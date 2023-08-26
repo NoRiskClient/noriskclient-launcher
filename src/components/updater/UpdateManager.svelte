@@ -34,7 +34,7 @@
     }
 
     return () => {
-      clearInterval(interval)
+      clearInterval(interval);
       unlisten();
     };
   });
@@ -63,6 +63,7 @@
     }
 
     .content {
+        background-color: var(--background-color);
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -76,14 +77,7 @@
     .content h1 {
         font-size: 20px;
         font-family: 'Press Start 2P', serif;
-        color: black;
-        text-shadow: 2px 2px #bcbcbc;
-    }
-
-    .content h2 {
-        font-size: 10px;
-        font-family: 'Press Start 2P', serif;
-        color: #565656;
-        text-shadow: 2px 2px #bcbcbc;
+        color: var(--font-color);
+        text-shadow: 2px 2px var(--font-color-text-shadow);
     }
 </style>
