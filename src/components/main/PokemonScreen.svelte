@@ -28,7 +28,6 @@
   let showCapeScreenHack = false;
   let showModrinthScreen = false;
   let showModrinthScreenHack = false;
-  let theme = "LIGHT";
   let log = [];
 
   listen("process-output", event => {
@@ -76,30 +75,6 @@
         console.error(reason);
       });
   });
-
-  onMount(() => {
-    let storedTheme = localStorage.getItem("theme");
-    if (storedTheme) {
-      if (storedTheme === "dark") {
-        window.document.body.classList.add("dark-mode");
-        theme = "DARK";
-      } else {
-        window.document.body.classList.remove("dark-mode");
-        theme = "LIGHT";
-      }
-      return;
-    }
-    localStorage.setItem("theme", "light");
-    theme = "LIGHT";
-  });
-
-  function toggleTheme() {
-    const isDark = window.document.body.classList.contains("dark-mode");
-    const newTheme = isDark ? "light" : "dark";
-    localStorage.setItem("theme", newTheme);
-    theme = newTheme.toUpperCase();
-    window.document.body.classList.toggle("dark-mode");
-  }
 
   onMount(async () => {
     await invoke("request_norisk_branches")
@@ -222,7 +197,7 @@
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
       <h1 on:click={handleOpenModScreen}>MODS</h1>
-      <h1 on:click={toggleTheme}>{theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
+      <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>
     <img transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="pokemon-title"

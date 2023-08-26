@@ -23,6 +23,8 @@ pub(crate) struct LauncherOptions {
     pub custom_java_path: String,
     #[serde(rename = "customJavaArgs", default)]
     pub custom_java_args: String,
+    #[serde(rename = "theme", default)]
+    pub theme: String,
     #[serde(rename = "preferredBranch")]
     pub preferred_branch: Option<String>,
     #[serde(rename = "currentUuid")]
@@ -59,6 +61,7 @@ impl Default for LauncherOptions {
             memory_percentage: 80, // 80% memory of computer allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
+            theme: "LIGHT".to_string(),
             current_uuid: None,
             accounts: Vec::new(),
             preferred_branch: None,
