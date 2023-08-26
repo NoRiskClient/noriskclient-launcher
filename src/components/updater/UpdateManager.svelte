@@ -3,23 +3,24 @@
   import { relaunch } from "@tauri-apps/api/process";
   import { onMount } from "svelte";
 
-  console.debug("Starting Update Checker...")
+  console.debug("Starting Update Checker...");
+  let dots = "";
 
   onMount(async () => {
 
-   /* const unlisten = await onUpdaterEvent(({ error, status }) => {
+    const unlisten = await onUpdaterEvent(({ error, status }) => {
       // This will log all updater events, including status updates and errors.
       console.log("Updater event", error, status);
     });
+
+    let interval;
 
     try {
       const { shouldUpdate, manifest } = await checkUpdate();
 
       if (shouldUpdate) {
-        // You could show a dialog asking the user if they want to install the update here.
-        console.log(
-          `Installing update ${manifest?.version}, ${manifest?.date}, ${manifest?.body}`,
-        );
+        interval = animateLoadingText();
+        console.debug(`Installing update ${manifest?.version}, ${manifest?.body}`);
 
         // Install the update. This will also restart the app on Windows!
         await installUpdate();
@@ -33,7 +34,56 @@
     }
 
     return () => {
+      clearInterval(interval)
       unlisten();
-    }; */
+    };
   });
+
+  function animateLoadingText() {
+    return setInterval(function() {
+      dots += " .";
+      if (dots.length > 6) {
+        dots = "";
+      }
+    }, 500);
+  }
 </script>
+
+<div class="black-bar" data-tauri-drag-region=""></div>
+<div class="content">
+  <h1>Updating Launcher {dots}</h1>
+</div>
+<div class="black-bar" data-tauri-drag-region=""></div>
+
+<style>
+    .black-bar {
+        width: 100%;
+        height: 10vh;
+        background-color: #151515;
+    }
+
+    .content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 80vh;
+        gap: 20px;
+        padding: 20px; /* Innenabstand für den Schlagschatten */
+    }
+
+    .content h1 {
+        font-size: 20px;
+        font-family: 'Press Start 2P', serif;
+        color: black;
+        text-shadow: 2px 2px #bcbcbc;
+    }
+
+    .content h2 {
+        font-size: 10px;
+        font-family: 'Press Start 2P', serif;
+        color: #565656;
+        text-shadow: 2px 2px #bcbcbc;
+    }
+</style>
