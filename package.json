@@ -1,0 +1,26 @@
+{
+  "name": "noriskclient",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^1.1.0",
+    "@tauri-apps/cli": "1.4.0",
+    "prettier": "^3.0.1",
+    "svelte": "^3.52.0",
+    "vite": "^3.2.3"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "1.4.0",
+    "nouislider": "^15.6.1",
+    "siema": "^1.5.1",
+    "svelte-tiny-virtual-list": "^2.0.5",
+    "tauri-plugin-fs-watch-api": "github:tauri-apps/tauri-plugin-fs-watch"
+  }
+}

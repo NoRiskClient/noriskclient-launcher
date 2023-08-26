@@ -1,0 +1,152 @@
+<script>
+  import ConfigSlider from "./inputs/ConfigSlider.svelte";
+  import { invoke } from "@tauri-apps/api";
+  import ConfigRadioButton from "./inputs/ConfigRadioButton.svelte";
+  import ConfigTextInput from "./inputs/ConfigTextInput.svelte";
+
+  export let showModal;
+  export let options;
+  export let dataFolderPath;
+
+  function hideSettings() {
+    showModal = false;
+    options.store();
+  }
+
+  let dialog; // HTMLDialogElement
+
+  $: if (dialog && showModal) dialog.showModal();
+
+  function clearData() {
+    invoke("clear_data", { options }).then(() => {
+      alert("Data cleared.");
+    }).catch(e => {
+      alert("Failed to clear data: " + e);
+      console.error(e);
+    });
+  }
+
+  function preventSelection(event) {
+    event.preventDefault();
+  }
+</script>
+
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<dialog
+  bind:this={dialog}
+  on:close={hideSettings}
+  on:click|self={() => dialog.close()}
+>
+  <div on:click|stopPropagation class="divider">
+    <div>
+      <div class="header-wrapper">
+        <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
+        <h1 class="nes-font red-text-clickable" on:click={hideSettings}>X</h1>
+      </div>
+      <hr>
+      <div class="settings-wrapper">
+        <ConfigRadioButton bind:value={options.keepLauncherOpen} text="Keep Launcher Open" />
+        <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
+        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
+                      step={1} />
+        <ConfigTextInput title="Java Path" placeHolder="Internal" />
+        <ConfigTextInput title="Data Folder" placeHolder={dataFolderPath} />
+      </div>
+    </div>
+    <!-- svelte-ignore a11y-autofocus -->
+    <div class="clear-data-button-wrapper">
+      <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR DATA</p>
+    </div>
+  </div>
+</dialog>
+
+<style>
+    .header-wrapper {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 1em;
+    }
+
+    .settings-wrapper {
+        display: flex;
+        flex-direction: column;
+        margin-top: 1.5em;
+        gap: 1em;
+    }
+
+    .divider {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+        padding: 1em;
+    }
+
+    dialog {
+        background-color: var(--background-color);
+        border: 5px solid black;
+        width: 30em;
+        height: 35em;
+        border-radius: 0.2em;
+        padding: 0;
+        position: fixed; /* Fixierte Positionierung */
+        top: 50%; /* 50% von oben */
+        left: 50%; /* 50% von links */
+        transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
+    }
+
+    dialog::backdrop {
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    dialog > div {
+        padding: 1em;
+    }
+
+    dialog[open]::backdrop {
+        animation: fade 0.2s ease-out;
+    }
+
+    @keyframes fade {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    button {
+        display: block;
+    }
+
+    .nes-font {
+        font-family: 'Press Start 2P', serif;
+        font-size: 30px;
+        user-select: none;
+        cursor: default;
+    }
+
+    .clear-data-button-wrapper {
+        display: flex;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Press Start 2P', serif;
+        font-size: 18px;
+        padding: 1em;
+        text-shadow: 2px 2px #6e0000;
+    }
+
+    .clear-data-button-wrapper p {
+        color: #ff0000;
+        padding: 0.3em;
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+
+    .clear-data-button-wrapper p:hover {
+        transform: scale(1.2);
+    }
+</style>
