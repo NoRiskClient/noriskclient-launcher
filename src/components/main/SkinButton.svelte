@@ -4,7 +4,7 @@
   import { createEventDispatcher } from "svelte";
   import { scale } from "svelte/transition";
   import { quintOut } from "svelte/easing";
-  import FallBackSkin from "../../images/fallback_skin_kopf.png"
+  import FallBackSkin from "../../images/fallback_skin_kopf.png";
 
   const dispatch = createEventDispatcher();
 
@@ -20,6 +20,7 @@
   }
 
   let showModal = false;
+  $: uuid = options.currentUuid
 
   const handleAddAccount = async () => {
     await invoke("login_norisk_microsoft").then((loginData) => {
@@ -51,11 +52,11 @@
     const resp = await fetch(src);
     const blob = await resp.blob();
 
-    return new Promise(function (resolve) {
+    return new Promise(function(resolve) {
       let reader = new FileReader();
       reader.readAsDataURL(blob);
       reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => console.error('Error: ', error);
+      reader.onerror = (error) => console.error("Error: ", error);
     });
   };
 </script>
@@ -65,9 +66,9 @@
   <div class="skin-kopf-container"
        on:mouseenter={handleSkinHover}
        on:mouseleave={handleSkinHoverOut}>
-    {#if options.currentUuid !== null}
+    {#if uuid !== null}
 
-      {#await preload("https://crafatar.com/avatars/"+options.currentUuid+"?overlay")}
+      {#await preload("https://crafatar.com/avatars/" + uuid + "?overlay")}
         <img class="skin-kopf"
              src={FallBackSkin}
              alt="Skin Kopf"
