@@ -110,9 +110,14 @@
 
     .crop {
         transform: scale(0.8);
+        padding: 10px;
+        width: max-content;
+        height: 280px;
     }
 
     .crop img {
+        width: 100%;
+        height: 100%;
         box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.75);
     }
 </style>

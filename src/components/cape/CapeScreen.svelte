@@ -90,10 +90,7 @@
   getNoRiskUserByUUID();
 </script>
 
-<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 <div class="wrapper">
-  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
-      on:click={handleNextRequest}><span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
   {#if currentRequest === 0}
     {#if !isLoading}
       <CapeEditor bind:options on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
@@ -103,7 +100,10 @@
       <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:options bind:capes />
     {/if}
   {/if}
+  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
+      on:click={handleNextRequest}><span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
 </div>
+<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 
 <style>
     .wrapper {
