@@ -89,7 +89,7 @@
 
     <div class="cape-slider-wrapper">
       {#if capes.length === 0}
-        <p class="fall-back-text">There are no capes here D:</p>
+        <p class="fall-back-text">No capes here D:</p>
       {/if}
 
       {#each visibleCapes as cape, index (cape.hash)}
