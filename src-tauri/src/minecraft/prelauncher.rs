@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::ptr::null;
 use std::sync::{Mutex, Arc};
 
 use anyhow::Result;
@@ -127,9 +128,18 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
-                    println!("downloading mod {} from {}", artifact, repository);
+                    let mut download_url: String = "".to_owned();
+                    if (url.clone().is_some()) {
+                        download_url = url.clone().unwrap();
+                    } else {
+                        let repository_url = manifest.repositories.get(repository).ok_or_else(|| LauncherError::InvalidVersionProfile(format!("There is no repository specified with the name {}", repository)))?;
+                        let maven_artifact_path = get_maven_artifact_path(artifact)?;
+                        download_url = format!("{}{}", repository_url, maven_artifact_path);
+                    }
 
-                    let retrieved_bytes = download_file(&format!("{}", url), |a, b| {
+                    println!("downloading mod {} from {}", artifact, download_url);
+
+                    let retrieved_bytes = download_file(&download_url, |a, b| {
                         progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskClientMods, get_progress(mod_idx, a, b), max));
                     }).await?;
 

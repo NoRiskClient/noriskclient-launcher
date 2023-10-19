@@ -277,7 +277,7 @@ impl LoaderMod {
 pub enum ModSource {
     #[serde(rename = "repository")]
     #[serde(rename_all = "camelCase")]
-    Repository { repository: String, artifact: String, url: String },
+    Repository { repository: String, artifact: String, url: Option<String> },
 }
 
 impl ModSource {
