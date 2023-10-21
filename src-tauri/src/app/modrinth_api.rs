@@ -156,6 +156,10 @@ impl ModrinthProject {
             file.filename.clone()
         }).unwrap_or("MOD_FALL_BACK".to_string());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
+        let url = self.files.first().map(|file| {
+            file.url.clone()
+        }).unwrap_or("MOD_FALL_BACK".to_string());
+
         return CustomMod {
             value: LoaderMod {
                 enabled,
@@ -164,6 +168,7 @@ impl ModrinthProject {
                 source: ModSource::Repository {
                     repository: "modrinth".to_string(),
                     artifact: repo_artifact,
+                    url: Some(url)
                 },
             },
             image_url: image_url.to_string(),
@@ -176,6 +181,10 @@ impl ModrinthProject {
             file.filename.clone()
         }).unwrap_or("MOD_FALL_BACK".to_string());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
+        let url = self.files.first().map(|file| {
+            file.url.clone()
+        }).unwrap_or("MOD_FALL_BACK".to_string());
+
         return LoaderMod {
             enabled,
             required,
@@ -183,6 +192,7 @@ impl ModrinthProject {
             source: ModSource::Repository {
                 repository: "modrinth".to_string(),
                 artifact: repo_artifact,
+                url: Some(url)
             },
         };
     }

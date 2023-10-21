@@ -277,13 +277,13 @@ impl LoaderMod {
 pub enum ModSource {
     #[serde(rename = "repository")]
     #[serde(rename_all = "camelCase")]
-    Repository { repository: String, artifact: String },
+    Repository { repository: String, artifact: String, url: Option<String> },
 }
 
 impl ModSource {
     pub fn get_slug(&self) -> String {
         match self {
-            ModSource::Repository { repository: _repository, artifact } => {
+            ModSource::Repository { repository: _repository, artifact, url } => {
                 let parts: Vec<&str> = artifact.split(":").collect();
                 if parts.len() > 1 {
                     parts[1].to_string()
@@ -298,7 +298,7 @@ impl ModSource {
     pub fn get_path(&self) -> Result<String> {
         Ok(
             match self {
-                ModSource::Repository { repository: _repository, artifact } => get_maven_artifact_path(artifact)?,
+                ModSource::Repository { repository: _repository, artifact, url } => get_maven_artifact_path(artifact)?,
                 _ => { "".to_string() }
             }
         )
