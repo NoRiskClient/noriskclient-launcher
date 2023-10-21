@@ -260,7 +260,7 @@
         <h2>|</h2>
         <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
         <h2>|</h2>
-        <h1 on:click={handleOpenCustomModsFolder}>Open Folder</h1>
+        <h1 on:click={handleOpenCustomModsFolder}>Custom</h1>
     </div>
     {#if currentTabIndex === 0}
         <ModrinthSearchBar on:search={searchMods} bind:searchTerm={searchterm}
@@ -299,7 +299,7 @@
     .navbar {
         display: flex;
         gap: 1em;
-        align-items: center;
+        justify-content: center;
     }
 
     .navbar h1 {
