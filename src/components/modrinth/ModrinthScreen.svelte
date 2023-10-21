@@ -280,7 +280,7 @@
             <VirtualList height="30em" items={[...customMods,...installedMods.mods].filter((mod) => {
                 let name = (mod?.value?.name ?? mod).toUpperCase()
                 console.debug("Name",name)
-                return name.endsWith(".JAR") && name.includes(filterterm.toUpperCase())
+                return (name.endsWith(".JAR") || name.endsWith(".DISABLED")) && name.includes(filterterm.toUpperCase())
             }).sort() } let:item>
                 {#if (typeof item === 'string' || item instanceof String)}
                     <CustomModItem on:delete={deleteCustomModFile(item)} on:togglemod={toggleCustomModFile(item)}
