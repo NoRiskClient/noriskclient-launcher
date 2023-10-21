@@ -17,6 +17,7 @@
         "removeFile": true,
         "renameFile": true,
         "scope": [
+          "**",
           "$APPDATA/**",
           "$APPDATA/*",
           "$APPDATA/",
