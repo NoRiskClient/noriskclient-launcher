@@ -54,6 +54,22 @@ impl LauncherOptions {
 
 impl Default for LauncherOptions {
     fn default() -> Self {
+        let mut theme = "";
+        let mode = dark_light::detect();
+        match mode {
+            // Dark mode
+            dark_light::Mode::Dark => {
+                theme = "DARK";
+            },
+            // Light mode
+            dark_light::Mode::Light => {
+                theme = "LIGHT";
+            },
+            // Unspecified
+            dark_light::Mode::Default => {
+                theme = "LIGHT";
+            },
+        }
         Self {
             keep_launcher_open: false,
             custom_data_path: String::new(),
@@ -61,7 +77,7 @@ impl Default for LauncherOptions {
             memory_percentage: 80, // 80% memory of computer allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
-            theme: "LIGHT".to_string(),
+            theme: theme.to_string(),
             current_uuid: None,
             accounts: Vec::new(),
             preferred_branch: None,
