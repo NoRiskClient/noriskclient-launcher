@@ -303,7 +303,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
 
 pub struct LaunchingParameter {
     pub memory: i64,
-    pub custom_data_path: Option<String>,
+    pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
     pub auth_player_name: String,
     pub auth_uuid: String,

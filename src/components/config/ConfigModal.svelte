@@ -18,23 +18,11 @@
   $: if (dialog && showModal) dialog.showModal();
 
   async function saveData() {
-    const customJavaPathInput = document.getElementById("customJavaPathInput")
-    const customDataFolderPathInput = document.getElementById("customDataFolderPathInput")
-    if (customJavaPathInput.value != options.customJavaPath) {
-      if (customJavaPathInput.value == 'Internal') {
-        customJavaPathInput.value = ""
-      } 
-      options.customJavaPath = customJavaPathInput.value;
-      console.log(`Set custom java path to "${customJavaPathInput.value ?? "DEFAULT"}"`)
-    }
-    if (customDataFolderPathInput.value != options.customDataPath) {
-      options.customDataPath = customDataFolderPathInput.value == dataFolderPath ? "" : customDataFolderPathInput.value;
-      console.log(`Set custom data folder path to "${customDataFolderPathInput.value == "" || customDataFolderPathInput.value == dataFolderPath ? "DEFAULT" : customDataFolderPathInput.value}"`)
-    }
-    options.store()
+    options.store();
   }
 
   async function clearData() {
+    // we need await!
     const confirm = await window.confirm("Are you sure you want to erase all saved data?");
     if (confirm) {
       invoke("clear_data", { options }).then(() => {
@@ -70,8 +58,8 @@
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
-        <ConfigTextInput title="Java Path" placeHolder="{options.customJavaPath != "" ? options.customJavaPath : "Internal"}" fieldId="customJavaPathInput" />
-        <ConfigTextInput title="Data Folder" placeHolder={options.customDataPath != "" ? options.customDataPath : dataFolderPath} fieldId="customDataFolderPathInput" />
+        <ConfigTextInput title="Java Path" bind:value={options.customJavaPath} />
+        <ConfigTextInput title="Data Folder" bind:value={options.dataPath} />
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
