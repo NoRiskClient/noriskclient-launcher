@@ -28,7 +28,7 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input autofocus={false} id={fieldId} value={placeHolder == 'Internal' ? '' : placeHolder} placeholder={placeHolder != 'Internal' ? '' : placeHolder} type="text" class="nes-input">
+    <input autofocus={false} id={fieldId} value={placeHolder} type="text" class="nes-input" disabled>
     <button on:click={selectFolderPath}>📂</button>
   </div>
 </div>
@@ -51,6 +51,10 @@
       border: none;
       text-align: center;
       padding: 3.5px;
+    }
+
+    button:hover {
+      cursor: pointer;
     }
       
     .input-container {
