@@ -480,6 +480,8 @@ async fn clear_data(options: LauncherOptions) -> Result<(), String> {
         None
     }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
 
+    let _ = store_options(LauncherOptions::default()).await;
+
     ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
         .iter()
         .map(|dir| data_directory.join(dir))

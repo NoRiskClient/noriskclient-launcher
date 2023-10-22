@@ -21,6 +21,9 @@
     const customJavaPathInput = document.getElementById("customJavaPathInput")
     const customDataFolderPathInput = document.getElementById("customDataFolderPathInput")
     if (customJavaPathInput.value != options.customJavaPath) {
+      if (customJavaPathInput.value == 'Internal') {
+        customJavaPathInput.value = ""
+      } 
       options.customJavaPath = customJavaPathInput.value;
       console.log(`Set custom java path to "${customJavaPathInput.value ?? "DEFAULT"}"`)
     }
@@ -34,6 +37,7 @@
   function clearData() {
     invoke("clear_data", { options }).then(() => {
       alert("Data cleared.");
+      options.reload()
     }).catch(e => {
       alert("Failed to clear data: " + e);
       console.error(e);
