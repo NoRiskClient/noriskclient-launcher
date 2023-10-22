@@ -1,5 +1,5 @@
 ## Todos
-- [ ] Drag and Drop Custom Mod files
+- [x] Drag and Drop Custom Mod files
 - [x] mc.logs api integration
 - [ ] Featured Mods
 - [ ] Set Custom Javapath and Mod Folder
