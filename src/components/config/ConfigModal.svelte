@@ -34,14 +34,17 @@
     options.store()
   }
 
-  function clearData() {
-    invoke("clear_data", { options }).then(() => {
-      alert("Data cleared.");
-      options.reload()
-    }).catch(e => {
-      alert("Failed to clear data: " + e);
-      console.error(e);
-    });
+  async function clearData() {
+    const confirm = await window.confirm("Are you sure you want to erase all saved data?");
+    if (confirm) {
+      invoke("clear_data", { options }).then(() => {
+        alert("Data cleared.");
+        options.reload()
+      }).catch(e => {
+        alert("Failed to clear data: " + e);
+        console.error(e);
+      });
+    }
   }
 
   function preventSelection(event) {
