@@ -1,7 +1,8 @@
-use std::{sync::{Arc, Mutex}, thread};
+use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
 use directories::UserDirs;
 use futures::TryFutureExt;
 
+use tokio::fs;
 use tracing::{error, info, debug};
 use tauri::{Manager, Window};
 use tauri::api::dialog::{FileDialogBuilder};
@@ -23,6 +24,13 @@ struct RunnerInstance {
 
 struct AppState {
     runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
+}
+
+
+#[derive(serde::Deserialize)]
+struct FileData {
+    name: String,
+    location: String,
 }
 
 #[tauri::command]
@@ -239,6 +247,24 @@ async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_versi
     }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
     let custom_mod_folder = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version));
     return custom_mod_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
+    let data_directory = if !options.custom_data_path.is_empty() {
+        Some(options.custom_data_path)
+    } else {
+        None
+    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
+    let file_path = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+
+    println!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -523,6 +549,7 @@ pub fn gui_main() {
             clear_data,
             get_installed_mods,
             get_custom_mods_folder,
+            save_custom_mods_to_folder,
             install_mod_and_dependencies,
             get_mod_version,
             upload_logs,
