@@ -3,7 +3,7 @@
 - [x] mc.logs api integration
 - [ ] Featured Mods
 - [ ] Set Custom Javapath and Mod Folder
-- [ ] Save Light/Darkmode - Use Default OS Setting
+- [x] Save Light/Darkmode - Use Default OS Setting
 
 ## Issues
 If you notice any bugs or missing features, you can let us know by opening an issue [here](https://github.com/CCBlueX/LiquidLauncher/issues).
