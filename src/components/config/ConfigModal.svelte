@@ -9,21 +9,42 @@
   export let dataFolderPath;
 
   function hideSettings() {
+    saveData()
     showModal = false;
-    options.store();
   }
 
   let dialog; // HTMLDialogElement
 
   $: if (dialog && showModal) dialog.showModal();
 
-  function clearData() {
-    invoke("clear_data", { options }).then(() => {
-      alert("Data cleared.");
-    }).catch(e => {
-      alert("Failed to clear data: " + e);
-      console.error(e);
-    });
+  async function saveData() {
+    const customJavaPathInput = document.getElementById("customJavaPathInput")
+    const customDataFolderPathInput = document.getElementById("customDataFolderPathInput")
+    if (customJavaPathInput.value != options.customJavaPath) {
+      if (customJavaPathInput.value == 'Internal') {
+        customJavaPathInput.value = ""
+      } 
+      options.customJavaPath = customJavaPathInput.value;
+      console.log(`Set custom java path to "${customJavaPathInput.value ?? "DEFAULT"}"`)
+    }
+    if (customDataFolderPathInput.value != options.customDataPath) {
+      options.customDataPath = customDataFolderPathInput.value == dataFolderPath ? "" : customDataFolderPathInput.value;
+      console.log(`Set custom data folder path to "${customDataFolderPathInput.value == "" || customDataFolderPathInput.value == dataFolderPath ? "DEFAULT" : customDataFolderPathInput.value}"`)
+    }
+    options.store()
+  }
+
+  async function clearData() {
+    const confirm = await window.confirm("Are you sure you want to erase all saved data?");
+    if (confirm) {
+      invoke("clear_data", { options }).then(() => {
+        alert("Data cleared.");
+        options.reload()
+      }).catch(e => {
+        alert("Failed to clear data: " + e);
+        console.error(e);
+      });
+    }
   }
 
   function preventSelection(event) {
@@ -41,7 +62,7 @@
     <div>
       <div class="header-wrapper">
         <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
-        <h1 class="nes-font red-text-clickable" on:click={hideSettings}>X</h1>
+        <h1 class="nes-font red-text-clickable close-button" on:click={hideSettings}>X</h1>
       </div>
       <hr>
       <div class="settings-wrapper">
@@ -49,13 +70,13 @@
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
-        <ConfigTextInput title="Java Path" placeHolder="Internal" />
-        <ConfigTextInput title="Data Folder" placeHolder={dataFolderPath} />
+        <ConfigTextInput title="Java Path" placeHolder="{options.customJavaPath != "" ? options.customJavaPath : "Internal"}" fieldId="customJavaPathInput" />
+        <ConfigTextInput title="Data Folder" placeHolder={options.customDataPath != "" ? options.customDataPath : dataFolderPath} fieldId="customDataFolderPathInput" />
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
     <div class="clear-data-button-wrapper">
-      <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR DATA</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR DATA</p>
     </div>
   </div>
 </dialog>
@@ -66,6 +87,15 @@
         flex-direction: row;
         justify-content: space-between;
         padding: 1em;
+    }
+
+    .close-button {
+      transition: transform 0.3s;
+    }
+
+    .close-button:hover {
+      transition: transform 0.3s;
+      transform: scale(1.2);
     }
 
     .settings-wrapper {
@@ -117,10 +147,6 @@
         }
     }
 
-    button {
-        display: block;
-    }
-
     .nes-font {
         font-family: 'Press Start 2P', serif;
         font-size: 30px;
@@ -137,9 +163,9 @@
         font-size: 18px;
         padding: 1em;
         text-shadow: 2px 2px #6e0000;
-    }
-
-    .clear-data-button-wrapper p {
+      }
+      
+      .clear-data-button-wrapper p {
         color: #ff0000;
         padding: 0.3em;
         cursor: pointer;

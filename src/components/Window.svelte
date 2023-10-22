@@ -12,7 +12,7 @@
   let showUpdateScreen = null;
 
   onMount(async () => {
-    await invoke("get_options").then(async (result) => {
+    const reload = async () => await invoke("get_options").then(async (result) => {
       options = result;
       accounts = options.accounts;
 
@@ -24,6 +24,8 @@
         console.debug("storing options", options);
         invoke("store_options", { options }).catch(e => console.error(e));
       };
+
+      options.reload = reload;
 
       options.toggleTheme = function() {
         if (options.theme === "LIGHT") {
@@ -71,6 +73,7 @@
         console.error(error);
       }
     });
+    reload()
   });
 
 
