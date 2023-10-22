@@ -40,17 +40,17 @@
   }
 
   function getIndex(hash) {
-    return capes.findIndex(value => value.hash === hash);
+    return capes.findIndex(value => value._id === hash);
   }
 
   let responseData = "";
 
   async function getNameByUUID(uuid) {
     console.debug("UUID", uuid);
-    await invoke("get_norisk_user_by_uuid", {
+    await invoke("mc_name_by_uuid", {
       uuid: uuid,
     }).then((user) => {
-      responseData = user?.ign ?? "Unknown";
+      responseData = user ?? "Unknown";
     }).catch(e => {
       responseData = "Unknown";
     });
@@ -92,9 +92,9 @@
         <p class="fall-back-text">No capes here D:</p>
       {/if}
 
-      {#each visibleCapes as cape, index (cape.hash)}
+      {#each visibleCapes as cape, index (cape._id)}
         <div class="image-wrapper">
-          <h1>{getIndex(cape.hash) + 1}.</h1>
+          <h1>{getIndex(cape._id) + 1}.</h1>
           <div
               class="crop"
               on:mouseenter={() =>{
@@ -102,8 +102,8 @@
                             return getNameByUUID(cape.firstSeen); }}
               on:mouseleave={() => cape.hovered = false}
           >
-            <img src={`https://dl.hglabor.de/capes/prod/${cape.hash}.png`} alt="Cape Image">
-            <div on:click={handleEquipCape(cape.hash)} class="equip-text">
+            <img src={`https://dl.hglabor.de/capes/prod/${cape._id}.png`} alt="Cape Image">
+            <div on:click={handleEquipCape(cape._id)} class="equip-text">
               EQUIP
             </div>
           </div>

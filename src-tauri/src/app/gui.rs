@@ -9,7 +9,7 @@ use tauri::api::dialog::blocking::message;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{Branches, Changelog, LaunchManifest, LoginData, NoRiskLaunchManifest};
-use crate::app::cape_api::{Cape, CapeApiEndpoints, NoRiskUserMinimal};
+use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
@@ -444,14 +444,28 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
 }
 
 #[tauri::command]
-async fn get_norisk_user_by_uuid(uuid: &str) -> Result<NoRiskUserMinimal, ()> {
-    let response = CapeApiEndpoints::norisk_user_by_uuid(uuid).await;
+async fn mc_name_by_uuid(uuid: &str) -> Result<String, ()> {
+    let response = CapeApiEndpoints::mc_name_by_uuid(uuid).await;
     match response {
         Ok(user) => {
             Ok(user)
         }
         Err(err) => {
-            debug!("Error Requesting UUID {:?}",err);
+            debug!("Error Requesting Mc Name {:?}",err);
+            Err(())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, ()> {
+    let response = CapeApiEndpoints::cape_hash_by_uuid(uuid).await;
+    match response {
+        Ok(user) => {
+            Ok(user)
+        }
+        Err(err) => {
+            debug!("Error Requesting Cape Hash {:?}",err);
             Err(())
         }
     }
@@ -510,7 +524,8 @@ pub fn gui_main() {
             login_norisk_microsoft,
             upload_cape,
             equip_cape,
-            get_norisk_user_by_uuid,
+            get_cape_hash_by_uuid,
+            mc_name_by_uuid,
             delete_cape,
             search_mods,
             run_client,

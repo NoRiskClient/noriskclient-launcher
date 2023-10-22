@@ -30,7 +30,7 @@
           alltime: alltime,
           limit: 30,
         }).then((result) => {
-          console.debug("Requesting Trending capes", result);
+          console.log("Requesting Trending capes", result);
           capes = result;
         }).catch(e => {
           console.error(e);
@@ -74,10 +74,14 @@
 
   async function getNoRiskUserByUUID() {
     if (options.currentUuid !== null) {
-      await invoke("get_norisk_user_by_uuid", {
+      await invoke("get_cape_hash_by_uuid", {
         uuid: options.currentUuid,
       }).then((user) => {
-        capeHash = user.cape;
+        if (user) {
+          capeHash = user;
+        } else {
+          console.log("No Cape Found");
+        }
         isLoading = false;
       }).catch(e => {
         alert("Failed to Request User by UUID: " + e);
