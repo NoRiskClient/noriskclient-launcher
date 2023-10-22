@@ -9,6 +9,7 @@
   export let dataFolderPath;
 
   function hideSettings() {
+    saveData()
     showModal = false;
   }
 
@@ -28,7 +29,6 @@
       console.log(`Set custom data folder path to "${customDataFolderPathInput.value == "" || customDataFolderPathInput.value == dataFolderPath ? "DEFAULT" : customDataFolderPathInput.value}"`)
     }
     options.store()
-    hideSettings()
   }
 
   function clearData() {
@@ -68,13 +68,8 @@
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
-    <div class="action-buttons-wrapper">
-      <div class="save-data-button-wrapper">
-        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={saveData}>SAVE</p>
-      </div>
-      <div class="clear-data-button-wrapper">
+    <div class="clear-data-button-wrapper">
         <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR DATA</p>
-      </div>
     </div>
   </div>
 </dialog>
@@ -152,11 +147,6 @@
         cursor: default;
     }
 
-    .action-buttons-wrapper {
-      display: flex;
-      justify-content: center;
-    }
-
     .clear-data-button-wrapper {
         display: flex;
         align-content: center;
@@ -176,28 +166,6 @@
     }
 
     .clear-data-button-wrapper p:hover {
-        transform: scale(1.2);
-    }
-    
-    .save-data-button-wrapper {
-        display: flex;
-        align-content: center;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Press Start 2P', serif;
-        font-size: 18px;
-        padding: 1em;
-        text-shadow: 2px 2px #086b08;
-      }
-      
-      .save-data-button-wrapper p {
-        color: #00ff00;
-        padding: 0.3em;
-        cursor: pointer;
-        transition: transform 0.3s;
-    }
-
-    .save-data-button-wrapper p:hover {
         transform: scale(1.2);
     }
 </style>
