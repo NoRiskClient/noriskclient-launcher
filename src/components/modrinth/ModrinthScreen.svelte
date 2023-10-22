@@ -238,12 +238,16 @@
         })
         if (locations instanceof Array && locations.length > 0) {
             locations.forEach(async (location) => {
-                console.log(location)
+                if (!location.endsWith(".jar")) {
+                    return;
+                }
+                const fileName = location.split("\\")[location.split("\\").length - 1];
+                console.log(`Installing custom Mod ${fileName}`)
                 await invoke("save_custom_mods_to_folder", {
                     options: options,
                     branch: launchManifest.build.branch,
                     mcVersion: launchManifest.build.mcVersion,
-                    file: {name: location.split("\\")[location.split("\\").length - 1], location: location}
+                    file: {name: fileName, location: location}
                 }).catch((error) => {
                     alert(error)
                 });
