@@ -1,7 +1,7 @@
 <script>
     import {invoke} from "@tauri-apps/api";
     import {renameFile, removeFile} from '@tauri-apps/api/fs';
-    import {open as shellOpen} from "@tauri-apps/api/shell";
+    import {open} from "@tauri-apps/api/dialog";
     import VirtualList from "../utils/VirtualList.svelte";
     import ModrinthSearchBar from "./ModrinthSearchBar.svelte";
     import ModrinthResultItem from "./ModrinthResultItem.svelte";
@@ -229,18 +229,30 @@
         })
     }
 
-    async function handleOpenCustomModsFolder() {
+    async function handleSelectCustomMods() {
         console.debug("Launch", launchManifest)
-        await invoke("get_custom_mods_folder", {
-            options: options,
-            branch: launchManifest.build.branch,
-            mcVersion: launchManifest.build.mcVersion
-        }).then((folder) => {
-            console.debug("Folder", folder)
-            shellOpen(folder)
-        }).catch((error) => {
-            alert(error)
+        try {
+        const locations = await open({
+            defaultPath: '',
+            multiple: true,
         })
+        if (locations instanceof Array && locations.length > 0) {
+            locations.forEach(async (location) => {
+                console.log(location)
+                await invoke("save_custom_mods_to_folder", {
+                    options: options,
+                    branch: launchManifest.build.branch,
+                    mcVersion: launchManifest.build.mcVersion,
+                    file: {name: location.split("\\")[location.split("\\").length - 1], location: location}
+                }).catch((error) => {
+                    alert(error)
+                });
+                getCustomModsFilenames()
+            })
+        }
+        } catch (e) {
+            alert("Failed to select file using dialog")
+        }
     }
 
 
@@ -260,7 +272,7 @@
         <h2>|</h2>
         <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
         <h2>|</h2>
-        <h1 on:click={handleOpenCustomModsFolder}>Custom</h1>
+        <h1 on:click={handleSelectCustomMods}>Custom</h1>
     </div>
     {#if currentTabIndex === 0}
         <ModrinthSearchBar on:search={searchMods} bind:searchTerm={searchterm}
@@ -276,7 +288,7 @@
     {:else if currentTabIndex === 1}
         <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
                            placeHolder="Filter installed Mods..."/>
-        {#if installedMods.mods.length !== 0}
+        {#if installedMods.mods.length > 0 || customMods.length > 0}
             <VirtualList height="30em" items={[...customMods,...installedMods.mods].filter((mod) => {
                 let name = (mod?.value?.name ?? mod).toUpperCase()
                 console.debug("Name",name)
