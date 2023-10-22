@@ -9,6 +9,7 @@
     import InstalledModItem from "./InstalledModItem.svelte";
     import CustomModItem from "./CustomModItem.svelte";
     import {watch} from "tauri-plugin-fs-watch-api";
+    import { listen } from '@tauri-apps/api/event';
 
     const dispatch = createEventDispatcher()
 
@@ -22,9 +23,15 @@
     let filterterm = "";
     let currentTabIndex = 0;
     let fileWatcher;
-    let customModsFolder;
 
     console.debug("Branch", currentBranch)
+
+    listen('tauri://file-drop', files => {
+        if (currentTabIndex != 1) {
+            return;
+        }
+        installCustomMods(files.payload)
+    })
 
     // check if an element exists in array using a comparer function
     // comparer : function(currentElement)
@@ -232,31 +239,35 @@
     async function handleSelectCustomMods() {
         console.debug("Launch", launchManifest)
         try {
-        const locations = await open({
-            defaultPath: '',
-            multiple: true,
-        })
-        if (locations instanceof Array && locations.length > 0) {
-            locations.forEach(async (location) => {
-                if (!location.endsWith(".jar")) {
-                    return;
-                }
-                const fileName = location.split("\\")[location.split("\\").length - 1];
-                console.log(`Installing custom Mod ${fileName}`)
-                await invoke("save_custom_mods_to_folder", {
-                    options: options,
-                    branch: launchManifest.build.branch,
-                    mcVersion: launchManifest.build.mcVersion,
-                    file: {name: fileName, location: location}
-                }).catch((error) => {
-                    alert(error)
-                });
-                getCustomModsFilenames()
+            const locations = await open({
+                defaultPath: '',
+                multiple: true,
             })
-        }
+            if (locations instanceof Array) {
+                installCustomMods(locations)
+            }
         } catch (e) {
             alert("Failed to select file using dialog")
         }
+    }
+
+    async function installCustomMods(locations) {
+        locations.forEach(async (location) => {
+            if (!location.endsWith(".jar")) {
+                return;
+            }
+            const fileName = location.split("\\")[location.split("\\").length - 1];
+            console.log(`Installing custom Mod ${fileName}`)
+            await invoke("save_custom_mods_to_folder", {
+                options: options,
+                branch: launchManifest.build.branch,
+                mcVersion: launchManifest.build.mcVersion,
+                file: {name: fileName, location: location}
+            }).catch((error) => {
+                alert(error)
+            });
+            getCustomModsFilenames()
+        })
     }
 
 
