@@ -242,6 +242,7 @@
             const locations = await open({
                 defaultPath: '',
                 multiple: true,
+                filters: [{name:"Mods", extensions: ["jar"]}]
             })
             if (locations instanceof Array) {
                 installCustomMods(locations)
