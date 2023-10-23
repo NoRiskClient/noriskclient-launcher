@@ -30,10 +30,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
     progress.progress_update(ProgressUpdate::set_max());
     progress.progress_update(ProgressUpdate::SetProgress(0));
 
-    let data_directory = launching_parameter.custom_data_path
-        .clone()
-        .map(|x| x.into())
-        .unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
+    let data_directory = launching_parameter.data_path.clone();
 
     // Copy retrieve and copy mods from manifest
     clear_mods(&data_directory, &launch_manifest).await?;

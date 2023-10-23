@@ -1,9 +1,12 @@
-use std::{path::Path, collections::HashMap};
+use std::{collections::HashMap, path::Path};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+
 use crate::app::api::LoginData;
+use crate::LAUNCHER_DIRECTORY;
 
 fn default_concurrent_downloads() -> i32 {
     10
@@ -13,8 +16,8 @@ fn default_concurrent_downloads() -> i32 {
 pub(crate) struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
-    #[serde(rename = "customDataPath", default)]
-    pub custom_data_path: String,
+    #[serde(rename = "dataPath")]
+    pub data_path: String,
     #[serde(rename = "showNightlyBuilds")]
     pub show_nightly_builds: bool,
     #[serde(rename = "memoryPercentage")]
@@ -50,6 +53,13 @@ impl LauncherOptions {
         fs::write(app_data.join("options.json"), serde_json::to_string_pretty(&self)?).await?;
         Ok(())
     }
+
+    pub fn data_path_buf(&self) -> PathBuf {
+        if self.data_path.is_empty() {
+            return LAUNCHER_DIRECTORY.data_dir().to_path_buf();
+        }
+        PathBuf::from(&self.data_path)
+    }
 }
 
 impl Default for LauncherOptions {
@@ -72,7 +82,7 @@ impl Default for LauncherOptions {
         }
         Self {
             keep_launcher_open: false,
-            custom_data_path: String::new(),
+            data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
             show_nightly_builds: false,
             memory_percentage: 80, // 80% memory of computer allocated to game
             custom_java_path: String::new(),
