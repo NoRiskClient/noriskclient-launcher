@@ -89,7 +89,7 @@
         console.debug("Slug", slug)
         await invoke("get_mod_version", {
             slug: slug,
-            params: `?game_versions=["1.20.1"]`,
+            params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
         }).then((result) => {
             console.debug("Mod Version", result);
         }).catch((err) => {
@@ -115,7 +115,7 @@
         mods = mods
         await invoke("install_mod_and_dependencies", {
             slug: mod.slug,
-            params: `?game_versions=["1.20.1"]&loaders=["fabric"]`,
+            params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
             requiredMods: launchManifest.mods
         }).then((result) => {
             result.image_url = mod.icon_url
@@ -149,7 +149,7 @@
         await invoke("search_mods", {
             params: {
                 //TODO mc version
-                facets: `[["categories:fabric"], ["versions:1.20.1"], ["project_type:mod"]]`,
+                facets: `[["categories:fabric"], ["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"]]`,
                 limit: 30,
                 query: searchterm,
             },
