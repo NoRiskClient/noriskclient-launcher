@@ -240,7 +240,7 @@
         console.debug("Launch", launchManifest)
         try {
             const locations = await open({
-                defaultPath: '',
+                defaultPath: '/',
                 multiple: true,
                 filters: [{name:"Mods", extensions: ["jar"]}]
             })
@@ -257,7 +257,14 @@
             if (!location.endsWith(".jar")) {
                 return;
             }
-            const fileName = location.split("\\")[location.split("\\").length - 1];
+            let splitter = ""
+            if (location.split("/")[0] == "") {
+                splitter = "/"
+            } else {
+                splitter = "\\"
+            }
+            console.log(location.split(splitter))
+            const fileName = location.split(splitter)[location.split(splitter).length - 1];
             console.log(`Installing custom Mod ${fileName}`)
             await invoke("save_custom_mods_to_folder", {
                 options: options,
