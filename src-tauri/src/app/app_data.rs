@@ -55,6 +55,9 @@ impl LauncherOptions {
     }
 
     pub fn data_path_buf(&self) -> PathBuf {
+        if self.data_path.is_empty() {
+            return LAUNCHER_DIRECTORY.data_dir().to_path_buf();
+        }
         PathBuf::from(&self.data_path)
     }
 }
