@@ -1,22 +1,20 @@
 use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
 use directories::UserDirs;
-use futures::TryFutureExt;
-
-use tokio::fs;
+use reqwest::{multipart::{Form, Part}, header::{HeaderMap, CONTENT_TYPE, CONTENT_LENGTH, HeaderValue}};
+use tokio::{fs, io::AsyncReadExt};
 use tracing::{error, info, debug};
 use tauri::{Manager, Window};
-use tauri::api::dialog::{FileDialogBuilder};
 use tauri::api::dialog::blocking::message;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
-use crate::app::api::{Branches, Changelog, LaunchManifest, LoginData, NoRiskLaunchManifest};
+use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, Build, LoaderMod}, app_data::LauncherOptions};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::LauncherOptions};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -31,6 +29,23 @@ struct AppState {
 struct FileData {
     name: String,
     location: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MinecraftProfile {
+    properties: Vec<MinecraftProfileProperty>,
+}
+
+#[derive(serde::Deserialize)]
+struct MinecraftProfileProperty {
+    name: String,
+    value: String,
+}
+
+#[derive(serde::Serialize)]
+struct NewMinecraftSkinBody {
+    variant: String,
+    file: Vec<u8>,
 }
 
 #[tauri::command]
@@ -285,6 +300,89 @@ async fn store_installed_mods(branch: &str, options: LauncherOptions, installed_
             Err(err.to_string())
         }
     };
+}
+
+#[tauri::command]
+async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
+    let minecraft_profile: Result<MinecraftProfile, reqwest::Error> = HTTP_CLIENT.get(format!("https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid))
+        .send().await
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .error_for_status()
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .json().await;
+        
+
+    match minecraft_profile {
+        Ok(profile) => {
+            let mut textures: Vec<String> = vec![];
+            for property in profile.properties.iter() {
+                if property.name == "textures" {
+                    textures.push(property.value.clone())
+                }
+            }
+            Ok(textures)
+        },
+        Err(_) => Err("Failed to retrieve Minecraft profile".to_string()), // You can provide a custom error message here.
+    }
+}
+
+#[tauri::command]
+async fn save_player_skin(file_data: String, slim: bool, access_token: String) -> Result<(), String> {
+    let buffer = match base64::decode(&file_data) {
+        Ok(data) => data,
+        Err(err) => return Err(format!("Error decoding base64 data: {}", err.to_string())),
+    };
+
+    let mut form = Form::new()
+        .text("variant", if slim { "slim".to_owned() } else { "classic".to_owned() })
+        .part("file", Part::bytes(buffer.clone()));
+
+    let boundary = format!("--------------------------{}", chrono::Utc::now().timestamp_nanos());
+
+    let content_length = buffer.clone().len() + boundary.len() + 10;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_str(&format!("multipart/form-data; boundary={}", boundary)).unwrap(),
+    );
+
+    headers.insert(
+        CONTENT_LENGTH,
+        HeaderValue::from_str(&content_length.to_string()).unwrap(),
+    );
+
+    let saved_cape: Result<(), reqwest::Error> = HTTP_CLIENT.post("https://api.minecraftservices.com/minecraft/profile/skins")
+        .bearer_auth(&access_token)
+        .headers(headers)
+        .multipart(form)
+        .send().await
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .error_for_status()
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .json().await;
+        
+
+    match saved_cape {
+        Ok(()) => Ok(()),
+        Err(_) => Err("Failed to save new skin".to_string()), // You can provide a custom error message here.
+    }
+}
+
+#[tauri::command]
+async fn read_local_skin_file(location: String) -> Result<String, String> {
+    match fs::File::open(&location).await {
+        Ok(mut file) => {
+            let mut buffer = Vec::new();
+            if let Err(err) = file.read_to_end(&mut buffer).await {
+                return Err(format!("Failed to read the file: {}", err));
+            }
+            Ok(base64::encode(buffer))
+        },
+        Err(err) => {
+            Err(format!("Failed to open the file: {}", err))
+        }
+    }
 }
 
 #[tauri::command]
@@ -552,6 +650,9 @@ pub fn gui_main() {
             login_norisk_microsoft,
             upload_cape,
             equip_cape,
+            get_player_skins,
+            save_player_skin,
+            read_local_skin_file,
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
             delete_cape,
