@@ -1,22 +1,21 @@
-use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
+use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
+
 use directories::UserDirs;
 use futures::TryFutureExt;
-
-use tokio::fs;
-use tracing::{error, info, debug};
 use tauri::{Manager, Window};
-use tauri::api::dialog::{FileDialogBuilder};
 use tauri::api::dialog::blocking::message;
+use tokio::fs;
+use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
-use crate::app::api::{Branches, Changelog, LaunchManifest, LoginData, NoRiskLaunchManifest};
+use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, Build, LoaderMod}, app_data::LauncherOptions};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::LauncherOptions};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -235,12 +234,7 @@ async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_versi
 
 #[tauri::command]
 async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-    let file_path = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+    let file_path = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
 
     println!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
 
