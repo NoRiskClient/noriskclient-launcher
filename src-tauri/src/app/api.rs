@@ -65,7 +65,7 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", "https://api.hglabor.de", "api/v1", endpoint);
+        let url = format!("{}/{}/{}", "https://api.norisk.gg", "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
@@ -76,7 +76,7 @@ impl ApiEndpoints {
     }
 
     pub async fn post_from_refresh_endpoint<T: DeserializeOwned>(endpoint: &str, request_body: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", "https://api.hglabor.de", "api/v1", endpoint);
+        let url = format!("{}/{}/{}", "https://api.norisk.gg", "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .body(request_body.to_string())
@@ -89,7 +89,7 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn post_from_await_endpoint<T: DeserializeOwned>(endpoint: &str, id: u32) -> Result<T> {
-        let url = format!("{}/{}/{}?{}={}", "https://api.hglabor.de", "api/v1", endpoint, "id", id);
+        let url = format!("{}/{}/{}?{}={}", "https://api.norisk.gg", "api/v1", endpoint, "id", id);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
