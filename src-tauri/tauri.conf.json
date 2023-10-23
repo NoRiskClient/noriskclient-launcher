@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "NoRiskClient",
-    "version": "0.2.3"
+    "version": "0.2.4"
   },
   "tauri": {
     "allowlist": {
@@ -17,6 +17,7 @@
         "removeFile": true,
         "renameFile": true,
         "scope": [
+          "**",
           "$APPDATA/**",
           "$APPDATA/*",
           "$APPDATA/",

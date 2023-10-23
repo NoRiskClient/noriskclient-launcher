@@ -24,7 +24,7 @@ impl CapeApiEndpoints {
                 let image_bytes = response.bytes().await;
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("https://api.hglabor.de/api/v1/capes/cape?token={}", token);
+                let url = format!("https://api.norisk.gg/cosmetics/cape/{}", token);
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
@@ -69,7 +69,7 @@ impl CapeApiEndpoints {
                 file.read_to_end(&mut image_data).expect("Error Reading File");
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("https://api.hglabor.de/api/v1/capes/cape?token={}", token);
+                let url = format!("https://api.norisk.gg/cosmetics/cape/{}", token);
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
@@ -105,18 +105,25 @@ impl CapeApiEndpoints {
         }
     }
 
-    pub async fn norisk_user_by_uuid(uuid: &str) -> Result<NoRiskUserMinimal, Box<dyn Error>> {
-        debug!("Requesting NoRisk User {}",uuid);
-        let url = format!("https://api.hglabor.de/api/v1/user/byUUID?uuid={}", uuid);
+    pub async fn mc_name_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
+        debug!("Requesting Minecraft Username {}",uuid);
+        let url = format!("  https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid);
+        let response = HTTP_CLIENT.get(url).send().await?;
+        let response_text = response.json::<McProfile>().await?;
+        Ok(response_text.name)
+    }
+
+    pub async fn cape_hash_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
+        debug!("Requesting Cape Hash {}",uuid);
+        let url = format!("https://api.norisk.gg/cosmetics/user/{}/cape", uuid);
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.text().await?;
-        let user: NoRiskUserMinimal = serde_json::from_str(&response_text)?;
-        Ok(user)
+        Ok(response_text)
     }
 
     pub async fn delete_cape(norisk_token: &str) -> Result<String, String> {
         // Baue die URL mit dem Token als Query-Parameter
-        let url = format!("https://api.hglabor.de/api/v1/capes/cape?token={}", norisk_token);
+        let url = format!("https://api.norisk.gg/cosmetics/cape/{}", norisk_token);
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
@@ -145,7 +152,7 @@ impl CapeApiEndpoints {
 
     pub async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Trending Capes...");
-        let url = format!("https://api.hglabor.de/api/v1/capes/trending?token={}&alltime={}&limit={}", norisk_token, alltime, limit);
+        let url = format!("https://api.norisk.gg/cosmetics/cape/{}/trending?alltime={}&limit={}", norisk_token, alltime, limit);
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.text().await?;
         let trending_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
@@ -154,7 +161,7 @@ impl CapeApiEndpoints {
 
     pub async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
-        let url = format!("https://api.hglabor.de/api/v1/capes/owned?token={}&limit={}", norisk_token, limit);
+        let url = format!("https://api.norisk.gg/cosmetics/cape/{}/owned?limit={}", norisk_token, limit);
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.text().await?;
         let owned_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
@@ -211,21 +218,14 @@ impl CapeApiEndpoints {
     }
 }
 
-fn default_rank() -> String {
-    String::from("NORMIE")
-}
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NoRiskUserMinimal {
-    pub uuid: String,
-    pub ign: String,
-    #[serde(default = "default_rank")]
-    pub rank: String,
-    pub cape: Option<String>,
+pub struct McProfile {
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cape {
+    #[serde(rename = "_id")]
     pub hash: String,
     pub accepted: bool,
     pub uses: u32,

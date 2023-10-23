@@ -1,7 +1,8 @@
-use std::{sync::{Arc, Mutex}, thread};
+use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
 use directories::UserDirs;
 use futures::TryFutureExt;
 
+use tokio::fs;
 use tracing::{error, info, debug};
 use tauri::{Manager, Window};
 use tauri::api::dialog::{FileDialogBuilder};
@@ -9,7 +10,7 @@ use tauri::api::dialog::blocking::message;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{Branches, Changelog, LaunchManifest, LoginData, NoRiskLaunchManifest};
-use crate::app::cape_api::{Cape, CapeApiEndpoints, NoRiskUserMinimal};
+use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
@@ -23,6 +24,13 @@ struct RunnerInstance {
 
 struct AppState {
     runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
+}
+
+
+#[derive(serde::Deserialize)]
+struct FileData {
+    name: String,
+    location: String,
 }
 
 #[tauri::command]
@@ -226,6 +234,24 @@ async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_versi
 }
 
 #[tauri::command]
+async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
+    let data_directory = if !options.custom_data_path.is_empty() {
+        Some(options.custom_data_path)
+    } else {
+        None
+    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
+    let file_path = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+
+    println!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn store_installed_mods(branch: &str, options: LauncherOptions, installed_mods: InstalledMods) -> Result<(), String> {
     let game_dir = options.data_path_buf().join("gameDir").join(branch);
     return match tokio::fs::create_dir_all(&game_dir).await {
@@ -422,14 +448,28 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
 }
 
 #[tauri::command]
-async fn get_norisk_user_by_uuid(uuid: &str) -> Result<NoRiskUserMinimal, ()> {
-    let response = CapeApiEndpoints::norisk_user_by_uuid(uuid).await;
+async fn mc_name_by_uuid(uuid: &str) -> Result<String, ()> {
+    let response = CapeApiEndpoints::mc_name_by_uuid(uuid).await;
     match response {
         Ok(user) => {
             Ok(user)
         }
         Err(err) => {
-            debug!("Error Requesting UUID {:?}",err);
+            debug!("Error Requesting Mc Name {:?}",err);
+            Err(())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, ()> {
+    let response = CapeApiEndpoints::cape_hash_by_uuid(uuid).await;
+    match response {
+        Ok(user) => {
+            Ok(user)
+        }
+        Err(err) => {
+            debug!("Error Requesting Cape Hash {:?}",err);
             Err(())
         }
     }
@@ -484,7 +524,8 @@ pub fn gui_main() {
             login_norisk_microsoft,
             upload_cape,
             equip_cape,
-            get_norisk_user_by_uuid,
+            get_cape_hash_by_uuid,
+            mc_name_by_uuid,
             delete_cape,
             search_mods,
             run_client,
@@ -495,6 +536,7 @@ pub fn gui_main() {
             clear_data,
             get_installed_mods,
             get_custom_mods_folder,
+            save_custom_mods_to_folder,
             install_mod_and_dependencies,
             get_mod_version,
             upload_logs,
