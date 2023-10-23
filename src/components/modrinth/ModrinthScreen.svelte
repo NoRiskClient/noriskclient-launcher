@@ -271,10 +271,13 @@
         })
     }
 
+    async function load() {
+        await getLaunchManifest();
+        searchMods();
+        loadInstalledModsConfig();
+    }
 
-    searchMods();
-    loadInstalledModsConfig();
-    getLaunchManifest();
+    load()
 
     onDestroy(() => {
         fileWatcher();
