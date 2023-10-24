@@ -173,8 +173,13 @@
     })
     const setting_sliders = Array.from(document.getElementsByClassName("setting-slider"))
     setting_sliders.forEach(slider => {
-      slider.classList.toggle("no-slide");
-      slider.classList.toggle("slide");
+      if (settings.open) {
+        slider.classList.toggle("no-slide");
+        slider.classList.toggle("slide");
+      } else {
+        slider.classList.add("no-slide");
+        slider.classList.remove("slide");
+      }
     })
   }
 
