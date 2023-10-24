@@ -386,6 +386,24 @@ async fn read_local_skin_file(location: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn read_remote_cape_file(location: String) -> Result<String, String> {
+    let response = HTTP_CLIENT
+        .get(location)
+        .send()
+        .await
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .error_for_status()
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .bytes()
+        .await;
+
+    match response {
+        Ok(bytes) => Ok(base64::encode(&bytes)),
+        Err(_) => Err("Failed to fetch cape from remote resource".to_string()),
+    }
+}
+
+#[tauri::command]
 async fn store_options(options: LauncherOptions) -> Result<(), String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     options.store(config_dir)
@@ -653,6 +671,7 @@ pub fn gui_main() {
             get_player_skins,
             save_player_skin,
             read_local_skin_file,
+            read_remote_cape_file,
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
             delete_cape,

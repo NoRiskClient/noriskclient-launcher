@@ -1,6 +1,7 @@
 <script>
   export let value;
   export let text;
+  export let reversed = false;
 
   function preventSelection(event) {
     event.preventDefault();
@@ -8,12 +9,18 @@
 </script>
 
 <div class="wrapper">
-  <label class="nes-switch">
-    <input type="checkbox" bind:checked={value}>
-    <span class="nes-slider"></span>
-  </label>
-  <h1 on:selectstart={preventSelection}
-      on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    {#if reversed}
+        <h1 on:selectstart={preventSelection}
+            on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    {/if}
+    <label class="nes-switch">
+        <input type="checkbox" bind:checked={value}>
+        <span class="nes-slider"></span>
+    </label>
+    {#if !reversed}
+        <h1 on:selectstart={preventSelection}
+            on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    {/if}
 </div>
 
 <style>
