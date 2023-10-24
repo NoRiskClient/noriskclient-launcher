@@ -211,8 +211,10 @@
   {#if (!showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
-      <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
-      <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+      {#if options.accounts.length > 0}
+        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+      {/if}
       <h1 on:click={handleOpenModScreen}>MODS</h1>
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <h1 on:click={closeWindow}>QUIT</h1>
