@@ -219,7 +219,11 @@
   <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={() => {settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={() => {settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
-      <h2 on:click={toggleSettings}>⛭</h2>
+      <svg on:click={toggleSettings} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
+        <path d="M0 0h24v24H0V0z" fill="none" />
+        <path
+          d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+      </svg>
       <div class="setting setting-slider no-slide" style="margin-top: 70px">
         <ConfigRadioButton bind:value={settings.rotatePlayer} text="Rotate Player" reversed></ConfigRadioButton>
       </div>
@@ -286,15 +290,19 @@
       top: 70px;
     }
 
-    .settings h2 {
+    .settings svg {
       position: absolute;
       font-size: 40px;
-      left: 215px;
+      left: 210px;
+      top: 10px;
+      height: 40px;
+      width: 40px;
+      fill: white;
       transition-duration: 0.3s;
       transform: rotateY(0);
     }
     
-    .settings h2:hover {
+    .settings svg:hover {
       transition-duration: 0.3s;
       transform: scale(1.2);
       cursor: pointer;
