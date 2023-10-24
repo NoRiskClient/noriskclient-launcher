@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
 use directories::UserDirs;
-use reqwest::{multipart::{Form, Part}, header::{HeaderMap, CONTENT_TYPE, CONTENT_LENGTH, HeaderValue}};
+use reqwest::{multipart::{Form, Part}};
 use tokio::{fs, io::AsyncReadExt};
 use tracing::{error, info, debug};
 use tauri::{Manager, Window};
@@ -327,45 +327,27 @@ async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn save_player_skin(file_data: String, slim: bool, access_token: String) -> Result<(), String> {
-    let buffer = match base64::decode(&file_data) {
+async fn save_player_skin(location: String, slim: bool, access_token: String) -> Result<(), String> {
+    let file_data = match tokio::fs::read(location).await {
         Ok(data) => data,
-        Err(err) => return Err(format!("Error decoding base64 data: {}", err.to_string())),
+        Err(e) => return Err(e.to_string()),
     };
 
-    let mut form = Form::new()
-        .text("variant", if slim { "slim".to_owned() } else { "classic".to_owned() })
-        .part("file", Part::bytes(buffer.clone()));
+    let part = Part::bytes(file_data)
+        .file_name("skin.png");
 
-    let boundary = format!("--------------------------{}", chrono::Utc::now().timestamp_nanos());
+    let response = HTTP_CLIENT.post("https://api.minecraftservices.com/minecraft/profile/skins")
+        .bearer_auth(access_token)
+        .multipart(Form::new().text("variant", if slim { "slim" } else { "classic" }).part("file", part))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request: {}", e))?;
 
-    let content_length = buffer.clone().len() + boundary.len() + 10;
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        CONTENT_TYPE,
-        HeaderValue::from_str(&format!("multipart/form-data; boundary={}", boundary)).unwrap(),
-    );
-
-    headers.insert(
-        CONTENT_LENGTH,
-        HeaderValue::from_str(&content_length.to_string()).unwrap(),
-    );
-
-    let saved_cape: Result<(), reqwest::Error> = HTTP_CLIENT.post("https://api.minecraftservices.com/minecraft/profile/skins")
-        .bearer_auth(&access_token)
-        .headers(headers)
-        .multipart(form)
-        .send().await
-        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
-        .error_for_status()
-        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
-        .json().await;
-        
-
-    match saved_cape {
-        Ok(()) => Ok(()),
-        Err(_) => Err("Failed to save new skin".to_string()), // You can provide a custom error message here.
+    if response.status().is_success() {
+        println!("Skin saved successfully.");
+        Ok(())
+    } else {
+        Err(format!("Failed to save the new skin. Status code: {}", response.status()))
     }
 }
 
