@@ -17,7 +17,6 @@
 
   listen('tauri://file-drop', files => {
     if (settings.open || unsavedSkin || !files.payload[0].endsWith('.png')) {
-        console.log(files.payload[0]);
         return;
     }
     previewSkin(files.payload[0])
@@ -27,7 +26,6 @@
   let currentSkinLocation;
   let capeLocation;
   let unsavedSkin;
-  let unsavedSkinData;
   let settings = {
     showCape: true,
     showCapeAsElytra: false,
@@ -43,7 +41,7 @@
         profileTexture = JSON.parse(atob(profileTexture))
         await getNoRiskUserByUUID(profileTexture)
       }
-      currentSkinLocation = profileTexture != null ? profileTexture.textures.SKIN.url : "../../images/default_skin.png";
+      currentSkinLocation = profileTexture != null ? profileTexture.textures.SKIN.url : "";
       const canvas = document.createElement('canvas');
       skinViewer = new SkinViewer({
         canvas: canvas,
@@ -53,8 +51,9 @@
         cape: settings.showCape ? capeLocation : '',
         animation: new IdleAnimation
       });
-      skinViewer.zoom = 0.65;
+      skinViewer.zoom = 0.7;
       skinViewer.autoRotate = settings.rotatePlayer;
+      skinViewer.controls.enableZoom = false;
       settings.showCape = capeLocation ? true : false;
       settings.showCapeBefore = capeLocation ? true : false;
       document.getElementById("skin").appendChild(canvas)
@@ -93,9 +92,7 @@
   async function previewSkin(location) {
     await invoke("read_local_skin_file", { location })
     .then((content) => {
-      unsavedSkinData = content;
       skinViewer.loadSkin(`data:image/png;base64,${content}`)
-      skinViewer.zoom = 0.65;
       unsavedSkin = location;
     }).catch((err) => {
       alert(err)
@@ -107,23 +104,27 @@
       return;
     }
     skinViewer.loadSkin(currentSkinLocation)
-    skinViewer.zoom = 0.65;
     unsavedSkin = null;
-    unsavedSkinData = null;
   }
   
-  async function saveSkin(imgData) {
+  async function saveSkin(location) {
     if (settings.open) {
       return;
     }
-    console.log(`Saving new player skin: ${imgData}`)
-    await invoke("save_player_skin", { fileData: imgData, slim: false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).accessToken })
+    console.log(`Saving new player skin: ${location}`)
+
+    const slim = skinViewer.scene.children[2].children[0].children[0].slim;
+    
+    console.log(`Model Type: ${slim ? 'slim' : 'classic'}`);
+
+    await invoke("save_player_skin", { location: location, slim: slim ?? false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).accessToken })
     .then(() => {
-      getSkins()
+      dispatch("reloadSkinButton")
+      dispatch("home")
     })
     .catch((err) => {
       console.error(err);
-    })
+    });
   }
 
   async function selectSkin() {
@@ -174,8 +175,15 @@
     const setting_sliders = Array.from(document.getElementsByClassName("setting-slider"))
     setting_sliders.forEach(slider => {
       if (settings.open) {
-        slider.classList.toggle("no-slide");
-        slider.classList.toggle("slide");
+        if (slider.id == "showCapeAsElytraSetting") {
+          if (settings.showCape) {
+            slider.classList.toggle("no-slide");
+            slider.classList.toggle("slide");  
+          }
+        } else {
+          slider.classList.toggle("no-slide");
+          slider.classList.toggle("slide");
+        }
       } else {
         slider.classList.add("no-slide");
         slider.classList.remove("slide");
@@ -184,6 +192,9 @@
   }
 
   setInterval(() => {
+    if (isLoading) {
+      return;
+    }
     if (capeLocation && (settings.showCape != settings.showCapeBefore)) {
       const showCapeAsElytraSetting = document.getElementById("showCapeAsElytraSetting")
       if (settings.showCape) {
@@ -224,7 +235,7 @@
   <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={() => {settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={() => {settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
-      <svg on:click={toggleSettings} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
+      <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
         <path d="M0 0h24v24H0V0z" fill="none" />
         <path
           d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
@@ -245,8 +256,8 @@
       <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
     {:else}
       <div class="unsavedSkinActionWrapper slider no-slide">
-        <h1 class="cancel-button" on:click={cancelSkinPreview}>Cancel</h1>
-        <h1 class="save-button" on:click={async () => saveSkin(unsavedSkinData)}>Save</h1>
+        <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
+        <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
       </div>
     {/if}
   {/if}
@@ -302,7 +313,6 @@
       top: 10px;
       height: 40px;
       width: 40px;
-      fill: white;
       transition-duration: 0.3s;
       transform: rotateY(0);
     }
@@ -368,13 +378,10 @@
       transition-duration: 0.3s;
       transform: scale(1.2);
     }
-
-    .cancel-button {
-      color: red;
-    }
     
     .save-button {
-      color: green;
+      color: #1cc009;
+      text-shadow: 2px 2px #114609;
     }
 
     .home-button {
