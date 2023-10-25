@@ -113,6 +113,8 @@
     }
     console.log(`Saving new player skin: ${location}`)
 
+    console.log(options);
+
     const slim = skinViewer.scene.children[2].children[0].children[0].slim;
     
     console.log(`Model Type: ${slim ? 'slim' : 'classic'}`);
@@ -226,13 +228,13 @@
 {#if settings.open}
   <div class="klickField" on:click={settings.open ? toggleSettings : () => {}}></div>
 {/if}
-  <div class="wrapper" on:selectstart={preventSelection}>
+<div class="wrapper" on:selectstart={preventSelection}>
   <div class="slider slide"></div>
   <h1 class="title slider">Skin</h1>
   {#if isLoading}
-  <h2>Loading...</h2>
+    <h2>Loading...</h2>
   {/if}
-  <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={() => {settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={() => {settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
+  <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={(e) => {if (e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={(e) => {if (e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
       <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
