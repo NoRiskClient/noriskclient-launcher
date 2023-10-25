@@ -70,7 +70,7 @@
         uuid: options.currentUuid,
       }).then(async (user) => {
         if (user) {
-          await invoke("read_remote_cape_file", { location: `https://dl.hglabor.de/capes/prod/${user}.png` })
+          await invoke("read_remote_image_file", { location: `https://dl.hglabor.de/capes/prod/${user}.png` })
           .then((capeData) => {
             capeLocation = `data:image/png;base64,${capeData}`
           }).catch((err) => {

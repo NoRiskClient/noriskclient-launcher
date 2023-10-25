@@ -342,14 +342,14 @@ async fn read_local_skin_file(location: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn read_remote_cape_file(location: String) -> Result<String, String> {
+async fn read_remote_image_file(location: String) -> Result<String, String> {
     let response = HTTP_CLIENT
-        .get(location)
+        .get(&location)
         .send()
         .await
-        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .map_err(|e| format!("unable to connect to {}: {:}", e, location))?
         .error_for_status()
-        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .map_err(|e| format!("{} returned an error: {:}", location, e))?
         .bytes()
         .await;
 
@@ -621,7 +621,7 @@ pub fn gui_main() {
             get_player_skins,
             save_player_skin,
             read_local_skin_file,
-            read_remote_cape_file,
+            read_remote_image_file,
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
             delete_cape,
