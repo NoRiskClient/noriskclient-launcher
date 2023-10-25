@@ -4,11 +4,8 @@ use directories::UserDirs;
 use reqwest::{multipart::{Form, Part}};
 use tokio::{fs, io::AsyncReadExt};
 use tracing::{error, info, debug};
-use futures::TryFutureExt;
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
-use tokio::fs;
-use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
