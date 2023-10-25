@@ -1,10 +1,14 @@
-use std::{sync::{Arc, Mutex}, thread, path::PathBuf};
+use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
+
 use directories::UserDirs;
 use reqwest::{multipart::{Form, Part}};
 use tokio::{fs, io::AsyncReadExt};
 use tracing::{error, info, debug};
+use futures::TryFutureExt;
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
+use tokio::fs;
+use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -224,13 +228,7 @@ async fn get_options() -> Result<LauncherOptions, String> {
 
 #[tauri::command]
 async fn get_installed_mods(branch: &str, options: LauncherOptions) -> Result<InstalledMods, String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-
-    let game_dir = data_directory.join("gameDir").join(branch);
+    let game_dir = options.data_path_buf().join("gameDir").join(branch);
     return match tokio::fs::create_dir_all(&game_dir).await {
         Ok(_) => {
             Ok(InstalledMods::load(&game_dir).await.unwrap_or_default()) // default to basic options if unable to load
@@ -243,35 +241,20 @@ async fn get_installed_mods(branch: &str, options: LauncherOptions) -> Result<In
 
 #[tauri::command]
 async fn get_custom_mods_filenames(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<Vec<String>, String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-    let custom_mod_folder = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version));
+    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
     let names = ModrinthApiEndpoints::get_custom_mod_names(&custom_mod_folder).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
     Ok(names)
 }
 
 #[tauri::command]
 async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<String, String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-    let custom_mod_folder = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version));
+    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
     return custom_mod_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
 }
 
 #[tauri::command]
 async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-    let file_path = data_directory.join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+    let file_path = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
 
     println!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
 
@@ -284,13 +267,7 @@ async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_v
 
 #[tauri::command]
 async fn store_installed_mods(branch: &str, options: LauncherOptions, installed_mods: InstalledMods) -> Result<(), String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-
-    let game_dir = data_directory.join("gameDir").join(branch);
+    let game_dir = options.data_path_buf().join("gameDir").join(branch);
     return match tokio::fs::create_dir_all(&game_dir).await {
         Ok(_) => {
             installed_mods.store(&game_dir).await.map_err(|e| format!("unable to store config data: {:?}", e))?; // default to basic options if unable to load
@@ -478,7 +455,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
     let parameters = LaunchingParameter {
         memory: percentage_of_total_memory(options.memory_percentage),
-        custom_data_path: if !options.custom_data_path.is_empty() { Some(options.custom_data_path) } else { None },
+        data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
         auth_player_name: login_data.username,
         auth_uuid: login_data.uuid,
@@ -612,17 +589,11 @@ async fn default_data_folder_path() -> Result<String, String> {
 
 #[tauri::command]
 async fn clear_data(options: LauncherOptions) -> Result<(), String> {
-    let data_directory = if !options.custom_data_path.is_empty() {
-        Some(options.custom_data_path)
-    } else {
-        None
-    }.map(|x| x.into()).unwrap_or_else(|| LAUNCHER_DIRECTORY.data_dir().to_path_buf());
-
     let _ = store_options(LauncherOptions::default()).await;
 
     ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
         .iter()
-        .map(|dir| data_directory.join(dir))
+        .map(|dir| options.data_path_buf().join(dir))
         .filter(|dir| dir.exists())
         .map(std::fs::remove_dir_all)
         .collect::<Result<Vec<_>, _>>()
