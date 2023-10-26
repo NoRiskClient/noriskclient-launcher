@@ -50,6 +50,9 @@
   $: image;
 
   async function getPlayerHead() {
+    if (!uuid) {
+      return;
+    }
     await invoke("get_player_skins", { uuid: uuid })
     .then(async (profileTextures) => {
       let profileTexture = profileTextures[0]
