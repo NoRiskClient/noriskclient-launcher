@@ -94,6 +94,8 @@
     .then((content) => {
       skinViewer.loadSkin(`data:image/png;base64,${content}`)
       unsavedSkin = location;
+      skinViewer.controls.enabled = true;
+      settings.lockControlls = false;
     }).catch((err) => {
       alert(err)
     })
@@ -134,16 +136,23 @@
       return;
     }
     try {
+      settings.lockControls = true;
+      skinViewer.controls.enabled = false;
       const location = await open({
-          defaultPath: '/',
-          multiple: false,
-          directory: false,
-          filters: [{name: "Skin", extensions: ["png"]}]
-        })
-        if (location) {
-          previewSkin(location)
-        }
-      } catch (e) {
+        defaultPath: '/',
+        multiple: false,
+        directory: false,
+        filters: [{name: "Skin", extensions: ["png"]}]
+      })
+      if (location) {
+        previewSkin(location)
+      } else {
+        skinViewer.controls.enabled = true;
+        settings.lockControls = false;
+      }
+    } catch (e) {
+        skinViewer.controls.enabled = true;
+        settings.lockControls = false;
         alert("Failed to select file using dialog")
       }
   }
@@ -235,7 +244,7 @@
   {#if isLoading}
     <h2>Loading...</h2>
   {/if}
-  <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={(e) => {if (settings.open || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={(e) => {if (settings.open || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
+  <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
       <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
