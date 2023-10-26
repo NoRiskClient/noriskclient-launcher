@@ -121,14 +121,27 @@
     
     console.log(`Model Type: ${slim ? 'slim' : 'classic'}`);
 
-    await invoke("save_player_skin", { location: location, slim: slim ?? false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).accessToken })
-    .then(() => {
-      dispatch("reloadSkinButton")
-      dispatch("home")
-    })
-    .catch((err) => {
-      console.error(err);
-    });
+    let failed = false;
+    const trySave = async () => {
+      await invoke("save_player_skin", { location: location, slim: slim ?? false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).accessToken })
+      .then(() => {
+        isLoading = false;
+        dispatch("home")
+        isLoading = true;
+      })
+      .catch(async (err) => {
+        if (!failed && err.split(' ').includes('401')) {
+          failed = true;
+          isLoading = true;
+          await options.reload(async () => await trySave())
+          return;
+        }
+        console.error(err);
+      });
+    }
+    if (!failed) {
+      await trySave();
+    }
   }
 
   async function selectSkin() {
@@ -244,7 +257,14 @@
   {#if isLoading}
     <h2>Loading...</h2>
   {/if}
-  <div id="skin" class="skin slider" on:selectstart={preventSelection} on:mousedown={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}} on:mouseup={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}></div>
+  <div
+    id="skin"
+    class="skin slider"
+    on:selectstart={preventSelection}
+    on:mousedown={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}}
+    on:mouseup={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}
+    hidden={isLoading}
+  ></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
       <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
