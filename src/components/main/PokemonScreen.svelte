@@ -79,18 +79,6 @@
       });
   });
 
-  onMount(async () => {
-    await invoke("request_norisk_branches")
-      .then((result) => {
-        console.debug("Received Branches", result);
-        branches = result;
-      })
-      .catch((reason) => {
-        alert(reason);
-        console.error(reason);
-      });
-  });
-
   listen("client-exited", () => {
     clientRunning = false;
     progressBarLabel = null;
