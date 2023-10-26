@@ -24,7 +24,7 @@
   $: uuid = options.currentUuid
 
   const handleAddAccount = async () => {
-    await invoke("login_norisk_microsoft").then((loginData) => {
+    await invoke("login_norisk_microsoft").then(async (loginData) => {
       console.debug("Received Login Data...", loginData);
 
       options.currentUuid = loginData.uuid;
@@ -40,6 +40,10 @@
       }
 
       options.store();
+      setTimeout(async () => {
+        console.log(uuid);
+        await getPlayerHead();
+      }, 100);
     }).catch(e => {
       console.error("microsoft authentication error", e);
       alert(e);
