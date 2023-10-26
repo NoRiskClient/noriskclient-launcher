@@ -41,7 +41,6 @@
 
       options.store();
       setTimeout(async () => {
-        console.log(uuid);
         await getPlayerHead();
       }, 100);
     }).catch(e => {
