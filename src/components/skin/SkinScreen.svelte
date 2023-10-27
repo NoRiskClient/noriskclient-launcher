@@ -16,7 +16,7 @@
   let isLoading = true;
 
   listen('tauri://file-drop', files => {
-    if (settings.open || unsavedSkin || !files.payload[0].endsWith('.png')) {
+    if (settings.open || !files.payload[0].endsWith('.png')) {
         return;
     }
     previewSkin(files.payload[0])
