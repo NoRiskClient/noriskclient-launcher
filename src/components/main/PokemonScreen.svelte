@@ -8,6 +8,7 @@
   import { listen } from "@tauri-apps/api/event";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
@@ -24,6 +25,8 @@
   let progressBarLabel = "";
   let settingsShown = false;
   let clientLogShown = false;
+  let showSkinScreen = false;
+  let showSkinScreenHack = false;
   let showCapeScreen = false;
   let showCapeScreenHack = false;
   let showModrinthScreen = false;
@@ -63,18 +66,6 @@
       currentBranchIndex = (currentBranchIndex + 1) % totalBranches;
     }
   }
-
-  onMount(async () => {
-    await invoke("request_norisk_branches")
-      .then((result) => {
-        console.debug("Received Branches", result);
-        branches = result;
-      })
-      .catch((reason) => {
-        alert(reason);
-        console.error(reason);
-      });
-  });
 
   onMount(async () => {
     await invoke("request_norisk_branches")
@@ -142,6 +133,13 @@
     event.preventDefault();
   }
 
+  function handleOpenSkinScreen() {
+    showSkinScreenHack = true;
+    setTimeout(() => {
+      showSkinScreen = true;
+    }, 300);
+  }
+  
   function handleOpenCapeScreen() {
     showCapeScreenHack = true;
     setTimeout(() => {
@@ -157,6 +155,8 @@
   }
 
   function home() {
+    showSkinScreen = false;
+    showSkinScreenHack = false;
     showCapeScreen = false;
     showCapeScreenHack = false;
     showModrinthScreen = false;
@@ -173,6 +173,10 @@
 
   {#if showModrinthScreen}
     <ModrinthScreen on:home={home} bind:options bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+
+  {#if showSkinScreen}
+    <SkinScreen on:home={home} bind:options></SkinScreen>
   {/if}
 
   {#if showCapeScreen}
@@ -192,10 +196,13 @@
                    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel}></LoadingScreen>
   {/if}
 
-  {#if (!showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
-      <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+      {#if options.accounts.length > 0}
+        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+      {/if}
       <h1 on:click={handleOpenModScreen}>MODS</h1>
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <h1 on:click={closeWindow}>QUIT</h1>

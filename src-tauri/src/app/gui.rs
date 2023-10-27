@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
-use futures::TryFutureExt;
+use reqwest::{multipart::{Form, Part}};
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
-use tokio::fs;
+use tokio::{fs, io::AsyncReadExt};
 use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
@@ -30,6 +30,23 @@ struct AppState {
 struct FileData {
     name: String,
     location: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MinecraftProfile {
+    properties: Vec<MinecraftProfileProperty>,
+}
+
+#[derive(serde::Deserialize)]
+struct MinecraftProfileProperty {
+    name: String,
+    value: String,
+}
+
+#[derive(serde::Serialize)]
+struct NewMinecraftSkinBody {
+    variant: String,
+    file: Vec<u8>,
 }
 
 #[tauri::command]
@@ -257,6 +274,89 @@ async fn store_installed_mods(branch: &str, options: LauncherOptions, installed_
             Err(err.to_string())
         }
     };
+}
+
+#[tauri::command]
+async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
+    let minecraft_profile: Result<MinecraftProfile, reqwest::Error> = HTTP_CLIENT.get(format!("https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid))
+        .send().await
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .error_for_status()
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .json().await;
+        
+
+    match minecraft_profile {
+        Ok(profile) => {
+            let mut textures: Vec<String> = vec![];
+            for property in profile.properties.iter() {
+                if property.name == "textures" {
+                    textures.push(property.value.clone())
+                }
+            }
+            Ok(textures)
+        },
+        Err(_) => Err("Failed to retrieve Minecraft profile".to_string()), // You can provide a custom error message here.
+    }
+}
+
+#[tauri::command]
+async fn save_player_skin(location: String, slim: bool, access_token: String) -> Result<(), String> {
+    let file_data = match tokio::fs::read(&location).await {
+        Ok(data) => data,
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let part = Part::bytes(file_data)
+        .file_name("skin.png");
+
+    let response = HTTP_CLIENT.post("https://api.minecraftservices.com/minecraft/profile/skins")
+        .bearer_auth(access_token)
+        .multipart(Form::new().text("variant", if slim { "slim" } else { "classic" }).part("file", part))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request: {}", e))?;
+
+    if response.status().is_success() {
+        println!("Skin {} saved successfully.", &location);
+        Ok(())
+    } else {
+        Err(format!("Failed to save the new skin. Status code: {}", response.status()))
+    }
+}
+
+#[tauri::command]
+async fn read_local_skin_file(location: String) -> Result<String, String> {
+    match fs::File::open(&location).await {
+        Ok(mut file) => {
+            let mut buffer = Vec::new();
+            if let Err(err) = file.read_to_end(&mut buffer).await {
+                return Err(format!("Failed to read the file: {}", err));
+            }
+            Ok(base64::encode(buffer))
+        },
+        Err(err) => {
+            Err(format!("Failed to open the file: {}", err))
+        }
+    }
+}
+
+#[tauri::command]
+async fn read_remote_image_file(location: String) -> Result<String, String> {
+    let response = HTTP_CLIENT
+        .get(&location)
+        .send()
+        .await
+        .map_err(|e| format!("unable to connect to {}: {:}", e, location))?
+        .error_for_status()
+        .map_err(|e| format!("{} returned an error: {:}", location, e))?
+        .bytes()
+        .await;
+
+    match response {
+        Ok(bytes) => Ok(base64::encode(&bytes)),
+        Err(_) => Err("Failed to fetch cape from remote resource".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -518,6 +618,10 @@ pub fn gui_main() {
             login_norisk_microsoft,
             upload_cape,
             equip_cape,
+            get_player_skins,
+            save_player_skin,
+            read_local_skin_file,
+            read_remote_image_file,
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
             delete_cape,
