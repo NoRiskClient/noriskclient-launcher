@@ -47,6 +47,10 @@
         cursor: default;
     }
 
+    .input-container input::placeholder {
+        opacity: 75%;
+    }
+
     .nes-input {
         font-family: 'Press Start 2P', serif;
         font-size: 15px;

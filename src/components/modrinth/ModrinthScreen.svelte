@@ -1,6 +1,6 @@
 <script>
     import {invoke} from "@tauri-apps/api";
-    import {renameFile, removeFile} from '@tauri-apps/api/fs';
+    import {removeFile, renameFile} from '@tauri-apps/api/fs';
     import {open} from "@tauri-apps/api/dialog";
     import VirtualList from "../utils/VirtualList.svelte";
     import ModrinthSearchBar from "./ModrinthSearchBar.svelte";
@@ -9,7 +9,7 @@
     import InstalledModItem from "./InstalledModItem.svelte";
     import CustomModItem from "./CustomModItem.svelte";
     import {watch} from "tauri-plugin-fs-watch-api";
-    import { listen } from '@tauri-apps/api/event';
+    import {listen} from '@tauri-apps/api/event';
 
     const dispatch = createEventDispatcher()
 
@@ -148,7 +148,6 @@
     async function searchMods() {
         await invoke("search_mods", {
             params: {
-                //TODO mc version
                 facets: `[["categories:fabric"], ["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"]]`,
                 limit: 30,
                 query: searchterm,
