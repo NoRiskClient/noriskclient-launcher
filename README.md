@@ -35,3 +35,6 @@ Noriskclient launcher is using Tauri and is written in the programming language 
 ## Contributing
 
 We appreciate contributions. So if you want to support us, feel free to make changes to Norisk source code and submit a pull request.
+
+## Info
+This code is originally forked from LiquidLauncher.
