@@ -2,10 +2,10 @@ use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
 use reqwest::{multipart::{Form, Part}};
-use tokio::{fs, io::AsyncReadExt};
-use tracing::{error, info, debug};
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
+use tokio::{fs, io::AsyncReadExt};
+use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -302,7 +302,7 @@ async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn save_player_skin(location: String, slim: bool, access_token: String) -> Result<(), String> {
-    let file_data = match tokio::fs::read(location).await {
+    let file_data = match tokio::fs::read(&location).await {
         Ok(data) => data,
         Err(e) => return Err(e.to_string()),
     };
@@ -318,7 +318,7 @@ async fn save_player_skin(location: String, slim: bool, access_token: String) ->
         .map_err(|e| format!("Failed to send request: {}", e))?;
 
     if response.status().is_success() {
-        println!("Skin saved successfully.");
+        println!("Skin {} saved successfully.", &location);
         Ok(())
     } else {
         Err(format!("Failed to save the new skin. Status code: {}", response.status()))
