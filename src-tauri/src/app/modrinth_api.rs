@@ -1,11 +1,12 @@
-use std::error::Error;
-use serde::{Deserialize, Serialize};
-use crate::HTTP_CLIENT;
-use std::fs;
 #[cfg(target_os = "linux")]
-use std::{fs::metadata};
+use std::fs::metadata;
+use std::error::Error;
 use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
 use crate::app::api::{LoaderMod, ModSource};
+use crate::HTTP_CLIENT;
 
 /// Placeholder struct for API endpoints implementation
 pub struct ModrinthApiEndpoints;
@@ -45,6 +46,18 @@ impl ModrinthApiEndpoints {
             .await
             .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
         match response.json::<Mod>().await {
+            Ok(json) => Ok(json),
+            Err(e) => Err(Box::new(e) as Box<dyn Error>),
+        }
+    }
+
+    pub async fn get_mod_info(slug_or_id: &str) -> Result<ModInfo, Box<dyn Error>> {
+        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let response = HTTP_CLIENT.get(url)
+            .send()
+            .await
+            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+        match response.json::<ModInfo>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
         }
@@ -115,7 +128,7 @@ pub struct ModrinthSearchRequestParams {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ModInfo {
     pub slug: String,
-    pub author: String,
+    pub author: Option<String>,
     pub title: String,
     pub description: String,
     pub icon_url: String,

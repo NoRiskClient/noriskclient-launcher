@@ -3,7 +3,7 @@
 
     const dispatch = createEventDispatcher();
 
-    export let title;
+    export let title = undefined; // optional
     export let placeHolder;
     export let searchTerm;
 
