@@ -1,7 +1,7 @@
 ## Todos
 - [x] Drag and Drop Custom Mod files
 - [x] mc.logs api integration
-- [ ] Featured Mods
+- [x] Featured Mods
 - [x] Set Custom Javapath and Mod Folder
 - [x] Save Light/Darkmode - Use Default OS Setting
 
