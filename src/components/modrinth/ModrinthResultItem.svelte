@@ -15,7 +15,9 @@
                 <a href={"https://modrinth.com/mod/"+mod.slug} target="_blank" title="Modrinth Page">
                     {mod.title}
                 </a>
-                <div>by {mod.author}</div>
+                {#if mod.author !== null}
+                    <div>by {mod.author}</div>
+                {/if}
             </div>
             <p>{mod.description}</p>
         </div>
