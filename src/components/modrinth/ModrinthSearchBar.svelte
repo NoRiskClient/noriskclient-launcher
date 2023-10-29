@@ -3,12 +3,21 @@
 
     const dispatch = createEventDispatcher();
 
-    export let title;
+    export let title = undefined; // optional
     export let placeHolder;
     export let searchTerm;
 
-    const onKeyPress = e => {
-        if (e.charCode === 13) dispatch("search");
+    let last_change = new Date();
+
+    const onChange = _e => {
+        console.log("ONCHANGE CALLED")
+        const now = new Date();
+        last_change = now;
+        setTimeout(() => {
+            if (last_change === now) {
+                dispatch('search');
+            }
+        }, 200);
     };
 </script>
 
@@ -17,9 +26,9 @@
         <h1>{title}</h1>
     {/if}
     <div class="input-button-wrapper">
-        <input on:keypress={onKeyPress}
+        <input on:input={onChange}
                bind:value={searchTerm}
-               autofocus={false}
+               autofocus={true}
                placeholder={placeHolder}
                type="text"
                class="nes-input">

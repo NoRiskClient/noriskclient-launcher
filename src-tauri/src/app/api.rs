@@ -1,12 +1,10 @@
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
-use tauri::http::header::{ACCEPT, CONTENT_TYPE};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::HTTP_CLIENT;
 use crate::utils::get_maven_artifact_path;
@@ -24,6 +22,11 @@ impl ApiEndpoints {
     /// Request all available branches
     pub async fn norisk_branches() -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint("branches").await
+    }
+
+    /// Request featured mods
+    pub async fn norisk_featured_mods(branch: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("featured-mods/{}", branch)).await
     }
 
     /// Request all available branches

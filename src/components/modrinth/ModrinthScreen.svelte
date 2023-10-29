@@ -146,6 +146,19 @@
     }
 
     async function searchMods() {
+        if (searchterm === "") {
+            // Fetch featured mods
+            await invoke("get_featured_mods", {
+                branch: currentBranch,
+            }).then((result) => {
+                console.debug("Featured Mods", result);
+                mods = result;
+            }).catch((err) => {
+                console.error(err);
+            });
+            return;
+        }
+
         await invoke("search_mods", {
             params: {
                 facets: `[["categories:fabric"], ["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"]]`,

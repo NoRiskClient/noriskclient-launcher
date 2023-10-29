@@ -11,7 +11,7 @@ use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{CustomMod, InstalledMods, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
+use crate::app::modrinth_api::{CustomMod, InstalledMods, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
@@ -108,6 +108,33 @@ async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Re
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
+    debug!("Getting Featured Mods...");
+
+    match ApiEndpoints::norisk_featured_mods(&branch).await {
+        Ok(result) => {
+            // fetch mod info for each mod
+            let mut mod_infos: Vec<ModInfo> = Vec::new();
+            for mod_id in result {
+                match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
+                    Ok(mod_info) => {
+                        mod_infos.push(mod_info);
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(mod_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
 }
 
 #[tauri::command]
@@ -626,6 +653,7 @@ pub fn gui_main() {
             mc_name_by_uuid,
             delete_cape,
             search_mods,
+            get_featured_mods,
             run_client,
             download_template_and_open_explorer,
             request_trending_capes,
