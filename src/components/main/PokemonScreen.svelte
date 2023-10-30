@@ -1,18 +1,17 @@
 <script>
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api";
-  import { appWindow } from "@tauri-apps/api/window";
-  import { scale } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
+  import {onMount} from "svelte";
+  import {invoke} from "@tauri-apps/api";
+  import {appWindow} from "@tauri-apps/api/window";
+  import {scale} from "svelte/transition";
+  import {quintOut} from "svelte/easing";
   import SkinButton from "./SkinButton.svelte";
-  import { listen } from "@tauri-apps/api/event";
+  import {listen} from "@tauri-apps/api/event";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
-  import NoRiskLogo from "../../images/norisk_logo_black_and_white.png";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
   export let options;
@@ -236,7 +235,7 @@
     <SkinButton on:launch={runClient} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
          on:mousedown={preventSelection} class="copyright">
-      © 2000-2023 HGLabor/Friends Inc. v0.2.4
+      © 2000-2023 HGLabor/Friends Inc. v0.2.5
     </div>
   {/if}
 </div>
