@@ -69,12 +69,13 @@ jobs:
           name: noriskclient-linux
           path: ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.*
 
+        # Krxwallo: Removed the following lines as the files seem to already exist.
+        # mv nsis/NoRiskClient**.exe nsis/NoRiskClient-Windows-setup.exe
+        # mv nsis/NoRiskClient**.nsis.zip nsis/NoRiskClient-Windows-setup.nsis.zip
+        # mv nsis/NoRiskClient**.nsis.zip.sig nsis/NoRiskClient-Windows-setup.nsis.zip.sig
       - run: |
           cd ./src-tauri/target/release/bundle
           Get-ChildItem -Recurse
-          mv nsis/NoRiskClient**.exe nsis/NoRiskClient-Windows-setup.exe
-          mv nsis/NoRiskClient**.nsis.zip nsis/NoRiskClient-Windows-setup.nsis.zip
-          mv nsis/NoRiskClient**.nsis.zip.sig nsis/NoRiskClient-Windows-setup.nsis.zip.sig
         if: matrix.platform == 'windows-latest'
       - uses: actions/upload-artifact@v2
         if: matrix.platform == 'windows-latest'
