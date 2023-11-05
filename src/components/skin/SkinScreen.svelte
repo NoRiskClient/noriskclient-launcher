@@ -30,6 +30,7 @@
     showCape: true,
     showCapeAsElytra: false,
     rotatePlayer: true,
+    enableZoom: false,
     open: false
   }
 
@@ -52,8 +53,8 @@
         animation: new IdleAnimation
       });
       skinViewer.zoom = 0.7;
+      skinViewer.controls.enableZoom = settings.enableZoom;
       skinViewer.autoRotate = settings.rotatePlayer;
-      skinViewer.controls.enableZoom = false;
       settings.showCape = capeLocation ? true : false;
       settings.showCapeBefore = capeLocation ? true : false;
       document.getElementById("skin").appendChild(canvas)
@@ -96,6 +97,7 @@
       unsavedSkin = location;
       skinViewer.controls.enabled = true;
       settings.lockControlls = false;
+      skinViewer.zoom = 0.7;
     }).catch((err) => {
       alert(err)
     })
@@ -174,6 +176,7 @@
     const sliders = Array.from(document.getElementsByClassName("slider"))
     settings.open = !settings.open;
     skinViewer.controls.enabled = settings.open ? false : true;
+    skinViewer.zoom = 0.7;
     sliders.forEach(slider => {
       slider.classList.toggle("slide");
       slider.classList.toggle("no-slide");
@@ -219,6 +222,10 @@
   setInterval(() => {
     if (isLoading) {
       return;
+    }
+    skinViewer.controls.enableZoom = settings.enableZoom;
+    if (!settings.enableZoom) {
+      skinViewer.zoom = 0.7;
     }
     if (capeLocation && (settings.showCape != settings.showCapeBefore)) {
       const showCapeAsElytraSetting = document.getElementById("showCapeAsElytraSetting")
@@ -274,6 +281,9 @@
       </svg>
       <div class="setting setting-slider no-slide" style="margin-top: 70px">
         <ConfigRadioButton bind:value={settings.rotatePlayer} text="Rotate Player" reversed></ConfigRadioButton>
+      </div>
+      <div class="setting setting-slider no-slide">
+        <ConfigRadioButton bind:value={settings.enableZoom} text="Zoom" reversed></ConfigRadioButton>
       </div>
       {#if capeLocation}
         <div class="setting setting-slider no-slide">
