@@ -563,7 +563,7 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
 
 #[tauri::command]
 async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> {
-    let account = login_data.refresh().await
+    let account = login_data.refresh_maybe_fixed().await
         .map_err(|e| format!("unable to refresh: {:?}", e))?;
     Ok(account)
 }

@@ -39,6 +39,10 @@ impl ApiEndpoints {
         Self::post_from_refresh_endpoint("auth/rust_refresh_only", body).await
     }
 
+    pub async fn refresh_token_maybe_fixed(body: &str) -> Result<AuthTokenResponse> {
+        Self::post_from_refresh_endpoint("auth/refresh_only", body).await
+    }
+
     /// Request all available branches
     pub async fn await_auth_response(id: u32) -> Result<LoginData> {
         Self::post_from_await_endpoint("auth/await", id).await
@@ -152,6 +156,27 @@ pub struct MinecraftToken {
 
 impl LoginData {
     /// Refresh access token if necessary
+
+    pub async fn refresh_maybe_fixed(self) -> Result<LoginData> {
+        debug!("Refreshing auth via norisk maybe fixed...");
+        match ApiEndpoints::refresh_token_maybe_fixed(&self.refresh_token).await {
+            Ok(response) => {
+                debug!("Refreshed auth... {:?}",response);
+                Ok(LoginData {
+                    uuid: self.uuid, //iwie returned response eine andere UUID XD?
+                    access_token: response.access_token,
+                    refresh_token: response.refresh_token,
+                    username: self.username,
+                    norisk_token: self.norisk_token,
+                    mc_token: self.mc_token,
+                })
+            }
+            Err(err) => {
+                Err(err)
+            }
+        }
+    }
+
     pub async fn refresh(self) -> Result<LoginData> {
         debug!("Refreshing auth via norisk...");
         match ApiEndpoints::refresh_token(&self.refresh_token).await {
@@ -268,7 +293,7 @@ pub struct LoaderMod {
 
 impl LoaderMod {
     pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
-        return self.source.get_slug().eq_ignore_ascii_case(&other.source.get_slug())
+        return self.source.get_slug().eq_ignore_ascii_case(&other.source.get_slug());
     }
 }
 
