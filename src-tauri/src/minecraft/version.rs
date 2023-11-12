@@ -349,35 +349,32 @@ impl AssetObject {
         }
     }
 
-    pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
-        return self.download(assets_objects_folder, progress).await;
-    }
-
-}
-
-#[derive(Deserialize, Clone)]
-pub struct NoriskAssetObject {
-    pub hash: String,
-    pub size: i64,
-}
-
-impl NoriskAssetObject {
-
-    pub async fn download(&self, branch: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+    pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
-        let asset_folder = assets_objects_folder.join(&self.hash[0..2]);
 
-        if !asset_folder.exists() {
-            fs::create_dir(&asset_folder).await?;
+        let mut path_parts: Vec<&str> = file_path.split("/").collect();
+        
+        let mut asset_file_path = assets_objects_folder.clone();
+        for part in path_parts.clone() {
+            asset_file_path = asset_file_path.join(part);
         }
 
-        let asset_path = asset_folder.join(&self.hash);
+        path_parts.pop();
 
-        return if !asset_path.exists() {
+        let mut asset_path = assets_objects_folder.clone();
+        for part in path_parts {
+            asset_path = asset_path.join(part);
+        }
+
+        if !asset_path.exists() {
+            fs::create_dir_all(&asset_path).await?;
+        }
+
+        return if !asset_file_path.exists() {
             progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
 
             info!("Downloading {}", self.hash);
-            download_file_untracked(&*format!("https://api.norisk.gg/launcherapi/v1/assets/{}/{}/{}", branch, &self.hash[0..2], &self.hash), asset_path).await?;
+            download_file_untracked(&*format!("https://api.norisk.gg/launcherapi/v1/assets/{}/{}/{}", branch, &self.hash[0..2], &self.hash), asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
@@ -386,8 +383,12 @@ impl NoriskAssetObject {
         }
     }
 
-    pub async fn download_destructing(self, branch: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
-        return self.download(branch, assets_objects_folder, progress).await;
+    pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        return self.download(assets_objects_folder, progress).await;
+    }
+    
+    pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        return self.download_norisk_cosmetic(branch, file_path, assets_objects_folder, progress).await;
     }
 
 }

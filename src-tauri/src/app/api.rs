@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use tracing::debug;
 
 use crate::HTTP_CLIENT;
-use crate::minecraft::version::NoriskAssetObject;
+use crate::minecraft::version::AssetObject;
 use crate::utils::get_maven_artifact_path;
 
 /// API endpoint url
@@ -365,5 +365,5 @@ pub struct JreSource {
 ///
 #[derive(Deserialize)]
 pub struct NoriskAssets {
-    pub objects: HashMap<String, NoriskAssetObject>,
+    pub objects: HashMap<String, AssetObject>,
 }

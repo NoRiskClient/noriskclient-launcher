@@ -1,21 +1,20 @@
-use std::{path::{Path, PathBuf}};
+use std::{path::{Path, PathBuf}, collections::HashMap};
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use std::process::{exit};
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 
-use serde_json::Map;
 use tracing::*;
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 
-use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::NoriskAssetObject};
-use crate::app::api::{NoRiskLaunchManifest};
+use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::AssetObject};
+use crate::app::api::NoRiskLaunchManifest;
 use crate::error::LauncherError;
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
 use crate::minecraft::rule_interpreter;
@@ -231,20 +230,20 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let game_dir = data.join("gameDir").join(manifest.build.branch.clone());
     
     // Norisk Assets
-    let norisk_asset_dir = game_dir.join("assets");
+    let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
     fs::create_dir_all(&norisk_asset_dir).await?;
     
     let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone()).await;
 
-    let norisk_asset_objects_to_download: Vec<NoriskAssetObject> = match json_data {
-        Ok(norisk_assets) => norisk_assets.objects.values().map(|x| x.to_owned()).collect::<Vec<_>>(),
+    let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
+        Ok(norisk_assets) => norisk_assets.objects,
         Err(err) => {
             eprintln!("Error fetching norisk_assets: {}", err);
-            Vec::new()
+            HashMap::new()
         }
     };
     let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
-    let norisk_asset_max = norisk_asset_objects_to_download.len() as u64;
+    let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
 
     launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
@@ -257,9 +256,9 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
             let branch_clone = manifest.build.branch.clone();
             
             async move {
-                let hash = asset_object.hash.clone();
+                let hash = asset_object.1.hash.clone();
 
-                match asset_object.download_destructing(branch_clone, folder_clone, data_clone.clone()).await {
+                match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
                     Ok(downloaded) => {
                         let curr = download_count.fetch_add(1, Ordering::Relaxed);
 
