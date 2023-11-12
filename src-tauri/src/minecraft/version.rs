@@ -355,6 +355,43 @@ impl AssetObject {
 
 }
 
+#[derive(Deserialize, Clone)]
+pub struct NoriskAssetObject {
+    pub hash: String,
+    pub size: i64,
+}
+
+impl NoriskAssetObject {
+
+    pub async fn download(&self, branch: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
+        let asset_folder = assets_objects_folder.join(&self.hash[0..2]);
+
+        if !asset_folder.exists() {
+            fs::create_dir(&asset_folder).await?;
+        }
+
+        let asset_path = asset_folder.join(&self.hash);
+
+        return if !asset_path.exists() {
+            progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
+
+            info!("Downloading {}", self.hash);
+            download_file_untracked(&*format!("https://api.norisk.gg/launcherapi/v1/assets/{}/{}/{}", branch, &self.hash[0..2], &self.hash), asset_path).await?;
+            info!("Downloaded {}", self.hash);
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub async fn download_destructing(self, branch: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        return self.download(branch, assets_objects_folder, progress).await;
+    }
+
+}
+
 #[derive(Deserialize)]
 pub struct Downloads {
     pub client: Option<Download>,

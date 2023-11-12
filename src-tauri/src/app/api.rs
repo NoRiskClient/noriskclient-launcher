@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use tracing::debug;
 
 use crate::HTTP_CLIENT;
+use crate::minecraft::version::NoriskAssetObject;
 use crate::utils::get_maven_artifact_path;
 
 /// API endpoint url
@@ -56,6 +57,11 @@ impl ApiEndpoints {
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
         Self::request_from_norisk_endpoint(&format!("version/jre/{}/{}/{}", os_name, os_arch, jre_version)).await
+    }
+
+    /// Request norisk assets json for specific branch
+    pub async fn norisk_assets(branch: String) -> Result<NoriskAssets> {
+        Self::request_from_norisk_endpoint(&format!("assets/{}", branch)).await
     }
 
     /// Request JSON formatted data from launcher API
@@ -352,4 +358,12 @@ pub enum LoaderSubsystem {
 pub struct JreSource {
     pub version: u32,
     pub download_url: String,
+}
+
+///
+/// JSON struct of norisk assets json
+///
+#[derive(Deserialize)]
+pub struct NoriskAssets {
+    pub objects: HashMap<String, NoriskAssetObject>,
 }
