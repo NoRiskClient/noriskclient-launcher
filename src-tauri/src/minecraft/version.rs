@@ -370,7 +370,23 @@ impl AssetObject {
             fs::create_dir_all(&asset_path).await?;
         }
 
-        return if !asset_file_path.exists() {
+        let mut download = false;
+
+        if (asset_file_path.exists()) {
+            let sha1 = sha1sum(&asset_file_path)?;
+
+            if &self.hash == &sha1 {
+                // If sha1 matches, return
+                info!("Norisk asset {} already exists and matches sha1.", &self.hash);
+            } else {
+                info!("Norisk asset {} already exists but does not match sha1.", &self.hash);
+                download = true;
+            }
+        } else {
+            download = true;
+        }
+
+        return if download {
             progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
 
             info!("Downloading {}", self.hash);
