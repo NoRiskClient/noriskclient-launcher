@@ -125,7 +125,7 @@
 
     let failed = false;
     const trySave = async () => {
-      await invoke("save_player_skin", { location: location, slim: slim ?? false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).accessToken })
+      await invoke("save_player_skin", { location: location, slim: slim ?? false, accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).mcToken })
       .then(() => {
         isLoading = false;
         dispatch("home")
