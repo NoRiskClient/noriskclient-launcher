@@ -1,8 +1,8 @@
-use std::{path::{Path, PathBuf}};
+use std::{path::{Path, PathBuf}, collections::HashMap};
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use std::process::{exit};
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -13,8 +13,8 @@ use tracing::*;
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 
-use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}};
-use crate::app::api::{NoRiskLaunchManifest};
+use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::AssetObject};
+use crate::app::api::NoRiskLaunchManifest;
 use crate::error::LauncherError;
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
 use crate::minecraft::rule_interpreter;
@@ -182,7 +182,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
 
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadLibraries, libraries_max, libraries_max));
 
-    // Assets
+    // Minecraft Assets
     let assets_folder = data.join("assets");
     let indexes_folder: PathBuf = assets_folder.join("indexes");
     let objects_folder: PathBuf = assets_folder.join("objects");
@@ -196,7 +196,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let assets_downloaded = Arc::new(AtomicU64::new(0));
     let asset_max = asset_objects_to_download.len() as u64;
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking assets..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Minecraft assets..."));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, asset_max));
 
     let _: Vec<Result<()>> = stream::iter(
@@ -214,7 +214,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
                         if downloaded {
                             // the progress bar is only being updated when a asset has been downloaded to improve speeds
                             data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, asset_max));
-                            data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded asset {}", hash)));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Minecraft asset {}", hash)));
                         }
                     }
                     Err(err) => error!("Unable to download asset {}: {:?}", hash, err)
@@ -227,12 +227,59 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
 
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, asset_max, asset_max));
 
+    let game_dir = data.join("gameDir").join(manifest.build.branch.clone());
+    
+    // Norisk Assets
+    let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
+    fs::create_dir_all(&norisk_asset_dir).await?;
+    
+    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone()).await;
+
+    let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
+        Ok(norisk_assets) => norisk_assets.objects,
+        Err(err) => {
+            eprintln!("Error fetching norisk_assets: {}", err);
+            HashMap::new()
+        }
+    };
+    let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
+    let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
+
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
+
+    let _: Vec<Result<()>> = stream::iter(
+        norisk_asset_objects_to_download.into_iter().map(|asset_object| {
+            let download_count = norisk_assets_downloaded.clone();
+            let data_clone = launcher_data_arc.clone();
+            let folder_clone = norisk_asset_dir.clone();
+            let branch_clone = manifest.build.branch.clone();
+            
+            async move {
+                let hash = asset_object.1.hash.clone();
+
+                match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
+                    Ok(downloaded) => {
+                        let curr = download_count.fetch_add(1, Ordering::Relaxed);
+
+                        if downloaded {
+                            // the progress bar is only being updated when a asset has been downloaded to improve speeds
+                            data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, norisk_asset_max));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+                        }
+                    }
+                    Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
+                }
+
+                Ok(())
+            }
+        })
+    ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
+
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, norisk_asset_max, norisk_asset_max));
+
     // Game
-    let game_dir = data.join("gameDir").join(manifest.build.branch);
-    fs::create_dir_all(&game_dir).await?;
-
     let java_runtime = JavaRuntime::new(java_bin);
-
 
     let mut command_arguments = Vec::new();
 

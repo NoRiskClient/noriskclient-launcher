@@ -349,8 +349,62 @@ impl AssetObject {
         }
     }
 
+    pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
+
+        let mut path_parts: Vec<&str> = file_path.split("/").collect();
+        
+        let mut asset_file_path = assets_objects_folder.clone();
+        for part in path_parts.clone() {
+            asset_file_path = asset_file_path.join(part);
+        }
+
+        path_parts.pop();
+
+        let mut asset_path = assets_objects_folder.clone();
+        for part in path_parts {
+            asset_path = asset_path.join(part);
+        }
+
+        if !asset_path.exists() {
+            fs::create_dir_all(&asset_path).await?;
+        }
+
+        let mut download = false;
+
+        if (asset_file_path.exists()) {
+            let sha1 = sha1sum(&asset_file_path)?;
+
+            if &self.hash == &sha1 {
+                // If sha1 matches, return
+                info!("Norisk asset {} already exists and matches sha1.", &self.hash);
+            } else {
+                info!("Norisk asset {} already exists but does not match sha1.", &self.hash);
+                download = true;
+            }
+        } else {
+            download = true;
+        }
+
+        return if download {
+            progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
+
+            info!("Downloading {}", self.hash);
+            download_file_untracked(&*format!("https://api.norisk.gg/launcherapi/v1/assets/{}/{}/{}", branch, &self.hash[0..2], &self.hash), asset_file_path).await?;
+            info!("Downloaded {}", self.hash);
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         return self.download(assets_objects_folder, progress).await;
+    }
+    
+    pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        return self.download_norisk_cosmetic(branch, file_path, assets_objects_folder, progress).await;
     }
 
 }
