@@ -40,8 +40,8 @@ impl ApiEndpoints {
         Self::post_from_refresh_endpoint("auth/rust_refresh_only", body).await
     }
 
-    pub async fn refresh_token_maybe_fixed(body: &str) -> Result<AuthTokenResponse> {
-        Self::post_from_refresh_endpoint("auth/refresh_only", body).await
+    pub async fn refresh_token_maybe_fixed(body: &str) -> Result<AuthTokenResponseWithMcToken> {
+        Self::post_from_refresh_endpoint("auth/rust_refresh_only", body).await
     }
 
     /// Request all available branches
@@ -138,6 +138,14 @@ pub struct AuthTokenResponse {
     pub refresh_token: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AuthTokenResponseWithMcToken {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub mc_token: String
+}
+
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoginData {
     #[serde(rename = "mcToken")]
@@ -169,12 +177,12 @@ impl LoginData {
             Ok(response) => {
                 debug!("Refreshed auth... {:?}",response);
                 Ok(LoginData {
-                    uuid: self.uuid, //iwie returned response eine andere UUID XD?
+                    uuid: self.uuid,
                     access_token: response.access_token,
                     refresh_token: response.refresh_token,
                     username: self.username,
-                    norisk_token: self.norisk_token,
-                    mc_token: self.mc_token,
+                    norisk_token: self.norisk_token, //TODO updaten
+                    mc_token: response.mc_token,
                 })
             }
             Err(err) => {
