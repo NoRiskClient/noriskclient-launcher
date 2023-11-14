@@ -28,7 +28,7 @@ this project entirely or partially for free and even commercially. However, plea
 Do the above and share your source code with everyone; just like we do.
 
 ## Compile it yourself!
-Noriskclient launcher is using Tauri and is written in the programming language Rust, so make sure that it is installed properly. Instructions can be found on [Rust's website](https://www.rust-lang.org/learn/get-started). It also requires NodeJS.
+NoriskClient launcher is using Tauri and is written in the programming language Rust, so make sure that it is installed properly. Instructions can be found on [Rust's website](https://www.rust-lang.org/learn/get-started). It also requires NodeJS.
 1. Clone the repository using `git clone --recurse-submodules https://github.com/NoRiskClient/noriskclient-launcher`. 
 2. Navigate into your local repository folder.
 3. Execute the command `npm i`
