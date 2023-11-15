@@ -361,7 +361,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
         if let Some(last_part) = parts.last() {
             keys_vec.push(last_part);
         }
-    } // FIXME -> use file names not entire path -> matching wont work later down the line 
+    }
     let file_names: &[&str] = &keys_vec;
     let mut verifyed: u64 = 0;
 
