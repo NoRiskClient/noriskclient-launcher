@@ -1,5 +1,4 @@
-use std::{path::{Path, PathBuf}, collections::HashMap};
-use std::collections::HashSet;
+use std::{path::{Path, PathBuf}, collections::HashMap};use std::collections::HashSet;
 use std::fmt::Write;
 
 use std::process::exit;
@@ -366,7 +365,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
     let mut verifyed: u64 = 0;
 
     launcher_data_arc.progress_update(ProgressUpdate::set_label("Verifying Norisk assets..."));
-    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, verifyed, file_names.len() as u64));
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifiedAssets, verifyed, file_names.len() as u64));
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
@@ -380,8 +379,8 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
                 }
             } else {
                 verifyed += 1;
-                launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyedAssets, verifyed, file_names.len() as u64));
-                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("Verifyed Norisk asset {}", file_name)));
+                launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifiedAssets, verifyed, file_names.len() as u64));
+                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("Verified Norisk asset {}", file_name)));
             }
         }
     }
