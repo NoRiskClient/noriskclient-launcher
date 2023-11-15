@@ -9,7 +9,7 @@ pub enum ProgressUpdateSteps {
     DownloadClientJar,
     DownloadLibraries,
     DownloadAssets,
-    VerifyedAssets,
+    VerifiedAssets,
 }
 
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
