@@ -9,6 +9,7 @@ pub enum ProgressUpdateSteps {
     DownloadClientJar,
     DownloadLibraries,
     DownloadAssets,
+    VerifyedAssets,
 }
 
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
@@ -31,6 +32,7 @@ impl ProgressUpdateSteps {
             ProgressUpdateSteps::DownloadClientJar => 2,
             ProgressUpdateSteps::DownloadLibraries => 3,
             ProgressUpdateSteps::DownloadAssets => 4,
+            ProgressUpdateSteps::VerifyedAssets => 5,
         }
     }
 }
