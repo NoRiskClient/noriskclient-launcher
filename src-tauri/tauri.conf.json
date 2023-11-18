@@ -2,13 +2,13 @@
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:5173",
+    "devPath": "http://127.0.0.1:5173",
     "distDir": "../dist",
     "withGlobalTauri": true
   },
   "package": {
     "productName": "NoRiskClient",
-    "version": "0.2.8"
+    "version": "0.2.9"
   },
   "tauri": {
     "allowlist": {
