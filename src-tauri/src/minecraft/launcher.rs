@@ -12,6 +12,7 @@ use futures::stream::{self, StreamExt};
 use tracing::*;
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
+use walkdir::WalkDir;
 
 use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::AssetObject};
 use crate::app::api::NoRiskLaunchManifest;
@@ -242,41 +243,48 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
             HashMap::new()
         }
     };
-    let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
-    let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
-    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
-
-    let _: Vec<Result<()>> = stream::iter(
-        norisk_asset_objects_to_download.into_iter().map(|asset_object| {
-            let download_count = norisk_assets_downloaded.clone();
-            let data_clone = launcher_data_arc.clone();
-            let folder_clone = norisk_asset_dir.clone();
-            let branch_clone = manifest.build.branch.clone();
-            
-            async move {
-                let hash = asset_object.1.hash.clone();
-
-                match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
-                    Ok(downloaded) => {
-                        let curr = download_count.fetch_add(1, Ordering::Relaxed);
-
-                        if downloaded {
-                            // the progress bar is only being updated when a asset has been downloaded to improve speeds
-                            data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, norisk_asset_max));
-                            data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+    if norisk_asset_objects_to_download.len() > 0 {
+        let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
+        let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
+    
+        launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
+        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
+    
+        let _: Vec<Result<()>> = stream::iter(
+            norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
+                let download_count = norisk_assets_downloaded.clone();
+                let data_clone = launcher_data_arc.clone();
+                let folder_clone = norisk_asset_dir.clone();
+                let branch_clone = manifest.build.branch.clone();
+                
+                async move {
+                    let hash = asset_object.1.hash.clone();
+    
+                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
+                        Ok(downloaded) => {
+                            let curr = download_count.fetch_add(1, Ordering::Relaxed);
+    
+                            if downloaded {
+                                // the progress bar is only being updated when a asset has been downloaded to improve speeds
+                                data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, norisk_asset_max));
+                                data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+                            }
                         }
+                        Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                     }
-                    Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
+    
+                    Ok(())
                 }
-
-                Ok(())
-            }
-        })
-    ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
-
-    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, norisk_asset_max, norisk_asset_max));
+            })
+        ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
+    
+        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, norisk_asset_max, norisk_asset_max));
+    
+        // Delete usused norisk assets
+    
+        verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
+    }
 
     // Game
     let java_runtime = JavaRuntime::new(java_bin);
@@ -346,6 +354,43 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     }
 
     Ok(())
+}
+
+async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap<String, AssetObject>, launcher_data_arc: Arc<LauncherData<D>>) {
+    let mut keys_vec: Vec<&str> = vec![];
+    for location in asset_objetcs.keys() {
+        let parts: Vec<&str> = location.split("/").collect();
+
+        if let Some(last_part) = parts.last() {
+            keys_vec.push(last_part);
+        }
+    }
+    keys_vec.push(".DS_Store");
+    let file_names: &[&str] = &keys_vec;
+    let mut verifyed: u64 = 0;
+
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("Verifying Norisk assets..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, verifyed, file_names.len() as u64));
+
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path().to_owned();
+        if path.is_file() {
+            let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+            if !file_names.contains(&file_name.as_ref()) {
+                if let Err(err) = fs::remove_file(&path).await {
+                    eprintln!("Failed to remove {}: {}", path.display(), err);
+                } else {
+                    println!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
+                }
+            } else {
+                verifyed += 1;
+                launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, verifyed, file_names.len() as u64));
+                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("Verified Norisk asset {}", file_name)));
+            }
+        }
+    }
+
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, file_names.len() as u64, file_names.len() as u64));
 }
 
 pub struct LaunchingParameter {
