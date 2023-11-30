@@ -478,6 +478,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
+        dev_mode: options.dev_mode,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },

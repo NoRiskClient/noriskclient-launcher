@@ -306,6 +306,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
         mapped.push(
             process_templates(x, |output, param| {
                 match param {
+                    "dev_mode" => output.push_str(&launching_parameter.dev_mode.to_string()),
                     "auth_player_name" => output.push_str(&launching_parameter.auth_player_name),
                     "version_name" => output.push_str(&version_profile.id),
                     "game_directory" => output.push_str(game_dir.absolutize().unwrap().to_str().unwrap()),
@@ -394,6 +395,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
 }
 
 pub struct LaunchingParameter {
+    pub dev_mode: bool,
     pub memory: i64,
     pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
