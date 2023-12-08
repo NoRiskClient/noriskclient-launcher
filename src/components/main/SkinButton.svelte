@@ -5,6 +5,7 @@
   import { scale } from "svelte/transition";
   import { quintOut } from "svelte/easing";
   import FallBackSkin from "../../images/fallback_skin_kopf.png";
+  import SteveSkin from "../../images/steve_head.png";
 
   const dispatch = createEventDispatcher();
 
@@ -129,7 +130,7 @@
       {/if}
     {:else}
       <img class="skin-kopf"
-           src={"https://crafatar.com/avatars/c06f8906-4c8a-4911-9c29-ea1dbd1aab82"}
+           src={SteveSkin}
            alt="Skin Kopf"
            on:click={handleAddAccount}
       >
