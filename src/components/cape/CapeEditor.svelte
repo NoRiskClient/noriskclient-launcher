@@ -52,7 +52,7 @@
   {#if capeHash !== null}
     <h1 class="header-text">Your Cape</h1>
     <div class="crop">
-      <img src={`https://dl.hglabor.de/capes/prod/${capeHash}.png`} alt="Current Cape">
+      <img src={`https://dl.norisk.gg/capes/prod/${capeHash}.png`} alt="Current Cape">
     </div>
   {:else}
     <h1 class="red-text empty-text">[No Cape Uploaded]</h1>

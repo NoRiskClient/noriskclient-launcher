@@ -17,7 +17,7 @@ pub struct CapeApiEndpoints;
 
 impl CapeApiEndpoints {
     pub async fn equip_cape(token: &str, hash: &str) -> Result<String, String> {
-        let image_url = format!("https://dl.hglabor.de/capes/prod/{}.png", hash);
+        let image_url = format!("https://dl.norisk.gg/capes/prod/{}.png", hash);
 
         return match reqwest::get(image_url).await {
             Ok(response) => {
