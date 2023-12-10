@@ -1,11 +1,11 @@
 <script>
-  import {onMount} from "svelte";
-  import {invoke} from "@tauri-apps/api";
-  import {appWindow} from "@tauri-apps/api/window";
-  import {scale} from "svelte/transition";
-  import {quintOut} from "svelte/easing";
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api";
+  import { appWindow } from "@tauri-apps/api/window";
+  import { scale } from "svelte/transition";
+  import { quintOut } from "svelte/easing";
   import SkinButton from "./SkinButton.svelte";
-  import {listen} from "@tauri-apps/api/event";
+  import { listen } from "@tauri-apps/api/event";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
@@ -18,6 +18,7 @@
   let branches = ["PRODUCTION"];
   let currentBranchIndex = 0;
   let clientRunning;
+  let refreshingAccount = false;
 
   let progressBarMax = 0;
   let progressBarProgress = 0;
@@ -91,6 +92,31 @@
   });
 
   export async function runClient() {
+    if (refreshingAccount) {
+      console.error("Refreshing Account...");
+      return;
+    }
+    refreshingAccount = true;
+    await invoke("refresh_via_norisk", { loginData: options.accounts.find(obj => obj.uuid === options.currentUuid) })
+      .then((account) => {
+        console.debug("Current UUID", options.currentUuid);
+        console.debug("Account UUID", account.uuid);
+        // Index des vorhandenen Objekts mit derselben UUID suchen
+        let existingIndex = options.accounts.findIndex(obj => obj.uuid === account.uuid);
+        if (existingIndex !== -1) {
+          console.debug("###Replaced Refreshed  Account");
+          options.accounts[existingIndex] = account;
+        } else {
+          console.debug("###Added Refreshed Account");
+          options.accounts.push(account);
+        }
+
+        options.store();
+      })
+      //TODO also aktueller stand ist dass das hier manchmal failen kann und deswegen kann man nicht refreshen haha einfach hoffen lol...
+      .catch(e => console.error("###" + e));
+    refreshingAccount = false;
+
     console.log("Client started");
     let branch = branches[currentBranchIndex];
     let installedMods = [];
@@ -138,7 +164,7 @@
       showSkinScreen = true;
     }, 300);
   }
-  
+
   function handleOpenCapeScreen() {
     showCapeScreenHack = true;
     setTimeout(() => {
@@ -216,16 +242,21 @@
           on:click={() => handleSwitchBranch(true)}>
         &lt;</h1>
       <section style="display:flex;justify-content:center">
-        {#each branches as branch, i}
-          {#if currentBranchIndex === i}
-            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                class="nes-font"
-                style="position:absolute"
-                on:selectstart={preventSelection}
-                on:mousedown={preventSelection}
-            > {branches[currentBranchIndex].toUpperCase()} VERSION</h1>
-          {/if}
-        {/each}
+        {#if refreshingAccount}
+          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }} style="position:absolute">
+            Loading Account...</h1>
+        {:else}
+          {#each branches as branch, i}
+            {#if currentBranchIndex === i}
+              <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                  class="nes-font"
+                  style="position:absolute"
+                  on:selectstart={preventSelection}
+                  on:mousedown={preventSelection}
+              > {branches[currentBranchIndex].toUpperCase()} VERSION</h1>
+            {/if}
+          {/each}
+        {/if}
       </section>
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection}
