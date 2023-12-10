@@ -306,7 +306,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
         mapped.push(
             process_templates(x, |output, param| {
                 match param {
-                    "dev_mode" => output.push_str(&launching_parameter.dev_mode.to_string()),
+                    "norisk.devMode" => output.push_str(&launching_parameter.dev_mode.to_string()),
                     "auth_player_name" => output.push_str(&launching_parameter.auth_player_name),
                     "version_name" => output.push_str(&version_profile.id),
                     "game_directory" => output.push_str(game_dir.absolutize().unwrap().to_str().unwrap()),
