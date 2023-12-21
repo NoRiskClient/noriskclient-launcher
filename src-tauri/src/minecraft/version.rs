@@ -128,7 +128,7 @@ pub enum ArgumentDeclaration {
 
 impl ArgumentDeclaration {
 
-    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
+    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, norisk_token: String, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
         command_arguments.push(format!("-Xmx{}M", parameter.memory));
         command_arguments.push("-XX:+UnlockExperimentalVMOptions".to_string());
         command_arguments.push("-XX:+UseG1GC".to_string());
@@ -137,6 +137,7 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:MaxGCPauseMillis=50".to_string());
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
         command_arguments.push(format!("-Dnorisk.token={}",norisk_token));
+        command_arguments.push(format!("-Dnorisk.devMode={}",));
 
         match self {
             ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec!["-Djava.library.path=${natives_directory}".to_string(), "-cp".to_string(), "${classpath}".to_string()]),
@@ -353,7 +354,7 @@ impl AssetObject {
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
 
         let mut path_parts: Vec<&str> = file_path.split("/").collect();
-        
+
         let mut asset_file_path = assets_objects_folder.clone();
         for part in path_parts.clone() {
             asset_file_path = asset_file_path.join(part);
@@ -402,7 +403,7 @@ impl AssetObject {
     pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         return self.download(assets_objects_folder, progress).await;
     }
-    
+
     pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         return self.download_norisk_cosmetic(branch, file_path, assets_objects_folder, progress).await;
     }

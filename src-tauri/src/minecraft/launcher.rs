@@ -229,11 +229,11 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, asset_max, asset_max));
 
     let game_dir = data.join("gameDir").join(manifest.build.branch.clone());
-    
+
     // Norisk Assets
     let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
     fs::create_dir_all(&norisk_asset_dir).await?;
-    
+
     let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone()).await;
 
     let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
@@ -247,24 +247,24 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     if norisk_asset_objects_to_download.len() > 0 {
         let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
         let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
-    
+
         launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
         launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
-    
+
         let _: Vec<Result<()>> = stream::iter(
             norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
                 let download_count = norisk_assets_downloaded.clone();
                 let data_clone = launcher_data_arc.clone();
                 let folder_clone = norisk_asset_dir.clone();
                 let branch_clone = manifest.build.branch.clone();
-                
+
                 async move {
                     let hash = asset_object.1.hash.clone();
-    
+
                     match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
                         Ok(downloaded) => {
                             let curr = download_count.fetch_add(1, Ordering::Relaxed);
-    
+
                             if downloaded {
                                 // the progress bar is only being updated when a asset has been downloaded to improve speeds
                                 data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, norisk_asset_max));
@@ -273,16 +273,16 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
                         }
                         Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                     }
-    
+
                     Ok(())
                 }
             })
         ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
-    
+
         launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, norisk_asset_max, norisk_asset_max));
-    
+
         // Delete usused norisk assets
-    
+
         verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
     }
 
@@ -292,7 +292,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let mut command_arguments = Vec::new();
 
     // JVM Args
-    version_profile.arguments.add_jvm_args_to_vec(norisk_token,&mut command_arguments, &launching_parameter, &features)?;
+    version_profile.arguments.add_jvm_args_to_vec(norisk_token, &launching_parameter.dev_mode.to_string(), &mut command_arguments, &launching_parameter, &features)?;
 
     // Main class
     command_arguments.push(version_profile.main_class.as_ref().ok_or_else(|| LauncherError::InvalidVersionProfile("Main class unspecified".to_string()))?.to_owned());
@@ -306,7 +306,6 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
         mapped.push(
             process_templates(x, |output, param| {
                 match param {
-                    "norisk.devMode" => output.push_str(&launching_parameter.dev_mode.to_string()),
                     "auth_player_name" => output.push_str(&launching_parameter.auth_player_name),
                     "version_name" => output.push_str(&version_profile.id),
                     "game_directory" => output.push_str(game_dir.absolutize().unwrap().to_str().unwrap()),
