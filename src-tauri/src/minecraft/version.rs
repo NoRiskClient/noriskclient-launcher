@@ -16,11 +16,10 @@ use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
 
 #[derive(Deserialize)]
 pub struct VersionManifest {
-    pub versions: Vec<ManifestVersion>
+    pub versions: Vec<ManifestVersion>,
 }
 
 impl VersionManifest {
-
     pub async fn download() -> Result<Self> {
         let response = HTTP_CLIENT.get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
             .send().await?
@@ -29,7 +28,6 @@ impl VersionManifest {
 
         Ok(manifest)
     }
-
 }
 
 #[derive(Deserialize)]
@@ -40,7 +38,7 @@ pub struct ManifestVersion {
     pub url: String,
     pub time: String,
     #[serde(rename = "releaseTime")]
-    pub release_time: String
+    pub release_time: String,
 }
 
 #[derive(Deserialize)]
@@ -63,7 +61,7 @@ pub struct VersionProfile {
     #[serde(rename = "type")]
     pub version_type: String,
     #[serde(flatten)]
-    pub arguments: ArgumentDeclaration
+    pub arguments: ArgumentDeclaration,
 }
 
 impl VersionProfile {
@@ -127,8 +125,7 @@ pub enum ArgumentDeclaration {
 }
 
 impl ArgumentDeclaration {
-
-    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, norisk_token: String, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
+    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, experimental: &bool, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
         command_arguments.push(format!("-Xmx{}M", parameter.memory));
         command_arguments.push("-XX:+UnlockExperimentalVMOptions".to_string());
         command_arguments.push("-XX:+UseG1GC".to_string());
@@ -136,8 +133,8 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:G1ReservePercent=20".to_string());
         command_arguments.push("-XX:MaxGCPauseMillis=50".to_string());
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
-        command_arguments.push(format!("-Dnorisk.token={}",norisk_token));
-        command_arguments.push(format!("-Dnorisk.devMode={}",));
+        command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
+        command_arguments.push(format!("-Dnorisk.experimental={}", experimental));
 
         match self {
             ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec!["-Djava.library.path=${natives_directory}".to_string(), "-cp".to_string(), "${classpath}".to_string()]),
@@ -158,7 +155,7 @@ impl ArgumentDeclaration {
                         .split(" ")
                         .map(ToOwned::to_owned)
                 );
-            },
+            }
             ArgumentDeclaration::V21(decl) => {
                 ArgumentDeclaration::check_rules_and_add(command_arguments, &decl.arguments.game, features)?;
             }
@@ -188,7 +185,7 @@ impl ArgumentDeclaration {
 #[derive(Deserialize)]
 pub struct V14ArgumentDeclaration {
     #[serde(rename = "minecraftArguments")]
-    pub minecraft_arguments: Option<String>
+    pub minecraft_arguments: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -213,24 +210,23 @@ pub struct Arguments {
     pub game: Vec<Argument>,
     #[serde(default)]
     #[serde(deserialize_with = "vec_argument")]
-    pub jvm: Vec<Argument>
+    pub jvm: Vec<Argument>,
 }
 
 #[derive(Deserialize)]
 pub struct Argument {
     pub rules: Option<Vec<Rule>>,
-    pub value: ArgumentValue
+    pub value: ArgumentValue,
 }
 
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum ArgumentValue {
     SINGLE(String),
-    VEC(Vec<String>)
+    VEC(Vec<String>),
 }
 
 impl FromStr for Argument {
-
     type Err = Void;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -239,10 +235,9 @@ impl FromStr for Argument {
 }
 
 
-
 fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
-where
-    D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
     struct Wrapper(#[serde(deserialize_with = "string_or_struct")] Argument);
@@ -252,16 +247,15 @@ where
 }
 
 fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: Deserialize<'de> + FromStr<Err = Void>,
-    D: Deserializer<'de>,
+    where
+        T: Deserialize<'de> + FromStr<Err=Void>,
+        D: Deserializer<'de>,
 {
-
     struct StringOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> Visitor<'de> for StringOrStruct<T>
-    where
-        T: Deserialize<'de> + FromStr<Err = Void>,
+        where
+            T: Deserialize<'de> + FromStr<Err=Void>,
     {
         type Value = T;
 
@@ -270,15 +264,15 @@ where
         }
 
         fn visit_str<E>(self, value: &str) -> Result<T, E>
-        where
-            E: serde::de::Error,
+            where
+                E: serde::de::Error,
         {
             Ok(FromStr::from_str(value).unwrap())
         }
 
         fn visit_map<M>(self, map: M) -> Result<T, M::Error>
-        where
-            M: MapAccess<'de>,
+            where
+                M: MapAccess<'de>,
         {
             Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
         }
@@ -294,11 +288,10 @@ pub struct AssetIndexLocation {
     pub size: i64,
     #[serde(rename = "totalSize")]
     pub total_size: i64,
-    pub url: String
+    pub url: String,
 }
 
 impl AssetIndexLocation {
-
     pub async fn load_asset_index(&self, assets_root: &PathBuf) -> Result<AssetIndex> {
         let asset_index = assets_root.join(format!("{}.json", &self.id));
 
@@ -311,22 +304,20 @@ impl AssetIndexLocation {
         let content = &*fs::read(&asset_index).await?;
         Ok(serde_json::from_slice::<AssetIndex>(content)?)
     }
-
 }
 
 #[derive(Deserialize)]
 pub struct AssetIndex {
-    pub objects: HashMap<String, AssetObject>
+    pub objects: HashMap<String, AssetObject>,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct AssetObject {
     pub hash: String,
-    pub size: i64
+    pub size: i64,
 }
 
 impl AssetObject {
-
     pub async fn download(&self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
         let asset_folder = assets_objects_folder.join(&self.hash[0..2]);
@@ -347,7 +338,7 @@ impl AssetObject {
             Ok(true)
         } else {
             Ok(false)
-        }
+        };
     }
 
     pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
@@ -397,7 +388,7 @@ impl AssetObject {
             Ok(true)
         } else {
             Ok(false)
-        }
+        };
     }
 
     pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
@@ -407,7 +398,6 @@ impl AssetObject {
     pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         return self.download_norisk_cosmetic(branch, file_path, assets_objects_folder, progress).await;
     }
-
 }
 
 #[derive(Deserialize)]
@@ -416,7 +406,7 @@ pub struct Downloads {
     pub client_mappings: Option<Download>,
     pub server: Option<Download>,
     pub server_mappings: Option<Download>,
-    pub windows_server: Option<Download>
+    pub windows_server: Option<Download>,
 }
 
 
@@ -424,17 +414,15 @@ pub struct Downloads {
 pub struct Download {
     pub sha1: String,
     pub size: i64,
-    pub url: String
+    pub url: String,
 }
 
 impl Download {
-
     pub async fn download(&self, path: impl AsRef<Path>) -> Result<()> {
         download_file_untracked(&self.url, path).await?;
         info!("Downloaded {}", self.url);
         Ok(())
     }
-
 }
 
 #[derive(Deserialize, Clone)]
@@ -444,11 +432,10 @@ pub struct Library {
     pub natives: Option<HashMap<String, String>>,
     #[serde(default)]
     pub rules: Vec<Rule>,
-    pub url: Option<String>
+    pub url: Option<String>,
 }
 
-impl Library  {
-
+impl Library {
     pub fn get_library_download(&self) -> Result<LibraryDownloadInfo> {
         if let Some(artifact) = self.downloads.as_ref().and_then(|x| x.artifact.as_ref()) {
             return Ok(artifact.into());
@@ -472,7 +459,7 @@ impl Library  {
 pub struct Rule {
     pub action: RuleAction,
     pub os: Option<OsRule>,
-    pub features: Option<HashMap<String, bool>>
+    pub features: Option<HashMap<String, bool>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -487,13 +474,13 @@ pub enum RuleAction {
     #[serde(rename = "allow")]
     Allow,
     #[serde(rename = "disallow")]
-    Disallow
+    Disallow,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct LibraryDownloads {
     pub artifact: Option<LibraryArtifact>,
-    pub classifiers: Option<HashMap<String, LibraryArtifact>>
+    pub classifiers: Option<HashMap<String, LibraryArtifact>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -501,7 +488,7 @@ pub struct LibraryArtifact {
     pub path: String,
     pub sha1: String,
     pub size: i64,
-    pub url: String
+    pub url: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -509,7 +496,7 @@ pub struct LibraryDownloadInfo {
     pub path: String,
     pub sha1: Option<String>,
     pub size: Option<i64>,
-    pub url: String
+    pub url: String,
 }
 
 impl From<&LibraryArtifact> for LibraryDownloadInfo {
@@ -518,13 +505,12 @@ impl From<&LibraryArtifact> for LibraryDownloadInfo {
             path: artifact.path.to_owned(),
             sha1: Some(artifact.sha1.to_owned()),
             size: Some(artifact.size),
-            url: artifact.url.to_owned()
+            url: artifact.url.to_owned(),
         }
     }
 }
 
 impl LibraryDownloadInfo {
-
     async fn fetch_sha1(&self) -> Result<String> {
         HTTP_CLIENT.get(&format!("{}{}", &self.url, ".sha1"))
             .send().await?
@@ -608,7 +594,6 @@ impl LibraryDownloadInfo {
 
         Ok(library_path)
     }
-
 }
 
 #[derive(Deserialize)]

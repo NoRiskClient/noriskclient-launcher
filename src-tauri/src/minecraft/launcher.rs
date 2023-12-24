@@ -292,7 +292,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let mut command_arguments = Vec::new();
 
     // JVM Args
-    version_profile.arguments.add_jvm_args_to_vec(norisk_token, &launching_parameter.dev_mode.to_string(), &mut command_arguments, &launching_parameter, &features)?;
+    version_profile.arguments.add_jvm_args_to_vec(norisk_token, &launching_parameter.dev_mode, &mut command_arguments, &launching_parameter, &features)?;
 
     // Main class
     command_arguments.push(version_profile.main_class.as_ref().ok_or_else(|| LauncherError::InvalidVersionProfile("Main class unspecified".to_string()))?.to_owned());
