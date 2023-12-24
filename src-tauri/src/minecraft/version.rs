@@ -125,7 +125,7 @@ pub enum ArgumentDeclaration {
 }
 
 impl ArgumentDeclaration {
-    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, experimental: &bool, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
+    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
         command_arguments.push(format!("-Xmx{}M", parameter.memory));
         command_arguments.push("-XX:+UnlockExperimentalVMOptions".to_string());
         command_arguments.push("-XX:+UseG1GC".to_string());
@@ -134,7 +134,7 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:MaxGCPauseMillis=50".to_string());
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
-        command_arguments.push(format!("-Dnorisk.experimental={}", experimental));
+        command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
 
         match self {
             ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec!["-Djava.library.path=${natives_directory}".to_string(), "-cp".to_string(), "${classpath}".to_string()]),
