@@ -6,18 +6,26 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use tracing::debug;
 
-use crate::HTTP_CLIENT;
+use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::app::app_data::LauncherOptions;
 use crate::minecraft::version::AssetObject;
 use crate::utils::get_maven_artifact_path;
 
 /// API endpoint url
-pub const NORISK_LAUNCHER_API: &str = "https://api.norisk.gg";
 pub const NORISK_LAUNCHER_API_VERSION: &str = "launcherapi/v1";
 
 pub const CONTENT_FOLDER: &str = "NoRiskClient";
 
 /// Placeholder struct for API endpoints implementation
 pub struct ApiEndpoints;
+
+pub fn get_launcher_api_base(is_experimental: bool) -> String {
+    return if is_experimental {
+        String::from("https://api-staging.norisk.gg")
+    } else {
+        String::from("https://api.norisk.gg")
+    }
+}
 
 impl ApiEndpoints {
     /// Request all available branches
@@ -66,7 +74,8 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", NORISK_LAUNCHER_API, NORISK_LAUNCHER_API_VERSION, endpoint);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?
@@ -78,7 +87,8 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", "https://api.norisk.gg", "api/v1", endpoint);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
@@ -89,7 +99,8 @@ impl ApiEndpoints {
     }
 
     pub async fn post_from_refresh_endpoint<T: DeserializeOwned>(endpoint: &str, request_body: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", "https://api.norisk.gg", "api/v1", endpoint);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .body(request_body.to_string())
@@ -102,7 +113,8 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn post_from_await_endpoint<T: DeserializeOwned>(endpoint: &str, id: u32) -> Result<T> {
-        let url = format!("{}/{}/{}?{}={}", "https://api.norisk.gg", "api/v1", endpoint, "id", id);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint, "id", id);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
