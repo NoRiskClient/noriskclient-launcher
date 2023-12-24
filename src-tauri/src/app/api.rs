@@ -173,7 +173,7 @@ pub struct LoginData {
     #[serde(rename = "noriskToken")]
     pub norisk_token: String,
     #[serde(rename = "experimentalToken")]
-    pub experimental_token: String,
+    pub experimental_token: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -199,7 +199,7 @@ impl LoginData {
                     refresh_token: response.refresh_token,
                     username: response.mc_name,
                     norisk_token: if options.experimental_mode { self.norisk_token } else { response.norisk_token.clone() },
-                    experimental_token: if options.experimental_mode { response.norisk_token } else { self.experimental_token },
+                    experimental_token: if options.experimental_mode { Some(response.norisk_token) } else { self.experimental_token },
                     mc_token: response.mc_token,
                 })
             }

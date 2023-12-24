@@ -424,6 +424,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 
 #[tauri::command]
 async fn login_norisk_microsoft() -> Result<LoginData, String> {
+    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {
@@ -436,7 +437,11 @@ async fn login_norisk_microsoft() -> Result<LoginData, String> {
             match login_data {
                 Ok(response) => {
                     info!("Received NoRisk Auth Response");
-                    Ok(response)
+                    Ok(LoginData {
+                        norisk_token: if options.experimental_mode { String::from("") } else { response.norisk_token.clone() },
+                        experimental_token: Option::from(if options.experimental_mode { response.norisk_token } else { String::from("") }),
+                        ..response
+                    })
                 }
                 Err(err) => {
                     Err(format!("await auth error: {:?}", err))
@@ -514,6 +519,9 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
     let copy_of_runner_instance = runner_instance.clone();
 
+    let experimental_token = login_data.experimental_token.unwrap_or_default();
+    let norisk_token = login_data.norisk_token;
+
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -523,7 +531,11 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                 let keep_launcher_open = parameters.keep_launcher_open;
 
                 if let Err(e) = prelauncher::launch(
-                    if (options.experimental_mode) { &login_data.experimental_token } else { &login_data.norisk_token },
+                    &if options.experimental_mode {
+                        experimental_token
+                    } else {
+                        norisk_token
+                    },
                     launch_manifest,
                     parameters,
                     mods,
