@@ -266,7 +266,7 @@
     <SkinButton on:launch={runClient} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
          on:mousedown={preventSelection} class="copyright">
-      © 2000-2023 HGLabor/Friends Inc. v0.2.9
+      © 2000-2023 HGLabor/Friends Inc. v0.3.0
     </div>
   {/if}
 </div>
