@@ -401,8 +401,8 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches() -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches()
+async fn request_norisk_branches(is_experimental: bool) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(is_experimental)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)

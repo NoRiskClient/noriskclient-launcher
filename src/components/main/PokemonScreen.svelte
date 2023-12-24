@@ -15,7 +15,7 @@
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
   export let options;
-  let branches = ["PRODUCTION"];
+  let branches = [];
   let currentBranchIndex = 0;
   let clientRunning;
   let refreshingAccount = false;
@@ -67,16 +67,32 @@
     }
   }
 
-  onMount(async () => {
-    await invoke("request_norisk_branches")
+  async function requestBranches() {
+    await invoke("request_norisk_branches", {
+      isExperimental: options.experimentalMode,
+    })
       .then((result) => {
-        console.debug("Received Branches", result);
+        const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
+        console.debug("Received Branches Latest Branch: " + latestBranch, result);
         branches = result;
+        branches.sort(function(a, b) {
+          if (a === latestBranch) {
+            return -1;
+          } else if (b === latestBranch) {
+            return 1;
+          } else {
+            return a.localeCompare(b);
+          }
+        });
       })
       .catch((reason) => {
         alert(reason);
         console.error(reason);
       });
+  }
+
+  onMount(async () => {
+    await requestBranches();
   });
 
   listen("client-exited", () => {
@@ -122,6 +138,14 @@
     let installedMods = [];
     log = [];
     clientRunning = true;
+
+    if (options.experimentalMode) {
+      options.latestDevBranch = branch;
+    } else {
+      options.latestBranch = branch;
+    }
+
+    options.store();
 
     await invoke("get_installed_mods", {
       branch: branch,
@@ -209,7 +233,8 @@
   {/if}
 
   {#if settingsShown}
-    <SettingsModal bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
+    <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
+                   dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
 
   {#if clientLogShown}

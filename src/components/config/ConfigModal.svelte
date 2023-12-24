@@ -3,13 +3,18 @@
   import { invoke } from "@tauri-apps/api";
   import ConfigRadioButton from "./inputs/ConfigRadioButton.svelte";
   import ConfigTextInput from "./inputs/ConfigTextInput.svelte";
+  import { createEventDispatcher } from "svelte";
+
+  const dispatch = createEventDispatcher();
 
   export let showModal;
   export let options;
   export let dataFolderPath;
 
   function hideSettings() {
-    saveData()
+    saveData().then(() => {
+      dispatch("requestBranches");
+    });
     showModal = false;
   }
 
@@ -27,7 +32,7 @@
     if (confirm) {
       invoke("clear_data", { options }).then(() => {
         alert("Data cleared.");
-        options.reload()
+        options.reload();
       }).catch(e => {
         alert("Failed to clear data: " + e);
         console.error(e);
@@ -65,7 +70,8 @@
     </div>
     <!-- svelte-ignore a11y-autofocus -->
     <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR DATA</p>
+      <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>CLEAR
+        DATA</p>
     </div>
   </div>
 </dialog>
@@ -79,12 +85,12 @@
     }
 
     .close-button {
-      transition: transform 0.3s;
+        transition: transform 0.3s;
     }
 
     .close-button:hover {
-      transition: transform 0.3s;
-      transform: scale(1.2);
+        transition: transform 0.3s;
+        transform: scale(1.2);
     }
 
     .settings-wrapper {
@@ -152,9 +158,9 @@
         font-size: 18px;
         padding: 1em;
         text-shadow: 2px 2px #6e0000;
-      }
-      
-      .clear-data-button-wrapper p {
+    }
+
+    .clear-data-button-wrapper p {
         color: #ff0000;
         padding: 0.3em;
         cursor: pointer;

@@ -20,8 +20,6 @@ pub(crate) struct LauncherOptions {
     pub experimental_mode: bool,
     #[serde(rename = "dataPath")]
     pub data_path: String,
-    #[serde(rename = "showNightlyBuilds")]
-    pub show_nightly_builds: bool,
     #[serde(rename = "memoryPercentage")]
     pub memory_percentage: i32,
     #[serde(rename = "customJavaPath", default)]
@@ -30,16 +28,14 @@ pub(crate) struct LauncherOptions {
     pub custom_java_args: String,
     #[serde(rename = "theme", default)]
     pub theme: String,
-    #[serde(rename = "preferredBranch")]
-    pub preferred_branch: Option<String>,
+    #[serde(rename = "latestBranch")]
+    pub latest_branch: Option<String>,
+    #[serde(rename = "latestDevBranch")]
+    pub latest_dev_branch: Option<String>,
     #[serde(rename = "currentUuid")]
     pub current_uuid: Option<String>,
     #[serde(rename = "accounts")]
     pub accounts: Vec<LoginData>,
-    #[serde(rename = "preferredBuild")]
-    pub preferred_build: Option<i32>,
-    #[serde(rename = "modStates", default)]
-    pub mod_states: HashMap<String, bool>,
     #[serde(rename = "concurrentDownloads", default = "default_concurrent_downloads")]
     pub concurrent_downloads: i32
 }
@@ -86,16 +82,14 @@ impl Default for LauncherOptions {
             keep_launcher_open: false,
             experimental_mode: false,
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
-            show_nightly_builds: false,
             memory_percentage: 80, // 80% memory of computer allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
             theme: theme.to_string(),
+            latest_branch: None,
+            latest_dev_branch: None,
             current_uuid: None,
             accounts: Vec::new(),
-            preferred_branch: None,
-            preferred_build: None,
-            mod_states: HashMap::new(),
             concurrent_downloads: 10
         }
     }

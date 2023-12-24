@@ -24,13 +24,13 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
         String::from("https://api-staging.norisk.gg")
     } else {
         String::from("https://api.norisk.gg")
-    }
+    };
 }
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches() -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint("branches").await
+    pub async fn norisk_branches(is_experimental: bool) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental).await
     }
 
     /// Request featured mods
@@ -76,6 +76,18 @@ impl ApiEndpoints {
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    //habe das angelegt weil in javascript wurde es schon geändert aber hier ist noch anderer wert?
+    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool) -> Result<T> {
+        let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?
@@ -156,7 +168,7 @@ pub struct RefreshResponse {
     pub refresh_token: String,
     pub mc_token: String,
     pub mc_name: String,
-    pub norisk_token: String, 
+    pub norisk_token: String,
 }
 
 
@@ -193,7 +205,7 @@ impl LoginData {
         match ApiEndpoints::refresh_token_maybe_fixed(&self.refresh_token).await {
             Ok(response) => {
                 debug!("Refreshed auth... {:?} ",response);
-                Ok(LoginData { 
+                Ok(LoginData {
                     uuid: self.uuid,
                     access_token: response.access_token,
                     refresh_token: response.refresh_token,
