@@ -45,29 +45,6 @@
           window.document.body.classList.remove("dark-mode");
         }
   
-        if (options.currentUuid !== null) {
-          invoke("refresh_via_norisk", { loginData: options.accounts.find(obj => obj.uuid === options.currentUuid) })
-            .then((account) => {
-              console.debug("Current UUID", options.currentUuid);
-              console.debug("Account UUID", account.uuid);
-              // Index des vorhandenen Objekts mit derselben UUID suchen
-              let existingIndex = options.accounts.findIndex(obj => obj.uuid === account.uuid);
-              if (existingIndex !== -1) {
-                console.debug("###Replaced Refreshed  Account");
-                options.accounts[existingIndex] = account;
-              } else {
-                console.debug("###Added Refreshed Account");
-                options.accounts.push(account);
-              }
-  
-              options.store();
-              if (afterReload) {
-                afterReload()
-              }
-            })
-            .catch(e => console.error(e));
-        }
-  
         try {
           const { shouldUpdate } = await checkUpdate();
           showUpdateScreen = shouldUpdate;

@@ -226,7 +226,7 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
     use std::fs::File;
     use std::io::Write;
 
-    let template_url = "https://dl.hglabor.de/capes/prod/template.png";
+    let template_url = "https://dl.norisk.gg/capes/prod/template.png";
     let user_dirs = UserDirs::new().unwrap();
     let downloads_dir = user_dirs.download_dir().unwrap();
     debug!("Downloads directory: {:?}", downloads_dir);

@@ -102,7 +102,7 @@
                             return getNameByUUID(cape.firstSeen); }}
               on:mouseleave={() => cape.hovered = false}
           >
-            <img src={`https://dl.hglabor.de/capes/prod/${cape._id}.png`} alt="Cape Image">
+            <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             <div on:click={handleEquipCape(cape._id)} class="equip-text">
               EQUIP
             </div>
