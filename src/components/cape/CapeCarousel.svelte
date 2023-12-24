@@ -96,13 +96,17 @@
         <div class="image-wrapper">
           <h1>{getIndex(cape._id) + 1}.</h1>
           <div
-              class="crop"
-              on:mouseenter={() =>{
+            class="crop"
+            on:mouseenter={() =>{
                             cape.hovered = true
                             return getNameByUUID(cape.firstSeen); }}
-              on:mouseleave={() => cape.hovered = false}
+            on:mouseleave={() => cape.hovered = false}
           >
-            <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
+            {#if options.experimentalMode}
+              <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
+            {:else}
+              <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
+            {/if}
             <div on:click={handleEquipCape(cape._id)} class="equip-text">
               EQUIP
             </div>
