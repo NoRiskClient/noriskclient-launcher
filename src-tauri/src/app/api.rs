@@ -172,6 +172,8 @@ pub struct LoginData {
     pub username: String,
     #[serde(rename = "noriskToken")]
     pub norisk_token: String,
+    #[serde(rename = "experimentalToken")]
+    pub experimental_token: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -187,6 +189,7 @@ impl LoginData {
 
     pub async fn refresh_maybe_fixed(self) -> Result<LoginData> {
         debug!("Refreshing auth via norisk maybe fixed...");
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         match ApiEndpoints::refresh_token_maybe_fixed(&self.refresh_token).await {
             Ok(response) => {
                 debug!("Refreshed auth... {:?} ",response);
@@ -195,28 +198,9 @@ impl LoginData {
                     access_token: response.access_token,
                     refresh_token: response.refresh_token,
                     username: response.mc_name,
-                    norisk_token: response.norisk_token,
+                    norisk_token: if options.experimental_mode { self.norisk_token } else { response.norisk_token.clone() },
+                    experimental_token: if options.experimental_mode { response.norisk_token } else { self.experimental_token },
                     mc_token: response.mc_token,
-                })
-            }
-            Err(err) => {
-                Err(err)
-            }
-        }
-    }
-
-    pub async fn refresh(self) -> Result<LoginData> {
-        debug!("Refreshing auth via norisk...");
-        match ApiEndpoints::refresh_token(&self.refresh_token).await {
-            Ok(response) => {
-                debug!("Refreshed auth...");
-                Ok(LoginData {
-                    uuid: self.uuid, //iwie returned response eine andere UUID XD?
-                    access_token: response.access_token,
-                    refresh_token: self.refresh_token,
-                    username: self.username,
-                    norisk_token: self.norisk_token,
-                    mc_token: self.mc_token,
                 })
             }
             Err(err) => {

@@ -315,7 +315,7 @@ async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
         .error_for_status()
         .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
         .json().await;
-        
+
 
     match minecraft_profile {
         Ok(profile) => {
@@ -326,7 +326,7 @@ async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
                 }
             }
             Ok(textures)
-        },
+        }
         Err(_) => Err("Failed to retrieve Minecraft profile".to_string()), // You can provide a custom error message here.
     }
 }
@@ -365,7 +365,7 @@ async fn read_local_skin_file(location: String) -> Result<String, String> {
                 return Err(format!("Failed to read the file: {}", err));
             }
             Ok(base64::encode(buffer))
-        },
+        }
         Err(err) => {
             Err(format!("Failed to open the file: {}", err))
         }
@@ -523,7 +523,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                 let keep_launcher_open = parameters.keep_launcher_open;
 
                 if let Err(e) = prelauncher::launch(
-                    &login_data.norisk_token,
+                    if (options.experimental_mode) { &login_data.experimental_token } else { &login_data.norisk_token },
                     launch_manifest,
                     parameters,
                     mods,
