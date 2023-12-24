@@ -75,7 +75,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?
@@ -88,7 +88,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint);
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
@@ -100,7 +100,7 @@ impl ApiEndpoints {
 
     pub async fn post_from_refresh_endpoint<T: DeserializeOwned>(endpoint: &str, request_body: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint);
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .body(request_body.to_string())
@@ -114,7 +114,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_await_endpoint<T: DeserializeOwned>(endpoint: &str, id: u32) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(options.dev_mode), "api/v1", endpoint, "id", id);
+        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint, "id", id);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?

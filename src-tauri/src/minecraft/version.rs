@@ -385,7 +385,7 @@ impl AssetObject {
             progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
 
             info!("Downloading {}", self.hash);
-            download_file_untracked(&*format!("{}/launcherapi/v1/assets/{}/{}/{}", get_launcher_api_base(options.dev_mode), branch, &self.hash[0..2], &self.hash), asset_file_path).await?;
+            download_file_untracked(&*format!("{}/launcherapi/v1/assets/{}/{}/{}", get_launcher_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)

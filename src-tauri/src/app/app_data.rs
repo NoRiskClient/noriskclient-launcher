@@ -16,8 +16,8 @@ fn default_concurrent_downloads() -> i32 {
 pub(crate) struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
-    #[serde(rename = "devMode")]
-    pub dev_mode: bool,
+    #[serde(rename = "experimentalMode")]
+    pub experimental_mode: bool,
     #[serde(rename = "dataPath")]
     pub data_path: String,
     #[serde(rename = "showNightlyBuilds")]
@@ -84,7 +84,7 @@ impl Default for LauncherOptions {
         }
         Self {
             keep_launcher_open: false,
-            dev_mode: false,
+            experimental_mode: false,
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
             show_nightly_builds: false,
             memory_percentage: 80, // 80% memory of computer allocated to game
