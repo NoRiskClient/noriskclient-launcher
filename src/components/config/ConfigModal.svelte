@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api";
   import ConfigRadioButton from "./inputs/ConfigRadioButton.svelte";
   import ConfigTextInput from "./inputs/ConfigTextInput.svelte";
+  import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
@@ -64,8 +65,9 @@
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
-        <ConfigTextInput title="Java Path" bind:value={options.customJavaPath} />
-        <ConfigTextInput title="Data Folder" bind:value={options.dataPath} />
+        <ConfigFolderInput title="Java Path" bind:value={options.customJavaPath} />
+        <ConfigTextInput title="Custom JVM args" bind:value={options.customJavaArgs} />
+        <ConfigFolderInput title="Data Folder" bind:value={options.dataPath} />
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
@@ -111,8 +113,8 @@
     dialog {
         background-color: var(--background-color);
         border: 5px solid black;
-        width: 30em;
-        height: 37em;
+        width: 34em;
+        height: 42em;
         border-radius: 0.2em;
         padding: 0;
         position: fixed; /* Fixierte Positionierung */
