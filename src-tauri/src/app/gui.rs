@@ -491,6 +491,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
+        custom_java_args: options.custom_java_args,
         auth_player_name: login_data.username,
         auth_uuid: login_data.uuid,
         auth_access_token: login_data.mc_token,

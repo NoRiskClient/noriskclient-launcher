@@ -1,14 +1,32 @@
 
 <script>
+  import { open } from '@tauri-apps/api/dialog';
+
   export let title;
   export let value; // value of the text field
+
+  // Try to get user-desired folder path via system dialog
+  async function selectFolderPath() {
+    try {
+      const result = await open({
+        defaultPath: value,
+        directory: true,
+      })
+      if (result) {
+        value = result
+      }
+    } catch (e) {
+      alert("Failed to select folder using dialog")
+    }
+  }
 </script>
 
 <div class="input-container">
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="" autofocus={false} bind:value={value} type="text" class="nes-input">
+    <input placeholder="Internal" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <button on:click={selectFolderPath} aria-label="Select Folder">📂</button>
   </div>
 </div>
 
@@ -22,6 +40,18 @@
 
     input {
       margin-right: 5px;
+    }
+
+    button {
+      outline: none;
+      background-color: transparent;
+      border: none;
+      text-align: center;
+      padding: 3.5px;
+    }
+
+    button:hover {
+      cursor: pointer;
     }
 
     .input-container {

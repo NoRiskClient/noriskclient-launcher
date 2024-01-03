@@ -137,6 +137,10 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
+        for arg in parameter.custom_java_args.split(" ") {
+            println!("Added custom java arg: {:?}", arg);
+            command_arguments.push(arg.to_string());
+        }
 
         match self {
             ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec!["-Djava.library.path=${natives_directory}".to_string(), "-cp".to_string(), "${classpath}".to_string()]),

@@ -398,6 +398,7 @@ pub struct LaunchingParameter {
     pub memory: i64,
     pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
+    pub custom_java_args: String,
     pub auth_player_name: String,
     pub auth_uuid: String,
     pub auth_access_token: String,
