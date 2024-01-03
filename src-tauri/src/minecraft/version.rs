@@ -138,8 +138,10 @@ impl ArgumentDeclaration {
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         for arg in parameter.custom_java_args.split(" ") {
-            println!("Added custom java arg: {:?}", arg);
-            command_arguments.push(arg.to_string());
+            if arg != " " && arg != "" {
+                println!("Added custom java arg: {:?}", arg);
+                command_arguments.push(arg.to_string());
+            }
         }
 
         match self {
