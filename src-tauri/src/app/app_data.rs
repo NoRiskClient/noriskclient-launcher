@@ -79,10 +79,10 @@ impl Default for LauncherOptions {
             },
         }
         Self {
-            keep_launcher_open: false,
+            keep_launcher_open: true,
             experimental_mode: false,
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
-            memory_percentage: 80, // 80% memory of computer allocated to game
+            memory_percentage: 35, // 35% memory of computer allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
             theme: theme.to_string(),
