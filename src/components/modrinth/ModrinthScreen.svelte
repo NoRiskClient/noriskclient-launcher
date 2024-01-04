@@ -175,7 +175,6 @@
 
     async function toggleInstalledMod(mod) {
         mod.value.enabled = !mod.value.enabled;
-        console.debug(installedMods);
         await storeInstalledMods(installedMods, currentBranch, options).then(() => {
             installedMods.mods = installedMods.mods
         })
