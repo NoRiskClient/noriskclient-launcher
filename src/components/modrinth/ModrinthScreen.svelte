@@ -173,6 +173,14 @@
         });
     }
 
+    async function toggleInstalledMod(mod) {
+        mod.value.enabled = !mod.value.enabled;
+        console.debug(installedMods);
+        await storeInstalledMods(installedMods, currentBranch, options).then(() => {
+            installedMods.mods = installedMods.mods
+        })
+    }
+
     async function deleteInstalledMod(slug) {
         let index = installedMods.mods.findIndex((element) => {
             return element.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
@@ -329,14 +337,13 @@
         {#if installedMods.mods.length > 0 || customMods.length > 0}
             <VirtualList height="30em" items={[...customMods,...installedMods.mods].filter((mod) => {
                 let name = (mod?.value?.name ?? mod).toUpperCase()
-                console.debug("Name",name)
                 return (name.endsWith(".JAR") || name.endsWith(".DISABLED")) && name.includes(filterterm.toUpperCase())
             }).sort() } let:item>
                 {#if (typeof item === 'string' || item instanceof String)}
                     <CustomModItem on:delete={deleteCustomModFile(item)} on:togglemod={toggleCustomModFile(item)}
                                    mod={item}/>
                 {:else}
-                    <InstalledModItem on:delete={deleteInstalledMod(item.value.source.artifact.split(":")[1])} mod={item}/>
+                    <InstalledModItem on:delete={deleteInstalledMod(item.value.source.artifact.split(":")[1])} on:disable={toggleInstalledMod(item)} mod={item}/>
                 {/if}
             </VirtualList>
         {:else}

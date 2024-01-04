@@ -24,9 +24,7 @@
     </div>
     <div class="button-wrapper">
         <h1 class="red-text-clickable disable-button"
-            on:click={() => {
-                mod.value.enabled = !mod.value.enabled
-            }}
+            on:click={() => dispatch('disable')}
             class:enable-button={!mod.value.enabled}
             class:red-text-clickable={mod.value.enabled}>
             {#if mod.value.enabled}
