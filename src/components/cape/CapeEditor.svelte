@@ -30,6 +30,7 @@
         noriskToken: account.noriskToken,
       }).then(() => {
         console.debug("Deleted Cape...");
+        capeHash = null;
         dispatch("fetchNoRiskUser");
       }).catch(e => {
         alert("Failed to Request User by UUID: " + e);
