@@ -221,11 +221,11 @@
   }
 
   function backToLoadingScreen() {
-    home()
-    fakeClientRunning = true;
+    fakeClientRunning = false;
     setTimeout(() => {
+      home()
       clientRunning = true;
-    }, 300);
+    }, 100);
   }
 
   function closeWindow() {
