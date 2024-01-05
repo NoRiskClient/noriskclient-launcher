@@ -1,7 +1,9 @@
 <script>
-  import { afterUpdate, onDestroy, onMount } from "svelte";
+  import { afterUpdate, onDestroy, onMount, createEventDispatcher } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import ClientLog from "../log/LogPopup.svelte";
+
+  const dispatch = createEventDispatcher()
 
   export let progressBarLabel;
   export let progressBarMax;
@@ -60,6 +62,7 @@
 {#if isNaN(progress) || progressBarLabel === undefined}
 {:else}
 
+  <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
   {#if clientLogShown}
     <ClientLog messages={log} on:hideClientLog={() => clientLogShown = false} />
   {/if}
@@ -112,5 +115,20 @@
         font-size: 8px;
         margin: 0;
         cursor: default;
+    }
+
+    .home-button {
+        position: absolute;
+        bottom: 1em; /* Abstand vom oberen Rand anpassen */
+        transition: transform 0.3s;
+        font-size: 20px;
+        color: #e8e8e8;
+        text-shadow: 2px 2px #7a7777;
+        font-family: 'Press Start 2P', serif;
+        cursor: pointer;
+    }
+
+    .home-button:hover {
+        transform: scale(1.2);
     }
 </style>

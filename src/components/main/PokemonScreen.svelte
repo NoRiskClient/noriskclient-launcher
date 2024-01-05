@@ -18,6 +18,7 @@
   let branches = [];
   let currentBranchIndex = 0;
   let clientRunning;
+  let fakeClientRunning = false;
   let refreshingAccount = false;
 
   let progressBarMax = 0;
@@ -97,6 +98,7 @@
 
   listen("client-exited", () => {
     clientRunning = false;
+    fakeClientRunning = false;
     progressBarLabel = null;
     progressBarProgress = 0;
     progressBarMax = null;
@@ -138,6 +140,7 @@
     let installedMods = [];
     log = [];
     clientRunning = true;
+    fakeClientRunning = true;
 
     if (options.experimentalMode) {
       options.latestDevBranch = branch;
@@ -212,6 +215,19 @@
     showModrinthScreenHack = false;
   }
 
+  function homeWhileClientRunning() {
+    clientRunning = false;
+    fakeClientRunning = true;
+  }
+
+  function backToLoadingScreen() {
+    fakeClientRunning = false;
+    setTimeout(() => {
+      home()
+      clientRunning = true;
+    }, 100);
+  }
+
   function closeWindow() {
     appWindow.close();
   }
@@ -243,10 +259,13 @@
 
   {#if clientRunning}
     <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-                   progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel}></LoadingScreen>
+                   progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
   {#if (!showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+    {#if fakeClientRunning}
+      <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
+    {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
@@ -374,6 +393,21 @@
     .settings-button-wrapper h1:hover {
         color: var(--hover-color);
         text-shadow: 1px 1px var(--hover-color-text-shadow);
+        transform: scale(1.2);
+    }
+
+    .back-to-loading-button {
+        position: absolute;
+        bottom: 1em; /* Abstand vom oberen Rand anpassen */
+        transition: transform 0.3s;
+        font-size: 20px;
+        color: #e8e8e8;
+        text-shadow: 2px 2px #7a7777;
+        font-family: 'Press Start 2P', serif;
+        cursor: pointer;
+    }
+
+    .back-to-loading-button:hover {
         transform: scale(1.2);
     }
 </style>
