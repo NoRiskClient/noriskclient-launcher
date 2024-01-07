@@ -55,7 +55,7 @@
 <div class="black-bar" data-tauri-drag-region=""></div>
 <div class="content">
     {#if isFinished}
-        <h1 on:click={restart}> Update Done. Please Restart :)!</h1>
+        <h1 on:click={restart}>Press Start</h1>
     {:else}
         <h1>Updating Launcher {dots}</h1>
     {/if}
