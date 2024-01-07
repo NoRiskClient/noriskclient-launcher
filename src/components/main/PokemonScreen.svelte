@@ -13,6 +13,7 @@
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
+  import {relaunch} from "@tauri-apps/api/process";
 
   export let options;
   let branches = [];
