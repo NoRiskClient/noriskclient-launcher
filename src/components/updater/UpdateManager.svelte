@@ -27,6 +27,8 @@
                 await installUpdate();
 
                 isFinished = true;
+
+                await relaunch();
             }
         } catch (error) {
             console.error(error);
