@@ -84,6 +84,7 @@ jobs:
 
       - run: |
           ls -R ./src-tauri/target/release/bundle
+          mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
         if: matrix.platform == 'macos-latest'
@@ -91,7 +92,7 @@ jobs:
         if: matrix.platform == 'macos-latest'
         with:
           name: noriskclient-macos
-          path: ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.*
+          path: ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.*
 
   create-release:
     needs: build-tauri
