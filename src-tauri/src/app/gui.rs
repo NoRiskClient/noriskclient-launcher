@@ -409,6 +409,14 @@ async fn request_norisk_branches(is_experimental: bool) -> Result<Vec<String>, S
 }
 
 #[tauri::command]
+async fn enable_experimental_mode(token: &str) -> Result<(), String> {
+    let valid = ApiEndpoints::enable_experimental_mode(token)
+        .await
+        .map_err(|e| format!("unable to validate 2fa token: {:?}", e));
+    return valid
+}
+
+#[tauri::command]
 async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, String> {
     let manifest = ApiEndpoints::launch_manifest(branch).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
