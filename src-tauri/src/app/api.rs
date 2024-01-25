@@ -30,7 +30,12 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
 impl ApiEndpoints {
     /// Request all available branches
     pub async fn norisk_branches(is_experimental: bool) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental).await
+        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, "").await
+    }
+
+    /// Request token for experimental mode
+    pub async fn enable_experimental_mode(token: &str) -> Result<()> {
+        Self::request_from_norisk_endpoint_with_experimental("experimental-mode", true, token).await
     }
 
     /// Request featured mods
@@ -86,10 +91,11 @@ impl ApiEndpoints {
     }
 
     //habe das angelegt weil in javascript wurde es schon geändert aber hier ist noch anderer wert?
-    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool) -> Result<T> {
+    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
+            .header("mfa-token", token)
             .send().await?
             .error_for_status()?
             .json::<T>()
