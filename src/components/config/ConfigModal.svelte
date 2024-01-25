@@ -41,6 +41,23 @@
     }
   }
 
+  async function toggleExperimentalMode() {
+    if (!options.experimentalMode) {
+      return;
+    }
+    const mfaKey = await window.prompt("Please enter your 2fa code:")
+    if (!mfaKey) {
+      options.experimentalMode = false;
+      return;
+    }
+    invoke("enable_experimental_mode", { mfaKey }).then(async allowed => {
+      alert(allowed)
+    }).catch(e => {
+      alert(`Failed to enable experimental mode: ${e}`);
+      console.error(e);
+    })
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -61,7 +78,7 @@
       <hr>
       <div class="settings-wrapper">
         <ConfigRadioButton bind:value={options.keepLauncherOpen} text="Keep Launcher Open" />
-        <ConfigRadioButton bind:value={options.experimentalMode} text="Experimental Mode" />
+        <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={options.experimentalMode} text="Experimental Mode" />
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
