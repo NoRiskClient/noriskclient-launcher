@@ -401,8 +401,8 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches(is_experimental: bool) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(is_experimental)
+async fn request_norisk_branches(is_experimental: bool, token: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(is_experimental, token)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
@@ -417,8 +417,8 @@ async fn enable_experimental_mode(token: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch).await
+async fn get_launch_manifest(branch: &str, token: &str) -> Result<NoRiskLaunchManifest, String> {
+    let manifest = ApiEndpoints::launch_manifest(branch, token).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
     Ok(manifest)
 }
@@ -517,7 +517,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
     }
 
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch)
+    let launch_manifest = ApiEndpoints::launch_manifest(&branch, if options.experimental_mode { login_data.experimental_token } else { login_data.norisk_token })
         .await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
 

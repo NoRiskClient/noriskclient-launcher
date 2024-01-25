@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::format;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -29,8 +30,8 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches(is_experimental: bool) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, "").await
+    pub async fn norisk_branches(is_experimental: bool, token: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, token).await
     }
 
     /// Request token for experimental mode
@@ -63,26 +64,27 @@ impl ApiEndpoints {
     }
 
     /// Request launch manifest of specific build
-    pub async fn launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest> {
-        Self::request_from_norisk_endpoint(&format!("version/launch/{}", branch)).await
+    pub async fn launch_manifest(branch: &str, token: &str) -> Result<NoRiskLaunchManifest> {
+        Self::request_from_norisk_endpoint(&format!("version/launch/{}", branch), token).await
     }
 
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
-        Self::request_from_norisk_endpoint(&format!("version/jre/{}/{}/{}", os_name, os_arch, jre_version)).await
+        Self::request_from_norisk_endpoint(&format!("version/jre/{}/{}/{}", os_name, os_arch, jre_version), "").await
     }
 
     /// Request norisk assets json for specific branch
-    pub async fn norisk_assets(branch: String) -> Result<NoriskAssets> {
-        Self::request_from_norisk_endpoint(&format!("assets/{}", branch)).await
+    pub async fn norisk_assets(branch: String, token: &str) -> Result<NoriskAssets> {
+        Self::request_from_norisk_endpoint(&format!("assets/{}", branch), token).await
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
+    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", token))
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -95,7 +97,7 @@ impl ApiEndpoints {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
-            .header("mfa-token", token)
+            .header("Authorization", format!("Bearer {}", token))
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -104,11 +106,12 @@ impl ApiEndpoints {
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", token))
             .send().await?
             .error_for_status()?
             .json::<T>()
