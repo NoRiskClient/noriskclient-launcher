@@ -1,4 +1,7 @@
 <script>
+  import { createEventDispatcher } from "svelte";
+
+  const dispatch = createEventDispatcher();
   export let value;
   export let text;
   export let reversed = false;
@@ -9,18 +12,18 @@
 </script>
 
 <div class="wrapper">
-    {#if reversed}
-        <h1 on:selectstart={preventSelection}
-            on:mousedown={preventSelection} class="nes-font">{text}</h1>
-    {/if}
-    <label class="nes-switch">
-        <input type="checkbox" bind:checked={value}>
-        <span class="nes-slider"></span>
-    </label>
-    {#if !reversed}
-        <h1 on:selectstart={preventSelection}
-            on:mousedown={preventSelection} class="nes-font">{text}</h1>
-    {/if}
+  {#if reversed}
+    <h1 on:selectstart={preventSelection}
+        on:mousedown={preventSelection} class="nes-font">{text}</h1>
+  {/if}
+  <label class="nes-switch">
+    <input type="checkbox" bind:checked={value} on:change={(e) => dispatch("toggle")}>
+    <span class="nes-slider"></span>
+  </label>
+  {#if !reversed}
+    <h1 on:selectstart={preventSelection}
+        on:mousedown={preventSelection} class="nes-font">{text}</h1>
+  {/if}
 </div>
 
 <style>
