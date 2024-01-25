@@ -45,12 +45,12 @@
     if (!options.experimentalMode) {
       return;
     }
-    const mfaKey = await window.prompt("Please enter your 2fa code:")
-    if (!mfaKey) {
+    const experimentalToken = await window.prompt("Please enter your experimental token:")
+    if (!experimentalToken) {
       options.experimentalMode = false;
       return;
     }
-    invoke("enable_experimental_mode", { mfaKey }).then(async allowed => {
+    invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       alert(allowed)
     }).catch(e => {
       alert(`Failed to enable experimental mode: ${e}`);
