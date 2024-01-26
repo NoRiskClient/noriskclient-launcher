@@ -111,6 +111,9 @@
   });
 
   export async function runClient() {
+    if (clientRunning) {
+      return;
+    }
     if (refreshingAccount) {
       console.error("Refreshing Account...");
       return;
