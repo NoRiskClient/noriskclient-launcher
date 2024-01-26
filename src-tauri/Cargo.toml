@@ -72,6 +72,9 @@ byteorder = { version = "1.4" }
 dark-light = "1.0.0"
 walkdir = "2.4.0"
 
+# Auth Store
+keyring = "2.3.1"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
