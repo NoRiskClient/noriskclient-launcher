@@ -70,8 +70,10 @@
   }
 
   async function requestBranches() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("request_norisk_branches", {
       isExperimental: options.experimentalMode,
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
     })
       .then((result) => {
         const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;

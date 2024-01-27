@@ -5,6 +5,7 @@
   import ConfigTextInput from "./inputs/ConfigTextInput.svelte";
   import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
   import { createEventDispatcher } from "svelte";
+  import ResetSettingButton from "./inputs/ResetSettingButton.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -29,7 +30,7 @@
 
   async function clearData() {
     // we need await!
-    const confirm = await window.confirm("Are you sure you want to erase all saved data?");
+    const confirm = await window.confirm("Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.")
     if (confirm) {
       invoke("clear_data", { options }).then(() => {
         alert("Data cleared.");
@@ -45,14 +46,17 @@
     if (!options.experimentalMode) {
       return;
     }
-    const experimentalToken = await window.prompt("Please enter your experimental token:")
+    const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : window.prompt("Please enter your experimental token:")
     if (!experimentalToken) {
       options.experimentalMode = false;
       return;
     }
-    invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
-      alert(allowed)
+    invoke("enable_experimental_mode", { experimentalToken }).then(allowed => {
+      options.experimentalModeToken = experimentalToken;
+      console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
+      options.experimentalMode = false;
+      options.experimentalModeToken = "";
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })
@@ -78,7 +82,12 @@
       <hr>
       <div class="settings-wrapper">
         <ConfigRadioButton bind:value={options.keepLauncherOpen} text="Keep Launcher Open" />
-        <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={options.experimentalMode} text="Experimental Mode" />
+        <div class="experimental-mode-wrapper">
+          <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={options.experimentalMode} text="Experimental Mode" />
+          {#if options.experimentalModeToken != ""}
+            <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
+          {/if}
+        </div>
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
@@ -166,6 +175,13 @@
         font-size: 30px;
         user-select: none;
         cursor: default;
+    }
+
+    .experimental-mode-wrapper {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
     }
 
     .clear-data-button-wrapper {

@@ -401,24 +401,23 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches(is_experimental: bool, token: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(is_experimental, token)
+async fn request_norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(is_experimental, norisk_token)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
 }
 
 #[tauri::command]
-async fn enable_experimental_mode(token: &str) -> Result<(), String> {
-    let valid = ApiEndpoints::enable_experimental_mode(token)
+async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, String> {
+    return ApiEndpoints::enable_experimental_mode(experimental_token)
         .await
-        .map_err(|e| format!("unable to validate 2fa token: {:?}", e));
-    return valid
+        .map_err(|e| format!("unable to validate experimental token: {:?}", e));
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str, token: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch, token).await
+async fn get_launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest, String> {
+    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
     Ok(manifest)
 }
@@ -516,8 +515,11 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
         return Err("client is already running".to_string());
     }
 
+    let experimental_token = login_data.experimental_token.unwrap_or_default();
+    let norisk_token = login_data.norisk_token;
+
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch, if options.experimental_mode { login_data.experimental_token } else { login_data.norisk_token })
+    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut())
         .await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
 
@@ -528,8 +530,6 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
     let copy_of_runner_instance = runner_instance.clone();
 
-    let experimental_token = login_data.experimental_token.unwrap_or_default();
-    let norisk_token = login_data.norisk_token;
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -681,6 +681,7 @@ pub fn gui_main() {
             search_mods,
             get_featured_mods,
             run_client,
+            enable_experimental_mode,
             download_template_and_open_explorer,
             request_trending_capes,
             request_owned_capes,

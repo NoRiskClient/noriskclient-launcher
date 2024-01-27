@@ -18,6 +18,8 @@ pub(crate) struct LauncherOptions {
     pub keep_launcher_open: bool,
     #[serde(rename = "experimentalMode")]
     pub experimental_mode: bool,
+    #[serde(rename = "experimentalModeToken")]
+    pub experimental_mode_token: String,
     #[serde(rename = "dataPath")]
     pub data_path: String,
     #[serde(rename = "memoryPercentage")]
@@ -81,6 +83,7 @@ impl Default for LauncherOptions {
         Self {
             keep_launcher_open: true,
             experimental_mode: false,
+            experimental_mode_token: String::new(),
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
             memory_percentage: 35, // 35% memory of computer allocated to game
             custom_java_path: String::new(),

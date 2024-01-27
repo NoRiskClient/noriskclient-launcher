@@ -24,6 +24,8 @@
     let currentTabIndex = 0;
     let fileWatcher;
 
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+
     console.debug("Branch", currentBranch)
 
     listen('tauri://file-drop', files => {
@@ -75,6 +77,7 @@
     async function getLaunchManifest() {
         await invoke("get_launch_manifest", {
             branch: currentBranch,
+            noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
         }).then((result) => {
             console.debug("Launch Manifest", result);
             launchManifest = result
