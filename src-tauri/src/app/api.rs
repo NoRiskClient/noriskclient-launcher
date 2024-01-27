@@ -181,18 +181,24 @@ pub struct RefreshResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoginData {
+    pub uuid: String,
+    pub username: String,
     #[serde(rename = "mcToken")]
     pub mc_token: String,
     #[serde(rename = "accessToken")]
     pub access_token: String,
     #[serde(rename = "refreshToken")]
     pub refresh_token: String,
-    pub uuid: String,
-    pub username: String,
     #[serde(rename = "noriskToken")]
     pub norisk_token: String,
     #[serde(rename = "experimentalToken")]
     pub experimental_token: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LoginDataMinimal {
+    pub uuid: String,
+    pub username: String
 }
 
 #[derive(Clone, Debug, Deserialize)]
