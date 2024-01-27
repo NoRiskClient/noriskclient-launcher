@@ -43,6 +43,36 @@ pub(crate) struct LauncherOptions {
     pub concurrent_downloads: i32
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct LauncherOptionsMinimal {
+    #[serde(rename = "keepLauncherOpen")]
+    pub keep_launcher_open: bool,
+    #[serde(rename = "experimentalMode")]
+    pub experimental_mode: bool,
+    #[serde(rename = "experimentalModeToken")]
+    pub experimental_mode_token: String,
+    #[serde(rename = "dataPath")]
+    pub data_path: String,
+    #[serde(rename = "memoryPercentage")]
+    pub memory_percentage: i32,
+    #[serde(rename = "customJavaPath", default)]
+    pub custom_java_path: String,
+    #[serde(rename = "customJavaArgs", default)]
+    pub custom_java_args: String,
+    #[serde(rename = "theme", default)]
+    pub theme: String,
+    #[serde(rename = "latestBranch")]
+    pub latest_branch: Option<String>,
+    #[serde(rename = "latestDevBranch")]
+    pub latest_dev_branch: Option<String>,
+    #[serde(rename = "currentUuid")]
+    pub current_uuid: Option<String>,
+    #[serde(rename = "accounts")]
+    pub accounts: Vec<LoginDataMinimal>,
+    #[serde(rename = "concurrentDownloads", default = "default_concurrent_downloads")]
+    pub concurrent_downloads: i32
+}
+
 impl LauncherOptions {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the options from the file
