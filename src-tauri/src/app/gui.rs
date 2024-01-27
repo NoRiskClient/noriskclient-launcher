@@ -9,6 +9,7 @@ use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
+use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
@@ -425,9 +426,8 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft() -> Result<LoginData, String> {
-    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-    let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
+async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+    let auth_prepare_response = ApiEndpoints::auth_prepare_response(options.experimental_mode).await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
@@ -435,13 +435,13 @@ async fn login_norisk_microsoft() -> Result<LoginData, String> {
             let id = response.id;
             let _ = open_url(url.as_str());
 
-            let login_data = ApiEndpoints::await_auth_response(id).await;
+            let login_data = ApiEndpoints::await_auth_response(options.experimental_mode, id).await;
             match login_data {
                 Ok(response) => {
                     info!("Received NoRisk Auth Response");
                     Ok(LoginData {
                         norisk_token: if options.experimental_mode { String::from("") } else { response.norisk_token.clone() },
-                        experimental_token: Option::from(if options.experimental_mode { response.norisk_token } else { String::from("") }),
+                        experimental_token: Some(if options.experimental_mode { response.norisk_token.clone() } else { String::from("") }),
                         ..response
                     })
                 }

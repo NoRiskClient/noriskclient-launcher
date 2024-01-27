@@ -43,8 +43,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint("auth/prepare", "").await
+    pub async fn auth_prepare_response(is_experimental: bool) -> Result<AuthPrepareResponse> {
+        Self::post_from_norisk_endpoint_with_experimental("auth/prepare", is_experimental, "").await
     }
 
     /// Request all available branches
@@ -57,8 +57,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn await_auth_response(id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint("auth/await", id).await
+    pub async fn await_auth_response(is_experimental: bool, id: u32) -> Result<LoginData> {
+        Self::post_from_await_endpoint_with_experimental("auth/await", is_experimental, id).await
     }
 
     /// Request launch manifest of specific build
@@ -96,6 +96,29 @@ impl ApiEndpoints {
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    pub async fn post_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
+        let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), "api/v1", endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    pub async fn post_from_await_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, id: u32) -> Result<T> {
+        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(is_experimental), "api/v1", endpoint, "id", id);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
             .send().await?
             .error_for_status()?
             .json::<T>()
