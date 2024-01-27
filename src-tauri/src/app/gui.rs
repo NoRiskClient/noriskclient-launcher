@@ -456,7 +456,13 @@ async fn login_norisk_microsoft() -> Result<LoginData, String> {
     }
 }
 
-fn handle_stdout(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+#[tauri::command]
+async fn remove_account(login_data: LoginData) -> Result<(), String> {
+    TokenManager{}.delete_tokens(login_data);
+    Ok(())
+}
+
+fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
@@ -634,6 +640,8 @@ async fn default_data_folder_path() -> Result<String, String> {
 
 #[tauri::command]
 async fn clear_data(options: LauncherOptions) -> Result<(), String> {
+    let _ = options.accounts.iter().map(|account| TokenManager{}.delete_tokens(account.clone()));
+
     let _ = store_options(LauncherOptions::default()).await;
 
     ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
@@ -664,6 +672,7 @@ pub fn gui_main() {
             store_options,
             request_norisk_branches,
             login_norisk_microsoft,
+            remove_account,
             upload_cape,
             equip_cape,
             get_player_skins,

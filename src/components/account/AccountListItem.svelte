@@ -79,6 +79,7 @@
     options.currentUuid = getRandomObjectOrNull(options.accounts)?.uuid ?? null;
     options = options;
     options.store();
+    invoke("remove_account", { loginData: account })
 
     if (options.currentUuid === null) {
       dialog.close();
