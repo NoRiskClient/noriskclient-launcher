@@ -51,7 +51,7 @@
       options.experimentalMode = false;
       return;
     }
-    invoke("enable_experimental_mode", { experimentalToken }).then(allowed => {
+    invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       options.experimentalModeToken = experimentalToken;
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
@@ -60,6 +60,43 @@
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })
+
+    let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
+    console.log(options.accounts[existingIndex])
+    if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
+      return getNewTokenType();
+    }
+  }
+
+  async function getNewTokenType() {
+    await invoke("login_norisk_microsoft", { options }).then(async (loginData) => {
+      console.debug("Received Login Data...", loginData);
+
+      options.currentUuid = loginData.uuid;
+
+      // Index des vorhandenen Objekts mit derselben UUID suchen
+      let existingIndex = options.accounts.findIndex(obj => obj.uuid === loginData.uuid);
+      if (existingIndex !== -1) {
+        console.debug("Replace Account");
+        options.accounts[existingIndex] = {
+          uuid: loginData.uuid,
+          username: loginData.username,
+          mcToken: loginData.mcToken,
+          accessToken: loginData.accessToken,
+          refreshToken: loginData.refreshToken,
+          experimentalToken: loginData.experimentalToken !== "" ? loginData.experimentalToken : options.accounts[existingIndex].experimentalToken,
+          noriskToken: loginData.noriskToken !== "" ? loginData.noriskToken : options.accounts[existingIndex].noriskToken,
+        };
+      } else {
+        console.debug("Add New Account");
+        options.accounts.push(loginData);
+      }
+
+      hideSettings();
+    }).catch(e => {
+      console.error("microsoft authentication error", e);
+      alert(e);
+    });
   }
 
   function preventSelection(event) {

@@ -13,7 +13,7 @@
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
-  import {relaunch} from "@tauri-apps/api/process";
+  import { relaunch } from "@tauri-apps/api/process";
 
   export let options;
   let branches = [];
@@ -289,12 +289,16 @@
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
-          on:click={() => handleSwitchBranch(true)}>
+          on:click={() => handleSwitchBranch(true)}
+          hidden={branches.length < 1 || options.currentUuid == null}>
         &lt;</h1>
       <section style="display:flex;justify-content:center">
         {#if refreshingAccount}
           <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }} style="position:absolute">
             Loading Account...</h1>
+        {:else if branches.length < 1 || options.currentUuid == null}
+          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
+            Sign in...</h1>
         {:else}
           {#each branches as branch, i}
             {#if currentBranchIndex === i}
@@ -303,7 +307,7 @@
                   style="position:absolute"
                   on:selectstart={preventSelection}
                   on:mousedown={preventSelection}
-              > {branches[currentBranchIndex].toUpperCase()} VERSION</h1>
+              > {branch.toUpperCase()} VERSION</h1>
             {/if}
           {/each}
         {/if}
@@ -311,9 +315,11 @@
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
-          class="nes-font switch" on:click={() => handleSwitchBranch(false)}>&gt;</h1>
+          class="nes-font switch" on:click={() => handleSwitchBranch(false)}
+          hidden={branches.length < 1 || options.currentUuid == null}>
+        &gt;</h1>
     </div>
-    <SkinButton on:launch={runClient} bind:options={options}></SkinButton>
+    <SkinButton on:launch={runClient} on:requestBranches={requestBranches} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
          on:mousedown={preventSelection} class="copyright">
       © 2000-2024 HGLabor/Friends Inc. v0.3.8
