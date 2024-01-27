@@ -62,8 +62,8 @@ impl CapeApiEndpoints {
                     }
                 };
             }
-            Err(err) => {
-                Err("Yo".parse().unwrap())
+            Err(_err) => {
+                Err("Failed to equip cape.".parse().unwrap())
             }
         };
     }
@@ -108,7 +108,7 @@ impl CapeApiEndpoints {
                     }
                 };
             }
-            Err(err) => {
+            Err(_err) => {
                 Err("Error Selecting Cape".parse().unwrap())
             }
         }

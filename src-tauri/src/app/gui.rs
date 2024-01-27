@@ -70,7 +70,6 @@ fn open_url(url: &str) -> Result<(), String> {
 #[tauri::command]
 async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Uploading Cape...");
-    use std::path::PathBuf;
     use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
 
     let dialog_result = FileDialogBuilder::new()
@@ -94,10 +93,6 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 #[tauri::command]
 async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Equiping Cape...");
-    use std::path::PathBuf;
-    use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
-
-    // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::equip_cape(norisk_token, hash).await {
         Ok(result) => {
@@ -138,7 +133,7 @@ async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<Mo
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, window: tauri::Window) -> Result<ModrinthSearchResponse, String> {
+async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthSearchResponse, String> {
     debug!("Searching Mods...");
 
     match ModrinthApiEndpoints::search_mods(&params).await {
@@ -153,7 +148,7 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: tauri::Window)
 }
 
 #[tauri::command]
-async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: tauri::Window) -> Result<CustomMod, String> {
+async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
     println!("Installing Mod And Dependencies...");
     match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
         Ok(installed_mod) => {
@@ -167,7 +162,7 @@ async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: V
 }
 
 #[tauri::command]
-async fn get_mod_version(slug: &str, params: &str, window: tauri::Window) -> Result<Vec<ModrinthProject>, String> {
+async fn get_mod_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
     println!("Searching Mod Version...");
 
     match ModrinthApiEndpoints::get_mod_version(slug, params).await {
@@ -182,7 +177,7 @@ async fn get_mod_version(slug: &str, params: &str, window: tauri::Window) -> Res
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
+async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
     debug!("Deleting Cape...");
     // dialog_result will be of type Option<PathBuf> now.
 
@@ -203,7 +198,7 @@ async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) ->
         Ok(result) => {
             Ok(result)
         }
-        Err(err) => {
+        Err(_err) => {
             Err("Error Requesting Trending Capes".to_string())
         }
     }
@@ -215,7 +210,7 @@ async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>
         Ok(result) => {
             Ok(result)
         }
-        Err(err) => {
+        Err(_err) => {
             Err("Error Requesting Owned Capes".to_string())
         }
     }
@@ -656,7 +651,7 @@ pub fn gui_main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs_watch::init())
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
+            let _window = app.get_window("main").unwrap();
             Ok(())
         })
         .manage(AppState {
