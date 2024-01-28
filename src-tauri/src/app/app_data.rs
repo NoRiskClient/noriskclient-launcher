@@ -76,7 +76,7 @@ pub(crate) struct LauncherOptionsMinimal {
 impl LauncherOptions {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the options from the file
-        let options = serde_json::from_slice::<LauncherOptionsMinimal>(&fs::read(app_data.join("options.json")).await?)?;
+        let options = serde_json::from_slice::<LauncherOptionsMinimal>(&fs::read(app_data.join("options.json")).await?).map_err(|err| -> String { format!("Failed to write options.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherOptionsMinimal::default());
         Ok(
             LauncherOptions {
                 keep_launcher_open: options.keep_launcher_open,
@@ -114,7 +114,7 @@ impl LauncherOptions {
             concurrent_downloads: self.concurrent_downloads
         };
 
-        fs::write(app_data.join("options.json"), serde_json::to_string_pretty(&options_minimal)?).await?;
+        let _ = fs::write(app_data.join("options.json"), serde_json::to_string_pretty(&options_minimal)?).await.map_err(|err| -> String { format!("Failed to write options.json: {}", err).into() });
         Ok(())
     }
 
@@ -184,6 +184,42 @@ impl TokenManager {
 }
 
 impl Default for LauncherOptions {
+    fn default() -> Self {
+        let mut theme = "";
+        let mode = dark_light::detect();
+        match mode {
+            // Dark mode
+            dark_light::Mode::Dark => {
+                theme = "DARK";
+            },
+            // Light mode
+            dark_light::Mode::Light => {
+                theme = "LIGHT";
+            },
+            // Unspecified
+            dark_light::Mode::Default => {
+                theme = "LIGHT";
+            },
+        }
+        Self {
+            keep_launcher_open: true,
+            experimental_mode: false,
+            experimental_mode_token: String::new(),
+            data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
+            memory_percentage: 35, // 35% memory of computer allocated to game
+            custom_java_path: String::new(),
+            custom_java_args: String::new(),
+            theme: theme.to_string(),
+            latest_branch: None,
+            latest_dev_branch: None,
+            current_uuid: None,
+            accounts: Vec::new(),
+            concurrent_downloads: 10
+        }
+    }
+}
+
+impl Default for LauncherOptionsMinimal {
     fn default() -> Self {
         let mut theme = "";
         let mode = dark_light::detect();
