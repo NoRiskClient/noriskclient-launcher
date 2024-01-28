@@ -1,10 +1,9 @@
 <script>
   import Modal from "../account/AccountModal.svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher } from "svelte";
   import { scale } from "svelte/transition";
   import { quintOut } from "svelte/easing";
-  import FallBackSkin from "../../images/fallback_skin_kopf.png";
   import SteveSkin from "../../images/steve_head.png";
 
   const dispatch = createEventDispatcher();
@@ -20,7 +19,6 @@
     skinHovered = false;
   }
 
-  let faceDataUrl;
   let showModal = false;
   $: uuid = options.currentUuid
 
@@ -50,7 +48,6 @@
 
       options.store();
       setTimeout(async () => {
-        await getPlayerHead();
         dispatch("requestBranches")
       }, 100);
     }).catch(e => {
@@ -61,61 +58,6 @@
 
   let image = null;
   $: image;
-
-  async function getPlayerHead() {
-    if (!uuid) {
-      return;
-    }
-    await invoke("get_player_skins", { uuid: uuid })
-    .then(async (profileTextures) => {
-      let profileTexture = profileTextures[0]
-      if (profileTexture) {
-        profileTexture = JSON.parse(atob(profileTexture))
-        await invoke("read_remote_image_file", { location: profileTexture.textures.SKIN.url })
-        .then((content) => {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          const image = new Image();
-
-          const x = 8;
-          const y = 8;
-          const width = 8;
-          const height = 8;
-
-          image.src = `data:image/png;base64,${content}`;
-
-          image.onload = () => {
-            canvas.width = width;
-            canvas.height = height;
-            context.drawImage(image, x, y, width, height, 0, 0, width, height);
-
-            const upscaledCanvas = document.createElement('canvas');
-            const upscaledContext = upscaledCanvas.getContext('2d');
-
-            upscaledCanvas.width = 128;
-            upscaledCanvas.height = 128;
-
-            upscaledContext.imageSmoothingEnabled = false;
-
-            upscaledContext.drawImage(canvas, 0, 0, width, height, 0, 0, 128, 128)
-
-            faceDataUrl = upscaledCanvas.toDataURL('image/png');
-            console.log('Extracted face data URL:', faceDataUrl);
-          };
-        })
-        .catch((err) => {
-          console.error(err);
-        })
-      }
-    })
-    .catch((err) => {
-      alert(err);
-    })
-  };
-
-  onMount(async () => {
-    await getPlayerHead();
-  })
 </script>
 
 <div transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
@@ -124,19 +66,12 @@
        on:mouseenter={handleSkinHover}
        on:mouseleave={handleSkinHoverOut}>
     {#if uuid !== null}
-      {#if faceDataUrl == null}
         <img class="skin-kopf"
-             src={FallBackSkin}
-             alt="Skin Kopf"
-        >
-      {:else}
-        <img class="skin-kopf"
-             src={faceDataUrl}
+             src={`https://mineskin.eu/helm/${uuid}/150.png`}
              alt="Skin Kopf"
              on:click={()=>dispatch("launch")}
         >
         <div on:click={() => (showModal = true)} class="tag">*</div>
-      {/if}
     {:else}
       <img class="skin-kopf"
            src={SteveSkin}
