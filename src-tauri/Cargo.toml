@@ -1,6 +1,6 @@
 [package]
 name = "noriskclient"
-version = "0.3.8"
+version = "0.3.9"
 description = "A NoRiskClient launcher for Minecraft, written in Rust using Tauri."
 authors = ["NoRiskk"]
 license = "GNU General Public License v3.0"
