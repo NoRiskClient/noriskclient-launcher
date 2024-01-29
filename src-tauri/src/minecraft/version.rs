@@ -373,7 +373,7 @@ impl AssetObject {
 
         let mut download = false;
 
-        if (asset_file_path.exists()) {
+        if asset_file_path.exists() {
             let sha1 = sha1sum(&asset_file_path)?;
 
             if &self.hash == &sha1 {

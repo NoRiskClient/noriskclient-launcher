@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap};
-
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -29,18 +28,23 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches(is_experimental: bool) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental).await
+    pub async fn norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, norisk_token).await
+    }
+
+    /// Request token for experimental mode
+    pub async fn enable_experimental_mode(experimental_token: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint_with_experimental("experimental-mode", true, experimental_token).await
     }
 
     /// Request featured mods
     pub async fn norisk_featured_mods(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("featured-mods/{}", branch)).await
+        Self::request_from_norisk_endpoint(&*format!("featured-mods/{}", branch), "").await
     }
 
     /// Request all available branches
-    pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint("auth/prepare").await
+    pub async fn auth_prepare_response(is_experimental: bool) -> Result<AuthPrepareResponse> {
+        Self::post_from_norisk_endpoint_with_experimental("auth/prepare", is_experimental, "").await
     }
 
     /// Request all available branches
@@ -53,31 +57,32 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn await_auth_response(id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint("auth/await", id).await
+    pub async fn await_auth_response(is_experimental: bool, id: u32) -> Result<LoginData> {
+        Self::post_from_await_endpoint_with_experimental("auth/await", is_experimental, id).await
     }
 
     /// Request launch manifest of specific build
-    pub async fn launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest> {
-        Self::request_from_norisk_endpoint(&format!("version/launch/{}", branch)).await
+    pub async fn launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest> {
+        Self::request_from_norisk_endpoint(&format!("version/launch/{}", branch), norisk_token).await
     }
 
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
-        Self::request_from_norisk_endpoint(&format!("version/jre/{}/{}/{}", os_name, os_arch, jre_version)).await
+        Self::request_from_norisk_endpoint(&format!("version/jre/{}/{}/{}", os_name, os_arch, jre_version), "").await
     }
 
     /// Request norisk assets json for specific branch
-    pub async fn norisk_assets(branch: String) -> Result<NoriskAssets> {
-        Self::request_from_norisk_endpoint(&format!("assets/{}", branch)).await
+    pub async fn norisk_assets(branch: String, norisk_token: &str) -> Result<NoriskAssets> {
+        Self::request_from_norisk_endpoint(&format!("assets/{}", branch), norisk_token).await
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
+    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -86,10 +91,34 @@ impl ApiEndpoints {
     }
 
     //habe das angelegt weil in javascript wurde es schon geändert aber hier ist noch anderer wert?
-    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool) -> Result<T> {
+    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    pub async fn post_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
+        let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), "api/v1", endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    pub async fn post_from_await_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, id: u32) -> Result<T> {
+        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(is_experimental), "api/v1", endpoint, "id", id);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -98,11 +127,12 @@ impl ApiEndpoints {
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -174,18 +204,24 @@ pub struct RefreshResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoginData {
+    pub uuid: String,
+    pub username: String,
     #[serde(rename = "mcToken")]
     pub mc_token: String,
     #[serde(rename = "accessToken")]
     pub access_token: String,
     #[serde(rename = "refreshToken")]
     pub refresh_token: String,
-    pub uuid: String,
-    pub username: String,
     #[serde(rename = "noriskToken")]
     pub norisk_token: String,
     #[serde(rename = "experimentalToken")]
     pub experimental_token: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LoginDataMinimal {
+    pub uuid: String,
+    pub username: String
 }
 
 #[derive(Clone, Debug, Deserialize)]

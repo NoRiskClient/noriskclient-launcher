@@ -234,7 +234,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
     fs::create_dir_all(&norisk_asset_dir).await?;
 
-    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone()).await;
+    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token.clone()).await;
 
     let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
         Ok(norisk_assets) => norisk_assets.objects,

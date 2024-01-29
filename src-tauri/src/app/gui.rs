@@ -9,6 +9,7 @@ use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
+use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, InstalledMods, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
@@ -70,7 +71,6 @@ fn open_url(url: &str) -> Result<(), String> {
 #[tauri::command]
 async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Uploading Cape...");
-    use std::path::PathBuf;
     use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
 
     let dialog_result = FileDialogBuilder::new()
@@ -94,10 +94,6 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 #[tauri::command]
 async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Equiping Cape...");
-    use std::path::PathBuf;
-    use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
-
-    // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::equip_cape(norisk_token, hash).await {
         Ok(result) => {
@@ -138,7 +134,7 @@ async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<Mo
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, window: tauri::Window) -> Result<ModrinthSearchResponse, String> {
+async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthSearchResponse, String> {
     debug!("Searching Mods...");
 
     match ModrinthApiEndpoints::search_mods(&params).await {
@@ -153,7 +149,7 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: tauri::Window)
 }
 
 #[tauri::command]
-async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: tauri::Window) -> Result<CustomMod, String> {
+async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
     println!("Installing Mod And Dependencies...");
     match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
         Ok(installed_mod) => {
@@ -167,7 +163,7 @@ async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: V
 }
 
 #[tauri::command]
-async fn get_mod_version(slug: &str, params: &str, window: tauri::Window) -> Result<Vec<ModrinthProject>, String> {
+async fn get_mod_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
     println!("Searching Mod Version...");
 
     match ModrinthApiEndpoints::get_mod_version(slug, params).await {
@@ -182,7 +178,7 @@ async fn get_mod_version(slug: &str, params: &str, window: tauri::Window) -> Res
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
+async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
     debug!("Deleting Cape...");
     // dialog_result will be of type Option<PathBuf> now.
 
@@ -203,7 +199,7 @@ async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) ->
         Ok(result) => {
             Ok(result)
         }
-        Err(err) => {
+        Err(_err) => {
             Err("Error Requesting Trending Capes".to_string())
         }
     }
@@ -215,7 +211,7 @@ async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>
         Ok(result) => {
             Ok(result)
         }
-        Err(err) => {
+        Err(_err) => {
             Err("Error Requesting Owned Capes".to_string())
         }
     }
@@ -401,16 +397,23 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches(is_experimental: bool) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(is_experimental)
+async fn request_norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(is_experimental, norisk_token)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch).await
+async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, String> {
+    return ApiEndpoints::enable_experimental_mode(experimental_token)
+        .await
+        .map_err(|e| format!("unable to validate experimental token: {:?}", e));
+}
+
+#[tauri::command]
+async fn get_launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest, String> {
+    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
     Ok(manifest)
 }
@@ -423,9 +426,8 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft() -> Result<LoginData, String> {
-    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-    let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
+async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+    let auth_prepare_response = ApiEndpoints::auth_prepare_response(options.experimental_mode).await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
@@ -433,13 +435,13 @@ async fn login_norisk_microsoft() -> Result<LoginData, String> {
             let id = response.id;
             let _ = open_url(url.as_str());
 
-            let login_data = ApiEndpoints::await_auth_response(id).await;
+            let login_data = ApiEndpoints::await_auth_response(options.experimental_mode, id).await;
             match login_data {
                 Ok(response) => {
                     info!("Received NoRisk Auth Response");
                     Ok(LoginData {
                         norisk_token: if options.experimental_mode { String::from("") } else { response.norisk_token.clone() },
-                        experimental_token: Option::from(if options.experimental_mode { response.norisk_token } else { String::from("") }),
+                        experimental_token: Some(if options.experimental_mode { response.norisk_token.clone() } else { String::from("") }),
                         ..response
                     })
                 }
@@ -454,7 +456,13 @@ async fn login_norisk_microsoft() -> Result<LoginData, String> {
     }
 }
 
-fn handle_stdout(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+#[tauri::command]
+async fn remove_account(login_data: LoginData) -> Result<(), String> {
+    TokenManager{}.delete_tokens(login_data);
+    Ok(())
+}
+
+fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
@@ -508,8 +516,11 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
         return Err("client is already running".to_string());
     }
 
+    let experimental_token = login_data.experimental_token.unwrap_or_default();
+    let norisk_token = login_data.norisk_token;
+
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch)
+    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut())
         .await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
 
@@ -520,8 +531,6 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
     let copy_of_runner_instance = runner_instance.clone();
 
-    let experimental_token = login_data.experimental_token.unwrap_or_default();
-    let norisk_token = login_data.norisk_token;
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -631,6 +640,8 @@ async fn default_data_folder_path() -> Result<String, String> {
 
 #[tauri::command]
 async fn clear_data(options: LauncherOptions) -> Result<(), String> {
+    let _ = options.accounts.iter().map(|account| TokenManager{}.delete_tokens(account.clone()));
+
     let _ = store_options(LauncherOptions::default()).await;
 
     ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
@@ -648,7 +659,7 @@ pub fn gui_main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs_watch::init())
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
+            let _window = app.get_window("main").unwrap();
             Ok(())
         })
         .manage(AppState {
@@ -661,6 +672,7 @@ pub fn gui_main() {
             store_options,
             request_norisk_branches,
             login_norisk_microsoft,
+            remove_account,
             upload_cape,
             equip_cape,
             get_player_skins,
@@ -673,6 +685,7 @@ pub fn gui_main() {
             search_mods,
             get_featured_mods,
             run_client,
+            enable_experimental_mode,
             download_template_and_open_explorer,
             request_trending_capes,
             request_owned_capes,

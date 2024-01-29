@@ -1,16 +1,12 @@
 use std::path::Path;
-use std::ptr::null;
 use std::sync::{Mutex, Arc};
 
 use anyhow::Result;
-use async_zip::read::mem::ZipFileReader;
 use tracing::*;
 use tokio::fs;
-use tokio::io::AsyncReadExt;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
 use crate::error::LauncherError;
-use crate::LAUNCHER_DIRECTORY;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
@@ -34,8 +30,8 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
 
     // Copy retrieve and copy mods from manifest
     clear_mods(&data_directory, &launch_manifest).await?;
-    let installed_mods = retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &progress, &Vec::new(), &window).await?;
-    retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &progress, &installed_mods, &window).await?;
+    let installed_mods = retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &progress, &Vec::new()).await?;
+    retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &progress, &installed_mods).await?;
 
     copy_custom_mods(&data_directory, &launch_manifest, &progress).await?;
 
@@ -86,7 +82,7 @@ pub(crate) async fn clear_mods(data: &Path, manifest: &NoRiskLaunchManifest) -> 
     Ok(())
 }
 
-pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest, mods: &Vec<LoaderMod>, progress: &impl ProgressReceiver, already_installed_mods: &Vec<LoaderMod>, window: &Arc<Mutex<tauri::Window>>) -> Result<Vec<LoaderMod>> {
+pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest, mods: &Vec<LoaderMod>, progress: &impl ProgressReceiver, already_installed_mods: &Vec<LoaderMod>) -> Result<Vec<LoaderMod>> {
     let mod_cache_path = data.join("mod_cache");
     let mods_path = data.join("gameDir").join(&manifest.build.branch).join("mods");
 
@@ -126,7 +122,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
                     let mut download_url: String = "".to_owned();
-                    if (url.clone().is_some()) {
+                    if url.clone().is_some() {
                         download_url = url.clone().unwrap();
                     } else {
                         let repository_url = manifest.repositories.get(repository).ok_or_else(|| LauncherError::InvalidVersionProfile(format!("There is no repository specified with the name {}", repository)))?;

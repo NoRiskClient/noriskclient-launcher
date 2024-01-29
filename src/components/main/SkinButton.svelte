@@ -23,7 +23,7 @@
   $: uuid = options.currentUuid
 
   const handleAddAccount = async () => {
-    await invoke("login_norisk_microsoft").then(async (loginData) => {
+    await invoke("login_norisk_microsoft", { options }).then(async (loginData) => {
       console.debug("Received Login Data...", loginData);
 
       options.currentUuid = loginData.uuid;
@@ -32,13 +32,24 @@
       let existingIndex = options.accounts.findIndex(obj => obj.uuid === loginData.uuid);
       if (existingIndex !== -1) {
         console.debug("Replace Account");
-        options.accounts[existingIndex] = loginData;
+        options.accounts[existingIndex] = {
+          uuid: loginData.uuid,
+          username: loginData.username,
+          mcToken: loginData.mcToken,
+          accessToken: loginData.accessToken,
+          refreshToken: loginData.refreshToken,
+          experimentalToken: loginData.experimentalToken !== "" ? loginData.experimentalToken : options.accounts[existingIndex].experimentalToken,
+          noriskToken: loginData.noriskToken !== "" ? loginData.noriskToken : options.accounts[existingIndex].noriskToken,
+        };
       } else {
         console.debug("Add New Account");
         options.accounts.push(loginData);
       }
 
       options.store();
+      setTimeout(async () => {
+        dispatch("requestBranches")
+      }, 100);
     }).catch(e => {
       console.error("microsoft authentication error", e);
       alert(e);

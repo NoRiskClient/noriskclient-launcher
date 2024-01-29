@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 use crate::HTTP_CLIENT;
 
 /// Placeholder struct for API endpoints implementation
