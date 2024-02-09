@@ -18,6 +18,18 @@ pub async fn download_file_untracked(url: &str, path: impl AsRef<Path>) -> Resul
     Ok(())
 }
 
+pub async fn download_private_file_untracked(url: &str, norisk_token: String, path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref().to_owned();
+    let response = HTTP_CLIENT.get(url)
+        .header("Authorization", format!("Bearer {}", norisk_token))
+        .send().await?
+        .error_for_status()?;
+
+    let content = response.bytes().await?;
+    fs::write(path, content).await?;
+    Ok(())
+}
+
 pub async fn download_file<F>(url: &str, on_progress: F) -> Result<Vec<u8>> where F : Fn(u64, u64) {
     debug!("Downloading file {:?}", url);
 
