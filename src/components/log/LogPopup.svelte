@@ -22,6 +22,12 @@
             console.error(error)
         })
     }
+
+    // Only split when necessary - fixes no-newline-messages resulting in "undefined"
+    function formatLogMessage(message) {
+        let messageSplit = message.split("]: ", 2)
+        return messageSplit[messageSplit.length - 1]
+    }
 </script>
 
 <div class="log" transition:fly={{ y: -10, duration: 200 }}>
@@ -32,7 +38,7 @@
 
     <div class="output">
         <VirtualList items={messages} let:item {autoScroll}>
-            <LogMessage text={item.split("]: ")[1]}/>
+            <LogMessage text={formatLogMessage(item)}/>
         </VirtualList>
     </div>
 
