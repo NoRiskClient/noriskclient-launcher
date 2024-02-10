@@ -1,6 +1,6 @@
+use std::error::Error;
 #[cfg(target_os = "linux")]
 use std::fs::metadata;
-use std::error::Error;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,7 @@ pub struct ModInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub game_versions: Option<Vec<String>>,
 }
 
 //Minified response from https://api.modrinth.com/v2/project/{id|slug}

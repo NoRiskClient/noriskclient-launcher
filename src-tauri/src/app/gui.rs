@@ -107,7 +107,7 @@ async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Re
 }
 
 #[tauri::command]
-async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
+async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
     debug!("Getting Featured Mods...");
 
     match ApiEndpoints::norisk_featured_mods(&branch).await {
@@ -117,7 +117,20 @@ async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<Mo
             for mod_id in result {
                 match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
                     Ok(mod_info) => {
-                        mod_infos.push(mod_info);
+                        // Filter featured mods based on mc version
+                        match &mod_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    mod_infos.push(mod_info);
+                                }
+                                else {
+                                    debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured mod {} has no game versions", mod_info.title);
+                            }
+                        }
                     }
                     Err(err) => {
                         message(Some(&window), "Modrinth Error", err.to_string());
