@@ -5,6 +5,7 @@
 
     export let mod;
     export let text;
+    export let enabled;
 </script>
 
 <div class="mod-item-wrapper">
@@ -26,6 +27,21 @@
         <h1 class="required-button">
             LOADING
         </h1>
+    {:else if text === "RECOMENDED"}
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <h1 class="required-button" style="margin-bottom: 15px;">
+                RECOMENDED
+            </h1>
+            {#if enabled}
+                <h1 class="red-text-clickable delete-button" on:click={() => dispatch("disable")}>
+                    DISABLE
+                </h1>
+            {:else}
+                <h1 class="green-text-clickable install-button" on:click={() => dispatch("enable")}>
+                    ENABLE
+                </h1>
+            {/if}
+        </div>
     {:else if text === "REQUIRED"}
         <h1 class="required-button">
             REQUIRED
