@@ -2,13 +2,14 @@
 <script>
   export let title;
   export let value; // value of the text field
+  export let disabled = false;
 </script>
 
 <div class="input-container">
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="" autofocus={false} bind:value={value} type="text" class="nes-input">
+    <input placeholder="" disabled={disabled} autofocus={false} bind:value={value} type="text" class="nes-input">
   </div>
 </div>
 

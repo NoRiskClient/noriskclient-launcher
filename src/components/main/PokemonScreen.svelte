@@ -8,12 +8,12 @@
   import { listen } from "@tauri-apps/api/event";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
-  import { relaunch } from "@tauri-apps/api/process";
 
   export let options;
   let branches = [];
@@ -28,6 +28,8 @@
   let progressBarLabel = "";
   let settingsShown = false;
   let clientLogShown = false;
+  let showProfilesScreen = false;
+  let showProfilesScreenHack = false;
   let showSkinScreen = false;
   let showSkinScreenHack = false;
   let showCapeScreen = false;
@@ -42,7 +44,6 @@
 
   listen("progress-update", event => {
     let progressUpdate = event.payload;
-    console.log(event);
 
     switch (progressUpdate.type) {
       case "max": {
@@ -244,6 +245,13 @@
     event.preventDefault();
   }
 
+  function handleOpenProfilesScreen() {
+    showProfilesScreenHack = true;
+    setTimeout(() => {
+      showProfilesScreen = true;
+    }, 300);
+  }
+
   function handleOpenSkinScreen() {
     showSkinScreenHack = true;
     setTimeout(() => {
@@ -266,6 +274,8 @@
   }
 
   function home() {
+    showProfilesScreen = false;
+    showProfilesScreenHack = false;
     showSkinScreen = false;
     showSkinScreenHack = false;
     showCapeScreen = false;
@@ -292,11 +302,16 @@
   }
 </script>
 
+
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
 
   {#if showModrinthScreen}
     <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+
+  {#if showProfilesScreen}
+    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={branches} currentBranchIndex={currentBranchIndex}></ProfilesScreen>
   {/if}
 
   {#if showSkinScreen}
@@ -321,24 +336,34 @@
                    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
-  {#if (!showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 on:click={handleOpenModScreen}>MODS</h1>
       {/if}
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>
     <img transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="pokemon-title"
          src={NoRiskLogoColor}
          alt="Pokemon Title">
     <div class="branch-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
@@ -365,6 +390,7 @@
           {/each}
         {/if}
       </section>
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
