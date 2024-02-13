@@ -7,7 +7,7 @@
     export let active;
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="profile-item-wrapper" on:click={() => dispatch('select')} class:enabled={active}>
     <div class="text-wrapper">
         <h2>{profile.name} ({profile.mods.length} Mods)</h2>

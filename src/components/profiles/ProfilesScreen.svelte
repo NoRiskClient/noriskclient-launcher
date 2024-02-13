@@ -71,7 +71,7 @@
     }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 <div class="profiles-wrapper">
     {#if settingsOpen}
@@ -86,7 +86,7 @@
     {/if}
     <div class="navbar">
         <div class="branch-wrapper">
-            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
                 on:selectstart={preventSelection} style="cursor: pointer"
                 on:mousedown={preventSelection} class="nes-font switch"
@@ -105,7 +105,7 @@
                     {/if}
                 {/each}
             </section>
-            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
                 on:selectstart={preventSelection}
                 style="cursor: pointer" on:mousedown={preventSelection}
@@ -118,7 +118,7 @@
         <Profile profile={item} active={profileById(activeProfile()).id == item.id} on:settings={() => openSettings(item)} on:select={() => selectProfile(item)}></Profile>
     </VirtualList>
     <div class="create-wrapper">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="create-button"
         on:click={openSettings}>
             CREATE PROFILE

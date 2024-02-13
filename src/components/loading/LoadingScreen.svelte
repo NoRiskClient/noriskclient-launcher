@@ -60,7 +60,7 @@
 </script>
 
 {#if !isNaN(progress) && progressBarLabel !== undefined}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
   <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
   {#if clientLogShown}
     <ClientLog messages={log} on:hideClientLog={() => clientLogShown = false} />
@@ -71,9 +71,9 @@
       class="nes-font-small progress-label-text">{progressBarLabel} </h1>
   {#if isFinished}
     <div class="button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="nes-font-big logs" on:click={() => clientLogShown = true}>LOGS</h1>
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="nes-font-big close red-text-clickable" on:click={terminateClient}>CLOSE</h1>
     </div>
   {/if}

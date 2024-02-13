@@ -338,32 +338,32 @@
 
   {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenModScreen}>MODS</h1>
       {/if}
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>
     <img transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="pokemon-title"
          src={NoRiskLogoColor}
          alt="Pokemon Title">
     <div class="branch-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
@@ -390,7 +390,7 @@
           {/each}
         {/if}
       </section>
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}

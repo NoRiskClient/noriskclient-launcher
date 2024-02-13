@@ -66,16 +66,16 @@
        on:mouseenter={handleSkinHover}
        on:mouseleave={handleSkinHoverOut}>
     {#if uuid !== null}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <img class="skin-kopf"
              src={`https://mineskin.eu/helm/${uuid}/150.png`}
              alt="Skin Kopf"
              on:click={()=>dispatch("launch")}
         >
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div on:click={() => (showModal = true)} class="tag">*</div>
     {:else}
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <img class="skin-kopf"
            src={SteveSkin}
            alt="Skin Kopf"

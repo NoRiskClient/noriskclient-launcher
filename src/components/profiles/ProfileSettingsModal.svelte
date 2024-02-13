@@ -71,7 +71,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <dialog
   bind:this={dialog}
   on:close={closeSettings}

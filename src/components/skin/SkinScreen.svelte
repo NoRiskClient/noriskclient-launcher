@@ -257,7 +257,7 @@
 </script>
 
 {#if settings.open}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div class="klickField" on:click={settings.open ? toggleSettings : () => {}}></div>
 {/if}
 <div class="wrapper" on:selectstart={preventSelection}>
@@ -276,7 +276,7 @@
   ></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
         <path d="M0 0h24v24H0V0z" fill="none" />
         <path
@@ -298,19 +298,19 @@
       {/if}
     </div>
     {#if !unsavedSkin}
-      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
     {:else}
       <div class="unsavedSkinActionWrapper slider no-slide">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
       </div>
     {/if}
   {/if}
 </div>
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 
 <style>
