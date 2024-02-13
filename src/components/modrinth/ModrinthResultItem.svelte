@@ -10,6 +10,7 @@
 
 <div class="mod-item-wrapper">
     <div class="image-text-wrapper">
+        <!-- svelte-ignore a11y-img-redundant-alt -->
         <img src={mod.icon_url} alt="Mod Picture">
         <div class="text-item-wrapper">
             <div class="href-wrapper">
@@ -33,10 +34,12 @@
                 RECOMENDED
             </h1>
             {#if enabled}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="red-text-clickable delete-button" on:click={() => dispatch("disable")}>
                     DISABLE
                 </h1>
             {:else}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="green-text-clickable install-button" on:click={() => dispatch("enable")}>
                     ENABLE
                 </h1>
@@ -47,10 +50,12 @@
             REQUIRED
         </h1>
     {:else if text === "INSTALL"}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="install-button" on:click={() => dispatch("install")}>
             INSTALL
         </h1>
     {:else if text === "INSTALLED"}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="red-text-clickable delete-button" on:click={() => dispatch("delete")}>
             DELETE
         </h1>

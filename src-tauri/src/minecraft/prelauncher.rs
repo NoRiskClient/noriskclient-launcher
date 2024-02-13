@@ -1,4 +1,3 @@
-use std::ops::Index;
 use std::path::Path;
 use std::sync::{Mutex, Arc};
 
@@ -7,8 +6,6 @@ use tracing::*;
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
-use crate::app::app_data::{LauncherOptions, LauncherProfile, LauncherProfiles};
-use crate::app::modrinth_api::CustomMod;
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
@@ -141,7 +138,6 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
                     fs::write(&current_mod_path, retrieved_bytes).await?;
                 }
-                _ => {}
             }
         }
 

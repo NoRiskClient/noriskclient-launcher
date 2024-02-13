@@ -346,13 +346,17 @@
     })
 </script>
 
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 <div class="modrinth-wrapper">
     <div class="navbar">
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
         <h2>|</h2>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
         <h2>|</h2>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <h1 on:click={handleSelectCustomMods}>Custom</h1>
     </div>
     {#if currentTabIndex === 0}
@@ -384,8 +388,6 @@
                     <InstalledModItem on:delete={deleteInstalledMod(item.value.source.artifact.split(":")[1])} on:disable={toggleInstalledMod(item)} mod={item}/>
                 {/if}
             </VirtualList>
-        {:else}
-
         {/if}
     {/if}
 </div>

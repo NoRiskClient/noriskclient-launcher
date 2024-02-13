@@ -104,10 +104,6 @@
         }
     }
 
-    button {
-        display: block;
-    }
-
     .nes-font {
         font-family: 'Press Start 2P', serif;
         font-size: 30px;

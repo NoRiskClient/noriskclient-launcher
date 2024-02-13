@@ -182,11 +182,11 @@ impl TokenManager {
     pub fn store_tokens(&mut self, login_data: LoginData) -> LoginDataMinimal {
         // logic for storing tokens
         let uuid = login_data.uuid.clone();
-        let mc_token = Self::get_keyring_entry(&uuid, "mcToken").set_password(&login_data.mc_token).unwrap();
-        let access_token = Self::get_keyring_entry(&uuid, "accessToken").set_password(&login_data.access_token).unwrap();
-        let refresh_token = Self::get_keyring_entry(&uuid, "refreshToken").set_password(&login_data.refresh_token).unwrap();
-        let norisk_token = Self::get_keyring_entry(&uuid, "noriskToken").set_password(&login_data.norisk_token).unwrap();
-        let experimental_token = Self::get_keyring_entry(&uuid, "experimentalToken").set_password(&login_data.experimental_token.unwrap()).unwrap();
+        let _mc_token = Self::get_keyring_entry(&uuid, "mcToken").set_password(&login_data.mc_token).unwrap();
+        let _access_token = Self::get_keyring_entry(&uuid, "accessToken").set_password(&login_data.access_token).unwrap();
+        let _refresh_token = Self::get_keyring_entry(&uuid, "refreshToken").set_password(&login_data.refresh_token).unwrap();
+        let _norisk_token = Self::get_keyring_entry(&uuid, "noriskToken").set_password(&login_data.norisk_token).unwrap();
+        let _experimental_token = Self::get_keyring_entry(&uuid, "experimentalToken").set_password(&login_data.experimental_token.unwrap()).unwrap();
 
         return LoginDataMinimal {
             uuid: login_data.uuid,

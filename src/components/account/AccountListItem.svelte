@@ -36,6 +36,7 @@
   }
 </script>
 
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="flex-wrapper" on:click={handleSelectAccount} class:active={isActive}>
   <div class="skin-text-wrapper">
     <img src={`https://mineskin.eu/helm/${account.uuid}/100.png`} alt="{account.username}'s Kopf">

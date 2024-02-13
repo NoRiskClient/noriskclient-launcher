@@ -27,6 +27,7 @@
 <div class="log" transition:fly={{ y: -10, duration: 200 }}>
     <div class="header">
         <div class="title nes-font">CLIENT LOG</div>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <div class="title nes-font red-text-clickable" on:click={() => dispatch("hideClientLog")}>X</div>
     </div>
 
@@ -38,6 +39,7 @@
 
     <div class="bottom">
         <ConfigRadioButton bind:value={autoScroll} text="Auto Scroll"/>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <p on:click={uploadLogs}>COPY</p>
     </div>
 </div>
@@ -100,12 +102,6 @@
 
     .title {
         font-size: 30px;
-    }
-
-    .button-hide {
-        background-color: transparent;
-        border: none;
-        cursor: pointer;
     }
 </style>
 
