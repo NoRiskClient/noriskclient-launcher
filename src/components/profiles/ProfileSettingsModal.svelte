@@ -80,7 +80,11 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>PROFILE SETTINGS</h1>
+        {#if createMode}
+          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>CREATE PROFILE</h1>
+        {:else}
+          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>PROFILE SETTINGS</h1>
+        {/if}
         <h1 class="nes-font red-text-clickable close-button" on:click={closeSettings}>X</h1>
       </div>
       <hr>
