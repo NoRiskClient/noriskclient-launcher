@@ -383,6 +383,20 @@ impl ModSource {
         }
     }
 
+    pub fn get_repository(&self) -> String {
+        match self {
+            ModSource::Repository { repository: _repository, artifact, url } => {
+                let parts: Vec<&str> = artifact.split(":").collect();
+                if parts.len() > 1 {
+                    parts[0].to_string()
+                } else {
+                    "".to_string()
+                }
+            }
+            _ => { "".to_string() }
+        }
+    }
+
     pub fn get_path(&self) -> Result<String> {
         Ok(
             match self {
