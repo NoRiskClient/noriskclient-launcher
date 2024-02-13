@@ -17,6 +17,7 @@
 
   export let options;
   let branches = [];
+  let launcherProfiles = {};
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
@@ -59,6 +60,13 @@
     }
   });
 
+  function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+  }
+
   function handleSwitchBranch(isLeft) {
     const totalBranches = branches.length;
 
@@ -93,6 +101,49 @@
         alert(reason);
         console.error(reason);
       });
+
+    await invoke("get_launcher_profiles").then((profiles) => {
+      console.info(`Loaded launcher profiles: `, profiles);
+      branches.forEach(branch => {
+        if (options.experimentalMode) {
+          const branchProfile = profiles.experimentalProfiles.find(p => p.branch == branch);
+          if (!branchProfile) {
+            const profileId = uuidv4();
+            profiles.experimentalProfiles.push({
+              id: profileId,
+              branch: branch,
+              name: `${branch} - Default`,
+              mods: []
+            });
+            profiles.selectedExperimentalProfiles[branch] = profileId;
+          }
+        } else {
+          const branchProfile = profiles.mainProfiles.find(p => p.branch == branch);
+          if (!branchProfile) {
+            const profileId = uuidv4();
+            profiles.mainProfiles.push({
+              id: profileId,
+              branch: branch,
+              name: `${branch} - Default`,
+              mods: []
+            });
+            profiles.selectedMainProfiles[branch] = profileId;
+          }
+        }
+      });
+
+      profiles.store = function() {
+        console.debug("storing launcher profiles", profiles);
+        invoke("store_launcher_profiles", { launcherProfiles: profiles }).catch(e => console.error(e));
+      }
+
+      profiles.store();
+
+      launcherProfiles = profiles;
+    }).catch((err) => {
+      console.error(`Failed to load launcher profiles: ${err}`);
+      alert(`Failed to load launcher profiles: ${err}`);
+    })
   }
 
   onMount(async () => {
@@ -156,18 +207,20 @@
 
     options.store();
 
-    await invoke("get_installed_mods", {
-      branch: branch,
-      options: options,
-    }).then(result => {
-      result.mods.forEach((mod) => {
-        console.debug("mod", mod);
-        installedMods.push(mod.value);
-        mod.dependencies.forEach((dependency) => {
-          installedMods.push(dependency.value);
-        });
+    let launcherProfile;
+    if (options.experimentalMode) {
+      const activeProfileId = launcherProfiles.selectedExperimentalProfiles[branch];
+      launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id == activeProfileId);
+    } else {
+      const activeProfileId = launcherProfiles.selectedMainProfiles[branch];
+      launcherProfile = launcherProfiles.mainProfiles.find(p => p.id == activeProfileId);
+    }
+
+    launcherProfile.mods.forEach(mod => {
+      installedMods.push(mod.value);
+      mod.dependencies.forEach((dependency) => {
+        installedMods.push(dependency.value);
       });
-      console.debug("Starting With Custom Mods", installedMods);
     });
 
     console.debug("Running Branch", branch);
@@ -243,7 +296,7 @@
 <div class="content">
 
   {#if showModrinthScreen}
-    <ModrinthScreen on:home={home} bind:options bind:currentBranch={branches[currentBranchIndex]} />
+    <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
 
   {#if showSkinScreen}
@@ -277,8 +330,8 @@
       {#if options.accounts.length > 0}
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+        <h1 on:click={handleOpenModScreen}>MODS</h1>
       {/if}
-      <h1 on:click={handleOpenModScreen}>MODS</h1>
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>

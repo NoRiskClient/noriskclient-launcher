@@ -8,26 +8,24 @@
 
   // Load options from file
   let options;
-  let accounts = [];
   let showUpdateScreen = null;
 
   onMount(async () => {
     const reload = async (afterReload) => {
       await invoke("get_options").then(async (result) => {
         options = result;
-        accounts = options.accounts;
-  
+
         // Debug options - might be interesting to see what's in there
         console.debug("read options", options);
-  
+
         // Easy way to store options
         options.store = function() {
           console.debug("storing options", options);
           invoke("store_options", { options }).catch(e => console.error(e));
         };
-  
+
         options.reload = reload;
-  
+
         options.toggleTheme = function() {
           if (options.theme === "LIGHT") {
             options.theme = "DARK";
@@ -38,13 +36,13 @@
           }
           invoke("store_options", { options }).catch(e => console.error(e));
         };
-  
+
         if (options.theme === "DARK") {
           window.document.body.classList.add("dark-mode");
         } else {
           window.document.body.classList.remove("dark-mode");
         }
-  
+
         try {
           const { shouldUpdate } = await checkUpdate();
           showUpdateScreen = shouldUpdate;
@@ -55,7 +53,7 @@
         }
 
       });
-    } 
+    }
     reload()
   });
 
