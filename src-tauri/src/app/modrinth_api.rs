@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::fs::metadata;
 use std::error::Error;
 use std::path::Path;
 
@@ -250,36 +248,9 @@ pub struct Dependency {
     pub dependency_type: String,
 }
 
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct InstalledMods {
-    pub mods: Vec<CustomMod>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CustomMod {
     pub value: LoaderMod,
     pub image_url: String,
     pub dependencies: Vec<CustomMod>,
-}
-
-impl InstalledMods {
-    pub async fn load(app_data: &Path) -> anyhow::Result<Self> {
-        // load the options from the file
-        Ok(serde_json::from_slice::<Self>(&tokio::fs::read(app_data.join("installed_mods.json")).await?)?)
-    }
-
-    pub async fn store(&self, app_data: &Path) -> anyhow::Result<()> {
-        // store the options in the file
-        tokio::fs::write(app_data.join("installed_mods.json"), serde_json::to_string_pretty(&self)?).await?;
-        Ok(())
-    }
-}
-
-impl Default for InstalledMods {
-    fn default() -> Self {
-        Self {
-            mods: Vec::new(),
-        }
-    }
 }
