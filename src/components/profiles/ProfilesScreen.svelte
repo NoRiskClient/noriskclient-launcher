@@ -20,6 +20,8 @@
     let settingsProfile = {};
     let settingsCreateMode = false;
 
+    let closed = false;
+
     function handleSwitchBranch(isLeft) {
         const totalBranches = branches.length;
 
@@ -72,7 +74,7 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+<h1 class="home-button" on:click={() => {closed = true; dispatch("home");}}>[BACK]</h1>
 <div class="profiles-wrapper">
     {#if settingsOpen}
         <ProfileSettingsModal
@@ -84,46 +86,48 @@
         on:update={() => {launcherProfiles = options.experimentalMode ? allLauncherProfiles.experimentalProfiles : allLauncherProfiles.mainProfiles}}
         ></ProfileSettingsModal>
     {/if}
-    <div class="navbar">
-        <div class="branch-wrapper">
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                on:selectstart={preventSelection} style="cursor: pointer"
-                on:mousedown={preventSelection} class="nes-font switch"
-                on:click={() => handleSwitchBranch(true)}
-                hidden={branches.length < 1 || options.currentUuid == null}>
-                &lt;</h1>
-            <section style="display:flex;justify-content:center">
-                {#each branches as branch, i}
-                    {#if currentBranchIndex === i}
-                        <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                            class="nes-font"
-                            style="position:absolute"
-                            on:selectstart={preventSelection}
-                            on:mousedown={preventSelection}
-                        > {branch.toUpperCase()} VERSION</h1>
-                    {/if}
-                {/each}
-            </section>
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                on:selectstart={preventSelection}
-                style="cursor: pointer" on:mousedown={preventSelection}
-                class="nes-font switch" on:click={() => handleSwitchBranch(false)}
-                hidden={branches.length < 1 || options.currentUuid == null}>
-                &gt;</h1>
+    {#if !closed}
+        <div class="navbar">
+            <div class="branch-wrapper">
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                    on:selectstart={preventSelection} style="cursor: pointer"
+                    on:mousedown={preventSelection} class="nes-font switch"
+                    on:click={() => handleSwitchBranch(true)}
+                    hidden={branches.length < 1 || options.currentUuid == null}>
+                    &lt;</h1>
+                <section style="display:flex;justify-content:center">
+                    {#each branches as branch, i}
+                        {#if currentBranchIndex === i}
+                            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                                class="nes-font"
+                                style="position:absolute"
+                                on:selectstart={preventSelection}
+                                on:mousedown={preventSelection}
+                            > {branch.toUpperCase()} VERSION</h1>
+                        {/if}
+                    {/each}
+                </section>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                    on:selectstart={preventSelection}
+                    style="cursor: pointer" on:mousedown={preventSelection}
+                    class="nes-font switch" on:click={() => handleSwitchBranch(false)}
+                    hidden={branches.length < 1 || options.currentUuid == null}>
+                    &gt;</h1>
+            </div>
         </div>
-    </div>
-    <VirtualList height="27em" items={launcherProfiles.filter(p => p.branch == currentBranch())} let:item>
-        <Profile profile={item} active={profileById(activeProfile()).id == item.id} on:settings={() => openSettings(item)} on:select={() => selectProfile(item)}></Profile>
-    </VirtualList>
-    <div class="create-wrapper">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="create-button"
-        on:click={openSettings}>
-            CREATE PROFILE
-        </h1>
-    </div>
+        <VirtualList height="27em" items={launcherProfiles.filter(p => p.branch == currentBranch())} let:item>
+            <Profile profile={item} active={profileById(activeProfile()).id == item.id} on:settings={() => openSettings(item)} on:select={() => selectProfile(item)}></Profile>
+        </VirtualList>
+        <div class="create-wrapper">
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <h1 class="create-button"
+            on:click={openSettings}>
+                CREATE PROFILE
+            </h1>
+        </div>
+    {/if}
 </div>
 
 <style>
