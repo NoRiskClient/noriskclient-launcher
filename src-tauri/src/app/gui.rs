@@ -149,6 +149,21 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
 }
 
 #[tauri::command]
+async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
+    debug!("Fetching mod info...");
+
+    match ModrinthApiEndpoints::get_mod_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
     println!("Installing Mod And Dependencies...");
     match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
@@ -682,6 +697,7 @@ pub fn gui_main() {
             request_owned_capes,
             refresh_via_norisk,
             clear_data,
+            get_mod_info,
             get_launcher_profiles,
             store_launcher_profiles,
             get_custom_mods_folder,
