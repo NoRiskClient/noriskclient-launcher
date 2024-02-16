@@ -141,6 +141,28 @@
             }).then((result) => {
                 console.debug("Featured Mods", result);
                 mods = result;
+                launchManifest.mods.forEach(async mod => {
+                    if (!mod.required) {
+                        const slug = mod.source.artifact.split(':')[1];
+                        let iconUrl = 'https://norisk.gg/icon_512px.png';
+                        let description = 'A custom NoRiskClient Mod.';
+                        if (mod.source.repository != 'norisk') {
+                            await invoke('get_mod_info', { slug }).then(info => {
+                                iconUrl = info.icon_url;
+                                description = info.description;
+                            }).catch((err) => {
+                                console.error(err);
+                            });
+                        }
+                        mods.push({
+                            author: null,
+                            description: description,
+                            icon_url: iconUrl,
+                            slug: slug,
+                            title: mod.name
+                        });
+                    }
+                });
             }).catch((err) => {
                 console.error(err);
             });
