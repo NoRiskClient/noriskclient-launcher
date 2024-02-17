@@ -9,7 +9,7 @@
   $: if (dialog && showModal) dialog.showModal();
 
   const handleAddAccount = async () => {
-    await invoke("login_norisk_microsoft").then((loginData) => {
+    await invoke("login_norisk_microsoft", { options }).then((loginData) => {
       console.debug("Received Login Data...", loginData);
 
       options.currentUuid = loginData.uuid;
