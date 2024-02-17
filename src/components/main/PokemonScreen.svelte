@@ -305,7 +305,6 @@
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
-
   {#if showModrinthScreen}
     <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
@@ -319,12 +318,12 @@
   {/if}
 
   {#if showCapeScreen}
-    <CapeScreen on:home={home} bind:options></CapeScreen>
+  <CapeScreen on:home={home} bind:options></CapeScreen>
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
-                   dataFolderPath={dataFolderPath}></SettingsModal>
+  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
+  dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
 
   {#if clientLogShown}
@@ -333,7 +332,7 @@
 
   {#if clientRunning}
     <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-                   progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
+    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
   {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
@@ -359,13 +358,14 @@
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>
-    <img transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="pokemon-title"
-         src={NoRiskLogoColor}
-         alt="Pokemon Title">
+    <img transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+      class="pokemon-title"
+      src={NoRiskLogoColor}
+      alt="Pokemon Title">
     <div class="branch-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-          on:selectstart={preventSelection} style="cursor: pointer"
+      on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
           hidden={branches.length < 1 || options.currentUuid == null}>
@@ -400,8 +400,8 @@
     </div>
     <SkinButton on:launch={runClient} on:requestBranches={requestBranches} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
-         on:mousedown={preventSelection} class="copyright">
-      © 2000-2024 HGLabor/Friends Inc. v0.3.9
+        on:mousedown={preventSelection} class="copyright">
+      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.3.9
     </div>
   {/if}
 </div>
