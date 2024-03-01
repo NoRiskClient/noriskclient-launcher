@@ -261,7 +261,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
                 async move {
                     let hash = asset_object.1.hash.clone();
 
-                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, folder_clone, data_clone.clone()).await {
+                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.clone().to_string(), folder_clone, data_clone.clone()).await {
                         Ok(downloaded) => {
                             let curr = download_count.fetch_add(1, Ordering::Relaxed);
 

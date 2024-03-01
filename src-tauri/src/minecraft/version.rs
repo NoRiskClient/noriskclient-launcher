@@ -6,7 +6,7 @@ use tokio::fs;
 use serde::{Deserialize, Deserializer, de::{self, MapAccess, Visitor}};
 use void::Void;
 use std::collections::HashSet;
-use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, Architecture}};
+use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, download_private_file_untracked, Architecture}};
 use crate::utils::{get_maven_artifact_path, sha1sum};
 use std::sync::Arc;
 use crate::app::api::get_launcher_api_base;
@@ -349,7 +349,7 @@ impl AssetObject {
         };
     }
 
-    pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+    pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, norisk_token: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
 
@@ -391,7 +391,7 @@ impl AssetObject {
             progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
 
             info!("Downloading {}", self.hash);
-            download_file_untracked(&*format!("{}/launcherapi/v1/assets/{}/{}/{}", get_launcher_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), asset_file_path).await?;
+            download_private_file_untracked(&*format!("{}/launcherapi/v1/assets/{}/{}/{}", get_launcher_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), norisk_token, asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
@@ -404,8 +404,8 @@ impl AssetObject {
         return self.download(assets_objects_folder, progress).await;
     }
 
-    pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
-        return self.download_norisk_cosmetic(branch, file_path, assets_objects_folder, progress).await;
+    pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, norisk_token: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+        return self.download_norisk_cosmetic(branch, file_path, norisk_token, assets_objects_folder, progress).await;
     }
 }
 
