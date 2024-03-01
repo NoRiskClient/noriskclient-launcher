@@ -249,7 +249,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
         let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
 
         launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
-        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, norisk_asset_max));
+        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
 
         let _: Vec<Result<()>> = stream::iter(
             norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
@@ -267,7 +267,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
 
                             if downloaded {
                                 // the progress bar is only being updated when a asset has been downloaded to improve speeds
-                                data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, norisk_asset_max));
+                                data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
                                 data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
                             }
                         }
@@ -279,7 +279,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
             })
         ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
 
-        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, norisk_asset_max, norisk_asset_max));
+        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, norisk_asset_max, norisk_asset_max));
 
         // Delete usused norisk assets
 
@@ -367,11 +367,10 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
     }
     keys_vec.push(".DS_Store");
     let file_names: &[&str] = &keys_vec;
-    let mut verifyed: u64 = 0;
+    let mut verified: u64 = 0;
 
     launcher_data_arc.progress_update(ProgressUpdate::set_label("Verifying Norisk assets..."));
-    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, verifyed, file_names.len() as u64));
-
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
         if path.is_file() {
@@ -383,14 +382,14 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
                     println!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
                 }
             } else {
-                verifyed += 1;
-                launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, verifyed, file_names.len() as u64));
+                verified += 1;
+                launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
                 launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("Verified Norisk asset {}", file_name)));
             }
         }
     }
-
-    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyAssets, file_names.len() as u64, file_names.len() as u64));
+    
+    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, file_names.len() as u64, file_names.len() as u64));
 }
 
 pub struct LaunchingParameter {
