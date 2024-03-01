@@ -153,6 +153,7 @@
             // Fetch featured mods
             await invoke("get_featured_mods", {
                 branch: currentBranch,
+                mcVersion: launchManifest.build.mcVersion,
             }).then((result) => {
                 console.debug("Featured Mods", result);
                 mods = result;
