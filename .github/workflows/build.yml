@@ -84,7 +84,7 @@ jobs:
 
       - run: |
           ls -R ./src-tauri/target/release/bundle
-          mv ./src-tauri/target/release/bundle/macos/NoRiskClient**.dmg ./src-tauri/target/release/bundle/dmg/NoRiskClient-MacOS.dmg
+          mv ./src-tauri/target/release/bundle/dmg/NoRiskClient**.dmg ./src-tauri/target/release/bundle/dmg/NoRiskClient-MacOS.dmg
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
         if: matrix.platform == 'macos-latest'
