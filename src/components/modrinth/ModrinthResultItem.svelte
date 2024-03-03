@@ -5,10 +5,12 @@
 
     export let mod;
     export let text;
+    export let enabled;
 </script>
 
 <div class="mod-item-wrapper">
     <div class="image-text-wrapper">
+        <!-- svelte-ignore a11y-img-redundant-alt -->
         <img src={mod.icon_url} alt="Mod Picture">
         <div class="text-item-wrapper">
             <div class="href-wrapper">
@@ -26,15 +28,34 @@
         <h1 class="required-button">
             LOADING
         </h1>
+    {:else if text === "RECOMENDED"}
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <h1 class="required-button" style="margin-bottom: 15px;">
+                RECOMENDED
+            </h1>
+            {#if enabled}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="red-text-clickable delete-button" on:click={() => dispatch("disable")}>
+                    DISABLE
+                </h1>
+            {:else}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="green-text-clickable install-button" on:click={() => dispatch("enable")}>
+                    ENABLE
+                </h1>
+            {/if}
+        </div>
     {:else if text === "REQUIRED"}
         <h1 class="required-button">
             REQUIRED
         </h1>
     {:else if text === "INSTALL"}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="install-button" on:click={() => dispatch("install")}>
             INSTALL
         </h1>
     {:else if text === "INSTALLED"}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="red-text-clickable delete-button" on:click={() => dispatch("delete")}>
             DELETE
         </h1>

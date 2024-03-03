@@ -82,6 +82,7 @@
 
 <div in:fade={{ duration: 400 }} class="cape-wrapper">
   {#if capes !== null}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:selectstart={preventSelection}
         on:mousedown={preventSelection}
         on:click={navigatePrevious} class="button">
@@ -103,10 +104,13 @@
             on:mouseleave={() => cape.hovered = false}
           >
             {#if options.experimentalMode}
+              <!-- svelte-ignore a11y-img-redundant-alt -->
               <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             {:else}
+              <!-- svelte-ignore a11y-img-redundant-alt -->
               <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             {/if}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div on:click={handleEquipCape(cape._id)} class="equip-text">
               EQUIP
             </div>
@@ -122,6 +126,7 @@
         </div>
       {/each}
     </div>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:selectstart={preventSelection}
         on:mousedown={preventSelection}
         on:click={navigateNext}

@@ -12,11 +12,11 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{CustomMod, InstalledMods, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
+use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, LoaderMod}, app_data::LauncherOptions};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -162,6 +162,21 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
 }
 
 #[tauri::command]
+async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
+    debug!("Fetching mod info...");
+
+    match ModrinthApiEndpoints::get_mod_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
     println!("Installing Mod And Dependencies...");
     match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
@@ -264,16 +279,11 @@ async fn get_options() -> Result<LauncherOptions, String> {
 }
 
 #[tauri::command]
-async fn get_installed_mods(branch: &str, options: LauncherOptions) -> Result<InstalledMods, String> {
-    let game_dir = options.data_path_buf().join("gameDir").join(branch);
-    return match tokio::fs::create_dir_all(&game_dir).await {
-        Ok(_) => {
-            Ok(InstalledMods::load(&game_dir).await.unwrap_or_default()) // default to basic options if unable to load
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    };
+async fn get_launcher_profiles() -> Result<LauncherProfiles, String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    let launcher_profiles = LauncherProfiles::load(config_dir).await.unwrap_or_default(); // default to basic launcher_profiles defaults if unable to load
+
+    Ok(launcher_profiles)
 }
 
 #[tauri::command]
@@ -300,20 +310,6 @@ async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_v
     }
 
     Ok(())
-}
-
-#[tauri::command]
-async fn store_installed_mods(branch: &str, options: LauncherOptions, installed_mods: InstalledMods) -> Result<(), String> {
-    let game_dir = options.data_path_buf().join("gameDir").join(branch);
-    return match tokio::fs::create_dir_all(&game_dir).await {
-        Ok(_) => {
-            installed_mods.store(&game_dir).await.map_err(|e| format!("unable to store config data: {:?}", e))?; // default to basic options if unable to load
-            Ok(())
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    };
 }
 
 #[tauri::command]
@@ -405,6 +401,16 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
     options.store(config_dir)
         .await
         .map_err(|e| format!("unable to store config data: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    launcher_profiles.store(config_dir)
+        .await
+        .map_err(|e| format!("unable to store launcher_profiles data: {:?}", e))?;
 
     Ok(())
 }
@@ -704,14 +710,15 @@ pub fn gui_main() {
             request_owned_capes,
             refresh_via_norisk,
             clear_data,
-            get_installed_mods,
+            get_mod_info,
+            get_launcher_profiles,
+            store_launcher_profiles,
             get_custom_mods_folder,
             save_custom_mods_to_folder,
             install_mod_and_dependencies,
             get_mod_version,
             upload_logs,
             get_launch_manifest,
-            store_installed_mods,
             get_custom_mods_filenames,
             mem_percentage,
             default_data_folder_path,

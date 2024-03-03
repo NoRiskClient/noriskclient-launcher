@@ -15,7 +15,8 @@
 
     export let currentBranch;
     export let options;
-    let installedMods = {mods: []};
+    export let launcherProfiles;
+    let launcherProfile = null;
     let customMods = [];
     let mods = null;
     let launchManifest = null;
@@ -51,28 +52,6 @@
             this.push(element);
         }
     };
-
-    async function loadInstalledModsConfig() {
-        await invoke("get_installed_mods", {
-            branch: currentBranch,
-            options: options
-        }).then(result => {
-            console.debug("Installed Mods", result)
-            installedMods = result
-        }).catch(err => {
-            alert(err)
-        })
-    }
-
-    async function storeInstalledMods(mods, branch, options) {
-        await invoke("store_installed_mods", {
-            installedMods: mods,
-            branch: branch,
-            options: options,
-        }).then(() => {
-            console.debug("Stored Installed Mods...", mods)
-        }).catch(e => console.error(e));
-    }
 
     async function getLaunchManifest() {
         await invoke("get_launch_manifest", {
@@ -122,13 +101,13 @@
             requiredMods: launchManifest.mods
         }).then((result) => {
             result.image_url = mod.icon_url
-            installedMods.mods.pushIfNotExist(result, function (e) {
+            launcherProfile.mods.pushIfNotExist(result, function (e) {
                 return e.value.name === result.value.name;
             })
-            installedMods = installedMods;
             mod.loading = false
             mods = mods
-            storeInstalledMods(installedMods, currentBranch, options);
+            launcherProfile.mods = launcherProfile.mods;
+            launcherProfiles.store()
         }).catch((err) => {
             console.error(err);
         });
@@ -138,9 +117,15 @@
         if (launchManifest.mods.some((mod) => {
             return mod.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
         })) {
-            return "REQUIRED"
+            if (launchManifest.mods.find((mod) =>
+                mod.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
+            ).required) {
+                return "REQUIRED"
+            } else {
+                return "RECOMENDED"
+            }
         }
-        if (installedMods.mods.some((mod) => {
+        if (launcherProfile.mods.some((mod) => {
             return mod.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
         })) {
             return "INSTALLED"
@@ -157,6 +142,28 @@
             }).then((result) => {
                 console.debug("Featured Mods", result);
                 mods = result;
+                launchManifest.mods.forEach(async mod => {
+                    if (!mod.required) {
+                        const slug = mod.source.artifact.split(':')[1];
+                        let iconUrl = 'https://norisk.gg/icon_512px.png';
+                        let description = 'A custom NoRiskClient Mod.';
+                        if (mod.source.repository != 'norisk') {
+                            await invoke('get_mod_info', { slug }).then(info => {
+                                iconUrl = info.icon_url;
+                                description = info.description;
+                            }).catch((err) => {
+                                console.error(err);
+                            });
+                        }
+                        mods.push({
+                            author: null,
+                            description: description,
+                            icon_url: iconUrl,
+                            slug: slug,
+                            title: mod.name
+                        });
+                    }
+                });
             }).catch((err) => {
                 console.error(err);
             });
@@ -179,22 +186,52 @@
 
     async function toggleInstalledMod(mod) {
         mod.value.enabled = !mod.value.enabled;
-        await storeInstalledMods(installedMods, currentBranch, options).then(() => {
-            installedMods.mods = installedMods.mods
-        })
+        launcherProfile.mods = launcherProfile.mods;
+        launcherProfiles.store();
     }
 
     async function deleteInstalledMod(slug) {
-        let index = installedMods.mods.findIndex((element) => {
+        let index = launcherProfile.mods.findIndex((element) => {
             return element.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
         })
         if (index !== -1) {
-            installedMods.mods.splice(index, 1);
-            installedMods = installedMods;
+            launcherProfile.mods.splice(index, 1);
             mods = mods
-            await storeInstalledMods(installedMods, currentBranch, options).then(() => {
-                installedMods.mods = installedMods.mods
-            })
+            launcherProfiles.store();
+        }
+    }
+
+    async function disableRecomendedMod(slug) {
+        if (launcherProfile.mods.find(mod => mod.value.name.toUpperCase() === slug.toUpperCase())) {
+            return;
+        }
+        launcherProfile.mods.push({
+            value: {
+                required: false,
+                enabled: false,
+                name: slug,
+                source: {
+                    type: 'repository',
+                    repository: '',
+                    artifact: `PLACEHOLDER:${slug}`,
+                    url: ''
+                }
+            },
+            image_url: '',
+            dependencies: []
+        })
+        mods = mods
+        launcherProfiles.store();
+    }
+
+    async function enableRecomendedMod(slug) {
+        let index = launcherProfile.mods.findIndex((element) => {
+            return element.value.name.toUpperCase() === slug.toUpperCase()
+        })
+        if (index !== -1) {
+            launcherProfile.mods.splice(index, 1);
+            mods = mods
+            launcherProfiles.store();
         }
     }
 
@@ -302,9 +339,27 @@
     }
 
     async function load() {
+        if (options.experimentalMode) {
+            const selectedProfile = launcherProfiles.selectedExperimentalProfiles[currentBranch];
+            launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id == selectedProfile);
+            if (!launcherProfile) {
+                launcherProfiles.experimentalProfiles.splice(launcherProfiles.experimentalProfiles.indexOf(launcherProfiles.experimentalProfiles.find(p => p.id == selectedProfile)), 1);
+                launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.name == `${currentBranch} - Default`);
+                launcherProfiles.selectedExperimentalProfiles[currentBranch] = launcherProfile.id;
+                launcherProfiles.store();
+            }
+        } else {
+            const selectedProfile = launcherProfiles.selectedMainProfiles[currentBranch];
+            launcherProfile = launcherProfiles.mainProfiles.find(p => p.id == selectedProfile);
+            if (!launcherProfile) {
+                launcherProfiles.mainProfiles.splice(launcherProfiles.mainProfiles.indexOf(launcherProfiles.mainProfiles.find(p => p.id == selectedProfile)), 1);
+                launcherProfile = launcherProfiles.mainProfiles.find(p => p.name == `${currentBranch} - Default`);
+                launcherProfiles.selectedMainProfiles[currentBranch] = launcherProfile.id;
+                launcherProfiles.store();
+            }
+        }
         await getLaunchManifest();
         searchMods();
-        loadInstalledModsConfig();
     }
 
     load()
@@ -314,13 +369,17 @@
     })
 </script>
 
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 <div class="modrinth-wrapper">
     <div class="navbar">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
         <h2>|</h2>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
         <h2>|</h2>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleSelectCustomMods}>Custom</h1>
     </div>
     {#if currentTabIndex === 0}
@@ -329,16 +388,19 @@
         {#if mods !== null }
             <VirtualList height="30em" items={mods} let:item>
                 <ModrinthResultItem text={checkIfRequiredOrInstalled(item.slug)}
+                                    enabled={launcherProfile.mods.find(mod => mod.value.name == item.slug)?.value?.enabled ?? true}
                                     on:delete={deleteInstalledMod(item.slug)}
                                     on:install={installModAndDependencies(item)}
+                                    on:disable={disableRecomendedMod(item.slug)}
+                                    on:enable={enableRecomendedMod(item.slug)}
                                     mod={item}/>
             </VirtualList>
         {/if}
     {:else if currentTabIndex === 1}
         <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
                            placeHolder="Filter installed Mods..."/>
-        {#if installedMods.mods.length > 0 || customMods.length > 0}
-            <VirtualList height="30em" items={[...customMods,...installedMods.mods].filter((mod) => {
+        {#if launcherProfile.mods.length > 0 || customMods.length > 0}
+            <VirtualList height="30em" items={[...customMods,...launcherProfile.mods].filter((mod) => {
                 let name = (mod?.value?.name ?? mod).toUpperCase()
                 return (name.endsWith(".JAR") || name.endsWith(".DISABLED")) && name.includes(filterterm.toUpperCase())
             }).sort() } let:item>
@@ -349,8 +411,6 @@
                     <InstalledModItem on:delete={deleteInstalledMod(item.value.source.artifact.split(":")[1])} on:disable={toggleInstalledMod(item)} mod={item}/>
                 {/if}
             </VirtualList>
-        {:else}
-
         {/if}
     {/if}
 </div>

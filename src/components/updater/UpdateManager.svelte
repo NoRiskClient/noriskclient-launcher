@@ -57,6 +57,7 @@
 <div class="black-bar" data-tauri-drag-region=""></div>
 <div class="content">
     {#if isFinished}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={restart}>Press Start</h1>
     {:else}
         <h1>Updating Launcher {dots}</h1>

@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::{Mutex, Arc};
 
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use tracing::*;
 use tokio::fs;
 
@@ -30,8 +30,8 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
 
     // Copy retrieve and copy mods from manifest
     clear_mods(&data_directory, &launch_manifest).await?;
-    let installed_mods = retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &progress, &Vec::new()).await?;
-    retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &progress, &installed_mods).await?;
+    retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &additional_mods, &progress).await?;
+    retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &additional_mods, &progress).await?;
 
     copy_custom_mods(&data_directory, &launch_manifest, &progress).await?;
 
@@ -82,7 +82,7 @@ pub(crate) async fn clear_mods(data: &Path, manifest: &NoRiskLaunchManifest) -> 
     Ok(())
 }
 
-pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest, mods: &Vec<LoaderMod>, progress: &impl ProgressReceiver, already_installed_mods: &Vec<LoaderMod>) -> Result<Vec<LoaderMod>> {
+pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest, mods: &Vec<LoaderMod>, additional_mods: &Vec<LoaderMod>, progress: &impl ProgressReceiver) -> Result<()> {
     let mod_cache_path = data.join("mod_cache");
     let mods_path = data.join("gameDir").join(&manifest.build.branch).join("mods");
 
@@ -96,14 +96,14 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
     for (mod_idx, current_mod) in mods.iter().enumerate() {
         // Skip mods that are not needed
-        if !current_mod.required && !current_mod.enabled {
+        if (!current_mod.required && !current_mod.enabled) || additional_mods.iter().any(|m| m.source.get_slug() == current_mod.source.get_slug() && m.source.get_repository() == "PLACEHOLDER") {
             continue;
         }
 
-        if already_installed_mods.iter().any(|loader_mod| {
+        if installed_mods.iter().any(|loader_mod| {
             return loader_mod.is_same_slug(current_mod);
         }) {
-            let already_installed = already_installed_mods.iter().find(|&loader_mod| {
+            let already_installed = installed_mods.iter().find(|&loader_mod| {
                 return loader_mod.is_same_slug(current_mod);
             }).unwrap();
             println!("Skipping Mod {:?} cuz {:?} is already installed",current_mod,already_installed);
@@ -138,7 +138,6 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
                     fs::write(&current_mod_path, retrieved_bytes).await?;
                 }
-                _ => {}
             }
         }
 
@@ -149,7 +148,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
         installed_mods.push(current_mod.clone())
     }
 
-    Ok(installed_mods)
+    Ok(())
 }
 
 pub async fn copy_custom_mods(data: &Path, manifest: &NoRiskLaunchManifest, progress: &impl ProgressReceiver) -> Result<()> {

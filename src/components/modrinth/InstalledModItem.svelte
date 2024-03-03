@@ -12,6 +12,7 @@
 
 <div class="mod-item-wrapper" class:enabled={mod.value.enabled} class:disabled={!mod.value.enabled}>
     <div class="image-text-wrapper">
+        <!-- svelte-ignore a11y-img-redundant-alt -->
         <img src={mod.image_url} alt="Mod Picture">
         <div class="text-wrapper">
             <a href={"https://modrinth.com/mod/"+getSlug()} target="_blank" title="Modrinth Page">
@@ -23,6 +24,7 @@
         </div>
     </div>
     <div class="button-wrapper">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="red-text-clickable disable-button"
             on:click={() => dispatch('disable')}
             class:enable-button={!mod.value.enabled}
@@ -33,6 +35,7 @@
                 ENABLE
             {/if}
         </h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="install-button red-text-clickable" on:click={() => dispatch("delete")}>
             DELETE
         </h1>
@@ -63,28 +66,6 @@
         align-items: start;
         display: flex;
         gap: 1em;
-    }
-
-    .href-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 0.7em;
-    }
-
-    .text-wrapper {
-
-    }
-
-    .href-wrapper div {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 0.7em;
-    }
-
-    .text-item-wrapper {
-        height: 100%;
-        max-width: 400px;
     }
 
     .button-wrapper {

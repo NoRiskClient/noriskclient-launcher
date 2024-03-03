@@ -26,6 +26,7 @@
         <h1>{title}</h1>
     {/if}
     <div class="input-button-wrapper">
+        <!-- svelte-ignore a11y-autofocus -->
         <input on:input={onChange}
                bind:value={searchTerm}
                autofocus={true}

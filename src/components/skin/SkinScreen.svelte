@@ -111,7 +111,7 @@
     skinViewer.loadSkin(currentSkinLocation)
     unsavedSkin = null;
   }
-  
+
   async function saveSkin(location) {
     if (settings.open) {
       return;
@@ -121,7 +121,7 @@
     console.log(options);
 
     const slim = skinViewer.scene.children[2].children[0].children[0].slim;
-    
+
     console.log(`Model Type: ${slim ? 'slim' : 'classic'}`);
 
     let failed = false;
@@ -207,7 +207,7 @@
         if (slider.id == "showCapeAsElytraSetting") {
           if (settings.showCape) {
             slider.classList.toggle("no-slide");
-            slider.classList.toggle("slide");  
+            slider.classList.toggle("slide");
           }
         } else {
           slider.classList.toggle("no-slide");
@@ -257,6 +257,7 @@
 </script>
 
 {#if settings.open}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div class="klickField" on:click={settings.open ? toggleSettings : () => {}}></div>
 {/if}
 <div class="wrapper" on:selectstart={preventSelection}>
@@ -275,6 +276,7 @@
   ></div>
   {#if !isLoading}
     <div id="settings" class="settings open">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`} xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
         <path d="M0 0h24v24H0V0z" fill="none" />
         <path
@@ -296,15 +298,19 @@
       {/if}
     </div>
     {#if !unsavedSkin}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
     {:else}
       <div class="unsavedSkinActionWrapper slider no-slide">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
       </div>
     {/if}
   {/if}
 </div>
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 
 <style>
@@ -334,7 +340,7 @@
     .slider {
       transition-duration: 0.3s;
     }
-    
+
     .slider.slide {
       transition-duration: 0.3s;
       transform: translateX(-140px) scale(0.5);
@@ -359,7 +365,7 @@
       transition-duration: 0.3s;
       transform: rotateY(0);
     }
-    
+
     .settings svg:hover {
       transition-duration: 0.3s;
       transform: scale(1.2);
@@ -378,14 +384,9 @@
     .setting-slider {
       transition-duration: 0.3s;
     }
-    
+
     .setting-slider.no-slide {
       transform: translateX(120%) scale(0);
-    }
-    
-    .setting-slider.slide {
-      transition-duration: 0.3s;
-      transform: translateX(-120%) scale(1);
     }
 
     .change-button {
@@ -396,7 +397,7 @@
       overflow: visible;
       transition-duration: 0.3s;
     }
-    
+
     .change-button.no-slide:hover {
       color: var(--primary-color);
       transition-duration: 0.3s;
@@ -416,12 +417,12 @@
     .unsavedSkinActionWrapper h1 {
       transition-duration: 0.3s;
     }
-    
+
     .unsavedSkinActionWrapper.no-slide h1:hover {
       transition-duration: 0.3s;
       transform: scale(1.2);
     }
-    
+
     .save-button {
       color: #1cc009;
       text-shadow: 2px 2px #114609;

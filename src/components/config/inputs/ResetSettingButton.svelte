@@ -21,10 +21,6 @@
         align-items: center;
     }
 
-    input {
-      margin-right: 5px;
-    }
-
     button {
       outline: none;
       background-color: transparent;

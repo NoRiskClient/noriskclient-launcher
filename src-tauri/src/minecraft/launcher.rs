@@ -234,7 +234,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
     fs::create_dir_all(&norisk_asset_dir).await?;
 
-    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token.clone()).await;
+    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token).await;
 
     let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
         Ok(norisk_assets) => norisk_assets.objects,
@@ -261,7 +261,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
                 async move {
                     let hash = asset_object.1.hash.clone();
 
-                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.clone().to_string(), folder_clone, data_clone.clone()).await {
+                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), folder_clone, data_clone.clone()).await {
                         Ok(downloaded) => {
                             let curr = download_count.fetch_add(1, Ordering::Relaxed);
 

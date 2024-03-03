@@ -104,9 +104,11 @@
       <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:options bind:capes />
     {/if}
   {/if}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
   <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
       on:click={handleNextRequest}><span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
 </div>
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 
 <style>

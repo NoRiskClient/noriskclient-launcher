@@ -8,15 +8,16 @@
   import { listen } from "@tauri-apps/api/event";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
-  import { relaunch } from "@tauri-apps/api/process";
 
   export let options;
   let branches = [];
+  let launcherProfiles = {};
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
@@ -27,6 +28,8 @@
   let progressBarLabel = "";
   let settingsShown = false;
   let clientLogShown = false;
+  let showProfilesScreen = false;
+  let showProfilesScreenHack = false;
   let showSkinScreen = false;
   let showSkinScreenHack = false;
   let showCapeScreen = false;
@@ -41,7 +44,6 @@
 
   listen("progress-update", event => {
     let progressUpdate = event.payload;
-    console.log(event);
 
     switch (progressUpdate.type) {
       case "max": {
@@ -58,6 +60,13 @@
       }
     }
   });
+
+  function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+  }
 
   function handleSwitchBranch(isLeft) {
     const totalBranches = branches.length;
@@ -93,6 +102,49 @@
         alert(reason);
         console.error(reason);
       });
+
+    await invoke("get_launcher_profiles").then((profiles) => {
+      console.info(`Loaded launcher profiles: `, profiles);
+      branches.forEach(branch => {
+        if (options.experimentalMode) {
+          const branchProfile = profiles.experimentalProfiles.find(p => p.branch == branch);
+          if (!branchProfile) {
+            const profileId = uuidv4();
+            profiles.experimentalProfiles.push({
+              id: profileId,
+              branch: branch,
+              name: `${branch} - Default`,
+              mods: []
+            });
+            profiles.selectedExperimentalProfiles[branch] = profileId;
+          }
+        } else {
+          const branchProfile = profiles.mainProfiles.find(p => p.branch == branch);
+          if (!branchProfile) {
+            const profileId = uuidv4();
+            profiles.mainProfiles.push({
+              id: profileId,
+              branch: branch,
+              name: `${branch} - Default`,
+              mods: []
+            });
+            profiles.selectedMainProfiles[branch] = profileId;
+          }
+        }
+      });
+
+      profiles.store = function() {
+        console.debug("storing launcher profiles", profiles);
+        invoke("store_launcher_profiles", { launcherProfiles: profiles }).catch(e => console.error(e));
+      }
+
+      profiles.store();
+
+      launcherProfiles = profiles;
+    }).catch((err) => {
+      console.error(`Failed to load launcher profiles: ${err}`);
+      alert(`Failed to load launcher profiles: ${err}`);
+    })
   }
 
   onMount(async () => {
@@ -156,18 +208,20 @@
 
     options.store();
 
-    await invoke("get_installed_mods", {
-      branch: branch,
-      options: options,
-    }).then(result => {
-      result.mods.forEach((mod) => {
-        console.debug("mod", mod);
-        installedMods.push(mod.value);
-        mod.dependencies.forEach((dependency) => {
-          installedMods.push(dependency.value);
-        });
+    let launcherProfile;
+    if (options.experimentalMode) {
+      const activeProfileId = launcherProfiles.selectedExperimentalProfiles[branch];
+      launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id == activeProfileId);
+    } else {
+      const activeProfileId = launcherProfiles.selectedMainProfiles[branch];
+      launcherProfile = launcherProfiles.mainProfiles.find(p => p.id == activeProfileId);
+    }
+
+    launcherProfile.mods.forEach(mod => {
+      installedMods.push(mod.value);
+      mod.dependencies.forEach((dependency) => {
+        installedMods.push(dependency.value);
       });
-      console.debug("Starting With Custom Mods", installedMods);
     });
 
     console.debug("Running Branch", branch);
@@ -189,6 +243,13 @@
 
   function preventSelection(event) {
     event.preventDefault();
+  }
+
+  function handleOpenProfilesScreen() {
+    showProfilesScreenHack = true;
+    setTimeout(() => {
+      showProfilesScreen = true;
+    }, 300);
   }
 
   function handleOpenSkinScreen() {
@@ -213,6 +274,8 @@
   }
 
   function home() {
+    showProfilesScreen = false;
+    showProfilesScreenHack = false;
     showSkinScreen = false;
     showSkinScreenHack = false;
     showCapeScreen = false;
@@ -239,11 +302,15 @@
   }
 </script>
 
+
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
-
   {#if showModrinthScreen}
-    <ModrinthScreen on:home={home} bind:options bind:currentBranch={branches[currentBranchIndex]} />
+    <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+
+  {#if showProfilesScreen}
+    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={branches} currentBranchIndex={currentBranchIndex}></ProfilesScreen>
   {/if}
 
   {#if showSkinScreen}
@@ -251,12 +318,12 @@
   {/if}
 
   {#if showCapeScreen}
-    <CapeScreen on:home={home} bind:options></CapeScreen>
+  <CapeScreen on:home={home} bind:options></CapeScreen>
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
-                   dataFolderPath={dataFolderPath}></SettingsModal>
+  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
+  dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
 
   {#if clientLogShown}
@@ -265,29 +332,40 @@
 
   {#if clientRunning}
     <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-                   progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
+    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
-  {#if (!showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenModScreen}>MODS</h1>
       {/if}
-      <h1 on:click={handleOpenModScreen}>MODS</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={closeWindow}>QUIT</h1>
     </div>
-    <img transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="pokemon-title"
-         src={NoRiskLogoColor}
-         alt="Pokemon Title">
+    <img transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+      class="pokemon-title"
+      src={NoRiskLogoColor}
+      alt="Pokemon Title">
     <div class="branch-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-          on:selectstart={preventSelection} style="cursor: pointer"
+      on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
           hidden={branches.length < 1 || options.currentUuid == null}>
@@ -312,6 +390,7 @@
           {/each}
         {/if}
       </section>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
@@ -321,8 +400,8 @@
     </div>
     <SkinButton on:launch={runClient} on:requestBranches={requestBranches} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
-         on:mousedown={preventSelection} class="copyright">
-      © 2000-2024 HGLabor/Friends Inc. v0.3.9
+        on:mousedown={preventSelection} class="copyright">
+      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.3.9
     </div>
   {/if}
 </div>

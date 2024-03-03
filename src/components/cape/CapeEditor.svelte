@@ -63,8 +63,11 @@
     <h1 class="red-text empty-text">[No Cape Uploaded]</h1>
   {/if}
   <div class="button-wrapper">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleUploadCape}>UPLOAD</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={downloadTemplate}>TEMPLATE</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="red-text-clickable" on:click={deleteCape}>DELETE</h1>
   </div>
 </div>

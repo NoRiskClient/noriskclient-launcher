@@ -1,5 +1,7 @@
-use std::{path::Path};
+use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
+use std::vec;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -9,8 +11,30 @@ use keyring::Entry as KeyringEntry;
 use crate::app::api::{LoginData, LoginDataMinimal};
 use crate::LAUNCHER_DIRECTORY;
 
+use super::modrinth_api::CustomMod;
+
 fn default_concurrent_downloads() -> i32 {
     10
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct LauncherProfile {
+    pub id: String,
+    pub branch: String,
+    pub name: String,
+    pub mods: Vec<CustomMod>
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct LauncherProfiles {
+    #[serde(rename = "mainProfiles")]
+    pub main_profiles: Vec<LauncherProfile>,
+    #[serde(rename = "selectedMainProfiles")]
+    pub selected_main_profiles: HashMap<String, String>,
+    #[serde(rename = "experimentalProfiles")]
+    pub experimental_profiles: Vec<LauncherProfile>,
+    #[serde(rename = "selectedExperimentalProfiles")]
+    pub selected_experimental_profiles: HashMap<String, String>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -126,9 +150,7 @@ impl LauncherOptions {
     }
 }
 
-pub struct TokenManager {
-
-}
+pub struct TokenManager {}
 
 impl TokenManager {
     const SERVICE: &'static str = "noriskclient-launcher";
@@ -160,11 +182,11 @@ impl TokenManager {
     pub fn store_tokens(&mut self, login_data: LoginData) -> LoginDataMinimal {
         // logic for storing tokens
         let uuid = login_data.uuid.clone();
-        let mc_token = Self::get_keyring_entry(&uuid, "mcToken").set_password(&login_data.mc_token).unwrap();
-        let access_token = Self::get_keyring_entry(&uuid, "accessToken").set_password(&login_data.access_token).unwrap();
-        let refresh_token = Self::get_keyring_entry(&uuid, "refreshToken").set_password(&login_data.refresh_token).unwrap();
-        let norisk_token = Self::get_keyring_entry(&uuid, "noriskToken").set_password(&login_data.norisk_token).unwrap();
-        let experimental_token = Self::get_keyring_entry(&uuid, "experimentalToken").set_password(&login_data.experimental_token.unwrap()).unwrap();
+        let _mc_token = Self::get_keyring_entry(&uuid, "mcToken").set_password(&login_data.mc_token).unwrap();
+        let _access_token = Self::get_keyring_entry(&uuid, "accessToken").set_password(&login_data.access_token).unwrap();
+        let _refresh_token = Self::get_keyring_entry(&uuid, "refreshToken").set_password(&login_data.refresh_token).unwrap();
+        let _norisk_token = Self::get_keyring_entry(&uuid, "noriskToken").set_password(&login_data.norisk_token).unwrap();
+        let _experimental_token = Self::get_keyring_entry(&uuid, "experimentalToken").set_password(&login_data.experimental_token.unwrap()).unwrap();
 
         return LoginDataMinimal {
             uuid: login_data.uuid,
@@ -251,6 +273,31 @@ impl Default for LauncherOptionsMinimal {
             current_uuid: None,
             accounts: Vec::new(),
             concurrent_downloads: 10
+        }
+    }
+}
+
+impl LauncherProfiles {
+    pub async fn load(app_data: &Path) -> Result<Self> {
+        // load the launcher_profiles from the file
+        let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(&fs::read(app_data.join("launcher_profiles.json")).await?).map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherProfiles::default());
+        Ok(launcher_profiles)
+    }
+
+    pub async fn store(&self, app_data: &Path) -> Result<()> {
+        // save the launcher_profiles to the file
+        let _ = fs::write(app_data.join("launcher_profiles.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err).into() });
+        Ok(())
+    }
+}
+
+impl Default for LauncherProfiles {
+    fn default() -> Self {
+        Self {
+            main_profiles: vec![],
+            selected_main_profiles: HashMap::new(),
+            experimental_profiles: vec![],
+            selected_experimental_profiles: HashMap::new()
         }
     }
 }

@@ -9,7 +9,7 @@
   $: if (dialog && showModal) dialog.showModal();
 
   const handleAddAccount = async () => {
-    await invoke("login_norisk_microsoft").then((loginData) => {
+    await invoke("login_norisk_microsoft", { options }).then((loginData) => {
       console.debug("Received Login Data...", loginData);
 
       options.currentUuid = loginData.uuid;
@@ -32,7 +32,7 @@
   };
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <dialog
   bind:this={dialog}
   on:close={() => (showModal = false)}
@@ -102,10 +102,6 @@
         to {
             opacity: 1;
         }
-    }
-
-    button {
-        display: block;
     }
 
     .nes-font {
