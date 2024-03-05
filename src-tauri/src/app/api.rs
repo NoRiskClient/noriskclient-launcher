@@ -75,6 +75,16 @@ impl ApiEndpoints {
     pub async fn norisk_assets(branch: String, norisk_token: &str) -> Result<NoriskAssets> {
         Self::request_from_norisk_endpoint(&format!("assets/{}", branch), norisk_token).await
     }
+    
+    /// Request mcreal app token
+    pub async fn get_mcreal_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String> {
+        Self::request_from_mcreal_endpoint_with_experimental(&format!("user/mobileAppToken?uuid={}", uuid), is_experimental, norisk_token).await
+    }
+    
+    /// Reset mcreal app token
+    pub async fn reset_mcreal_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String> {
+        Self::post_from_mcreal_endpoint_with_experimental(&format!("user/mobileAppToken/reset?uuid={}", uuid), is_experimental, norisk_token).await
+    }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
@@ -99,6 +109,30 @@ impl ApiEndpoints {
             .send().await?
             .error_for_status()?
             .json::<T>()
+            .await?
+        )
+    }
+    
+    pub async fn request_from_mcreal_endpoint_with_experimental(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<String> {
+        let url = format!("{}/mcreal/{}", get_launcher_api_base(is_experimental), endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
+    }
+    
+    pub async fn post_from_mcreal_endpoint_with_experimental(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<String> {
+        let url = format!("{}/mcreal/{}", get_launcher_api_base(is_experimental), endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .text()
             .await?
         )
     }

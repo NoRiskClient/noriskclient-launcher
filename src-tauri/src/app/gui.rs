@@ -269,6 +269,29 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
+    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(_err) => {
+            Err("Error Requesting mcreal App token".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn reset_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
+    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(_err) => {
+            Err("Error Requesting mcreal App token".to_string())
+        }
+    }
+}
 
 #[tauri::command]
 async fn get_options() -> Result<LauncherOptions, String> {
@@ -709,6 +732,8 @@ pub fn gui_main() {
             request_trending_capes,
             request_owned_capes,
             refresh_via_norisk,
+            get_mobile_app_token,
+            reset_mobile_app_token,
             clear_data,
             get_mod_info,
             get_launcher_profiles,
