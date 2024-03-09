@@ -26,7 +26,7 @@
     if (account !== null) {
       if (options.currentUuid !== null) {
         await invoke("request_trending_capes", {
-          noriskToken: account.noriskToken,
+          noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
           alltime: alltime,
           limit: 30,
         }).then((result) => {
@@ -44,7 +44,7 @@
     if (account !== null) {
       if (options.currentUuid !== null) {
         await invoke("request_owned_capes", {
-          noriskToken: account.noriskToken,
+          noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
           limit: 30,
         }).then((result) => {
           console.debug("Requesting owned capes", result);
