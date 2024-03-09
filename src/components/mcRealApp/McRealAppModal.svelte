@@ -68,11 +68,11 @@
         <div class="settings-wrapper">
           <h4 class="nes-font red-text-clickable warning">Do not share this QR Code with anyone and only scan it with the official McReal App!</h4>
           <div class="qrCode" id="qrCode"></div>
-          {#if codeContent && showButton}
-            <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}&color=white`} alt="">
-            <h4 class="nes-font red-text-clickable warning" on:click={resetToken()}>Reset QR Code</h4>
+          {#if codeContent && showQrCode}
+            <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}`} alt="">
+            <h4 class="nes-font red-text-clickable warning reset" on:click={() => resetToken()}>Reset QR Code</h4>
           {:else}
-            <h1 class="nes-font showButton" on:click={showQrCode = true}>Show QR Code</h1>
+            <h1 class="nes-font showButton" on:click={() => showQrCode = true}>Show QR Code</h1>
           {/if}
         </div>
       </div>
@@ -109,15 +109,16 @@
           justify-content: space-between;
           height: 100%;
           padding: 1em;
-      }
-  
-      dialog {
+        }
+        
+        dialog {
           background-color: var(--background-color);
           border: 5px solid black;
           width: 30em;
           height: 40em;
           border-radius: 0.2em;
           padding: 0;
+          overflow: hidden;
           position: fixed; /* Fixierte Positionierung */
           top: 50%; /* 50% von oben */
           left: 50%; /* 50% von links */
@@ -157,21 +158,30 @@
         text-align: center;
         line-height: 20px;
         letter-spacing: 1.5px;
+        transition-duration: 200ms;
       }
 
       .showButton {
         color: var(--primary-color);
-        font-size: 22.5px;
+        font-size: 20px;
         margin-top: 30%;
         text-align: center;
+        transition-duration: 200ms;
       }
 
       .qrCode {
         display: flex;
         justify-self: center;
         align-self: center;
-        heigh: 250px;
         width: 250px;
+      }
+
+      .warning.reset:hover {
+        transform: scale(1.2);
+      }
+
+      .showButton:hover {
+        transform: scale(1.2);
       }
   </style>
   
