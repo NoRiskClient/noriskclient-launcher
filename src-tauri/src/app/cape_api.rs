@@ -32,11 +32,12 @@ impl CapeApiEndpoints {
                 let image_bytes = response.bytes().await;
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape/{}", get_launcher_api_base(options.experimental_mode), token);
+                let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)
+                    .header("Authorization", format!("Bearer {}", token))
                     .body(image_bytes.unwrap())
                     .send()
                     .await
@@ -78,11 +79,12 @@ impl CapeApiEndpoints {
                 file.read_to_end(&mut image_data).expect("Error Reading File");
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape/{}", get_launcher_api_base(options.experimental_mode), token);
+                let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)
+                    .header("Authorization", format!("Bearer {}", token))
                     .body(image_data)
                     .send()
                     .await
@@ -131,14 +133,15 @@ impl CapeApiEndpoints {
         Ok(response_text)
     }
 
-    pub async fn delete_cape(norisk_token: &str) -> Result<String, String> {
+    pub async fn delete_cape(norisk_token: &str) -> Result<(), String> {
         // Baue die URL mit dem Token als Query-Parameter
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/{}", get_launcher_api_base(options.experimental_mode), norisk_token);
+        let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
             .delete(&url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
             .send()
             .await
             .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
@@ -147,10 +150,7 @@ impl CapeApiEndpoints {
 
         return match response.status() {
             StatusCode::OK => {
-                let response_text = response.text().await.map_err(|err| {
-                    format!("Error reading the request: {}", err)
-                })?;
-                Ok(response_text)
+                Ok(())
             }
             _ => {
                 let response_text = response.text().await.map_err(|err| {
@@ -164,8 +164,11 @@ impl CapeApiEndpoints {
     pub async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Trending Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/{}/trending?alltime={}&limit={}", get_launcher_api_base(options.experimental_mode), norisk_token, alltime, limit);
-        let response = HTTP_CLIENT.get(url).send().await?;
+        let url = format!("{}/cosmetics/cape/trending?alltime={}&limit={}", get_launcher_api_base(options.experimental_mode), alltime, limit);
+        let response = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?;
         let response_text = response.text().await?;
         let trending_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
         Ok(trending_capes)
@@ -174,8 +177,11 @@ impl CapeApiEndpoints {
     pub async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/{}/owned?limit={}", get_launcher_api_base(options.experimental_mode), norisk_token, limit);
-        let response = HTTP_CLIENT.get(url).send().await?;
+        let url = format!("{}/cosmetics/cape/owned?limit={}", get_launcher_api_base(options.experimental_mode), limit);
+        let response = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?;
         let response_text = response.text().await?;
         let owned_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
         Ok(owned_capes)

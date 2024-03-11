@@ -211,9 +211,7 @@ async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token).await {
-        Ok(result) => {
-            message(Some(&window), "Cape Deletion", result);
-        }
+        Ok(result) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
