@@ -36,7 +36,7 @@
 
   async function deleteProfile() {
     // we need await!
-    const confirm = await window.confirm("Are you sure you want to this profile?")
+    const confirm = await window.confirm("Are you sure you want to delete this profile?")
     if (confirm) {
         console.info("DELETING PROFILE", settingsProfile);
         console.log(launcherProfiles.experimentalProfiles.indexOf(settingsProfile));
@@ -53,6 +53,7 @@
   }
 
   async function createProfile() {
+    if (settingsProfile.name == '' || settingsProfile.name.toLowerCase() == `${settingsProfile.branch} - Default`.toLowerCase()) return;
     console.info("CREATING PROFILE " + settingsProfile);
     if (experimentalMode) {
         launcherProfiles.experimentalProfiles.push(settingsProfile);
