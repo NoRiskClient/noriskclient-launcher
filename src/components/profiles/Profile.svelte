@@ -10,11 +10,12 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="profile-item-wrapper" on:click={() => dispatch('select')} class:enabled={active}>
     <div class="text-wrapper">
-        <h2>{profile.name} ({profile.mods.length} Mods)</h2>
+        <h2>{profile.name.length > 20 && profile.name != `${profile.branch} - Default` ? profile.name.substring(0, 20) + '...' : profile.name}</h2>
+        <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.length} Mods)</h2>
     </div>
     <div class="button-wrapper">
         {#if profile.name != `${profile.branch} - Default`}
-            <h1 class="settings-button" on:click={() => dispatch('settings')}>
+            <h1 class="settings-button" title="Edit Profile" on:click={() => dispatch('settings')}>
                 ⚙️
             </h1>
         {:else}
@@ -40,6 +41,15 @@
         gap: 1em;
         margin-top: 0.5em;
         justify-content: space-between;
+    }
+
+    .text-wrapper {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .text-wrapper h2:nth-child(2) {
+        align-self: flex-end;
     }
 
     .enabled {
