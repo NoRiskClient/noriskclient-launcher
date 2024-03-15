@@ -107,7 +107,7 @@ async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Re
 }
 
 #[tauri::command]
-async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
+async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
     debug!("Getting Featured Mods...");
 
     match ApiEndpoints::norisk_featured_mods(&branch).await {
@@ -117,7 +117,20 @@ async fn get_featured_mods(branch: &str, window: tauri::Window) -> Result<Vec<Mo
             for mod_id in result {
                 match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
                     Ok(mod_info) => {
-                        mod_infos.push(mod_info);
+                        // Filter featured mods based on mc version
+                        match &mod_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    mod_infos.push(mod_info);
+                                }
+                                else {
+                                    debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured mod {} has no game versions", mod_info.title);
+                            }
+                        }
                     }
                     Err(err) => {
                         message(Some(&window), "Modrinth Error", err.to_string());
@@ -138,6 +151,21 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
     debug!("Searching Mods...");
 
     match ModrinthApiEndpoints::search_mods(&params).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
+    debug!("Fetching mod info...");
+
+    match ModrinthApiEndpoints::get_mod_info(&slug).await {
         Ok(result) => {
             Ok(result)
         }
@@ -183,9 +211,7 @@ async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token).await {
-        Ok(result) => {
-            message(Some(&window), "Cape Deletion", result);
-        }
+        Ok(result) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -682,6 +708,7 @@ pub fn gui_main() {
             request_owned_capes,
             refresh_via_norisk,
             clear_data,
+            get_mod_info,
             get_launcher_profiles,
             store_launcher_profiles,
             get_custom_mods_folder,

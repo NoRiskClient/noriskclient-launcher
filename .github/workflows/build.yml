@@ -62,6 +62,7 @@ jobs:
           mv ./src-tauri/target/release/bundle/appimage/no-risk-client**.AppImage ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage
           mv ./src-tauri/target/release/bundle/appimage/no-risk-client**.AppImage.tar.gz ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage.tar.gz
           mv ./src-tauri/target/release/bundle/appimage/no-risk-client**.AppImage.tar.gz.sig ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage.tar.gz.sig
+          mv ./src-tauri/target/release/bundle/deb/no-risk-client**.deb ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.deb
         if: matrix.platform == 'ubuntu-latest'
       - uses: actions/upload-artifact@v2
         if: matrix.platform == 'ubuntu-latest'
@@ -84,8 +85,7 @@ jobs:
 
       - run: |
           ls -R ./src-tauri/target/release/bundle
-          mv ./src-tauri/target/release/bundle/macos/NoRiskClient.dmg ./src-tauri/target/release/bundle/dmg/NoRiskClient**.dmg
-          mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app
+          mv ./src-tauri/target/release/bundle/dmg/NoRiskClient**.dmg ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.dmg
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
           mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
         if: matrix.platform == 'macos-latest'

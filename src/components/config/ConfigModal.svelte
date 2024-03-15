@@ -6,6 +6,7 @@
   import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
   import { createEventDispatcher } from "svelte";
   import ResetSettingButton from "./inputs/ResetSettingButton.svelte";
+  import ExperimentalTokenModal from "./ExperimentalTokenModal.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -21,6 +22,7 @@
   }
 
   let dialog; // HTMLDialogElement
+  let showExperimentalTokenModal = false;
 
   $: if (dialog && showModal) dialog.showModal();
 
@@ -46,7 +48,11 @@
     if (!options.experimentalMode) {
       return;
     }
-    const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : window.prompt("Please enter your experimental token:")
+    if (options.experimentalModeToken == "") {
+      showExperimentalTokenModal = true;
+      return;
+    }
+    const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : null
     if (!experimentalToken) {
       options.experimentalMode = false;
       return;
@@ -62,7 +68,6 @@
     })
 
     let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
-    console.log(options.accounts[existingIndex])
     if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
       return getNewTokenType();
     }
@@ -110,6 +115,11 @@
   on:close={hideSettings}
   on:click|self={() => dialog.close()}
 >
+<div class="content">
+  {#if showExperimentalTokenModal}
+    <ExperimentalTokenModal bind:options bind:showModal={showExperimentalTokenModal} />
+  {/if}
+</div>
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
@@ -156,6 +166,17 @@
     .close-button:hover {
         transition: transform 0.3s;
         transform: scale(1.2);
+    }
+
+    content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 80vh;
+        gap: 20px;
+        padding: 20px; /* Innenabstand für den Schlagschatten */
     }
 
     .settings-wrapper {
