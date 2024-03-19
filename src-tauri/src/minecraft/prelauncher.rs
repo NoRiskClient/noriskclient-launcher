@@ -6,6 +6,8 @@ use tracing::*;
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
+use crate::app::app_data::LauncherProfile;
+use crate::app::modrinth_api::{ModrinthApiEndpoints, Shader};
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
@@ -16,7 +18,7 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     info!("Loading minecraft version manifest...");
     let mc_version_manifest = VersionManifest::download().await?;
 
@@ -32,6 +34,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
     clear_mods(&data_directory, &launch_manifest).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &additional_mods, &progress).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &additional_mods, &progress).await?;
+    retrieve_shaders(&data_directory, &launch_manifest, &shaders, &progress).await?;
 
     copy_custom_mods(&data_directory, &launch_manifest, &progress).await?;
 
@@ -146,6 +149,55 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
         println!("Installed Mod {:?}",current_mod);
         installed_mods.push(current_mod.clone())
+    }
+
+    Ok(())
+}
+
+pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shaders: &Vec<Shader>, progress: &impl ProgressReceiver) -> Result<()> {
+    let shader_path = data.join("gameDir").join(&manifest.build.branch).join("shaderpacks");
+
+    fs::create_dir_all(&shader_path).await?;
+
+    let mut installed_shaders: Vec<Shader> = Vec::new();
+
+    // Download shaders
+    let max = get_max(shaders.len());
+
+    for (shader_idx, current_shader) in shaders.iter().enumerate() {
+        if installed_shaders.iter().any(|shader| {
+            return shader.slug == current_shader.slug;
+        }) {
+            let already_installed = installed_shaders.iter().find(|&shader| {
+                return shader.slug == current_shader.slug;
+            }).unwrap();
+            println!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
+            continue;
+        }
+
+        progress.progress_update(ProgressUpdate::set_label(format!("Downloading recommended mod {}", &current_shader.title)));
+
+        let current_shader_path = shader_path.join(&current_shader.file_name);
+
+        // Do we need to download the shader?
+        if !current_shader_path.exists() {
+            // Make sure that the parent directory exists
+            fs::create_dir_all(&current_shader_path.parent().unwrap()).await?;
+
+            // ignore shaders that dont have a download url.
+            if let Some(url) = &current_shader.url {
+                println!("downloading shader {} from {}", &current_shader.file_name, url);
+                
+                let retrieved_bytes = download_file(url, |a, b| {
+                    progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskClientMods, get_progress(shader_idx, a, b), max));
+                }).await?;
+                
+                fs::write(&current_shader_path, retrieved_bytes).await?;
+            }
+        }
+
+        println!("Installed Shader {:?}", &current_shader);
+        installed_shaders.push(current_shader.clone())
     }
 
     Ok(())

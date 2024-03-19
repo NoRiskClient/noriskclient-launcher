@@ -12,6 +12,7 @@ use crate::app::api::{LoginData, LoginDataMinimal};
 use crate::LAUNCHER_DIRECTORY;
 
 use super::modrinth_api::CustomMod;
+use super::modrinth_api::Shader;
 
 fn default_concurrent_downloads() -> i32 {
     10
@@ -22,7 +23,8 @@ pub(crate) struct LauncherProfile {
     pub id: String,
     pub branch: String,
     pub name: String,
-    pub mods: Vec<CustomMod>
+    pub mods: Vec<CustomMod>,
+    pub shaders: Vec<Shader>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -281,6 +283,16 @@ impl LauncherProfiles {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the launcher_profiles from the file
         let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(&fs::read(app_data.join("launcher_profiles.json")).await?).map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherProfiles::default());
+        // for profile in launcher_profiles.main_profiles.iter_mut() {
+        //     if profile.shaders.is_none() {
+        //         profile.shaders = Some(vec![]);
+        //     }
+        // }
+        // for profile in launcher_profiles.experimental_profiles.iter_mut() {
+        //     if profile.shaders.is_none() {
+        //         profile.shaders = Some(vec![]);
+        //     }
+        // }
         Ok(launcher_profiles)
     }
 

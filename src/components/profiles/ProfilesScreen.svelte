@@ -44,10 +44,10 @@
                 id: uuidv4(),
                 name: '',
                 branch: currentBranch(),
-                mods: []
+                mods: [],
+                shaders: []
             }
         }
-        console.log(settingsProfile);
         settingsOpen = true;
     }
 

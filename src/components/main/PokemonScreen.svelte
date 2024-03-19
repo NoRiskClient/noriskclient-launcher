@@ -12,6 +12,7 @@
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
+  import AddonsScreen from "../addons/AddonsScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
@@ -36,6 +37,8 @@
   let showCapeScreenHack = false;
   let showModrinthScreen = false;
   let showModrinthScreenHack = false;
+  let showAddonsScreen = false;
+  let showAddonsScreenHack = false;
   let log = [];
 
   listen("process-output", event => {
@@ -114,7 +117,8 @@
               id: profileId,
               branch: branch,
               name: `${branch} - Default`,
-              mods: []
+              mods: [],
+              shaders: []
             });
             profiles.selectedExperimentalProfiles[branch] = profileId;
           }
@@ -126,7 +130,8 @@
               id: profileId,
               branch: branch,
               name: `${branch} - Default`,
-              mods: []
+              mods: [],
+              shaders: []
             });
             profiles.selectedMainProfiles[branch] = profileId;
           }
@@ -230,6 +235,7 @@
       loginData: options.accounts.find(obj => obj.uuid === options.currentUuid),
       options: options,
       mods: installedMods,
+      shaders: launcherProfile.shaders,
     });
   }
 
@@ -272,6 +278,13 @@
       showModrinthScreen = true;
     }, 300);
   }
+  
+  function handleOpenAddonsScreen() {
+    showAddonsScreenHack = true;
+    setTimeout(() => {
+      showAddonsScreen = true;
+    }, 300);
+  }
 
   function home() {
     showProfilesScreen = false;
@@ -282,6 +295,8 @@
     showCapeScreenHack = false;
     showModrinthScreen = false;
     showModrinthScreenHack = false;
+    showAddonsScreen = false;
+    showAddonsScreenHack = false;
   }
 
   function homeWhileClientRunning() {
@@ -307,6 +322,10 @@
 <div class="content">
   {#if showModrinthScreen}
     <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+  
+  {#if showAddonsScreen}
+    <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
 
   {#if showProfilesScreen}
@@ -335,7 +354,7 @@
     progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
-  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack && !showAddonsScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
@@ -352,6 +371,8 @@
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenModScreen}>MODS</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
-use reqwest::{multipart::{Form, Part}};
+use reqwest::multipart::{Form, Part};
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
@@ -12,11 +12,11 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
+use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthModsSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfile, LauncherProfiles}, modrinth_api::{ModrinthShadersSearchResponse, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -147,7 +147,7 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthSearchResponse, String> {
+async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
 
     match ModrinthApiEndpoints::search_mods(&params).await {
@@ -191,12 +191,56 @@ async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: V
 }
 
 #[tauri::command]
-async fn get_mod_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
-    println!("Searching Mod Version...");
+async fn get_project_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
+    println!("Searching Project Version...");
 
-    match ModrinthApiEndpoints::get_mod_version(slug, params).await {
+    match ModrinthApiEndpoints::get_project_version(slug, params).await {
         Ok(result) => {
             Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn search_shaders(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthShadersSearchResponse, String> {
+    debug!("Searching Shaders...");
+
+    match ModrinthApiEndpoints::search_shaders(&params).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_shader_info(slug: String, window: Window) -> Result<ShaderInfo, String> {
+    debug!("Fetching shader info...");
+
+    match ModrinthApiEndpoints::get_shader_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn install_shader(slug: &str, params: &str, window: Window) -> Result<Shader, String> {
+    println!("Installing Shader...");
+    match ModrinthApiEndpoints::install_shader(slug, params).await {
+        Ok(installed_shader) => {
+            Ok(installed_shader)
         }
         Err(err) => {
             message(Some(&window), "Modrinth Error", err.to_string());
@@ -305,6 +349,32 @@ async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_v
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_custom_shaders_filenames(options: LauncherOptions, profile: LauncherProfile, branch: &str) -> Result<Vec<String>, String> {
+    let custom_shader_folder = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks");
+    let names = ModrinthApiEndpoints::get_custom_shader_names(&custom_shader_folder, &profile).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    Ok(names)
+}
+
+#[tauri::command]
+async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Result<String, String> {
+    let custom_shader_folder = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks");
+    return custom_shader_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn save_custom_shaders_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file.name.clone());
+
+    println!("Saving {} to {} shaders folder.", file.name.clone(), branch);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom shader {}: {}", file.name, err));
     }
 
     Ok(())
@@ -507,7 +577,7 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, mods: Vec<LoaderMod>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
     info!("Starting Client with branch {}",branch);
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
@@ -566,6 +636,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                     launch_manifest,
                     parameters,
                     mods,
+                    shaders,
                     LauncherData {
                         on_stdout: handle_stdout,
                         on_stderr: handle_stderr,
@@ -713,11 +784,17 @@ pub fn gui_main() {
             store_launcher_profiles,
             get_custom_mods_folder,
             save_custom_mods_to_folder,
+            get_custom_mods_filenames,
+            get_custom_shaders_folder,
+            save_custom_shaders_to_folder,
+            get_custom_shaders_filenames,
             install_mod_and_dependencies,
-            get_mod_version,
+            get_project_version,
+            search_shaders,
+            get_shader_info,
+            install_shader,
             upload_logs,
             get_launch_manifest,
-            get_custom_mods_filenames,
             mem_percentage,
             default_data_folder_path,
             terminate

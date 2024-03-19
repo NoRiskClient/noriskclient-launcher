@@ -69,7 +69,7 @@
 
     async function fetchModVersion(slug) {
         console.debug("Slug", slug)
-        await invoke("get_mod_version", {
+        await invoke("get_project_version", {
             slug: slug,
             params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
         }).then((result) => {
