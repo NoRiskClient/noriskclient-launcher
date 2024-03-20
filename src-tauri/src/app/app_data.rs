@@ -12,6 +12,8 @@ use crate::app::api::{LoginData, LoginDataMinimal};
 use crate::LAUNCHER_DIRECTORY;
 
 use super::modrinth_api::CustomMod;
+use super::modrinth_api::Datapack;
+use super::modrinth_api::ResourcePack;
 use super::modrinth_api::Shader;
 
 fn default_concurrent_downloads() -> i32 {
@@ -19,12 +21,19 @@ fn default_concurrent_downloads() -> i32 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct LauncherProfile {
+pub struct Addons {
+    pub shaders: Vec<Shader>,
+    #[serde(rename = "resourcePacks")]
+    pub resourcepacks: Vec<ResourcePack>,
+    pub datapacks: Vec<Datapack>
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LauncherProfile {
     pub id: String,
     pub branch: String,
     pub name: String,
     pub mods: Vec<CustomMod>,
-    pub shaders: Vec<Shader>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,7 +45,8 @@ pub(crate) struct LauncherProfiles {
     #[serde(rename = "experimentalProfiles")]
     pub experimental_profiles: Vec<LauncherProfile>,
     #[serde(rename = "selectedExperimentalProfiles")]
-    pub selected_experimental_profiles: HashMap<String, String>
+    pub selected_experimental_profiles: HashMap<String, String>,
+    pub addons: HashMap<String, Addons>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -283,16 +293,6 @@ impl LauncherProfiles {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the launcher_profiles from the file
         let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(&fs::read(app_data.join("launcher_profiles.json")).await?).map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherProfiles::default());
-        // for profile in launcher_profiles.main_profiles.iter_mut() {
-        //     if profile.shaders.is_none() {
-        //         profile.shaders = Some(vec![]);
-        //     }
-        // }
-        // for profile in launcher_profiles.experimental_profiles.iter_mut() {
-        //     if profile.shaders.is_none() {
-        //         profile.shaders = Some(vec![]);
-        //     }
-        // }
         Ok(launcher_profiles)
     }
 
@@ -309,7 +309,18 @@ impl Default for LauncherProfiles {
             main_profiles: vec![],
             selected_main_profiles: HashMap::new(),
             experimental_profiles: vec![],
-            selected_experimental_profiles: HashMap::new()
+            selected_experimental_profiles: HashMap::new(),
+            addons: HashMap::new()
+        }
+    }
+}
+
+impl Default for Addons {
+    fn default() -> Self {
+        Self {
+            shaders: vec![],
+            resourcepacks: vec![],
+            datapacks: vec![]
         }
     }
 }
