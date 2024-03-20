@@ -44,8 +44,7 @@
                 id: uuidv4(),
                 name: '',
                 branch: currentBranch(),
-                mods: [],
-                shaders: []
+                mods: []
             }
         }
         settingsOpen = true;
