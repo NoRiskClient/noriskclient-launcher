@@ -1,6 +1,9 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import ShadersScreen from "./shaders/ShadersScreen.svelte";
+    import ResourcePacksScreen from "./resourcepacks/ResourcePacksScreen.svelte";
+    import SelectWorldScreen from "./datapacks/SelectWorldScreen.svelte";
+    import ModsScreen from "./mods/ModsScreen.svelte";
  
     const dispatch = createEventDispatcher()
   
@@ -24,31 +27,31 @@
     <div class="wrapper" on:selectstart={preventSelection}>
       <h1 class="title">Addons</h1>
       <div class="card" style="margin-top: 60px;" on:click={() => switchTab('MODS')}>
-        <h2>📦 Mods</h2>
+        <h2>📦   Mods</h2>
         <p>&gt;</p>
       </div>
       <div class="card" on:click={() => switchTab('RESOURCE_PACKS')}>
-        <h2>🎨 Resource Packs</h2>
+        <h2>🎨   Resource Packs</h2>
         <p>&gt;</p>
       </div>
       <div class="card" on:click={() => switchTab('SHADERS')}>
-        <h2>🔮 Shaders</h2>
+        <h2>🔮   Shaders</h2>
         <p>&gt;</p>
       </div>
       <div class="card" on:click={() => switchTab('DATAPACKS')}>
-        <h2>🛠️ Datapacks</h2>
+        <h2>🛠️   Datapacks</h2>
         <p>&gt;</p>
       </div>
     </div>
     <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
   {:else if activeTab == "MODS"}
+    <ModsScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:options bind:launcherProfiles bind:currentBranch={currentBranch}/>
   {:else if activeTab == "RESOURCE_PACKS"}
+    <ResourcePacksScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:options bind:launcherProfiles bind:currentBranch={currentBranch}/>
   {:else if activeTab == "SHADERS"}
     <ShadersScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:options bind:launcherProfiles bind:currentBranch={currentBranch}/>
   {:else if activeTab == "DATAPACKS"}
-  {:else}
-    <h2 style="display: flex; justify-content: center; align-items: center; font-family: 'Press Start 2P', serif;">WTF happened here!?!?!?</h2>
-    <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+    <SelectWorldScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:options bind:launcherProfiles bind:currentBranch={currentBranch}/>
   {/if}
   
   <style>
@@ -94,6 +97,7 @@
       .card h2 {
         justify-content: flex-start;
         font-size: 17.5px;
+        font-weight: 500;
       }
 
       .card p {
