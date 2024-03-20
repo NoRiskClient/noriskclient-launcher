@@ -71,7 +71,7 @@
         await invoke("get_custom_shaders_filenames", {
             options: options,
             branch: launchManifest.build.branch,
-            profile: launcherProfile
+            installedShaders: launcherProfiles.addons[currentBranch].shaders
         }).then((shaders) => {
             console.debug("Custom Shaders", shaders)
             customShaders = shaders;
@@ -85,14 +85,14 @@
         shaders = shaders
         await invoke("install_shader", {
             slug: shader.slug,
-            params: `?game_versions=["${launchManifest.build.mcVersion}"]`
+            params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`
         }).then((result) => {
-            launcherProfile.shaders.pushIfNotExist(result, function (e) {
+            launcherProfiles.addons[currentBranch].shaders.pushIfNotExist(result, function (e) {
                 return e.slug === result.slug;
             })
             shader.loading = false;
             shaders = shaders;
-            launcherProfile.shaders = launcherProfile.shaders;
+            launcherProfiles.addons[currentBranch].shaders = launcherProfiles.addons[currentBranch].shaders;
             launcherProfiles.store();
         }).catch((err) => {
             console.error(err);
@@ -100,20 +100,7 @@
     }
 
     function checkIfRequiredOrInstalled(slug) {
-        // Später required shaders!?!?!??! Eig unnötig oder?
-        // if (launchManifest.shaders.some((shader) => {
-        //     return shader.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
-        // })) {
-        //     if (launchManifest.mods.find((mod) =>
-        //         mod.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase()
-        //     ).required) {
-        //         return "REQUIRED"
-        //     } else {
-        //         return "RECOMENDED"
-        //     }
-        // }
-
-        if (launcherProfile.shaders.some((shader) => {
+        if (launcherProfiles.addons[currentBranch].shaders.some((shader) => {
             return shader.slug.toUpperCase() === slug.toUpperCase()
         })) {
             return "INSTALLED"
@@ -161,7 +148,7 @@
 
         await invoke("search_shaders", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:shader"]]`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:shader"], ["categories:'iris'"]]`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -187,20 +174,21 @@
     }
 
     async function deleteInstalledShader(shader) {
-        let index = launcherProfile.shaders.findIndex((element) => {
+        let index = launcherProfiles.addons[currentBranch].shaders.findIndex((element) => {
             return element.slug.toUpperCase() === (shader?.slug ?? shader).toUpperCase()
         })
         if (index !== -1) {
-            launcherProfile.shaders.splice(index, 1);
-            deleteShaderFile(shader?.file_name ?? shader);
+            launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
+            deleteShaderFile(shader?.file_name ?? shader, false);
             shaders = shaders
+            launcherProfiles.addons[currentBranch].shaders = launcherProfiles.addons[currentBranch].shaders;
             launcherProfiles.store();
         } else {
             deleteShaderFile(shader);
         }
     }
 
-    async function deleteShaderFile(filename) {
+    async function deleteShaderFile(filename, showError = true) {
         await invoke("get_custom_shaders_folder", {
             options: options,
             branch: launchManifest.build.branch
@@ -208,7 +196,12 @@
             await removeFile(folder + "/" + filename).then(() => {
                 getCustomShadersFilenames()
             }).catch((error) => {
+                if (!showError) return;
                 alert(error)
+            })
+            // remove potential shader settings txt
+            await removeFile(folder + "/" + filename + ".txt").catch((error) => {
+                return;
             })
         }).catch((error) => {
             alert(error)
@@ -323,38 +316,36 @@
             searchShaders();
         }} bind:searchTerm={searchterm} placeHolder="Search for Shaders on Modrinth..."/>
         {#if shaders !== null && shaders.length > 0 }
-        <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
-            {#if item == 'LOAD_MORE_SHADERS'}
-                        <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
-                    {:else if item != null}
+            <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
+                {#if item == 'LOAD_MORE_SHADERS'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+                {:else if item != null}
                         <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
                             on:delete={() => deleteInstalledShader(item)}
                             on:install={() => installShader(item)}
                             type="RESULT"
                             shader={item}/>
-                    {/if}
+                {/if}
             </VirtualList>
         {:else}
-            <h1 style="display: flex; justify-content: center; align-items: center; font-family: 'Press Start 2P', serif;">{shaders == null ? 'No shaders found.' : 'Loading...'}</h1>
+            <h1 class="loading-indicator">{shaders == null ? 'No Shaders found.' : 'Loading...'}</h1>
         {/if}
     {:else if currentTabIndex === 1}
         <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Shaders..."/>
-        {#if launcherProfile.shaders.length > 0 || customShaders.length > 0}
-            <VirtualList height="30em" items={[...customShaders,...launcherProfile.shaders].filter((shader) => {
+        {#if launcherProfiles.addons[currentBranch].shaders.length > 0 || customShaders.length > 0}
+            <VirtualList height="30em" items={[...customShaders,...launcherProfiles.addons[currentBranch].shaders].filter((shader) => {
                 let name = (shader?.title ?? shader).toUpperCase()
                 return (shader?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase())
-            }).sort() } let:item>
+            }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) } let:item>
                 {#if (typeof item === 'string' || item instanceof String)}
                     <ShaderItem text="INSTALLED"
                         on:delete={() => deleteInstalledShader(item)}
-                        on:install={() => {}}
                         type="CUSTOM"
                         shader={item}/>
                 {:else}
                     <ShaderItem text="INSTALLED"
                         on:delete={() => deleteInstalledShader(item)}
-                        on:install={() => {}}
                         type="INSTALLED"
                         shader={item}/>
                 {/if}
@@ -394,6 +385,15 @@
     .active-tab {
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    .loading-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Press Start 2P', serif;
+        font-size: 20px;
+        margin-top: 200px;
     }
 
     .load-more-button {
