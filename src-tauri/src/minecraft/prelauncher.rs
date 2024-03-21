@@ -195,12 +195,12 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
                 }).await?;
                 
                 fs::write(&current_shader_path, retrieved_bytes).await?;
+                println!("Installed Shader {}", &current_shader.file_name);
             }
         } else {
             println!("Shader {} is already downloaded", &current_shader.file_name);
         }
 
-        println!("Installed Shader {:?}", &current_shader);
         installed_shaders.push(current_shader.clone())
     }
 
@@ -246,12 +246,12 @@ pub async fn retrieve_resourcepacks(data: &Path, manifest: &NoRiskLaunchManifest
                 }).await?;
                 
                 fs::write(&current_resourcepack_path, retrieved_bytes).await?;
+                println!("Installed ResourcePack {}", &current_resourcepack.file_name);
             }
         } else {
             println!("ResourcePack {} is already downloaded", &current_resourcepack.file_name);
         }
 
-        println!("Installed ResourcePack {:?}", &current_resourcepack);
         installed_resourcepacks.push(current_resourcepack.clone())
     }
 
@@ -300,12 +300,12 @@ pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, da
                 }).await?;
                 
                 fs::write(&current_datapack_path, retrieved_bytes).await?;
+                println!("Installed Datapack {} in world {}", &current_datapack.file_name, &current_datapack.world_name);
             }
         } else {
-            println!("Datapack {} is already downloaded", &current_datapack.file_name);
+            println!("Datapack {} is already downloaded in world {}", &current_datapack.file_name, &current_datapack.world_name);
         }
 
-        println!("Installed Datapack {:?}", &current_datapack);
         installed_datapacks.push(current_datapack.clone())
     }
 
