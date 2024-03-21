@@ -270,7 +270,7 @@ pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, da
     
     for (datapack_idx, current_datapack) in datapacks.iter().enumerate() {
         let datapack_path = saves_path.join(current_datapack.world_name.clone()).join("datapacks");
-        println!("datapack_path: {:?}", &datapack_path);
+
         fs::create_dir_all(&datapack_path).await?;
         if installed_datapacks.iter().any(|datapack| {
             return datapack.slug == current_datapack.slug && current_datapack.world_name == datapack.world_name;
