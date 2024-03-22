@@ -201,18 +201,18 @@
         if (!client_side && !server_side) {
             client_server_side_filters = '';
         } else if (client_side.enabled && server_side.enabled) {
-            client_server_side_filters = ',["client_side:required"],["server_side:required"]';
+            client_server_side_filters = ', ["client_side:required"], ["server_side:required"]';
         } else if (client_side.enabled && !server_side.enabled) {
-            client_server_side_filters = ',["client_side:optional","client_side:required"],["server_side:optional","server_side:unsupported"]';
+            client_server_side_filters = ', ["client_side:optional","client_side:required"], ["server_side:optional","server_side:unsupported"]';
         } else if (!client_side.enabled && server_side.enabled) {
-            client_server_side_filters = ',["client_side:optional","client_side:unsupported"],["server_side:optional","server_side:required"]';
+            client_server_side_filters = ', ["client_side:optional","client_side:unsupported"], ["server_side:optional","server_side:required"]';
         }
 
         const notEnvironmentFilter = (filter) => filter.id !== 'client_side' && filter.id !== 'server_side';
-
+        
         await invoke("search_mods", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(', ')}${client_server_side_filters}`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(', ')}${client_server_side_filters}]`,
                 index: search_index,
                 limit: search_limit + (searchterm == '' ? launchManifest.mods.length : 0),
                 offset: search_offset,
