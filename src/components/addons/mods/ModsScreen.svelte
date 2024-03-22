@@ -30,7 +30,7 @@
 
     let filterCategories = [
         {
-            type: 'Environment',
+            type: 'Environments',
             entries: [
                 {id: 'client_side', name: 'Client',},
                 {id: 'server_side', name: 'Server'}
@@ -193,7 +193,6 @@
             }).catch((err) => {
                 console.error(err);
             });
-            return;
         }
 
         let client_server_side_filters = '';
@@ -215,7 +214,7 @@
             params: {
                 facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(', ')}${client_server_side_filters}`,
                 index: search_index,
-                limit: search_limit,
+                limit: search_limit + (searchterm == '' ? launchManifest.mods.length : 0),
                 offset: search_offset,
                 query: searchterm,
             },
@@ -226,10 +225,12 @@
             });
             if (result.hits.length === 0) {
                 mods = null;
-            } else if (search_offset == 0) {
+            } else if (search_offset == 0 && searchterm !== '') {
                 mods = result.hits;
             } else {
-                mods = [...mods, ...result.hits];
+                mods = [...mods, ...result.hits.filter(mod => searchterm != '' || !launchManifest.mods.some((launchManifestMod) => {
+                    return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase()
+                }))];
             }
         }).catch((err) => {
             console.error(err);
@@ -237,7 +238,7 @@
     }
 
     function loadMore() {
-        search_offset += search_limit;
+        search_offset += search_limit + (searchterm == '' ? launchManifest.mods.length : 0);
         searchMods();
     }
 
