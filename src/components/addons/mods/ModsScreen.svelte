@@ -228,9 +228,10 @@
             } else if (search_offset == 0 && searchterm !== '') {
                 mods = result.hits;
             } else {
-                mods = [...mods, ...result.hits.filter(mod => searchterm != '' || !launchManifest.mods.some((launchManifestMod) => {
+                mods = [...mods, ...result.hits.filter(mod => searchterm != '' || (!launchManifest.mods.some((launchManifestMod) => {
                     return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase()
-                }))];
+                }) && !featuredMods.some((featuredMod) => {
+                    return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase()})))];
             }
         }).catch((err) => {
             console.error(err);
