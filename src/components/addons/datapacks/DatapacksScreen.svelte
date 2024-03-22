@@ -28,6 +28,34 @@
     let search_limit = 30;
     let search_index = "relevance";
 
+    let filterCategories = [
+        {
+            type: 'Categories',
+            entries: [
+                {id: 'adventure', name: 'Adventure'},
+                {id: 'cursed', name: 'Cursed'},
+                {id: 'decoration', name: 'Decoration'},
+                {id: 'economy', name: 'Economy'},
+                {id: 'equipment', name: 'Equipment'},
+                {id: 'food', name: 'Food'},
+                {id: 'game-mechanics', name: 'Game Mechanics'},
+                {id: 'library', name: 'Library'},
+                {id: 'magic', name: 'Magic'},
+                {id: 'management', name: 'Management'},
+                {id: 'minigame', name: 'Minigame'},
+                {id: 'mobs', name: 'Mobs'},
+                {id: 'optimization', name: 'Optimization'},
+                {id: 'social', name: 'Social'},
+                {id: 'storage', name: 'Storage'},
+                {id: 'technology', name: 'Technology'},
+                {id: 'transportation', name: 'Transportation'},
+                {id: 'utility', name: 'Utility'},
+                {id: 'worldgen', name: 'Worldgen'}
+            ]
+        }
+    ];
+    let filters = {};
+
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     listen('tauri://file-drop', files => {
@@ -151,7 +179,7 @@
 
         await invoke("search_datapacks", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:datapack"], ["categories:'datapack'"]]`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:datapack"], ["categories:'datapack'"]]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(', ')}`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -317,7 +345,7 @@
         <ModrinthSearchBar on:search={() => {
             search_offset = 0;
             searchDatapacks();
-        }} bind:searchTerm={searchterm} placeHolder="Search for Datapacks on Modrinth..."/>
+        }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters} bind:options={options} placeHolder="Search for Datapacks on Modrinth..."/>
         {#if datapacks !== null && datapacks.length > 0 }
             <VirtualList height="30em" items={[...datapacks, datapacks.length >= 30 ? 'LOAD_MORE_DATAPACKS' : null]} let:item>
                 {#if item == 'LOAD_MORE_DATAPACKS'}

@@ -27,6 +27,54 @@
     let search_limit = 30;
     let search_index = "relevance";
 
+    let filterCategories = [
+        {
+            type: 'Categories',
+            entries: [
+                {id: "combat", name: "Combat"},
+                {id: "cursed", name: "Cursed"},
+                {id: "decoration", name: "Decoration"},
+                {id: "modded", name: "Modded"},
+                {id: "realistic", name: "Realistic"},
+                {id: "simplistic", name: "Simplistic"},
+                {id: "themed", name: "Themed"},
+                {id: "tweaks", name: "Tweaks"},
+                {id: "utility", name: "Utility"},
+                {id: "vanilla-like", name: "Vanilla Like"},
+            ]
+        },
+        {
+            type: 'Features',
+            entries: [
+                {id: "audio", name: "Audio"},
+                {id: "blocks", name: "Blocks"},
+                {id: "core-shaders", name: "Core Shaders"},
+                {id: "entities", name: "Entities"},
+                {id: "environment", name: "Environment"},
+                {id: "equipment", name: "Equipment"},
+                {id: "fonts", name: "Fonts"},
+                {id: "gui", name: "GUI"},
+                {id: "items", name: "Items"},
+                {id: "locale", name: "Locale"},
+                {id: "models", name: "Models"},
+            ]
+        },
+        {
+            type: 'Performance',
+            entries: [
+                {id: "8x-", name: "8x or lower"},
+                {id: "16x", name: "16x"},
+                {id: "32x", name: "32x"},
+                {id: "48x", name: "48x"},
+                {id: "64x", name: "64x"},
+                {id: "128x", name: "128x"},
+                {id: "256x", name: "256x"},
+                {id: "512x+", name: "512x or higher"},
+            ]
+        },
+    ];
+    let filters = {};
+
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     listen('tauri://file-drop', files => {
@@ -148,7 +196,7 @@
 
         await invoke("search_resourcepacks", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:resourcepack"]]`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:resourcepack"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(', ')}]`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -311,7 +359,7 @@
         <ModrinthSearchBar on:search={() => {
             search_offset = 0;
             searchResourcePacks();
-        }} bind:searchTerm={searchterm} placeHolder="Search for Resource Packs on Modrinth..."/>
+        }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters} bind:options={options} placeHolder="Search for Resource Packs on Modrinth..."/>
         {#if resourcePacks !== null && resourcePacks.length > 0 }
             <VirtualList height="30em" items={[...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null]} let:item>
                 {#if item == 'LOAD_MORE_RESOURCEPACKS'}

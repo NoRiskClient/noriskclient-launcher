@@ -28,6 +28,41 @@
     let search_limit = 30;
     let search_index = "relevance";
 
+    let filterCategories = [
+        {
+            type: 'Environment',
+            entries: [
+                {id: 'client_side', name: 'Client',},
+                {id: 'server_side', name: 'Server'}
+            ]
+        },
+        {
+            type: 'Categories',
+            entries: [
+                {id: 'adventure', name: 'Adventure'},
+                {id: 'cursed', name: 'Cursed'},
+                {id: 'decoration', name: 'Decoration'},
+                {id: 'economy', name: 'Economy'},
+                {id: 'equipment', name: 'Equipment'},
+                {id: 'food', name: 'Food'},
+                {id: 'game-mechanics', name: 'Game Mechanics'},
+                {id: 'library', name: 'Library'},
+                {id: 'magic', name: 'Magic'},
+                {id: 'management', name: 'Management'},
+                {id: 'minigame', name: 'Minigame'},
+                {id: 'mobs', name: 'Mobs'},
+                {id: 'optimization', name: 'Optimization'},
+                {id: 'social', name: 'Social'},
+                {id: 'storage', name: 'Storage'},
+                {id: 'technology', name: 'Technology'},
+                {id: 'transportation', name: 'Transportation'},
+                {id: 'utility', name: 'Utility'},
+                {id: 'worldgen', name: 'Worldgen'}
+            ]
+        }
+    ];
+    let filters = {};
+
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     listen('tauri://file-drop', files => {
@@ -161,9 +196,24 @@
             return;
         }
 
+        let client_server_side_filters = '';
+        const client_side = Object.values(filters).find(filter => filter.id == 'client_side');
+        const server_side = Object.values(filters).find(filter => filter.id == 'server_side');
+        if (!client_side && !server_side) {
+            client_server_side_filters = '';
+        } else if (client_side.enabled && server_side.enabled) {
+            client_server_side_filters = ',["client_side:required"],["server_side:required"]';
+        } else if (client_side.enabled && !server_side.enabled) {
+            client_server_side_filters = ',["client_side:optional","client_side:required"],["server_side:optional","server_side:unsupported"]';
+        } else if (!client_side.enabled && server_side.enabled) {
+            client_server_side_filters = ',["client_side:optional","client_side:unsupported"],["server_side:optional","server_side:required"]';
+        }
+
+        const notEnvironmentFilter = (filter) => filter.id !== 'client_side' && filter.id !== 'server_side';
+
         await invoke("search_mods", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]]`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(', ')}${client_server_side_filters}`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -399,7 +449,7 @@
         <ModrinthSearchBar on:search={() => {
             search_offset = 0;
             searchMods();
-        }} bind:searchTerm={searchterm} placeHolder="Search for Mods on Modrinth..."/>
+        }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters} bind:options={options} placeHolder="Search for Mods on Modrinth..."/>
         {#if mods !== null && mods.length > 0 }
             <VirtualList height="30em" items={[...mods, mods.length >= 30 ? 'LOAD_MORE_MODS' : null]} let:item>
                 {#if item == 'LOAD_MORE_MODS'}

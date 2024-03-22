@@ -27,6 +27,44 @@
     let search_limit = 30;
     let search_index = "relevance";
 
+    let filterCategories = [
+        {
+            type: 'Categories',
+            entries: [
+                {id: "cartoon", name: "Cartoon"},
+                {id: "cursed", name: "Cursed"},
+                {id: "fantasy", name: "Fantasy"},
+                {id: "realistic", name: "Realistic"},
+                {id: "semi-realistic", name: "Semi Realistic"},
+                {id: "vanilla-like", name: "Vanilla Like"},
+            ]
+        },
+        {
+            type: 'Features',
+            entries: [
+                {id: "atmosphere", name: "Atmosphere"},
+                {id: "bloom", name: "Bloom"},
+                {id: "colored-lighting", name: "Colored Lighting"},
+                {id: "foliage", name: "Foliage"},
+                {id: "path-tracing", name: "Path Tracing"},
+                {id: "pbr", name: "PBR"},
+                {id: "reflections", name: "Reflections"},
+                {id: "shadows", name: "Shadows"},
+            ]
+        },
+        {
+            type: 'Performance Impact',
+            entries: [
+                {id: "potato", name: "Potato"},
+                {id: "low", name: "Low"},
+                {id: "medium", name: "Medium"},
+                {id: "high", name: "High"},
+                {id: "screenshot", name: "Screenshot"},
+            ]
+        },
+    ];
+    let filters = {};
+
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     listen('tauri://file-drop', files => {
@@ -148,7 +186,7 @@
 
         await invoke("search_shaders", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:shader"], ["categories:'iris'"]]`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:shader"], ["categories:'iris'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(', ')}]`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -314,7 +352,7 @@
         <ModrinthSearchBar on:search={() => {
             search_offset = 0;
             searchShaders();
-        }} bind:searchTerm={searchterm} placeHolder="Search for Shaders on Modrinth..."/>
+        }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters} bind:options={options} placeHolder="Search for Shaders on Modrinth..."/>
         {#if shaders !== null && shaders.length > 0 }
             <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
                 {#if item == 'LOAD_MORE_SHADERS'}

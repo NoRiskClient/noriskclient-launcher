@@ -1,17 +1,18 @@
 <script>
   import { createEventDispatcher } from "svelte";
-
   const dispatch = createEventDispatcher();
+
   export let value;
   export let text;
   export let reversed = false;
+  export let spaced = false;
 
   function preventSelection(event) {
     event.preventDefault();
   }
 </script>
 
-<div class="wrapper">
+<div class="wrapper" class:spaced={spaced}>
   {#if reversed}
     <h1 on:selectstart={preventSelection}
         on:mousedown={preventSelection} class="nes-font">{text}</h1>
@@ -31,6 +32,11 @@
         display: flex;
         align-items: center;
         gap: 1em;
+    }
+
+    .spaced {
+      justify-content: space-between;
+      padding-right: 10px;
     }
 
     .nes-font {
