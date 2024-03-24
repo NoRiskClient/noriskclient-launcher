@@ -147,6 +147,126 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
 }
 
 #[tauri::command]
+async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ResourcePackInfo>, String> {
+    debug!("Getting Featured ResourcePacks...");
+
+    match ApiEndpoints::norisk_featured_resourcepacks(&branch).await {
+        Ok(result) => {
+            // fetch resourcepack info for each resourcepack
+            let mut resourcepack_infos: Vec<ResourcePackInfo> = Vec::new();
+            for resourcepack_id in result {
+                match ModrinthApiEndpoints::get_resourcepack_info(&*resourcepack_id).await {
+                    Ok(resourcepack_info) => {
+                        // Filter featured resourcepacks based on mc version
+                        match &resourcepack_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    resourcepack_infos.push(resourcepack_info);
+                                }
+                                else {
+                                    debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured resourcepack {} has no game versions", resourcepack_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(resourcepack_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ShaderInfo>, String> {
+    debug!("Getting Featured Shaders...");
+
+    match ApiEndpoints::norisk_featured_shaders(&branch).await {
+        Ok(result) => {
+            // fetch shader info for each resourcepack
+            let mut shader_infos: Vec<ShaderInfo> = Vec::new();
+            for shader_id in result {
+                match ModrinthApiEndpoints::get_shader_info(&*shader_id).await {
+                    Ok(shader_info) => {
+                        // Filter featured shaders based on mc version
+                        match &shader_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    shader_infos.push(shader_info);
+                                }
+                                else {
+                                    debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured shader {} has no game versions", shader_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(shader_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<DatapackInfo>, String> {
+    debug!("Getting Featured Datapacks...");
+
+    match ApiEndpoints::norisk_featured_datapacks(&branch).await {
+        Ok(result) => {
+            // fetch datapack info for each resourcepack
+            let mut datapack_infos: Vec<DatapackInfo> = Vec::new();
+            for datapack_id in result {
+                match ModrinthApiEndpoints::get_datapack_info(&*datapack_id).await {
+                    Ok(datapack_info) => {
+                        // Filter featured datapacks based on mc version
+                        match &datapack_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    datapack_infos.push(datapack_info);
+                                }
+                                else {
+                                    debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured datapack {} has no game versions", datapack_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(datapack_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
 
@@ -733,12 +853,13 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
     info!("Starting Client with branch {}",branch);
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
+        force_server: force_server,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
@@ -930,6 +1051,9 @@ pub fn gui_main() {
             delete_cape,
             search_mods,
             get_featured_mods,
+            get_featured_resourcepacks,
+            get_featured_shaders,
+            get_featured_datapacks,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,

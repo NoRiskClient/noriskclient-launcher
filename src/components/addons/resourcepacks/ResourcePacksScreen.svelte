@@ -16,6 +16,7 @@
     export let launcherProfiles;
     let launcherProfile = null;
     let customResourcePacks = [];
+    let featuredResourcePacks = [];
     let resourcePacks = [];
     let launchManifest = null;
     let searchterm = "";
@@ -157,42 +158,19 @@
     }
 
     async function searchResourcePacks() {
-        // if (searchterm === "") {
-            // Fetch featured shders
-            // Wollen wir das für resourcePacks?
-        //     await invoke("get_featured_mods", {
-        //         branch: currentBranch,
-        //         mcVersion: launchManifest.build.mcVersion,
-        //     }).then((result) => {
-        //         console.debug("Featured Mods", result);
-        //         mods = result;
-        //         launchManifest.mods.forEach(async mod => {
-        //             if (!mod.required) {
-        //                 const slug = mod.source.artifact.split(':')[1];
-        //                 let iconUrl = 'https://norisk.gg/icon_512px.png';
-        //                 let description = 'A custom NoRiskClient Mod.';
-        //                 if (mod.source.repository != 'norisk') {
-        //                     await invoke('get_mod_info', { slug }).then(info => {
-        //                         iconUrl = info.icon_url;
-        //                         description = info.description;
-        //                     }).catch((err) => {
-        //                         console.error(err);
-        //                     });
-        //                 }
-        //                 mods.push({
-        //                     author: null,
-        //                     description: description,
-        //                     icon_url: iconUrl,
-        //                     slug: slug,
-        //                     title: mod.name
-        //                 });
-        //             }
-        //         });
-        //     }).catch((err) => {
-        //         console.error(err);
-        //     });
-        //     return;
-        // }
+        if (searchterm === "" && search_offset === 0) {
+            await invoke("get_featured_resourcepacks", {
+                branch: currentBranch,
+                mcVersion: launchManifest.build.mcVersion,
+            }).then((result) => {
+                console.debug("Featured ResourcePacks", result);
+                result.forEach(resourcePack => resourcePack.featured = true);
+                resourcePacks = result;
+                featuredResourcePacks = result;
+            }).catch((err) => {
+                console.error(err);
+            });
+        }
 
         await invoke("search_resourcepacks", {
             params: {
@@ -204,12 +182,15 @@
             },
         }).then((result) => {
             console.debug("Search ResourcePack Result", result);
+            result.hits.forEach(resourcePack => {
+                resourcePack.featured = featuredResourcePacks.filter(featuredResourcePack => featuredResourcePack.slug === resourcePack.slug).length > 0;
+            });
             if (result.hits.length === 0) {
                 resourcePacks = null;
-            } else if (search_offset == 0) {
+            } else if ((search_offset == 0 && searchterm != '') || Object.values(filters).length > 0) {
                 resourcePacks = result.hits;
             } else {
-                resourcePacks = [...resourcePacks, ...result.hits];
+                resourcePacks = [...resourcePacks, ...result.hits.filter(resourcePack => searchterm != '' || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))];
             }
         }).catch((err) => {
             console.error(err);

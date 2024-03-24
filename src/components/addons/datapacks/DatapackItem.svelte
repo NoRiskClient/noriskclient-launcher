@@ -22,7 +22,11 @@
                     <a class="datapack-title" href={"https://modrinth.com/datapack/"+datapack.slug} target="_blank" title="Modrinth Page">
                         {datapack.title}
                     </a>
+                    {#if datapack?.featured}
+                        <p title="Featured" style="font-size: 20px;">⭐️</p>
+                    {/if}
                 {:else}
+                    <!-- svelte-ignore a11y-missing-attribute -->
                     <a class="datapack-title">{datapack.replace('.zip', '')}</a>
                 {/if}
                 {#if datapack?.author != undefined && datapack?.author != null}
@@ -40,10 +44,22 @@
                 LOADING
             </h1>
         {:else if text === "INSTALL"}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="install-button" on:click={() => dispatch("install")}>
-                INSTALL
-            </h1>
+            {#if datapack?.featured}
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <h1 class="featured-label" style="margin-bottom: 15px;">
+                        FEATURED
+                    </h1>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <h1 class="install-button" on:click={() => dispatch("install")}>
+                        INSTALL
+                    </h1>
+                </div>
+            {:else}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="install-button" on:click={() => dispatch("install")}>
+                    INSTALL
+                </h1>
+            {/if}
         {:else if text === "INSTALLED"}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <h1 class="red-text-clickable delete-button" on:click={() => dispatch("delete")}>
@@ -145,6 +161,14 @@
         text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
+    }
+
+    .featured-label {
+        font-family: 'Press Start 2P', serif;
+        font-size: 17px;
+        color: #f0c91a;
+        text-shadow: 1.5px 1.5px var(--hover-color-text-shadow);
+        cursor: default;
     }
 
     .required-button {

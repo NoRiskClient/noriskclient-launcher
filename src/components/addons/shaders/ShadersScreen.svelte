@@ -16,6 +16,7 @@
     export let launcherProfiles;
     let launcherProfile = null;
     let customShaders = [];
+    let featuredShaders = [];
     let shaders = [];
     let launchManifest = null;
     let searchterm = "";
@@ -147,42 +148,19 @@
     }
 
     async function searchShaders() {
-        // if (searchterm === "") {
-            // Fetch featured shders
-            // Wollen wir das für shader?
-        //     await invoke("get_featured_mods", {
-        //         branch: currentBranch,
-        //         mcVersion: launchManifest.build.mcVersion,
-        //     }).then((result) => {
-        //         console.debug("Featured Mods", result);
-        //         mods = result;
-        //         launchManifest.mods.forEach(async mod => {
-        //             if (!mod.required) {
-        //                 const slug = mod.source.artifact.split(':')[1];
-        //                 let iconUrl = 'https://norisk.gg/icon_512px.png';
-        //                 let description = 'A custom NoRiskClient Mod.';
-        //                 if (mod.source.repository != 'norisk') {
-        //                     await invoke('get_mod_info', { slug }).then(info => {
-        //                         iconUrl = info.icon_url;
-        //                         description = info.description;
-        //                     }).catch((err) => {
-        //                         console.error(err);
-        //                     });
-        //                 }
-        //                 mods.push({
-        //                     author: null,
-        //                     description: description,
-        //                     icon_url: iconUrl,
-        //                     slug: slug,
-        //                     title: mod.name
-        //                 });
-        //             }
-        //         });
-        //     }).catch((err) => {
-        //         console.error(err);
-        //     });
-        //     return;
-        // }
+        if (searchterm === "" && search_offset === 0) {
+            await invoke("get_featured_shaders", {
+                branch: currentBranch,
+                mcVersion: launchManifest.build.mcVersion,
+            }).then((result) => {
+                console.debug("Featured Shaders", result);
+                result.forEach(shader => shader.featured = true);
+                shaders = result;
+                featuredShaders = result;
+            }).catch((err) => {
+                console.error(err);
+            });
+        }
 
         await invoke("search_shaders", {
             params: {
@@ -194,12 +172,15 @@
             },
         }).then((result) => {
             console.debug("Search Shader Result", result);
+            result.hits.forEach(shader => {
+                shader.featured = featuredShaders.filter(featuredShader => featuredShader.slug === shader.slug).length > 0;
+            });
             if (result.hits.length === 0) {
                 shaders = null;
-            } else if (search_offset == 0) {
+            } else if ((search_offset == 0 && searchterm != '') || Object.values(filters).length > 0) {
                 shaders = result.hits;
             } else {
-                shaders = [...shaders, ...result.hits];
+                shaders = [...shaders, ...result.hits.filter(shader => searchterm != '' || !featuredShaders.some((element) => element.slug === shader.slug))];
             }
         }).catch((err) => {
             console.error(err);

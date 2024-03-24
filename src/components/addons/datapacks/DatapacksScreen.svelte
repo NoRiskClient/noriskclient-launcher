@@ -17,6 +17,7 @@
     export let world;
     let launcherProfile = null;
     let customDatapacks = [];
+    let featuredDatapacks = [];
     let datapacks = [];
     let launchManifest = null;
     let searchterm = "";
@@ -140,46 +141,23 @@
     }
 
     async function searchDatapacks() {
-        // if (searchterm === "") {
-            // Fetch featured shders
-            // Wollen wir das für datapacks?
-        //     await invoke("get_featured_mods", {
-        //         branch: currentBranch,
-        //         mcVersion: launchManifest.build.mcVersion,
-        //     }).then((result) => {
-        //         console.debug("Featured Mods", result);
-        //         mods = result;
-        //         launchManifest.mods.forEach(async mod => {
-        //             if (!mod.required) {
-        //                 const slug = mod.source.artifact.split(':')[1];
-        //                 let iconUrl = 'https://norisk.gg/icon_512px.png';
-        //                 let description = 'A custom NoRiskClient Mod.';
-        //                 if (mod.source.repository != 'norisk') {
-        //                     await invoke('get_mod_info', { slug }).then(info => {
-        //                         iconUrl = info.icon_url;
-        //                         description = info.description;
-        //                     }).catch((err) => {
-        //                         console.error(err);
-        //                     });
-        //                 }
-        //                 mods.push({
-        //                     author: null,
-        //                     description: description,
-        //                     icon_url: iconUrl,
-        //                     slug: slug,
-        //                     title: mod.name
-        //                 });
-        //             }
-        //         });
-        //     }).catch((err) => {
-        //         console.error(err);
-        //     });
-        //     return;
-        // }
+        if (searchterm === "" && search_offset === 0) {
+            await invoke("get_featured_datapacks", {
+                branch: currentBranch,
+                mcVersion: launchManifest.build.mcVersion,
+            }).then((result) => {
+                console.debug("Featured Datapacks", result);
+                result.forEach(datapack => datapack.featured = true);
+                datapacks = result;
+                featuredDatapacks = result;
+            }).catch((err) => {
+                console.error(err);
+            });
+        }
 
         await invoke("search_datapacks", {
             params: {
-                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:datapack"], ["categories:'datapack'"]]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(', ')}`,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:datapack"], ["categories:'datapack'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(', ')}]`,
                 index: search_index,
                 limit: search_limit,
                 offset: search_offset,
@@ -187,12 +165,15 @@
             },
         }).then((result) => {
             console.debug("Search Datapack Result", result);
+            result.hits.forEach(datapack => {
+                datapack.featured = featuredDatapacks.filter(featuredDatapack => featuredDatapack.slug === datapack.slug).length > 0;
+            });
             if (result.hits.length === 0) {
                 datapacks = null;
-            } else if (search_offset == 0) {
+            } else if ((search_offset == 0 && searchterm != '') || Object.values(filters).length > 0) {
                 datapacks = result.hits;
             } else {
-                datapacks = [...datapacks, ...result.hits];
+                datapacks = [...datapacks, ...result.hits.filter(datapack => searchterm != '' || !featuredDatapacks.some((element) => element.slug === datapack.slug))];
             }
         }).catch((err) => {
             console.error(err);

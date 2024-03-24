@@ -181,6 +181,7 @@
       console.error("Refreshing Account...");
       return;
     }
+
     refreshingAccount = true;
     await invoke("refresh_via_norisk", { loginData: options.accounts.find(obj => obj.uuid === options.currentUuid) })
       .then((account) => {
@@ -203,11 +204,23 @@
     refreshingAccount = false;
 
     console.log("Client started");
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let launchManifest = {};
     let branch = branches[currentBranchIndex];
     let installedMods = [];
     log = [];
     clientRunning = true;
     fakeClientRunning = true;
+
+    await invoke("get_launch_manifest", {
+        branch: branch,
+        noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+    }).then((result) => {
+        console.debug("Launch Manifest", result);
+        launchManifest = result;
+    }).catch((err) => {
+        console.error(err);
+    });
 
     if (options.experimentalMode) {
       options.latestDevBranch = branch;
@@ -236,8 +249,9 @@
     console.debug("Running Branch", branch);
     await invoke("run_client", {
       branch: branch,
-      loginData: options.accounts.find(obj => obj.uuid === options.currentUuid),
+      loginData: loginData,
       options: options,
+      forceServer: launchManifest.server.length > 0 ? launchManifest.server : null,
       mods: installedMods,
       shaders: launcherProfiles.addons[branch].shaders,
       resourcepacks: launcherProfiles.addons[branch].resourcePacks,

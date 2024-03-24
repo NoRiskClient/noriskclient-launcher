@@ -137,6 +137,9 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
+        if parameter.force_server.is_some() {
+            command_arguments.push(format!("-Dnorisk.forceServer={}", parameter.force_server.clone().unwrap()));
+        }
         for arg in parameter.custom_java_args.split(" ") {
             if arg != " " && arg != "" {
                 println!("Added custom java arg: {:?}", arg);

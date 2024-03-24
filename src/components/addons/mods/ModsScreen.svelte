@@ -225,7 +225,7 @@
             });
             if (result.hits.length === 0) {
                 mods = null;
-            } else if (search_offset == 0 && searchterm !== '') {
+            } else if ((search_offset == 0 && searchterm != '') || Object.values(filters).length > 0) {
                 mods = result.hits;
             } else {
                 mods = [...mods, ...result.hits.filter(mod => searchterm != '' || (!launchManifest.mods.some((launchManifestMod) => {

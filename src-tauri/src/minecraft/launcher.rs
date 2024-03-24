@@ -394,6 +394,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
 
 pub struct LaunchingParameter {
     pub dev_mode: bool,
+    pub force_server: Option<String>,
     pub memory: i64,
     pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
