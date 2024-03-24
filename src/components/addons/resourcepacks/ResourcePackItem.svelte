@@ -61,10 +61,24 @@
             </h1>
         {/if}
         {:else if text === "INSTALLED"}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="red-text-clickable delete-button" on:click={() => dispatch("delete")}>
-                DELETE
-            </h1>
+            {#if type == "RESULT"}
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    {#if resourcePack?.featured}
+                        <h1 class="featured-label" style="margin-bottom: 15px;">
+                            FEATURED
+                        </h1>
+                    {/if}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
+                        DELETE
+                    </h1>
+                </div>
+            {:else}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
+                    DELETE
+                </h1>
+            {/if}
         {/if}
     </div>
 </div>
