@@ -2,12 +2,10 @@
     import {invoke} from "@tauri-apps/api";
     import {removeFile, renameFile} from '@tauri-apps/api/fs';
     import {open} from "@tauri-apps/api/dialog";
-    import VirtualList from "../utils/VirtualList.svelte";
-    import ModrinthSearchBar from "./ModrinthSearchBar.svelte";
-    import ModrinthResultItem from "./ModrinthResultItem.svelte";
+    import VirtualList from "../../utils/VirtualList.svelte";
+    import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
+    import ModItem from "./ModItem.svelte";
     import {createEventDispatcher, onDestroy} from "svelte";
-    import InstalledModItem from "./InstalledModItem.svelte";
-    import CustomModItem from "./CustomModItem.svelte";
     import {watch} from "tauri-plugin-fs-watch-api";
     import {listen} from '@tauri-apps/api/event';
 
@@ -18,16 +16,54 @@
     export let launcherProfiles;
     let launcherProfile = null;
     let customMods = [];
-    let mods = null;
+    let mods = [];
+    let featuredMods = [];
     let launchManifest = null;
     let searchterm = "";
     let filterterm = "";
     let currentTabIndex = 0;
     let fileWatcher;
 
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let search_offset = 0;
+    let search_limit = 30;
+    let search_index = "relevance";
 
-    console.debug("Branch", currentBranch)
+    let filterCategories = [
+        {
+            type: 'Environments',
+            entries: [
+                {id: 'client_side', name: 'Client',},
+                {id: 'server_side', name: 'Server'}
+            ]
+        },
+        {
+            type: 'Categories',
+            entries: [
+                {id: 'adventure', name: 'Adventure'},
+                {id: 'cursed', name: 'Cursed'},
+                {id: 'decoration', name: 'Decoration'},
+                {id: 'economy', name: 'Economy'},
+                {id: 'equipment', name: 'Equipment'},
+                {id: 'food', name: 'Food'},
+                {id: 'game-mechanics', name: 'Game Mechanics'},
+                {id: 'library', name: 'Library'},
+                {id: 'magic', name: 'Magic'},
+                {id: 'management', name: 'Management'},
+                {id: 'minigame', name: 'Minigame'},
+                {id: 'mobs', name: 'Mobs'},
+                {id: 'optimization', name: 'Optimization'},
+                {id: 'social', name: 'Social'},
+                {id: 'storage', name: 'Storage'},
+                {id: 'technology', name: 'Technology'},
+                {id: 'transportation', name: 'Transportation'},
+                {id: 'utility', name: 'Utility'},
+                {id: 'worldgen', name: 'Worldgen'}
+            ]
+        }
+    ];
+    let filters = {};
+
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     listen('tauri://file-drop', files => {
         if (currentTabIndex != 1) {
@@ -67,18 +103,6 @@
         });
     }
 
-    async function fetchModVersion(slug) {
-        console.debug("Slug", slug)
-        await invoke("get_mod_version", {
-            slug: slug,
-            params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
-        }).then((result) => {
-            console.debug("Mod Version", result);
-        }).catch((err) => {
-            console.error(err);
-        });
-    }
-
     async function getCustomModsFilenames() {
         await invoke("get_custom_mods_filenames", {
             options: options,
@@ -93,14 +117,12 @@
     }
 
     async function installModAndDependencies(mod) {
-        mod.loading = true
-        mods = mods
         await invoke("install_mod_and_dependencies", {
             slug: mod.slug,
             params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
             requiredMods: launchManifest.mods
         }).then((result) => {
-            result.image_url = mod.icon_url
+            result.image_url = mod.icon_url;
             launcherProfile.mods.pushIfNotExist(result, function (e) {
                 return e.value.name === result.value.name;
             })
@@ -134,29 +156,33 @@
     }
 
     async function searchMods() {
-        if (searchterm === "") {
-            // Fetch featured mods
+        if (searchterm === "" && search_offset === 0) {
             await invoke("get_featured_mods", {
                 branch: currentBranch,
                 mcVersion: launchManifest.build.mcVersion,
             }).then((result) => {
                 console.debug("Featured Mods", result);
+                result.forEach(mod => mod.featured = true);
                 mods = result;
+                featuredMods = result;
                 launchManifest.mods.forEach(async mod => {
                     if (!mod.required) {
                         const slug = mod.source.artifact.split(':')[1];
-                        let iconUrl = 'https://norisk.gg/icon_512px.png';
-                        let description = 'A custom NoRiskClient Mod.';
+                        let author;
+                        let iconUrl = 'src/images/norisk_logo.png';
+                        let description = "A custom NoRiskClient Mod."
                         if (mod.source.repository != 'norisk') {
                             await invoke('get_mod_info', { slug }).then(info => {
+                                author = info.author ?? null;
                                 iconUrl = info.icon_url;
                                 description = info.description;
                             }).catch((err) => {
                                 console.error(err);
                             });
                         }
+                        if (!mod.enabled) disableRecomendedMod(slug);
                         mods.push({
-                            author: null,
+                            author: author,
                             description: description,
                             icon_url: iconUrl,
                             slug: slug,
@@ -167,27 +193,65 @@
             }).catch((err) => {
                 console.error(err);
             });
-            return;
         }
 
+        let client_server_side_filters = '';
+        const client_side = Object.values(filters).find(filter => filter.id == 'client_side');
+        const server_side = Object.values(filters).find(filter => filter.id == 'server_side');
+        if (!client_side && !server_side) {
+            client_server_side_filters = '';
+        } else if (client_side.enabled && server_side.enabled) {
+            client_server_side_filters = ', ["client_side:required"], ["server_side:required"]';
+        } else if (client_side.enabled && !server_side.enabled) {
+            client_server_side_filters = ', ["client_side:optional","client_side:required"], ["server_side:optional","server_side:unsupported"]';
+        } else if (!client_side.enabled && server_side.enabled) {
+            client_server_side_filters = ', ["client_side:optional","client_side:unsupported"], ["server_side:optional","server_side:required"]';
+        }
+
+        const notEnvironmentFilter = (filter) => filter.id !== 'client_side' && filter.id !== 'server_side';
+        
         await invoke("search_mods", {
             params: {
-                facets: `[["categories:fabric"], ["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"]]`,
-                limit: 30,
+                facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).length > 0 ? ', ' : ''}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(', ')}${client_server_side_filters}]`,
+                index: search_index,
+                limit: search_limit + (searchterm == '' ? launchManifest.mods.length : 0),
+                offset: search_offset,
                 query: searchterm,
             },
         }).then((result) => {
             console.debug("Search Mod Result", result);
-            mods = result.hits;
+            result.hits.forEach(mod => {
+                mod.featured = featuredMods.filter(featuredMod => featuredMod.slug === mod.slug).length > 0;
+            });
+            if (result.hits.length === 0) {
+                mods = null;
+            } else if ((search_offset == 0 && searchterm != '') || Object.values(filters).length > 0) {
+                mods = result.hits;
+            } else {
+                mods = [...mods, ...result.hits.filter(mod => searchterm != '' || (!launchManifest.mods.some((launchManifestMod) => {
+                    return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase()
+                }) && !featuredMods.some((featuredMod) => {
+                    return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase()})))];
+            }
         }).catch((err) => {
             console.error(err);
         });
+    }
+
+    function loadMore() {
+        search_offset += search_limit + (searchterm == '' ? launchManifest.mods.length : 0);
+        searchMods();
     }
 
     async function toggleInstalledMod(mod) {
         mod.value.enabled = !mod.value.enabled;
         launcherProfile.mods = launcherProfile.mods;
         launcherProfiles.store();
+        const keep = launcherProfile.mods;
+        launcherProfile.mods = [];
+        setTimeout(() => {
+            launcherProfile.mods = keep;
+        }, 0)
     }
 
     async function deleteInstalledMod(slug) {
@@ -196,7 +260,8 @@
         })
         if (index !== -1) {
             launcherProfile.mods.splice(index, 1);
-            mods = mods
+            mods = mods;
+            launcherProfile.mods = launcherProfile.mods;
             launcherProfiles.store();
         }
     }
@@ -206,6 +271,8 @@
             return;
         }
         launcherProfile.mods.push({
+            title: slug,
+            image_url: '',
             value: {
                 required: false,
                 enabled: false,
@@ -217,10 +284,10 @@
                     url: ''
                 }
             },
-            image_url: '',
             dependencies: []
         })
         mods = mods
+        launcherProfile.mods = launcherProfile.mods;
         launcherProfiles.store();
     }
 
@@ -231,6 +298,7 @@
         if (index !== -1) {
             launcherProfile.mods.splice(index, 1);
             mods = mods
+            launcherProfile.mods = launcherProfile.mods;
             launcherProfiles.store();
         }
     }
@@ -258,7 +326,7 @@
             mcVersion: launchManifest.build.mcVersion
         }).then(async (folder) => {
             if (filename.endsWith(".disabled")) {
-                await renameFile(folder + "/" + filename, folder + "/" + filename.replace(".disabled", "")).then(() => {
+                await renameFile(folder + "/" + filename, folder + "/" + filename.replace('.disabled', '')).then(() => {
                     getCustomModsFilenames()
                 }).catch((error) => {
                     alert(error)
@@ -285,10 +353,7 @@
             // can also watch an array of paths
             fileWatcher = await watch(
                 folder,
-                (event) => {
-                    const {type, payload} = event;
-                    getCustomModsFilenames()
-                },
+                getCustomModsFilenames,
                 {recursive: true}
             );
         }).catch((error) => {
@@ -297,12 +362,11 @@
     }
 
     async function handleSelectCustomMods() {
-        console.debug("Launch", launchManifest)
         try {
             const locations = await open({
                 defaultPath: '/',
                 multiple: true,
-                filters: [{name:"Mods", extensions: ["jar"]}]
+                filters: [{name:"Custom Mods", extensions: ["jar"]}]
             })
             if (locations instanceof Array) {
                 installCustomMods(locations)
@@ -323,7 +387,6 @@
             } else {
                 splitter = "\\"
             }
-            console.log(location.split(splitter))
             const fileName = location.split(splitter)[location.split(splitter).length - 1];
             console.log(`Installing custom Mod ${fileName}`)
             await invoke("save_custom_mods_to_folder", {
@@ -365,12 +428,14 @@
     load()
 
     onDestroy(() => {
-        fileWatcher();
+        fileWatcher = null;
     })
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+<h1 class="home-button" style="left: 220px;" on:click={() => dispatch("back")}>[BACK]</h1>
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 <div class="modrinth-wrapper">
     <div class="navbar">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -383,32 +448,52 @@
         <h1 on:click={handleSelectCustomMods}>Custom</h1>
     </div>
     {#if currentTabIndex === 0}
-        <ModrinthSearchBar on:search={searchMods} bind:searchTerm={searchterm}
-                           placeHolder="Search for Mods on Modrinth..."/>
-        {#if mods !== null }
-            <VirtualList height="30em" items={mods} let:item>
-                <ModrinthResultItem text={checkIfRequiredOrInstalled(item.slug)}
-                                    enabled={launcherProfile.mods.find(mod => mod.value.name == item.slug)?.value?.enabled ?? true}
-                                    on:delete={deleteInstalledMod(item.slug)}
-                                    on:install={installModAndDependencies(item)}
-                                    on:disable={disableRecomendedMod(item.slug)}
-                                    on:enable={enableRecomendedMod(item.slug)}
-                                    mod={item}/>
+        <ModrinthSearchBar on:search={() => {
+            search_offset = 0;
+            searchMods();
+        }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters} bind:options={options} placeHolder="Search for Mods on Modrinth..."/>
+        {#if mods !== null && mods.length > 0 }
+            <VirtualList height="30em" items={[...mods, mods.length >= 30 ? 'LOAD_MORE_MODS' : null]} let:item>
+                {#if item == 'LOAD_MORE_MODS'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+                {:else if item != null}
+                        <ModItem
+                            text={checkIfRequiredOrInstalled(item.slug)}
+                            enabled={launcherProfile.mods.find(mod => mod.value.name == item.slug)?.value?.enabled ?? true}
+                            on:install={() => installModAndDependencies(item)}
+                            on:enable={() => enableRecomendedMod(item.slug)}
+                            on:disable={() => disableRecomendedMod(item.slug)}
+                            on:delete={() => deleteInstalledMod(item.slug)}
+                            type="RESULT"
+                            mod={item}/>
+                {/if}
             </VirtualList>
+        {:else}
+            <h1 class="loading-indicator">{mods == null ? 'No Mods found.' : 'Loading...'}</h1>
         {/if}
     {:else if currentTabIndex === 1}
-        <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
-                           placeHolder="Filter installed Mods..."/>
-        {#if launcherProfile.mods.length > 0 || customMods.length > 0}
+        <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Mods..."/>
+            {#if launcherProfile.mods.length > 0 || customMods.length > 0}
             <VirtualList height="30em" items={[...customMods,...launcherProfile.mods].filter((mod) => {
                 let name = (mod?.value?.name ?? mod).toUpperCase()
-                return (name.endsWith(".JAR") || name.endsWith(".DISABLED")) && name.includes(filterterm.toUpperCase())
-            }).sort() } let:item>
+                return (mod?.value?.name != null || name.endsWith(".JAR") || name.endsWith(".DISABLED")) && name.includes(filterterm.toUpperCase()) && !mod?.value?.source?.artifact?.includes("PLACEHOLDER")
+            }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) } let:item>
                 {#if (typeof item === 'string' || item instanceof String)}
-                    <CustomModItem on:delete={deleteCustomModFile(item)} on:togglemod={toggleCustomModFile(item)}
-                                   mod={item}/>
+                    <ModItem
+                        text="CUSTOM"
+                        enabled={!item.toUpperCase().endsWith(".DISABLED")}
+                        on:delete={() => deleteCustomModFile(item)}
+                        on:toggle={() => toggleCustomModFile(item)}
+                        type="CUSTOM"
+                        mod={item}/>
                 {:else}
-                    <InstalledModItem on:delete={deleteInstalledMod(item.value.source.artifact.split(":")[1])} on:disable={toggleInstalledMod(item)} mod={item}/>
+                    <ModItem
+                        text="INSTALLED"
+                        on:delete={() => deleteInstalledMod(item.value.source.artifact.split(":")[1])}
+                        on:toggle={() => toggleInstalledMod(item)}
+                        type="INSTALLED"
+                        mod={item}/>
                 {/if}
             </VirtualList>
         {/if}
@@ -444,6 +529,36 @@
     }
 
     .active-tab {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    .loading-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Press Start 2P', serif;
+        font-size: 20px;
+        margin-top: 200px;
+    }
+
+    .load-more-button {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        margin-top: 20px;
+        font-family: 'Press Start 2P', serif;
+        font-size: 18px;
+        margin-bottom: 0.8em;
+        cursor: pointer;
+        transition-duration: 150ms;
+    }
+
+    .load-more-button:hover {
+        transform: scale(1.2);
+    }
+
+    .load-more-button p {
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
     }

@@ -39,7 +39,22 @@ impl ApiEndpoints {
 
     /// Request featured mods
     pub async fn norisk_featured_mods(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("featured-mods/{}", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("featured/mods/{}", branch), "").await
+    }
+
+    /// Request featured resourcepacks
+    pub async fn norisk_featured_resourcepacks(branch: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("featured/resourcepacks/{}", branch), "").await
+    }
+
+    /// Request featured shaders
+    pub async fn norisk_featured_shaders(branch: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("featured/shaders/{}", branch), "").await
+    }
+    
+    /// Request featured datapacks
+    pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("featured/datapacks/{}", branch), "").await
     }
 
     /// Request all available branches
@@ -321,6 +336,7 @@ pub struct SubsystemSpecificData {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NoRiskLaunchManifest {
     pub build: NoRiskBuild,
+    pub server: String,
     pub subsystem: LoaderSubsystem,
     pub mods: Vec<LoaderMod>,
     pub repositories: BTreeMap<String, String>,

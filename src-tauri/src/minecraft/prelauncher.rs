@@ -6,6 +6,8 @@ use tracing::*;
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
+use crate::app::app_data::LauncherProfile;
+use crate::app::modrinth_api::{Datapack, ModrinthApiEndpoints, ResourcePack, Shader};
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
@@ -16,7 +18,7 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     info!("Loading minecraft version manifest...");
     let mc_version_manifest = VersionManifest::download().await?;
 
@@ -32,6 +34,9 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
     clear_mods(&data_directory, &launch_manifest).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &additional_mods, &progress).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &additional_mods, &progress).await?;
+    retrieve_shaders(&data_directory, &launch_manifest, &shaders, &progress).await?;
+    retrieve_resourcepacks(&data_directory, &launch_manifest, &resourcepacks, &progress).await?;
+    retrieve_datapacks(&data_directory, &launch_manifest, &datapacks, &progress).await?;
 
     copy_custom_mods(&data_directory, &launch_manifest, &progress).await?;
 
@@ -146,6 +151,162 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
         println!("Installed Mod {:?}",current_mod);
         installed_mods.push(current_mod.clone())
+    }
+
+    Ok(())
+}
+
+pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shaders: &Vec<Shader>, progress: &impl ProgressReceiver) -> Result<()> {
+    let shader_path = data.join("gameDir").join(&manifest.build.branch).join("shaderpacks");
+
+    fs::create_dir_all(&shader_path).await?;
+
+    let mut installed_shaders: Vec<Shader> = Vec::new();
+
+    // Download shaders
+    let max = get_max(shaders.len());
+
+    for (shader_idx, current_shader) in shaders.iter().enumerate() {
+        if installed_shaders.iter().any(|shader| {
+            return shader.slug == current_shader.slug;
+        }) {
+            let already_installed = installed_shaders.iter().find(|&shader| {
+                return shader.slug == current_shader.slug;
+            }).unwrap();
+            println!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
+            continue;
+        }
+
+        progress.progress_update(ProgressUpdate::set_label(format!("Downloading shader {}", &current_shader.title)));
+
+        let current_shader_path = shader_path.join(&current_shader.file_name);
+
+        // Do we need to download the shader?
+        if !current_shader_path.exists() {
+            // Make sure that the parent directory exists
+            fs::create_dir_all(&current_shader_path.parent().unwrap()).await?;
+
+            // ignore shaders that dont have a download url.
+            if let Some(url) = &current_shader.url {
+                println!("downloading shader {} from {}", &current_shader.file_name, url);
+                
+                let retrieved_bytes = download_file(url, |a, b| {
+                    progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadShader, get_progress(shader_idx, a, b), max));
+                }).await?;
+                
+                fs::write(&current_shader_path, retrieved_bytes).await?;
+                println!("Installed Shader {}", &current_shader.file_name);
+            }
+        } else {
+            println!("Shader {} is already downloaded", &current_shader.file_name);
+        }
+
+        installed_shaders.push(current_shader.clone())
+    }
+
+    Ok(())
+}
+
+pub async fn retrieve_resourcepacks(data: &Path, manifest: &NoRiskLaunchManifest, resourcepacks: &Vec<ResourcePack>, progress: &impl ProgressReceiver) -> Result<()> {
+    let resourcepack_path = data.join("gameDir").join(&manifest.build.branch).join("resourcepacks");
+
+    fs::create_dir_all(&resourcepack_path).await?;
+
+    let mut installed_resourcepacks: Vec<ResourcePack> = Vec::new();
+
+    // Download shaders
+    let max = get_max(resourcepacks.len());
+
+    for (resourcepack_idx, current_resourcepack) in resourcepacks.iter().enumerate() {
+        if installed_resourcepacks.iter().any(|resourcepack| {
+            return resourcepack.slug == current_resourcepack.slug;
+        }) {
+            let already_installed = installed_resourcepacks.iter().find(|&resourcepack| {
+                return resourcepack.slug == current_resourcepack.slug;
+            }).unwrap();
+            println!("Skipping ResoucePack {:?} cuz {:?} is already installed", &current_resourcepack, already_installed);
+            continue;
+        }
+
+        progress.progress_update(ProgressUpdate::set_label(format!("Downloading resourcepack {}", &current_resourcepack.title)));
+
+        let current_resourcepack_path = resourcepack_path.join(&current_resourcepack.file_name);
+
+        // Do we need to download the ResourcePack?
+        if !current_resourcepack_path.exists() {
+            // Make sure that the parent directory exists
+            fs::create_dir_all(&current_resourcepack_path.parent().unwrap()).await?;
+
+            // ignore shaders that dont have a download url.
+            if let Some(url) = &current_resourcepack.url {
+                println!("downloading resourcepack {} from {}", &current_resourcepack.file_name, url);
+                
+                let retrieved_bytes = download_file(url, |a, b| {
+                    progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadResourcePack, get_progress(resourcepack_idx, a, b), max));
+                }).await?;
+                
+                fs::write(&current_resourcepack_path, retrieved_bytes).await?;
+                println!("Installed ResourcePack {}", &current_resourcepack.file_name);
+            }
+        } else {
+            println!("ResourcePack {} is already downloaded", &current_resourcepack.file_name);
+        }
+
+        installed_resourcepacks.push(current_resourcepack.clone())
+    }
+
+    Ok(())
+}
+
+pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, datapacks: &Vec<Datapack>, progress: &impl ProgressReceiver) -> Result<()> {
+    let saves_path = data.join("gameDir").join(&manifest.build.branch).join("saves");
+
+    fs::create_dir_all(&saves_path).await?;
+    
+    let mut installed_datapacks: Vec<Datapack> = Vec::new();
+    
+    // Download shaders
+    let max = get_max(datapacks.len());
+    
+    for (datapack_idx, current_datapack) in datapacks.iter().enumerate() {
+        let datapack_path = saves_path.join(current_datapack.world_name.clone()).join("datapacks");
+
+        fs::create_dir_all(&datapack_path).await?;
+        if installed_datapacks.iter().any(|datapack| {
+            return datapack.slug == current_datapack.slug && current_datapack.world_name == datapack.world_name;
+        }) {
+            let already_installed = installed_datapacks.iter().find(|&datapack| {
+                return datapack.slug == current_datapack.slug && current_datapack.world_name == datapack.world_name;
+            }).unwrap();
+            println!("Skipping Datapack {:?} cuz {:?} is already installed", &current_datapack, already_installed);
+            continue;
+        }
+
+        progress.progress_update(ProgressUpdate::set_label(format!("Downloading datapack {}", &current_datapack.title)));
+
+        let current_datapack_path = datapack_path.join(&current_datapack.file_name);
+
+        // Do we need to download the ResourcePack?
+        if !current_datapack_path.exists() || current_datapack_path.is_dir() {
+            // Make sure that the parent directory exists
+            fs::create_dir_all(&current_datapack_path.parent().unwrap()).await?;
+
+            // ignore shaders that dont have a download url.
+            if let Some(url) = &current_datapack.url {
+                println!("downloading datapack {} from {}", &current_datapack.file_name, url);
+                
+                let retrieved_bytes = download_file(url, |a, b| {
+                    progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadDatapack, get_progress(datapack_idx, a, b), max));
+                }).await?;
+                
+                fs::write(&current_datapack_path, retrieved_bytes).await?;
+                println!("Installed Datapack {} in world {}", &current_datapack.file_name, &current_datapack.world_name);
+            }
+        } else {
+            println!("Datapack {} is already downloaded in world {}", &current_datapack.file_name, &current_datapack.world_name);
+        }
+
+        installed_datapacks.push(current_datapack.clone())
     }
 
     Ok(())

@@ -4,14 +4,14 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { scale } from "svelte/transition";
   import { quintOut } from "svelte/easing";
-  import SkinButton from "./SkinButton.svelte";
   import { listen } from "@tauri-apps/api/event";
+  import SkinButton from "./SkinButton.svelte";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
   import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
-  import ModrinthScreen from "../modrinth/ModrinthScreen.svelte";
+  import AddonsScreen from "../addons/AddonsScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
@@ -34,8 +34,8 @@
   let showSkinScreenHack = false;
   let showCapeScreen = false;
   let showCapeScreenHack = false;
-  let showModrinthScreen = false;
-  let showModrinthScreenHack = false;
+  let showAddonsScreen = false;
+  let showAddonsScreenHack = false;
   let log = [];
 
   listen("process-output", event => {
@@ -131,10 +131,19 @@
             profiles.selectedMainProfiles[branch] = profileId;
           }
         }
+        const branchAddons = profiles.addons[branch];
+        if (!branchAddons) {
+          profiles.addons[branch] = {
+            shaders: [],
+            resourcePacks: [],
+            datapacks: []
+          };
+        }
       });
 
       profiles.store = function() {
         console.debug("storing launcher profiles", profiles);
+        console.log(profiles)
         invoke("store_launcher_profiles", { launcherProfiles: profiles }).catch(e => console.error(e));
       }
 
@@ -172,6 +181,7 @@
       console.error("Refreshing Account...");
       return;
     }
+
     refreshingAccount = true;
     await invoke("refresh_via_norisk", { loginData: options.accounts.find(obj => obj.uuid === options.currentUuid) })
       .then((account) => {
@@ -194,11 +204,23 @@
     refreshingAccount = false;
 
     console.log("Client started");
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let launchManifest = {};
     let branch = branches[currentBranchIndex];
     let installedMods = [];
     log = [];
     clientRunning = true;
     fakeClientRunning = true;
+
+    await invoke("get_launch_manifest", {
+        branch: branch,
+        noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+    }).then((result) => {
+        console.debug("Launch Manifest", result);
+        launchManifest = result;
+    }).catch((err) => {
+        console.error(err);
+    });
 
     if (options.experimentalMode) {
       options.latestDevBranch = branch;
@@ -227,9 +249,13 @@
     console.debug("Running Branch", branch);
     await invoke("run_client", {
       branch: branch,
-      loginData: options.accounts.find(obj => obj.uuid === options.currentUuid),
+      loginData: loginData,
       options: options,
+      forceServer: launchManifest.server.length > 0 ? launchManifest.server : null,
       mods: installedMods,
+      shaders: launcherProfiles.addons[branch].shaders,
+      resourcepacks: launcherProfiles.addons[branch].resourcePacks,
+      datapacks: launcherProfiles.addons[branch].datapacks
     });
   }
 
@@ -265,11 +291,11 @@
       showCapeScreen = true;
     }, 300);
   }
-
-  function handleOpenModScreen() {
-    showModrinthScreenHack = true;
+  
+  function handleOpenAddonsScreen() {
+    showAddonsScreenHack = true;
     setTimeout(() => {
-      showModrinthScreen = true;
+      showAddonsScreen = true;
     }, 300);
   }
 
@@ -280,8 +306,8 @@
     showSkinScreenHack = false;
     showCapeScreen = false;
     showCapeScreenHack = false;
-    showModrinthScreen = false;
-    showModrinthScreenHack = false;
+    showAddonsScreen = false;
+    showAddonsScreenHack = false;
   }
 
   function homeWhileClientRunning() {
@@ -305,8 +331,8 @@
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
-  {#if showModrinthScreen}
-    <ModrinthScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {#if showAddonsScreen}
+    <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
 
   {#if showProfilesScreen}
@@ -335,7 +361,7 @@
     progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
-  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showModrinthScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
@@ -351,12 +377,12 @@
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenModScreen}>MODS</h1>
+        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={closeWindow}>QUIT</h1>
+      <h1 class="quit" on:click={closeWindow}>QUIT</h1>
     </div>
     <img transition:scale={{ x: 15, duration: 300, easing: quintOut }}
       class="pokemon-title"
@@ -473,9 +499,10 @@
     }
 
     .settings-button-wrapper h1 {
-        font-size: 10px;
+        font-size: 11px;
         font-family: 'Press Start 2P', serif;
         margin-bottom: 1em;
+        cursor: pointer;
         color: var(--secondary-color);
         text-shadow: 1px 1px var(--secondary-color-text-shadow);
         transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
@@ -484,6 +511,12 @@
     .settings-button-wrapper h1:hover {
         color: var(--hover-color);
         text-shadow: 1px 1px var(--hover-color-text-shadow);
+        transform: scale(1.2);
+    }
+    
+    .settings-button-wrapper h1.quit:hover {
+        color: red;
+        text-shadow: 1px 1px #460000;
         transform: scale(1.2);
     }
 

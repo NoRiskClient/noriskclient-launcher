@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
-use reqwest::{multipart::{Form, Part}};
+use reqwest::multipart::{Form, Part};
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
@@ -12,11 +12,11 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthSearchResponse};
+use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthModsSearchResponse};
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{DatapackInfo, Datapack, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -147,7 +147,127 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthSearchResponse, String> {
+async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ResourcePackInfo>, String> {
+    debug!("Getting Featured ResourcePacks...");
+
+    match ApiEndpoints::norisk_featured_resourcepacks(&branch).await {
+        Ok(result) => {
+            // fetch resourcepack info for each resourcepack
+            let mut resourcepack_infos: Vec<ResourcePackInfo> = Vec::new();
+            for resourcepack_id in result {
+                match ModrinthApiEndpoints::get_resourcepack_info(&*resourcepack_id).await {
+                    Ok(resourcepack_info) => {
+                        // Filter featured resourcepacks based on mc version
+                        match &resourcepack_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    resourcepack_infos.push(resourcepack_info);
+                                }
+                                else {
+                                    debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured resourcepack {} has no game versions", resourcepack_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(resourcepack_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ShaderInfo>, String> {
+    debug!("Getting Featured Shaders...");
+
+    match ApiEndpoints::norisk_featured_shaders(&branch).await {
+        Ok(result) => {
+            // fetch shader info for each resourcepack
+            let mut shader_infos: Vec<ShaderInfo> = Vec::new();
+            for shader_id in result {
+                match ModrinthApiEndpoints::get_shader_info(&*shader_id).await {
+                    Ok(shader_info) => {
+                        // Filter featured shaders based on mc version
+                        match &shader_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    shader_infos.push(shader_info);
+                                }
+                                else {
+                                    debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured shader {} has no game versions", shader_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(shader_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<DatapackInfo>, String> {
+    debug!("Getting Featured Datapacks...");
+
+    match ApiEndpoints::norisk_featured_datapacks(&branch).await {
+        Ok(result) => {
+            // fetch datapack info for each resourcepack
+            let mut datapack_infos: Vec<DatapackInfo> = Vec::new();
+            for datapack_id in result {
+                match ModrinthApiEndpoints::get_datapack_info(&*datapack_id).await {
+                    Ok(datapack_info) => {
+                        // Filter featured datapacks based on mc version
+                        match &datapack_info.game_versions {
+                            Some(versions) => {
+                                if versions.contains(&mc_version.to_string()) {
+                                    datapack_infos.push(datapack_info);
+                                }
+                                else {
+                                    debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);
+                                }
+                            }
+                            _ => {
+                                error!("Featured datapack {} has no game versions", datapack_info.title);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        message(Some(&window), "Modrinth Error", err.to_string());
+                    }
+                }
+            }
+            Ok(datapack_infos)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
 
     match ModrinthApiEndpoints::search_mods(&params).await {
@@ -191,10 +311,10 @@ async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: V
 }
 
 #[tauri::command]
-async fn get_mod_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
-    println!("Searching Mod Version...");
+async fn get_project_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
+    println!("Searching Project Version...");
 
-    match ModrinthApiEndpoints::get_mod_version(slug, params).await {
+    match ModrinthApiEndpoints::get_project_version(slug, params).await {
         Ok(result) => {
             Ok(result)
         }
@@ -203,6 +323,154 @@ async fn get_mod_version(slug: &str, params: &str, window: Window) -> Result<Vec
             Err(err.to_string())
         }
     }
+}
+
+#[tauri::command]
+async fn search_shaders(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthShadersSearchResponse, String> {
+    debug!("Searching Shaders...");
+
+    match ModrinthApiEndpoints::search_shaders(&params).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_shader_info(slug: String, window: Window) -> Result<ShaderInfo, String> {
+    debug!("Fetching shader info...");
+
+    match ModrinthApiEndpoints::get_shader_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn install_shader(slug: &str, params: &str, window: Window) -> Result<Shader, String> {
+    println!("Installing Shader...");
+    match ModrinthApiEndpoints::install_shader(slug, params).await {
+        Ok(installed_shader) => {
+            Ok(installed_shader)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn search_resourcepacks(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthResourcePacksSearchResponse, String> {
+    debug!("Searching ResourcePacks...");
+
+    match ModrinthApiEndpoints::search_resourcepacks(&params).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_resourcepack_info(slug: String, window: Window) -> Result<ResourcePackInfo, String> {
+    debug!("Fetching ResourcePack info...");
+
+    match ModrinthApiEndpoints::get_resourcepack_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn install_resourcepack(slug: &str, params: &str, window: Window) -> Result<ResourcePack, String> {
+    println!("Installing ResourcePack...");
+    match ModrinthApiEndpoints::install_resourcepack(slug, params).await {
+        Ok(installed_resourcepack) => {
+            Ok(installed_resourcepack)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn search_datapacks(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthDatapacksSearchResponse, String> {
+    debug!("Searching Datapacks...");
+
+    match ModrinthApiEndpoints::search_datapacks(&params).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_datapack_info(slug: String, window: Window) -> Result<DatapackInfo, String> {
+    debug!("Fetching Datapack info...");
+
+    match ModrinthApiEndpoints::get_datapack_info(&slug).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn install_datapack(slug: &str, params: &str, world: &str, window: Window) -> Result<Datapack, String> {
+    println!("Installing Datapack...");
+    match ModrinthApiEndpoints::install_datapack(slug, params, world).await {
+        Ok(installed_datapack) => {
+            Ok(installed_datapack)
+        }
+        Err(err) => {
+            message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
+    let mut world_folders: Vec<String> = Vec::new();
+    let mut world_folder = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&branch).join("saves");
+    if world_folder.exists() {
+        let mut entries = fs::read_dir(world_folder).await.map_err(|e| format!("unable to read world folders: {:?}", e))?;
+        while let Some(entry) = entries.next_entry().await.map_err(|e| format!("unable to read world folder: {:?}", e))? {
+            let path = entry.path();
+            if path.is_dir() {
+                world_folders.push(path.file_name().unwrap().to_str().unwrap().to_string());
+            }
+        }
+    }
+    Ok(world_folders)
 }
 
 #[tauri::command]
@@ -305,6 +573,84 @@ async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_v
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_custom_shaders_filenames(options: LauncherOptions, installed_shaders: Vec<Shader>, branch: &str) -> Result<Vec<String>, String> {
+    let custom_shader_folder = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks");
+    let names = ModrinthApiEndpoints::get_custom_shader_names(&custom_shader_folder, &installed_shaders).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    Ok(names)
+}
+
+#[tauri::command]
+async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Result<String, String> {
+    let custom_shader_folder = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks");
+    return custom_shader_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn save_custom_shaders_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file.name.clone());
+
+    println!("Saving {} to {} shaders folder.", file.name.clone(), branch);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom shader {}: {}", file.name, err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_custom_resourcepacks_filenames(options: LauncherOptions, installed_resourcepacks: Vec<ResourcePack>, branch: &str) -> Result<Vec<String>, String> {
+    let custom_resourcepack_folder = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks");
+    let names = ModrinthApiEndpoints::get_custom_resourcepack_names(&custom_resourcepack_folder, &installed_resourcepacks).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    Ok(names)
+}
+
+#[tauri::command]
+async fn get_custom_resourcepacks_folder(options: LauncherOptions, branch: &str) -> Result<String, String> {
+    let custom_resourcepack_folder = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks");
+    return custom_resourcepack_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn save_custom_resourcepacks_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file.name.clone());
+
+    println!("Saving {} to {} resourcepacks folder.", file.name.clone(), branch);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom resourcepack {}: {}", file.name, err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_custom_datapacks_filenames(options: LauncherOptions, installed_datapacks: Vec<Datapack>, branch: &str, world: &str) -> Result<Vec<String>, String> {
+    let custom_datapack_folder = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks");
+    let names = ModrinthApiEndpoints::get_custom_datapack_names(&custom_datapack_folder, &installed_datapacks).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    Ok(names)
+}
+
+#[tauri::command]
+async fn get_custom_datapacks_folder(options: LauncherOptions, branch: &str, world: &str) -> Result<String, String> {
+    let custom_datapack_folder = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks");
+    return custom_datapack_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn save_custom_datapacks_to_folder(options: LauncherOptions, branch: &str, world: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks").join(file.name.clone());
+
+    println!("Saving {} to {} datapacks folder.", file.name.clone(), branch);
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom datapack {}: {}", file.name, err));
     }
 
     Ok(())
@@ -507,12 +853,13 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, mods: Vec<LoaderMod>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
     info!("Starting Client with branch {}",branch);
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
+        force_server: force_server,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
@@ -566,6 +913,9 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                     launch_manifest,
                     parameters,
                     mods,
+                    shaders,
+                    resourcepacks,
+                    datapacks,
                     LauncherData {
                         on_stdout: handle_stdout,
                         on_stderr: handle_stderr,
@@ -701,6 +1051,9 @@ pub fn gui_main() {
             delete_cape,
             search_mods,
             get_featured_mods,
+            get_featured_resourcepacks,
+            get_featured_shaders,
+            get_featured_datapacks,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,
@@ -711,13 +1064,32 @@ pub fn gui_main() {
             get_mod_info,
             get_launcher_profiles,
             store_launcher_profiles,
+            get_project_version,
             get_custom_mods_folder,
             save_custom_mods_to_folder,
             install_mod_and_dependencies,
-            get_mod_version,
+            get_custom_mods_filenames,
+            get_custom_shaders_folder,
+            save_custom_shaders_to_folder,
+            get_custom_shaders_filenames,
+            search_shaders,
+            get_shader_info,
+            install_shader,
+            get_custom_resourcepacks_folder,
+            save_custom_resourcepacks_to_folder,
+            get_custom_resourcepacks_filenames,
+            search_resourcepacks,
+            get_resourcepack_info,
+            install_resourcepack,
+            get_custom_datapacks_folder,
+            save_custom_datapacks_to_folder,
+            get_custom_datapacks_filenames,
+            search_datapacks,
+            get_datapack_info,
+            install_datapack,
+            get_world_folders,
             upload_logs,
             get_launch_manifest,
-            get_custom_mods_filenames,
             mem_percentage,
             default_data_folder_path,
             terminate

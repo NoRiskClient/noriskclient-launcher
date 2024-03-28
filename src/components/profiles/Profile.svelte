@@ -33,13 +33,15 @@
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
         font-weight: 300;
+        border-radius: 7.5px;
+        background-color: var(--background-contrast-color);
         text-shadow: 1px 1px var(--primary-color-text-shadow);
-        border: 2px solid black;
+        border: 1.5px solid var(--background-contrast-color);
         align-items: center;
         justify-content: space-between;
         padding: 1.5em;
         gap: 1em;
-        margin-top: 0.5em;
+        margin-top: 1em;
         justify-content: space-between;
     }
 
@@ -57,6 +59,7 @@
     }
 
     .settings-button {
+        cursor: pointer;
         margin-bottom: 3px;
         transition-duration: 100ms;
     }
@@ -67,6 +70,7 @@
     }
 
     .default-info {
+        cursor: default;
         color: var(--primary-color);
         text-shadow: 0.85px 0.85px var(--primary-color-text-shadow);
         font-weight: 200;

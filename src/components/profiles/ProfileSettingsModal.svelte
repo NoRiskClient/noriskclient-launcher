@@ -39,7 +39,6 @@
     const confirm = await window.confirm("Are you sure you want to delete this profile?")
     if (confirm) {
         console.info("DELETING PROFILE", settingsProfile);
-        console.log(launcherProfiles.experimentalProfiles.indexOf(settingsProfile));
         if (experimentalMode) {
             launcherProfiles.experimentalProfiles.splice(launcherProfiles.experimentalProfiles.indexOf(settingsProfile), 1);
             launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = launcherProfiles.experimentalProfiles[0].id;
