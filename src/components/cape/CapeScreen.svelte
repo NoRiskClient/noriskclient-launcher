@@ -14,7 +14,8 @@
     { text: "CAPE EDIT" },
     { text: "ALLTIME" },
     { text: "WEEKLY" },
-    { text: "OWNED" }];
+    { text: "OWNED" }
+  ];
   let currentRequest = 0;
 
   onMount(() => {

@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
   import { createEventDispatcher, onMount } from "svelte";
+  import { SkinViewer } from "skinview3d";
 
   const dispatch = createEventDispatcher();
 
