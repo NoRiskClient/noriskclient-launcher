@@ -62,6 +62,7 @@
     if (account !== null) {
       await invoke("equip_cape", {
         noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+        uuid: options.currentUuid,
         hash: hash,
       }).then(() => {
         dispatch("fetchNoRiskUser");

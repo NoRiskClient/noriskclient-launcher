@@ -28,6 +28,7 @@
       if (options.currentUuid !== null) {
         await invoke("request_trending_capes", {
           noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+          uuid: options.currentUuid,
           alltime: alltime,
           limit: 30,
         }).then((result) => {
@@ -46,6 +47,7 @@
       if (options.currentUuid !== null) {
         await invoke("request_owned_capes", {
           noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+          uuid: options.currentUuid,
           limit: 30,
         }).then((result) => {
           console.debug("Requesting owned capes", result);
@@ -76,7 +78,7 @@
   async function getNoRiskUserByUUID() {
     if (options.currentUuid !== null) {
       await invoke("get_cape_hash_by_uuid", {
-        uuid: options.currentUuid,
+        uuid: options.currentUuid
       }).then((user) => {
         if (user) {
           capeHash = user;
