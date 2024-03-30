@@ -18,7 +18,7 @@ use crate::app::app_data::LauncherOptions;
 pub struct CapeApiEndpoints;
 
 impl CapeApiEndpoints {
-    pub async fn equip_cape(token: &str, hash: &str) -> Result<String, String> {
+    pub async fn equip_cape(token: &str, uuid: &str, hash: &str) -> Result<String, String> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
 
         let image_url = if options.experimental_mode {
@@ -32,7 +32,7 @@ impl CapeApiEndpoints {
                 let image_bytes = response.bytes().await;
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
+                let url = format!("{}/cosmetics/cape?uuid={}", get_launcher_api_base(options.experimental_mode), uuid);
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
@@ -69,7 +69,7 @@ impl CapeApiEndpoints {
         };
     }
 
-    pub async fn upload_cape(token: &str, image_path: PathBuf) -> Result<String, String> {
+    pub async fn upload_cape(token: &str, uuid: &str, image_path: PathBuf) -> Result<String, String> {
         debug!("Image Path {:?}",image_path);
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         // Lese den Inhalt der Bilddatei in Bytes ein
@@ -79,7 +79,7 @@ impl CapeApiEndpoints {
                 file.read_to_end(&mut image_data).expect("Error Reading File");
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
+                let url = format!("{}/cosmetics/cape?uuid={}", get_launcher_api_base(options.experimental_mode), uuid);
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
@@ -133,10 +133,10 @@ impl CapeApiEndpoints {
         Ok(response_text)
     }
 
-    pub async fn delete_cape(norisk_token: &str) -> Result<(), String> {
+    pub async fn delete_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
         // Baue die URL mit dem Token als Query-Parameter
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape", get_launcher_api_base(options.experimental_mode));
+        let url = format!("{}/cosmetics/cape?uuid={}", get_launcher_api_base(options.experimental_mode), uuid);
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
@@ -161,10 +161,10 @@ impl CapeApiEndpoints {
         };
     }
 
-    pub async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_trending_capes(norisk_token: &str, uuid: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Trending Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/trending?alltime={}&limit={}", get_launcher_api_base(options.experimental_mode), alltime, limit);
+        let url = format!("{}/cosmetics/cape/trending?uuid={}&alltime={}&limit={}", get_launcher_api_base(options.experimental_mode), uuid, alltime, limit);
         let response = HTTP_CLIENT
             .get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -174,10 +174,10 @@ impl CapeApiEndpoints {
         Ok(trending_capes)
     }
 
-    pub async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/owned?limit={}", get_launcher_api_base(options.experimental_mode), limit);
+        let url = format!("{}/cosmetics/cape/owned?uuid={}&limit={}", get_launcher_api_base(options.experimental_mode), uuid, limit);
         let response = HTTP_CLIENT
             .get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))

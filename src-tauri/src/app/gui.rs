@@ -69,7 +69,7 @@ fn open_url(url: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
+async fn upload_cape(norisk_token: &str, uuid: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Uploading Cape...");
     use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
 
@@ -80,7 +80,7 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 
     // dialog_result will be of type Option<PathBuf> now.
 
-    match CapeApiEndpoints::upload_cape(norisk_token, dialog_result.unwrap()).await {
+    match CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await {
         Ok(result) => {
             message(Some(&window), "Cape Upload", result);
         }
@@ -92,10 +92,10 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 }
 
 #[tauri::command]
-async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
+async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Equiping Cape...");
 
-    match CapeApiEndpoints::equip_cape(norisk_token, hash).await {
+    match CapeApiEndpoints::equip_cape(norisk_token, uuid, hash).await {
         Ok(result) => {
             message(Some(&window), "Cape Upload", result);
         }
@@ -474,11 +474,11 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
+async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(), String> {
     debug!("Deleting Cape...");
     // dialog_result will be of type Option<PathBuf> now.
 
-    match CapeApiEndpoints::delete_cape(norisk_token).await {
+    match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
         Ok(result) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
@@ -488,8 +488,8 @@ async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_trending_capes(norisk_token, alltime, limit).await {
+async fn request_trending_capes(norisk_token: &str, uuid: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, String> {
+    match CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit).await {
         Ok(result) => {
             Ok(result)
         }
@@ -500,8 +500,8 @@ async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) ->
 }
 
 #[tauri::command]
-async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_owned_capes(norisk_token, limit).await {
+async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, String> {
+    match CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit).await {
         Ok(result) => {
             Ok(result)
         }

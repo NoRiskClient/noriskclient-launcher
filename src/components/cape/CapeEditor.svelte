@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
   import { createEventDispatcher, onMount } from "svelte";
-  import { SkinViewer } from "skinview3d";
 
   const dispatch = createEventDispatcher();
 
@@ -18,6 +17,7 @@
     if (account !== null) {
       await invoke("upload_cape", {
         noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+        uuid: options.currentUuid,
       }).then(() => {
         dispatch("fetchNoRiskUser");
       });
@@ -29,6 +29,7 @@
     if (account !== null) {
       await invoke("delete_cape", {
         noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+        uuid: options.currentUuid,
       }).then(() => {
         console.debug("Deleted Cape...");
         capeHash = null;
