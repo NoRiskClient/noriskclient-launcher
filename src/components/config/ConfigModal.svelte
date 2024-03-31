@@ -14,8 +14,8 @@
   export let options;
   export let dataFolderPath;
 
-  function hideSettings() {
-    saveData().then(() => {
+  async function hideSettings() {
+    await saveData().then(() => {
       dispatch("requestBranches");
     });
     showModal = false;
@@ -27,7 +27,7 @@
   $: if (dialog && showModal) dialog.showModal();
 
   async function saveData() {
-    options.store();
+    await options.store();
   }
 
   async function clearData() {
@@ -59,6 +59,7 @@
     }
     invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       options.experimentalModeToken = experimentalToken;
+      options.experimentalMode = allowed;
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
       options.experimentalMode = false;
@@ -66,6 +67,7 @@
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })
+    await options.store();
 
     let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
     if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
