@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{DatapackInfo, Datapack, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServer, CustomServersResponse, FeaturedServer, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -460,7 +460,7 @@ async fn install_datapack(slug: &str, params: &str, world: &str, window: Window)
 #[tauri::command]
 async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
     let mut world_folders: Vec<String> = Vec::new();
-    let mut world_folder = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&branch).join("saves");
+    let world_folder = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&branch).join("saves");
     if world_folder.exists() {
         let mut entries = fs::read_dir(world_folder).await.map_err(|e| format!("unable to read world folders: {:?}", e))?;
         while let Some(entry) = entries.next_entry().await.map_err(|e| format!("unable to read world folder: {:?}", e))? {
@@ -474,12 +474,60 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, String> {
+    match ApiEndpoints::norisk_featured_servers(branch).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String> {
+    match ApiEndpoints::norisk_custom_servers(token).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer, String> {
+    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_delete_custom_server(id, token).await {
+        Ok(_) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(), String> {
     debug!("Deleting Cape...");
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(result) => { () },
+        Ok(_result) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -760,8 +808,8 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
-async fn request_norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(is_experimental, norisk_token)
+async fn request_norisk_branches(norisk_token: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(norisk_token)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
@@ -790,7 +838,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 
 #[tauri::command]
 async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
-    let auth_prepare_response = ApiEndpoints::auth_prepare_response(options.experimental_mode).await;
+    let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
@@ -798,7 +846,7 @@ async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, S
             let id = response.id;
             let _ = open_url(url.as_str());
 
-            let login_data = ApiEndpoints::await_auth_response(options.experimental_mode, id).await;
+            let login_data = ApiEndpoints::await_auth_response(id).await;
             match login_data {
                 Ok(response) => {
                     info!("Received NoRisk Auth Response");
@@ -1088,6 +1136,10 @@ pub fn gui_main() {
             get_datapack_info,
             install_datapack,
             get_world_folders,
+            get_featured_servers,
+            get_custom_servers,
+            create_custom_server,
+            delete_custom_server,
             upload_logs,
             get_launch_manifest,
             mem_percentage,

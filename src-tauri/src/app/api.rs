@@ -28,8 +28,8 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, norisk_token).await
+    pub async fn norisk_branches(norisk_token: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint("branches", norisk_token).await
     }
 
     /// Request token for experimental mode
@@ -56,10 +56,30 @@ impl ApiEndpoints {
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(&*format!("featured/datapacks/{}", branch), "").await
     }
+    
+    /// Request featured servers
+    pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
+        Self::request_from_norisk_endpoint(&*format!("featured/servers/{}", branch), "").await
+    }
+    
+    /// Request custom servers
+    pub async fn norisk_custom_servers(token: &str) -> Result<CustomServersResponse> {
+        Self::request_from_norisk_endpoint("custom-servers", token).await
+    }
+
+    /// Create custom server
+    pub async fn norisk_create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer> {
+        Self::post_from_norisk_endpoint_with_body("custom-servers", CreateCustomServerRequest { mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token).await
+    }
+
+    /// Delete custom server
+    pub async fn norisk_delete_custom_server(server_id: &str, token: &str) -> Result<()> {
+        Self::delete_from_norisk_endpoint(&format!("custom-servers/{}", server_id), token).await
+    }
 
     /// Request all available branches
-    pub async fn auth_prepare_response(is_experimental: bool) -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint_with_experimental("auth/prepare", is_experimental, "").await
+    pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
+        Self::post_from_norisk_endpoint("auth/prepare", "").await
     }
 
     /// Request all available branches
@@ -72,8 +92,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn await_auth_response(is_experimental: bool, id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint_with_experimental("auth/await", is_experimental, id).await
+    pub async fn await_auth_response(id: u32) -> Result<LoginData> {
+        Self::post_from_await_endpoint("auth/await", id).await
     }
 
     /// Request launch manifest of specific build
@@ -94,6 +114,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        println!("Experimental Mode: {}", options.experimental_mode); // Den formatierten String ausgeben
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
@@ -105,35 +126,12 @@ impl ApiEndpoints {
         )
     }
 
-    //habe das angelegt weil in javascript wurde es schon geändert aber hier ist noch anderer wert?
+    // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
-            .error_for_status()?
-            .json::<T>()
-            .await?
-        )
-    }
-
-    pub async fn post_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), "api/v1", endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
-            .error_for_status()?
-            .json::<T>()
-            .await?
-        )
-    }
-
-    pub async fn post_from_await_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, id: u32) -> Result<T> {
-        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(is_experimental), "api/v1", endpoint, "id", id);
-        println!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.post(url)
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -147,6 +145,36 @@ impl ApiEndpoints {
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        let body_json = serde_json::to_string(&body)?;
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .body(body_json)
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.delete(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
@@ -193,6 +221,51 @@ pub struct Branches {
 pub struct Changelog {
     pub build: Build,
     pub changelog: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FeaturedServer {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "iconUrl")]
+    pub icon_url: String,
+    pub ip: String,
+    pub port: u16,
+    #[serde(rename = "supportsNoRiskClientFeatures")]
+    pub supports_nrc_features: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CustomServer {
+    pub id: String,
+    pub owner: String,
+    #[serde(rename = "mcVersion")]
+    pub mc_version: String,
+    #[serde(rename = "loaderVersion")]
+    pub loader_version: String,
+    pub r#type: String,
+    pub subdomain: String,
+    pub port: u16,
+    #[serde(rename = "lastOnline")]
+    pub last_online: u64,
+    #[serde(rename = "createdAt")]
+    pub created_at: u64
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CustomServersResponse {
+    pub limit: i32,
+    pub servers: Vec<CustomServer>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateCustomServerRequest {
+    #[serde(rename = "mcVersion")]
+    pub mc_version: String,
+    #[serde(rename = "loaderVersion")]
+    pub loader_version: Option<String>,
+    pub r#type: String,
+    pub subdomain: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -12,6 +12,7 @@
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import AddonsScreen from "../addons/AddonsScreen.svelte";
+  import ServersScreen from "../servers/ServersScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
@@ -22,6 +23,7 @@
   let clientRunning;
   let fakeClientRunning = false;
   let refreshingAccount = false;
+  let forceServer = null;
 
   let progressBarMax = 0;
   let progressBarProgress = 0;
@@ -36,6 +38,8 @@
   let showCapeScreenHack = false;
   let showAddonsScreen = false;
   let showAddonsScreenHack = false;
+  let showServersScreen = false;
+  let showServersScreenHack = false;
   let log = [];
 
   listen("process-output", event => {
@@ -80,8 +84,8 @@
 
   async function requestBranches() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
     await invoke("request_norisk_branches", {
-      isExperimental: options.experimentalMode,
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
     })
       .then((result) => {
@@ -166,11 +170,13 @@
     progressBarLabel = null;
     progressBarProgress = 0;
     progressBarMax = null;
+    forceServer = null;
   });
-
+  
   listen("client-error", (e) => {
     clientLogShown = true;
     console.error(e.payload);
+    forceServer = null;
   });
 
   export async function runClient() {
@@ -246,17 +252,22 @@
       });
     });
 
+    home();
+
     console.debug("Running Branch", branch);
+    console.log(forceServer);
     await invoke("run_client", {
       branch: branch,
       loginData: loginData,
       options: options,
-      forceServer: launchManifest.server.length > 0 ? launchManifest.server : null,
+      forceServer: forceServer != null ? forceServer : launchManifest.server?.length > 0 ? launchManifest.server : null,
       mods: installedMods,
       shaders: launcherProfiles.addons[branch].shaders,
       resourcepacks: launcherProfiles.addons[branch].resourcePacks,
       datapacks: launcherProfiles.addons[branch].datapacks
     });
+
+    forceServer = `${forceServer}:LAUNCHED`;
   }
 
   let dataFolderPath;
@@ -298,6 +309,13 @@
       showAddonsScreen = true;
     }, 300);
   }
+  
+  function handleOpenServersScreen() {
+    showServersScreenHack = true;
+    setTimeout(() => {
+      showServersScreen = true;
+    }, 300);
+  }
 
   function home() {
     showProfilesScreen = false;
@@ -308,6 +326,8 @@
     showCapeScreenHack = false;
     showAddonsScreen = false;
     showAddonsScreenHack = false;
+    showServersScreen = false;
+    showServersScreenHack = false;
   }
 
   function homeWhileClientRunning() {
@@ -333,6 +353,10 @@
 <div class="content">
   {#if showAddonsScreen}
     <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+
+  {#if showServersScreen}
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} />
   {/if}
 
   {#if showProfilesScreen}
@@ -361,7 +385,7 @@
     progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
-  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack && !showServersScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
@@ -372,6 +396,8 @@
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
