@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use tracing::debug;
 
+use crate::custom_servers::models::CustomServer;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::version::AssetObject;
@@ -65,6 +66,16 @@ impl ApiEndpoints {
     /// Request custom servers
     pub async fn norisk_custom_servers(token: &str) -> Result<CustomServersResponse> {
         Self::request_from_norisk_endpoint("custom-servers", token).await
+    }
+    
+    /// Check subdomain
+    pub async fn norisk_check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint(&format!("custom-servers/check-subdomain?subdomain={}", subdomain), token).await
+    }
+    
+    /// Get JWT token
+    pub async fn norisk_get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String> {
+        Self::request_from_norisk_endpoint(&format!("custom-servers/{}/token", custom_server_id), token).await
     }
 
     /// Create custom server
@@ -233,23 +244,6 @@ pub struct FeaturedServer {
     pub port: u16,
     #[serde(rename = "supportsNoRiskClientFeatures")]
     pub supports_nrc_features: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CustomServer {
-    pub id: String,
-    pub owner: String,
-    #[serde(rename = "mcVersion")]
-    pub mc_version: String,
-    #[serde(rename = "loaderVersion")]
-    pub loader_version: String,
-    pub r#type: String,
-    pub subdomain: String,
-    pub port: u16,
-    #[serde(rename = "lastOnline")]
-    pub last_online: u64,
-    #[serde(rename = "createdAt")]
-    pub created_at: u64
 }
 
 #[derive(Serialize, Deserialize)]

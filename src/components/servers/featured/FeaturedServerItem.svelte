@@ -16,7 +16,7 @@
             <div class="name-wrapper">
                 <h4 class="server-name">{server.name}</h4>
                 {#if server.supportsNoRiskClientFeatures}
-                    <img src={NRCLogo} alt="NRC Logo">
+                    <img src={NRCLogo} alt="NRC Logo" title="Supports special NoRiskClient features">
                 {/if}
             </div>
             <p>{server.description}</p>
@@ -51,7 +51,6 @@
         margin-bottom: 10px;
         gap: 1em;
         margin-top: 0.3em;
-        cursor: pointer;
     }
 
     .buttons {
@@ -98,7 +97,6 @@
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
         font-size: 18px;
-        cursor: pointer;
     }
 
     .server-item-wrapper p {
@@ -106,7 +104,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
         line-height: 1.2em;
-        cursor: default;
         padding-top: 2em;
     }
 
@@ -125,7 +122,6 @@
         margin-right: 1em;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
-        cursor: default;
     }
 
     .play-button:hover {

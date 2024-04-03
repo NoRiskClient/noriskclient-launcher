@@ -7,7 +7,7 @@ use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
 use tracing::{debug, error, info};
 
-use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
+use crate::{custom_servers::{models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServer, CustomServersResponse, FeaturedServer, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -471,54 +471,6 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
         }
     }
     Ok(world_folders)
-}
-
-#[tauri::command]
-async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, String> {
-    match ApiEndpoints::norisk_featured_servers(branch).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
-}
-
-#[tauri::command]
-async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String> {
-    match ApiEndpoints::norisk_custom_servers(token).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
-}
-
-#[tauri::command]
-async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer, String> {
-    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
-}
-
-#[tauri::command]
-async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
-    match ApiEndpoints::norisk_delete_custom_server(id, token).await {
-        Ok(_) => {
-            Ok(())
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
 }
 
 #[tauri::command]
@@ -1069,6 +1021,217 @@ async fn clear_data(options: LauncherOptions) -> Result<(), String> {
     Ok(())
 }
 
+///
+/// Custom Servers
+///
+#[tauri::command]
+async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, String> {
+    match ApiEndpoints::norisk_featured_servers(branch).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String> {
+    match ApiEndpoints::norisk_custom_servers(token).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token).await {
+        Ok(_result) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String, String> {
+    match ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer, String> {
+    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_delete_custom_server(id, token).await {
+        Ok(_) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+///
+/// Custom Vanilla Server
+/// 
+#[tauri::command]
+async fn get_all_vanilla_versions() -> Result<VanillaVersions, String> {
+    let versions = VanillaProvider::get_all_versions().await
+        .map_err(|e| format!("unable to get all vanilla versions: {:?}", e))?;
+    Ok(versions)
+}
+
+#[tauri::command]
+async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManifest, String> {
+    let manifest = VanillaProvider::get_manifest(hash, version).await
+        .map_err(|e| format!("unable to get vanilla manifest: {:?}", e))?;
+    Ok(manifest)
+}
+
+// #[tauri::command]
+// async fn download_vanilla_server_jar(custom_server: CustomServer, hash: &str) -> Result<(), String> {
+//     let server_jar = VanillaProvider::download_server_jar(&custom_server, hash).await
+//         .map_err(|e| format!("unable to download vanilla server jar: {:?}", e))?;
+//     Ok(server_jar)
+
+// }
+
+///
+/// Custom Fabric Server
+/// 
+#[tauri::command]
+async fn get_all_fabric_game_versions() -> Result<Vec<FabricVersion>, String> {
+    let versions = FabricProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all fabric game versions: {:?}", e))?;
+    Ok(versions)
+}
+
+#[tauri::command]
+async fn get_all_fabric_loader_versions(mc_version: &str) -> Result<Vec<FabricLoaderVersion>, String> {
+    let versions = FabricProvider::get_all_loader_versions(mc_version).await
+        .map_err(|e| format!("unable to get all fabric loader versions: {:?}", e))?;
+    Ok(versions)
+}
+
+///
+/// Custom Quilt Server
+/// 
+#[tauri::command]
+async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
+    let manifest = QuiltProvider::get_manifest().await
+        .map_err(|e| format!("unable to get quilt manifest: {:?}", e))?;
+    Ok(manifest)
+}
+
+///
+/// Custom Forge Server
+/// 
+#[tauri::command]
+async fn get_forge_manifest() -> Result<ForgeManifest, String> {
+    let manifest = ForgeProvider::get_manifest().await
+        .map_err(|e| format!("unable to get forge manifest: {:?}", e))?;
+    Ok(manifest)
+}
+
+///
+/// Custom Forge Server
+/// 
+#[tauri::command]
+async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
+    let manifest = NeoForgeProvider::get_manifest().await
+        .map_err(|e| format!("unable to get neoforge manifest: {:?}", e))?;
+    Ok(manifest)
+}
+
+///
+/// Custom Paper Server
+/// 
+#[tauri::command]
+async fn get_all_paper_game_versions() -> Result<PaperManifest, String> {
+    let manifest = PaperProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all paper game versions: {:?}", e))?;
+    Ok(manifest)
+}
+
+#[tauri::command]
+async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, String> {
+    let build_versions = PaperProvider::get_all_build_versions(mc_version).await
+        .map_err(|e| format!("unable to get all paper build versions: {:?}", e))?;
+    Ok(build_versions)
+}
+
+///
+/// Custom Folia Server
+/// 
+#[tauri::command]
+async fn get_all_folia_game_versions() -> Result<FoliaManifest, String> {
+    let manifest = FoliaProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all folia game versions: {:?}", e))?;
+    Ok(manifest)
+}
+
+#[tauri::command]
+async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, String> {
+    let versions = FoliaProvider::get_all_build_versions(mc_version).await
+        .map_err(|e| format!("unable to get all folia build versions: {:?}", e))?;
+    Ok(versions)
+}
+
+///
+/// Custom Purpur Server
+/// 
+#[tauri::command]
+async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
+    let versions = PurpurProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all purpur game versions: {:?}", e))?;
+    Ok(versions)
+}
+
+///
+/// Custom Spigot Server
+/// 
+#[tauri::command]
+async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
+    let versions = SpigotProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all spigot game versions: {:?}", e))?;
+    Ok(versions)
+}
+
+///
+/// Custom Bukkit Server
+/// 
+#[tauri::command]
+async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
+    let versions = BukkitProvider::get_all_game_versions().await
+        .map_err(|e| format!("unable to get all bukkit game versions: {:?}", e))?;
+    Ok(versions)
+}
+
 /// Runs the GUI and returns when the window is closed.
 pub fn gui_main() {
     tauri::Builder::default()
@@ -1136,15 +1299,31 @@ pub fn gui_main() {
             get_datapack_info,
             install_datapack,
             get_world_folders,
-            get_featured_servers,
-            get_custom_servers,
-            create_custom_server,
-            delete_custom_server,
             upload_logs,
             get_launch_manifest,
             mem_percentage,
             default_data_folder_path,
-            terminate
+            terminate,
+            get_featured_servers,
+            get_custom_servers,
+            check_custom_server_subdomain,
+            get_custom_server_jwt_token,
+            create_custom_server,
+            delete_custom_server,
+            get_all_vanilla_versions,
+            get_vanilla_manifest,
+            get_all_fabric_game_versions,
+            get_all_fabric_loader_versions,
+            get_quilt_manifest,
+            get_forge_manifest,
+            get_neoforge_manifest,
+            get_all_paper_game_versions,
+            get_all_paper_build_versions,
+            get_all_folia_game_versions,
+            get_all_folia_build_versions,
+            get_all_purpur_game_versions,
+            get_all_spigot_game_versions,
+            get_all_bukkit_game_versions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

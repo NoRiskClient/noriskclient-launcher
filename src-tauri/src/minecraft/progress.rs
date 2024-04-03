@@ -26,7 +26,7 @@ pub fn get_max(len: usize) -> u64 {
 
 impl ProgressUpdateSteps {
     fn len() -> usize {
-        7
+        10
     }
 
     fn step_idx(&self) -> usize {

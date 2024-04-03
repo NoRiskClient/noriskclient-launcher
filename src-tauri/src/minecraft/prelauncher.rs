@@ -6,8 +6,7 @@ use tracing::*;
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
-use crate::app::app_data::LauncherProfile;
-use crate::app::modrinth_api::{Datapack, ModrinthApiEndpoints, ResourcePack, Shader};
+use crate::app::modrinth_api::{Datapack, ResourcePack, Shader};
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};

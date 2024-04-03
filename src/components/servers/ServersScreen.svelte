@@ -3,6 +3,7 @@
     import VirtualList from "../utils/VirtualList.svelte";
     import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
     import CustomServerItem from "./custom/CustomServerItem.svelte";
+    import CreateCustomServerScreen from "./custom/CreateCustomServerScreen.svelte";
     import {createEventDispatcher} from "svelte";
 
     const dispatch = createEventDispatcher()
@@ -14,6 +15,8 @@
     let customServers = [];
     let customServerLimit = 0;
     let currentTabIndex = 0;
+    let createCustomServer = false;
+    let customServerDetails = null;
 
     async function loadData() {
         featuredServers = null;
@@ -45,47 +48,54 @@
     loadData();
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" on:click={() => dispatch("home")}>[HOME]</h1>
-<div class="servers-wrapper">
-    <div class="navbar">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
-        <h2>|</h2>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
-    </div>
-    {#if currentTabIndex === 0}
-        {#if featuredServers !== null && featuredServers.length > 0 }
-            <VirtualList height="30em" items={featuredServers} let:item>
-                <FeaturedServerItem
-                    on:play={() => dispatch("play")}
-                    bind:forceServer={forceServer}
-                    server={item}/>
-            </VirtualList>
-        {:else}
-            <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
-        {/if}
-    {:else if currentTabIndex === 1}
-        <div class="customServerToolbar">
-            <h4>Servers: {customServers.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
-            {#if customServerLimit == -1 || customServers.length < customServerLimit}
-                <h4 class="create-server-button">Create</h4>
-            {:else}
-                <h4 class="create-server-button-limit">Limit reached</h4>
-            {/if}
+{#if createCustomServer}
+    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:home={() => dispatch('home')} bind:options={options}/>
+{:else if customServerDetails != null}
+    <p>DETAILS</p>
+{:else}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="home-button" on:click={() => dispatch("home")}>[HOME]</h1>
+    <div class="servers-wrapper">
+        <div class="navbar">
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+            <h2>|</h2>
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
         </div>
-        {#if customServers !== null && customServers.length > 0}
-            <VirtualList height="30em" items={customServers} let:item>
-                <CustomServerItem
-                    on:openDetails={() => {}}
-                    server={item}/>
-            </VirtualList>
-        {:else}
-            <h1 class="loading-indicator">{customServers != null ? 'No custom servers found.' : 'Loading...'}</h1>
+        {#if currentTabIndex === 0}
+            {#if featuredServers !== null && featuredServers.length > 0 }
+                <VirtualList height="30em" items={featuredServers} let:item>
+                    <FeaturedServerItem
+                        on:play={() => dispatch("play")}
+                        bind:forceServer={forceServer}
+                        server={item}/>
+                </VirtualList>
+            {:else}
+                <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
+            {/if}
+        {:else if currentTabIndex === 1}
+            <div class="customServerToolbar">
+                <h4>Servers: {customServers.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
+                {#if customServerLimit == -1 || customServers.length < customServerLimit}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <h4 class="create-server-button" on:click={() => createCustomServer = true}>Create</h4>
+                {:else}
+                    <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit reached</h4>
+                {/if}
+            </div>
+            {#if customServers !== null && customServers.length > 0}
+                <VirtualList height="30em" items={customServers} let:item>
+                    <CustomServerItem
+                        on:openDetails={() => {}}
+                        server={item}/>
+                </VirtualList>
+            {:else}
+                <h1 class="loading-indicator">{customServers != null ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
+            {/if}
         {/if}
-    {/if}
-</div>
+    </div>
+{/if}
 
 <style>
     .navbar {
@@ -150,7 +160,6 @@
     .customServerToolbar h4 {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
-        cursor: default;
     }
 
     .create-server-button {
