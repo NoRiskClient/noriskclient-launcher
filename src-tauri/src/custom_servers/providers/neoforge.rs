@@ -20,17 +20,19 @@ impl NeoForgeProvider {
     }
 
     pub async fn download_installer_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers").join(format!("neoforge-{}.jar", custom_server.loader_version));
-        let url = format!("{}/{loader}/neoforge-{loader}-installer.jar", NEO_FORGE_MAVEN_REPO_BASE, loader = custom_server.loader_version);
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers");
+        fs::create_dir_all(&path).await?;
+        let url = format!("{}/{loader}/neoforge-{loader}-installer.jar", NEO_FORGE_MAVEN_REPO_BASE, loader = custom_server.loader_version.clone().unwrap_or_default());
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
+        let _ = fs::write(path.join(format!("neoforge-{}.jar", custom_server.loader_version.clone().unwrap_or_default())), content).await.map_err(|e| e);
         Ok(())
     }
 
     pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let _ = fs::write(path.join("eula.txt"), Vec::from(content)).await.map_err(|e| e);
         Ok(())
     }
 

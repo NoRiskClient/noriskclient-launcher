@@ -5,6 +5,7 @@
     import LoaderVersionTab from "./create/LoaderVersionTab.svelte";
     import TypeTab from "./create/TypeTab.svelte";
     import EulaTab from "./create/EulaTab.svelte"
+    import LoadingScreen from "../../loading/LoadingScreen.svelte"
     import VanillaIcon from "../../../images/custom-servers/vanilla.png";
     import ForgeDarkIcon from "../../../images/custom-servers/forge_dark.png";
     import ForgeWhiteIcon from "../../../images/custom-servers/forge_white.png";
@@ -23,14 +24,16 @@
     const dispatch = createEventDispatcher()
 
     export let options;
+    export let customServerProgress;
 
+    let createdServer;
 
     /**
-     * Flow: Server Name & Icon -> Subdomain -> Server Type -> Mc Version & ggf Loader Version -> Info -> [Details]
+     * Flow: Server Name & Icon & Subdomain -> Server Type -> Mc Version -> ggf Loader Version -> Info -> [Details]
      */
     let currentTab = "NAME_ICON_SUBDOMAIN";
-    let name = "a";
-    let subdomain = "a";
+    let name = "";
+    let subdomain = "";
     let icon = null;
     let type = "";
     let mcVersion = "";
@@ -122,6 +125,55 @@
             "versions": []
         },
     };
+
+    async function createServer() {
+        const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+        const server = {
+            name: name,
+            subdomain: subdomain,
+            icon: icon,
+            type: type,
+            mcVersion: mcVersion,
+            loaderVersion: loaderVersion,
+            eula: eula
+        };
+        await invoke("create_custom_server", {
+            mcVersion: server.mcVersion,
+            loaderVersion: server.loaderVersion,
+            type: server.type,
+            subdomain: server.subdomain,
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+        }).then(async (newServer) => {
+            console.log('Created Server:', newServer);
+            createdServer = newServer;
+            customServerProgress[newServer._id] = { label: "Initializing...", progress: 0, max: 0 };
+            
+            let additionalData = null;
+            if (newServer.type == "VANILLA") {
+                additionalData = availableTypes[type].downloadHash;
+            }
+            
+            currentTab = "INITIALIZING";
+
+            await invoke("initialize_custom_server", {
+                customServer: newServer,
+                additionalData: additionalData,
+                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            }).then(() => {
+                console.log('Initialized Server:', newServer);
+                delete customServerProgress[newServer._id];
+                currentTab = "COMPLETED";
+            }).catch((error) => {
+                console.error(error);
+                dispatch("back");
+                alert(error);
+            });
+        }).catch((error) => {
+            console.error(error);
+            dispatch("back");
+            alert(error);
+        });
+    }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -132,13 +184,22 @@
     {#if currentTab === "NAME_ICON_SUBDOMAIN"}
         <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} on:next={() => currentTab = "TYPE"}/>
     {:else if currentTab === "TYPE"}
-        <TypeTab bind:type={type} bind:version={mcVersion} bind:majorVersion={majorVersion} bind:availableTypes={availableTypes} on:back={() => currentTab = "NAME_ICON_SUBDOMAIN"} on:next={() => currentTab = "VERSIONS"}/>
+        <TypeTab bind:type={type} bind:version={mcVersion} bind:majorVersion={majorVersion} bind:loaderVersion={loaderVersion} bind:availableTypes={availableTypes} on:back={() => currentTab = "NAME_ICON_SUBDOMAIN"} on:next={() => currentTab = "VERSIONS"}/>
     {:else if currentTab === "VERSIONS"}
         <VersionTab bind:type={type} bind:availableTypes={availableTypes} bind:version={mcVersion} bind:majorVersion={majorVersion} on:back={() => currentTab = "TYPE"} on:next={() => currentTab = availableTypes[type].requiresLoader ? "LOADER_VERSIONS" : "INFO"}/>
     {:else if currentTab === "LOADER_VERSIONS"}
         <LoaderVersionTab bind:type={type} bind:availableTypes={availableTypes} bind:version={mcVersion} bind:loaderVersion={loaderVersion} on:back={() => currentTab = "VERSIONS"} on:next={() => currentTab = "INFO"}/>
     {:else if currentTab === "INFO"}
-        <EulaTab bind:eula={eula} />
+        <EulaTab bind:eula={eula} on:back={() => currentTab = availableTypes[type].requiresLoader ? "LOADER_VERSIONS" : "VERSIONS"} on:next={createServer} />
+    {:else if currentTab === "INITIALIZING"}
+        <div class="center">
+            <LoadingScreen bind:progressBarLabel={customServerProgress[createdServer._id].label} bind:progressBarProgress={customServerProgress[createdServer._id].progress} bind:progressBarMax={customServerProgress[createdServer._id].max} log={[]} />
+        </div>
+    {:else if currentTab = "COMPLETED"}
+        <div class="center">
+            <h1 class="success">Server successfully created!</h1>
+            <h1 class="details">Open Details Page</h1>
+        </div>
     {/if}
 </div>
 
@@ -164,5 +225,13 @@
 
     .home-button:hover {
         transform: scale(1.2);
+    }
+
+    .center {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
 </style>

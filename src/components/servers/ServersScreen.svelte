@@ -11,6 +11,8 @@
     export let currentBranch;
     export let options;
     export let forceServer;
+    export let customServerLogs;
+    export let customServerProgress;
     let featuredServers = [];
     let customServers = [];
     let customServerLimit = 0;
@@ -49,7 +51,7 @@
 </script>
 
 {#if createCustomServer}
-    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:home={() => dispatch('home')} bind:options={options}/>
+    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:home={() => dispatch('home')} bind:options={options} bind:customServerProgress={customServerProgress} />
 {:else if customServerDetails != null}
     <p>DETAILS</p>
 {:else}

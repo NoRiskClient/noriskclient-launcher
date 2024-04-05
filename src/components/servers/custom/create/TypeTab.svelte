@@ -6,6 +6,7 @@
     export let type;
     export let version;
     export let majorVersion;
+    export let loaderVersion;
     export let availableTypes;
 </script>
 
@@ -16,7 +17,7 @@
     <div class="types row">
         {#each Object.values(availableTypes) as serverType}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div class="type row" class:active={type == serverType.type} on:click={() => {type = serverType.type; version = ""; majorVersion = "";}}>
+            <div class="type row" class:active={type == serverType.type} on:click={() => {type = serverType.type; version = ""; majorVersion = ""; loaderVersion = "";}}>
                 <img src={serverType.iconUrl} alt="Type Icon">
                 <p>{serverType.name}</p>
             </div>

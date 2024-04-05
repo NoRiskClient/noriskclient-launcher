@@ -13,9 +13,9 @@
         <img class="icon" src={NRCLogo} alt="Server Icon">
         <div class="text-item-wrapper">
             <div class="name-wrapper">
-                <h4 class="server-name">{server.name}</h4>
+                <h4 class="server-name">{"NAME"}</h4>
             </div>
-            <p>{server.subdomain}.soonToBeDomain.com</p>
+            <p>{server.subdomain}.{server.domain}</p>
         </div>
     </div>
     <div class="buttons">
@@ -38,7 +38,7 @@
         margin-bottom: 10px;
         gap: 1em;
         margin-top: 0.3em;
-        cursor: pointer;
+        cursor: default;
     }
 
     .buttons {
@@ -80,7 +80,6 @@
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
         font-size: 18px;
-        cursor: pointer;
     }
 
     .server-item-wrapper p {
@@ -88,7 +87,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
         line-height: 1.2em;
-        cursor: default;
         padding-top: 2em;
     }
 
@@ -97,7 +95,8 @@
         font-size: 17px;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
-        cursor: default;
+        cursor: pointer;
+        transition-duration: 200ms;
     }
 
     .details-button:hover {

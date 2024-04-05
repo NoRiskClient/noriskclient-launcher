@@ -2,15 +2,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct CustomServer {
+    #[serde(rename = "_id")]
     pub id: String,
     pub owner: String,
     #[serde(rename = "mcVersion")]
     pub mc_version: String,
     #[serde(rename = "loaderVersion")]
-    pub loader_version: String,
+    pub loader_version: Option<String>,
     pub r#type: CustomServerType,
+    pub domain: String,
     pub subdomain: String,
-    pub port: u16,
     #[serde(rename = "lastOnline")]
     pub last_online: u64,
     #[serde(rename = "createdAt")]

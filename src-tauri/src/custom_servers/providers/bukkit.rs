@@ -28,17 +28,19 @@ impl BukkitProvider {
     }
 
     pub async fn download_server_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.mc_version).join(format!("bukkit-{}.jar", &custom_server.mc_version));
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.mc_version);
+        fs::create_dir_all(&path).await?;
         let url = format!("{}/craftbukkit-{}.jar", GETBUKKIT_API_BASE, custom_server.mc_version);
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
+        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
         Ok(())
     }
 
     pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let _ = fs::write(path.join("eula.txt"), Vec::from(content)).await.map_err(|e| e);
         Ok(())
     }
 

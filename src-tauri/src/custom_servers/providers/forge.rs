@@ -20,17 +20,13 @@ impl ForgeProvider {
     }
 
     pub async fn download_installer_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers").join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version));
-        let url = format!("{}/{mc}-{loader}/forge-{mc}-{loader}-installer.jar", FORGE_MAVEN_REPO_BASE, mc = custom_server.mc_version, loader = custom_server.loader_version);
-        let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
-        Ok(())
-    }
-
-    pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
-        let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers");
+        if !path.join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default())).exists() {
+            fs::create_dir_all(&path).await?;
+            let url = format!("{}/{mc}-{loader}/forge-{mc}-{loader}-installer.jar", FORGE_MAVEN_REPO_BASE, mc = custom_server.mc_version, loader = custom_server.loader_version.clone().unwrap_or_default());
+            let content = download_file(&url, on_progress).await?;
+            let _ = fs::write(path.join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default())), content).await.map_err(|e| e);
+        }
         Ok(())
     }
 

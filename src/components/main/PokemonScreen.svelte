@@ -41,6 +41,8 @@
   let showServersScreen = false;
   let showServersScreenHack = false;
   let log = [];
+  let customServerProgress = {};
+  let customServerLogs = {};
 
   listen("process-output", event => {
     log = [...log, event.payload];
@@ -60,6 +62,33 @@
       }
       case "label": {
         progressBarLabel = progressUpdate.value;
+        break;
+      }
+    }
+  });
+
+  listen("custom-server-process-output", event => {
+    customServerLogs[event.payload.server_id] = [...customServerLogs[event.payload.server_id], event.payload.data];
+  });
+
+  listen("custom-server-progress-update", event => {
+    let progressUpdate = event.payload.data;
+
+    if (customServerProgress[event.payload.server_id] == null) {
+      customServerProgress[event.payload.server_id] = {label: '', progress: 0, max: 0};
+    }
+
+    switch (progressUpdate.type) {
+      case "max": {
+        customServerProgress[event.payload.server_id]["max"] = progressUpdate.value;
+        break;
+      }
+      case "progress": {
+        customServerProgress[event.payload.server_id]["progress"] = progressUpdate.value;
+        break;
+      }
+      case "label": {
+        customServerProgress[event.payload.server_id]["label"] = progressUpdate.value;
         break;
       }
     }
@@ -356,7 +385,7 @@
   {/if}
 
   {#if showServersScreen}
-    <ServersScreen on:home={home} on:play={runClient} bind:options bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} />
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
@@ -372,8 +401,7 @@
   {/if}
 
   {#if settingsShown}
-  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
-  dataFolderPath={dataFolderPath}></SettingsModal>
+  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
 
   {#if clientLogShown}
@@ -381,8 +409,7 @@
   {/if}
 
   {#if clientRunning}
-    <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
+    <LoadingScreen bind:log progressBarMax={progressBarMax} progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning} />
   {/if}
 
   {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack && !showServersScreenHack) && !clientRunning && !clientLogShown}

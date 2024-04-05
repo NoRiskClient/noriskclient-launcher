@@ -11,8 +11,10 @@
     <h1 class="title">Eula</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="before-button" on:click={() => dispatch('back')}>&lt;-</h1>
-    <p class="eula-text">Hereby you agree to the <a href="https://www.minecraft.net/en-us/eula">EULA</a> of Minecraft.</p>
-    <ConfigRadioButton bind:value={eula} text="I agree to the EULA" />
+    <div class="column content">
+        <p class="eula-text">Hereby you agree to the <a href="https://www.minecraft.net/en-us/eula" target="_blank" title="Minecraft EULA">EULA</a> of Minecraft.</p>
+        <ConfigRadioButton bind:value={eula} text="" />
+    </div>
     {#if eula == true}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="next-button" on:click={() => dispatch('next')}>Finish</h1>
@@ -34,15 +36,33 @@
         cursor: default;
     }
 
-    .row {
+    .column {
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
         gap: 1.5em;
+    }
+
+    .content {
+        margin-top: 6em;
+    }
+
+    a {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     h1 {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
+        margin-bottom: 0.8em;
+        cursor: default;
+    }
+
+    p {
+        font-family: 'Press Start 2P', serif;
+        font-size: 14px;
         margin-bottom: 0.8em;
         cursor: default;
     }

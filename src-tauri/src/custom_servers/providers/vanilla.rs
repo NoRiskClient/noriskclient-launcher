@@ -11,7 +11,6 @@ use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 pub struct VanillaProvider;
 
 static VANILLA_LAUNCHER_API: &str = "https://launchermeta.mojang.com";
-const VANILLA_PISTON_API: &str = "https://piston-meta.mojang.com";
 
 impl VanillaProvider {
     /// Request all available minecraft versions
@@ -25,17 +24,11 @@ impl VanillaProvider {
     }
 
     pub async fn download_server_jar<F>(custom_server: &CustomServer, hash: &str, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("server.jar");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let manifest = Self::get_manifest(hash, &custom_server.mc_version).await?;
         let content = download_file(&manifest.downloads.client.url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
-        Ok(())
-    }
-
-    pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
-        let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
         Ok(())
     }
 
@@ -75,7 +68,7 @@ pub struct VanillaVersion {
 pub struct VanillaManifest {
     pub downloads: Downloads,
     pub id: String,
-    #[serde(rename(serialize = "javaVersion"))]
+    #[serde(rename = "javaVersion")]
     pub java_version: JavaVersion
 }
 
@@ -95,6 +88,6 @@ pub struct DownloadFile {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JavaVersion {
     pub component: String,
-    #[serde(rename(serialize = "majorVersion"))]
+    #[serde(rename = "majorVersion")]
     pub major_version: u32,
 }

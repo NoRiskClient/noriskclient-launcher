@@ -125,7 +125,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
-                    let mut download_url: String = "".to_owned();
+                    let download_url;
                     if url.clone().is_some() {
                         download_url = url.clone().unwrap();
                     } else {

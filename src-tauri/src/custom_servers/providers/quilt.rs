@@ -36,17 +36,19 @@ impl QuiltProvider {
 
     pub async fn download_installer_jar<F>(on_progress: F) -> Result<()> where F : Fn(u64, u64) {
         let installer_version = Self::get_all_installer_versions().await?.first().unwrap().clone();
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers").join(format!("quilt-{}.jar", installer_version));
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers");
+        fs::create_dir_all(&path).await?;
         let url = format!("{}/quilt-installer/{}/quilt-installer-{}.jar", QUILT_MAVEN_REPO_BASE, installer_version, installer_version);
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
+        let _ = fs::write(path.join(format!("quilt-{}.jar", installer_version)), content).await.map_err(|e| e);
         Ok(())
     }
 
     pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let _ = fs::write(path.join("eula.txt"), Vec::from(content)).await.map_err(|e| e);
         Ok(())
     }
 

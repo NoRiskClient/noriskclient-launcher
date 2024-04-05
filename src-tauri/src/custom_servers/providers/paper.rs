@@ -1,5 +1,4 @@
 use anyhow::Result;
-use futures::SinkExt;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use tokio::fs;
@@ -25,20 +24,22 @@ impl PaperProvider {
     }
 
     pub async fn download_server_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join(format!("server-{}.jar", custom_server.mc_version));
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let mut build_version = Self::get_all_build_versions(&custom_server.mc_version).await?.builds;
         build_version.reverse();
         let latest_build = build_version.first().unwrap();
-        let url = format!("{}/versions/{}/builds/{}/downloads/{}", PAPER_API_BASE, &custom_server.mc_version, &custom_server.loader_version, format!("server-{}-{}.jar", custom_server.mc_version, latest_build.build));
+        let url = format!("{}/versions/{}/builds/{}/downloads/{}", PAPER_API_BASE, &custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default(), format!("server-{}-{}.jar", custom_server.mc_version, latest_build.build));
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path, content).await.map_err(|e| e);
+        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
         Ok(())
     }
 
     pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id).join("eula.txt");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
+        fs::create_dir_all(&path).await?;
         let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path, Vec::from(content)).await.map_err(|e| e);
+        let _ = fs::write(path.join("eula.txt"), Vec::from(content)).await.map_err(|e| e);
         Ok(())
     }
 

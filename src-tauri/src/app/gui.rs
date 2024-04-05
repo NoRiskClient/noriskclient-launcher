@@ -7,7 +7,7 @@ use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
 use tracing::{debug, error, info};
 
-use crate::{custom_servers::{models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
@@ -1085,6 +1085,20 @@ async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#
 }
 
 #[tauri::command]
+async fn initialize_custom_server(custom_server: CustomServer, additional_data: Option<&str>, window: Window) -> Result<(), String> {
+    let window_mutex = Arc::new(std::sync::Mutex::new(window));
+    match CustomServerManager::initialize_server(&window_mutex, custom_server, additional_data).await {
+        Ok(_) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+
+#[tauri::command]
 async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
     match ApiEndpoints::norisk_delete_custom_server(id, token).await {
         Ok(_) => {
@@ -1309,6 +1323,7 @@ pub fn gui_main() {
             check_custom_server_subdomain,
             get_custom_server_jwt_token,
             create_custom_server,
+            initialize_custom_server,
             delete_custom_server,
             get_all_vanilla_versions,
             get_vanilla_manifest,
