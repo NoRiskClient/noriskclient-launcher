@@ -27,7 +27,7 @@ impl VanillaProvider {
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
         fs::create_dir_all(&path).await?;
         let manifest = Self::get_manifest(hash, &custom_server.mc_version).await?;
-        let content = download_file(&manifest.downloads.client.url, on_progress).await?;
+        let content = download_file(&manifest.downloads.server.url, on_progress).await?;
         let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
         Ok(())
     }
