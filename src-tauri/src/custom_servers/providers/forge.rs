@@ -11,7 +11,7 @@ use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 pub struct ForgeProvider;
 
 static FORGE_MODRINTH_API_BASE: &str = "https://meta.modrinth.com/forge";
-static FORGE_MAVEN_REPO_BASE: &str = "https://files.minecraftforge.net/net/minecraftforge/forge";
+static FORGE_MAVEN_REPO_BASE: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge";
 
 impl ForgeProvider {
     /// Request all available minecraft versions

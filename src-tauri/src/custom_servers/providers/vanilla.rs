@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use tokio::fs;
 
 use crate::custom_servers::models::CustomServer;
-use crate::utils::download_file;
+use crate::utils::download_file_untracked;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
 /// Placeholder struct for API endpoints implementation
@@ -23,12 +23,11 @@ impl VanillaProvider {
         Self::request_from_endpoint(VANILLA_LAUNCHER_API, &format!("v1/packages/{}/{}.json", hash, version)).await
     }
 
-    pub async fn download_server_jar<F>(custom_server: &CustomServer, hash: &str, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
+    pub async fn download_server_jar(custom_server: &CustomServer, hash: &str) -> Result<()> {
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
         fs::create_dir_all(&path).await?;
         let manifest = Self::get_manifest(hash, &custom_server.mc_version).await?;
-        let content = download_file(&manifest.downloads.server.url, on_progress).await?;
-        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
+        let _ = download_file_untracked(&manifest.downloads.server.url, path.join("server.jar")).await?;
         Ok(())
     }
 

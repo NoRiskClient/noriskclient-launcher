@@ -1,10 +1,64 @@
 <script>
     import {createEventDispatcher} from "svelte";
     import NRCLogo from "../../../images/norisk_logo.png";
+    import VanillaIcon from "../../../images/custom-servers/vanilla.png";
+    import ForgeDarkIcon from "../../../images/custom-servers/forge_dark.png";
+    import ForgeWhiteIcon from "../../../images/custom-servers/forge_white.png";
+    import NeoForgeIcon from "../../../images/custom-servers/neo_forge.png";
+    import FabricIcon from "../../../images/custom-servers/fabric.png";
+    import QuiltIcon from "../../../images/custom-servers/quilt.png";
+    import PaperIcon from "../../../images/custom-servers/paper.png";
+    import FoliaIcon from "../../../images/custom-servers/folia.png";
+    import PurpurIcon from "../../../images/custom-servers/purpur.png";
+    import BukkitIcon from "../../../images/custom-servers/bukkit.png";
+    import SpigotIcon from "../../../images/custom-servers/spigot.png";
+    import SpongeLightIcon from "../../../images/custom-servers/sponge_light.png";
+    import SpongeDarkIcon from "../../../images/custom-servers/sponge_dark.png";
 
     const dispatch = createEventDispatcher()
 
+    export let options;
     export let server;
+
+    let loaderIcon;
+    switch (server.type.toUpperCase()) {
+        case "VANILLA":
+            loaderIcon = VanillaIcon
+            break;
+        case "FORGE":
+            loaderIcon = options.theme == "DARK" ? ForgeWhiteIcon : ForgeDarkIcon
+            break;
+        case "NEO_FORGE":
+            loaderIcon = NeoForgeIcon
+            break;
+        case "FABRIC":
+            loaderIcon = FabricIcon
+            break;
+        case "QUILT":
+            loaderIcon = QuiltIcon
+            break;
+        case "PAPER":
+            loaderIcon = PaperIcon
+            break;
+        case "FOLIA":
+            loaderIcon = FoliaIcon
+            break;
+        case "PURPUR":
+            loaderIcon = PurpurIcon
+            break;
+        case "BUKKIT":
+            loaderIcon = BukkitIcon
+            break;
+        case "SPIGOT":
+            loaderIcon = SpigotIcon
+            break;
+        case "SPONGE":
+            loaderIcon = options.theme == "DARK" ? SpongeLightIcon : SpongeDarkIcon
+            break;
+        default:
+            loaderIcon = VanillaIcon
+            break;
+    }
 </script>
 
 <div class="server-item-wrapper">
@@ -13,9 +67,10 @@
         <img class="icon" src={NRCLogo} alt="Server Icon">
         <div class="text-item-wrapper">
             <div class="name-wrapper">
+                <img src={loaderIcon} alt="server-loader-icon">
                 <h4 class="server-name">{"NAME"}</h4>
             </div>
-            <p>{server.subdomain}.{server.domain}</p>
+            <p>{server.subdomain}.{server.domain} | {server.mcVersion}</p>
         </div>
     </div>
     <div class="buttons">
@@ -60,6 +115,11 @@
         display: flex;
         align-items: center;
         gap: 0.7em;
+    }
+
+    .name-wrapper img {
+        width: 30px;
+        height: 30px;
     }
 
     .text-item-wrapper {

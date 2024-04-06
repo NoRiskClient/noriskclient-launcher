@@ -50,7 +50,7 @@ pub(crate) struct LauncherProfiles {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct LauncherOptions {
+pub struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
     #[serde(rename = "experimentalMode")]

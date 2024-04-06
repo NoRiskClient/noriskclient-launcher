@@ -68,6 +68,10 @@
   });
 
   listen("custom-server-process-output", event => {
+    console.log(event.payload);
+    if (customServerLogs[event.payload.server_id] == null) {
+      customServerLogs[event.payload.server_id] = [];
+    }
     customServerLogs[event.payload.server_id] = [...customServerLogs[event.payload.server_id], event.payload.data];
   });
 
@@ -426,14 +430,12 @@
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
+        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
       {/if}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="quit" on:click={closeWindow}>QUIT</h1>
     </div>

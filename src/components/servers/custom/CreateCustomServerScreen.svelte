@@ -4,8 +4,7 @@
     import VersionTab from "./create/VersionTab.svelte";
     import LoaderVersionTab from "./create/LoaderVersionTab.svelte";
     import TypeTab from "./create/TypeTab.svelte";
-    import EulaTab from "./create/EulaTab.svelte"
-    import LoadingScreen from "../../loading/LoadingScreen.svelte"
+    import EulaTab from "./create/EulaTab.svelte";
     import VanillaIcon from "../../../images/custom-servers/vanilla.png";
     import ForgeDarkIcon from "../../../images/custom-servers/forge_dark.png";
     import ForgeWhiteIcon from "../../../images/custom-servers/forge_white.png";
@@ -161,8 +160,8 @@
                 token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
             }).then(() => {
                 console.log('Initialized Server:', newServer);
-                delete customServerProgress[newServer._id];
                 currentTab = "COMPLETED";
+                // delete customServerProgress[newServer._id];
             }).catch((error) => {
                 console.error(error);
                 dispatch("back");
@@ -177,7 +176,7 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" style="left: 220px;" on:click={() => dispatch("back")}>[BACK]</h1>
+<h1 class="home-button" style="left: 220px;" on:click={createdServer != null ? () => dispatch("backAndUpdate") : () => dispatch("back")}>[BACK]</h1>
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 <div class="create-server-wrapper">
@@ -193,12 +192,13 @@
         <EulaTab bind:eula={eula} on:back={() => currentTab = availableTypes[type].requiresLoader ? "LOADER_VERSIONS" : "VERSIONS"} on:next={createServer} />
     {:else if currentTab === "INITIALIZING"}
         <div class="center">
-            <LoadingScreen bind:progressBarLabel={customServerProgress[createdServer._id].label} bind:progressBarProgress={customServerProgress[createdServer._id].progress} bind:progressBarMax={customServerProgress[createdServer._id].max} log={[]} />
+            <h1>{customServerProgress[createdServer._id] ? customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
         </div>
     {:else if currentTab = "COMPLETED"}
         <div class="center">
-            <h1 class="success">Server successfully created!</h1>
-            <h1 class="details">Open Details Page</h1>
+            <h1>Server successfully created!</h1>
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <h1 class="details" on:click={() => dispatch('details', createdServer)}>Open Details Page</h1>
         </div>
     {/if}
 </div>
@@ -223,8 +223,22 @@
         cursor: pointer;
     }
 
+    h1 {
+        font-family: 'Press Start 2P', serif;
+        font-size: 20px;
+    }
+
     .home-button:hover {
         transform: scale(1.2);
+    }
+
+    .details {
+        font-family: 'Press Start 2P', serif;
+        font-size: 20px;
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+        cursor: pointer;
+        transition: transform 0.3s;
     }
 
     .center {

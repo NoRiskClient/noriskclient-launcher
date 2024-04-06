@@ -24,6 +24,7 @@ struct RunnerInstance {
 
 struct AppState {
     runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
+    custom_server_instance: Arc<Mutex<Option<RunnerInstance>>>,
 }
 
 
@@ -945,7 +946,8 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
 #[tauri::command]
 async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let mut lck = app_state.runner_instance.lock()
+    let runner_instance = app_state.runner_instance.clone();
+    let mut lck = runner_instance.lock()
         .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
 
     if let Some(inst) = lck.take() {
@@ -1097,6 +1099,49 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
     }
 }
 
+#[tauri::command]
+async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let window_mutex = Arc::new(std::sync::Mutex::new(window));
+    let custom_server_instance = app_state.custom_server_instance.clone();
+    let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
+
+    *custom_server_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e))?
+        = Some(RunnerInstance { terminator: terminator_tx });
+
+    let copy_of_runner_instance = custom_server_instance;
+
+
+    thread::spawn(move || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                if let Err(e) = CustomServerManager::run_server(custom_server, options, token, terminator_rx, Box::new(window_mutex.clone()), window_mutex.clone()).await {
+                    window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
+                    handle_stderr(&window_mutex, format!("Failed to launch client: {:?}", e).as_bytes()).unwrap();
+                };
+                
+                *copy_of_runner_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e)).unwrap()
+                    = None;
+                window_mutex.lock().unwrap().emit("client-exited", ()).unwrap()
+            });
+    });
+    Ok(())
+}
+
+#[tauri::command]
+async fn terminate_custom_server(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let runner_instance = app_state.custom_server_instance.clone();
+    let mut lck = runner_instance.lock()
+        .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
+
+    if let Some(inst) = lck.take() {
+        info!("Sending sigterm");
+        inst.terminator.send(()).unwrap();
+    }
+    Ok(())
+}
 
 #[tauri::command]
 async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
@@ -1255,7 +1300,8 @@ pub fn gui_main() {
             Ok(())
         })
         .manage(AppState {
-            runner_instance: Arc::new(Mutex::new(None))
+            runner_instance: Arc::new(Mutex::new(None)),
+            custom_server_instance: Arc::new(Mutex::new(None))
         })
         .invoke_handler(tauri::generate_handler![
             open_url,
@@ -1324,6 +1370,8 @@ pub fn gui_main() {
             get_custom_server_jwt_token,
             create_custom_server,
             initialize_custom_server,
+            run_custom_server,
+            terminate_custom_server,
             delete_custom_server,
             get_all_vanilla_versions,
             get_vanilla_manifest,

@@ -3,6 +3,7 @@
     import VirtualList from "../utils/VirtualList.svelte";
     import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
     import CustomServerItem from "./custom/CustomServerItem.svelte";
+    import CustomServerDetails from "./custom/CustomServerDetails.svelte";
     import CreateCustomServerScreen from "./custom/CreateCustomServerScreen.svelte";
     import {createEventDispatcher} from "svelte";
 
@@ -51,9 +52,9 @@
 </script>
 
 {#if createCustomServer}
-    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:home={() => dispatch('home')} bind:options={options} bind:customServerProgress={customServerProgress} />
+    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:backAndUpdate={() => { loadData(); createCustomServer = false; }} on:home={() => dispatch('home')} on:details={(details) => {customServerDetails = details.detail; customServerLogs[customServerDetails['_id']] = []; createCustomServer = false;}} bind:options={options} bind:customServerProgress={customServerProgress} />
 {:else if customServerDetails != null}
-    <p>DETAILS</p>
+    <CustomServerDetails on:back={() => customServerDetails = null} on:home={() => dispatch('home')} on:terminated={() => customServerLogs[customServerDetails._id] = []} bind:options={options} bind:customServer={customServerDetails} bind:logs={customServerLogs[customServerDetails._id]} />
 {:else}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="home-button" on:click={() => dispatch("home")}>[HOME]</h1>
@@ -78,8 +79,8 @@
             {/if}
         {:else if currentTabIndex === 1}
             <div class="customServerToolbar">
-                <h4>Servers: {customServers.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
-                {#if customServerLimit == -1 || customServers.length < customServerLimit}
+                <h4>Servers: {customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
+                {#if customServerLimit == -1 || customServers?.length < customServerLimit}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h4 class="create-server-button" on:click={() => createCustomServer = true}>Create</h4>
                 {:else}
@@ -89,7 +90,8 @@
             {#if customServers !== null && customServers.length > 0}
                 <VirtualList height="30em" items={customServers} let:item>
                     <CustomServerItem
-                        on:openDetails={() => {}}
+                        on:openDetails={() => customServerDetails = item}
+                        options={options}
                         server={item}/>
                 </VirtualList>
             {:else}

@@ -23,6 +23,7 @@
 
   let dialog; // HTMLDialogElement
   let showExperimentalTokenModal = false;
+  let lightTheme = options.theme == "LIGHT";
 
   $: if (dialog && showModal) dialog.showModal();
 
@@ -106,6 +107,11 @@
     });
   }
 
+  function toggleTheme() {
+    options.toggleTheme();
+    lightTheme = options.theme == "LIGHT";
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -134,9 +140,10 @@
         <div class="experimental-mode-wrapper">
           <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={options.experimentalMode} text="Experimental Mode" />
           {#if options.experimentalModeToken != ""}
-            <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
+          <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
           {/if}
         </div>
+        <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${options.theme}`}/>
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
