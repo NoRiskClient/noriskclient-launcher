@@ -9,8 +9,6 @@
     export let options;
     export let friendInviteSlots;
 
-    console.log(friendInviteSlots);
-
     let friendIdentifier = "";
   
     async function hideSettings() {
