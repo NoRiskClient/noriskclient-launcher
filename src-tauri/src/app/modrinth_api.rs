@@ -299,7 +299,7 @@ impl ModrinthApiEndpoints {
         }
     }
 
-    pub async fn install_datapack(slug: &str, mut params: &str, world: &str) -> Result<Datapack, Box<dyn Error>> {
+    pub async fn install_datapack(slug: &str, params: &str, world: &str) -> Result<Datapack, Box<dyn Error>> {
         let datapack_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
         let project_version = datapack_versions.first().ok_or("Datapack not found")?;
         let project = ModrinthApiEndpoints::get_datapack_info(&slug).await?;

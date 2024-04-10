@@ -52,7 +52,6 @@ struct NewMinecraftSkinBody {
 
 #[derive(serde::Deserialize)]
 struct PlayerDBData {
-    success: bool,
     data: PlayerDBEntry,
 }
 
@@ -63,8 +62,7 @@ struct PlayerDBEntry {
 
 #[derive(serde::Deserialize)]
 struct PlayerDBPlayer {
-    id: String,
-    username: String,
+    id: String
 }
 
 #[tauri::command]
@@ -477,7 +475,7 @@ async fn install_datapack(slug: &str, params: &str, world: &str, window: Window)
 #[tauri::command]
 async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
     let mut world_folders: Vec<String> = Vec::new();
-    let mut world_folder = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&branch).join("saves");
+    let world_folder = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&branch).join("saves");
     if world_folder.exists() {
         let mut entries = fs::read_dir(world_folder).await.map_err(|e| format!("unable to read world folders: {:?}", e))?;
         while let Some(entry) = entries.next_entry().await.map_err(|e| format!("unable to read world folder: {:?}", e))? {
@@ -496,7 +494,7 @@ async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(result) => { () },
+        Ok(_) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
