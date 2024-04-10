@@ -169,6 +169,7 @@
     }).catch((reason) => {
       alert(reason);
       console.error(reason);
+      friendInviteSlots = {};
     });
   }
 
@@ -374,8 +375,7 @@
   {/if}
 
   {#if settingsShown}
-  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
-  dataFolderPath={dataFolderPath}></SettingsModal>
+  <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
 
   {#if clientLogShown}
