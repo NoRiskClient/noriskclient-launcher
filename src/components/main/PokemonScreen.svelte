@@ -12,12 +12,14 @@
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import AddonsScreen from "../addons/AddonsScreen.svelte";
+  import InvitePopup from "../invite/InvitePopup.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
   export let options;
   let branches = [];
   let launcherProfiles = {};
+  let friendInviteSlots = {};
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
@@ -36,6 +38,7 @@
   let showCapeScreenHack = false;
   let showAddonsScreen = false;
   let showAddonsScreenHack = false;
+  let showInvitePopup = false;
   let log = [];
 
   listen("process-output", event => {
@@ -156,8 +159,22 @@
     })
   }
 
+  async function loadFriendInvites() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("get_whitelist_slots", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+    }).then((result) => {
+      console.debug("Received Whitelist Slots", result);
+      friendInviteSlots = result;
+    }).catch((reason) => {
+      alert(reason);
+      console.error(reason);
+    });
+  }
+
   onMount(async () => {
     await requestBranches();
+    await loadFriendInvites();
   });
 
   listen("client-exited", () => {
@@ -271,6 +288,10 @@
     event.preventDefault();
   }
 
+  function handleShowInvitePopup() {
+    showInvitePopup = true;
+  }
+
   function handleOpenProfilesScreen() {
     showProfilesScreenHack = true;
     setTimeout(() => {
@@ -300,6 +321,7 @@
   }
 
   function home() {
+    showInvitePopup = false;
     showProfilesScreen = false;
     showProfilesScreenHack = false;
     showSkinScreen = false;
@@ -331,6 +353,10 @@
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
+  {#if showInvitePopup}
+    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup} bind:friendInviteSlots />
+  {/if}
+
   {#if showAddonsScreen}
     <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
@@ -357,8 +383,7 @@
   {/if}
 
   {#if clientRunning}
-    <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
+    <LoadingScreen bind:log progressBarMax={progressBarMax} progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
   {/if}
 
   {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack) && !clientRunning && !clientLogShown}
@@ -367,11 +392,19 @@
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
+      {#if options.accounts.length > 0 && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
+      {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
+      {#if friendInviteSlots.availableSlots == -1}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
+        <h1 on:click={handleShowInvitePopup}>Invite</h1>
+      {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -518,6 +551,19 @@
         color: red;
         text-shadow: 1px 1px #460000;
         transform: scale(1.2);
+    }
+
+    .settings-button-wrapper h1.invite-button {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      font-size: 12.5px;
+    }
+
+    .settings-button-wrapper h1.invite-button p {
+      margin-bottom: 5px;
+      padding-right: 5px;
+      font-size: 15px;
     }
 
     .back-to-loading-button {
