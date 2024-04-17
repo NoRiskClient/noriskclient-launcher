@@ -28,8 +28,8 @@ pub fn get_launcher_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint_with_experimental("branches", is_experimental, norisk_token).await
+    pub async fn norisk_branches(norisk_token: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint("branches", norisk_token).await
     }
 
     /// Request token for experimental mode
@@ -58,8 +58,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn auth_prepare_response(is_experimental: bool) -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint_with_experimental("auth/prepare", is_experimental, "").await
+    pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
+        Self::post_from_norisk_endpoint("auth/prepare", "").await
     }
 
     /// Request all available branches
@@ -72,8 +72,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn await_auth_response(is_experimental: bool, id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint_with_experimental("auth/await", is_experimental, id).await
+    pub async fn await_auth_response(id: u32) -> Result<LoginData> {
+        Self::post_from_await_endpoint("auth/await", id).await
     }
 
     /// Request launch manifest of specific build
@@ -118,22 +118,13 @@ impl ApiEndpoints {
         )
     }
 
-    pub async fn post_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
-        let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), "api/v1", endpoint);
+    /// Request JSON formatted data from launcher API
+    pub async fn request_from_norisk_main_backend_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.post(url)
+        Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
-            .error_for_status()?
-            .json::<T>()
-            .await?
-        )
-    }
-
-    pub async fn post_from_await_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, id: u32) -> Result<T> {
-        let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(is_experimental), "api/v1", endpoint, "id", id);
-        println!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.post(url)
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -448,3 +439,4 @@ pub struct JreSource {
 pub struct NoriskAssets {
     pub objects: HashMap<String, AssetObject>,
 }
+

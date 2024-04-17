@@ -19,9 +19,9 @@
         console.debug("read options", options);
 
         // Easy way to store options
-        options.store = function() {
+        options.store = async function() {
           console.debug("storing options", options);
-          invoke("store_options", { options }).catch(e => console.error(e));
+          await invoke("store_options", { options }).catch(e => console.error(e));
         };
 
         options.reload = reload;

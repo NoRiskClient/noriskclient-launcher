@@ -14,8 +14,8 @@
   export let options;
   export let dataFolderPath;
 
-  function hideSettings() {
-    saveData().then(() => {
+  async function hideSettings() {
+    await saveData().then(() => {
       dispatch("requestBranches");
     });
     showModal = false;
@@ -27,7 +27,7 @@
   $: if (dialog && showModal) dialog.showModal();
 
   async function saveData() {
-    options.store();
+    await options.store();
   }
 
   async function clearData() {
@@ -48,8 +48,9 @@
     if (!options.experimentalMode) {
       return;
     }
-    if (options.experimentalModeToken == "") {
+    if (options.experimentalModeToken == "" && options.experimentalMode) {
       showExperimentalTokenModal = true;
+      options.experimentalMode = false;
       return;
     }
     const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : null
@@ -59,6 +60,7 @@
     }
     invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       options.experimentalModeToken = experimentalToken;
+      options.experimentalMode = allowed;
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
       options.experimentalMode = false;
@@ -66,6 +68,7 @@
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })
+    await options.store();
 
     let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
     if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
@@ -115,11 +118,9 @@
   on:close={hideSettings}
   on:click|self={() => dialog.close()}
 >
-<div class="content">
   {#if showExperimentalTokenModal}
     <ExperimentalTokenModal bind:options bind:showModal={showExperimentalTokenModal} />
   {/if}
-</div>
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
@@ -166,17 +167,6 @@
     .close-button:hover {
         transition: transform 0.3s;
         transform: scale(1.2);
-    }
-
-    content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 80vh;
-        gap: 20px;
-        padding: 20px; /* Innenabstand für den Schlagschatten */
     }
 
     .settings-wrapper {
