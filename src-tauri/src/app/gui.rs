@@ -62,9 +62,13 @@ async fn check_online_status() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: &str) -> Result<(), String> {
-    open::that(url)
-        .map_err(|e| format!("unable to open url: {:?}", e))?;
+fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
+    let window = tauri::WindowBuilder::new(
+        &handle,
+        "external", /* the unique window label */
+        tauri::WindowUrl::External(url.parse().unwrap())
+    ).build().unwrap();
+    window.set_title("NoRiskClient");
     Ok(())
 }
 
@@ -789,14 +793,14 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response(options.experimental_mode).await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
             let url = response.url;
             let id = response.id;
-            let _ = open_url(url.as_str());
+            let _ = open_url(url.as_str(), handle);
 
             let login_data = ApiEndpoints::await_auth_response(options.experimental_mode, id).await;
             match login_data {
