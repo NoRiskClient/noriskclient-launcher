@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{DatapackInfo, Datapack, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -73,7 +73,7 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), String> {
+async fn upload_cape(norisk_token: &str, uuid: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Uploading Cape...");
     use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
 
@@ -84,7 +84,7 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 
     // dialog_result will be of type Option<PathBuf> now.
 
-    match CapeApiEndpoints::upload_cape(norisk_token, dialog_result.unwrap()).await {
+    match CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await {
         Ok(result) => {
             message(Some(&window), "Cape Upload", result);
         }
@@ -96,10 +96,10 @@ async fn upload_cape(norisk_token: &str, window: tauri::Window) -> Result<(), St
 }
 
 #[tauri::command]
-async fn equip_cape(norisk_token: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
+async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
     debug!("Equiping Cape...");
 
-    match CapeApiEndpoints::equip_cape(norisk_token, hash).await {
+    match CapeApiEndpoints::equip_cape(norisk_token, uuid, hash).await {
         Ok(result) => {
             message(Some(&window), "Cape Upload", result);
         }
@@ -478,11 +478,11 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
+async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(), String> {
     debug!("Deleting Cape...");
     // dialog_result will be of type Option<PathBuf> now.
 
-    match CapeApiEndpoints::delete_cape(norisk_token).await {
+    match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
         Ok(result) => { () },
         Err(err) => {
             message(Some(&window), "Cape Error", err);
@@ -492,8 +492,8 @@ async fn delete_cape(norisk_token: &str, window: Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_trending_capes(norisk_token, alltime, limit).await {
+async fn request_trending_capes(norisk_token: &str, uuid: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, String> {
+    match CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit).await {
         Ok(result) => {
             Ok(result)
         }
@@ -504,8 +504,8 @@ async fn request_trending_capes(norisk_token: &str, alltime: u32, limit: u32) ->
 }
 
 #[tauri::command]
-async fn request_owned_capes(norisk_token: &str, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_owned_capes(norisk_token, limit).await {
+async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, String> {
+    match CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit).await {
         Ok(result) => {
             Ok(result)
         }
@@ -764,8 +764,8 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
-async fn request_norisk_branches(is_experimental: bool, norisk_token: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(is_experimental, norisk_token)
+async fn request_norisk_branches(norisk_token: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(norisk_token)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
@@ -793,8 +793,8 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
-    let auth_prepare_response = ApiEndpoints::auth_prepare_response(options.experimental_mode).await;
+async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+    let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
@@ -802,7 +802,7 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
             let id = response.id;
             let _ = open_url(url.as_str(), handle);
 
-            let login_data = ApiEndpoints::await_auth_response(options.experimental_mode, id).await;
+            let login_data = ApiEndpoints::await_auth_response(id).await;
             match login_data {
                 Ok(response) => {
                     info!("Received NoRisk Auth Response");

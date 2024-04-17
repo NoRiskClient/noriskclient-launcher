@@ -21,17 +21,18 @@
     if (experimentalModeToken == "") return;
       invoke("enable_experimental_mode", { experimentalToken: experimentalModeToken }).then(async allowed => {
         options.experimentalModeToken = experimentalModeToken;
-        options.store();
+        options.experimentalMode = allowed;
+        await options.store();
         hideModal();
         console.log(`Enabled experimental mode: ${allowed}`);
         let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
           if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
             return getNewTokenType();
         }
-      }).catch(e => {
+      }).catch(async e => {
         options.experimentalMode = false;
         options.experimentalModeToken = "";
-        options.store()
+        await options.store()
         alert(`Failed to enable experimental mode: ${e}`);
         console.error(e);
       })
