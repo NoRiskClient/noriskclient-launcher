@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use anyhow::Result;
 use directories::ProjectDirs;
 use reqwest::Client;
-use tracing::{debug};
+use tracing::{debug, info};
 use tracing_subscriber::layer::SubscriberExt;
 
 pub mod app;
@@ -66,7 +66,7 @@ pub fn main() -> Result<()> {
 
 
     // application directory
-    debug!("Creating launcher directories...");
+    info!("Creating launcher directories...");
     fs::create_dir_all(LAUNCHER_DIRECTORY.data_dir())?;
     fs::create_dir_all(LAUNCHER_DIRECTORY.config_dir())?;
 

@@ -46,10 +46,10 @@
         try {
           const { shouldUpdate } = await checkUpdate();
           showUpdateScreen = shouldUpdate;
-          console.debug("Checking for Updates...", shouldUpdate);
+          invoke("console_log_info", { message: `Checking for Updates... ${shouldUpdate}` }).catch(e => console.error(e));
         } catch (error) {
           showUpdateScreen = false;
-          console.error(error);
+          invoke("console_log_error", { message: `error` }).catch(e => console.error(e));
         }
 
       });

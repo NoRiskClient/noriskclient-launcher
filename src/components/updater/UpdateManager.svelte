@@ -2,8 +2,9 @@
     import {checkUpdate, installUpdate, onUpdaterEvent} from "@tauri-apps/api/updater";
     import {relaunch} from "@tauri-apps/api/process";
     import {onMount} from "svelte";
+    import { invoke } from "@tauri-apps/api";
 
-    console.debug("Starting Update Checker...");
+    invoke("console_log_info", { message: "Starting Update Checker.." }).catch(e => console.error(e));
     let dots = "";
     let isFinished = false
 
@@ -11,7 +12,7 @@
 
         const unlisten = await onUpdaterEvent(({error, status}) => {
             // This will log all updater events, including status updates and errors.
-            console.log("Updater event", error, status);
+            invoke("console_log_info", { message: `Updater event: ${error} ${status}` }).catch(e => console.error(e));
         });
 
         let interval;
@@ -21,16 +22,19 @@
 
             if (shouldUpdate) {
                 interval = animateLoadingText();
-                console.debug(`Installing update ${manifest?.version}, ${manifest?.body}`);
+                invoke("console_log_info", { message: `Installing update: ${manifest?.version} ${manifest?.body}` }).catch(e => console.error(e));
 
                 // Install the update. This will also restart the app on Windows!
                 await installUpdate();
+                invoke("console_log_info", { message: `Update was installed` }).catch(e => console.error(e));
 
                 isFinished = true;
 
+                invoke("console_log_info", { message: `Trying to relaunch` }).catch(e => console.error(e));
                 await relaunch();
             }
         } catch (error) {
+            invoke("console_log_error", { message: `${error}` }).catch(e => console.error(e));
             console.error(error);
         }
 

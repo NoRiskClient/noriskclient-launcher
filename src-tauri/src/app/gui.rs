@@ -286,6 +286,16 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
 }
 
 #[tauri::command]
+async fn console_log_info(message: String) {
+    info!(message);
+}
+
+#[tauri::command]
+async fn console_log_error(message: String) {
+    error!(message);
+}
+
+#[tauri::command]
 async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
     debug!("Fetching mod info...");
 
@@ -1066,6 +1076,8 @@ pub fn gui_main() {
             refresh_via_norisk,
             clear_data,
             get_mod_info,
+            console_log_info,
+            console_log_error,
             get_launcher_profiles,
             store_launcher_profiles,
             get_project_version,
