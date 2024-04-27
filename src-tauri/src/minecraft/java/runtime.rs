@@ -5,6 +5,9 @@ use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
 use tokio::io::AsyncReadExt;
 use tracing::debug;
+
+// use crate::custom_servers::forwarding_manager::CustomServerForwardingManager;
+use crate::custom_servers::models::CustomServer;
 pub struct JavaRuntime(PathBuf);
 
 impl JavaRuntime {
@@ -77,7 +80,7 @@ impl JavaRuntime {
         Ok(())
     }
 
-    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server_id: &str, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, terminator: Receiver<()>, data: &D) -> Result<()> {
+    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, terminator: Receiver<()>, data: &D) -> Result<()> {
         let mut stdout = running_task.stdout.take().unwrap();
         let mut stderr = running_task.stderr.take().unwrap();
     
@@ -89,10 +92,14 @@ impl JavaRuntime {
         loop {
             tokio::select! {
                 read_len = stdout.read(&mut stdout_buf) => {
-                    let _ = (on_stdout)(&data, server_id, &stdout_buf[..read_len?]);
+                    let content = &stdout_buf[..read_len?];
+                    let _ = (on_stdout)(&data, &server.id, content);
+                    if String::from_utf8_lossy(content).contains("Done") {
+                        // CustomServerForwardingManager::new().forward_server((*server).to_owned()).await?;
+                    }
                 },
                 read_len = stderr.read(&mut stderr_buf) => {
-                    let _ = (on_stderr)(&data, server_id, &stderr_buf[..read_len?]);
+                    let _ = (on_stderr)(&data, &server.id, &stderr_buf[..read_len?]);
                 },
                 _ = &mut terminator => {
                     running_task.kill().await?;

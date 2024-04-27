@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CustomServer {
     #[serde(rename = "_id")]
     pub id: String,
@@ -18,6 +18,7 @@ pub struct CustomServer {
     pub created_at: u64
 }
 
+#[derive(Clone, Debug)]
 pub enum CustomServerType {
     VANILLA,
     FORGE,

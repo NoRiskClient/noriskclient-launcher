@@ -1119,12 +1119,12 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
             .block_on(async {
                 if let Err(e) = CustomServerManager::run_server(custom_server, options, token, terminator_rx, Box::new(window_mutex.clone()), window_mutex.clone()).await {
                     window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
-                    handle_stderr(&window_mutex, format!("Failed to launch client: {:?}", e).as_bytes()).unwrap();
+                    handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
                 };
                 
                 *copy_of_runner_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e)).unwrap()
                     = None;
-                window_mutex.lock().unwrap().emit("client-exited", ()).unwrap()
+                window_mutex.lock().unwrap().emit("server-exited", ()).unwrap()
             });
     });
     Ok(())

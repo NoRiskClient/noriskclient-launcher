@@ -90,7 +90,7 @@ impl CustomServerManager {
 
         let mut running_task = java_runtime.run_server(2048, 2048, &custom_server_path).await?;
 
-        java_runtime.handle_server_io(&mut running_task, &custom_server.id, Self::handle_stdout, Self::handle_stderr, terminator, &window_mutex)
+        java_runtime.handle_server_io(&mut running_task, &custom_server, Self::handle_stdout, Self::handle_stderr, terminator, &window_mutex)
             .await?;
         Ok(())
     }

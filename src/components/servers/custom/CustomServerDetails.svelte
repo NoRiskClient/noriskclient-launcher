@@ -1,7 +1,7 @@
 <script>
     import {invoke} from "@tauri-apps/api";
     import VirtualList from "../../utils/VirtualList.svelte";
-    import {createEventDispatcher, afterUpdate} from "svelte";
+    import {createEventDispatcher} from "svelte";
 
     const dispatch = createEventDispatcher()
 
@@ -10,18 +10,6 @@
     export let logs = [];
 
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-
-    afterUpdate(() => {
-        const item = logs[0];
-        if (!item) return;
-        if (item.startsWith('[')) {
-            console.log(item.split(' ')[0]);
-            console.log(item.split('/')[1].split(']: ')[0]);
-            console.log(item.split(']: ').slice(1).join(']: '));
-        } else {
-            console.log(item);
-        }
-    });
 
     async function runServer() {
         console.log(customServer);
