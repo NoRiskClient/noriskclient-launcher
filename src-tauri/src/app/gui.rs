@@ -69,7 +69,7 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
         "external", /* the unique window label */
         tauri::WindowUrl::External(url.parse().unwrap()),
     ).build().unwrap();
-    window.set_title("NoRiskClient");
+    let _ = window.set_title("NoRiskClient");
     Ok(())
 }
 
@@ -800,7 +800,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {

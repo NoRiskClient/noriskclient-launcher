@@ -1,9 +1,9 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 
 use anyhow::{Ok, Result};
+use log::{debug, error, info};
 use tauri::Window;
 use tokio::fs;
-use tracing::{debug, error, info};
 
 use crate::{app::app_data::LauncherOptions, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 

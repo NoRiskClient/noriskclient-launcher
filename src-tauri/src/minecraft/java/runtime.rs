@@ -5,7 +5,6 @@ use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
 use tokio::io::AsyncReadExt;
 use log::debug;
-use tracing::debug;
 // use crate::custom_servers::forwarding_manager::CustomServerForwardingManager;
 use crate::custom_servers::models::CustomServer;
 
