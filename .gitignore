@@ -1,0 +1,12 @@
+/node_modules/
+/public/build/
+/dist
+/tauri
+
+.DS_Store
+.idea
+
+.yarn
+.pnp.cjs
+.pnp.loader.mjs
+yarn.lock

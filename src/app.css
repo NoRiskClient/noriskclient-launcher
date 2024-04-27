@@ -1,0 +1,35 @@
+@font-face {
+    font-family: 'Press Start 2P';
+    src: url('font/PressStart2P-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-appearance: none;
+}
+
+*:focus {
+    outline: none;
+}
+
+body {
+    background-color: var(--background-color);
+    font-weight: 400;
+    font-size: 14px;
+    user-select: none;
+    /* border-radius: 14px; */
+}
+
+::-webkit-scrollbar {
+    width: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #4677FF;
+    border-radius: 5px;
+}
