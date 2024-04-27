@@ -66,7 +66,7 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
         &handle,
         "external", /* the unique window label */
-        tauri::WindowUrl::External(url.parse().unwrap())
+        tauri::WindowUrl::External(url.parse().unwrap()),
     ).build().unwrap();
     window.set_title("NoRiskClient");
     Ok(())
@@ -126,8 +126,7 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     mod_infos.push(mod_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
                                 }
                             }
@@ -166,8 +165,7 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: taur
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     resourcepack_infos.push(resourcepack_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
                                 }
                             }
@@ -206,8 +204,7 @@ async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Win
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     shader_infos.push(shader_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
                                 }
                             }
@@ -246,8 +243,7 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     datapack_infos.push(datapack_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);
                                 }
                             }
@@ -287,12 +283,12 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
 
 #[tauri::command]
 async fn console_log_info(message: String) {
-    info!(message);
+    log::info!("{}" ,message);
 }
 
 #[tauri::command]
 async fn console_log_error(message: String) {
-    error!(message);
+    log::error!("{}" ,message);
 }
 
 #[tauri::command]
@@ -493,7 +489,7 @@ async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(result) => { () },
+        Ok(result) => { () }
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -835,7 +831,7 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
 
 #[tauri::command]
 async fn remove_account(login_data: LoginData) -> Result<(), String> {
-    TokenManager{}.delete_tokens(login_data);
+    TokenManager {}.delete_tokens(login_data);
     Ok(())
 }
 
@@ -1021,7 +1017,7 @@ async fn default_data_folder_path() -> Result<String, String> {
 
 #[tauri::command]
 async fn clear_data(options: LauncherOptions) -> Result<(), String> {
-    let _ = options.accounts.iter().map(|account| TokenManager{}.delete_tokens(account.clone()));
+    let _ = options.accounts.iter().map(|account| TokenManager {}.delete_tokens(account.clone()));
 
     let _ = store_options(LauncherOptions::default()).await;
 
