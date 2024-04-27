@@ -26,7 +26,6 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use tracing_subscriber::layer::SubscriberExt;
 
 pub mod app;
 pub mod minecraft;
@@ -61,15 +60,17 @@ static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
 const TRIGGER_FILE_SIZE: u64 = 2 * 1024 * 1000;
 
 /// Number of archive log files to keep
-const LOG_FILE_COUNT: u32 = 3;
+const LOG_FILE_COUNT: u32 = 10;
 
 pub fn main() -> Result<()> {
     let log_folder = LAUNCHER_DIRECTORY.data_dir().join("logs");
     let latest_log = log_folder.join("latest.log");
     let archive_folder = log_folder.join("archive").join("launcher.{}.log");
 
-    // Build a stderr logger.
-    let stderr = ConsoleAppender::builder().target(Target::Stderr).build();
+    // Build a stdout logger.
+    let stderr = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n")))
+        .target(Target::Stderr).build();
 
     // Create a policy to use with the file logging
     let trigger = SizeTrigger::new(TRIGGER_FILE_SIZE);
@@ -82,7 +83,7 @@ pub fn main() -> Result<()> {
     // Logging to log file. (with rolling)
     let logfile = log4rs::append::rolling_file::RollingFileAppender::builder()
         // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
-        .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S %Z)(local)} {l} - {m}\n")))
+        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n")))
         .build(latest_log.clone(), Box::new(policy))
         .unwrap();
 
@@ -93,10 +94,7 @@ pub fn main() -> Result<()> {
         .appender(Appender::builder().build("logfile", Box::new(logfile)))
         .appender(
             Appender::builder()
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Info)))
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Error)))
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Trace)))
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Debug)))
+                //.filter(Box::new(ThresholdFilter::new(LevelFilter::Trace)))
                 .build("stderr", Box::new(stderr)),
         )
         .build(
@@ -112,6 +110,15 @@ pub fn main() -> Result<()> {
     // if you are trying to debug an issue and need more logs on then turn it off
     // once you are done.
     let _handle = log4rs::init_config(config)?;
+
+    info!("###############################");
+    info!("");
+    info!("");
+    info!("      NEW LAUNCHER LOG");
+    info!("");
+    info!("");
+    info!("###############################");
+
 
     // application directory
     info!("Creating launcher directories...");

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use tokio::fs;
-use tracing::debug;
+use log::debug;
 use anyhow::Result;
 
 use crate::HTTP_CLIENT;

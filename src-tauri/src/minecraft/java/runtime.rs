@@ -4,7 +4,7 @@ use tokio::sync::oneshot::Receiver;
 use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
 use tokio::io::AsyncReadExt;
-use tracing::debug;
+use log::debug;
 pub struct JavaRuntime(PathBuf);
 
 impl JavaRuntime {
