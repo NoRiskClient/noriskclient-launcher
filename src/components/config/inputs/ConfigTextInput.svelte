@@ -2,6 +2,9 @@
 <script>
   export let title;
   export let value; // value of the text field
+  export let placeholder = "";
+  export let suffix = "";
+  export let autofocus = false;
   export let disabled = false;
 </script>
 
@@ -9,7 +12,10 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="" disabled={disabled} autofocus={false} bind:value={value} type="text" class="nes-input">
+    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input">
+    {#if suffix != ""}
+      <p class="suffix">{suffix}</p>
+    {/if}
   </div>
 </div>
 
@@ -23,6 +29,7 @@
 
     input {
       margin-right: 5px;
+      border-radius: 5px;
     }
 
     .input-container {
@@ -51,5 +58,10 @@
 
     .nes-input::placeholder {
       color: var(--font-color);
+    }
+
+    .suffix {
+      font-family: 'Press Start 2P', serif;
+      font-size: 10px;
     }
 </style>

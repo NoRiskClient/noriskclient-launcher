@@ -9,6 +9,7 @@
   export let progressBarMax;
   export let progressBarProgress;
   export let log;
+  export let allowHome = true;
 
   $: progress = progressBarProgress / progressBarMax;
 
@@ -60,8 +61,10 @@
 </script>
 
 {#if !isNaN(progress) && progressBarLabel !== undefined}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+  {#if allowHome}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+  {/if}
   {#if clientLogShown}
     <ClientLog messages={log} on:hideClientLog={() => clientLogShown = false} />
   {/if}

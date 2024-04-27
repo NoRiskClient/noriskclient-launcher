@@ -6,8 +6,7 @@ use log::{debug, info};
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
-use crate::app::app_data::LauncherProfile;
-use crate::app::modrinth_api::{Datapack, ModrinthApiEndpoints, ResourcePack, Shader};
+use crate::app::modrinth_api::{Datapack, ResourcePack, Shader};
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
@@ -126,7 +125,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
-                    let mut download_url: String = "".to_owned();
+                    let download_url;
                     if url.clone().is_some() {
                         download_url = url.clone().unwrap();
                     } else {

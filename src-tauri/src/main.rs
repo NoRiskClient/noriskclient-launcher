@@ -26,9 +26,12 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
+use tracing::debug;
+use tracing_subscriber::layer::SubscriberExt;
 
 pub mod app;
 pub mod minecraft;
+pub mod custom_servers;
 
 mod error;
 mod utils;
