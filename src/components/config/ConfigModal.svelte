@@ -49,8 +49,9 @@
     if (!options.experimentalMode) {
       return;
     }
-    if (options.experimentalModeToken == "") {
+    if (options.experimentalModeToken == "" && options.experimentalMode) {
       showExperimentalTokenModal = true;
+      options.experimentalMode = false;
       return;
     }
     const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : null
@@ -123,11 +124,9 @@
   on:close={hideSettings}
   on:click|self={() => dialog.close()}
 >
-<div class="content">
   {#if showExperimentalTokenModal}
     <ExperimentalTokenModal bind:options bind:showModal={showExperimentalTokenModal} />
   {/if}
-</div>
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
@@ -175,17 +174,6 @@
     .close-button:hover {
         transition: transform 0.3s;
         transform: scale(1.2);
-    }
-
-    content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 80vh;
-        gap: 20px;
-        padding: 20px; /* Innenabstand für den Schlagschatten */
     }
 
     .settings-wrapper {

@@ -1,6 +1,6 @@
 [package]
 name = "noriskclient"
-version = "0.4.2"
+version = "0.4.6"
 description = "A NoRiskClient launcher for Minecraft, written in Rust using Tauri."
 authors = ["NoRiskk"]
 license = "GNU General Public License v3.0"
@@ -13,9 +13,8 @@ tauri-build = { version = "1.4.0", features = [] }
 
 [dependencies]
 # Log
-tracing = { version = "0.1", features = ["max_level_debug", "release_max_level_warn"] }
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-tracing-appender = "0.2"
+log4rs = "1.3.0"
+log = "0.4.20"
 
 # Async IO
 tokio = { version = "1", features = ["full"] }
@@ -33,7 +32,7 @@ void = "1"
 rand = "0.8.5"
 directories = "4.0"
 once_cell = "1.16.0"
-open = "4.0.1"
+open = "5.1.2"
 
 # FS libs
 async_zip = { version = "0.0.11", features = ["full"] }

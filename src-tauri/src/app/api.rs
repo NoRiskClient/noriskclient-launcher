@@ -3,7 +3,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
-use tracing::debug;
+use log::{debug, info};
 
 use crate::custom_servers::models::CustomServer;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
@@ -127,7 +127,7 @@ impl ApiEndpoints {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         println!("Experimental Mode: {}", options.experimental_mode); // Den formatierten String ausgeben
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
@@ -140,7 +140,7 @@ impl ApiEndpoints {
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
@@ -153,8 +153,8 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
@@ -178,12 +178,12 @@ impl ApiEndpoints {
             .await?
         )
     }
-
+          
     /// Request JSON formatted data from launcher API
     pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.delete(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
@@ -196,7 +196,7 @@ impl ApiEndpoints {
     pub async fn post_from_refresh_endpoint<T: DeserializeOwned>(endpoint: &str, request_body: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .body(request_body.to_string())
             .send().await?
@@ -210,7 +210,7 @@ impl ApiEndpoints {
     pub async fn post_from_await_endpoint<T: DeserializeOwned>(endpoint: &str, id: u32) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}/{}?{}={}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint, "id", id);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .send().await?
             .error_for_status()?
@@ -321,7 +321,7 @@ impl LoginData {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         match ApiEndpoints::refresh_token_maybe_fixed(&self.refresh_token).await {
             Ok(response) => {
-                debug!("Refreshed auth... {:?} ",response);
+                debug!("Refreshed auth...");
                 Ok(LoginData {
                     uuid: self.uuid,
                     access_token: response.access_token,
@@ -514,3 +514,4 @@ pub struct JreSource {
 pub struct NoriskAssets {
     pub objects: HashMap<String, AssetObject>,
 }
+

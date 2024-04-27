@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt, marker::PhantomData, path::{Path, PathBuf}, str::FromStr};
 
 use anyhow::Result;
-use tracing::{debug, info};
 use tokio::fs;
 use serde::{Deserialize, Deserializer, de::{self, MapAccess, Visitor}};
 use void::Void;
@@ -9,6 +8,7 @@ use std::collections::HashSet;
 use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, download_private_file_untracked, Architecture}};
 use crate::utils::{get_maven_artifact_path, sha1sum};
 use std::sync::Arc;
+use log::{debug, info};
 use crate::app::api::get_launcher_api_base;
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::launcher::LaunchingParameter;
@@ -143,7 +143,7 @@ impl ArgumentDeclaration {
         }
         for arg in parameter.custom_java_args.split(" ") {
             if arg != " " && arg != "" {
-                println!("Added custom java arg: {:?}", arg);
+                info!("Added custom java arg: {:?}", arg);
                 command_arguments.push(arg.to_string());
             }
         }
