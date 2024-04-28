@@ -30,7 +30,7 @@ thiserror = "1.0"
 # Generic
 void = "1"
 rand = "0.8.5"
-directories = "4.0"
+directories = "5.0.1"
 once_cell = "1.16.0"
 open = "5.1.2"
 
@@ -58,15 +58,15 @@ base16ct = {version = "0.2.0", features = ["alloc"] }
 tauri = {version = "1.4.0", features = ["api-all", "updater"] }
 
 # HTTP library
-reqwest = { version = "0.11", features = ["json", "multipart"] }
+reqwest = { version = "0.12.4", features = ["json", "multipart"] }
 
 # Framework for serializing and deserializing data
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.7.2"
+toml = "0.8.12"
 
 # Support for the old authentication file
-base64 = { version = "0.13" }
+base64 = { version = "0.22.0" }
 byteorder = { version = "1.4" }
 dark-light = "1.0.0"
 walkdir = "2.4.0"
