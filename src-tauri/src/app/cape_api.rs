@@ -8,7 +8,7 @@ use std::process::Command;
 
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use log::debug;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::get_launcher_api_base;

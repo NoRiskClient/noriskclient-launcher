@@ -1,11 +1,11 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
+use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
 use tauri::{Manager, Window};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
-use tracing::{debug, error, info};
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -77,9 +77,13 @@ async fn check_online_status() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: &str) -> Result<(), String> {
-    open::that(url)
-        .map_err(|e| format!("unable to open url: {:?}", e))?;
+fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
+    let window = tauri::WindowBuilder::new(
+        &handle,
+        "external", /* the unique window label */
+        tauri::WindowUrl::External(url.parse().unwrap()),
+    ).build().unwrap();
+    window.set_title("NoRiskClient");
     Ok(())
 }
 
@@ -137,8 +141,7 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     mod_infos.push(mod_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
                                 }
                             }
@@ -177,8 +180,7 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: taur
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     resourcepack_infos.push(resourcepack_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
                                 }
                             }
@@ -217,8 +219,7 @@ async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Win
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     shader_infos.push(shader_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
                                 }
                             }
@@ -257,8 +258,7 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
                                     datapack_infos.push(datapack_info);
-                                }
-                                else {
+                                } else {
                                     debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);
                                 }
                             }
@@ -297,6 +297,16 @@ async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Res
 }
 
 #[tauri::command]
+async fn console_log_info(message: String) {
+    log::info!("{}" ,message);
+}
+
+#[tauri::command]
+async fn console_log_error(message: String) {
+    log::error!("{}" ,message);
+}
+
+#[tauri::command]
 async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
     debug!("Fetching mod info...");
 
@@ -313,7 +323,7 @@ async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
 
 #[tauri::command]
 async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
-    println!("Installing Mod And Dependencies...");
+    info!("Installing Mod And Dependencies...");
     match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
         Ok(installed_mod) => {
             Ok(installed_mod)
@@ -327,7 +337,7 @@ async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: V
 
 #[tauri::command]
 async fn get_project_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
-    println!("Searching Project Version...");
+    info!("Searching Project Version...");
 
     match ModrinthApiEndpoints::get_project_version(slug, params).await {
         Ok(result) => {
@@ -372,7 +382,7 @@ async fn get_shader_info(slug: String, window: Window) -> Result<ShaderInfo, Str
 
 #[tauri::command]
 async fn install_shader(slug: &str, params: &str, window: Window) -> Result<Shader, String> {
-    println!("Installing Shader...");
+    info!("Installing Shader...");
     match ModrinthApiEndpoints::install_shader(slug, params).await {
         Ok(installed_shader) => {
             Ok(installed_shader)
@@ -416,7 +426,7 @@ async fn get_resourcepack_info(slug: String, window: Window) -> Result<ResourceP
 
 #[tauri::command]
 async fn install_resourcepack(slug: &str, params: &str, window: Window) -> Result<ResourcePack, String> {
-    println!("Installing ResourcePack...");
+    info!("Installing ResourcePack...");
     match ModrinthApiEndpoints::install_resourcepack(slug, params).await {
         Ok(installed_resourcepack) => {
             Ok(installed_resourcepack)
@@ -460,7 +470,7 @@ async fn get_datapack_info(slug: String, window: Window) -> Result<DatapackInfo,
 
 #[tauri::command]
 async fn install_datapack(slug: &str, params: &str, world: &str, window: Window) -> Result<Datapack, String> {
-    println!("Installing Datapack...");
+    info!("Installing Datapack...");
     match ModrinthApiEndpoints::install_datapack(slug, params, world).await {
         Ok(installed_datapack) => {
             Ok(installed_datapack)
@@ -494,7 +504,7 @@ async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(_) => { () },
+        Ok(_) => { () }
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -584,7 +594,7 @@ async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_versi
 async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
 
-    println!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
+    info!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom mod {}: {}", file.name, err));
@@ -610,7 +620,7 @@ async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Re
 async fn save_custom_shaders_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file.name.clone());
 
-    println!("Saving {} to {} shaders folder.", file.name.clone(), branch);
+    info!("Saving {} to {} shaders folder.", file.name.clone(), branch);
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom shader {}: {}", file.name, err));
@@ -636,7 +646,7 @@ async fn get_custom_resourcepacks_folder(options: LauncherOptions, branch: &str)
 async fn save_custom_resourcepacks_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file.name.clone());
 
-    println!("Saving {} to {} resourcepacks folder.", file.name.clone(), branch);
+    info!("Saving {} to {} resourcepacks folder.", file.name.clone(), branch);
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom resourcepack {}: {}", file.name, err));
@@ -662,7 +672,7 @@ async fn get_custom_datapacks_folder(options: LauncherOptions, branch: &str, wor
 async fn save_custom_datapacks_to_folder(options: LauncherOptions, branch: &str, world: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks").join(file.name.clone());
 
-    println!("Saving {} to {} datapacks folder.", file.name.clone(), branch);
+    info!("Saving {} to {} datapacks folder.", file.name.clone(), branch);
 
     if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
         return Err(format!("Error saving custom datapack {}: {}", file.name, err));
@@ -713,7 +723,7 @@ async fn save_player_skin(location: String, slim: bool, access_token: String) ->
         .map_err(|e| format!("Failed to send request: {}", e))?;
 
     if response.status().is_success() {
-        println!("Skin {} saved successfully.", &location);
+        info!("Skin {} saved successfully.", &location);
         Ok(())
     } else {
         Err(format!("Failed to save the new skin. Status code: {}", response.status()))
@@ -804,14 +814,14 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
             let url = response.url;
             let id = response.id;
-            let _ = open_url(url.as_str());
+            let _ = open_url(url.as_str(), handle);
 
             let login_data = ApiEndpoints::await_auth_response(id).await;
             match login_data {
@@ -836,7 +846,7 @@ async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, S
 
 #[tauri::command]
 async fn remove_account(login_data: LoginData) -> Result<(), String> {
-    TokenManager{}.delete_tokens(login_data);
+    TokenManager {}.delete_tokens(login_data);
     Ok(())
 }
 
@@ -1051,7 +1061,7 @@ async fn default_data_folder_path() -> Result<String, String> {
 
 #[tauri::command]
 async fn clear_data(options: LauncherOptions) -> Result<(), String> {
-    let _ = options.accounts.iter().map(|account| TokenManager{}.delete_tokens(account.clone()));
+    let _ = options.accounts.iter().map(|account| TokenManager {}.delete_tokens(account.clone()));
 
     let _ = store_options(LauncherOptions::default()).await;
 
@@ -1108,6 +1118,8 @@ pub fn gui_main() {
             refresh_via_norisk,
             clear_data,
             get_mod_info,
+            console_log_info,
+            console_log_error,
             get_launcher_profiles,
             store_launcher_profiles,
             get_project_version,

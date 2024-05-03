@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::{Mutex, Arc};
 
 use anyhow::{Ok, Result};
-use tracing::*;
+use log::{debug, info};
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
@@ -110,7 +110,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
             let already_installed = installed_mods.iter().find(|&loader_mod| {
                 return loader_mod.is_same_slug(current_mod);
             }).unwrap();
-            println!("Skipping Mod {:?} cuz {:?} is already installed",current_mod,already_installed);
+            info!("Skipping Mod {:?} cuz {:?} is already installed",current_mod,already_installed);
             continue;
         }
 
@@ -133,7 +133,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
                         format!("{}{}", repository_url, maven_artifact_path)
                     };
 
-                    println!("downloading mod {} from {}", artifact, download_url);
+                    info!("downloading mod {} from {}", artifact, download_url);
 
                     let retrieved_bytes = download_file(&download_url, |a, b| {
                         progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskClientMods, get_progress(mod_idx, a, b), max));
@@ -147,7 +147,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
         // Copy the mod.
         fs::copy(&current_mod_path, mods_path.join(format!("{}.jar", current_mod.name.replace(".jar","")))).await?;
 
-        println!("Installed Mod {:?}",current_mod);
+        info!("Installed Mod {:?}",current_mod);
         installed_mods.push(current_mod.clone())
     }
 
@@ -171,7 +171,7 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
             let already_installed = installed_shaders.iter().find(|&shader| {
                 return shader.slug == current_shader.slug;
             }).unwrap();
-            println!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
+            info!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
             continue;
         }
 
@@ -186,17 +186,17 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_shader.url {
-                println!("downloading shader {} from {}", &current_shader.file_name, url);
+                info!("downloading shader {} from {}", &current_shader.file_name, url);
                 
                 let retrieved_bytes = download_file(url, |a, b| {
                     progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadShader, get_progress(shader_idx, a, b), max));
                 }).await?;
                 
                 fs::write(&current_shader_path, retrieved_bytes).await?;
-                println!("Installed Shader {}", &current_shader.file_name);
+                info!("Installed Shader {}", &current_shader.file_name);
             }
         } else {
-            println!("Shader {} is already downloaded", &current_shader.file_name);
+            info!("Shader {} is already downloaded", &current_shader.file_name);
         }
 
         installed_shaders.push(current_shader.clone())
@@ -222,7 +222,7 @@ pub async fn retrieve_resourcepacks(data: &Path, manifest: &NoRiskLaunchManifest
             let already_installed = installed_resourcepacks.iter().find(|&resourcepack| {
                 return resourcepack.slug == current_resourcepack.slug;
             }).unwrap();
-            println!("Skipping ResoucePack {:?} cuz {:?} is already installed", &current_resourcepack, already_installed);
+            info!("Skipping ResoucePack {:?} cuz {:?} is already installed", &current_resourcepack, already_installed);
             continue;
         }
 
@@ -237,17 +237,17 @@ pub async fn retrieve_resourcepacks(data: &Path, manifest: &NoRiskLaunchManifest
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_resourcepack.url {
-                println!("downloading resourcepack {} from {}", &current_resourcepack.file_name, url);
+                info!("downloading resourcepack {} from {}", &current_resourcepack.file_name, url);
                 
                 let retrieved_bytes = download_file(url, |a, b| {
                     progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadResourcePack, get_progress(resourcepack_idx, a, b), max));
                 }).await?;
                 
                 fs::write(&current_resourcepack_path, retrieved_bytes).await?;
-                println!("Installed ResourcePack {}", &current_resourcepack.file_name);
+                info!("Installed ResourcePack {}", &current_resourcepack.file_name);
             }
         } else {
-            println!("ResourcePack {} is already downloaded", &current_resourcepack.file_name);
+            info!("ResourcePack {} is already downloaded", &current_resourcepack.file_name);
         }
 
         installed_resourcepacks.push(current_resourcepack.clone())
@@ -276,7 +276,7 @@ pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, da
             let already_installed = installed_datapacks.iter().find(|&datapack| {
                 return datapack.slug == current_datapack.slug && current_datapack.world_name == datapack.world_name;
             }).unwrap();
-            println!("Skipping Datapack {:?} cuz {:?} is already installed", &current_datapack, already_installed);
+            info!("Skipping Datapack {:?} cuz {:?} is already installed", &current_datapack, already_installed);
             continue;
         }
 
@@ -291,17 +291,17 @@ pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, da
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_datapack.url {
-                println!("downloading datapack {} from {}", &current_datapack.file_name, url);
+                info!("downloading datapack {} from {}", &current_datapack.file_name, url);
                 
                 let retrieved_bytes = download_file(url, |a, b| {
                     progress.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadDatapack, get_progress(datapack_idx, a, b), max));
                 }).await?;
                 
                 fs::write(&current_datapack_path, retrieved_bytes).await?;
-                println!("Installed Datapack {} in world {}", &current_datapack.file_name, &current_datapack.world_name);
+                info!("Installed Datapack {} in world {}", &current_datapack.file_name, &current_datapack.world_name);
             }
         } else {
-            println!("Datapack {} is already downloaded in world {}", &current_datapack.file_name, &current_datapack.world_name);
+            info!("Datapack {} is already downloaded in world {}", &current_datapack.file_name, &current_datapack.world_name);
         }
 
         installed_datapacks.push(current_datapack.clone())

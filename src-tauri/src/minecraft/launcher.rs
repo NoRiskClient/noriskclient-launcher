@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
+use log::{debug, error, info};
 
-use tracing::*;
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 use walkdir::WalkDir;
@@ -239,7 +239,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
         Ok(norisk_assets) => norisk_assets.objects,
         Err(err) => {
-            eprintln!("Error fetching norisk_assets: {}", err);
+            info!("Error fetching norisk_assets: {}", err);
             HashMap::new()
         }
     };
@@ -377,9 +377,9 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
             let file_name = path.file_name().unwrap_or_default().to_string_lossy();
             if !file_names.contains(&file_name.as_ref()) {
                 if let Err(err) = fs::remove_file(&path).await {
-                    eprintln!("Failed to remove {}: {}", path.display(), err);
+                    info!("Failed to remove {}: {}", path.display(), err);
                 } else {
-                    println!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
+                    info!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
                 }
             } else {
                 verified += 1;
