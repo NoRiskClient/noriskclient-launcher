@@ -16,8 +16,6 @@
     import PurpurIcon from "../../../images/custom-servers/purpur.png";
     import BukkitIcon from "../../../images/custom-servers/bukkit.png";
     import SpigotIcon from "../../../images/custom-servers/spigot.png";
-    import SpongeLightIcon from "../../../images/custom-servers/sponge_light.png";
-    import SpongeDarkIcon from "../../../images/custom-servers/sponge_dark.png";
     import {createEventDispatcher} from "svelte";
 
     const dispatch = createEventDispatcher()
@@ -115,14 +113,7 @@
             "iconUrl": BukkitIcon,
             "requiresLoader": false,
             "versions": []
-        },
-        "SPONGE": {
-            "name": "Sponge",
-            "type": "SPONGE",
-            "iconUrl": options.theme == "DARK" ? SpongeLightIcon : SpongeDarkIcon,
-            "requiresLoader": false,
-            "versions": []
-        },
+        }
     };
 
     async function createServer() {

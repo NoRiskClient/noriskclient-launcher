@@ -41,6 +41,7 @@
             console.log(result);
             customServers = result.servers;
             customServerLimit = result.limit;
+            customServers.forEach(server => customServerLogs[server._id] = []);
         }).catch((e) => {
             customServers = [];
             console.error(e);
@@ -92,7 +93,8 @@
                     <CustomServerItem
                         on:openDetails={() => customServerDetails = item}
                         options={options}
-                        server={item}/>
+                        server={item}
+                        bind:logs={customServerLogs[item._id]}/>
                 </VirtualList>
             {:else}
                 <h1 class="loading-indicator">{customServers != null ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>

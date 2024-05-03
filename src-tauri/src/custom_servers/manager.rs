@@ -36,7 +36,6 @@ impl CustomServerManager {
             CustomServerType::NEO_FORGE => todo!(),
             CustomServerType::QUILT => todo!(),
             CustomServerType::PAPER => todo!(),
-            CustomServerType::SPONGE => todo!(),
             CustomServerType::SPIGOT => todo!(),
             CustomServerType::BUKKIT => todo!(),
             CustomServerType::FOLIA => todo!(),
