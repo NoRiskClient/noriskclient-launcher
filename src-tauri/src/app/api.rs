@@ -134,18 +134,17 @@ impl ApiEndpoints {
 
     /// Request whitelist slots
     pub async fn whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots> {
-        Self::request_from_norisk_main_backend_endpoint("whitelist/slots", norisk_token).await
+        Self::request_from_main_norisk_endpoint("whitelist/slots", norisk_token).await
     }
 
     /// Add user to whitelist
     pub async fn whitelist_add_user(uuid: &str, norisk_token: &str) -> Result<bool> {
-        Self::post_from_norisk_endpoint(&format!("whitelist/invite/{}", uuid), norisk_token).await
+        Self::post_from_main_norisk_endpoint(&format!("whitelist/invite/{}", uuid), norisk_token).await
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        println!("Experimental Mode: {}", options.experimental_mode); // Den formatierten String ausgeben
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
@@ -160,6 +159,20 @@ impl ApiEndpoints {
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from main API
+    pub async fn request_from_main_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/api/v1/{}", get_launcher_api_base(options.experimental_mode), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -216,6 +229,20 @@ impl ApiEndpoints {
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .json(&body)
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    pub async fn post_from_main_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/api/v1/{}", get_launcher_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
             .json::<T>()

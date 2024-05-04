@@ -27,6 +27,7 @@
                         <p title="Featured">⭐️</p>
                     {/if}
                 {:else}
+                    <!-- svelte-ignore a11y-missing-attribute -->
                     <a class="mod-title">{mod.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if mod?.author != undefined && mod?.author != null}

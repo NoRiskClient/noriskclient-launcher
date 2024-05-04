@@ -430,11 +430,11 @@
   {/if}
 
   {#if showCapeScreen}
-  <CapeScreen on:home={home} bind:options></CapeScreen>
+    <CapeScreen on:home={home} bind:options></CapeScreen>
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
+    <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} bind:showMcRealAppModal={mcRealQrCodeShown} />
   {/if}
   
   {#if mcRealQrCodeShown}
@@ -464,16 +464,14 @@
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
-        {#if friendInviteSlots.availableSlots == -1}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h1 on:click={handleShowInvitePopup}>Invite</h1>
-        {/if}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->  
-        <h1 on:click={() => mcRealQrCodeShown = true}>MCREAL APP</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
+        {#if friendInviteSlots.availableSlots == -1}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 on:click={handleShowInvitePopup}>Invite</h1>
+        {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
