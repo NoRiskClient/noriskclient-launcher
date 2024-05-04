@@ -138,6 +138,7 @@ impl ArgumentDeclaration {
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         if parameter.force_server.is_some() {
+            println!("\n\n\nAdded force server arg: {:?}\n\n\n.", parameter.force_server.clone().unwrap());
             command_arguments.push(format!("-Dnorisk.forceServer={}", parameter.force_server.clone().unwrap()));
         }
         for arg in parameter.custom_java_args.split(" ") {

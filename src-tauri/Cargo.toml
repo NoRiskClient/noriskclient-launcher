@@ -73,6 +73,7 @@ walkdir = "2.4.0"
 
 # Auth Store
 keyring = "2.3.1"
+jsonwebtoken = "9.3.0"
 
 [features]
 # by default Tauri runs in production mode

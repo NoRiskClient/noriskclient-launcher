@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use log::{debug, info};
 
+use crate::custom_servers::models::CustomServer;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::version::AssetObject;
@@ -56,6 +57,36 @@ impl ApiEndpoints {
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(&*format!("featured/datapacks/{}", branch), "").await
     }
+    
+    /// Request featured servers
+    pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
+        Self::request_from_norisk_endpoint(&*format!("featured/servers/{}", branch), "").await
+    }
+    
+    /// Request custom servers
+    pub async fn norisk_custom_servers(token: &str) -> Result<CustomServersResponse> {
+        Self::request_from_norisk_endpoint("custom-servers", token).await
+    }
+    
+    /// Check subdomain
+    pub async fn norisk_check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint(&format!("custom-servers/check-subdomain?subdomain={}", subdomain), token).await
+    }
+    
+    /// Get JWT token
+    pub async fn norisk_get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String> {
+        Self::request_from_norisk_endpoint(&format!("custom-servers/{}/token", custom_server_id), token).await
+    }
+
+    /// Create custom server
+    pub async fn norisk_create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer> {
+        Self::post_from_norisk_endpoint_with_body("custom-servers", CreateCustomServerRequest { mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token).await
+    }
+
+    /// Delete custom server
+    pub async fn norisk_delete_custom_server(server_id: &str, token: &str) -> Result<()> {
+        Self::delete_from_norisk_endpoint(&format!("custom-servers/{}", server_id), token).await
+    }
 
     /// Request all available branches
     pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
@@ -90,6 +121,16 @@ impl ApiEndpoints {
     pub async fn norisk_assets(branch: String, norisk_token: &str) -> Result<NoriskAssets> {
         Self::request_from_norisk_endpoint(&format!("assets/{}", branch), norisk_token).await
     }
+    
+    /// Request mcreal app token
+    pub async fn get_mcreal_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String> {
+        Self::request_from_mcreal_endpoint_with_experimental(&format!("user/mobileAppToken?uuid={}", uuid), is_experimental, norisk_token).await
+    }
+    
+    /// Reset mcreal app token
+    pub async fn reset_mcreal_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String> {
+        Self::post_from_mcreal_endpoint_with_experimental(&format!("user/mobileAppToken/reset?uuid={}", uuid), is_experimental, norisk_token).await
+    }
 
     /// Request whitelist slots
     pub async fn whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots> {
@@ -104,6 +145,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        println!("Experimental Mode: {}", options.experimental_mode); // Den formatierten String ausgeben
         let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
@@ -115,7 +157,7 @@ impl ApiEndpoints {
         )
     }
 
-    //habe das angelegt weil in javascript wurde es schon geändert aber hier ist noch anderer wert?
+    // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
@@ -127,13 +169,37 @@ impl ApiEndpoints {
             .await?
         )
     }
+    
+    pub async fn request_from_mcreal_endpoint_with_experimental(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<String> {
+        let url = format!("{}/mcreal/{}", get_launcher_api_base(is_experimental), endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
+    }
+    
+    pub async fn post_from_mcreal_endpoint_with_experimental(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<String> {
+        let url = format!("{}/mcreal/{}", get_launcher_api_base(is_experimental), endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
+    }
 
     /// Request JSON formatted data from launcher API
-    pub async fn request_from_norisk_main_backend_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.get(url)
+        Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
@@ -143,11 +209,26 @@ impl ApiEndpoints {
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
-        info!("URL: {}", url); // Den formatierten String ausgeben
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .json(&body)
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+          
+    /// Request JSON formatted data from launcher API
+    pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.delete(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send().await?
             .error_for_status()?
@@ -194,6 +275,34 @@ pub struct Branches {
 pub struct Changelog {
     pub build: Build,
     pub changelog: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FeaturedServer {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "iconUrl")]
+    pub icon_url: String,
+    pub ip: String,
+    pub port: u16,
+    #[serde(rename = "supportsNoRiskClientFeatures")]
+    pub supports_nrc_features: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CustomServersResponse {
+    pub limit: i32,
+    pub servers: Vec<CustomServer>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateCustomServerRequest {
+    #[serde(rename = "mcVersion")]
+    pub mc_version: String,
+    #[serde(rename = "loaderVersion")]
+    pub loader_version: Option<String>,
+    pub r#type: String,
+    pub subdomain: String,
 }
 
 #[derive(Debug, Deserialize)]
