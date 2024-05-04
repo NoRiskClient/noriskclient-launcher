@@ -69,7 +69,7 @@
           <h4 class="nes-font red-text-clickable warning">Do not share this QR Code with anyone and only scan it with the official McReal App!</h4>
           <div class="qrCode" id="qrCode"></div>
           {#if codeContent && showQrCode}
-            <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}`} alt="">
+            <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}&fill_color=%2300afe8`} alt="">
             <h4 class="nes-font red-text-clickable warning reset" on:click={() => resetToken()}>Reset QR Code</h4>
           {:else}
             <h1 class="nes-font showButton" on:click={() => showQrCode = true}>Show QR Code</h1>
