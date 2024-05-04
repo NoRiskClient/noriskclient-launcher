@@ -47,7 +47,6 @@
                 mods: []
             }
         }
-        console.log(settingsProfile);
         settingsOpen = true;
     }
 

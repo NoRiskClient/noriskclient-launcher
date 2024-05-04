@@ -12,17 +12,28 @@ use crate::app::api::{LoginData, LoginDataMinimal};
 use crate::LAUNCHER_DIRECTORY;
 
 use super::modrinth_api::CustomMod;
+use super::modrinth_api::Datapack;
+use super::modrinth_api::ResourcePack;
+use super::modrinth_api::Shader;
 
 fn default_concurrent_downloads() -> i32 {
     10
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct LauncherProfile {
+pub struct Addons {
+    pub shaders: Vec<Shader>,
+    #[serde(rename = "resourcePacks")]
+    pub resourcepacks: Vec<ResourcePack>,
+    pub datapacks: Vec<Datapack>
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LauncherProfile {
     pub id: String,
     pub branch: String,
     pub name: String,
-    pub mods: Vec<CustomMod>
+    pub mods: Vec<CustomMod>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -34,11 +45,12 @@ pub(crate) struct LauncherProfiles {
     #[serde(rename = "experimentalProfiles")]
     pub experimental_profiles: Vec<LauncherProfile>,
     #[serde(rename = "selectedExperimentalProfiles")]
-    pub selected_experimental_profiles: HashMap<String, String>
+    pub selected_experimental_profiles: HashMap<String, String>,
+    pub addons: HashMap<String, Addons>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct LauncherOptions {
+pub struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
     #[serde(rename = "experimentalMode")]
@@ -297,7 +309,18 @@ impl Default for LauncherProfiles {
             main_profiles: vec![],
             selected_main_profiles: HashMap::new(),
             experimental_profiles: vec![],
-            selected_experimental_profiles: HashMap::new()
+            selected_experimental_profiles: HashMap::new(),
+            addons: HashMap::new()
+        }
+    }
+}
+
+impl Default for Addons {
+    fn default() -> Self {
+        Self {
+            shaders: vec![],
+            resourcepacks: vec![],
+            datapacks: vec![]
         }
     }
 }

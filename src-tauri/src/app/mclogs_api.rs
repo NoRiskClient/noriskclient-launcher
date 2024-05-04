@@ -1,3 +1,4 @@
+use log::info;
 use serde::{Deserialize, Serialize};
 use crate::HTTP_CLIENT;
 
@@ -6,7 +7,7 @@ pub struct McLogsApiEndpoints;
 
 impl McLogsApiEndpoints {
     pub async fn upload_logs(log: String) -> anyhow::Result<McLogsUploadResponse> {
-        println!("Uploading Logs...");
+        info!("Uploading Logs...");
         let form = reqwest::multipart::Form::new().text("content", log);
         Ok(HTTP_CLIENT.post("https://api.mclo.gs/1/log")
             .multipart(form)

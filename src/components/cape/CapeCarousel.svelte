@@ -61,7 +61,8 @@
     let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
     if (account !== null) {
       await invoke("equip_cape", {
-        noriskToken: account.noriskToken,
+        noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
+        uuid: options.currentUuid,
         hash: hash,
       }).then(() => {
         dispatch("fetchNoRiskUser");

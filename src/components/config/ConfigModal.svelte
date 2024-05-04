@@ -6,6 +6,7 @@
   import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
   import { createEventDispatcher } from "svelte";
   import ResetSettingButton from "./inputs/ResetSettingButton.svelte";
+  import ExperimentalTokenModal from "./ExperimentalTokenModal.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -13,19 +14,21 @@
   export let options;
   export let dataFolderPath;
 
-  function hideSettings() {
-    saveData().then(() => {
+  async function hideSettings() {
+    await saveData().then(() => {
       dispatch("requestBranches");
     });
     showModal = false;
   }
 
   let dialog; // HTMLDialogElement
+  let showExperimentalTokenModal = false;
+  let lightTheme = options.theme == "LIGHT";
 
   $: if (dialog && showModal) dialog.showModal();
 
   async function saveData() {
-    options.store();
+    await options.store();
   }
 
   async function clearData() {
@@ -46,13 +49,19 @@
     if (!options.experimentalMode) {
       return;
     }
-    const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : window.prompt("Please enter your experimental token:")
+    if (options.experimentalModeToken == "" && options.experimentalMode) {
+      showExperimentalTokenModal = true;
+      options.experimentalMode = false;
+      return;
+    }
+    const experimentalToken = options.experimentalModeToken != "" ? options.experimentalModeToken : null
     if (!experimentalToken) {
       options.experimentalMode = false;
       return;
     }
     invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       options.experimentalModeToken = experimentalToken;
+      options.experimentalMode = allowed;
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
       options.experimentalMode = false;
@@ -60,9 +69,9 @@
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })
+    await options.store();
 
     let existingIndex = options.accounts.findIndex(acc => acc.uuid === options.currentUuid);
-    console.log(options.accounts[existingIndex])
     if (options.currentUuid === null || options.accounts[existingIndex].experimentalToken === "" || options.accounts[existingIndex].noriskToken === "") {
       return getNewTokenType();
     }
@@ -99,6 +108,11 @@
     });
   }
 
+  function toggleTheme() {
+    options.toggleTheme();
+    lightTheme = options.theme == "LIGHT";
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -110,6 +124,9 @@
   on:close={hideSettings}
   on:click|self={() => dialog.close()}
 >
+  {#if showExperimentalTokenModal}
+    <ExperimentalTokenModal bind:options bind:showModal={showExperimentalTokenModal} />
+  {/if}
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
@@ -122,9 +139,10 @@
         <div class="experimental-mode-wrapper">
           <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={options.experimentalMode} text="Experimental Mode" />
           {#if options.experimentalModeToken != ""}
-            <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
+          <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
           {/if}
         </div>
+        <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${options.theme}`}/>
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
                       step={1} />
