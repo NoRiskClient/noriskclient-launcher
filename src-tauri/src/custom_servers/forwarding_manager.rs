@@ -3,9 +3,15 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
+use anyhow::Result;
 use jsonwebtoken::{Algorithm, encode, EncodingKey, Header};
 
-use serde::Serialize;
+use log::info;
+use serde::{Deserialize, Serialize};
+
+use crate::app::api::ApiEndpoints;
+
+use super::models::CustomServer;
 
 #[derive(Debug, Serialize)]
 struct NewConnectionClaims {
@@ -15,19 +21,19 @@ struct NewConnectionClaims {
     connection_id: String,
 }
 
-fn handle_receive(mut stream: TcpStream) {
+fn handle_receive(mut stream: TcpStream, custom_server: CustomServer, private_key: String) {
     loop {
+        let server = custom_server.clone();
+        let key = private_key.clone();
         let mut buffer = [0; 128];
         let bytes_read = stream.read(&mut buffer);
-        let Some(bytes_read) = bytes_read.ok() else {
-            continue;
-        };
+        let Some(bytes_read) = bytes_read.ok() else { continue; };
         if buffer[0] == 0x00u8 {
             println!("Received heartbeat");
         } else if buffer[0] == 0x01u8 {
             println!("Received message to forward");
             thread::spawn(move || {
-                open_new_connection(&buffer[1..bytes_read])
+                open_new_connection(&buffer[1..bytes_read], &server, &key)
             });
         } else {
             println!("Received unknown message: {:?}", &buffer[..bytes_read])
@@ -48,27 +54,23 @@ fn forward(src: TcpStream, dest: TcpStream) -> io::Result<()> {
     }
 }
 
-fn open_new_connection(x: &[u8]) -> io::Result<()> {
+fn open_new_connection(x: &[u8], custom_server: &CustomServer, private_key: &String) -> io::Result<()> {
     let id = String::from_utf8_lossy(x);
 
     println!("Opening new connection for id: {}", id);
 
-    let mut host_conn = TcpStream::connect("127.0.0.1:4444")?;
-    let mc_conn = TcpStream::connect("127.0.0.1:25566")?;
+    let mut host_conn = TcpStream::connect("135.181.46.40:4444")?;
+    let mc_conn = TcpStream::connect("127.0.0.1:25565")?;
 
     let mut prefix = 0x11u8.to_be_bytes().to_vec();
 
     // Use the private key which we got from the API to sign the token
-    let ecdsa_private_key = "-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQglBnO+qn+RecAQ31T
-jBklNu+AwiFN5eVHBFbnjecmMryhRANCAARGpVef6j7rMQ6lYSwbDkKwH7B3zM6P
-G7S4BIamIY/7Bh9xzW6fIzFxK1sPNSNG45tjwNqVoIn38npSuRCRkG1n
------END PRIVATE KEY-----";
+    let ecdsa_private_key = private_key;
     
     // Replace with the values we got from the API
     let claims = NewConnectionClaims {
-        subdomain: "mein-server".to_string(),
-        basedomain: "norisk.gg".to_string(),
+        subdomain: custom_server.subdomain.to_string(),
+        basedomain: custom_server.domain.to_string(),
         connection_id: id.to_string(),
     };
     let header = Header::new(Algorithm::ES256);
@@ -76,6 +78,7 @@ G7S4BIamIY/7Bh9xzW6fIzFxK1sPNSNG45tjwNqVoIn38npSuRCRkG1n
         .expect("Failed to encode claims to token");
 
     prefix.extend(token.as_bytes().to_vec());
+    info!("Sending new connection prefix: {:?}", prefix);
     host_conn.write_all(&prefix)?;
 
     let host_conn_clone = host_conn.try_clone()?;
@@ -90,13 +93,15 @@ G7S4BIamIY/7Bh9xzW6fIzFxK1sPNSNG45tjwNqVoIn38npSuRCRkG1n
     Ok(())
 }
 
-fn main() -> io::Result<()> {
-    let stream = TcpStream::connect("127.0.0.1:4444")?;
+pub async fn start_forwarding(custom_server: CustomServer, token: String) -> Result<(), String> {
+    let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token).await.map_err(|err| format!("Failed to get token: {}", err))?;
+
+    let stream = TcpStream::connect("135.181.46.40:4444").map_err(|err| format!("Failed to connect to forwarding server: {}", err))?;
     let shared_stream = Arc::new(Mutex::new(stream));
     println!("Connected to server.");
 
     //Replace with the token we got from the API
-    let message_to_send = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJiYXNlZG9tYWluIjoibm9yaXNrLmdnIiwiaWF0IjoxNzEyNTExOTIyLCJpc3MiOiJOUkMtTGF1bmNoZXItQVBJIiwib3duZXIiOiI2MjVkZDIyYi1iYWQyLTRiODItYTBiYy1lNDNiYTFjMWE3ZmQiLCJwdWJsaWNrZXkiOiItLS0tLUJFR0lOIFBVQkxJQyBLRVktLS0tLVxuTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFUnFWWG4rbys2ekVPcFdFc0d3NUNzQit3ZDh6T1xuanh1MHVBU0dwaUdQK3dZZmNjMXVueU14Y1N0YkR6VWpSdU9iWThEYWxhQ0o5L0o2VXJrUWtaQnRadz09XG4tLS0tLUVORCBQVUJMSUMgS0VZLS0tLS1cbiIsInNlcnZlciI6IjYyZTY3YWVhLWMzZTUtNDRkOC1iMWIyLTljY2YyZjFiNWY0MyIsInN1YmRvbWFpbiI6Im1laW4tc2VydmVyIn0.BmFRSl8mXI3q3ifa3DQW59erja4z-C_l7SvvrH-2Y9k".as_bytes().to_vec();
+    let message_to_send = tokens.jwt.as_bytes().to_vec();
     let mut prefix = 0x10u8.to_be_bytes().to_vec();
 
     prefix.extend(message_to_send);
@@ -104,16 +109,24 @@ fn main() -> io::Result<()> {
     let receive_handle = {
         let shared_stream = Arc::clone(&shared_stream);
         thread::spawn(move || {
-            handle_receive(shared_stream.lock().unwrap().try_clone().expect("Failed to clone stream"))
+            handle_receive(shared_stream.lock().unwrap().try_clone().expect("Failed to clone stream"), custom_server.clone(), tokens.private_key.clone())
         })
     };
 
-    shared_stream.lock().unwrap().write_all(&prefix)?;
+    shared_stream.lock().unwrap().write_all(&prefix).map_err(|err| format!("Failed to send message to server: {}", err))?;
 
     receive_handle.join().expect("Receive thread panicked");
 
     // Keep the main thread alive
+    // TODO: Implement a way to stop the forwarding
     loop {
         sleep(std::time::Duration::from_secs(1));
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GetTokenResponse {
+    jwt: String,
+    #[serde(rename = "privateKey")]
+    private_key: String,
 }
