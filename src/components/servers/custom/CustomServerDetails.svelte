@@ -230,4 +230,11 @@
         color: #ff9100;
         text-shadow: none;
     }
+
+    .ERROR {
+        font-family: 'Press Start 2P', serif;
+        font-size: 10px;
+        color: #ff0000;
+        text-shadow: none;
+    }
 </style>
