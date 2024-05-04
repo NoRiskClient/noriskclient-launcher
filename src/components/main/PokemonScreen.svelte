@@ -8,6 +8,7 @@
   import SkinButton from "./SkinButton.svelte";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
   import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
@@ -29,6 +30,7 @@
   let progressBarProgress = 0;
   let progressBarLabel = "";
   let settingsShown = false;
+  let mcRealQrCodeShown = false;
   let clientLogShown = false;
   let showProfilesScreen = false;
   let showProfilesScreenHack = false;
@@ -407,6 +409,10 @@
   {#if settingsShown}
   <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
   {/if}
+  
+  {#if mcRealQrCodeShown}
+  <McRealAppModal bind:options bind:showModal={mcRealQrCodeShown}></McRealAppModal>
+  {/if}
 
   {#if clientLogShown}
     <ClientLog messages={log} on:hideClientLog={() => clientLogShown = false} />
@@ -425,6 +431,8 @@
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={() => mcRealQrCodeShown = true}>MCREAL APP</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
