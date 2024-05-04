@@ -132,6 +132,16 @@ impl ApiEndpoints {
         Self::post_from_mcreal_endpoint_with_experimental(&format!("user/mobileAppToken/reset?uuid={}", uuid), is_experimental, norisk_token).await
     }
 
+    /// Request whitelist slots
+    pub async fn whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots> {
+        Self::request_from_norisk_main_backend_endpoint("whitelist/slots", norisk_token).await
+    }
+
+    /// Add user to whitelist
+    pub async fn whitelist_add_user(uuid: &str, norisk_token: &str) -> Result<bool> {
+        Self::post_from_norisk_endpoint(&format!("whitelist/invite/{}", uuid), norisk_token).await
+    }
+
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
@@ -549,3 +559,13 @@ pub struct NoriskAssets {
     pub objects: HashMap<String, AssetObject>,
 }
 
+///
+/// JSON struct of norisk whitelist slots
+/// 
+#[derive(Serialize, Deserialize)]
+pub struct WhitelistSlots {
+    #[serde(rename = "availableSlots")]
+    pub available_slots: i32,
+    #[serde(rename = "previousInvites")]
+    pub previous_invites: u32,
+}

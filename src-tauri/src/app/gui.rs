@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -49,6 +49,21 @@ struct MinecraftProfileProperty {
 struct NewMinecraftSkinBody {
     variant: String,
     file: Vec<u8>,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayerDBData {
+    data: PlayerDBEntry,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayerDBEntry {
+    player: Option<PlayerDBPlayer>,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayerDBPlayer {
+    id: String
 }
 
 #[tauri::command]
@@ -490,7 +505,7 @@ async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(_result) => { () },
+        Ok(_) => { () }
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -1026,6 +1041,35 @@ async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, ()> {
 }
 
 #[tauri::command]
+async fn get_whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots, String> {
+    let response = ApiEndpoints::whitelist_slots(norisk_token).await;
+    match response {
+        Ok(slots) => {
+            Ok(slots)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn add_player_to_whitelist(identifier: &str, norisk_token: &str) -> Result<(), String> {
+    let response = HTTP_CLIENT.get(format!("https://playerdb.co/api/player/minecraft/{}", identifier)).send().await.map_err(|e| format!("invalid username: {:}", e)).unwrap();
+    let response_text = response.json::<PlayerDBData>().await.unwrap();
+    let uuid = response_text.data.player.unwrap().id;
+    let response = ApiEndpoints::whitelist_add_user(&uuid, norisk_token).await;
+    match response {
+        Ok(_) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn mem_percentage(memory_percentage: i32) -> i64 {
     percentage_of_total_memory(memory_percentage)
 }
@@ -1358,6 +1402,8 @@ pub fn gui_main() {
             get_featured_resourcepacks,
             get_featured_shaders,
             get_featured_datapacks,
+            get_whitelist_slots,
+            add_player_to_whitelist,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,

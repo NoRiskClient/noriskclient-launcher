@@ -125,14 +125,13 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
-                    let download_url;
-                    if url.clone().is_some() {
-                        download_url = url.clone().unwrap();
+                    let download_url = if let Some(url) = url.clone() {
+                        url
                     } else {
                         let repository_url = manifest.repositories.get(repository).ok_or_else(|| LauncherError::InvalidVersionProfile(format!("There is no repository specified with the name {}", repository)))?;
                         let maven_artifact_path = get_maven_artifact_path(artifact)?;
-                        download_url = format!("{}{}", repository_url, maven_artifact_path);
-                    }
+                        format!("{}{}", repository_url, maven_artifact_path)
+                    };
 
                     info!("downloading mod {} from {}", artifact, download_url);
 
