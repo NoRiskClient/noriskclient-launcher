@@ -62,6 +62,8 @@
             {#if logs.length < 1}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="startServer-button" on:click={runServer}>Start</h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>

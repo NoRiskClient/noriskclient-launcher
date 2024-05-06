@@ -1,5 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use chrono::format;
+use futures::lock::Mutex;
 use tokio::sync::oneshot::Receiver;
 use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
@@ -80,28 +84,33 @@ impl JavaRuntime {
         Ok(())
     }
 
-    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, token: &str, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, terminator: Receiver<()>, data: &D) -> Result<()> {
+    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, token: &str, forwarder_running_state: Arc<AtomicBool>, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, server_terminator: Receiver<()>, data: &D) -> Result<()> {
         let mut stdout = running_task.stdout.take().unwrap();
         let mut stderr = running_task.stderr.take().unwrap();
     
         let mut stdout_buf = vec![0; 1024];
         let mut stderr_buf = vec![0; 1024];
     
-        tokio::pin!(terminator);
+        tokio::pin!(server_terminator);
     
         loop {
             tokio::select! {
                 read_len = stdout.read(&mut stdout_buf) => {
                     let content = &stdout_buf[..read_len?];
-                    let _ = (on_stdout)(&data, &server.id, content);
                     if String::from_utf8_lossy(content).contains("Done") {
-                        start_forwarding(server.clone(), token.to_string()).await.map_err(|e| format!("Failed to start forwarding: {}", e));
+                        let server_clone = server.clone();
+                        let token_clone = token.to_string().clone();
+                        let forwarder_running_state_clone = forwarder_running_state.clone();
+                        tokio::spawn(async move {
+                            let _ = start_forwarding(server_clone, token_clone, forwarder_running_state_clone).await.map_err(|e| format!("Failed to start forwarding: {}", e));
+                        });
                     }
+                    let _ = (on_stdout)(&data, &server.id, content);
                 },
                 read_len = stderr.read(&mut stderr_buf) => {
                     let _ = (on_stderr)(&data, &server.id, &stderr_buf[..read_len?]);
                 },
-                _ = &mut terminator => {
+                _ = &mut server_terminator => {
                     running_task.kill().await?;
                     break;
                 },

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io, thread};
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -8,6 +9,7 @@ use jsonwebtoken::{Algorithm, encode, EncodingKey, Header};
 
 use log::info;
 use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot::Receiver;
 
 use crate::app::api::ApiEndpoints;
 
@@ -93,7 +95,7 @@ fn open_new_connection(x: &[u8], custom_server: &CustomServer, private_key: &Str
     Ok(())
 }
 
-pub async fn start_forwarding(custom_server: CustomServer, token: String) -> Result<(), String> {
+pub async fn start_forwarding(custom_server: CustomServer, token: String, running_state: Arc<AtomicBool>) -> Result<(), String> {
     let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token).await.map_err(|err| format!("Failed to get token: {}", err))?;
 
     let stream = TcpStream::connect("135.181.46.40:4444").map_err(|err| format!("Failed to connect to forwarding server: {}", err))?;
@@ -118,10 +120,11 @@ pub async fn start_forwarding(custom_server: CustomServer, token: String) -> Res
     receive_handle.join().expect("Receive thread panicked");
 
     // Keep the main thread alive
-    // TODO: Implement a way to stop the forwarding
-    loop {
+    while running_state.load(Ordering::SeqCst) {
         sleep(std::time::Duration::from_secs(1));
     }
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

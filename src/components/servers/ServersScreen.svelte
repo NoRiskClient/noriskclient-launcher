@@ -41,7 +41,11 @@
             console.log(result);
             customServers = result.servers;
             customServerLimit = result.limit;
-            customServers.forEach(server => customServerLogs[server._id] = []);
+            customServers.forEach(server => {
+                if (!customServerLogs[server._id]) {
+                    customServerLogs[server._d] = [];
+                }
+            });
         }).catch((e) => {
             customServers = [];
             console.error(e);

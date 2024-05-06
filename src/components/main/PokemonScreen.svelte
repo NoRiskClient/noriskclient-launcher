@@ -21,6 +21,7 @@
   export let options;
   let branches = [];
   let launcherProfiles = {};
+  let featureToggles = {};
   let friendInviteSlots = {};
   let currentBranchIndex = 0;
   let clientRunning;
@@ -198,6 +199,16 @@
     })
   }
 
+  async function loadFeatureToggles() {
+    await invoke("get_feature_toggles").then((result) => {
+      console.debug("Feature Toggles", result);
+      featureToggles = result;
+    }).catch((reason) => {
+      console.error(reason);
+      featureToggles = {};
+    });
+  }
+
   async function loadFriendInvites() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("get_whitelist_slots", {
@@ -214,7 +225,10 @@
 
   onMount(async () => {
     await requestBranches();
-    await loadFriendInvites();
+    await loadFeatureToggles();
+    if (featureToggles["inviteFriends"]?.includes(options.currentUuid)) {
+      await loadFriendInvites();
+    }
   });
 
   listen("client-exited", () => {
@@ -434,7 +448,7 @@
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} bind:showMcRealAppModal={mcRealQrCodeShown} />
+    <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} bind:featureToggles bind:showMcRealAppModal={mcRealQrCodeShown} />
   {/if}
   
   {#if mcRealQrCodeShown}
@@ -455,7 +469,7 @@
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
-      {#if options.accounts.length > 0 && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+      {#if options.accounts.length > 0 && featureToggles["inviteFriends"]?.includes(options.currentUuid) && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
@@ -464,11 +478,13 @@
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
+        {#if featureToggles["customServers"]?.includes(options.currentUuid)}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
+        {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
-        {#if friendInviteSlots.availableSlots == -1}
+        {#if featureToggles["inviteFriends"]?.includes(options.currentUuid) && friendInviteSlots.availableSlots == -1}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <h1 on:click={handleShowInvitePopup}>Invite</h1>
         {/if}

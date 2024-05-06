@@ -1,9 +1,9 @@
-use std::{path::PathBuf, sync::{Arc, Mutex}};
+use std::{path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex}};
 
 use anyhow::{Ok, Result};
 use log::{debug, error, info};
 use tauri::Window;
-use tokio::fs;
+use tokio::{fs, sync::oneshot::Receiver};
 
 use crate::{app::app_data::LauncherOptions, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 
@@ -24,12 +24,7 @@ impl CustomServerManager {
             CustomServerType::FORGE => {
                 let label = ProgressUpdate::SetLabel("Downloading installer jar...".to_owned());
                 let _ = Self::handle_progress(&window, &server.id, label);
-                let _ = ForgeProvider::download_installer_jar(&server, |curr, max| {
-                    let max_progress = ProgressUpdate::SetMax(max);
-                    let progress = ProgressUpdate::SetProgress((curr / max) * 100);
-                    let _ = Self::handle_progress(&window, &server.id, max_progress).unwrap();
-                    let _ = Self::handle_progress(&window, &server.id, progress).unwrap();
-                }).await;
+                let _ = ForgeProvider::download_installer_jar(&server).await;
                 let _ = Self::create_eula_file(&server).await;
             },
             CustomServerType::FABRIC => todo!(),
@@ -52,7 +47,7 @@ impl CustomServerManager {
         Ok(())
     }
 
-    pub async fn run_server<D: Send + Sync>(custom_server: CustomServer, options: LauncherOptions, token: String, terminator: tokio::sync::oneshot::Receiver<()>, data: Box<D>, window_mutex: Arc<Mutex<Window>>) -> Result<()> {
+    pub async fn run_server(custom_server: CustomServer, options: LauncherOptions, token: String, server_terminator: Receiver<()>, forwarder_running_state: Arc<AtomicBool>, window_mutex: Arc<Mutex<Window>>) -> Result<()> {
         // JRE download
         let runtimes_folder = options.data_path_buf().join("runtimes");
         if !runtimes_folder.exists() {
@@ -89,8 +84,10 @@ impl CustomServerManager {
 
         let mut running_task = java_runtime.run_server(2048, 2048, &custom_server_path).await?;
 
-        java_runtime.handle_server_io(&mut running_task, &custom_server, &token, Self::handle_stdout, Self::handle_stderr, terminator, &window_mutex)
-            .await?;
+        let custom_server_clone = custom_server.clone();
+
+        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &token, forwarder_running_state, Self::handle_stdout, Self::handle_stderr, server_terminator, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
+
         Ok(())
     }
 

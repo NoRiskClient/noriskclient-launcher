@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use tokio::fs;
 
 use crate::custom_servers::models::CustomServer;
-use crate::utils::download_file;
+use crate::utils::{download_file, download_file_untracked};
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
 /// Placeholder struct for API endpoints implementation
@@ -19,13 +19,12 @@ impl ForgeProvider {
         Self::request_from_endpoint(FORGE_MODRINTH_API_BASE, "v0/manifest.json").await
     }
 
-    pub async fn download_installer_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()> where F : Fn(u64, u64) {
+    pub async fn download_installer_jar(custom_server: &CustomServer) -> Result<()> {
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers");
         if !path.join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default())).exists() {
             fs::create_dir_all(&path).await?;
             let url = format!("{}/{mc}-{loader}/forge-{mc}-{loader}-installer.jar", FORGE_MAVEN_REPO_BASE, mc = custom_server.mc_version, loader = custom_server.loader_version.clone().unwrap_or_default());
-            let content = download_file(&url, on_progress).await?;
-            let _ = fs::write(path.join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default())), content).await.map_err(|e| e);
+            download_file_untracked(&url, path.join(format!("forge-{}-{}.jar", custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default()))).await?;
         }
         Ok(())
     }

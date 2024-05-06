@@ -33,6 +33,11 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint("branches", norisk_token).await
     }
 
+    /// Request all available branches
+    pub async fn norisk_feature_toggles() -> Result<HashMap<String, Vec<String>>> {
+        Self::request_from_download_norisk_endpoint("feature-toggles/feature-toggles.json").await
+    }
+
     /// Request token for experimental mode
     pub async fn enable_experimental_mode(experimental_token: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint_with_experimental("experimental-mode", true, experimental_token).await
@@ -155,7 +160,7 @@ impl ApiEndpoints {
             .await?
         )
     }
-
+    
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, is_experimental: bool, norisk_token: &str) -> Result<T> {
         let url = format!("{}/{}/{}", get_launcher_api_base(is_experimental), NORISK_LAUNCHER_API_VERSION, endpoint);
@@ -168,7 +173,7 @@ impl ApiEndpoints {
             .await?
         )
     }
-
+    
     /// Request JSON formatted data from main API
     pub async fn request_from_main_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
@@ -176,6 +181,19 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    pub async fn request_from_download_norisk_endpoint<T: DeserializeOwned>(endpoint: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("https://dl{}.norisk.gg/{}", if options.experimental_mode { "-staging" } else { "" }, endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
             .send().await?
             .error_for_status()?
             .json::<T>()

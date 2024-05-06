@@ -12,6 +12,7 @@
 
   export let showModal;
   export let options;
+  export let featureToggles;
   export let showMcRealAppModal;
 
   async function hideSettings() {
@@ -143,10 +144,12 @@
           {/if}
         </div>
         <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${options.theme}`}/>
-        <div class="mcreal-app-wrapper">
-          <h1 class="title">MCReal App</h1>
-          <h1 class="button" on:click={() => { hideSettings(); showMcRealAppModal = true; }}>Details</h1>
-        </div>
+        {#if featureToggles["mcRealApp"]?.includes(options.currentUuid)}
+          <div class="mcreal-app-wrapper">
+            <h1 class="title">MCReal App</h1>
+            <h1 class="button" on:click={() => { hideSettings(); showMcRealAppModal = true; }}>Details</h1>
+          </div>
+        {/if}
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads} step={1} />
         <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
