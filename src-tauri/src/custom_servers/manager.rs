@@ -5,7 +5,7 @@ use log::{debug, error, info};
 use tauri::Window;
 use tokio::{fs, sync::oneshot::Receiver};
 
-use crate::{app::app_data::LauncherOptions, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
+use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions}, custom_servers::forwarding_manager::GetTokenResponse, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 
 use super::{models::{CustomServer, CustomServerType}, providers::{forge::ForgeProvider, vanilla::VanillaProvider}};
 
@@ -86,7 +86,9 @@ impl CustomServerManager {
 
         let custom_server_clone = custom_server.clone();
 
-        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &token, forwarder_running_state, Self::handle_stdout, Self::handle_stderr, server_terminator, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
+        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
+
+        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, forwarder_running_state, Self::handle_stdout, Self::handle_stderr, server_terminator, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 
         Ok(())
     }

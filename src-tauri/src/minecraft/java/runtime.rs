@@ -2,14 +2,13 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use chrono::format;
-use futures::lock::Mutex;
+use std::thread;
 use tokio::sync::oneshot::Receiver;
 use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
 use tokio::io::AsyncReadExt;
 use log::debug;
-use crate::custom_servers::forwarding_manager::start_forwarding;
+use crate::custom_servers::forwarding_manager::{start_forwarding, GetTokenResponse};
 use crate::custom_servers::models::CustomServer;
 
 pub struct JavaRuntime(PathBuf);
@@ -84,12 +83,14 @@ impl JavaRuntime {
         Ok(())
     }
 
-    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, token: &str, forwarder_running_state: Arc<AtomicBool>, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, server_terminator: Receiver<()>, data: &D) -> Result<()> {
+    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, tokens: &GetTokenResponse, forwarder_running_state: Arc<AtomicBool>, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, server_terminator: Receiver<()>, data: &D) -> Result<()> {
         let mut stdout = running_task.stdout.take().unwrap();
         let mut stderr = running_task.stderr.take().unwrap();
     
         let mut stdout_buf = vec![0; 1024];
         let mut stderr_buf = vec![0; 1024];
+
+        let mut startet_forwarding = false;
     
         tokio::pin!(server_terminator);
     
@@ -97,13 +98,14 @@ impl JavaRuntime {
             tokio::select! {
                 read_len = stdout.read(&mut stdout_buf) => {
                     let content = &stdout_buf[..read_len?];
-                    if String::from_utf8_lossy(content).contains("Done") {
+                    if String::from_utf8_lossy(content).contains("Done") && !startet_forwarding {
                         let server_clone = server.clone();
-                        let token_clone = token.to_string().clone();
+                        let tokens_clone = tokens.clone();
                         let forwarder_running_state_clone = forwarder_running_state.clone();
-                        tokio::spawn(async move {
-                            let _ = start_forwarding(server_clone, token_clone, forwarder_running_state_clone).await.map_err(|e| format!("Failed to start forwarding: {}", e));
+                        thread::spawn(move || {
+                            let _ = start_forwarding(server_clone, tokens_clone, forwarder_running_state_clone).map_err(|e| format!("Failed to start forwarding: {}", e));
                         });
+                        startet_forwarding = true;
                     }
                     let _ = (on_stdout)(&data, &server.id, content);
                 },
