@@ -415,6 +415,15 @@
     }, 100);
   }
 
+  async function connect_discord_intigration() {
+    await invoke("connect_discord_intigration").then(() => {
+      console.log("Connected to Discord Intigration");
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+    });
+  }
+
   function closeWindow() {
     appWindow.close();
   }
@@ -474,6 +483,8 @@
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 on:click={connect_discord_intigration}>DISCORD</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -486,7 +497,7 @@
         <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
         {#if featureToggles["inviteFriends"]?.includes(options.currentUuid) && friendInviteSlots.availableSlots == -1}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h1 on:click={handleShowInvitePopup}>Invite</h1>
+          <h1 on:click={handleShowInvitePopup}>INVITE</h1>
         {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>

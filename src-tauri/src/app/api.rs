@@ -228,7 +228,7 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), NORISK_LAUNCHER_API_VERSION, endpoint);
+        let url = format!("{}/{}/{}", get_launcher_api_base(options.experimental_mode), "api/v1", endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
