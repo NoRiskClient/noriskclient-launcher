@@ -95,7 +95,7 @@ impl ApiEndpoints {
 
     /// Request all available branches
     pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint("auth/prepare", "").await
+        Self::post_from_main_norisk_endpoint("auth/prepare", "").await
     }
 
     /// Request all available branches
