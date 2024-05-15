@@ -87,6 +87,10 @@ fn open_url(url: &str, size: (u32, u32), handle: tauri::AppHandle) -> Result<(),
     ).build().unwrap();
     let _ = window.set_title("NoRiskClient");
     let _ = window.set_size(LogicalSize::new(size.0, size.1));
+    let _ = window.set_resizable(false);
+    let _ = window.set_focus();
+    let _ = window.set_minimizable(false);
+    let _ = window.set_maximizable(false);
     Ok(())
 }
 
@@ -840,9 +844,9 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn connect_discord_intigration(handle: tauri::AppHandle) -> Result<(), String> {
-    let url = "https://discord.com/oauth2/authorize?client_id=1237087999104122981&response_type=code&redirect_uri=https%3A%2F%2Fapi.norisk.gg%2Fapi%2Fv1%2Fdiscord&scope=identify+guilds";
-    let _ = open_url(url, (1200, 900), handle);
+async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
+    let url = format!("https://api{}.norisk.gg/api/v1/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
+    let _ = open_url(url.as_str(), (1200, 900), handle);
     Ok(())
 }
 

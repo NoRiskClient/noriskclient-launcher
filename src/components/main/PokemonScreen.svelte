@@ -416,7 +416,8 @@
   }
 
   async function connect_discord_intigration() {
-    await invoke("connect_discord_intigration").then(() => {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("connect_discord_intigration", { options, loginData }).then(() => {
       console.log("Connected to Discord Intigration");
     }).catch(err => {
       console.error(err);
