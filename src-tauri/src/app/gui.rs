@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, thread};
+use std::{path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, thread};
 
 use directories::UserDirs;
 use log::{debug, error, info};
@@ -568,8 +568,8 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
-    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -580,8 +580,8 @@ async fn get_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: b
 }
 
 #[tauri::command]
-async fn reset_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
-    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1394,10 +1394,10 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 /// Get Launcher feature toggles
 /// 
 #[tauri::command]
-async fn get_feature_toggles() -> Result<HashMap<String, Vec<String>>, String> {
-    let feature_toggles = ApiEndpoints::norisk_feature_toggles().await
-        .map_err(|e| format!("unable to get feature toggles: {:?}", e))?;
-    Ok(feature_toggles)
+async fn check_feature_whitelist(feature: &str, norisk_token: &str) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token).await
+        .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
+    Ok(is_whitelisted)
 }
 
 /// Runs the GUI and returns when the window is closed.
@@ -1510,7 +1510,7 @@ pub fn gui_main() {
             get_all_purpur_game_versions,
             get_all_spigot_game_versions,
             get_all_bukkit_game_versions,
-            get_feature_toggles,
+            check_feature_whitelist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

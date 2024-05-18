@@ -12,7 +12,7 @@
 
   export let showModal;
   export let options;
-  export let featureToggles;
+  export let featureWhitelist;
   export let showMcRealAppModal;
 
   async function hideSettings() {
@@ -144,7 +144,7 @@
           {/if}
         </div>
         <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${options.theme}`}/>
-        {#if featureToggles["mcRealApp"]?.includes(options.currentUuid)}
+        {#if featureWhitelist.includes("MCREAL_APP")}
           <div class="mcreal-app-wrapper">
             <h1 class="title">MCReal App</h1>
             <h1 class="button" on:click={() => { hideSettings(); showMcRealAppModal = true; }}>Details</h1>
