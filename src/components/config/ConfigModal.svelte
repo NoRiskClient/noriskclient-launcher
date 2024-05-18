@@ -63,10 +63,12 @@
     invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
       options.experimentalModeToken = experimentalToken;
       options.experimentalMode = allowed;
+      featureToggles = {};
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
       options.experimentalMode = false;
       options.experimentalModeToken = "";
+      featureToggles = {};
       alert(`Failed to enable experimental mode: ${e}`);
       console.error(e);
     })

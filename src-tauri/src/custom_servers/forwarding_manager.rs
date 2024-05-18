@@ -7,11 +7,8 @@ use std::thread::sleep;
 use anyhow::Result;
 use jsonwebtoken::{Algorithm, encode, EncodingKey, Header};
 
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot::Receiver;
-
-use crate::app::api::ApiEndpoints;
 
 use super::models::CustomServer;
 
@@ -31,14 +28,14 @@ fn handle_receive(mut stream: TcpStream, custom_server: CustomServer, private_ke
         let bytes_read = stream.read(&mut buffer);
         let Some(bytes_read) = bytes_read.ok() else { continue; };
         if buffer[0] == 0x00u8 {
-            println!("Received heartbeat");
+            // println!("Received heartbeat");
         } else if buffer[0] == 0x01u8 {
-            println!("Received message to forward");
+            // println!("Received message to forward");
             thread::spawn(move || {
                 open_new_connection(&buffer[1..bytes_read], &server, &key)
             });
         } else {
-            println!("Received unknown message: {:?}", &buffer[..bytes_read])
+            warn!("Received unknown message: {:?}", &buffer[..bytes_read])
         }
     }
 }
@@ -59,7 +56,7 @@ fn forward(src: TcpStream, dest: TcpStream) -> io::Result<()> {
 fn open_new_connection(x: &[u8], custom_server: &CustomServer, private_key: &String) -> io::Result<()> {
     let id = String::from_utf8_lossy(x);
 
-    println!("Opening new connection for id: {}", id);
+    info!("Opening new custom server connection for id: {}", id);
 
     let mut host_conn = TcpStream::connect("135.181.46.40:4444")?;
     let mc_conn = TcpStream::connect("127.0.0.1:25565")?;
@@ -95,12 +92,11 @@ fn open_new_connection(x: &[u8], custom_server: &CustomServer, private_key: &Str
     Ok(())
 }
 
-pub async fn start_forwarding(custom_server: CustomServer, token: String, running_state: Arc<AtomicBool>) -> Result<(), String> {
-    let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token).await.map_err(|err| format!("Failed to get token: {}", err))?;
-
+pub fn start_forwarding(custom_server: CustomServer, tokens: GetTokenResponse, running_state: Arc<AtomicBool>) -> Result<(), String> {
     let stream = TcpStream::connect("135.181.46.40:4444").map_err(|err| format!("Failed to connect to forwarding server: {}", err))?;
     let shared_stream = Arc::new(Mutex::new(stream));
-    println!("Connected to server.");
+    info!("Strting forwarding manager...");
+    info!("Connected to server.");
 
     //Replace with the token we got from the API
     let message_to_send = tokens.jwt.as_bytes().to_vec();
@@ -127,8 +123,8 @@ pub async fn start_forwarding(custom_server: CustomServer, token: String, runnin
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GetTokenResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetTokenResponse {
     jwt: String,
     #[serde(rename = "privateKey")]
     private_key: String,
