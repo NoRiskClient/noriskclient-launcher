@@ -1,9 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, thread};
+use std::{path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, thread};
 
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{Manager, Window, WindowEvent};
+use tauri::{LogicalSize, Manager, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::AsyncReadExt};
 
@@ -79,13 +79,18 @@ async fn check_online_status() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
+fn open_url(url: &str, size: (u32, u32), handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
         &handle,
         "external", /* the unique window label */
         tauri::WindowUrl::External(url.parse().unwrap()),
     ).build().unwrap();
     let _ = window.set_title("NoRiskClient");
+    let _ = window.set_size(LogicalSize::new(size.0, size.1));
+    let _ = window.set_resizable(false);
+    let _ = window.set_focus();
+    let _ = window.set_minimizable(false);
+    let _ = window.set_maximizable(false);
     Ok(())
 }
 
@@ -563,8 +568,8 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
-    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -575,8 +580,8 @@ async fn get_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: b
 }
 
 #[tauri::command]
-async fn reset_mobile_app_token(norisk_token: &str, uuid: &str, is_experimental: bool) -> Result<String, String> {
-    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid, is_experimental).await {
+async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -839,6 +844,13 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
+async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
+    let url = format!("https://api{}.norisk.gg/api/v1/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
+    let _ = open_url(url.as_str(), (1200, 900), handle);
+    Ok(())
+}
+
+#[tauri::command]
 async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
@@ -846,7 +858,7 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
             // Hier kannst du auf die Daten von 'response' zugreifen
             let url = response.url;
             let id = response.id;
-            let _ = open_url(url.as_str(), handle);
+            let _ = open_url(url.as_str(), (1200, 800), handle);
 
             let login_data = ApiEndpoints::await_auth_response(id).await;
             match login_data {
@@ -1382,10 +1394,10 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 /// Get Launcher feature toggles
 /// 
 #[tauri::command]
-async fn get_feature_toggles() -> Result<HashMap<String, Vec<String>>, String> {
-    let feature_toggles = ApiEndpoints::norisk_feature_toggles().await
-        .map_err(|e| format!("unable to get feature toggles: {:?}", e))?;
-    Ok(feature_toggles)
+async fn check_feature_whitelist(feature: &str, norisk_token: &str) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token).await
+        .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
+    Ok(is_whitelisted)
 }
 
 /// Runs the GUI and returns when the window is closed.
@@ -1413,6 +1425,7 @@ pub fn gui_main() {
             get_options,
             store_options,
             request_norisk_branches,
+            connect_discord_intigration,
             login_norisk_microsoft,
             remove_account,
             upload_cape,
@@ -1497,7 +1510,7 @@ pub fn gui_main() {
             get_all_purpur_game_versions,
             get_all_spigot_game_versions,
             get_all_bukkit_game_versions,
-            get_feature_toggles,
+            check_feature_whitelist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

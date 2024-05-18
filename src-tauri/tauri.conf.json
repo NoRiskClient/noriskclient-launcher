@@ -70,6 +70,20 @@
             "main"
           ],
           "enableTauriAPI": true
+        },
+        {
+          "domain": "api.norisk.gg",
+          "windows": [
+            "external"
+          ],
+          "enableTauriAPI": true
+        },
+        {
+          "domain": "api-staging.norisk.gg",
+          "windows": [
+            "external"
+          ],
+          "enableTauriAPI": true
         }
       ]
     },

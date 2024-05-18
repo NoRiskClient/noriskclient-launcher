@@ -19,7 +19,7 @@
     $: if (dialog && showModal) dialog.showModal();
   
     async function getToken() {
-      invoke("get_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid, isExperimental: options.experimentalMode }).then(token => {
+      invoke("get_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid }).then(token => {
         mobileAppToken = token;
         codeContent = `{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}"}`;
         // var qr = qrcode(4, 'L');
@@ -32,7 +32,7 @@
     }
     
     async function resetToken() {
-      invoke("reset_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid, isExperimental: options.experimentalMode }).then(token => {
+      invoke("reset_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid }).then(token => {
         mobileAppToken = token;
         codeContent = `{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}"}`;
         showQrCode = false;
