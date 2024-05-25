@@ -26,128 +26,128 @@ pub fn get_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request all available branches
-    pub async fn norisk_branches(norisk_token: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint("launcher/branches", norisk_token).await
+    pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint("launcher/branches", norisk_token, request_uuid).await
     }
 
     /// Request all available branches
-    pub async fn norisk_feature_whitelist(feature: &str, norisk_token: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint(format!("core/whitelist/feature/{}", feature).as_str(), norisk_token).await
+    pub async fn norisk_feature_whitelist(feature: &str, norisk_token: &str, request_uuid: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint(format!("core/whitelist/feature/{}", feature).as_str(), norisk_token, request_uuid).await
     }
 
     /// Request token for experimental mode
     pub async fn enable_experimental_mode(experimental_token: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint_with_experimental("launcher/experimental-mode", experimental_token).await
+        Self::request_from_norisk_endpoint_with_experimental("launcher/experimental-mode", experimental_token, "").await
     }
 
     /// Request featured mods
     pub async fn norisk_featured_mods(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/mods", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/mods", branch), "", "").await
     }
 
     /// Request featured resourcepacks
     pub async fn norisk_featured_resourcepacks(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/resourcepacks", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/resourcepacks", branch), "", "").await
     }
 
     /// Request featured shaders
     pub async fn norisk_featured_shaders(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/shaders", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/shaders", branch), "", "").await
     }
     
     /// Request featured datapacks
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/datapacks", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/datapacks", branch), "", "").await
     }
     
     /// Request featured servers
     pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
-        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/servers", branch), "").await
+        Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/servers", branch), "", "").await
     }
     
     /// Request custom servers
-    pub async fn norisk_custom_servers(token: &str) -> Result<CustomServersResponse> {
-        Self::request_from_norisk_endpoint("launcher/custom-servers", token).await
+    pub async fn norisk_custom_servers(token: &str, request_uuid: &str) -> Result<CustomServersResponse> {
+        Self::request_from_norisk_endpoint("launcher/custom-servers", token, request_uuid).await
     }
     
     /// Check subdomain
-    pub async fn norisk_check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/check-subdomain?subdomain={}", subdomain), token).await
+    pub async fn norisk_check_custom_server_subdomain(subdomain: &str, token: &str, request_uuid: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/check-subdomain?subdomain={}", subdomain), token, request_uuid).await
     }
     
     /// Get JWT token
-    pub async fn norisk_get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/{}/token", custom_server_id), token).await
+    pub async fn norisk_get_custom_server_jwt_token(custom_server_id: &str, token: &str, request_uuid: &str) -> Result<String> {
+        Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/{}/token", custom_server_id), token, request_uuid).await
     }
 
     /// Create custom server
-    pub async fn norisk_create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer> {
-        Self::post_from_norisk_endpoint_with_body("launcher/custom-servers", CreateCustomServerRequest { mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token).await
+    pub async fn norisk_create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str, request_uuid: &str) -> Result<CustomServer> {
+        Self::post_from_norisk_endpoint_with_body("launcher/custom-servers", CreateCustomServerRequest { mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token, request_uuid).await
     }
 
     /// Delete custom server
-    pub async fn norisk_delete_custom_server(server_id: &str, token: &str) -> Result<()> {
-        Self::delete_from_norisk_endpoint(&format!("launcher/custom-servers/{}", server_id), token).await
+    pub async fn norisk_delete_custom_server(server_id: &str, token: &str, request_uuid: &str) -> Result<()> {
+        Self::delete_from_norisk_endpoint(&format!("launcher/custom-servers/{}", server_id), token, request_uuid).await
     }
 
     /// Request all available branches
     pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint("core/auth/prepare", "").await
+        Self::post_from_norisk_endpoint("auth/prepare", "", "").await
     }
 
     /// Request all available branches
     pub async fn refresh_token(body: &str) -> Result<MinecraftToken> {
-        Self::post_from_norisk_endpoint_with_body("core/auth/rust_refresh_only", body, "").await
+        Self::post_from_norisk_endpoint_with_body("auth/rust_refresh_only", body, "", "").await
     }
 
     pub async fn refresh_token_maybe_fixed(body: &str) -> Result<RefreshResponse> {
-        Self::post_from_norisk_endpoint_with_body("core/auth/rust_refresh_only", body, "").await
+        Self::post_from_norisk_endpoint_with_body("auth/rust_refresh_only", body, "", "").await
     }
 
     /// Request all available branches
     pub async fn await_auth_response(id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint("core/auth/await", id).await
+        Self::post_from_await_endpoint("auth/await", id).await
     }
 
     /// Request launch manifest of specific build
-    pub async fn launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest> {
-        Self::request_from_norisk_endpoint(&format!("launcher/version/launch/{}", branch), norisk_token).await
+    pub async fn launch_manifest(branch: &str, norisk_token: &str, request_uuid: &str) -> Result<NoRiskLaunchManifest> {
+        Self::request_from_norisk_endpoint(&format!("launcher/version/launch/{}", branch), norisk_token, request_uuid).await
     }
 
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
-        Self::request_from_norisk_endpoint(&format!("launcher/version/jre/{}/{}/{}", os_name, os_arch, jre_version), "").await
+        Self::request_from_norisk_endpoint(&format!("launcher/version/jre/{}/{}/{}", os_name, os_arch, jre_version), "", "").await
     }
 
     /// Request norisk assets json for specific branch
-    pub async fn norisk_assets(branch: String, norisk_token: &str) -> Result<NoriskAssets> {
-        Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token).await
+    pub async fn norisk_assets(branch: String, norisk_token: &str, request_uuid: &str) -> Result<NoriskAssets> {
+        Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token, request_uuid).await
     }
     
     /// Request mcreal app token
-    pub async fn get_mcreal_app_token(norisk_token: &str, uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint(&format!("mcreal/user/mobileAppToken?uuid={}", uuid), norisk_token).await
+    pub async fn get_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
+        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken", norisk_token, request_uuid).await
     }
     
     /// Reset mcreal app token
-    pub async fn reset_mcreal_app_token(norisk_token: &str, uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint(&format!("mcreal/user/mobileAppToken/reset?uuid={}", uuid), norisk_token).await
+    pub async fn reset_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
+        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken/reset", norisk_token, request_uuid).await
     }
 
     /// Request whitelist slots
-    pub async fn whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots> {
-        Self::request_from_norisk_endpoint("core/whitelist/slots", norisk_token).await
+    pub async fn whitelist_slots(norisk_token: &str, request_uuid: &str) -> Result<WhitelistSlots> {
+        Self::request_from_norisk_endpoint("core/whitelist/slots", norisk_token, request_uuid).await
     }
 
     /// Add user to whitelist
-    pub async fn whitelist_add_user(uuid: &str, norisk_token: &str) -> Result<bool> {
-        Self::post_from_norisk_endpoint(&format!("core/whitelist/invite/{}", uuid), norisk_token).await
+    pub async fn whitelist_add_user(uuid: &str, norisk_token: &str, request_uuid: &str) -> Result<bool> {
+        Self::post_from_norisk_endpoint(&format!("core/whitelist/invite/{}", uuid), norisk_token, request_uuid).await
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+    pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -159,8 +159,8 @@ impl ApiEndpoints {
     }
     
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
-    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
-        let url = format!("{}/{}", get_api_base(true), endpoint);
+    pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
+        let url = format!("{}/{}?uuid={}", get_api_base(true), endpoint, request_uuid);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -185,9 +185,9 @@ impl ApiEndpoints {
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -199,9 +199,9 @@ impl ApiEndpoints {
     }
 
     /// Request JSON formatted data from launcher API
-    pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str) -> Result<T> {
+    pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -214,9 +214,9 @@ impl ApiEndpoints {
     }
           
     /// Request JSON formatted data from launcher API
-    pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str) -> Result<T> {
+    pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.delete(url)
             .header("Authorization", format!("Bearer {}", norisk_token))

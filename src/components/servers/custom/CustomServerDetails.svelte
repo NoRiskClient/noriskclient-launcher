@@ -19,7 +19,8 @@
         await invoke("run_custom_server", {
             customServer,
             options,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then(() => {
             console.log("YAY!");
         }).catch((error) => {

@@ -815,8 +815,8 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
-async fn request_norisk_branches(norisk_token: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(norisk_token)
+async fn request_norisk_branches(norisk_token: &str, uuid: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(norisk_token, uuid)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
@@ -830,8 +830,8 @@ async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, Stri
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token).await
+async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: &str) -> Result<NoRiskLaunchManifest, String> {
+    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
     Ok(manifest)
 }
@@ -845,7 +845,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 
 #[tauri::command]
 async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
-    let url = format!("https://api{}.norisk.gg/api/v1/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
+    let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
     let _ = open_url(url.as_str(), (1200, 900), handle);
     Ok(())
 }
@@ -946,7 +946,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
     let norisk_token = login_data.norisk_token;
 
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut())
+    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut(), options.current_uuid.clone().unwrap().as_str())
         .await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
 
@@ -972,6 +972,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                     } else {
                         norisk_token
                     },
+                    options.current_uuid.unwrap().as_str(),
                     launch_manifest,
                     parameters,
                     mods,
@@ -1054,8 +1055,8 @@ async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, ()> {
 }
 
 #[tauri::command]
-async fn get_whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots, String> {
-    let response = ApiEndpoints::whitelist_slots(norisk_token).await;
+async fn get_whitelist_slots(norisk_token: &str, uuid: &str) -> Result<WhitelistSlots, String> {
+    let response = ApiEndpoints::whitelist_slots(norisk_token, uuid).await;
     match response {
         Ok(slots) => {
             Ok(slots)
@@ -1067,11 +1068,11 @@ async fn get_whitelist_slots(norisk_token: &str) -> Result<WhitelistSlots, Strin
 }
 
 #[tauri::command]
-async fn add_player_to_whitelist(identifier: &str, norisk_token: &str) -> Result<(), String> {
+async fn add_player_to_whitelist(identifier: &str, norisk_token: &str, request_uuid: &str) -> Result<(), String> {
     let response = HTTP_CLIENT.get(format!("https://playerdb.co/api/player/minecraft/{}", identifier)).send().await.map_err(|e| format!("invalid username: {:}", e)).unwrap();
     let response_text = response.json::<PlayerDBData>().await.unwrap();
     let uuid = response_text.data.player.unwrap().id;
-    let response = ApiEndpoints::whitelist_add_user(&uuid, norisk_token).await;
+    let response = ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid).await;
     match response {
         Ok(_) => {
             Ok(())
@@ -1129,8 +1130,8 @@ async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, Strin
 }
 
 #[tauri::command]
-async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String> {
-    match ApiEndpoints::norisk_custom_servers(token).await {
+async fn get_custom_servers(token: &str, uuid: &str) -> Result<CustomServersResponse, String> {
+    match ApiEndpoints::norisk_custom_servers(token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1141,8 +1142,8 @@ async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String
 }
 
 #[tauri::command]
-async fn check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<(), String> {
-    match ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token).await {
+async fn check_custom_server_subdomain(subdomain: &str, token: &str, uuid: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token, uuid).await {
         Ok(_result) => {
             Ok(())
         }
@@ -1153,8 +1154,8 @@ async fn check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<(
 }
 
 #[tauri::command]
-async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String, String> {
-    match ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token).await {
+async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1165,8 +1166,8 @@ async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Res
 }
 
 #[tauri::command]
-async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer, String> {
-    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token).await {
+async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str, uuid: &str) -> Result<CustomServer, String> {
+    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1243,8 +1244,8 @@ async fn terminate_custom_server(app_state: tauri::State<'_, AppState>) -> Resul
 }
 
 #[tauri::command]
-async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
-    match ApiEndpoints::norisk_delete_custom_server(id, token).await {
+async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_delete_custom_server(id, token, uuid).await {
         Ok(_) => {
             Ok(())
         }
@@ -1394,8 +1395,8 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 /// Get Launcher feature toggles
 /// 
 #[tauri::command]
-async fn check_feature_whitelist(feature: &str, norisk_token: &str) -> Result<bool, String> {
-    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token).await
+async fn check_feature_whitelist(feature: &str, norisk_token: &str, uuid: &str) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token, uuid).await
         .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
     Ok(is_whitelisted)
 }

@@ -19,7 +19,9 @@
   
     async function save() {
     if (experimentalModeToken == "") return;
-      invoke("enable_experimental_mode", { experimentalToken: experimentalModeToken }).then(async allowed => {
+      invoke("enable_experimental_mode", {
+        experimentalToken: experimentalModeToken
+      }).then(async allowed => {
         options.experimentalModeToken = experimentalModeToken;
         options.experimentalMode = allowed;
         await options.store();

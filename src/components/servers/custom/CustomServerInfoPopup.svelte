@@ -24,14 +24,15 @@
     async function deleteServer() {
         if (!confirm("Are you sure you want to delete this server?")) return;
         await invoke("delete_custom_server", {
-        customServer,
-        options
+          customServer,
+          options,
+          uuid: options.currentUuid
         }).then(() => {
-        console.log("YAY!");
-        dispatch("deleted");
+          console.log("YAY!");
+          dispatch("deleted");
         }).catch((error) => {
-        console.error(error);
-        alert(error);
+          console.error(error);
+          alert(error);
         });
     }
     

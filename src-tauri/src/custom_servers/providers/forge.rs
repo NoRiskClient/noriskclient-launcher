@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use tokio::fs;
 
 use crate::custom_servers::models::CustomServer;
-use crate::utils::{download_file, download_file_untracked};
+use crate::utils::download_file_untracked;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
 /// Placeholder struct for API endpoints implementation

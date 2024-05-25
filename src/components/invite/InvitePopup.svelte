@@ -25,7 +25,8 @@
         const loginData = options.accounts.find(acc => acc.uuid == options.currentUuid)
         await invoke("add_player_to_whitelist", {
           identifier: friendIdentifier,
-          noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+          noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+          requestUuid: options.currentUuid
         }).then(() => {
           alert("Successfully invited " + friendIdentifier + " to the NRC closed beta!")
           hideSettings();

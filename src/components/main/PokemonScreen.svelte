@@ -126,6 +126,7 @@
     console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
     await invoke("request_norisk_branches", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
     })
       .then((result) => {
         const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
@@ -200,7 +201,12 @@
   }
 
   async function checkFeatureWhitelist(feature) {
-    await invoke("check_feature_whitelist", { feature: feature, noriskToken:  }).then((result) => {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("check_feature_whitelist", {
+      feature: feature,
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
       console.debug("Feature Toggles", result);
       featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
     }).catch((reason) => {
@@ -212,7 +218,8 @@
   async function loadFriendInvites() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("get_whitelist_slots", {
-      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
     }).then((result) => {
       console.debug("Received Whitelist Slots", result);
       friendInviteSlots = result;
@@ -288,6 +295,7 @@
     await invoke("get_launch_manifest", {
         branch: branch,
         noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+        uuid: options.currentUuid
     }).then((result) => {
         console.debug("Launch Manifest", result);
         launchManifest = result;

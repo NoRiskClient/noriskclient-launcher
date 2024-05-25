@@ -133,6 +133,7 @@
             type: server.type,
             subdomain: server.subdomain,
             token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid,
         }).then(async (newServer) => {
             console.log('Created Server:', newServer);
             createdServer = newServer;
@@ -148,7 +149,7 @@
             await invoke("initialize_custom_server", {
                 customServer: newServer,
                 additionalData: additionalData,
-                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
             }).then(() => {
                 console.log('Initialized Server:', newServer);
                 currentTab = "COMPLETED";

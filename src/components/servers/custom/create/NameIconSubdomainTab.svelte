@@ -15,7 +15,8 @@
     async function next() {
         await invoke('check_custom_server_subdomain', {
             subdomain: subdomain,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then(() => {
             dispatch('next');
         }).catch(err => {

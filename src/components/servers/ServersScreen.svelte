@@ -35,7 +35,8 @@
         });
 
         await invoke("get_custom_servers", {
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then((result) => {
             console.log(`Loaded custom servers: `);
             console.log(result);

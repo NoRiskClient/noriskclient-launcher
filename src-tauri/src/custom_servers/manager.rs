@@ -86,7 +86,7 @@ impl CustomServerManager {
 
         let custom_server_clone = custom_server.clone();
 
-        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
+        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, options.current_uuid.unwrap().as_str()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
 
         java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, forwarder_running_state, Self::handle_stdout, Self::handle_stderr, server_terminator, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 
