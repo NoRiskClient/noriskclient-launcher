@@ -147,10 +147,11 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -160,10 +161,11 @@ impl ApiEndpoints {
     
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
-        let url = format!("{}/{}?uuid={}", get_api_base(true), endpoint, request_uuid);
+        let url = format!("{}/{}", get_api_base(true), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -187,10 +189,11 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -201,10 +204,11 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
         println!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
             .json(&body)
             .send().await?
             .error_for_status()?
@@ -216,10 +220,11 @@ impl ApiEndpoints {
     /// Request JSON formatted data from launcher API
     pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}?uuid={}", get_api_base(options.experimental_mode), endpoint, request_uuid);
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.delete(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
             .send().await?
             .error_for_status()?
             .json::<T>()
@@ -269,6 +274,8 @@ pub struct FeaturedServer {
 #[derive(Serialize, Deserialize)]
 pub struct CustomServersResponse {
     pub limit: i32,
+    #[serde(rename = "baseUrl")]
+    pub base_url: String,
     pub servers: Vec<CustomServer>
 }
 
