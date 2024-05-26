@@ -83,7 +83,7 @@ impl JavaRuntime {
         Ok(())
     }
 
-    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, tokens: &GetTokenResponse, forwarder_running_state: Arc<AtomicBool>, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, server_terminator: Receiver<()>, data: &D) -> Result<()> {
+    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, tokens: &GetTokenResponse, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, data: &D) -> Result<()> {
         let mut stdout = running_task.stdout.take().unwrap();
         let mut stderr = running_task.stderr.take().unwrap();
     
@@ -92,8 +92,6 @@ impl JavaRuntime {
 
         let mut startet_forwarding = false;
     
-        tokio::pin!(server_terminator);
-    
         loop {
             tokio::select! {
                 read_len = stdout.read(&mut stdout_buf) => {
@@ -101,9 +99,8 @@ impl JavaRuntime {
                     if String::from_utf8_lossy(content).contains("Done") && !startet_forwarding {
                         let server_clone = server.clone();
                         let tokens_clone = tokens.clone();
-                        let forwarder_running_state_clone = forwarder_running_state.clone();
                         thread::spawn(move || {
-                            let _ = start_forwarding(server_clone, tokens_clone, forwarder_running_state_clone).map_err(|e| format!("Failed to start forwarding: {}", e));
+                            let _ = start_forwarding(server_clone, tokens_clone).map_err(|e| format!("Failed to start forwarding: {}", e));
                         });
                         startet_forwarding = true;
                     }
@@ -111,10 +108,6 @@ impl JavaRuntime {
                 },
                 read_len = stderr.read(&mut stderr_buf) => {
                     let _ = (on_stderr)(&data, &server.id, &stderr_buf[..read_len?]);
-                },
-                _ = &mut server_terminator => {
-                    running_task.kill().await?;
-                    break;
                 },
                 exit_status = running_task.wait() => {
                     let code = exit_status?.code().unwrap_or(7900); // 7900 = unwrap failed error code

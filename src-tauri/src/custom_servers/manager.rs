@@ -1,9 +1,9 @@
-use std::{path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex}};
+use std::{path::PathBuf, sync::{Arc, Mutex}};
 
 use anyhow::{Ok, Result};
 use log::{debug, error, info};
 use tauri::Window;
-use tokio::{fs, sync::oneshot::Receiver};
+use tokio::{fs, process::Child};
 
 use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions}, custom_servers::forwarding_manager::GetTokenResponse, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 
@@ -47,7 +47,7 @@ impl CustomServerManager {
         Ok(())
     }
 
-    pub async fn run_server(custom_server: CustomServer, options: LauncherOptions, token: String, server_terminator: Receiver<()>, forwarder_running_state: Arc<AtomicBool>, window_mutex: Arc<Mutex<Window>>) -> Result<()> {
+    pub async fn run_server(custom_server: CustomServer, options: LauncherOptions, token: String, window_mutex: Arc<Mutex<Window>>) -> Result<Child> {
         // JRE download
         let runtimes_folder = options.data_path_buf().join("runtimes");
         if !runtimes_folder.exists() {
@@ -88,9 +88,9 @@ impl CustomServerManager {
 
         let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, options.current_uuid.unwrap().as_str()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
 
-        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, forwarder_running_state, Self::handle_stdout, Self::handle_stderr, server_terminator, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
+        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 
-        Ok(())
+        Ok(running_task)
     }
 
     fn handle_stdout(window: &Arc<Mutex<Window>>, server_id: &str, data: &[u8]) -> anyhow::Result<()> {

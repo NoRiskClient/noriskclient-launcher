@@ -1,11 +1,11 @@
-use std::{path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, thread};
+use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
 use tauri::{LogicalSize, Manager, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
-use tokio::{fs, io::AsyncReadExt};
+use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
 use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{self, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -24,8 +24,8 @@ struct RunnerInstance {
 
 struct AppState {
     runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
-    custom_server_instance: Arc<Mutex<Option<RunnerInstance>>>,
-    forwarding_manager_running_state: Arc<AtomicBool>,
+    forwarding_manager_process: Arc<Mutex<Option<Child>>>,
+    custom_server_process: Arc<Mutex<Option<Child>>>,
 }
 
 
@@ -1193,17 +1193,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 #[tauri::command]
 async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
-    let custom_server_instance = app_state.custom_server_instance.clone();
-    
-    let (server_terminator_tx, server_terminator_rx) = tokio::sync::oneshot::channel();
-
-    *custom_server_instance.lock().map_err(|e| format!("unable to lock custom server instance: {:?}", e))?
-        = Some(RunnerInstance { terminator: server_terminator_tx });
-    
-    app_state.forwarding_manager_running_state.store(true, Ordering::SeqCst);
-
-    let copy_of_custom_server_instance = custom_server_instance;
-    let copy_of_forwarding_manager_running_state = app_state.forwarding_manager_running_state.clone();
+    let custom_server_process_mutex = Arc::new(std::sync::Mutex::new(None));
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -1211,14 +1201,13 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
             .build()
             .unwrap()
             .block_on(async {
-                if let Err(e) = CustomServerManager::run_server(custom_server, options, token, server_terminator_rx, copy_of_forwarding_manager_running_state.clone(), window_mutex.clone()).await {
-                    window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
-                    handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
-                };
-                
-                *copy_of_custom_server_instance.lock().map_err(|e| format!("unable to lock custom_server instance: {:?}", e)).unwrap()
-                    = None;
-                copy_of_forwarding_manager_running_state.store(false, Ordering::SeqCst);
+                let custom_server_process = CustomServerManager::run_server(custom_server, options, token, window_mutex.clone()).await.unwrap();    
+                // if let Err(e) = custom_server_process {
+                //     window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
+                //     handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
+                // };
+
+                custom_server_process_mutex.lock().unwrap().replace(custom_server_process);
 
                 window_mutex.lock().unwrap().emit("server-exited", ()).unwrap()
             });
@@ -1228,17 +1217,14 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 
 #[tauri::command]
 async fn terminate_custom_server(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let custom_server_instance = app_state.custom_server_instance.clone();
-    let mut custom_server_lck = custom_server_instance.lock()
-        .map_err(|e| format!("unable to lock custom_server instance: {:?}", e))?;
-
-    if let Some(inst) = custom_server_lck.take() {
-        info!("Killing Custom Server");
-        inst.terminator.send(()).map_err(|e| format!("unable to send custom server terminator: {:?}", e)).unwrap();
-    }
-
+    info!("Killing Custom Server");
+    let mut custom_server_process = app_state.custom_server_process.lock().unwrap().take().unwrap();
+    custom_server_process.stdin.as_mut().unwrap().write_all(b"stop\n").await.unwrap();
+    // custom_server_process.kill().await.unwrap();
+    
     info!("Killing Forwarding Manager");
-    app_state.forwarding_manager_running_state.store(false,  Ordering::SeqCst);
+    let mut custom_sever_forwarding_process = app_state.forwarding_manager_process.lock().unwrap().take().unwrap();
+    custom_sever_forwarding_process.kill().await.unwrap();
 
     Ok(())
 }
@@ -1417,8 +1403,8 @@ pub fn gui_main() {
         })
         .manage(AppState {
             runner_instance: Arc::new(Mutex::new(None)),
-            custom_server_instance: Arc::new(Mutex::new(None)),
-            forwarding_manager_running_state: Arc::new(AtomicBool::new(false)),
+            forwarding_manager_process: Arc::new(Mutex::new(None)),
+            custom_server_process: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             open_url,

@@ -92,7 +92,7 @@ fn open_new_connection(x: &[u8], custom_server: &CustomServer, private_key: &Str
     Ok(())
 }
 
-pub fn start_forwarding(custom_server: CustomServer, tokens: GetTokenResponse, running_state: Arc<AtomicBool>) -> Result<(), String> {
+pub fn start_forwarding(custom_server: CustomServer, tokens: GetTokenResponse) -> Result<(), String> {
     let stream = TcpStream::connect("135.181.46.40:4444").map_err(|err| format!("Failed to connect to forwarding server: {}", err))?;
     let shared_stream = Arc::new(Mutex::new(stream));
     info!("Strting forwarding manager...");
@@ -116,7 +116,7 @@ pub fn start_forwarding(custom_server: CustomServer, tokens: GetTokenResponse, r
     receive_handle.join().expect("Receive thread panicked");
 
     // Keep the main thread alive
-    while running_state.load(Ordering::SeqCst) {
+    loop {
         sleep(std::time::Duration::from_secs(1));
     }
 
