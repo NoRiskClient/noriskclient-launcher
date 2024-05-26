@@ -22,6 +22,7 @@
 
     export let options;
     export let customServerProgress;
+    export let baseDomain;
 
     let createdServer;
 
@@ -173,7 +174,7 @@
 <h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 <div class="create-server-wrapper">
     {#if currentTab === "NAME_ICON_SUBDOMAIN"}
-        <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} on:next={() => currentTab = "TYPE"}/>
+        <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} baseDomain={baseDomain} on:next={() => currentTab = "TYPE"}/>
     {:else if currentTab === "TYPE"}
         <TypeTab bind:type={type} bind:version={mcVersion} bind:majorVersion={majorVersion} bind:loaderVersion={loaderVersion} bind:availableTypes={availableTypes} on:back={() => currentTab = "NAME_ICON_SUBDOMAIN"} on:next={() => currentTab = "VERSIONS"}/>
     {:else if currentTab === "VERSIONS"}

@@ -17,6 +17,7 @@
     let featuredServers = [];
     let customServers = [];
     let customServerLimit = 0;
+    let baseDomain;
     let currentTabIndex = 0;
     let createCustomServer = false;
     let customServerDetails = null;
@@ -42,6 +43,7 @@
             console.log(result);
             customServers = result.servers;
             customServerLimit = result.limit;
+            baseDomain = result.baseUrl;
             customServers.forEach(server => {
                 if (!customServerLogs[server._id]) {
                     customServerLogs[server._d] = [];
@@ -58,7 +60,7 @@
 </script>
 
 {#if createCustomServer}
-    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:backAndUpdate={() => { loadData(); createCustomServer = false; }} on:home={() => dispatch('home')} on:details={(details) => {customServerDetails = details.detail; customServerLogs[customServerDetails['_id']] = []; createCustomServer = false;}} bind:options={options} bind:customServerProgress={customServerProgress} />
+    <CreateCustomServerScreen on:back={() => createCustomServer = false} on:backAndUpdate={() => { loadData(); createCustomServer = false; }} on:home={() => dispatch('home')} on:details={(details) => {customServerDetails = details.detail; customServerLogs[customServerDetails['_id']] = []; createCustomServer = false;}} bind:options={options} bind:customServerProgress={customServerProgress} baseDomain={baseDomain} />
 {:else if customServerDetails != null}
     <CustomServerDetails on:back={() => customServerDetails = null} on:home={() => dispatch('home')} on:terminated={() => customServerLogs[customServerDetails._id] = []} bind:options={options} bind:customServer={customServerDetails} bind:logs={customServerLogs[customServerDetails._id]} />
 {:else}
