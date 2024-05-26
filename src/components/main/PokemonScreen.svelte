@@ -233,6 +233,8 @@
   onMount(async () => {
     await requestBranches();
     await checkFeatureWhitelist("INVITE_FRIENDS");
+    await checkFeatureWhitelist("CUSTOM_SERVERS");
+    await checkFeatureWhitelist("MCREAL_APP");
     if (featureWhitelist.includes("INVITE_FRIENDS")) {
       await loadFriendInvites();
     }
