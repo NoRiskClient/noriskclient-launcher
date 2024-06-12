@@ -9,7 +9,7 @@
     // Load options from file
     let options;
     let showUpdateScreen = null;
-    let MAINTENANCE_MODE = true;
+    let MAINTENANCE_MODE = false;
 
     onMount(async () => {
         const reload = async (afterReload) => {
