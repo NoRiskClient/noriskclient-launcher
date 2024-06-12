@@ -25,6 +25,11 @@ pub fn get_api_base(is_experimental: bool) -> String {
 }
 
 impl ApiEndpoints {
+    /// Request maintenance mode
+    pub async fn norisk_maintenance_mode() -> Result<bool> {
+        Self::request_from_norisk_endpoint("launcher/maintenance-mode", "", "").await
+    }
+
     /// Request all available branches
     pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint("launcher/branches", norisk_token, request_uuid).await
