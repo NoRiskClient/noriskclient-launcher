@@ -97,16 +97,16 @@ impl ApiEndpoints {
 
     /// Request all available branches
     pub async fn auth_prepare_response() -> Result<AuthPrepareResponse> {
-        Self::post_from_norisk_endpoint("auth/prepare", "", "").await
+        Self::post_from_norisk_endpoint("core/auth/prepare", "", "").await
     }
 
     /// Request all available branches
     pub async fn refresh_token(body: &str) -> Result<MinecraftToken> {
-        Self::post_from_norisk_endpoint_with_body("auth/rust_refresh_only", body, "", "").await
+        Self::post_from_norisk_endpoint_with_body("core/auth/rust_refresh_only", body, "", "").await
     }
 
     pub async fn refresh_token_maybe_fixed(body: &str) -> Result<RefreshResponse> {
-        Self::post_from_norisk_endpoint_with_body("auth/rust_refresh_only", body, "", "").await
+        Self::post_from_norisk_endpoint_with_body("core/auth/rust_refresh_only", body, "", "").await
     }
 
     /// Request all available branches
