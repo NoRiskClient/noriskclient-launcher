@@ -859,6 +859,20 @@ async fn connect_discord_intigration(options: LauncherOptions, login_data: Login
 }
 
 #[tauri::command]
+async fn check_discord_intigration(norisk_token: &str, uuid: &str) -> Result<bool, String> {
+    let status = ApiEndpoints::discord_link_status(norisk_token, uuid).await
+        .map_err(|e| format!("unable to check discord intigration: {:?}", e))?;
+    Ok(status)
+}
+
+#[tauri::command]
+async fn unlink_discord_intigration(norisk_token: &str, uuid: &str) -> Result<(), String> {
+    ApiEndpoints::unlink_discord(norisk_token, uuid).await
+        .map_err(|e| format!("unable to unlink discord: {:?}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
@@ -1422,6 +1436,8 @@ pub fn gui_main() {
             request_norisk_maintenance_mode,
             request_norisk_branches,
             connect_discord_intigration,
+            check_discord_intigration,
+            unlink_discord_intigration,
             login_norisk_microsoft,
             remove_account,
             upload_cape,

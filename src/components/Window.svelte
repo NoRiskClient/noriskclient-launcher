@@ -73,6 +73,11 @@
         alert("You are offline! Please connect to the internet and restart the app.\n If this problem persists, please contact the developer.\n\n (Error: " + e + ")");
         console.error(e);
     });
+
+    async function toggleMaintenance() {
+        if (prompt("Enter the password to toggle maintenance mode") != "password") return;
+        MAINTENANCE_MODE = !MAINTENANCE_MODE;
+    }
 </script>
 
 <div class="window">
@@ -84,7 +89,7 @@
                 <div class="black-bar" data-tauri-drag-region></div>
                 <div class="maintenance-mode">
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="title text" on:click={() => { MAINTENANCE_MODE = false }}>Maintenance Mode</h1>
+                    <h1 class="title text" on:click={() => toggleMaintenance}>Maintenance Mode</h1>
                     <p class="text">The server is currently in maintenance mode. Please try again later.</p>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="quit-button" on:click={() => { window.close(); }}>Exit</h1>

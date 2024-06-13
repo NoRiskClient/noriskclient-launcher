@@ -11,6 +11,7 @@
 
     export let currentBranch;
     export let options;
+    export let featureWhitelist;
     export let forceServer;
     export let customServerLogs;
     export let customServerProgress;
@@ -35,25 +36,28 @@
             alert("Failed to load featured servers:\n" + e);
         });
 
-        await invoke("get_custom_servers", {
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-            uuid: options.currentUuid
-        }).then((result) => {
-            console.log(`Loaded custom servers: `);
-            console.log(result);
-            customServers = result.servers;
-            customServerLimit = result.limit;
-            baseDomain = result.baseUrl;
-            customServers.forEach(server => {
-                if (!customServerLogs[server._id]) {
-                    customServerLogs[server._d] = [];
-                }
+        if (featureWhitelist.includes("CUSTOM_SERVERS")) {
+            await invoke("get_custom_servers", {
+                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+                uuid: options.currentUuid
+            }).then((result) => {
+                console.log(`Loaded custom servers: `);
+                console.log(result);
+                customServers = result.servers;
+                customServerLimit = result.limit;
+                baseDomain = result.baseUrl;
+                customServers.forEach(server => {
+                    if (!customServerLogs[server._id]) {
+                        customServerLogs[server._d] = [];
+                    }
+                });
+            }).catch((e) => {
+                customServers = [];
+                console.error(e);
+                alert("Failed to load custom servers:\n" + e);
             });
-        }).catch((e) => {
-            customServers = [];
-            console.error(e);
-            alert("Failed to load custom servers:\n" + e);
-        });
+        }
+
     }
 
     loadData();
@@ -67,13 +71,20 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="home-button" on:click={() => dispatch("home")}>[HOME]</h1>
     <div class="servers-wrapper">
-        <div class="navbar">
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
-            <h2>|</h2>
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
-        </div>
+        {#if featureWhitelist.includes("CUSTOM_SERVERS")}
+            <div class="navbar">
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+                <h2>|</h2>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+            </div>
+        {:else}
+            <div class="navbar">
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1>Featured Servers</h1>
+            </div>
+        {/if}
         {#if currentTabIndex === 0}
             {#if featuredServers !== null && featuredServers.length > 0 }
                 <VirtualList height="30em" items={featuredServers} let:item>

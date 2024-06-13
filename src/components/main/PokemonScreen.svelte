@@ -23,6 +23,7 @@
   let launcherProfiles = {};
   let featureWhitelist = [];
   let friendInviteSlots = {};
+  let discordLinked = false;
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
@@ -230,14 +231,20 @@
     });
   }
 
-  onMount(async () => {
+  async function loadAllData() {
     await requestBranches();
+    featureWhitelist = [];
     await checkFeatureWhitelist("INVITE_FRIENDS");
     await checkFeatureWhitelist("CUSTOM_SERVERS");
     await checkFeatureWhitelist("MCREAL_APP");
     if (featureWhitelist.includes("INVITE_FRIENDS")) {
       await loadFriendInvites();
     }
+    await check_discord_link();
+  }
+
+  onMount(() => {
+    loadAllData();
   });
 
   listen("client-exited", () => {
@@ -434,6 +441,33 @@
       alert(err);
     });
   }
+  
+  async function check_discord_link() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("check_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      discordLinked = result;
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+    });
+  }
+
+  async function unlink_discord() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("unlink_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then(() => {
+      discordLinked = false;
+      alert("Discord unlinked successfully!");
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+    });
+  }
 
   function closeWindow() {
     appWindow.close();
@@ -452,7 +486,7 @@
   {/if}
 
   {#if showServersScreen}
-    <ServersScreen on:home={home} on:play={runClient} bind:options bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
@@ -468,7 +502,7 @@
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={() => { requestBranches(); loadFriendInvites(); }} bind:options bind:showModal={settingsShown} bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
+    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown} bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
   {/if}
   
   {#if mcRealQrCodeShown}
@@ -487,23 +521,23 @@
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
-    {/if}
+      {/if}
+      <div class="left-settings-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 on:click={() => discordLinked ? unlink_discord : connect_discord_intigration}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+    </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
       {#if options.accounts.length > 0 && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={connect_discord_intigration}>DISCORD</h1>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
-        {#if featureWhitelist.includes("CUSTOM_SERVERS")}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
-        {/if}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
         {#if featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1}
@@ -622,6 +656,32 @@
         cursor: default;
     }
 
+    .left-settings-button-wrapper {
+        position: absolute;
+        top: 5em;
+        left: 2.5px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+    }
+
+    .left-settings-button-wrapper h1 {
+        font-size: 11px;
+        font-family: 'Press Start 2P', serif;
+        margin-bottom: 1em;
+        cursor: pointer;
+        color: var(--secondary-color);
+        text-shadow: 1px 1px var(--secondary-color-text-shadow);
+        transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+    }
+
+    .left-settings-button-wrapper h1:hover {
+        color: var(--hover-color);
+        text-shadow: 1px 1px var(--hover-color-text-shadow);
+        transform: scale(1.2);
+    }
+    
     .settings-button-wrapper {
         position: absolute;
         top: 5em;

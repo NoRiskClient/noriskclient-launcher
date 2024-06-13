@@ -139,6 +139,16 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken/reset", norisk_token, request_uuid).await
     }
 
+    /// Request discord link status
+    pub async fn discord_link_status(norisk_token: &str, request_uuid: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint("core/oauth/discord/check", norisk_token, request_uuid).await
+    }
+    
+    /// Request discord link status
+    pub async fn unlink_discord(norisk_token: &str, request_uuid: &str) -> Result<String> {
+        Self::delete_from_norisk_endpoint("core/oauth/discord/unlink", norisk_token, request_uuid).await
+    }
+
     /// Request whitelist slots
     pub async fn whitelist_slots(norisk_token: &str, request_uuid: &str) -> Result<WhitelistSlots> {
         Self::request_from_norisk_endpoint("core/whitelist/slots", norisk_token, request_uuid).await
