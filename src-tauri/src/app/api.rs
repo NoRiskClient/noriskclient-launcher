@@ -111,7 +111,7 @@ impl ApiEndpoints {
 
     /// Request all available branches
     pub async fn await_auth_response(id: u32) -> Result<LoginData> {
-        Self::post_from_await_endpoint("auth/await", id).await
+        Self::post_from_await_endpoint("core/auth/await", id).await
     }
 
     /// Request launch manifest of specific build
