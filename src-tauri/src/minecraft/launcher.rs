@@ -39,7 +39,7 @@ impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
     }
 }
 
-pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     let launcher_data_arc = Arc::new(launcher_data);
 
     let features: HashSet<String> = HashSet::new();
@@ -234,7 +234,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, data: &Path, manifest: N
     let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
     fs::create_dir_all(&norisk_asset_dir).await?;
 
-    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token).await;
+    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token, uuid).await;
 
     let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
         Ok(norisk_assets) => norisk_assets.objects,

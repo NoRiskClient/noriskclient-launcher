@@ -9,7 +9,7 @@ use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{downl
 use crate::utils::{get_maven_artifact_path, sha1sum};
 use std::sync::Arc;
 use log::{debug, info};
-use crate::app::api::get_launcher_api_base;
+use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
@@ -138,6 +138,7 @@ impl ArgumentDeclaration {
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         if parameter.force_server.is_some() {
+            println!("\n\n\nAdded force server arg: {:?}\n\n\n.", parameter.force_server.clone().unwrap());
             command_arguments.push(format!("-Dnorisk.forceServer={}", parameter.force_server.clone().unwrap()));
         }
         for arg in parameter.custom_java_args.split(" ") {
@@ -394,7 +395,7 @@ impl AssetObject {
             progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
 
             info!("Downloading {}", self.hash);
-            download_private_file_untracked(&*format!("{}/launcherapi/v1/assets/{}/{}/{}", get_launcher_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), norisk_token, asset_file_path).await?;
+            download_private_file_untracked(&*format!("{}/launcher/assets/{}/{}/{}", get_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), norisk_token, asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)

@@ -6,8 +6,7 @@ use log::{debug, info};
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
-use crate::app::app_data::LauncherProfile;
-use crate::app::modrinth_api::{Datapack, ModrinthApiEndpoints, ResourcePack, Shader};
+use crate::app::modrinth_api::{Datapack, ResourcePack, Shader};
 use crate::error::LauncherError;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
@@ -18,7 +17,7 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     info!("Loading minecraft version manifest...");
     let mc_version_manifest = VersionManifest::download().await?;
 
@@ -66,7 +65,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, launch_manifest: 
 
     info!("Launching {}...", launch_manifest.build.branch);
 
-    launcher::launch(norisk_token,&data_directory, launch_manifest, version, launching_parameter, progress, window).await?;
+    launcher::launch(norisk_token, uuid, &data_directory, launch_manifest, version, launching_parameter, progress, window).await?;
     Ok(())
 }
 
@@ -126,14 +125,13 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
 
             match &current_mod.source {
                 ModSource::Repository { repository, artifact, url } => {
-                    let mut download_url: String = "".to_owned();
-                    if url.clone().is_some() {
-                        download_url = url.clone().unwrap();
+                    let download_url = if let Some(url) = url.clone() {
+                        url
                     } else {
                         let repository_url = manifest.repositories.get(repository).ok_or_else(|| LauncherError::InvalidVersionProfile(format!("There is no repository specified with the name {}", repository)))?;
                         let maven_artifact_path = get_maven_artifact_path(artifact)?;
-                        download_url = format!("{}{}", repository_url, maven_artifact_path);
-                    }
+                        format!("{}{}", repository_url, maven_artifact_path)
+                    };
 
                     info!("downloading mod {} from {}", artifact, download_url);
 

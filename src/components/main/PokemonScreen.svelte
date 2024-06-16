@@ -8,25 +8,33 @@
   import SkinButton from "./SkinButton.svelte";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
   import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import AddonsScreen from "../addons/AddonsScreen.svelte";
+  import InvitePopup from "../invite/InvitePopup.svelte";
+  import ServersScreen from "../servers/ServersScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
 
   export let options;
   let branches = [];
   let launcherProfiles = {};
+  let featureWhitelist = [];
+  let friendInviteSlots = {};
+  let discordLinked = false;
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
   let refreshingAccount = false;
+  let forceServer = null;
 
   let progressBarMax = 0;
   let progressBarProgress = 0;
   let progressBarLabel = "";
   let settingsShown = false;
+  let mcRealQrCodeShown = false;
   let clientLogShown = false;
   let showProfilesScreen = false;
   let showProfilesScreenHack = false;
@@ -36,7 +44,12 @@
   let showCapeScreenHack = false;
   let showAddonsScreen = false;
   let showAddonsScreenHack = false;
+  let showInvitePopup = false;
+  let showServersScreen = false;
+  let showServersScreenHack = false;
   let log = [];
+  let customServerProgress = {};
+  let customServerLogs = {};
 
   listen("process-output", event => {
     log = [...log, event.payload];
@@ -61,6 +74,37 @@
     }
   });
 
+  listen("custom-server-process-output", event => {
+    console.log(event.payload);
+    if (customServerLogs[event.payload.server_id] == null) {
+      customServerLogs[event.payload.server_id] = [];
+    }
+    customServerLogs[event.payload.server_id] = [...customServerLogs[event.payload.server_id], event.payload.data];
+  });
+
+  listen("custom-server-progress-update", event => {
+    let progressUpdate = event.payload.data;
+
+    if (customServerProgress[event.payload.server_id] == null) {
+      customServerProgress[event.payload.server_id] = {label: '', progress: 0, max: 0};
+    }
+
+    switch (progressUpdate.type) {
+      case "max": {
+        customServerProgress[event.payload.server_id]["max"] = progressUpdate.value;
+        break;
+      }
+      case "progress": {
+        customServerProgress[event.payload.server_id]["progress"] = progressUpdate.value;
+        break;
+      }
+      case "label": {
+        customServerProgress[event.payload.server_id]["label"] = progressUpdate.value;
+        break;
+      }
+    }
+  });
+
   function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -80,9 +124,10 @@
 
   async function requestBranches() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
     await invoke("request_norisk_branches", {
-      isExperimental: options.experimentalMode,
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
     })
       .then((result) => {
         const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
@@ -156,8 +201,51 @@
     })
   }
 
-  onMount(async () => {
+  async function checkFeatureWhitelist(feature) {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("check_feature_whitelist", {
+      feature: feature,
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      console.debug(feature + ":", result);
+      if (!result) return;
+      featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
+    }).catch((reason) => {
+      console.error(reason);
+      featureWhitelist = [];
+    });
+  }
+
+  async function loadFriendInvites() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("get_whitelist_slots", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      console.debug("Received Whitelist Slots", result);
+      friendInviteSlots = result;
+    }).catch((reason) => {
+      alert(reason);
+      console.error(reason);
+      friendInviteSlots = {};
+    });
+  }
+
+  async function loadAllData() {
     await requestBranches();
+    featureWhitelist = [];
+    await checkFeatureWhitelist("INVITE_FRIENDS");
+    await checkFeatureWhitelist("CUSTOM_SERVERS");
+    await checkFeatureWhitelist("MCREAL_APP");
+    if (featureWhitelist.includes("INVITE_FRIENDS")) {
+      await loadFriendInvites();
+    }
+    await check_discord_link();
+  }
+
+  onMount(() => {
+    loadAllData();
   });
 
   listen("client-exited", () => {
@@ -166,11 +254,13 @@
     progressBarLabel = null;
     progressBarProgress = 0;
     progressBarMax = null;
+    forceServer = null;
   });
-
+  
   listen("client-error", (e) => {
     clientLogShown = true;
     console.error(e.payload);
+    forceServer = null;
   });
 
   export async function runClient() {
@@ -215,6 +305,7 @@
     await invoke("get_launch_manifest", {
         branch: branch,
         noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+        uuid: options.currentUuid
     }).then((result) => {
         console.debug("Launch Manifest", result);
         launchManifest = result;
@@ -246,17 +337,22 @@
       });
     });
 
+    home();
+
     console.debug("Running Branch", branch);
+    console.log(forceServer);
     await invoke("run_client", {
       branch: branch,
       loginData: loginData,
       options: options,
-      forceServer: launchManifest.server.length > 0 ? launchManifest.server : null,
+      forceServer: forceServer != null ? forceServer : launchManifest.server?.length > 0 ? launchManifest.server : null,
       mods: installedMods,
       shaders: launcherProfiles.addons[branch].shaders,
       resourcepacks: launcherProfiles.addons[branch].resourcePacks,
       datapacks: launcherProfiles.addons[branch].datapacks
     });
+
+    forceServer = `${forceServer}:LAUNCHED`;
   }
 
   let dataFolderPath;
@@ -269,6 +365,10 @@
 
   function preventSelection(event) {
     event.preventDefault();
+  }
+
+  function handleShowInvitePopup() {
+    showInvitePopup = true;
   }
 
   function handleOpenProfilesScreen() {
@@ -298,8 +398,16 @@
       showAddonsScreen = true;
     }, 300);
   }
+  
+  function handleOpenServersScreen() {
+    showServersScreenHack = true;
+    setTimeout(() => {
+      showServersScreen = true;
+    }, 300);
+  }
 
   function home() {
+    showInvitePopup = false;
     showProfilesScreen = false;
     showProfilesScreenHack = false;
     showSkinScreen = false;
@@ -308,6 +416,8 @@
     showCapeScreenHack = false;
     showAddonsScreen = false;
     showAddonsScreenHack = false;
+    showServersScreen = false;
+    showServersScreenHack = false;
   }
 
   function homeWhileClientRunning() {
@@ -323,6 +433,50 @@
     }, 100);
   }
 
+  async function connect_discord_intigration() {
+    if ((await check_discord_link()) == true) return discordLinked = true;
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("connect_discord_intigration", { options, loginData }).then(() => {
+      console.log("Connected to Discord Intigration");
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+    });
+  }
+  
+  async function check_discord_link() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let linked;
+    await invoke("check_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      discordLinked = result;
+      linked = result;
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+      linked = false;
+    });
+    return linked;
+  }
+
+  async function unlink_discord() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("unlink_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then(() => {
+      alert("Discord unlinked successfully!");
+      check_discord_link();
+    }).catch(async err => {
+      console.error(err);
+      const still_linked = await check_discord_link();
+      if (still_linked) return;
+      alert("Discord unlinked successfully!");
+    });
+  }
+
   function closeWindow() {
     appWindow.close();
   }
@@ -331,8 +485,16 @@
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
+  {#if showInvitePopup}
+    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup} bind:friendInviteSlots />
+  {/if}
+
   {#if showAddonsScreen}
     <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+  {/if}
+
+  {#if showServersScreen}
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
@@ -344,12 +506,15 @@
   {/if}
 
   {#if showCapeScreen}
-  <CapeScreen on:home={home} bind:options></CapeScreen>
+    <CapeScreen on:home={home} bind:options></CapeScreen>
   {/if}
 
   {#if settingsShown}
-  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown}
-  dataFolderPath={dataFolderPath}></SettingsModal>
+    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown} bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
+  {/if}
+  
+  {#if mcRealQrCodeShown}
+    <McRealAppModal bind:options bind:showModal={mcRealQrCodeShown}></McRealAppModal>
   {/if}
 
   {#if clientLogShown}
@@ -357,30 +522,41 @@
   {/if}
 
   {#if clientRunning}
-    <LoadingScreen bind:log bind:clientLogShown progressBarMax={progressBarMax}
-    progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning}></LoadingScreen>
+    <LoadingScreen bind:log progressBarMax={progressBarMax} progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning} />
   {/if}
 
-  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack) && !clientRunning && !clientLogShown}
+  {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack && !showServersScreenHack) && !clientRunning && !clientLogShown}
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
+    <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+    </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
+      {#if options.accounts.length > 0 && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
+      {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
+        <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
+        {#if featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 on:click={handleShowInvitePopup}>INVITE</h1>
+        {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
+        <h1 on:click={handleOpenSkinScreen}>SKIN</h1>
       {/if}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={() => {options.toggleTheme()}}>{options.theme === "LIGHT" ? "DARK" : "LIGHT"}</h1>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="quit" on:click={closeWindow}>QUIT</h1>
     </div>
@@ -488,6 +664,32 @@
         cursor: default;
     }
 
+    .left-settings-button-wrapper {
+        position: absolute;
+        top: 5em;
+        left: 2.5px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+    }
+
+    .left-settings-button-wrapper h1 {
+        font-size: 11px;
+        font-family: 'Press Start 2P', serif;
+        margin-bottom: 1em;
+        cursor: pointer;
+        color: var(--secondary-color);
+        text-shadow: 1px 1px var(--secondary-color-text-shadow);
+        transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+    }
+
+    .left-settings-button-wrapper h1:hover {
+        color: var(--hover-color);
+        text-shadow: 1px 1px var(--hover-color-text-shadow);
+        transform: scale(1.2);
+    }
+    
     .settings-button-wrapper {
         position: absolute;
         top: 5em;
@@ -518,6 +720,19 @@
         color: red;
         text-shadow: 1px 1px #460000;
         transform: scale(1.2);
+    }
+
+    .settings-button-wrapper h1.invite-button {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      font-size: 12.5px;
+    }
+
+    .settings-button-wrapper h1.invite-button p {
+      margin-bottom: 5px;
+      padding-right: 5px;
+      font-size: 15px;
     }
 
     .back-to-loading-button {

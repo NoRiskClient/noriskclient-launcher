@@ -40,6 +40,7 @@
 
     input {
       margin-right: 5px;
+      border-radius: 5px;
     }
 
     button {

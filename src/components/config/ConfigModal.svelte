@@ -12,7 +12,8 @@
 
   export let showModal;
   export let options;
-  export let dataFolderPath;
+  export let featureWhitelist;
+  export let showMcRealAppModal;
 
   async function hideSettings() {
     await saveData().then(() => {
@@ -23,6 +24,7 @@
 
   let dialog; // HTMLDialogElement
   let showExperimentalTokenModal = false;
+  let lightTheme = options.theme == "LIGHT";
 
   $: if (dialog && showModal) dialog.showModal();
 
@@ -59,10 +61,12 @@
       return;
     }
     invoke("enable_experimental_mode", { experimentalToken }).then(async allowed => {
+      featureWhitelist = [];
       options.experimentalModeToken = experimentalToken;
       options.experimentalMode = allowed;
       console.log(`Enabled experimental mode: ${allowed}`);
     }).catch(e => {
+      featureWhitelist = [];
       options.experimentalMode = false;
       options.experimentalModeToken = "";
       alert(`Failed to enable experimental mode: ${e}`);
@@ -107,6 +111,11 @@
     });
   }
 
+  function toggleTheme() {
+    options.toggleTheme();
+    lightTheme = options.theme == "LIGHT";
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -136,10 +145,17 @@
             <ResetSettingButton bind:setting={options.experimentalModeToken} defaultValue="" tooltip="Clear cached token" />
           {/if}
         </div>
+        <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${options.theme}`}/>
+        {#if featureWhitelist.includes("MCREAL_APP")}
+          <div class="mcreal-app-wrapper">
+            <h1 class="title">MCReal App</h1>
+            <h1 class="button" on:click={() => { hideSettings(); showMcRealAppModal = true; }}>Details</h1>
+          </div>
+        {/if}
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={options.memoryPercentage} step={1} />
-        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads}
-                      step={1} />
-        <ConfigFolderInput title="Java Path" bind:value={options.customJavaPath} />
+        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={options.concurrentDownloads} step={1} />
+        <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
+        <!-- <ConfigFolderInput title="Java Path" bind:value={options.customJavaPath} /> -->
         <ConfigTextInput title="Custom JVM args" bind:value={options.customJavaArgs} />
         <ConfigFolderInput title="Data Folder" bind:value={options.dataPath} />
       </div>
@@ -230,6 +246,32 @@
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
+    }
+    
+    .mcreal-app-wrapper {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    .mcreal-app-wrapper > .title {
+        font-family: 'Press Start 2P', serif;
+        font-size: 14px;
+        color: white;
+    }
+
+    .mcreal-app-wrapper > .button {
+        font-family: 'Press Start 2P', serif;
+        font-size: 14px;
+        color: var(--primary-color);
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+
+    .mcreal-app-wrapper > .button:hover {
+        transform: scale(1.15);
     }
 
     .clear-data-button-wrapper {

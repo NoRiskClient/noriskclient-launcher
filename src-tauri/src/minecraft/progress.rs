@@ -14,6 +14,9 @@ pub enum ProgressUpdateSteps {
     DownloadAssets,
     DownloadNoRiskAssets,
     VerifyNoRiskAssets,
+
+    DownloadCustomServerJar,
+    DownloadCustomServerInstallerJar
 }
 
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
@@ -26,7 +29,7 @@ pub fn get_max(len: usize) -> u64 {
 
 impl ProgressUpdateSteps {
     fn len() -> usize {
-        7
+        12
     }
 
     fn step_idx(&self) -> usize {
@@ -41,6 +44,9 @@ impl ProgressUpdateSteps {
             ProgressUpdateSteps::DownloadShader => 7,
             ProgressUpdateSteps::DownloadResourcePack => 8,
             ProgressUpdateSteps::DownloadDatapack => 9,
+
+            ProgressUpdateSteps::DownloadCustomServerJar => 1,
+            ProgressUpdateSteps::DownloadCustomServerInstallerJar => 2,
         }
     }
 }
