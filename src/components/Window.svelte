@@ -75,7 +75,7 @@
     });
 
     async function toggleMaintenance() {
-        if (prompt("Enter the password to toggle maintenance mode") != "password") return;
+        if (prompt("Enter the password to toggle maintenance mode") != "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl") return;
         MAINTENANCE_MODE = !MAINTENANCE_MODE;
     }
 </script>
@@ -89,7 +89,7 @@
                 <div class="black-bar" data-tauri-drag-region></div>
                 <div class="maintenance-mode">
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="title text" on:click={() => toggleMaintenance}>Maintenance Mode</h1>
+                    <h1 class="title text" on:click={() => toggleMaintenance()}>Maintenance Mode</h1>
                     <p class="text">The server is currently in maintenance mode. Please try again later.</p>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="quit-button" on:click={() => { window.close(); }}>Exit</h1>

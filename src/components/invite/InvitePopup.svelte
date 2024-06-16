@@ -32,6 +32,7 @@
           hideSettings();
         }).catch((e) => {
           alert("An error occurred while inviting " + friendIdentifier + " to the NRC closed beta: " + e);
+          console.error(e);
         });
       }
     }

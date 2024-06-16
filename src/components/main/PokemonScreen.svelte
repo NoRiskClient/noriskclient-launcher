@@ -208,7 +208,8 @@
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
       uuid: options.currentUuid
     }).then((result) => {
-      console.debug("Feature Toggles", result);
+      console.debug(feature + ":", result);
+      if (!result) return;
       featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
     }).catch((reason) => {
       console.error(reason);
@@ -456,6 +457,7 @@
   }
 
   async function unlink_discord() {
+    console.log("AAAAAAAA");
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("unlink_discord_intigration", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
@@ -521,10 +523,10 @@
     {#if fakeClientRunning}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
-      {/if}
-      <div class="left-settings-button-wrapper">
+    {/if}
+    <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={() => discordLinked ? unlink_discord : connect_discord_intigration}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+      <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
     </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
       {#if options.accounts.length > 0 && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}

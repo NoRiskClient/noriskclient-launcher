@@ -61,6 +61,7 @@
     }
 
     loadData();
+    console.log(featureWhitelist);
 </script>
 
 {#if createCustomServer}

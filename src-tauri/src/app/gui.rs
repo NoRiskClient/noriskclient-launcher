@@ -815,7 +815,7 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
-async fn request_norisk_maintenance_mode() -> Result<bool, String> {
+async fn check_maintenance_mode() -> Result<bool, String> {
     let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
         .await
         .map_err(|e| format!("unable to request maintenance mode: {:?}", e))?;
@@ -1433,7 +1433,7 @@ pub fn gui_main() {
             check_online_status,
             get_options,
             store_options,
-            request_norisk_maintenance_mode,
+            check_maintenance_mode,
             request_norisk_branches,
             connect_discord_intigration,
             check_discord_intigration,

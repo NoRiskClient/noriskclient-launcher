@@ -28,6 +28,8 @@
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
       }).catch(e => {
         console.error(e);
+        alert("You have to start your game at least once to use the McReal App!");
+        dialog.close();
       });
     }
     
