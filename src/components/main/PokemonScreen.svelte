@@ -434,6 +434,7 @@
   }
 
   async function connect_discord_intigration() {
+    if ((await check_discord_link()) == true) return discordLinked = true;
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("connect_discord_intigration", { options, loginData }).then(() => {
       console.log("Connected to Discord Intigration");
@@ -445,29 +446,34 @@
   
   async function check_discord_link() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let linked;
     await invoke("check_discord_intigration", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
       uuid: options.currentUuid
     }).then((result) => {
       discordLinked = result;
+      linked = result;
     }).catch(err => {
       console.error(err);
       alert(err);
+      linked = false;
     });
+    return linked;
   }
 
   async function unlink_discord() {
-    console.log("AAAAAAAA");
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("unlink_discord_intigration", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
       uuid: options.currentUuid
     }).then(() => {
-      discordLinked = false;
       alert("Discord unlinked successfully!");
-    }).catch(err => {
+      check_discord_link();
+    }).catch(async err => {
       console.error(err);
-      alert(err);
+      const still_linked = await check_discord_link();
+      if (still_linked) return;
+      alert("Discord unlinked successfully!");
     });
   }
 

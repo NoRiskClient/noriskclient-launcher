@@ -91,6 +91,7 @@ fn open_url(url: &str, size: (u32, u32), handle: tauri::AppHandle) -> Result<(),
     let _ = window.set_focus();
     let _ = window.set_minimizable(false);
     let _ = window.set_maximizable(false);
+    let _ = window.set_always_on_top(true);
     Ok(())
 }
 
@@ -855,6 +856,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
     let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
     let _ = open_url(url.as_str(), (1200, 900), handle);
+
     Ok(())
 }
 
