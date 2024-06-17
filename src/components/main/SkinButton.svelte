@@ -10,6 +10,7 @@
 
   let skinHovered = false;
   export let options;
+  export let branches;
 
   function handleSkinHover() {
     skinHovered = true;
@@ -48,7 +49,7 @@
 
       options.store();
       setTimeout(async () => {
-        dispatch("requestBranches")
+        dispatch("requestBranches");
       }, 100);
     }).catch(e => {
       console.error("microsoft authentication error", e);
@@ -65,11 +66,11 @@
 </script>
 
 <div transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
-  <Modal bind:options={options} bind:showModal></Modal>
+  <Modal bind:options={options} bind:showModal refreshData={() => dispatch("requestBranches")}></Modal>
   <div class="skin-kopf-container"
        on:mouseenter={handleSkinHover}
        on:mouseleave={handleSkinHoverOut}>
-    {#if uuid !== null}
+    {#if uuid !== null && branches.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <img class="skin-kopf"
              src={`https://mineskin.eu/helm/${uuid}/150.png`}

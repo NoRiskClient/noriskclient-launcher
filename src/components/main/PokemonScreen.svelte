@@ -434,14 +434,21 @@
   }
 
   async function connect_discord_intigration() {
-    if ((await check_discord_link()) == true) return discordLinked = true;
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    await invoke("connect_discord_intigration", { options, loginData }).then(() => {
-      console.log("Connected to Discord Intigration");
-    }).catch(err => {
-      console.error(err);
-      alert(err);
-    });
+    if ((await check_discord_link()) === true) {
+					discordLinked = true;
+					return;
+				}
+				const loginData = options.accounts.find(
+					(obj) => obj.uuid === options.currentUuid,
+				);
+				await invoke("connect_discord_intigration", { options, loginData })
+					.then(() => {
+						console.log("Connected to Discord Intigration");
+					})
+					.catch((err) => {
+						console.error(err);
+						alert(err);
+					});
   }
   
   async function check_discord_link() {
@@ -458,7 +465,7 @@
       alert(err);
       linked = false;
     });
-    return linked;
+    return linked ?? false;
   }
 
   async function unlink_discord() {
@@ -531,17 +538,19 @@
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+      {/if}
     </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
-      {#if options.accounts.length > 0 && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
-      {#if options.accounts.length > 0}
+      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -570,7 +579,7 @@
       on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
-          hidden={branches.length < 1 || options.currentUuid == null}>
+          style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
         &lt;</h1>
       <section style="display:flex;justify-content:center">
         {#if refreshingAccount}
@@ -597,10 +606,10 @@
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
           class="nes-font switch" on:click={() => handleSwitchBranch(false)}
-          hidden={branches.length < 1 || options.currentUuid == null}>
+          style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
         &gt;</h1>
     </div>
-    <SkinButton on:launch={runClient} on:requestBranches={requestBranches} bind:options={options}></SkinButton>
+    <SkinButton on:launch={runClient} on:requestBranches={() => loadAllData()} bind:options={options} bind:branches={branches} />
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
         on:mousedown={preventSelection} class="copyright">
       © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.8
