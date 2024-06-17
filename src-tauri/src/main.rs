@@ -4,15 +4,9 @@ all(not(debug_assertions), target_os = "windows"),
 windows_subsystem = "windows"
 )]
 
-use std::{fs, io};
-use std::{
-    thread::sleep,
-    time::{Duration, Instant},
-};
-
-use anyhow::Result;
+use std::fs;
 use directories::ProjectDirs;
-use log::{debug, error, info, LevelFilter, SetLoggerError, trace, warn};
+use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -21,13 +15,11 @@ use log4rs::{
         },
     },
     config::{Appender, Config, Root},
-    encode::pattern::PatternEncoder,
-    filter::threshold::ThresholdFilter,
+    encode::pattern::PatternEncoder
 };
-use once_cell::sync::Lazy;
 use reqwest::Client;
-use tracing::debug;
-use tracing_subscriber::layer::SubscriberExt;
+use anyhow::Result;
+use once_cell::sync::Lazy;
 
 pub mod app;
 pub mod minecraft;
@@ -45,9 +37,9 @@ static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
 });
 
 static APP_USER_AGENT: &str = concat!(
-env!("CARGO_PKG_NAME"),
-"/",
-env!("CARGO_PKG_VERSION"),
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
 );
 
 /// HTTP Client with launcher agent

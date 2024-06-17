@@ -87,6 +87,7 @@
         await invoke("get_launch_manifest", {
             branch: currentBranch,
             noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then((result) => {
             console.debug("Launch Manifest", result);
             launchManifest = result

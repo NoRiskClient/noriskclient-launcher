@@ -9,6 +9,7 @@
     // Load options from file
     let options;
     let showUpdateScreen = null;
+    let MAINTENANCE_MODE = false;
 
     onMount(async () => {
         const reload = async (afterReload) => {
@@ -57,6 +58,14 @@
         reload()
     });
 
+    invoke("check_maintenance_mode").then((isInMaintenance) => {
+        if (isInMaintenance) {
+            MAINTENANCE_MODE = true;
+        }
+    }).catch(e => {
+        console.error(e);
+    });
+
 
     invoke("check_online_status").then((result) => {
         console.debug("online status", result);
@@ -64,6 +73,11 @@
         alert("You are offline! Please connect to the internet and restart the app.\n If this problem persists, please contact the developer.\n\n (Error: " + e + ")");
         console.error(e);
     });
+
+    async function toggleMaintenance() {
+        if (prompt("Enter the password to toggle maintenance mode") != "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl") return;
+        MAINTENANCE_MODE = !MAINTENANCE_MODE;
+    }
 </script>
 
 <div class="window">
@@ -71,9 +85,74 @@
         {#if showUpdateScreen}
             <UpdateManager/>
         {:else}
-            <PokemonScreen bind:options={options}></PokemonScreen>
+            {#if MAINTENANCE_MODE}
+                <div class="black-bar" data-tauri-drag-region></div>
+                <div class="maintenance-mode">
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <h1 class="title text" on:click={() => toggleMaintenance()}>Maintenance Mode</h1>
+                    <p class="text">The server is currently in maintenance mode. Please try again later.</p>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <h1 class="quit-button" on:click={() => { window.close(); }}>Exit</h1>
+                </div>
+                <div class="black-bar" data-tauri-drag-region></div>
+            {:else}
+                <PokemonScreen bind:options={options}></PokemonScreen>
+            {/if}
         {/if}
     {:else}
         <StartUpScreen/>
     {/if}
 </div>
+
+<style>
+    .black-bar {
+        width: 100%;
+        height: 10vh;
+        background-color: #151515;
+    }
+    
+    .text {
+        color: #e8e8e8;
+        text-shadow: 2px 2px #7a7777;
+        font-family: 'Press Start 2P', serif;
+        text-align: center;
+    }
+
+    .maintenance-mode {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 80vh;
+    }
+
+    .maintenance-mode .title {
+        margin-top: 50px;
+        font-size: 30px;
+        margin-bottom: 20px;
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    .maintenance-mode p {
+        font-size: 15px;
+        text-shadow: none;
+        padding: 0 35px;
+    }
+
+    .quit-button {
+        cursor: pointer;
+        margin-top: 100px;
+        color: red;
+        text-shadow: 2px 2px #460000;
+        font-family: 'Press Start 2P', serif;
+        text-align: center;
+        font-size: 40px;
+        cursor: pointer;
+        transition-duration: 300ms;
+    }
+
+    .quit-button:hover {
+        transform: scale(1.3);
+    }
+</style>

@@ -27,7 +27,11 @@
       options.store();
     }).catch(e => {
       console.error("microsoft authentication error", e);
-      alert(e);
+      if (e.includes(403)) {
+        alert("NoRiskClient is currently still in closed beta.\n Please wait for a public release.");
+      } else {
+        alert(e);
+      }
     });
   };
 </script>

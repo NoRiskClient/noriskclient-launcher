@@ -9,13 +9,15 @@
     export let name;
     export let icon;
     export let subdomain;
+    export let baseDomain;
 
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     async function next() {
         await invoke('check_custom_server_subdomain', {
             subdomain: subdomain,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then(() => {
             dispatch('next');
         }).catch(err => {
@@ -31,7 +33,7 @@
     <div class="row">
         <div class="column" style="width: 65%;">
             <TextInput bind:value={name} title="Server Name" placeholder="Your server name..." autofocus={true} />
-            <TextInput bind:value={subdomain} title="Domain" placeholder="Your custom subdomain..." suffix=".norisk.gg" />
+            <TextInput bind:value={subdomain} title="Domain" placeholder="Your custom subdomain..." suffix={`.${baseDomain}`} />
         </div>
         <div class="column" style="gap: 0em;">
             <h1>Icon</h1>

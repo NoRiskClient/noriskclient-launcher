@@ -3,9 +3,9 @@ use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{Manager, Window};
+use tauri::{LogicalSize, Manager, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
-use tokio::{fs, io::AsyncReadExt};
+use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
 use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -16,7 +16,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::minecraft::auth;
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{self, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -24,7 +24,8 @@ struct RunnerInstance {
 
 struct AppState {
     runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
-    custom_server_instance: Arc<Mutex<Option<RunnerInstance>>>,
+    forwarding_manager_process: Arc<Mutex<Option<Child>>>,
+    custom_server_process: Arc<Mutex<Option<Child>>>,
 }
 
 
@@ -51,6 +52,21 @@ struct NewMinecraftSkinBody {
     file: Vec<u8>,
 }
 
+#[derive(serde::Deserialize)]
+struct PlayerDBData {
+    data: PlayerDBEntry,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayerDBEntry {
+    player: Option<PlayerDBPlayer>,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayerDBPlayer {
+    id: String
+}
+
 #[tauri::command]
 async fn check_online_status() -> Result<(), String> {
     //TODO
@@ -63,13 +79,19 @@ async fn check_online_status() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
+fn open_url(url: &str, size: (u32, u32), handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
         &handle,
         "external", /* the unique window label */
         tauri::WindowUrl::External(url.parse().unwrap()),
     ).build().unwrap();
-    window.set_title("NoRiskClient");
+    let _ = window.set_title("NoRiskClient");
+    let _ = window.set_size(LogicalSize::new(size.0, size.1));
+    let _ = window.set_resizable(false);
+    let _ = window.set_focus();
+    let _ = window.set_minimizable(false);
+    let _ = window.set_maximizable(false);
+    let _ = window.set_always_on_top(true);
     Ok(())
 }
 
@@ -490,7 +512,7 @@ async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(
     // dialog_result will be of type Option<PathBuf> now.
 
     match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(_result) => { () },
+        Ok(_) => { () }
         Err(err) => {
             message(Some(&window), "Cape Error", err);
         }
@@ -546,6 +568,29 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(_err) => {
+            Err("Error Requesting mcreal App token".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid).await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(_err) => {
+            Err("Error Requesting mcreal App token".to_string())
+        }
+    }
+}
 
 #[tauri::command]
 async fn get_options() -> Result<LauncherOptions, String> {
@@ -771,8 +816,16 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
-async fn request_norisk_branches(norisk_token: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(norisk_token)
+async fn check_maintenance_mode() -> Result<bool, String> {
+    let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
+        .await
+        .map_err(|e| format!("unable to request maintenance mode: {:?}", e))?;
+    Ok(maintenance_mode)
+}
+
+#[tauri::command]
+async fn request_norisk_branches(norisk_token: &str, uuid: &str) -> Result<Vec<String>, String> {
+    let branches = ApiEndpoints::norisk_branches(norisk_token, uuid)
         .await
         .map_err(|e| format!("unable to request branches: {:?}", e))?;
     Ok(branches)
@@ -786,8 +839,8 @@ async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, Stri
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str, norisk_token: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token).await
+async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: &str) -> Result<NoRiskLaunchManifest, String> {
+    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
     Ok(manifest)
 }
@@ -800,14 +853,36 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions) -> Result<LoginData, String> {
+async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
+    let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
+    let _ = open_url(url.as_str(), (1200, 900), handle);
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn check_discord_intigration(norisk_token: &str, uuid: &str) -> Result<bool, String> {
+    let status = ApiEndpoints::discord_link_status(norisk_token, uuid).await
+        .map_err(|e| format!("unable to check discord intigration: {:?}", e))?;
+    Ok(status)
+}
+
+#[tauri::command]
+async fn unlink_discord_intigration(norisk_token: &str, uuid: &str) -> Result<(), String> {
+    ApiEndpoints::unlink_discord(norisk_token, uuid).await
+        .map_err(|e| format!("unable to unlink discord: {:?}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
     let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
     match auth_prepare_response {
         Ok(response) => {
             // Hier kannst du auf die Daten von 'response' zugreifen
             let url = response.url;
             let id = response.id;
-            let _ = open_url(url.as_str(), handle);
+            let _ = open_url(url.as_str(), (1200, 800), handle);
 
             let login_data = ApiEndpoints::await_auth_response(id).await;
             match login_data {
@@ -895,7 +970,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
     let norisk_token = login_data.norisk_token;
 
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut())
+    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut(), options.current_uuid.clone().unwrap().as_str())
         .await
         .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
 
@@ -921,6 +996,7 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                     } else {
                         norisk_token
                     },
+                    options.current_uuid.unwrap().as_str(),
                     launch_manifest,
                     parameters,
                     mods,
@@ -1003,6 +1079,35 @@ async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, ()> {
 }
 
 #[tauri::command]
+async fn get_whitelist_slots(norisk_token: &str, uuid: &str) -> Result<WhitelistSlots, String> {
+    let response = ApiEndpoints::whitelist_slots(norisk_token, uuid).await;
+    match response {
+        Ok(slots) => {
+            Ok(slots)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn add_player_to_whitelist(identifier: &str, norisk_token: &str, request_uuid: &str) -> Result<(), String> {
+    let response = HTTP_CLIENT.get(format!("https://playerdb.co/api/player/minecraft/{}", identifier)).send().await.map_err(|e| format!("invalid username: {:}", e)).unwrap();
+    let response_text = response.json::<PlayerDBData>().await.unwrap();
+    let uuid = response_text.data.player.unwrap().id;
+    let response = ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid).await;
+    match response {
+        Ok(_) => {
+            Ok(())
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn mem_percentage(memory_percentage: i32) -> i64 {
     percentage_of_total_memory(memory_percentage)
 }
@@ -1049,8 +1154,8 @@ async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, Strin
 }
 
 #[tauri::command]
-async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String> {
-    match ApiEndpoints::norisk_custom_servers(token).await {
+async fn get_custom_servers(token: &str, uuid: &str) -> Result<CustomServersResponse, String> {
+    match ApiEndpoints::norisk_custom_servers(token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1061,8 +1166,8 @@ async fn get_custom_servers(token: &str) -> Result<CustomServersResponse, String
 }
 
 #[tauri::command]
-async fn check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<(), String> {
-    match ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token).await {
+async fn check_custom_server_subdomain(subdomain: &str, token: &str, uuid: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token, uuid).await {
         Ok(_result) => {
             Ok(())
         }
@@ -1073,8 +1178,8 @@ async fn check_custom_server_subdomain(subdomain: &str, token: &str) -> Result<(
 }
 
 #[tauri::command]
-async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Result<String, String> {
-    match ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token).await {
+async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str, uuid: &str) -> Result<String, String> {
+    match ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1085,8 +1190,8 @@ async fn get_custom_server_jwt_token(custom_server_id: &str, token: &str) -> Res
 }
 
 #[tauri::command]
-async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str) -> Result<CustomServer, String> {
-    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token).await {
+async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str, uuid: &str) -> Result<CustomServer, String> {
+    match ApiEndpoints::norisk_create_custom_server(mc_version, loader_version, r#type, subdomain, token, uuid).await {
         Ok(result) => {
             Ok(result)
         }
@@ -1112,14 +1217,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 #[tauri::command]
 async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
-    let custom_server_instance = app_state.custom_server_instance.clone();
-    let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
-
-    *custom_server_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e))?
-        = Some(RunnerInstance { terminator: terminator_tx });
-
-    let copy_of_runner_instance = custom_server_instance;
-
+    let custom_server_process_mutex = Arc::new(std::sync::Mutex::new(None));
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -1127,13 +1225,14 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
             .build()
             .unwrap()
             .block_on(async {
-                if let Err(e) = CustomServerManager::run_server(custom_server, options, token, terminator_rx, Box::new(window_mutex.clone()), window_mutex.clone()).await {
-                    window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
-                    handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
-                };
-                
-                *copy_of_runner_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e)).unwrap()
-                    = None;
+                let custom_server_process = CustomServerManager::run_server(custom_server, options, token, window_mutex.clone()).await.unwrap();    
+                // if let Err(e) = custom_server_process {
+                //     window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
+                //     handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
+                // };
+
+                custom_server_process_mutex.lock().unwrap().replace(custom_server_process);
+
                 window_mutex.lock().unwrap().emit("server-exited", ()).unwrap()
             });
     });
@@ -1142,20 +1241,21 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 
 #[tauri::command]
 async fn terminate_custom_server(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let runner_instance = app_state.custom_server_instance.clone();
-    let mut lck = runner_instance.lock()
-        .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
+    info!("Killing Custom Server");
+    let mut custom_server_process = app_state.custom_server_process.lock().unwrap().take().unwrap();
+    custom_server_process.stdin.as_mut().unwrap().write_all(b"stop\n").await.unwrap();
+    // custom_server_process.kill().await.unwrap();
+    
+    info!("Killing Forwarding Manager");
+    let mut custom_sever_forwarding_process = app_state.forwarding_manager_process.lock().unwrap().take().unwrap();
+    custom_sever_forwarding_process.kill().await.unwrap();
 
-    if let Some(inst) = lck.take() {
-        info!("Sending sigterm");
-        inst.terminator.send(()).unwrap();
-    }
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_custom_server(id: &str, token: &str) -> Result<(), String> {
-    match ApiEndpoints::norisk_delete_custom_server(id, token).await {
+async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), String> {
+    match ApiEndpoints::norisk_delete_custom_server(id, token, uuid).await {
         Ok(_) => {
             Ok(())
         }
@@ -1301,9 +1401,25 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
     Ok(versions)
 }
 
+///
+/// Get Launcher feature toggles
+/// 
+#[tauri::command]
+async fn check_feature_whitelist(feature: &str, norisk_token: &str, uuid: &str) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token, uuid).await
+        .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
+    Ok(is_whitelisted)
+}
+
 /// Runs the GUI and returns when the window is closed.
 pub fn gui_main() {
     tauri::Builder::default()
+        .on_window_event(move |event| match event.event() {
+            WindowEvent::Destroyed => {
+                info!("Window destroyed, quitting application");
+            }
+            _ => {}
+        })
         .plugin(tauri_plugin_fs_watch::init())
         .setup(|app| {
             let _window = app.get_window("main").unwrap();
@@ -1311,14 +1427,19 @@ pub fn gui_main() {
         })
         .manage(AppState {
             runner_instance: Arc::new(Mutex::new(None)),
-            custom_server_instance: Arc::new(Mutex::new(None))
+            forwarding_manager_process: Arc::new(Mutex::new(None)),
+            custom_server_process: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             open_url,
             check_online_status,
             get_options,
             store_options,
+            check_maintenance_mode,
             request_norisk_branches,
+            connect_discord_intigration,
+            check_discord_intigration,
+            unlink_discord_intigration,
             login_norisk_microsoft,
             remove_account,
             upload_cape,
@@ -1335,12 +1456,16 @@ pub fn gui_main() {
             get_featured_resourcepacks,
             get_featured_shaders,
             get_featured_datapacks,
+            get_whitelist_slots,
+            add_player_to_whitelist,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,
             request_trending_capes,
             request_owned_capes,
             refresh_via_norisk,
+            get_mobile_app_token,
+            reset_mobile_app_token,
             clear_data,
             get_mod_info,
             console_log_info,
@@ -1399,6 +1524,7 @@ pub fn gui_main() {
             get_all_purpur_game_versions,
             get_all_spigot_game_versions,
             get_all_bukkit_game_versions,
+            check_feature_whitelist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

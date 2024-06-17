@@ -16,14 +16,13 @@
     import PurpurIcon from "../../../images/custom-servers/purpur.png";
     import BukkitIcon from "../../../images/custom-servers/bukkit.png";
     import SpigotIcon from "../../../images/custom-servers/spigot.png";
-    import SpongeLightIcon from "../../../images/custom-servers/sponge_light.png";
-    import SpongeDarkIcon from "../../../images/custom-servers/sponge_dark.png";
     import {createEventDispatcher} from "svelte";
 
     const dispatch = createEventDispatcher()
 
     export let options;
     export let customServerProgress;
+    export let baseDomain;
 
     let createdServer;
 
@@ -115,14 +114,7 @@
             "iconUrl": BukkitIcon,
             "requiresLoader": false,
             "versions": []
-        },
-        "SPONGE": {
-            "name": "Sponge",
-            "type": "SPONGE",
-            "iconUrl": options.theme == "DARK" ? SpongeLightIcon : SpongeDarkIcon,
-            "requiresLoader": false,
-            "versions": []
-        },
+        }
     };
 
     async function createServer() {
@@ -142,6 +134,7 @@
             type: server.type,
             subdomain: server.subdomain,
             token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid,
         }).then(async (newServer) => {
             console.log('Created Server:', newServer);
             createdServer = newServer;
@@ -157,7 +150,7 @@
             await invoke("initialize_custom_server", {
                 customServer: newServer,
                 additionalData: additionalData,
-                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
             }).then(() => {
                 console.log('Initialized Server:', newServer);
                 currentTab = "COMPLETED";
@@ -181,7 +174,7 @@
 <h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 <div class="create-server-wrapper">
     {#if currentTab === "NAME_ICON_SUBDOMAIN"}
-        <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} on:next={() => currentTab = "TYPE"}/>
+        <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} baseDomain={baseDomain} on:next={() => currentTab = "TYPE"}/>
     {:else if currentTab === "TYPE"}
         <TypeTab bind:type={type} bind:version={mcVersion} bind:majorVersion={majorVersion} bind:loaderVersion={loaderVersion} bind:availableTypes={availableTypes} on:back={() => currentTab = "NAME_ICON_SUBDOMAIN"} on:next={() => currentTab = "VERSIONS"}/>
     {:else if currentTab === "VERSIONS"}

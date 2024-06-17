@@ -8,10 +8,12 @@
   import SkinButton from "./SkinButton.svelte";
   import LoadingScreen from "../loading/LoadingScreen.svelte";
   import SettingsModal from "../config/ConfigModal.svelte";
+  import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
   import ProfilesScreen from "../profiles/ProfilesScreen.svelte";
   import SkinScreen from "../skin/SkinScreen.svelte";
   import CapeScreen from "../cape/CapeScreen.svelte";
   import AddonsScreen from "../addons/AddonsScreen.svelte";
+  import InvitePopup from "../invite/InvitePopup.svelte";
   import ServersScreen from "../servers/ServersScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
@@ -19,6 +21,9 @@
   export let options;
   let branches = [];
   let launcherProfiles = {};
+  let featureWhitelist = [];
+  let friendInviteSlots = {};
+  let discordLinked = false;
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
@@ -29,6 +34,7 @@
   let progressBarProgress = 0;
   let progressBarLabel = "";
   let settingsShown = false;
+  let mcRealQrCodeShown = false;
   let clientLogShown = false;
   let showProfilesScreen = false;
   let showProfilesScreenHack = false;
@@ -38,6 +44,7 @@
   let showCapeScreenHack = false;
   let showAddonsScreen = false;
   let showAddonsScreenHack = false;
+  let showInvitePopup = false;
   let showServersScreen = false;
   let showServersScreenHack = false;
   let log = [];
@@ -120,6 +127,7 @@
     console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
     await invoke("request_norisk_branches", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
     })
       .then((result) => {
         const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
@@ -193,8 +201,51 @@
     })
   }
 
-  onMount(async () => {
+  async function checkFeatureWhitelist(feature) {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("check_feature_whitelist", {
+      feature: feature,
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      console.debug(feature + ":", result);
+      if (!result) return;
+      featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
+    }).catch((reason) => {
+      console.error(reason);
+      featureWhitelist = [];
+    });
+  }
+
+  async function loadFriendInvites() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("get_whitelist_slots", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      console.debug("Received Whitelist Slots", result);
+      friendInviteSlots = result;
+    }).catch((reason) => {
+      alert(reason);
+      console.error(reason);
+      friendInviteSlots = {};
+    });
+  }
+
+  async function loadAllData() {
     await requestBranches();
+    featureWhitelist = [];
+    await checkFeatureWhitelist("INVITE_FRIENDS");
+    await checkFeatureWhitelist("CUSTOM_SERVERS");
+    await checkFeatureWhitelist("MCREAL_APP");
+    if (featureWhitelist.includes("INVITE_FRIENDS")) {
+      await loadFriendInvites();
+    }
+    await check_discord_link();
+  }
+
+  onMount(() => {
+    loadAllData();
   });
 
   listen("client-exited", () => {
@@ -254,6 +305,7 @@
     await invoke("get_launch_manifest", {
         branch: branch,
         noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+        uuid: options.currentUuid
     }).then((result) => {
         console.debug("Launch Manifest", result);
         launchManifest = result;
@@ -315,6 +367,10 @@
     event.preventDefault();
   }
 
+  function handleShowInvitePopup() {
+    showInvitePopup = true;
+  }
+
   function handleOpenProfilesScreen() {
     showProfilesScreenHack = true;
     setTimeout(() => {
@@ -351,6 +407,7 @@
   }
 
   function home() {
+    showInvitePopup = false;
     showProfilesScreen = false;
     showProfilesScreenHack = false;
     showSkinScreen = false;
@@ -376,6 +433,50 @@
     }, 100);
   }
 
+  async function connect_discord_intigration() {
+    if ((await check_discord_link()) == true) return discordLinked = true;
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("connect_discord_intigration", { options, loginData }).then(() => {
+      console.log("Connected to Discord Intigration");
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+    });
+  }
+  
+  async function check_discord_link() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    let linked;
+    await invoke("check_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then((result) => {
+      discordLinked = result;
+      linked = result;
+    }).catch(err => {
+      console.error(err);
+      alert(err);
+      linked = false;
+    });
+    return linked;
+  }
+
+  async function unlink_discord() {
+    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    await invoke("unlink_discord_intigration", {
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid
+    }).then(() => {
+      alert("Discord unlinked successfully!");
+      check_discord_link();
+    }).catch(async err => {
+      console.error(err);
+      const still_linked = await check_discord_link();
+      if (still_linked) return;
+      alert("Discord unlinked successfully!");
+    });
+  }
+
   function closeWindow() {
     appWindow.close();
   }
@@ -384,12 +485,16 @@
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
+  {#if showInvitePopup}
+    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup} bind:friendInviteSlots />
+  {/if}
+
   {#if showAddonsScreen}
     <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
   {/if}
 
   {#if showServersScreen}
-    <ServersScreen on:home={home} on:play={runClient} bind:options bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
@@ -401,11 +506,15 @@
   {/if}
 
   {#if showCapeScreen}
-  <CapeScreen on:home={home} bind:options></CapeScreen>
+    <CapeScreen on:home={home} bind:options></CapeScreen>
   {/if}
 
   {#if settingsShown}
-  <SettingsModal on:requestBranches={requestBranches} bind:options bind:showModal={settingsShown} dataFolderPath={dataFolderPath}></SettingsModal>
+    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown} bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
+  {/if}
+  
+  {#if mcRealQrCodeShown}
+    <McRealAppModal bind:options bind:showModal={mcRealQrCodeShown}></McRealAppModal>
   {/if}
 
   {#if clientLogShown}
@@ -421,7 +530,15 @@
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
+    <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+    </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
+      {#if options.accounts.length > 0 && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
+      {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
       {#if options.accounts.length > 0}
@@ -431,6 +548,10 @@
         <h1 on:click={handleOpenServersScreen}>SERVERS</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenAddonsScreen}>ADDONS</h1>
+        {#if featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 on:click={handleShowInvitePopup}>INVITE</h1>
+        {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenCapeScreen}>CAPES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -482,7 +603,7 @@
     <SkinButton on:launch={runClient} on:requestBranches={requestBranches} bind:options={options}></SkinButton>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
         on:mousedown={preventSelection} class="copyright">
-      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.6
+      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.8
     </div>
   {/if}
 </div>
@@ -543,6 +664,32 @@
         cursor: default;
     }
 
+    .left-settings-button-wrapper {
+        position: absolute;
+        top: 5em;
+        left: 2.5px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+    }
+
+    .left-settings-button-wrapper h1 {
+        font-size: 11px;
+        font-family: 'Press Start 2P', serif;
+        margin-bottom: 1em;
+        cursor: pointer;
+        color: var(--secondary-color);
+        text-shadow: 1px 1px var(--secondary-color-text-shadow);
+        transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+    }
+
+    .left-settings-button-wrapper h1:hover {
+        color: var(--hover-color);
+        text-shadow: 1px 1px var(--hover-color-text-shadow);
+        transform: scale(1.2);
+    }
+    
     .settings-button-wrapper {
         position: absolute;
         top: 5em;
@@ -573,6 +720,19 @@
         color: red;
         text-shadow: 1px 1px #460000;
         transform: scale(1.2);
+    }
+
+    .settings-button-wrapper h1.invite-button {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      font-size: 12.5px;
+    }
+
+    .settings-button-wrapper h1.invite-button p {
+      margin-bottom: 5px;
+      padding-right: 5px;
+      font-size: 15px;
     }
 
     .back-to-loading-button {

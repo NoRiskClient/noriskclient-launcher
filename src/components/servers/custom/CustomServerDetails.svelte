@@ -1,6 +1,7 @@
 <script>
     import {invoke} from "@tauri-apps/api";
     import VirtualList from "../../utils/VirtualList.svelte";
+    import CustomServerInfoPopup from "./CustomServerInfoPopup.svelte";
     import {createEventDispatcher} from "svelte";
 
     const dispatch = createEventDispatcher()
@@ -9,6 +10,8 @@
     export let customServer;
     export let logs = [];
 
+    let showInfoPopup = false;
+
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     async function runServer() {
@@ -16,7 +19,8 @@
         await invoke("run_custom_server", {
             customServer,
             options,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken
+            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+            uuid: options.currentUuid
         }).then(() => {
             console.log("YAY!");
         }).catch((error) => {
@@ -40,20 +44,27 @@
 <h1 class="home-button" style="left: 220px;" on:click={() => dispatch("back")}>[BACK]</h1>
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
+{#if showInfoPopup}
+<CustomServerInfoPopup bind:options={options} bind:customServer={customServer} bind:showModal={showInfoPopup} />
+{/if}
 <div class="create-server-wrapper">
     <div class="row">
         <div class="row">
             <h1>Status:</h1>
             {#if logs.length < 1}
                 <h1 class="offline">Offline</h1>
-            {:else}
+            {:else if logs.join(' ').includes('Done')}
                 <h1 class="online">Running</h1>
+            {:else}
+                <h1 class="starting">Starting...</h1>
             {/if}
         </div>
         <div>
             {#if logs.length < 1}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="startServer-button" on:click={runServer}>Start</h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>
@@ -61,7 +72,8 @@
         </div>
     </div>
     <div class="row">
-        <h1 class="detailsButton">Infos</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="detailsButton" on:click={() => showInfoPopup = true}>Infos</h1>
         {#if ["FABRIC", "FORGE", "QUILT", "NEO_FORGE"].includes(customServer.type.toUpperCase())}
             <h1 class="detailsButton">Mods</h1>
         {/if}
@@ -133,6 +145,11 @@
     .online {
         color: #0bb00b;
         text-shadow: 2px 2px #086b08;
+    }
+
+    .starting {
+        color: #ff9100;
+        text-shadow: 2px 2px #d67900;
     }
 
     .offline {
@@ -207,13 +224,20 @@
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
+        text-shadow: none;
     }
 
-    .WARNING {
+    .WARN {
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ff9100;
-        text-shadow: 2px 2px #ba7d0b;
+        text-shadow: none;
+    }
+
+    .ERROR {
+        font-family: 'Press Start 2P', serif;
+        font-size: 10px;
+        color: #ff0000;
+        text-shadow: none;
     }
 </style>

@@ -9,7 +9,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - platform: 'macos-latest'
+            args: '--verbose --target x86_64-apple-darwin'
+          - platform: 'ubuntu-latest'
+            args: '--verbose'
+          - platform: 'windows-latest'
+            args: '--verbose'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -24,7 +30,10 @@ jobs:
           node-version: 16
 
       - name: install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.76
+        with:
+          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
@@ -56,6 +65,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          args: ${{ matrix.args }}
 
       - run: |
           ls -R ./src-tauri/target/release/bundle
@@ -84,16 +95,16 @@ jobs:
           path: ./src-tauri/target/release/bundle/nsis/NoRiskClient-Windows-setup.*
 
       - run: |
-          ls -R ./src-tauri/target/release/bundle
-          mv ./src-tauri/target/release/bundle/dmg/NoRiskClient**.dmg ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.dmg
-          mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
-          mv ./src-tauri/target/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
+          ls -R ./src-tauri/target/x86_64-apple-darwin/release/bundle
+          mv ./src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/NoRiskClient**.dmg ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.dmg
+          mv ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
+          mv ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
         if: matrix.platform == 'macos-latest'
       - uses: actions/upload-artifact@v2
         if: matrix.platform == 'macos-latest'
         with:
           name: noriskclient-macos
-          path: ./src-tauri/target/release/bundle/macos/NoRiskClient-MacOS.*
+          path: ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.*
 
   create-release:
     needs: build-tauri

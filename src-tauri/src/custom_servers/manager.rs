@@ -1,11 +1,11 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 
 use anyhow::{Ok, Result};
+use log::{debug, error, info};
 use tauri::Window;
-use tokio::fs;
-use tracing::{debug, error, info};
+use tokio::{fs, process::Child};
 
-use crate::{app::app_data::LauncherOptions, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
+use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions}, custom_servers::forwarding_manager::GetTokenResponse, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 
 use super::{models::{CustomServer, CustomServerType}, providers::{forge::ForgeProvider, vanilla::VanillaProvider}};
 
@@ -24,19 +24,13 @@ impl CustomServerManager {
             CustomServerType::FORGE => {
                 let label = ProgressUpdate::SetLabel("Downloading installer jar...".to_owned());
                 let _ = Self::handle_progress(&window, &server.id, label);
-                let _ = ForgeProvider::download_installer_jar(&server, |curr, max| {
-                    let max_progress = ProgressUpdate::SetMax(max);
-                    let progress = ProgressUpdate::SetProgress((curr / max) * 100);
-                    let _ = Self::handle_progress(&window, &server.id, max_progress).unwrap();
-                    let _ = Self::handle_progress(&window, &server.id, progress).unwrap();
-                }).await;
+                let _ = ForgeProvider::download_installer_jar(&server).await;
                 let _ = Self::create_eula_file(&server).await;
             },
             CustomServerType::FABRIC => todo!(),
             CustomServerType::NEO_FORGE => todo!(),
             CustomServerType::QUILT => todo!(),
             CustomServerType::PAPER => todo!(),
-            CustomServerType::SPONGE => todo!(),
             CustomServerType::SPIGOT => todo!(),
             CustomServerType::BUKKIT => todo!(),
             CustomServerType::FOLIA => todo!(),
@@ -53,7 +47,7 @@ impl CustomServerManager {
         Ok(())
     }
 
-    pub async fn run_server<D: Send + Sync>(custom_server: CustomServer, options: LauncherOptions, token: String, terminator: tokio::sync::oneshot::Receiver<()>, data: Box<D>, window_mutex: Arc<Mutex<Window>>) -> Result<()> {
+    pub async fn run_server(custom_server: CustomServer, options: LauncherOptions, token: String, window_mutex: Arc<Mutex<Window>>) -> Result<Child> {
         // JRE download
         let runtimes_folder = options.data_path_buf().join("runtimes");
         if !runtimes_folder.exists() {
@@ -90,9 +84,13 @@ impl CustomServerManager {
 
         let mut running_task = java_runtime.run_server(2048, 2048, &custom_server_path).await?;
 
-        java_runtime.handle_server_io(&mut running_task, &custom_server, Self::handle_stdout, Self::handle_stderr, terminator, &window_mutex)
-            .await?;
-        Ok(())
+        let custom_server_clone = custom_server.clone();
+
+        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, options.current_uuid.unwrap().as_str()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
+
+        java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
+
+        Ok(running_task)
     }
 
     fn handle_stdout(window: &Arc<Mutex<Window>>, server_id: &str, data: &[u8]) -> anyhow::Result<()> {

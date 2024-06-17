@@ -12,13 +12,12 @@
     import PurpurIcon from "../../../images/custom-servers/purpur.png";
     import BukkitIcon from "../../../images/custom-servers/bukkit.png";
     import SpigotIcon from "../../../images/custom-servers/spigot.png";
-    import SpongeLightIcon from "../../../images/custom-servers/sponge_light.png";
-    import SpongeDarkIcon from "../../../images/custom-servers/sponge_dark.png";
 
     const dispatch = createEventDispatcher()
 
     export let options;
     export let server;
+    export let logs = [];
 
     let loaderIcon;
     switch (server.type.toUpperCase()) {
@@ -52,9 +51,6 @@
         case "SPIGOT":
             loaderIcon = SpigotIcon
             break;
-        case "SPONGE":
-            loaderIcon = options.theme == "DARK" ? SpongeLightIcon : SpongeDarkIcon
-            break;
         default:
             loaderIcon = VanillaIcon
             break;
@@ -70,7 +66,10 @@
                 <img src={loaderIcon} alt="server-loader-icon">
                 <h4 class="server-name">{"NAME"}</h4>
             </div>
-            <p>{server.subdomain}.{server.domain} | {server.mcVersion}</p>
+            <div class="infoBar">
+                <div class="statusBlob" class:stopped={logs.length < 1} class:starting={logs.length > 1 && !logs.join(' ').includes('Done')} class:running={logs.length > 1 && logs.join(' ').includes('Done')} />
+                <p> | {server.subdomain}.{server.domain} | {server.mcVersion}</p>
+            </div>
         </div>
     </div>
     <div class="buttons">
@@ -161,5 +160,56 @@
 
     .details-button:hover {
         transform: scale(1.2);
+    }
+
+    .infoBar {
+        display: flex;
+        flex-direction: row;
+        gap: 7.5px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .statusBlob {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        border: none;
+        margin-top: 16px;
+    }
+    
+    .statusBlob.stopped {
+        background-color: #ff0000;
+        -webkit-box-shadow:0px 0px 5px 2px #a80000;
+        -moz-box-shadow: 0px 0px 5px 2px #a80000;
+        box-shadow: 0px 0px 5px 2px #a80000;
+    }
+    
+    .statusBlob.starting {
+        background-color: #ff9100;
+        -webkit-box-shadow:0px 0px 5px 2px #d67900;
+        -moz-box-shadow: 0px 0px 5px 2px #d67900;
+        box-shadow: 0px 0px 5px 2px #d67900;
+        animation: statusBlob 1.5s infinite;
+    }
+    
+    .statusBlob.running {
+        background-color: #0bb00b;
+        -webkit-box-shadow:0px 0px 5px 2px #086b08;
+        -moz-box-shadow: 0px 0px 5px 2px #086b08;
+        box-shadow: 0px 0px 5px 2px #086b08;
+        animation: statusBlob 1.5s infinite;
+    }
+
+    @keyframes statusBlob {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.2);
+        }
+        100% {
+            transform: scale(1);
+        }
     }
 </style>
