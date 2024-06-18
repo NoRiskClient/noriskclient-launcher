@@ -1,11 +1,11 @@
 <script>
-  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
 
   export let account;
   export let isActive;
   export let options;
   export let dialog;
+  export let onSelect;
 
   function getRandomObjectOrNull(array) {
     if (array.length === 0) {
@@ -20,15 +20,18 @@
       options.currentUuid = account.uuid;
       options = options;
       options.store();
+      onSelect();
     }
   }
 
-  function handleRemoveAccount() {
+  async function handleRemoveAccount() {
     options.accounts = options.accounts.filter(entry => entry.uuid !== account.uuid);
     options.currentUuid = getRandomObjectOrNull(options.accounts)?.uuid ?? null;
     options = options;
     options.store();
-    invoke("remove_account", { loginData: account })
+    await invoke("remove_account", { loginData: account }).then(() => {
+      onSelect();
+    });
 
     if (options.currentUuid === null) {
       dialog.close();

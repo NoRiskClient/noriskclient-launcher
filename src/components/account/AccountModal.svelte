@@ -4,6 +4,7 @@
 
   export let showModal;
   export let options;
+  export let refreshData;
 
   let dialog; // HTMLDialogElement
   $: if (dialog && showModal) dialog.showModal();
@@ -25,6 +26,7 @@
       }
 
       options.store();
+      refreshData();
     }).catch(e => {
       console.error("microsoft authentication error", e);
       if (e.includes(403)) {
@@ -50,7 +52,7 @@
       </div>
       <hr>
       {#each options.accounts as account}
-        <AccountListItem bind:dialog isActive={options.currentUuid === account.uuid} bind:options={options} account={account} />
+        <AccountListItem bind:dialog isActive={options.currentUuid === account.uuid} bind:options={options} account={account} onSelect={refreshData} />
       {/each}
     </div>
     <!-- svelte-ignore a11y-autofocus -->

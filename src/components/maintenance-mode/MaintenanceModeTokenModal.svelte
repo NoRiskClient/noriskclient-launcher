@@ -1,85 +1,27 @@
 <script>
-    import { invoke } from "@tauri-apps/api";
-    import ConfigTextInput from "./inputs/ConfigTextInput.svelte";
+    import ConfigTextInput from "../config/inputs/ConfigTextInput.svelte";
     import { createEventDispatcher } from "svelte";
   
     const dispatch = createEventDispatcher();
   
     export let showModal;
-    export let options;
+    export let maintenanceMode;
+    let token = "";
   
     function hideModal() {
       showModal = false;
     }
   
     let dialog; // HTMLDialogElement
-    let experimentalModeToken = "";
   
     $: if (dialog && showModal) dialog.showModal();
-  
-    async function save() {
-    if (experimentalModeToken === "") return;
-				invoke("enable_experimental_mode", {
-					experimentalToken: experimentalModeToken,
-				})
-					.then(async (allowed) => {
-						options.experimentalModeToken = experimentalModeToken;
-						options.experimentalMode = allowed;
-						await options.store();
-						hideModal();
-						console.log(`Enabled experimental mode: ${allowed}`);
-						const existingIndex = options.accounts.findIndex(
-							(acc) => acc.uuid === options.currentUuid,
-						);
-						if (
-							options.currentUuid === null ||
-							options.accounts[existingIndex].experimentalToken === "" ||
-							options.accounts[existingIndex].noriskToken === ""
-						) {
-							return getNewTokenType();
-						}
-					})
-					.catch(async (e) => {
-						options.experimentalMode = false;
-						options.experimentalModeToken = "";
-						await options.store();
-						alert(`Failed to enable experimental mode: ${e}`);
-						console.error(e);
-					});
-    }
 
-    async function getNewTokenType() {
-      await invoke("login_norisk_microsoft", { options }).then(async (loginData) => {
-      console.debug("Received Login Data...", loginData);
-
-      options.currentUuid = loginData.uuid;
-
-      // Index des vorhandenen Objekts mit derselben UUID suchen
-						const existingIndex = options.accounts.findIndex(
-							(obj) => obj.uuid === loginData.uuid,
-						);
-      if (existingIndex !== -1) {
-        console.debug("Replace Account");
-        options.accounts[existingIndex] = {
-          uuid: loginData.uuid,
-          username: loginData.username,
-          mcToken: loginData.mcToken,
-          accessToken: loginData.accessToken,
-          refreshToken: loginData.refreshToken,
-          experimentalToken: loginData.experimentalToken !== "" ? loginData.experimentalToken : options.accounts[existingIndex].experimentalToken,
-          noriskToken: loginData.noriskToken !== "" ? loginData.noriskToken : options.accounts[existingIndex].noriskToken,
-        };
-      } else {
-        console.debug("Add New Account");
-        options.accounts.push(loginData);
+    function toggleMaintenanceMode() {
+      if (token == "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl") {
+        maintenanceMode = false;
       }
-
       hideModal();
-    }).catch(e => {
-      console.error("microsoft authentication error", e);
-      alert(e);
-    });
-  }
+    }
   
     function preventSelection(event) {
       event.preventDefault();
@@ -95,17 +37,17 @@
     <div on:click|stopPropagation class="divider">
       <div>
         <div class="header-wrapper">
-          <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>EXPERIMENTAL TOKEN</h1>
+          <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>MAINTENANCE MODE</h1>
           <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
         </div>
         <hr>
         <div class="settings-wrapper">
-            <p class="nes-font setting">Please enter your experimental token</p>
-          <ConfigTextInput title="" bind:value={experimentalModeToken} />
+            <p class="nes-font setting">Enter your maintenance-mode token</p>
+          <ConfigTextInput title="" bind:value={token} />
         </div>
       </div>
       <div class="save-token-button-wrapper">
-        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={save}>SAVE</p>
+        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={toggleMaintenanceMode}>VERIFY</p>
       </div>
     </div>
   </dialog>
