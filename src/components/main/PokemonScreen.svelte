@@ -612,7 +612,7 @@
     <SkinButton on:launch={runClient} on:requestBranches={() => loadAllData()} bind:options={options} bind:branches={branches} />
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
         on:mousedown={preventSelection} class="copyright">
-      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.8
+      © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.9
     </div>
   {/if}
 </div>
