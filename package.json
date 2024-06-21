@@ -22,6 +22,7 @@
     "siema": "^1.5.1",
     "skinview3d": "^3.0.1",
     "svelte-tiny-virtual-list": "^2.0.5",
-    "tauri-plugin-fs-watch-api": "github:tauri-apps/tauri-plugin-fs-watch"
+    "tauri-plugin-fs-watch-api": "github:tauri-apps/tauri-plugin-fs-watch",
+    "uuid": "^10.0.0"
   }
 }

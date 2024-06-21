@@ -7,6 +7,7 @@
     import {checkUpdate} from "@tauri-apps/api/updater";
     import {onMount} from "svelte";
     import { appWindow } from "@tauri-apps/api/window";
+    import Notifications from "./notification/Notifications.svelte";
 
     // Load options from file
     let options;
@@ -93,6 +94,7 @@
 </script>
 
 <div class="window">
+    <Notifications/>
     {#if showUpdateScreen !== null && options !== null}
         {#if showUpdateScreen}
             <UpdateManager/>

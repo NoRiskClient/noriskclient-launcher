@@ -17,6 +17,7 @@
   import ServersScreen from "../servers/ServersScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
+  import Notifications from "../notification/Notifications.svelte";
 
   export let options;
   let branches = [];
