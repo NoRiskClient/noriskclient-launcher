@@ -5,6 +5,8 @@ windows_subsystem = "windows"
 )]
 
 use std::fs;
+
+use anyhow::Result;
 use directories::ProjectDirs;
 use log::{info, LevelFilter};
 use log4rs::{
@@ -15,11 +17,10 @@ use log4rs::{
         },
     },
     config::{Appender, Config, Root},
-    encode::pattern::PatternEncoder
+    encode::pattern::PatternEncoder,
 };
-use reqwest::Client;
-use anyhow::Result;
 use once_cell::sync::Lazy;
+use reqwest::Client;
 
 pub mod app;
 pub mod minecraft;
@@ -37,9 +38,9 @@ static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
 });
 
 static APP_USER_AGENT: &str = concat!(
-    env!("CARGO_PKG_NAME"),
-    "/",
-    env!("CARGO_PKG_VERSION"),
+env!("CARGO_PKG_NAME"),
+"/",
+env!("CARGO_PKG_VERSION"),
 );
 
 /// HTTP Client with launcher agent

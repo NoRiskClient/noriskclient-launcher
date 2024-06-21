@@ -59,27 +59,34 @@ impl ApiEndpoints {
     pub async fn norisk_featured_shaders(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/shaders", branch), "", "").await
     }
-    
+
     /// Request featured datapacks
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/datapacks", branch), "", "").await
     }
-    
+
     /// Request featured servers
     pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/servers", branch), "", "").await
     }
-    
+
     /// Request custom servers
     pub async fn norisk_custom_servers(token: &str, request_uuid: &str) -> Result<CustomServersResponse> {
         Self::request_from_norisk_endpoint("launcher/custom-servers", token, request_uuid).await
     }
-    
+
+    /**
+    In diesem Fall ist es nicht der NoRiskToken sondern der Minecraft Token!!
+    */
+    pub async fn refresh_norisk_token(token: &str) -> Result<NoRiskUser> {
+        Self::post_from_norisk_endpoint("launcher/auth/validate", token, "").await
+    }
+
     /// Check subdomain
     pub async fn norisk_check_custom_server_subdomain(subdomain: &str, token: &str, request_uuid: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/check-subdomain?subdomain={}", subdomain), token, request_uuid).await
     }
-    
+
     /// Get JWT token
     pub async fn norisk_get_custom_server_jwt_token(custom_server_id: &str, token: &str, request_uuid: &str) -> Result<String> {
         Self::request_from_norisk_endpoint(&format!("launcher/custom-servers/{}/token", custom_server_id), token, request_uuid).await
@@ -128,12 +135,12 @@ impl ApiEndpoints {
     pub async fn norisk_assets(branch: String, norisk_token: &str, request_uuid: &str) -> Result<NoriskAssets> {
         Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token, request_uuid).await
     }
-    
+
     /// Request mcreal app token
     pub async fn get_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
         Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken", norisk_token, request_uuid).await
     }
-    
+
     /// Reset mcreal app token
     pub async fn reset_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
         Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken/reset", norisk_token, request_uuid).await
@@ -143,7 +150,7 @@ impl ApiEndpoints {
     pub async fn discord_link_status(norisk_token: &str, request_uuid: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint("core/oauth/discord/check", norisk_token, request_uuid).await
     }
-    
+
     /// Request discord link status
     pub async fn unlink_discord(norisk_token: &str, request_uuid: &str) -> Result<String> {
         Self::delete_from_norisk_endpoint("core/oauth/discord/unlink", norisk_token, request_uuid).await
@@ -173,7 +180,7 @@ impl ApiEndpoints {
             .await?
         )
     }
-    
+
     // brachen wir für experimental token request, der immer auf experimental endpoint geht
     pub async fn request_from_norisk_endpoint_with_experimental<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let url = format!("{}/{}", get_api_base(true), endpoint);
@@ -231,7 +238,7 @@ impl ApiEndpoints {
             .await?
         )
     }
-          
+
     /// Request JSON formatted data from launcher API
     pub async fn delete_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
@@ -291,7 +298,16 @@ pub struct CustomServersResponse {
     pub limit: i32,
     #[serde(rename = "baseUrl")]
     pub base_url: String,
-    pub servers: Vec<CustomServer>
+    pub servers: Vec<CustomServer>,
+}
+
+//TODO andere attribute bei bedarf adden
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NoRiskUser {
+    pub uuid: String,
+    pub token: String,
+    pub ign: String,
+    pub rank: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -345,7 +361,7 @@ pub struct LoginData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoginDataMinimal {
     pub uuid: String,
-    pub username: String
+    pub username: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -560,7 +576,7 @@ pub struct NoriskAssets {
 
 ///
 /// JSON struct of norisk whitelist slots
-/// 
+///
 #[derive(Serialize, Deserialize)]
 pub struct WhitelistSlots {
     #[serde(rename = "availableSlots")]

@@ -363,6 +363,15 @@
     console.error(e);
   });
 
+  function microsoftAuth() {
+    invoke("microsoft_auth").then(result => {
+      alert("Yooo")
+    }).catch(e => {
+      alert("Auth Error");
+      console.error(e);
+    });
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -588,6 +597,8 @@
         {:else if branches.length < 1 || options.currentUuid == null}
           <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
             Sign in...</h1>
+          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:click={microsoftAuth}>
+            New Login</h1>
         {:else}
           {#each branches as branch, i}
             {#if currentBranchIndex === i}

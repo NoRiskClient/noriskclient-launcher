@@ -1,9 +1,10 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
+use chrono::{Duration, Utc};
 
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{LogicalSize, Manager, Window, WindowEvent};
+use tauri::{LogicalSize, Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
@@ -14,6 +15,7 @@ use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthModsSearchResponse};
 use crate::minecraft::auth;
+use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
 use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{self, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
@@ -64,7 +66,7 @@ struct PlayerDBEntry {
 
 #[derive(serde::Deserialize)]
 struct PlayerDBPlayer {
-    id: String
+    id: String,
 }
 
 #[tauri::command]
@@ -906,6 +908,69 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
 }
 
 #[tauri::command]
+async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, String> {
+    let mut accounts = MinecraftAuthStore::init().await.ok().unwrap();
+
+    let flow = accounts.login_begin().await.expect("TODO: panic message");
+
+    let start = Utc::now();
+
+    if let Some(window) = app.get_window("signin") {
+        window.close().ok();
+    }
+
+    let window = tauri::WindowBuilder::new(
+        &app,
+        "signin",
+        tauri::WindowUrl::External(flow.redirect_uri.parse().map_err(
+            |_| {
+                crate::error::ErrorKind::OtherError(
+                    "Error parsing auth redirect URL".to_string(),
+                )
+                    .as_error()
+            },
+        ).expect("TODO: panic message")),
+    )
+        .title("Sign into NoRiskClient")
+        .always_on_top(true)
+        .center()
+        .build().ok().unwrap();
+
+    window.request_user_attention(Some(UserAttentionType::Critical)).expect("TODO: panic message");
+
+    while (Utc::now() - start) < chrono::Duration::minutes(10) {
+        if window.title().is_err() {
+            // user closed window, cancelling flow
+            return Ok(None);
+        }
+
+        if window
+            .url()
+            .as_str()
+            .starts_with("https://login.live.com/oauth20_desktop.srf")
+        {
+            if let Some((_, code)) =
+                window.url().query_pairs().find(|x| x.0 == "code")
+            {
+                window.close().ok();
+                let credentials = accounts.login_finish(&code.clone(), flow).await.ok().unwrap();
+                //TODO das hier später nur machen wenn unser JWT NoRisk Token abgelaufen ist
+                let _ = accounts.refresh_norisk_token(&credentials).await.expect("TODO Error Handling");
+
+                //TODO Minecraft Auth + NoRisk Token Done
+
+                return Ok(Some(credentials));
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    window.close().ok();
+    Ok(None)
+}
+
+#[tauri::command]
 async fn remove_account(login_data: LoginData) -> Result<(), String> {
     TokenManager {}.delete_tokens(login_data);
     Ok(())
@@ -1225,7 +1290,7 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
             .build()
             .unwrap()
             .block_on(async {
-                let custom_server_process = CustomServerManager::run_server(custom_server, options, token, window_mutex.clone()).await.unwrap();    
+                let custom_server_process = CustomServerManager::run_server(custom_server, options, token, window_mutex.clone()).await.unwrap();
                 // if let Err(e) = custom_server_process {
                 //     window_mutex.lock().unwrap().emit("s-error", format!("Failed to launch server: {:?}", e)).unwrap();
                 //     handle_stderr(&window_mutex, format!("Failed to launch server: {:?}", e).as_bytes()).unwrap();
@@ -1245,7 +1310,7 @@ async fn terminate_custom_server(app_state: tauri::State<'_, AppState>) -> Resul
     let mut custom_server_process = app_state.custom_server_process.lock().unwrap().take().unwrap();
     custom_server_process.stdin.as_mut().unwrap().write_all(b"stop\n").await.unwrap();
     // custom_server_process.kill().await.unwrap();
-    
+
     info!("Killing Forwarding Manager");
     let mut custom_sever_forwarding_process = app_state.forwarding_manager_process.lock().unwrap().take().unwrap();
     custom_sever_forwarding_process.kill().await.unwrap();
@@ -1267,7 +1332,7 @@ async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), S
 
 ///
 /// Custom Vanilla Server
-/// 
+///
 #[tauri::command]
 async fn get_all_vanilla_versions() -> Result<VanillaVersions, String> {
     let versions = VanillaProvider::get_all_versions().await
@@ -1292,7 +1357,7 @@ async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManife
 
 ///
 /// Custom Fabric Server
-/// 
+///
 #[tauri::command]
 async fn get_all_fabric_game_versions() -> Result<Vec<FabricVersion>, String> {
     let versions = FabricProvider::get_all_game_versions().await
@@ -1309,7 +1374,7 @@ async fn get_all_fabric_loader_versions(mc_version: &str) -> Result<Vec<FabricLo
 
 ///
 /// Custom Quilt Server
-/// 
+///
 #[tauri::command]
 async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
     let manifest = QuiltProvider::get_manifest().await
@@ -1319,7 +1384,7 @@ async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
 
 ///
 /// Custom Forge Server
-/// 
+///
 #[tauri::command]
 async fn get_forge_manifest() -> Result<ForgeManifest, String> {
     let manifest = ForgeProvider::get_manifest().await
@@ -1329,7 +1394,7 @@ async fn get_forge_manifest() -> Result<ForgeManifest, String> {
 
 ///
 /// Custom Forge Server
-/// 
+///
 #[tauri::command]
 async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
     let manifest = NeoForgeProvider::get_manifest().await
@@ -1339,7 +1404,7 @@ async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
 
 ///
 /// Custom Paper Server
-/// 
+///
 #[tauri::command]
 async fn get_all_paper_game_versions() -> Result<PaperManifest, String> {
     let manifest = PaperProvider::get_all_game_versions().await
@@ -1356,7 +1421,7 @@ async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, S
 
 ///
 /// Custom Folia Server
-/// 
+///
 #[tauri::command]
 async fn get_all_folia_game_versions() -> Result<FoliaManifest, String> {
     let manifest = FoliaProvider::get_all_game_versions().await
@@ -1373,7 +1438,7 @@ async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, S
 
 ///
 /// Custom Purpur Server
-/// 
+///
 #[tauri::command]
 async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
     let versions = PurpurProvider::get_all_game_versions().await
@@ -1383,7 +1448,7 @@ async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
 
 ///
 /// Custom Spigot Server
-/// 
+///
 #[tauri::command]
 async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
     let versions = SpigotProvider::get_all_game_versions().await
@@ -1393,7 +1458,7 @@ async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
 
 ///
 /// Custom Bukkit Server
-/// 
+///
 #[tauri::command]
 async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
     let versions = BukkitProvider::get_all_game_versions().await
@@ -1403,7 +1468,7 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 
 ///
 /// Get Launcher feature toggles
-/// 
+///
 #[tauri::command]
 async fn check_feature_whitelist(feature: &str, norisk_token: &str, uuid: &str) -> Result<bool, String> {
     let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token, uuid).await
@@ -1450,6 +1515,7 @@ pub fn gui_main() {
             read_remote_image_file,
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
+            microsoft_auth,
             delete_cape,
             search_mods,
             get_featured_mods,
