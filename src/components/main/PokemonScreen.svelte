@@ -121,6 +121,7 @@
   }
 
   function handleSwitchBranch(isLeft) {
+    if ($branches.length <= 0) return;
     const totalBranches = $branches.length;
 
     if (isLeft) {
@@ -536,7 +537,7 @@
           on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
-          style:opacity={$branches.length < 2 || defaultUser == null ? 0 : 100}>
+          style:opacity={$defaultUser == null ? 0 : 100}>
         &lt;</h1>
       <section style="display:flex;justify-content:center">
         {#if !$defaultUser}
@@ -568,7 +569,7 @@
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
           class="nes-font switch" on:click={() => handleSwitchBranch(false)}
-          style:opacity={$branches.length < 2 || options.currentUuid == null ? 0 : 100}>
+          style:opacity={$defaultUser == null ? 0 : 100}>
         &gt;</h1>
     </div>
     <SkinButton

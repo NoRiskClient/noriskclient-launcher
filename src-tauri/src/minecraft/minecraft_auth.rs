@@ -402,6 +402,7 @@ impl MinecraftAuthStore {
             }
 
             if creds.expires < Utc::now() {
+                debug!("Refreshing expired Token {:?} {:?}", creds.expires, creds.id);
                 let old_credentials = creds.clone();
 
                 let res = self.refresh_token(&old_credentials).await;
