@@ -80,9 +80,12 @@ pub enum ErrorKind {
     #[error("Error: {0}")]
     OtherError(String),
 
-    #[cfg(feature = "tauri")]
     #[error("Tauri error: {0}")]
     TauriError(#[from] tauri::Error),
+
+    // Füge ein `Anyhow`-Fehler hinzu
+    #[error("Anyhow error: {0}")]
+    AnyhowError(#[from] anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -115,10 +118,17 @@ impl<E: Into<ErrorKind>> From<E> for Error {
     }
 }
 
+// we must manually implement serde::Serialize
+impl serde::Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_ref())
+    }
+}
 impl ErrorKind {
     pub fn as_error(self) -> Error {
         self.into()
     }
 }
-
-pub type Result<T> = core::result::Result<T, Error>;

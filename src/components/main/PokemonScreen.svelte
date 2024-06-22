@@ -17,7 +17,7 @@
   import ServersScreen from "../servers/ServersScreen.svelte";
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
-  import Notifications from "../notification/Notifications.svelte";
+  import { addNotification } from "../../stores/notificationStore.js";
 
   export let options;
   let branches = [];
@@ -87,7 +87,7 @@
     let progressUpdate = event.payload.data;
 
     if (customServerProgress[event.payload.server_id] == null) {
-      customServerProgress[event.payload.server_id] = {label: '', progress: 0, max: 0};
+      customServerProgress[event.payload.server_id] = { label: "", progress: 0, max: 0 };
     }
 
     switch (progressUpdate.type) {
@@ -107,9 +107,9 @@
   });
 
   function uuidv4() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
     });
   }
 
@@ -128,7 +128,7 @@
     console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
     await invoke("request_norisk_branches", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid
+      uuid: options.currentUuid,
     })
       .then((result) => {
         const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
@@ -160,7 +160,7 @@
               id: profileId,
               branch: branch,
               name: `${branch} - Default`,
-              mods: []
+              mods: [],
             });
             profiles.selectedExperimentalProfiles[branch] = profileId;
           }
@@ -172,7 +172,7 @@
               id: profileId,
               branch: branch,
               name: `${branch} - Default`,
-              mods: []
+              mods: [],
             });
             profiles.selectedMainProfiles[branch] = profileId;
           }
@@ -182,16 +182,16 @@
           profiles.addons[branch] = {
             shaders: [],
             resourcePacks: [],
-            datapacks: []
+            datapacks: [],
           };
         }
       });
 
       profiles.store = function() {
         console.debug("storing launcher profiles", profiles);
-        console.log(profiles)
+        console.log(profiles);
         invoke("store_launcher_profiles", { launcherProfiles: profiles }).catch(e => console.error(e));
-      }
+      };
 
       profiles.store();
 
@@ -199,7 +199,7 @@
     }).catch((err) => {
       console.error(`Failed to load launcher profiles: ${err}`);
       alert(`Failed to load launcher profiles: ${err}`);
-    })
+    });
   }
 
   async function checkFeatureWhitelist(feature) {
@@ -207,7 +207,7 @@
     await invoke("check_feature_whitelist", {
       feature: feature,
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid
+      uuid: options.currentUuid,
     }).then((result) => {
       console.debug(feature + ":", result);
       if (!result) return;
@@ -222,7 +222,7 @@
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("get_whitelist_slots", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid
+      uuid: options.currentUuid,
     }).then((result) => {
       console.debug("Received Whitelist Slots", result);
       friendInviteSlots = result;
@@ -257,7 +257,7 @@
     progressBarMax = null;
     forceServer = null;
   });
-  
+
   listen("client-error", (e) => {
     clientLogShown = true;
     console.error(e.payload);
@@ -304,14 +304,14 @@
     fakeClientRunning = true;
 
     await invoke("get_launch_manifest", {
-        branch: branch,
-        noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-        uuid: options.currentUuid
+      branch: branch,
+      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      uuid: options.currentUuid,
     }).then((result) => {
-        console.debug("Launch Manifest", result);
-        launchManifest = result;
+      console.debug("Launch Manifest", result);
+      launchManifest = result;
     }).catch((err) => {
-        console.error(err);
+      console.error(err);
     });
 
     if (options.experimentalMode) {
@@ -350,7 +350,7 @@
       mods: installedMods,
       shaders: launcherProfiles.addons[branch].shaders,
       resourcepacks: launcherProfiles.addons[branch].resourcePacks,
-      datapacks: launcherProfiles.addons[branch].datapacks
+      datapacks: launcherProfiles.addons[branch].datapacks,
     });
 
     forceServer = `${forceServer}:LAUNCHED`;
@@ -366,10 +366,9 @@
 
   function microsoftAuth() {
     invoke("microsoft_auth").then(result => {
-      alert("Yooo")
+      console.log("Result",result)
     }).catch(e => {
-      alert("Auth Error");
-      console.error(e);
+      addNotification(e);
     });
   }
 
@@ -401,14 +400,14 @@
       showCapeScreen = true;
     }, 300);
   }
-  
+
   function handleOpenAddonsScreen() {
     showAddonsScreenHack = true;
     setTimeout(() => {
       showAddonsScreen = true;
     }, 300);
   }
-  
+
   function handleOpenServersScreen() {
     showServersScreenHack = true;
     setTimeout(() => {
@@ -438,35 +437,35 @@
   function backToLoadingScreen() {
     fakeClientRunning = false;
     setTimeout(() => {
-      home()
+      home();
       clientRunning = true;
     }, 100);
   }
 
   async function connect_discord_intigration() {
     if ((await check_discord_link()) === true) {
-					discordLinked = true;
-					return;
-				}
-				const loginData = options.accounts.find(
-					(obj) => obj.uuid === options.currentUuid,
-				);
-				await invoke("connect_discord_intigration", { options, loginData })
-					.then(() => {
-						console.log("Connected to Discord Intigration");
-					})
-					.catch((err) => {
-						console.error(err);
-						alert(err);
-					});
+      discordLinked = true;
+      return;
+    }
+    const loginData = options.accounts.find(
+      (obj) => obj.uuid === options.currentUuid,
+    );
+    await invoke("connect_discord_intigration", { options, loginData })
+      .then(() => {
+        console.log("Connected to Discord Intigration");
+      })
+      .catch((err) => {
+        console.error(err);
+        alert(err);
+      });
   }
-  
+
   async function check_discord_link() {
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     let linked;
     await invoke("check_discord_intigration", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid
+      uuid: options.currentUuid,
     }).then((result) => {
       discordLinked = result;
       linked = result;
@@ -482,7 +481,7 @@
     const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
     await invoke("unlink_discord_intigration", {
       noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid
+      uuid: options.currentUuid,
     }).then(() => {
       alert("Discord unlinked successfully!");
       check_discord_link();
@@ -503,7 +502,8 @@
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
   {#if showInvitePopup}
-    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup} bind:friendInviteSlots />
+    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup}
+                 bind:friendInviteSlots />
   {/if}
 
   {#if showAddonsScreen}
@@ -511,11 +511,14 @@
   {/if}
 
   {#if showServersScreen}
-    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer} bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
+    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist
+                   bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer}
+                   bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
-    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={branches} currentBranchIndex={currentBranchIndex}></ProfilesScreen>
+    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={branches}
+                    currentBranchIndex={currentBranchIndex}></ProfilesScreen>
   {/if}
 
   {#if showSkinScreen}
@@ -527,9 +530,10 @@
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown} bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
+    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown}
+                   bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
   {/if}
-  
+
   {#if mcRealQrCodeShown}
     <McRealAppModal bind:options bind:showModal={mcRealQrCodeShown}></McRealAppModal>
   {/if}
@@ -539,7 +543,8 @@
   {/if}
 
   {#if clientRunning}
-    <LoadingScreen bind:log progressBarMax={progressBarMax} progressBarProgress={progressBarProgress} progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning} />
+    <LoadingScreen bind:log progressBarMax={progressBarMax} progressBarProgress={progressBarProgress}
+                   progressBarLabel={progressBarLabel} on:home={homeWhileClientRunning} />
   {/if}
 
   {#if (!showProfilesScreenHack && !showSkinScreenHack && !showCapeScreenHack && !showAddonsScreenHack && !showServersScreenHack) && !clientRunning && !clientLogShown}
@@ -550,7 +555,8 @@
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
       {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>{#if discordLinked}UN{/if}LINK DISCORD</h1>
+        <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>
+          {#if discordLinked}UN{/if}LINK DISCORD</h1>
       {/if}
     </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
@@ -580,13 +586,13 @@
       <h1 class="quit" on:click={closeWindow}>QUIT</h1>
     </div>
     <img transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-      class="pokemon-title"
-      src={NoRiskLogoColor}
-      alt="Pokemon Title">
+         class="pokemon-title"
+         src={NoRiskLogoColor}
+         alt="Pokemon Title">
     <div class="branch-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-      on:selectstart={preventSelection} style="cursor: pointer"
+          on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
           style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
@@ -621,9 +627,10 @@
           style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
         &gt;</h1>
     </div>
-    <SkinButton on:launch={runClient} on:requestBranches={() => loadAllData()} bind:options={options} bind:branches={branches} />
+    <SkinButton on:launch={runClient} on:requestBranches={() => loadAllData()} bind:options={options}
+                bind:branches={branches} />
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
-        on:mousedown={preventSelection} class="copyright">
+         on:mousedown={preventSelection} class="copyright">
       © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.9
     </div>
   {/if}
@@ -710,7 +717,7 @@
         text-shadow: 1px 1px var(--hover-color-text-shadow);
         transform: scale(1.2);
     }
-    
+
     .settings-button-wrapper {
         position: absolute;
         top: 5em;
@@ -736,7 +743,7 @@
         text-shadow: 1px 1px var(--hover-color-text-shadow);
         transform: scale(1.2);
     }
-    
+
     .settings-button-wrapper h1.quit:hover {
         color: red;
         text-shadow: 1px 1px #460000;
@@ -744,16 +751,16 @@
     }
 
     .settings-button-wrapper h1.invite-button {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      font-size: 12.5px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        font-size: 12.5px;
     }
 
     .settings-button-wrapper h1.invite-button p {
-      margin-bottom: 5px;
-      padding-right: 5px;
-      font-size: 15px;
+        margin-bottom: 5px;
+        padding-right: 5px;
+        font-size: 15px;
     }
 
     .back-to-loading-button {

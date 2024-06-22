@@ -14,6 +14,7 @@ use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthModsSearchResponse};
+use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
@@ -908,15 +909,15 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
 }
 
 #[tauri::command]
-async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, String> {
-    let mut accounts = MinecraftAuthStore::init().await.ok().unwrap();
+async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, crate::error::Error> {
+    let mut accounts = MinecraftAuthStore::init().await?;
 
-    let flow = accounts.login_begin().await.expect("TODO: panic message");
+    let flow = accounts.login_begin().await?;
 
     let start = Utc::now();
 
     if let Some(window) = app.get_window("signin") {
-        window.close().ok();
+        window.close()?;
     }
 
     let window = tauri::WindowBuilder::new(
@@ -929,14 +930,14 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, St
                 )
                     .as_error()
             },
-        ).expect("TODO: panic message")),
+        )?),
     )
         .title("Sign into NoRiskClient")
         .always_on_top(true)
         .center()
-        .build().ok().unwrap();
+        .build()?;
 
-    window.request_user_attention(Some(UserAttentionType::Critical)).expect("TODO: panic message");
+    window.request_user_attention(Some(UserAttentionType::Critical))?;
 
     while (Utc::now() - start) < chrono::Duration::minutes(10) {
         if window.title().is_err() {
@@ -952,21 +953,21 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, St
             if let Some((_, code)) =
                 window.url().query_pairs().find(|x| x.0 == "code")
             {
-                window.close().ok();
-                let credentials = accounts.login_finish(&code.clone(), flow).await.ok().unwrap();
+                window.close()?;
+                let credentials = accounts.login_finish(&code.clone(), flow).await?;
                 //TODO das hier später nur machen wenn unser JWT NoRisk Token abgelaufen ist
-                let _ = accounts.refresh_norisk_token(&credentials).await.expect("TODO Error Handling");
+                let credentials_with_norisk = accounts.refresh_norisk_token(&credentials).await?;
 
                 //TODO Minecraft Auth + NoRisk Token Done
 
-                return Ok(Some(credentials));
+                return Ok(Some(credentials_with_norisk));
             }
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
 
-    window.close().ok();
+    window.close()?;
     Ok(None)
 }
 

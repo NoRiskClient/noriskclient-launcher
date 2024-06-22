@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::path::Path;
 
 use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::Digest;
+use tokio::fs;
 use tracing::field::debug;
 use uuid::Uuid;
 use crate::app::api::{ApiEndpoints, get_api_base};
@@ -105,7 +107,7 @@ pub struct MinecraftAuthStore {
 
 impl MinecraftAuthStore {
     //TODO
-    pub async fn init() -> crate::Result<Self> {
+    pub async fn init() -> Result<Self, crate::error::Error> {
         //let auth_path = dirs.caches_meta_dir().await.join(AUTH_JSON);
         //let store = read_json(&auth_path, io_semaphore).await.ok();
 
@@ -126,7 +128,10 @@ impl MinecraftAuthStore {
     }
 
     //TODO
-    pub async fn save(&self) -> crate::error::Result<()> {
+    pub async fn save(&self) -> Result<(), crate::error::Error> {
+        let _ = fs::write(LAUNCHER_DIRECTORY.config_dir().join("accounts.json"), serde_json::to_string_pretty(&self)?)
+            .await
+            .map_err(|err| -> String { format!("Failed to write options.json: {}", err).into() });
         //let state = State::get().await?;
         //let auth_path = state.directories.caches_meta_dir().await.join(AUTH_JSON);
 
@@ -139,7 +144,7 @@ impl MinecraftAuthStore {
         &mut self,
         current_date: DateTime<Utc>,
         force_generate: bool,
-    ) -> crate::error::Result<(DeviceTokenKey, DeviceToken, DateTime<Utc>, bool)> {
+    ) -> Result<(DeviceTokenKey, DeviceToken, DateTime<Utc>, bool), crate::error::Error> {
         macro_rules! generate_key {
             ($self:ident, $generate_key:expr, $device_token:expr, $SaveDeviceToken:path) => {{
                 let key = generate_key()?;
@@ -203,7 +208,7 @@ impl MinecraftAuthStore {
         Ok((key, token, date, valid_date))
     }
 
-    pub async fn login_begin(&mut self) -> crate::error::Result<MinecraftLoginFlow> {
+    pub async fn login_begin(&mut self) -> Result<MinecraftLoginFlow, crate::error::Error> {
         let (key, token, current_date, valid_date) =
             self.refresh_and_get_device_token(Utc::now(), false).await?;
 
@@ -258,7 +263,7 @@ impl MinecraftAuthStore {
         &mut self,
         code: &str,
         flow: MinecraftLoginFlow,
-    ) -> crate::error::Result<Credentials> {
+    ) -> Result<Credentials, crate::error::Error> {
         let (key, token, _, _) =
             self.refresh_and_get_device_token(Utc::now(), false).await?;
 
@@ -311,28 +316,25 @@ impl MinecraftAuthStore {
     pub(crate) async fn refresh_norisk_token(
         &mut self,
         creds: &Credentials,
-    ) -> crate::error::Result<Option<Credentials>> {
+    ) -> Result<Credentials, crate::error::Error> {
         let cred_id = creds.id;
-        let profile_name = creds.username.clone();
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
 
-        let norisk_user = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await.expect("TODO Error");
+        let norisk_user = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await?;
 
-        debug!("###Received NoRisk User {:?}", norisk_user);
         //TODO maybe ganzen norisk_user speichern für rank information und discordId?
-        let mut old_creds = creds.clone();
-        old_creds.norisk_credentials.access_token = norisk_user.token;
+        let mut copied_credentials = creds.clone();
+        copied_credentials.norisk_credentials.access_token = norisk_user.token;
 
-        self.users.insert(cred_id, creds.clone());
+        self.users.insert(cred_id, copied_credentials.clone());
         self.save().await?;
 
-        Ok(Some(old_creds))
+        Ok(copied_credentials)
     }
 
     async fn refresh_token(
         &mut self,
         creds: &Credentials,
-    ) -> crate::error::Result<Option<Credentials>> {
+    ) -> Result<Option<Credentials>, crate::error::Error> {
         let cred_id = creds.id;
         let profile_name = creds.username.clone();
 
@@ -378,7 +380,7 @@ impl MinecraftAuthStore {
 
     pub async fn get_default_credential(
         &mut self,
-    ) -> crate::error::Result<Option<Credentials>> {
+    ) -> Result<Option<Credentials>, crate::error::Error> {
         let credentials = if let Some(default_user) = self.default_user {
             if let Some(creds) = self.users.get(&default_user) {
                 Some(creds)
@@ -429,7 +431,7 @@ impl MinecraftAuthStore {
     pub async fn remove(
         &mut self,
         id: Uuid,
-    ) -> crate::error::Result<Option<Credentials>> {
+    ) -> Result<Option<Credentials>, crate::error::Error> {
         let val = self.users.remove(&id);
         self.save().await?;
         Ok(val)
