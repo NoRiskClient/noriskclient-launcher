@@ -18,9 +18,11 @@
   import ClientLog from "../log/LogPopup.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { fetchBranches, branches } from "../../stores/branchesStore.js";
+  import { launcherOptions } from "../../stores/optionsStore.js";
 
   export let options;
-  let branches = [];
   let launcherProfiles = {};
   let featureWhitelist = [];
   let friendInviteSlots = {};
@@ -28,7 +30,6 @@
   let currentBranchIndex = 0;
   let clientRunning;
   let fakeClientRunning = false;
-  let refreshingAccount = false;
   let forceServer = null;
 
   let progressBarMax = 0;
@@ -51,6 +52,12 @@
   let log = [];
   let customServerProgress = {};
   let customServerLogs = {};
+
+  defaultUser.subscribe(async value => {
+    console.log("Default User Was Updatedd", value);
+    await fetchBranches();
+    await loadProfiles();
+  });
 
   listen("process-output", event => {
     log = [...log, event.payload];
@@ -114,7 +121,7 @@
   }
 
   function handleSwitchBranch(isLeft) {
-    const totalBranches = branches.length;
+    const totalBranches = $branches.length;
 
     if (isLeft) {
       currentBranchIndex = (currentBranchIndex - 1 + totalBranches) % totalBranches;
@@ -123,35 +130,10 @@
     }
   }
 
-  async function requestBranches() {
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    console.log(options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken);
-    await invoke("request_norisk_branches", {
-      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid,
-    })
-      .then((result) => {
-        const latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
-        console.debug("Received Branches Latest Branch: " + latestBranch, result);
-        branches = result;
-        branches.sort(function(a, b) {
-          if (a === latestBranch) {
-            return -1;
-          } else if (b === latestBranch) {
-            return 1;
-          } else {
-            return a.localeCompare(b);
-          }
-        });
-      })
-      .catch((reason) => {
-        alert(reason);
-        console.error(reason);
-      });
-
+  async function loadProfiles() {
     await invoke("get_launcher_profiles").then((profiles) => {
       console.info(`Loaded launcher profiles: `, profiles);
-      branches.forEach(branch => {
+      $branches.forEach(branch => {
         if (options.experimentalMode) {
           const branchProfile = profiles.experimentalProfiles.find(p => p.branch == branch);
           if (!branchProfile) {
@@ -203,10 +185,10 @@
   }
 
   async function checkFeatureWhitelist(feature) {
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    console.log("Credentials", credentials);
     await invoke("check_feature_whitelist", {
       feature: feature,
-      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+      noriskToken: options.experimentalMode ? credentials.norisk_credentials.production.value : credentials.norisk_credentials.experimental.value,
       uuid: options.currentUuid,
     }).then((result) => {
       console.debug(feature + ":", result);
@@ -234,15 +216,15 @@
   }
 
   async function loadAllData() {
-    await requestBranches();
+    await loadProfiles();
     featureWhitelist = [];
-    await checkFeatureWhitelist("INVITE_FRIENDS");
-    await checkFeatureWhitelist("CUSTOM_SERVERS");
-    await checkFeatureWhitelist("MCREAL_APP");
+    //await checkFeatureWhitelist("INVITE_FRIENDS");
+    //await checkFeatureWhitelist("CUSTOM_SERVERS");
+    //await checkFeatureWhitelist("MCREAL_APP");
     if (featureWhitelist.includes("INVITE_FRIENDS")) {
-      await loadFriendInvites();
+      //await loadFriendInvites();
     }
-    await check_discord_link();
+    //await check_discord_link();
   }
 
   onMount(() => {
@@ -266,53 +248,15 @@
 
   export async function runClient() {
     if (clientRunning) {
-      return;
+      //return;
     }
-    if (refreshingAccount) {
-      console.error("Refreshing Account...");
-      return;
-    }
-
-    refreshingAccount = true;
-    await invoke("refresh_via_norisk", { loginData: options.accounts.find(obj => obj.uuid === options.currentUuid) })
-      .then((account) => {
-        console.debug("Current UUID", options.currentUuid);
-        console.debug("Account UUID", account.uuid);
-        // Index des vorhandenen Objekts mit derselben UUID suchen
-        let existingIndex = options.accounts.findIndex(obj => obj.uuid === account.uuid);
-        if (existingIndex !== -1) {
-          console.debug("###Replaced Refreshed  Account");
-          options.accounts[existingIndex] = account;
-        } else {
-          console.debug("###Added Refreshed Account");
-          options.accounts.push(account);
-        }
-
-        options.store();
-      })
-      //TODO also aktueller stand ist dass das hier manchmal failen kann und deswegen kann man nicht refreshen haha einfach hoffen lol...
-      .catch(e => console.error("###" + e));
-    refreshingAccount = false;
 
     console.log("Client started");
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    let launchManifest = {};
-    let branch = branches[currentBranchIndex];
+    let branch = $branches[currentBranchIndex];
     let installedMods = [];
     log = [];
     clientRunning = true;
     fakeClientRunning = true;
-
-    await invoke("get_launch_manifest", {
-      branch: branch,
-      noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-      uuid: options.currentUuid,
-    }).then((result) => {
-      console.debug("Launch Manifest", result);
-      launchManifest = result;
-    }).catch((err) => {
-      console.error(err);
-    });
 
     if (options.experimentalMode) {
       options.latestDevBranch = branch;
@@ -323,15 +267,17 @@
     options.store();
 
     let launcherProfile;
-    if (options.experimentalMode) {
-      const activeProfileId = launcherProfiles.selectedExperimentalProfiles[branch];
-      launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id == activeProfileId);
-    } else {
-      const activeProfileId = launcherProfiles.selectedMainProfiles[branch];
-      launcherProfile = launcherProfiles.mainProfiles.find(p => p.id == activeProfileId);
+    if ($branches.length > 0) {
+      if ($launcherOptions.experimentalMode) {
+        const activeProfileId = launcherProfiles.selectedExperimentalProfiles[branch];
+        launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id == activeProfileId);
+      } else {
+        const activeProfileId = launcherProfiles.selectedMainProfiles[branch];
+        launcherProfile = launcherProfiles.mainProfiles.find(p => p.id == activeProfileId);
+      }
     }
 
-    launcherProfile.mods.forEach(mod => {
+    launcherProfile?.mods?.forEach(mod => {
       installedMods.push(mod.value);
       mod.dependencies.forEach((dependency) => {
         installedMods.push(dependency.value);
@@ -344,13 +290,15 @@
     console.log(forceServer);
     await invoke("run_client", {
       branch: branch,
-      loginData: loginData,
       options: options,
-      forceServer: forceServer != null ? forceServer : launchManifest.server?.length > 0 ? launchManifest.server : null,
       mods: installedMods,
-      shaders: launcherProfiles.addons[branch].shaders,
-      resourcepacks: launcherProfiles.addons[branch].resourcePacks,
-      datapacks: launcherProfiles.addons[branch].datapacks,
+      shaders: launcherProfiles.addons[branch]?.shaders ?? [],
+      resourcepacks: launcherProfiles.addons[branch]?.resourcePacks ?? [],
+      datapacks: launcherProfiles.addons[branch]?.datapacks ?? [],
+    }).catch(reason => {
+      clientRunning = false;
+      fakeClientRunning = false;
+      addNotification(reason);
     });
 
     forceServer = `${forceServer}:LAUNCHED`;
@@ -363,14 +311,6 @@
     alert("Failed to get data folder: " + e);
     console.error(e);
   });
-
-  function microsoftAuth() {
-    invoke("microsoft_auth").then(result => {
-      console.log("Result",result)
-    }).catch(e => {
-      addNotification(e);
-    });
-  }
 
   function preventSelection(event) {
     event.preventDefault();
@@ -507,17 +447,18 @@
   {/if}
 
   {#if showAddonsScreen}
-    <AddonsScreen on:home={home} bind:options bind:launcherProfiles bind:currentBranch={branches[currentBranchIndex]} />
+    <AddonsScreen on:home={home} bind:options bind:launcherProfiles
+                  bind:currentBranch={$branches[currentBranchIndex]} />
   {/if}
 
   {#if showServersScreen}
     <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist
-                   bind:currentBranch={branches[currentBranchIndex]} bind:forceServer={forceServer}
+                   bind:currentBranch={$branches[currentBranchIndex]} bind:forceServer={forceServer}
                    bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
-    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={branches}
+    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={$branches}
                     currentBranchIndex={currentBranchIndex}></ProfilesScreen>
   {/if}
 
@@ -553,20 +494,20 @@
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
-      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null}
+      {#if $branches.length > 0 && options.currentUuid != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>
           {#if discordLinked}UN{/if}LINK DISCORD</h1>
       {/if}
     </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
-      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+      {#if $branches.length > 0 && options.currentUuid != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
-      {#if options.accounts.length > 0 && branches.length > 0 && options.currentUuid != null}
+      {#if $branches.length > 0 && options.currentUuid != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -595,28 +536,31 @@
           on:selectstart={preventSelection} style="cursor: pointer"
           on:mousedown={preventSelection} class="nes-font switch"
           on:click={() => handleSwitchBranch(true)}
-          style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
+          style:opacity={$branches.length < 2 || defaultUser == null ? 0 : 100}>
         &lt;</h1>
       <section style="display:flex;justify-content:center">
-        {#if refreshingAccount}
-          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }} style="position:absolute">
-            Loading Account...</h1>
-        {:else if branches.length < 1 || options.currentUuid == null}
-          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
-            Sign in...</h1>
-          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:click={microsoftAuth}>
-            New Login</h1>
+        {#if !$defaultUser}
+          <h1 class="nes-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Sign in...</h1>
         {:else}
-          {#each branches as branch, i}
-            {#if currentBranchIndex === i}
-              <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                  class="nes-font"
-                  style="position:absolute"
-                  on:selectstart={preventSelection}
-                  on:mousedown={preventSelection}
-              > {branch.toUpperCase()} VERSION</h1>
-            {/if}
-          {/each}
+          {#if $branches.length > 0}
+            {#each $branches as branch, i}
+              {#if currentBranchIndex === i}
+                <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                    class="nes-font"
+                    style="position:absolute"
+                    on:selectstart={preventSelection}
+                    on:mousedown={preventSelection}
+                > {branch.toUpperCase()} VERSION</h1>
+              {/if}
+            {/each}
+          {:else}
+            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                class="nes-font"
+                style="position:absolute"
+                on:selectstart={preventSelection}
+                on:mousedown={preventSelection}
+            > NOT WHITELISTED</h1>
+          {/if}
         {/if}
       </section>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -624,11 +568,15 @@
           on:selectstart={preventSelection}
           style="cursor: pointer" on:mousedown={preventSelection}
           class="nes-font switch" on:click={() => handleSwitchBranch(false)}
-          style:opacity={branches.length < 2 || options.currentUuid == null ? 0 : 100}>
+          style:opacity={$branches.length < 2 || options.currentUuid == null ? 0 : 100}>
         &gt;</h1>
     </div>
-    <SkinButton on:launch={runClient} on:requestBranches={() => loadAllData()} bind:options={options}
-                bind:branches={branches} />
+    <SkinButton
+      on:launch={runClient}
+      on:requestBranches={() => loadAllData()}
+      bind:options={options}
+      bind:branches={$branches}
+    />
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
          on:mousedown={preventSelection} class="copyright">
       © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.9

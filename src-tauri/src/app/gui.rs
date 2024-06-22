@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
-use chrono::{Duration, Utc};
 
+use chrono::{Duration, Utc};
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
@@ -8,12 +8,11 @@ use tauri::{LogicalSize, Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
-use crate::app::app_data::TokenManager;
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthProject, ModrinthSearchRequestParams, ModrinthModsSearchResponse};
+use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject, ModrinthSearchRequestParams};
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
@@ -596,6 +595,38 @@ async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String
 }
 
 #[tauri::command]
+async fn minecraft_auth_get_store() -> Result<MinecraftAuthStore, crate::error::Error> {
+    Ok(MinecraftAuthStore::init(None).await?)
+}
+
+#[tauri::command]
+pub async fn minecraft_auth_remove_user(uuid: uuid::Uuid) -> Result<Option<Credentials>, crate::error::Error> {
+    Ok(minecraft_auth_get_store().await?.remove(uuid).await?)
+}
+
+#[tauri::command]
+pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, crate::error::Error> {
+    let mut accounts = minecraft_auth_get_store().await?;
+    Ok(accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).cloned())
+}
+
+#[tauri::command]
+pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), crate::error::Error> {
+    let mut accounts = minecraft_auth_get_store().await?;
+    accounts.default_user = Some(uuid);
+    accounts.save().await?;
+    Ok(())
+}
+
+/// Get a copy of the list of all user credentials
+// invoke('plugin:auth|auth_users',user)
+#[tauri::command]
+pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Error> {
+    let mut accounts = minecraft_auth_get_store().await?;
+    Ok(accounts.users.values().cloned().collect())
+}
+
+#[tauri::command]
 async fn get_options() -> Result<LauncherOptions, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
@@ -827,11 +858,8 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches(norisk_token: &str, uuid: &str) -> Result<Vec<String>, String> {
-    let branches = ApiEndpoints::norisk_branches(norisk_token, uuid)
-        .await
-        .map_err(|e| format!("unable to request branches: {:?}", e))?;
-    Ok(branches)
+async fn request_norisk_branches() -> Result<Vec<String>, crate::error::Error> {
+    Ok(ApiEndpoints::norisk_branches().await?)
 }
 
 #[tauri::command]
@@ -842,10 +870,8 @@ async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, Stri
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: &str) -> Result<NoRiskLaunchManifest, String> {
-    let manifest = ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await
-        .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
-    Ok(manifest)
+async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, crate::error::Error> {
+    Ok(ApiEndpoints::launch_manifest(branch).await?)
 }
 
 #[tauri::command]
@@ -910,7 +936,7 @@ async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHand
 
 #[tauri::command]
 async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, crate::error::Error> {
-    let mut accounts = MinecraftAuthStore::init().await?;
+    let mut accounts = MinecraftAuthStore::init(None).await?;
 
     let flow = accounts.login_begin().await?;
 
@@ -971,12 +997,6 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
     Ok(None)
 }
 
-#[tauri::command]
-async fn remove_account(login_data: LoginData) -> Result<(), String> {
-    TokenManager {}.delete_tokens(login_data);
-    Ok(())
-}
-
 fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
@@ -1005,20 +1025,21 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, login_data: LoginData, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_client(branch: String, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     info!("Starting Client with branch {}",branch);
+    let credentials = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
-        force_server: force_server,
+        force_server: None, //TODO ich fix das noch <3
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
         custom_java_args: options.custom_java_args,
-        auth_player_name: login_data.username,
-        auth_uuid: login_data.uuid,
-        auth_access_token: login_data.mc_token,
+        auth_player_name: credentials.username,
+        auth_uuid: credentials.id.to_string(),
+        auth_access_token: credentials.access_token,
         auth_xuid: "x".to_string(),
         clientid: auth::AZURE_CLIENT_ID.to_string(),
         user_type: "msa".to_string(),
@@ -1028,21 +1049,23 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
 
     let runner_instance = &app_state.runner_instance;
 
-    if runner_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e))?.is_some() {
-        return Err("client is already running".to_string());
+    if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
+        return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
     }
 
-    let experimental_token = login_data.experimental_token.unwrap_or_default();
-    let norisk_token = login_data.norisk_token;
+    let token = if options.experimental_mode {
+        credentials.norisk_credentials.experimental.ok_or(ErrorKind::NoCredentialsError)?.value
+    } else {
+        credentials.norisk_credentials.production.ok_or(ErrorKind::NoCredentialsError)?.value
+    };
+
 
     info!("Loading launch manifest...");
-    let launch_manifest = ApiEndpoints::launch_manifest(&branch, (if options.experimental_mode { experimental_token.clone() } else { norisk_token.clone() }).to_string().as_mut(), options.current_uuid.clone().unwrap().as_str())
-        .await
-        .map_err(|e| format!("unable to request launch manifest: {:?}", e))?;
+    let launch_manifest = get_launch_manifest(&branch).await?;
 
     let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
 
-    *runner_instance.lock().map_err(|e| format!("unable to lock runner instance: {:?}", e))?
+    *runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?
         = Some(RunnerInstance { terminator: terminator_tx });
 
     let copy_of_runner_instance = runner_instance.clone();
@@ -1057,12 +1080,8 @@ async fn run_client(branch: String, login_data: LoginData, options: LauncherOpti
                 let keep_launcher_open = parameters.keep_launcher_open;
 
                 if let Err(e) = prelauncher::launch(
-                    &if options.experimental_mode {
-                        experimental_token
-                    } else {
-                        norisk_token
-                    },
-                    options.current_uuid.unwrap().as_str(),
+                    &token,
+                    &credentials.id.to_string(),
                     launch_manifest,
                     parameters,
                     mods,
@@ -1189,8 +1208,9 @@ async fn default_data_folder_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn clear_data(options: LauncherOptions) -> Result<(), String> {
-    let _ = options.accounts.iter().map(|account| TokenManager {}.delete_tokens(account.clone()));
+async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error> {
+    let auth_store = MinecraftAuthStore::init(Some(true)).await?;
+    auth_store.save().await?;
 
     let _ = store_options(LauncherOptions::default()).await;
 
@@ -1200,7 +1220,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), String> {
         .filter(|dir| dir.exists())
         .map(std::fs::remove_dir_all)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("unable to clear data: {:?}", e))?;
+        .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
     Ok(())
 }
 
@@ -1500,6 +1520,11 @@ pub fn gui_main() {
             open_url,
             check_online_status,
             get_options,
+            minecraft_auth_get_store,
+            minecraft_auth_get_default_user,
+            minecraft_auth_set_default_user,
+            minecraft_auth_remove_user,
+            minecraft_auth_users,
             store_options,
             check_maintenance_mode,
             request_norisk_branches,
@@ -1507,7 +1532,6 @@ pub fn gui_main() {
             check_discord_intigration,
             unlink_discord_intigration,
             login_norisk_microsoft,
-            remove_account,
             upload_cape,
             equip_cape,
             get_player_skins,

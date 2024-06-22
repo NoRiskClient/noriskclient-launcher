@@ -1,41 +1,12 @@
 <script>
   import AccountListItem from "./AccountListItem.svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
+  import { defaultUser, users } from "../../stores/credentialsStore.js";
+  import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
 
   export let showModal;
-  export let options;
-  export let refreshData;
 
   let dialog; // HTMLDialogElement
   $: if (dialog && showModal) dialog.showModal();
-
-  const handleAddAccount = async () => {
-    await invoke("login_norisk_microsoft", { options }).then((loginData) => {
-      console.debug("Received Login Data...", loginData);
-
-      options.currentUuid = loginData.uuid;
-
-      // Index des vorhandenen Objekts mit derselben UUID suchen
-      let existingIndex = options.accounts.findIndex(obj => obj.uuid === loginData.uuid);
-      if (existingIndex !== -1) {
-        console.debug("Replace Account");
-        options.accounts[existingIndex] = loginData;
-      } else {
-        console.debug("Add New Account");
-        options.accounts.push(loginData);
-      }
-
-      options.store();
-      refreshData();
-    }).catch(e => {
-      console.error("microsoft authentication error", e);
-      if (e.includes(403)) {
-        alert("NoRiskClient is currently still in closed beta.\n Please wait for a public release.");
-      } else {
-        alert(e);
-      }
-    });
-  };
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -51,12 +22,14 @@
         <h1 class="nes-font red-text-clickable" on:click={() => dialog.close()}>X</h1>
       </div>
       <hr>
-      {#each options.accounts as account}
-        <AccountListItem bind:dialog isActive={options.currentUuid === account.uuid} bind:options={options} account={account} onSelect={refreshData} />
-      {/each}
+      {#if $defaultUser}
+        {#each $users as account}
+          <AccountListItem bind:dialog isActive={$defaultUser.id === account.id} account={account} />
+        {/each}
+      {/if}
     </div>
     <!-- svelte-ignore a11y-autofocus -->
-    <div class="add-account-button" on:click={handleAddAccount}>ADD ACCOUNT</div>
+    <div class="add-account-button" on:click={startMicrosoftAuth}>ADD ACCOUNT</div>
   </div>
 </dialog>
 

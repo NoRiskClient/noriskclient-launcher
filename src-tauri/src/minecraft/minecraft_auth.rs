@@ -19,12 +19,14 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::Digest;
 use tokio::fs;
+use tokio::io::AsyncReadExt;
 use tracing::field::debug;
 use uuid::Uuid;
+
+use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{ApiEndpoints, get_api_base};
 use crate::app::app_data::LauncherOptions;
 use crate::error::ErrorKind;
-use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
 #[derive(Debug, Clone, Copy)]
 pub enum MinecraftAuthStep {
@@ -107,11 +109,19 @@ pub struct MinecraftAuthStore {
 
 impl MinecraftAuthStore {
     //TODO
-    pub async fn init() -> Result<Self, crate::error::Error> {
-        //let auth_path = dirs.caches_meta_dir().await.join(AUTH_JSON);
-        //let store = read_json(&auth_path, io_semaphore).await.ok();
-
-        /*if let Some(store) = store {
+    pub async fn init(create_new: Option<bool>) -> Result<Self, crate::error::Error> {
+        let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
+        if auth_path.exists() || create_new.unwrap_or(false) {
+            let mut file = fs::File::open(&auth_path).await.map_err(|e| {
+                ErrorKind::FSError(format!("Failed to open accounts.json: {}", e))
+            })?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).await.map_err(|e| {
+                ErrorKind::FSError(format!("Failed to read accounts.json: {}", e))
+            })?;
+            let store: MinecraftAuthStore = serde_json::from_str(&contents).map_err(|e| {
+                ErrorKind::JSONError(e)
+            })?;
             Ok(store)
         } else {
             Ok(Self {
@@ -119,12 +129,7 @@ impl MinecraftAuthStore {
                 token: None,
                 default_user: None,
             })
-        }*/
-        Ok(Self {
-            users: HashMap::new(),
-            token: None,
-            default_user: None,
-        })
+        }
     }
 
     //TODO
@@ -132,11 +137,6 @@ impl MinecraftAuthStore {
         let _ = fs::write(LAUNCHER_DIRECTORY.config_dir().join("accounts.json"), serde_json::to_string_pretty(&self)?)
             .await
             .map_err(|err| -> String { format!("Failed to write options.json: {}", err).into() });
-        //let state = State::get().await?;
-        //let auth_path = state.directories.caches_meta_dir().await.join(AUTH_JSON);
-
-        //write(&auth_path, &serde_json::to_vec(&self)?, &state.io_semaphore).await?;
-
         Ok(())
     }
 
@@ -297,9 +297,8 @@ impl MinecraftAuthStore {
             username: profile.name,
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
-            expires: oauth_token.date
-                + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: NoRiskCredentials { access_token: "".to_string() },
+            expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+            norisk_credentials: NoRiskCredentials { production: None, experimental: None },
         };
 
         self.users.insert(profile_id, credentials.clone());
@@ -319,11 +318,17 @@ impl MinecraftAuthStore {
     ) -> Result<Credentials, crate::error::Error> {
         let cred_id = creds.id;
 
-        let norisk_user = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await?;
+        let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await
+            .map_err(|e| ErrorKind::LauncherError(e.to_string()).as_error())?;
 
         //TODO maybe ganzen norisk_user speichern für rank information und discordId?
         let mut copied_credentials = creds.clone();
-        copied_credentials.norisk_credentials.access_token = norisk_user.token;
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        if options.experimental_mode {
+            copied_credentials.norisk_credentials.experimental = Some(norisk_token);
+        } else {
+            copied_credentials.norisk_credentials.production = Some(norisk_token);
+        }
 
         self.users.insert(cred_id, copied_credentials.clone());
         self.save().await?;
@@ -367,9 +372,8 @@ impl MinecraftAuthStore {
             username: profile_name,
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
-            expires: oauth_token.date
-                + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: NoRiskCredentials { access_token: "".to_string() },
+            expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+            norisk_credentials: creds.clone().norisk_credentials,
         };
 
         self.users.insert(val.id, val.clone());
@@ -433,6 +437,14 @@ impl MinecraftAuthStore {
         id: Uuid,
     ) -> Result<Option<Credentials>, crate::error::Error> {
         let val = self.users.remove(&id);
+        if self.default_user.filter(|user| user == &id).is_some() {
+            if self.users.is_empty() {
+                self.default_user = None;
+            } else {
+                self.default_user = self.users.keys().next().cloned();
+            }
+        }
+        debug!("Removing {:?}",id);
         self.save().await?;
         Ok(val)
     }
@@ -451,7 +463,14 @@ pub struct Credentials {
 //TODO JWT
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NoRiskCredentials {
-    pub access_token: String,
+    pub production: Option<NoRiskToken>,
+    pub experimental: Option<NoRiskToken>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NoRiskToken {
+    pub value: String,
+    //TODO habs nichts hinbekommen jetzt erstmal bei jedem restart, pub expires: DateTime<Utc>,
 }
 
 const MICROSOFT_CLIENT_ID: &str = "00000000402b5328";
@@ -892,8 +911,8 @@ async fn minecraft_entitlements(
 async fn auth_retry<F>(
     reqwest_request: impl Fn() -> F,
 ) -> Result<reqwest::Response, reqwest::Error>
-    where
-        F: Future<Output=Result<Response, reqwest::Error>>,
+where
+    F: Future<Output=Result<Response, reqwest::Error>>,
 {
     const RETRY_COUNT: usize = 5; // Does command 9 times
     const RETRY_WAIT: std::time::Duration =

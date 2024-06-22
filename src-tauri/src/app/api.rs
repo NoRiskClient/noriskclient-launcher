@@ -1,13 +1,18 @@
 use std::collections::{BTreeMap, HashMap};
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
-use log::{debug, info};
+use sha1::digest::typenum::op;
 
-use crate::custom_servers::models::CustomServer;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::app_data::LauncherOptions;
+use crate::app::gui::minecraft_auth_get_default_user;
+use crate::custom_servers::models::CustomServer;
+use crate::error::ErrorKind;
+use crate::minecraft::minecraft_auth::{NoRiskCredentials, NoRiskToken};
 use crate::minecraft::version::AssetObject;
 use crate::utils::get_maven_artifact_path;
 
@@ -31,8 +36,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint("launcher/branches", norisk_token, request_uuid).await
+    pub async fn norisk_branches() -> core::result::Result<Vec<String>, crate::error::Error> {
+        Self::request_from_noriskclient_endpoint("launcher/branches").await
     }
 
     /// Request all available branches
@@ -77,8 +82,8 @@ impl ApiEndpoints {
 
     /**
     In diesem Fall ist es nicht der NoRiskToken sondern der Minecraft Token!!
-    */
-    pub async fn refresh_norisk_token(token: &str) -> Result<NoRiskUser> {
+     */
+    pub async fn refresh_norisk_token(token: &str) -> Result<NoRiskToken> {
         Self::post_from_norisk_endpoint("launcher/auth/validate", token, "").await
     }
 
@@ -122,8 +127,8 @@ impl ApiEndpoints {
     }
 
     /// Request launch manifest of specific build
-    pub async fn launch_manifest(branch: &str, norisk_token: &str, request_uuid: &str) -> Result<NoRiskLaunchManifest> {
-        Self::request_from_norisk_endpoint(&format!("launcher/version/launch/{}", branch), norisk_token, request_uuid).await
+    pub async fn launch_manifest(branch: &str) -> core::result::Result<NoRiskLaunchManifest, crate::error::Error> {
+        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{}", branch)).await
     }
 
     /// Request download of specified JRE for specific OS and architecture
@@ -174,6 +179,28 @@ impl ApiEndpoints {
         Ok(HTTP_CLIENT.get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    pub async fn request_from_noriskclient_endpoint<T: DeserializeOwned>(endpoint: &str) -> core::result::Result<T, crate::error::Error> {
+        let credentials = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        //TODO brauchen wir das wirklich? diesen token also zukünftig
+        let token = if (options.experimental_mode) {
+            credentials.norisk_credentials.experimental.ok_or(ErrorKind::NoCredentialsError)?
+        } else {
+            credentials.norisk_credentials.production.ok_or(ErrorKind::NoCredentialsError)?
+        };
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", token.value))
+            .query(&[("uuid", credentials.id)])
             .send().await?
             .error_for_status()?
             .json::<T>()

@@ -6,6 +6,7 @@ use tauri::Window;
 use tokio::{fs, process::Child};
 
 use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions}, custom_servers::forwarding_manager::GetTokenResponse, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
+use crate::app::gui::minecraft_auth_get_default_user;
 
 use super::{models::{CustomServer, CustomServerType}, providers::{forge::ForgeProvider, vanilla::VanillaProvider}};
 
@@ -86,7 +87,10 @@ impl CustomServerManager {
 
         let custom_server_clone = custom_server.clone();
 
-        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, options.current_uuid.unwrap().as_str()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
+        //Das sollte anders gelöst werden
+        let todo_credentials = minecraft_auth_get_default_user().await?.unwrap();
+
+        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, &todo_credentials.id.to_string()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
 
         java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 

@@ -1,48 +1,23 @@
 <script>
-  import { invoke } from "@tauri-apps/api/tauri";
+  import { removeUser, setDefaultUser, users } from "../../stores/credentialsStore.js";
 
   export let account;
   export let isActive;
-  export let options;
   export let dialog;
-  export let onSelect;
-
-  function getRandomObjectOrNull(array) {
-    if (array.length === 0) {
-      return null; // Wenn das Array leer ist, geben wir null zurück
-    }
-
-    const randomIndex = Math.floor(Math.random() * array.length);
-    return array[randomIndex];
-  }
-  function handleSelectAccount() {
-    if (options.currentUuid !== account.uuid) {
-      options.currentUuid = account.uuid;
-      options = options;
-      options.store();
-      onSelect();
-    }
-  }
 
   async function handleRemoveAccount() {
-    options.accounts = options.accounts.filter(entry => entry.uuid !== account.uuid);
-    options.currentUuid = getRandomObjectOrNull(options.accounts)?.uuid ?? null;
-    options = options;
-    options.store();
-    await invoke("remove_account", { loginData: account }).then(() => {
-      onSelect();
+    await removeUser(account).then(value => {
+      if ($users.length === 0) {
+        dialog.close();
+      }
     });
-
-    if (options.currentUuid === null) {
-      dialog.close();
-    }
   }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div class="flex-wrapper" on:click={handleSelectAccount} class:active={isActive}>
+<div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
   <div class="skin-text-wrapper">
-    <img src={`https://mineskin.eu/helm/${account.uuid}/100.png`} alt="{account.username}'s Kopf">
+    <img src={`https://mineskin.eu/helm/${account.id}/100.png`} alt="{account.username}'s Kopf">
     <h1 class:active={isActive}>{account.username}</h1>
   </div>
   <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
@@ -72,8 +47,8 @@
     }
 
     .active {
-      color: #0bb00b;
-      text-shadow: 2px 2px #086b08;
+        color: #0bb00b;
+        text-shadow: 2px 2px #086b08;
     }
 
     .skin-text-wrapper {
@@ -90,6 +65,6 @@
     }
 
     .remove-button {
-      cursor: pointer;
+        cursor: pointer;
     }
 </style>

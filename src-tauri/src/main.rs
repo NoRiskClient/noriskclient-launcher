@@ -6,9 +6,8 @@ windows_subsystem = "windows"
 
 use std::fs;
 
-use anyhow::Result;
 use directories::ProjectDirs;
-use log::{info, LevelFilter};
+use log::{debug, info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -21,6 +20,7 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
+use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 
 pub mod app;
 pub mod minecraft;
@@ -58,7 +58,7 @@ const TRIGGER_FILE_SIZE: u64 = 2 * 1024 * 1000;
 /// Number of archive log files to keep
 const LOG_FILE_COUNT: u32 = 10;
 
-pub fn main() -> Result<()> {
+pub fn main() -> anyhow::Result<()> {
     let log_folder = LAUNCHER_DIRECTORY.data_dir().join("logs");
     let latest_log = log_folder.join("latest.log");
     let archive_folder = log_folder.join("archive").join("launcher.{}.log");
