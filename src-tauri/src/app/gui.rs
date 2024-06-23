@@ -981,12 +981,8 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
             {
                 window.close()?;
                 let credentials = accounts.login_finish(&code.clone(), flow).await?;
-                //TODO das hier später nur machen wenn unser JWT NoRisk Token abgelaufen ist
-                let credentials_with_norisk = accounts.refresh_norisk_token(&credentials).await?;
 
-                //TODO Minecraft Auth + NoRisk Token Done
-
-                return Ok(Some(credentials_with_norisk));
+                return Ok(Some(credentials));
             }
         }
 

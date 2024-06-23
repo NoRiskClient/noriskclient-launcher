@@ -316,6 +316,7 @@ impl MinecraftAuthStore {
         &mut self,
         creds: &Credentials,
     ) -> Result<Credentials, crate::error::Error> {
+        debug!("Refreshing NoRisk Token");
         let cred_id = creds.id;
 
         let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await
@@ -408,7 +409,13 @@ impl MinecraftAuthStore {
                 let res = self.refresh_token(&old_credentials).await;
 
                 match res {
-                    Ok(val) => Ok(val),
+                    Ok(val) => {
+                        return if val.is_some() {
+                            Ok(Some(self.refresh_norisk_token(&val.unwrap().clone()).await?))
+                        } else {
+                            Err(ErrorKind::NoCredentialsError.as_error())
+                        }
+                    }
                     Err(err) => {
                         if let ErrorKind::MinecraftAuthenticationError(
                             MinecraftAuthenticationError::Request {
@@ -426,7 +433,8 @@ impl MinecraftAuthStore {
                     }
                 }
             } else {
-                Ok(Some(creds.clone()))
+                //Refresh NoRisk Token
+                Ok(Some(self.refresh_norisk_token(&creds.clone()).await?))
             }
         } else {
             Ok(None)
