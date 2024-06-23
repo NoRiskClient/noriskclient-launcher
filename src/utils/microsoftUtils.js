@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api";
-import { addNotification } from "../stores/notificationStore.js";
 import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 
 export function startMicrosoftAuth() {

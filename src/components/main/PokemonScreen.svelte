@@ -19,10 +19,9 @@
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
   import { addNotification } from "../../stores/notificationStore.js";
   import { defaultUser } from "../../stores/credentialsStore.js";
-  import { fetchBranches, branches } from "../../stores/branchesStore.js";
+  import { branches, fetchBranches } from "../../stores/branchesStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
 
-  export let options;
   let launcherProfiles = {};
   let featureWhitelist = [];
   let friendInviteSlots = {};
@@ -135,7 +134,7 @@
     await invoke("get_launcher_profiles").then((profiles) => {
       console.info(`Loaded launcher profiles: `, profiles);
       $branches.forEach(branch => {
-        if (options.experimentalMode) {
+        if ($launcherOptions.experimentalMode) {
           const branchProfile = profiles.experimentalProfiles.find(p => p.branch == branch);
           if (!branchProfile) {
             const profileId = uuidv4();
@@ -443,41 +442,39 @@
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
   {#if showInvitePopup}
-    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:options bind:showModal={showInvitePopup}
-                 bind:friendInviteSlots />
+    <InvitePopup on:getInviteSlots={loadFriendInvites} bind:showModal={showInvitePopup} bind:friendInviteSlots />
   {/if}
 
   {#if showAddonsScreen}
-    <AddonsScreen on:home={home} bind:options bind:launcherProfiles
-                  bind:currentBranch={$branches[currentBranchIndex]} />
+    <AddonsScreen on:home={home} bind:launcherProfiles bind:currentBranch={$branches[currentBranchIndex]} />
   {/if}
 
   {#if showServersScreen}
-    <ServersScreen on:home={home} on:play={runClient} bind:options bind:featureWhitelist
+    <ServersScreen on:home={home} on:play={runClient} bind:featureWhitelist
                    bind:currentBranch={$branches[currentBranchIndex]} bind:forceServer={forceServer}
                    bind:customServerLogs={customServerLogs} bind:customServerProgress={customServerProgress} />
   {/if}
 
   {#if showProfilesScreen}
-    <ProfilesScreen on:home={home} bind:options bind:allLauncherProfiles={launcherProfiles} branches={$branches}
+    <ProfilesScreen on:home={home} bind:allLauncherProfiles={launcherProfiles} branches={$branches}
                     currentBranchIndex={currentBranchIndex}></ProfilesScreen>
   {/if}
 
   {#if showSkinScreen}
-    <SkinScreen on:home={home} bind:options></SkinScreen>
+    <SkinScreen on:home={home}></SkinScreen>
   {/if}
 
   {#if showCapeScreen}
-    <CapeScreen on:home={home} bind:options></CapeScreen>
+    <CapeScreen on:home={home}></CapeScreen>
   {/if}
 
   {#if settingsShown}
-    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:options bind:showModal={settingsShown}
+    <SettingsModal on:requestBranches={() => { loadAllData(); }} bind:showModal={settingsShown}
                    bind:featureWhitelist bind:showMcRealAppModal={mcRealQrCodeShown} />
   {/if}
 
   {#if mcRealQrCodeShown}
-    <McRealAppModal bind:options bind:showModal={mcRealQrCodeShown}></McRealAppModal>
+    <McRealAppModal bind:showModal={mcRealQrCodeShown}></McRealAppModal>
   {/if}
 
   {#if clientLogShown}
@@ -495,20 +492,20 @@
       <h1 class="back-to-loading-button" on:click={() => backToLoadingScreen()}>[BACK TO RUNNING GAME]</h1>
     {/if}
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="left-settings-button-wrapper">
-      {#if $branches.length > 0 && options.currentUuid != null}
+      {#if $branches.length > 0 && $defaultUser != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={() => discordLinked ? unlink_discord() : connect_discord_intigration()}>
           {#if discordLinked}UN{/if}LINK DISCORD</h1>
       {/if}
     </div>
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} class="settings-button-wrapper">
-      {#if $branches.length > 0 && options.currentUuid != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
+      {#if $branches.length > 0 && $defaultUser != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots != -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites)}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class="invite-button" on:click={handleShowInvitePopup}><p>✨</p>Invite</h1>
       {/if}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 on:click={() => settingsShown = true}>SETTINGS</h1>
-      {#if $branches.length > 0 && options.currentUuid != null}
+      {#if $branches.length > 0 && $defaultUser != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 on:click={handleOpenProfilesScreen}>PROFILES</h1>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -572,12 +569,7 @@
           style:opacity={$defaultUser == null ? 0 : 100}>
         &gt;</h1>
     </div>
-    <SkinButton
-      on:launch={runClient}
-      on:requestBranches={() => loadAllData()}
-      bind:options={options}
-      bind:branches={$branches}
-    />
+    <SkinButton on:launch={runClient} />
     <div transition:scale={{ x: 15, duration: 300, easing: quintOut }} on:selectstart={preventSelection}
          on:mousedown={preventSelection} class="copyright">
       © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.4.9

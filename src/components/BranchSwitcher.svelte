@@ -1,0 +1,73 @@
+<script>
+  import { preventSelection } from "../utils/svelteUtils.js";
+  import { defaultUser } from "../stores/credentialsStore.js";
+  import { quintOut } from "svelte/easing";
+  import { branches, switchBranch, currentBranchIndex } from "../stores/branchesStore.js";
+  import { scale } from "svelte/transition";
+</script>
+
+<div class="branch-wrapper">
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+      on:selectstart={preventSelection} style="cursor: pointer"
+      on:mousedown={preventSelection} class="branch-font switch"
+      on:click={() => switchBranch(true)}
+      style:opacity={$defaultUser == null ? 0 : 100}>
+    &lt;</h1>
+  <section style="display:flex;justify-content:center">
+    {#if !$defaultUser}
+      <h1 class="branch-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Sign in...</h1>
+    {:else}
+      {#if $branches.length > 0}
+        {#each $branches as branch, i}
+          {#if $currentBranchIndex === i}
+            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                class="branch-font"
+                style="position:absolute"
+                on:selectstart={preventSelection}
+                on:mousedown={preventSelection}
+            > {branch.toUpperCase()} VERSION</h1>
+          {/if}
+        {/each}
+      {:else}
+        <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+            class="branch-font"
+            style="position:absolute"
+            on:selectstart={preventSelection}
+            on:mousedown={preventSelection}
+        > NOT WHITELISTED</h1>
+      {/if}
+    {/if}
+  </section>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+      on:selectstart={preventSelection}
+      style="cursor: pointer" on:mousedown={preventSelection}
+      class="branch-font switch" on:click={() => switchBranch(false)}
+      style:opacity={$defaultUser == null ? 0 : 100}>
+    &gt;</h1>
+</div>
+
+<style>
+    .branch-wrapper {
+        display: flex;
+        align-content: space-evenly;
+        flex-direction: row;
+        gap: 200px;
+        border: 1px solid red;
+    }
+
+    .branch-font {
+        font-family: 'Press Start 2P', serif;
+        font-size: 18px;
+        margin: 0;
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+        cursor: default;
+    }
+
+    .switch:hover {
+        color: var(--hover-color);
+        text-shadow: 2px 2px var(--hover-color-text-shadow);
+    }
+</style>

@@ -1,9 +1,19 @@
 <script>
-  import Window from "./components/Window.svelte";
+  import Router from "./pages/Router.svelte";
+  import { onMount } from "svelte";
+  import { fetchDefaultUserOrError } from "./stores/credentialsStore.js";
+  import { fetchOptions } from "./stores/optionsStore.js";
+  import { fetchBranches } from "./stores/branchesStore.js";
+
+  onMount(async () => {
+    await fetchDefaultUserOrError(false);
+    await fetchOptions();
+    await fetchBranches();
+  });
 </script>
 
 <main>
-    <Window/>
+  <Router />
 </main>
 
 <style>

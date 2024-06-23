@@ -13,7 +13,7 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject, ModrinthSearchRequestParams};
-use crate::error::ErrorKind;
+use crate::error::{Error, ErrorKind};
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
@@ -982,7 +982,18 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
                 window.close()?;
                 let credentials = accounts.login_finish(&code.clone(), flow).await?;
 
-                return Ok(Some(credentials));
+                match accounts.refresh_norisk_token(&credentials.clone()).await {
+                    Ok(credentials_with_norisk) => {
+                        debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
+                        return Ok(Some(credentials_with_norisk))
+                    }
+                    Err(err) => {
+                        //Ist uns aber egal Microsoft Auth hat geklappt
+                        debug!("After Microsoft Auth: Error Fetching NoRiskClient Token {:?}", err)
+                    }
+                }
+
+                return Ok(Some(credentials.clone()));
             }
         }
 
@@ -1022,7 +1033,7 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 
 #[tauri::command]
 async fn run_client(branch: String, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
-    info!("Starting Client with branch {}",branch);
+    debug!("Starting Client with branch {}",branch);
     let credentials = minecraft_auth_get_store().await?.get_default_credential().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
