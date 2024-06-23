@@ -53,7 +53,7 @@
   <ShadersScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:launcherProfiles
                  bind:currentBranch={currentBranch} />
 {:else if activeTab == "DATAPACKS"}
-  <SelectWorldScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')}
+  <SelectWorldScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')}fC
                      bind:launcherProfiles bind:currentBranch={currentBranch} />
 {/if}
 

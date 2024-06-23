@@ -4,16 +4,20 @@
 </script>
 
 <TransitionWrapper>
-  <SkinScreen></SkinScreen>
+  <div>
+    <SkinScreen></SkinScreen>
+  </div>
 </TransitionWrapper>
 
+<!--
+ Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
+ ich setze mich nochmal dran wenn du mich pingst
+ -->
+
 <style>
-    .box2 {
-        width: 360px;
+    div:has(div) {
+        width: 720px;
         height: 100%;
-        overflow: auto;
-        overflow-x: hidden;
-        scrollbar-gutter: stable both-edges;
-        background: green;
+        overflow: hidden;
     }
 </style>

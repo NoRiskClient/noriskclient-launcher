@@ -3,10 +3,13 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import CapeCarousel from "./CapeCarousel.svelte";
   import CapeEditor from "./CapeEditor.svelte";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { launcherOptions } from "../../stores/optionsStore.js";
+  import { push } from "svelte-spa-router";
+  import { preventSelection } from "../../utils/svelteUtils.js";
 
-  const dispatch = createEventDispatcher()
+  const dispatch = createEventDispatcher();
 
-  export let options;
   let capes = null;
   let capeHash = null;
   let isLoading = true;
@@ -14,7 +17,7 @@
     { text: "CAPE EDIT" },
     { text: "ALLTIME" },
     { text: "WEEKLY" },
-    { text: "OWNED" }
+    { text: "OWNED" },
   ];
   let currentRequest = 0;
 
@@ -23,39 +26,34 @@
   });
 
   async function requestTrendingCapes(alltime) {
-    let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    if (account !== null) {
-      if (options.currentUuid !== null) {
-        await invoke("request_trending_capes", {
-          noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
-          uuid: options.currentUuid,
-          alltime: alltime,
-          limit: 30,
-        }).then((result) => {
-          console.log("Requesting Trending capes", result);
-          capes = result;
-        }).catch(e => {
-          console.error(e);
-        });
-      }
+    if ($defaultUser) {
+      await invoke("request_trending_capes", {
+        noriskToken: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+        uuid: $defaultUser.id,
+        alltime: alltime,
+        limit: 30,
+      }).then((result) => {
+        console.log("Requesting Trending capes", result);
+        capes = result;
+      }).catch(e => {
+        console.error(e);
+      });
     }
+
   }
 
   async function requestOwnedCapes() {
-    let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    if (account !== null) {
-      if (options.currentUuid !== null) {
-        await invoke("request_owned_capes", {
-          noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
-          uuid: options.currentUuid,
-          limit: 30,
-        }).then((result) => {
-          console.debug("Requesting owned capes", result);
-          capes = result;
-        }).catch(e => {
-          console.error(e);
-        });
-      }
+    if ($defaultUser) {
+      await invoke("request_owned_capes", {
+        noriskToken: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+        uuid: $defaultUser.id,
+        limit: 30,
+      }).then((result) => {
+        console.debug("Requesting owned capes", result);
+        capes = result;
+      }).catch(e => {
+        console.error(e);
+      });
     }
   }
 
@@ -71,14 +69,10 @@
     }
   }
 
-  function preventSelection(event) {
-    event.preventDefault();
-  }
-
   async function getNoRiskUserByUUID() {
-    if (options.currentUuid !== null) {
+    if ($defaultUser) {
       await invoke("get_cape_hash_by_uuid", {
-        uuid: options.currentUuid
+        uuid: $defaultUser.id,
       }).then((user) => {
         if (user) {
           capeHash = user;
@@ -98,24 +92,25 @@
 </script>
 
 <div class="wrapper">
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={handleNextRequest}>
+    <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
   {#if currentRequest === 0}
     {#if !isLoading}
-      <CapeEditor bind:options on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
+      <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
     {/if}
   {:else}
     {#if capes != null}
-      <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:options bind:capes />
+      <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
     {/if}
   {/if}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
-      on:click={handleNextRequest}><span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
 </div>
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
+<h1 class="home-button" on:click={() => push("/")}>[BACK]</h1>
 
 <style>
     .wrapper {
+        height: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -125,8 +120,7 @@
         font-family: 'Press Start 2P', serif;
         font-size: 35px;
         cursor: pointer;
-        position: absolute;
-        top: 4em;
+        margin-top: 2em;
         transition: transform 0.3s;
     }
 
@@ -142,7 +136,6 @@
     .home-button {
         position: absolute;
         bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
         font-size: 20px;
         color: #e8e8e8;
         text-shadow: 2px 2px #7a7777;

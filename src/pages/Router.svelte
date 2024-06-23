@@ -7,7 +7,7 @@
   import MinecraftStartProgress from "./MinecraftStartProgress.svelte";
   import MinecraftClientLogs from "./MinecraftClientLogs.svelte";
   import LauncherSettings from "./LauncherSettings.svelte";
-  import Skin from "./Skin.svelte";
+  import Capes from "./Capes.svelte";
 
   const routes = {
     "/": Home,
@@ -15,7 +15,7 @@
     "/start-progress": MinecraftStartProgress,
     "/logs": MinecraftClientLogs,
     "/launcher-settings": LauncherSettings,
-    "/skin": Skin,
+    "/capes": Capes,
   };
 </script>
 

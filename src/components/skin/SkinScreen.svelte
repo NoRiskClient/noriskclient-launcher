@@ -256,65 +256,68 @@
 
 </script>
 
-{#if settings.open}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <div class="klickField" on:click={settings.open ? toggleSettings : () => {}}></div>
-{/if}
-<div class="wrapper" on:selectstart={preventSelection}>
-  <div class="slider slide"></div>
-  <h1 class="title slider">Skin</h1>
-  {#if isLoading}
-    <h2>Loading...</h2>
+<div class="skin-wrapper">
+  {#if settings.open}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <div class="klickField" on:click={settings.open ? toggleSettings : () => {}}></div>
   {/if}
-  <div
-    id="skin"
-    class="skin slider"
-    on:selectstart={preventSelection}
-    on:mousedown={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}}
-    on:mouseup={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}
-    hidden={isLoading}
-  ></div>
-  {#if !isLoading}
-    <div id="settings" class="settings open">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <svg on:click={toggleSettings} style={`fill: ${$launcherOptions.theme === "DARK" ? '#ffffff' : '#00000'};`}
-           xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
-        <path d="M0 0h24v24H0V0z" fill="none" />
-        <path
-          d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
-      </svg>
-      <div class="setting setting-slider no-slide" style="margin-top: 70px">
-        <ConfigRadioButton bind:value={settings.rotatePlayer} text="Rotate Player" reversed></ConfigRadioButton>
-      </div>
-      <div class="setting setting-slider no-slide">
-        <ConfigRadioButton bind:value={settings.enableZoom} text="Zoom" reversed></ConfigRadioButton>
-      </div>
-      {#if capeLocation}
-        <div class="setting setting-slider no-slide">
-          <ConfigRadioButton bind:value={settings.showCape} text="Show Cape" reversed></ConfigRadioButton>
+  <div class="wrapper" on:selectstart={preventSelection}>
+    <div class="slider slide"></div>
+    <h1 class="title slider">Skin</h1>
+    {#if isLoading}
+      <h2>Loading...</h2>
+    {/if}
+    <div
+      id="skin"
+      class="skin slider"
+      on:selectstart={preventSelection}
+      on:mousedown={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayerBefore = settings.rotatePlayer; settings.rotatePlayer = false}}
+      on:mouseup={(e) => {if (settings.open || settings.lockControls || e.button != 0) {return;};settings.rotatePlayer = settings.rotatePlayerBefore; settings.rotatePlayerBefore = false}}
+      hidden={isLoading}
+    ></div>
+    {#if !isLoading}
+      <div id="settings" class="settings open">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <svg on:click={toggleSettings} style={`fill: ${$launcherOptions.theme === "DARK" ? '#ffffff' : '#00000'};`}
+             xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
+          <path d="M0 0h24v24H0V0z" fill="none" />
+          <path
+            d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+        </svg>
+        <div class="setting setting-slider no-slide" style="margin-top: 70px">
+          <ConfigRadioButton bind:value={settings.rotatePlayer} text="Rotate Player" reversed></ConfigRadioButton>
         </div>
-        <div id="showCapeAsElytraSetting" class="setting setting-slider no-slide">
-          <ConfigRadioButton bind:value={settings.showCapeAsElytra} text="Elytra" reversed></ConfigRadioButton>
+        <div class="setting setting-slider no-slide">
+          <ConfigRadioButton bind:value={settings.enableZoom} text="Zoom" reversed></ConfigRadioButton>
+        </div>
+        {#if capeLocation}
+          <div class="setting setting-slider no-slide">
+            <ConfigRadioButton bind:value={settings.showCape} text="Show Cape" reversed></ConfigRadioButton>
+          </div>
+          <div id="showCapeAsElytraSetting" class="setting setting-slider no-slide">
+            <ConfigRadioButton bind:value={settings.showCapeAsElytra} text="Elytra" reversed></ConfigRadioButton>
+          </div>
+        {/if}
+      </div>
+      {#if !unsavedSkin}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
+      {:else}
+        <div class="unsavedSkinActionWrapper slider no-slide">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
         </div>
       {/if}
-    </div>
-    {#if !unsavedSkin}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
-    {:else}
-      <div class="unsavedSkinActionWrapper slider no-slide">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
-      </div>
     {/if}
-  {/if}
+  </div>
 </div>
 
 <style>
-    * {
+    .skin-wrapper {
         overflow: hidden;
+        border: 1px solid green;
     }
 
     .wrapper {

@@ -20,11 +20,11 @@
 {/if}
 
 <style>
-  .box {
-      width: 720px;
-      height: 100%;
-      overflow: auto;
-      overflow-x: hidden;
-      scrollbar-gutter: stable both-edges;
-  }
+    .box {
+        width: 720px;
+        height: 100%;
+        overflow: auto;
+        overflow-x: hidden;
+        scrollbar-gutter: stable both-edges;
+    }
 </style>

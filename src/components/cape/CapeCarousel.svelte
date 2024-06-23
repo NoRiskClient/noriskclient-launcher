@@ -2,10 +2,12 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
   import { createEventDispatcher } from "svelte";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { launcherOptions } from "../../stores/optionsStore.js";
+  import { getNoRiskToken } from "../../utils/noriskUtils.js";
 
   const dispatch = createEventDispatcher();
 
-  export let options;
   export let capes = [];
   let visibleCapes = [];
 
@@ -58,11 +60,10 @@
 
   async function handleEquipCape(hash) {
     console.debug("CLICKED", hash);
-    let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    if (account !== null) {
+    if ($defaultUser) {
       await invoke("equip_cape", {
-        noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
-        uuid: options.currentUuid,
+        noriskToken: getNoRiskToken(),
+        uuid: $defaultUser.id,
         hash: hash,
       }).then(() => {
         dispatch("fetchNoRiskUser");
@@ -104,7 +105,7 @@
                             return getNameByUUID(cape.firstSeen); }}
             on:mouseleave={() => cape.hovered = false}
           >
-            {#if options.experimentalMode}
+            {#if $launcherOptions.experimentalMode}
               <!-- svelte-ignore a11y-img-redundant-alt -->
               <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             {:else}
@@ -162,6 +163,7 @@
         align-items: center;
         justify-content: center;
         width: 100vw;
+        height: 100%;
         padding: 2.25rem;
     }
 

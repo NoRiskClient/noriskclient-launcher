@@ -11,11 +11,14 @@
       onClick: () => console.log("Profiles clicked"),
       condition: () => get(branches).length > 0 && get(defaultUser) != null,
     },
+    /*
+      Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
+      ich setze mich nochmal dran wenn du mich pingst
     {
       name: "SERVERS",
       onClick: () => console.log("Servers clicked"),
       condition: () => get(branches).length > 0 && get(defaultUser) != null,
-    },
+    },*/
     {
       name: "ADDONS",
       onClick: () => console.log("Addons clicked"),
@@ -23,14 +26,16 @@
     },
     {
       name: "CAPES",
-      onClick: () => console.log("Capes clicked"),
+      onClick: () => push("/capes"),
       condition: () => get(branches).length > 0 && get(defaultUser) != null,
     },
+    /*
+    Ich habs wirklich probiert aber Overflow hat gekickt
     {
       name: "SKIN",
       onClick: () => push("/skin"),
       condition: () => get(defaultUser) != null,
-    },
+    },*/
     { name: "QUIT", onClick: () => console.log("Quit clicked"), condition: true, className: "quit" },
   ];
 

@@ -2,34 +2,37 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
   import { createEventDispatcher, onMount } from "svelte";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { getNoRiskToken } from "../../utils/noriskUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
+  import { launcherOptions } from "../../stores/optionsStore.js";
 
   const dispatch = createEventDispatcher();
 
   export let capeHash = null;
-  export let options;
 
   onMount(() => {
     dispatch("fetchNoRiskUser");
   });
 
   async function handleUploadCape() {
-    let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    if (account !== null) {
+    if ($defaultUser) {
       await invoke("upload_cape", {
-        noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
-        uuid: options.currentUuid,
+        noriskToken: getNoRiskToken(),
+        uuid: $defaultUser.id,
       }).then(() => {
         dispatch("fetchNoRiskUser");
+      }).catch(reason => {
+        addNotification(reason);
       });
     }
   }
 
   async function deleteCape() {
-    let account = options.accounts.find(obj => obj.uuid === options.currentUuid);
-    if (account !== null) {
+    if ($defaultUser) {
       await invoke("delete_cape", {
-        noriskToken: options.experimentalMode ? account.experimentalToken : account.noriskToken,
-        uuid: options.currentUuid,
+        noriskToken: getNoRiskToken(),
+        uuid: $defaultUser.id,
       }).then(() => {
         console.debug("Deleted Cape...");
         capeHash = null;
@@ -37,6 +40,7 @@
       }).catch(e => {
         alert("Failed to Request User by UUID: " + e);
         console.error(e);
+        addNotification(e);
       });
     }
   }
@@ -55,7 +59,7 @@
   {#if capeHash !== null}
     <h1 class="header-text">Your Cape</h1>
     <div class="crop">
-      {#if options.experimentalMode}
+      {#if $launcherOptions.experimentalMode}
         <img src={`https://dl-staging.norisk.gg/capes/prod/${capeHash}.png`} alt="Current Cape">
       {:else}
         <img src={`https://dl.norisk.gg/capes/prod/${capeHash}.png`} alt="Current Cape">
@@ -82,6 +86,8 @@
         justify-content: center;
         align-content: center;
         align-items: center;
+        height: 100%;
+        width: 100vw;
     }
 
     .header-text {
