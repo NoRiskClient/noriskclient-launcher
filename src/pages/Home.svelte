@@ -24,6 +24,7 @@
         justify-content: center;
         align-content: center;
         align-items: center;
+        gap: 1.2em;
     }
 
     .pokemon-title {

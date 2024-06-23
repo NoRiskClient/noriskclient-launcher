@@ -2,6 +2,7 @@
   export let text;
 </script>
 
+<!-- TODO Log Highlighting -->
 <pre class="message">{text}</pre>
 
 <style>
@@ -11,5 +12,6 @@
         user-select: text;
         word-break: break-word;
         overflow-wrap: anywhere;
+        text-shadow: none;
     }
 </style>

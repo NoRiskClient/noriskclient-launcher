@@ -54,6 +54,12 @@
         text-shadow: 2px 2px #460000;
     }
 
+    :global(.primary-text-clickable) {
+        color: red;
+        text-shadow: 2px 2px #460000;
+        cursor: pointer;
+    }
+
     :global(.red-text-clickable) {
         color: red;
         text-shadow: 2px 2px #460000;

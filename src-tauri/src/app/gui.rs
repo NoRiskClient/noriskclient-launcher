@@ -1,4 +1,6 @@
-use std::{path::PathBuf, sync::{Arc, Mutex}, thread};
+use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
+use std::fs::File;
+use std::io::BufRead;
 
 use chrono::{Duration, Utc};
 use directories::UserDirs;
@@ -595,6 +597,45 @@ async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String
 }
 
 #[tauri::command]
+pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
+    let window = tauri::WindowBuilder::new(
+        &handle,
+        "local",
+        tauri::WindowUrl::App("/#/logs".into()),
+    ).build()?;
+    let _ = window.set_title("Minecraft Logs");
+    let _ = window.set_resizable(true);
+    let _ = window.set_focus();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_latest_minecraft_logs(handle: tauri::AppHandle) -> Result<Vec<String>, crate::error::Error> {
+    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+    let latest_branch = if (options.experimental_mode) {
+        options.latest_branch
+    } else {
+        options.latest_dev_branch
+    }.ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
+
+    let log_path: PathBuf = LAUNCHER_DIRECTORY.data_dir()
+        .join("gameDir")
+        .join(latest_branch)
+        .join("logs")
+        .join("latest.log");
+
+    if !log_path.exists() {
+        return Err(ErrorKind::OtherError("Log file does not exist".to_string()).as_error());
+    }
+
+    let file = File::open(log_path)?;
+    let reader = io::BufReader::new(file);
+    let lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+
+    Ok(lines)
+}
+
+#[tauri::command]
 async fn minecraft_auth_get_store() -> Result<MinecraftAuthStore, crate::error::Error> {
     Ok(MinecraftAuthStore::init(None).await?)
 }
@@ -985,7 +1026,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
                 match accounts.refresh_norisk_token(&credentials.clone()).await {
                     Ok(credentials_with_norisk) => {
                         debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
-                        return Ok(Some(credentials_with_norisk))
+                        return Ok(Some(credentials_with_norisk));
                     }
                     Err(err) => {
                         //Ist uns aber egal Microsoft Auth hat geklappt
@@ -1527,6 +1568,8 @@ pub fn gui_main() {
             open_url,
             check_online_status,
             get_options,
+            open_minecraft_logs_window,
+            get_latest_minecraft_logs,
             minecraft_auth_get_store,
             minecraft_auth_get_default_user,
             minecraft_auth_set_default_user,
