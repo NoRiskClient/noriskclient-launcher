@@ -12,7 +12,7 @@
 
   onMount(() => {
     invoke("get_latest_minecraft_logs").then(value => {
-      minecraftLogs.set(value);
+      minecraftLogs.set(value.map(string => string + "\n"));
     }).catch(reason => {
       addNotification(reason);
     });
@@ -26,7 +26,7 @@
 
   async function uploadLogs() {
     await invoke("upload_logs", {
-      log: $minecraftLogs.join("\n")
+      log: $minecraftLogs.join("")
     }).then((result) => {
       console.debug("Received Result", result)
       navigator.clipboard.writeText(result.url)
