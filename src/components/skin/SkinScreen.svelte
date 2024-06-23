@@ -5,12 +5,11 @@
   import { listen } from "@tauri-apps/api/event";
   import ConfigRadioButton from "../config/inputs/ConfigRadioButton.svelte";
   import { IdleAnimation, SkinViewer } from "skinview3d";
+  import { fetchOptions, launcherOptions } from "../../stores/optionsStore.js";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { preventSelection } from "../../utils/svelteUtils.js";
 
   const dispatch = createEventDispatcher();
-
-  function preventSelection(event) {
-    event.preventDefault();
-  }
 
   let isLoading = true;
 
@@ -34,7 +33,7 @@
   };
 
   async function getSkins() {
-    await invoke("get_player_skins", { uuid: options.currentUuid })
+    await invoke("get_player_skins", { uuid: $defaultUser.id })
       .then(async (profileTextures) => {
         let profileTexture = profileTextures[0];
         if (profileTexture) {
@@ -65,12 +64,12 @@
   }
 
   async function getNoRiskUserByUUID(profileTexture) {
-    if (options.currentUuid !== null) {
+    if ($defaultUser) {
       await invoke("get_cape_hash_by_uuid", {
-        uuid: options.currentUuid,
+        uuid: $defaultUser.id,
       }).then(async (user) => {
         if (user) {
-          const url = options.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${user}.png` : `https://dl.norisk.gg/capes/prod/${user}.png`;
+          const url = $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${user}.png` : `https://dl.norisk.gg/capes/prod/${user}.png`;
           await invoke("read_remote_image_file", { location: url })
             .then((capeData) => {
               capeLocation = `data:image/png;base64,${capeData}`;
@@ -126,7 +125,7 @@
       await invoke("save_player_skin", {
         location: location,
         slim: slim ?? false,
-        accessToken: options.accounts.find(acc => acc.uuid == options.currentUuid).mcToken,
+        accessToken: $defaultUser.accessToken,
       })
         .then(() => {
           isLoading = false;
@@ -137,7 +136,7 @@
           if (!failed && err.split(" ").includes("401")) {
             failed = true;
             isLoading = true;
-            await options.reload(async () => await trySave());
+            await fetchOptions.bind(async () => await trySave());
             return;
           }
           console.error(err);
@@ -205,7 +204,7 @@
     const setting_sliders = Array.from(document.getElementsByClassName("setting-slider"));
     setting_sliders.forEach(slider => {
       if (settings.open) {
-        if (slider.id == "showCapeAsElytraSetting") {
+        if (slider.id === "showCapeAsElytraSetting") {
           if (settings.showCape) {
             slider.classList.toggle("no-slide");
             slider.classList.toggle("slide");
@@ -278,7 +277,7 @@
   {#if !isLoading}
     <div id="settings" class="settings open">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <svg on:click={toggleSettings} style={`fill: ${options.theme == "DARK" ? '#ffffff' : '#00000'};`}
+      <svg on:click={toggleSettings} style={`fill: ${$launcherOptions.theme === "DARK" ? '#ffffff' : '#00000'};`}
            xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
         <path d="M0 0h24v24H0V0z" fill="none" />
         <path
@@ -312,8 +311,6 @@
     {/if}
   {/if}
 </div>
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
 
 <style>
     * {

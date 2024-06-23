@@ -6,20 +6,20 @@
   import Notifications from "../components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./MinecraftStartProgress.svelte";
   import MinecraftClientLogs from "./MinecraftClientLogs.svelte";
+  import LauncherSettings from "./LauncherSettings.svelte";
+  import Skin from "./Skin.svelte";
 
   const routes = {
     "/": Home,
     "/about": About,
     "/start-progress": MinecraftStartProgress,
     "/logs": MinecraftClientLogs,
+    "/launcher-settings": LauncherSettings,
+    "/skin": Skin,
   };
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
-  <a href="/">Home</a>
-  <a href="/#/about">About</a>
-  <a href="/#/start-progress">Progress</a>
-  <a href="/#/logs">Logs</a>
 </div>
 <div class="content">
   <Notifications />

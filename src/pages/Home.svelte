@@ -4,19 +4,22 @@
   import SkinButton from "../components/main/SkinButton.svelte";
   import BranchSwitcher from "../components/BranchSwitcher.svelte";
   import NoRiskLogoColor from "../images/norisk_logo_color.png";
+  import CopyrightLabel from "../components/v2/CopyrightLabel.svelte";
+  import HomeNavbar from "../components/v2/HomeNavbar.svelte";
 </script>
 
 <TransitionWrapper>
   <div class="home-wrapper">
+    <HomeNavbar />
     <img class="pokemon-title" src={NoRiskLogoColor} alt="Pokemon Title">
     <BranchSwitcher />
     <SkinButton />
+    <CopyrightLabel />
   </div>
 </TransitionWrapper>
 
 <style>
     .home-wrapper {
-        border: 5px solid green;
         width: 100%;
         height: 100%;
         display: flex;

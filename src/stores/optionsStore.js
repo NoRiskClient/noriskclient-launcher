@@ -1,6 +1,7 @@
-import { writable } from "svelte/store";
+import { writable, get } from "svelte/store";
 import { invoke } from "@tauri-apps/api";
 import { addNotification } from "./notificationStore.js";
+import { fetchBranches } from "./branchesStore.js";
 
 export const launcherOptions = writable();
 
@@ -13,8 +14,43 @@ export const launcherOptions = writable();
 
 export async function fetchOptions() {
   await invoke("get_options").then(async (result) => {
+    result.toggleTheme = () => {
+      let options = get(launcherOptions);
+      if (options.theme === "LIGHT") {
+        options.theme = "DARK";
+        window.document.body.classList.add(
+          "dark-mode",
+        );
+      } else {
+        options.theme = "LIGHT";
+        window.document.body.classList.remove(
+          "dark-mode",
+        );
+      }
+      launcherOptions.set(options)
+    };
+
+    if (result.theme === "DARK") {
+      window.document.body.classList.add(
+        "dark-mode",
+      );
+    } else {
+      window.document.body.classList.remove(
+        "dark-mode",
+      );
+    }
+
     launcherOptions.set(result);
   }).catch(reason => {
     addNotification(reason);
   });
+}
+
+export async function saveOptions() {
+  let options = get(launcherOptions);
+  console.log("Saving Launcher Options: ", options);
+  await invoke("store_options", {
+    options,
+  }).catch((e) => addNotification(e));
+  await fetchBranches()
 }

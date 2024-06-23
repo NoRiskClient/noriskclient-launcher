@@ -24,7 +24,7 @@
 
   let dialog; // HTMLDialogElement
   let showExperimentalTokenModal = false;
-  let lightTheme = options.theme == "LIGHT";
+  let lightTheme = options.theme === "LIGHT";
 
   $: if (dialog && showModal) dialog.showModal();
 
@@ -247,7 +247,7 @@
         align-items: center;
         justify-content: space-between;
     }
-    
+
     .mcreal-app-wrapper {
         display: flex;
         flex-direction: row;

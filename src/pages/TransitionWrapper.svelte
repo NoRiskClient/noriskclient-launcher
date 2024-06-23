@@ -14,15 +14,17 @@
 </script>
 
 {#if visible}
-  <div class="box" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>
+  <div class="box" transition:scale={{  duration: 300, easing: quintOut }}>
     <slot />
   </div>
 {/if}
 
 <style>
   .box {
-      width: 100%;
+      width: 720px;
       height: 100%;
-      border: 1px solid green;
+      overflow: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable both-edges;
   }
 </style>
