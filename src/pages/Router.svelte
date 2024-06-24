@@ -10,6 +10,11 @@
   import Capes from "./Capes.svelte";
   import BackButton from "../components/v2/buttons/BackButton.svelte";
   import Profiles from "./Profiles.svelte";
+  import Addons from "./Addons.svelte";
+  import Mods from "./Mods.svelte";
+  import Shaders from "./Shaders.svelte";
+  import Resourcepacks from "./Resourcepacks.svelte";
+  import Datapacks from "./Datapacks.svelte";
 
   const routes = {
     "/": Home,
@@ -19,6 +24,11 @@
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
     "/profiles": Profiles,
+    "/addons": Addons,
+    "/addons/mods": Mods,
+    "/addons/resourcepacks": Resourcepacks,
+    "/addons/datapacks": Datapacks,
+    "/addons/shaders": Shaders,
   };
 </script>
 

@@ -7,7 +7,7 @@
     export let name;
     export let onClick = () => {};
   </script>
-  
+
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div class="card" on:select={preventSelection} on:click={onClick}>
     <div class="content">
@@ -16,7 +16,7 @@
     </div>
     <p>&gt;</p>
   </div>
-  
+
   <style>
     * {
       overflow: hidden;
@@ -49,7 +49,7 @@
       justify-content: flex-start;
       gap: 1em;
     }
-    
+
     .icon.active {
       font-size: 30px;
       width: 40px;

@@ -22,7 +22,7 @@
     },*/
     {
       name: "ADDONS",
-      onClick: () => console.log("Addons clicked"),
+      onClick: () => push("/addons"),
       condition: () => get(branches).length > 0 && get(defaultUser) != null,
     },
     {

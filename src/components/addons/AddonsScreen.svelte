@@ -1,80 +1,43 @@
 <script>
-  import { createEventDispatcher } from "svelte";
-  import ShadersScreen from "./shaders/ShadersScreen.svelte";
-  import ResourcePacksScreen from "./resourcepacks/ResourcePacksScreen.svelte";
-  import SelectWorldScreen from "./datapacks/SelectWorldScreen.svelte";
-  import ModsScreen from "./mods/ModsScreen.svelte";
-
-  const dispatch = createEventDispatcher();
-
-  function preventSelection(event) {
-    event.preventDefault();
-  }
-
-  export let currentBranch;
-  export let launcherProfiles;
-
-  let activeTab = "MAIN";
-
-  function switchTab(tab) {
-    activeTab = tab;
-  }
+  import { preventSelection } from "../../utils/svelteUtils.js";
+  import { push } from "svelte-spa-router";
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-{#if activeTab == "MAIN"}
-  <div class="wrapper" on:selectstart={preventSelection}>
-    <h1 class="title">Addons</h1>
-    <div class="card" style="margin-top: 60px;" on:click={() => switchTab('MODS')}>
-      <h2>📦 Mods</h2>
-      <p>&gt;</p>
-    </div>
-    <div class="card" on:click={() => switchTab('RESOURCE_PACKS')}>
-      <h2>🎨 Resource Packs</h2>
-      <p>&gt;</p>
-    </div>
-    <div class="card" on:click={() => switchTab('SHADERS')}>
-      <h2>🔮 Shaders</h2>
-      <p>&gt;</p>
-    </div>
-    <div class="card" on:click={() => switchTab('DATAPACKS')}>
-      <h2>🛠️ Datapacks</h2>
-      <p>&gt;</p>
-    </div>
+<div class="addons-wrapper" on:selectstart={preventSelection}>
+  <h1 class="title">Addons</h1>
+  <div class="card" style="margin-top: 60px;" on:click={() => push('/addons/mods')}>
+    <h2>📦 Mods</h2>
+    <p>&gt;</p>
   </div>
-  <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
-{:else if activeTab == "MODS"}
-  <ModsScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:launcherProfiles
-              bind:currentBranch={currentBranch} />
-{:else if activeTab == "RESOURCE_PACKS"}
-  <ResourcePacksScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')}
-                       bind:launcherProfiles bind:currentBranch={currentBranch} />
-{:else if activeTab == "SHADERS"}
-  <ShadersScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')} bind:launcherProfiles
-                 bind:currentBranch={currentBranch} />
-{:else if activeTab == "DATAPACKS"}
-  <SelectWorldScreen on:home={() => dispatch('home')} on:back={() => switchTab('MAIN')}fC
-                     bind:launcherProfiles bind:currentBranch={currentBranch} />
-{/if}
+  <div class="card" on:click={() => push('/addons/resourcepacks')}>
+    <h2>🎨 Resource Packs</h2>
+    <p>&gt;</p>
+  </div>
+  <div class="card" on:click={() => push('/addons/shaders')}>
+    <h2>🔮 Shaders</h2>
+    <p>&gt;</p>
+  </div>
+  <div class="card" on:click={() => push('/addons/datapacks')}>
+    <h2>🛠️ Datapacks</h2>
+    <p>&gt;</p>
+  </div>
+</div>
 
 <style>
-    * {
-        overflow: hidden;
-    }
-
-    .wrapper {
+    .addons-wrapper {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
+        align-content: center;
         font-family: 'Press Start 2P', serif;
-        width: fit-content;
-        height: fit-content;
+        width: 100%;
+        height: 79vh;
     }
 
     .title {
         font-size: 35px;
-        position: absolute;
-        top: 2.5em;
     }
 
     .card {
@@ -113,20 +76,5 @@
     .card:hover p {
         opacity: 100%;
         transform: translateX(0px);
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
     }
 </style>
