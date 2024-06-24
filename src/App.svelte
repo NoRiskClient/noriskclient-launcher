@@ -6,14 +6,12 @@
   import { fetchBranches } from "./stores/branchesStore.js";
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
-  import { push } from "svelte-spa-router";
+  import { location, push } from "svelte-spa-router";
   import { isClientRunning } from "./utils/noriskUtils.js";
-  import { location } from "svelte-spa-router";
-
 
   onMount(async () => {
-    await fetchDefaultUserOrError(false);
     await fetchOptions();
+    await fetchDefaultUserOrError(false);
     await fetchBranches();
     await fetchProfiles();
   });

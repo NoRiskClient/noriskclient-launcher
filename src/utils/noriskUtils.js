@@ -7,6 +7,7 @@ import { defaultUser } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
 export const isClientRunning = writable(false);
+export const isCheckingForUpdates = writable(true)
 
 export async function runClient(branch) {
   if (get(isClientRunning)) {
@@ -79,4 +80,9 @@ export function getNoRiskToken() {
 export function noriskLog(message) {
   console.log(message);
   invoke("console_log_info", { message }).catch(e => console.error(e));
+}
+
+export function noriskError(message) {
+  console.error(message);
+  invoke("console_log_error", { message }).catch(e => console.error(e));
 }

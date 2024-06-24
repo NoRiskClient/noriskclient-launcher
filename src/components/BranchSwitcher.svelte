@@ -4,6 +4,8 @@
   import { quintOut } from "svelte/easing";
   import { branches, switchBranch, currentBranchIndex } from "../stores/branchesStore.js";
   import { scale } from "svelte/transition";
+  import { isCheckingForUpdates } from "../utils/noriskUtils.js";
+  import Updater from "./v2/Updater.svelte";
 </script>
 
 <div class="branch-wrapper">
@@ -12,11 +14,15 @@
       on:selectstart={preventSelection} style="cursor: pointer"
       on:mousedown={preventSelection} class="branch-font switch"
       on:click={() => switchBranch(true)}
-      style:opacity={$defaultUser == null ? 0 : 100}>
+      style:opacity={($defaultUser == null || $isCheckingForUpdates)? 0 : 100}>
     &lt;</h1>
   <section style="display:flex;justify-content:center">
-    {#if !$defaultUser}
-      <h1 class="branch-font" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Sign in...</h1>
+
+    {#if $isCheckingForUpdates}
+      <Updater />
+    {:else if !$defaultUser}
+      <h1 class="branch-font" style="position:absolute"
+          transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Sign in...</h1>
     {:else}
       {#if $branches.length > 0}
         {#each $branches as branch, i}
@@ -44,7 +50,7 @@
       on:selectstart={preventSelection}
       style="cursor: pointer" on:mousedown={preventSelection}
       class="branch-font switch" on:click={() => switchBranch(false)}
-      style:opacity={$defaultUser == null ? 0 : 100}>
+      style:opacity={($defaultUser == null || $isCheckingForUpdates) ? 0 : 100}>
     &gt;</h1>
 </div>
 

@@ -6,8 +6,10 @@ export const branches = writable([]);
 export const currentBranchIndex = writable(0);
 
 export async function fetchBranches() {
+  let options = get(launcherOptions);
+
   await invoke("request_norisk_branches").then(result => {
-    const latestBranch = launcherOptions.experimentalMode ? launcherOptions.latestDevBranch : launcherOptions.latestBranch;
+    const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
     result.sort(function(a, b) {
       if (a === latestBranch) {
         return -1;
@@ -24,8 +26,7 @@ export async function fetchBranches() {
   });
   console.log("Fetches Branches: ", get(branches))
 
-  let options = get(launcherOptions);
-  let latestBranch = options.experimentalMode ? options.latestDevBranch : options.latestBranch;
+  let latestBranch = options?.experimentalMode ? options?.latestDevBranch : options?.latestBranch;
   let _branches = get(branches);
   if (!latestBranch) {
     if (_branches.length > 0) {
