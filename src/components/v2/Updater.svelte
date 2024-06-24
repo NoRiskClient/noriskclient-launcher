@@ -6,6 +6,7 @@
   import { relaunch } from "@tauri-apps/api/process";
   import { isCheckingForUpdates, noriskError, noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { delay } from "../../utils/svelteUtils.js";
 
   let dots = "";
 
@@ -39,6 +40,8 @@
           noriskError(reason);
         });
       } else {
+        //TODO das kann in production weg
+        await delay(1000);
         isCheckingForUpdates.set(false);
       }
     } catch (error) {

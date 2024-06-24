@@ -19,7 +19,6 @@ export async function runClient(branch) {
   let options = get(launcherOptions);
   let launcherProfiles = get(profiles);
   let installedMods = [];
-  isClientRunning.set(true);
 
   if (options.experimentalMode) {
     options.latestDevBranch = branch;
@@ -29,7 +28,7 @@ export async function runClient(branch) {
 
   await saveOptions();
 
-  push("/start-progress");
+  await push("/start-progress");
 
   let launcherProfile;
   if (options.experimentalMode) {
@@ -56,6 +55,8 @@ export async function runClient(branch) {
     shaders: get(profiles)?.addons[branch]?.shaders ?? [],
     resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
     datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
+  }).then(() => {
+    isClientRunning.set(true);
   }).catch(reason => {
     isClientRunning.set(false);
     console.error("Error: ", reason);

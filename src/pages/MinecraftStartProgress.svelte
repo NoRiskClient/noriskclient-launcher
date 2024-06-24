@@ -7,11 +7,9 @@
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
 
-  let log = [];
   let progressBarMax = 0;
   let progressBarProgress = 0;
   let progressBarLabel = "";
-  let loadingText = "Loading";
   $: isFinished = $isClientRunning;
 
   $: progress = progressBarProgress / progressBarMax;
@@ -36,6 +34,7 @@
   });
 
   onMount(() => {
+    //Jup hier kann ein bug auftreten und der Progress ist über > 1000% aber jcukt erstmal
     if (isFinished) {
       progressBarProgress = 100;
       progressBarMax = 100;
@@ -52,7 +51,6 @@
   afterUpdate(() => {
     if (progressBarLabel === "Launching...") {
       isFinished = true;
-      loadingText = "Starting Game";
     }
   });
 
