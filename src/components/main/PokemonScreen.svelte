@@ -21,6 +21,7 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { branches, fetchBranches } from "../../stores/branchesStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
+  import { fetchProfiles } from "../../stores/profilesStore.js";
 
   let launcherProfiles = {};
   let featureWhitelist = [];
@@ -55,7 +56,7 @@
   defaultUser.subscribe(async value => {
     console.log("Default User Was Updatedd", value);
     await fetchBranches();
-    await loadProfiles();
+    await fetchProfiles();
   });
 
   listen("process-output", event => {

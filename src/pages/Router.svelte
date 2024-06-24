@@ -9,6 +9,7 @@
   import LauncherSettings from "./LauncherSettings.svelte";
   import Capes from "./Capes.svelte";
   import BackButton from "../components/v2/buttons/BackButton.svelte";
+  import Profiles from "./Profiles.svelte";
 
   const routes = {
     "/": Home,
@@ -17,6 +18,7 @@
     "/logs": MinecraftClientLogs,
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
+    "/profiles": Profiles,
   };
 </script>
 

@@ -8,7 +8,7 @@
     { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
     {
       name: "PROFILES",
-      onClick: () => console.log("Profiles clicked"),
+      onClick: () => push("/profiles"),
       condition: () => get(branches).length > 0 && get(defaultUser) != null,
     },
     /*

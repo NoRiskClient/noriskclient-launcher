@@ -1,14 +1,22 @@
 <script>
   import Router from "./pages/Router.svelte";
   import { onMount } from "svelte";
-  import { fetchDefaultUserOrError } from "./stores/credentialsStore.js";
+  import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
   import { fetchOptions } from "./stores/optionsStore.js";
   import { fetchBranches } from "./stores/branchesStore.js";
+  import { fetchProfiles } from "./stores/profilesStore.js";
 
   onMount(async () => {
     await fetchDefaultUserOrError(false);
     await fetchOptions();
     await fetchBranches();
+    await fetchProfiles();
+  });
+
+  defaultUser.subscribe(async value => {
+    console.log("Default User Was Updated", value);
+    await fetchBranches();
+    await fetchProfiles();
   });
 </script>
 
