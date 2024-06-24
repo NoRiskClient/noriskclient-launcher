@@ -43,6 +43,7 @@ export async function fetchBranches() {
 
 export function switchBranch(isLeft) {
   const totalBranches = get(branches).length;
+  if (totalBranches === 0) return
   if (isLeft) {
     currentBranchIndex.update(value => {
       return (value - 1 + totalBranches) % totalBranches;
