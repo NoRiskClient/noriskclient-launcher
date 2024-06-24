@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::Digest;
+use tauri::Window;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tracing::field::debug;
@@ -275,11 +276,18 @@ impl MinecraftAuthStore {
         &mut self,
         code: &str,
         flow: MinecraftLoginFlow,
+        window: Window,
     ) -> Result<Credentials, crate::error::Error> {
+        debug!("refresh_and_get_device_token");
+        window.emit("microsoft-output", "Device Token").unwrap_or_default();
         let (key, token, _, _) =
             self.refresh_and_get_device_token(Utc::now(), false).await?;
 
+        debug!("oauth_token");
+        window.emit("microsoft-output", "OAuth Token").unwrap_or_default();
         let oauth_token = oauth_token(code, &flow.verifier).await?;
+        window.emit("microsoft-output", "Sisu Authorize").unwrap_or_default();
+        debug!("sisu_authorize");
         let sisu_authorize = sisu_authorize(
             Some(&flow.session_id),
             &oauth_token.value.access_token,
@@ -289,6 +297,8 @@ impl MinecraftAuthStore {
         )
             .await?;
 
+        debug!("xsts_authorize");
+        window.emit("microsoft-output", "XSTS Authorize").unwrap_or_default();
         let xbox_token = xsts_authorize(
             sisu_authorize.value,
             &token.token,
@@ -296,10 +306,17 @@ impl MinecraftAuthStore {
             sisu_authorize.date,
         )
             .await?;
+
+        debug!("minecraft_token");
+        window.emit("microsoft-output", "Mc Token").unwrap_or_default();
         let minecraft_token = minecraft_token(xbox_token.value).await?;
 
+        debug!("minecraft_entitlements");
+        window.emit("microsoft-output", "Mc Entitlements").unwrap_or_default();
         minecraft_entitlements(&minecraft_token.access_token).await?;
 
+        debug!("minecraft_profile");
+        window.emit("microsoft-output", "Receiving Profile").unwrap_or_default();
         let profile = minecraft_profile(&minecraft_token.access_token).await?;
 
         let profile_id = profile.id.unwrap_or_default();
@@ -320,6 +337,8 @@ impl MinecraftAuthStore {
         }
 
         self.save().await?;
+
+        window.emit("microsoft-output", "Mc Done").unwrap_or_default();
 
         Ok(credentials)
     }

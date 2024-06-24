@@ -2,10 +2,11 @@
   import { preventSelection } from "../utils/svelteUtils.js";
   import { defaultUser } from "../stores/credentialsStore.js";
   import { quintOut } from "svelte/easing";
-  import { branches, switchBranch, currentBranchIndex } from "../stores/branchesStore.js";
+  import { branches, currentBranchIndex, switchBranch } from "../stores/branchesStore.js";
   import { scale } from "svelte/transition";
   import { isCheckingForUpdates } from "../utils/noriskUtils.js";
   import Updater from "./v2/Updater.svelte";
+  import SignInOutput from "./v2/SignInOutput.svelte";
 </script>
 
 <div class="branch-wrapper">
@@ -21,8 +22,7 @@
     {#if $isCheckingForUpdates}
       <Updater />
     {:else if !$defaultUser}
-      <h1 class="branch-font" style="position:absolute"
-          transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Sign in...</h1>
+      <SignInOutput />
     {:else}
       {#if $branches.length > 0}
         {#each $branches as branch, i}

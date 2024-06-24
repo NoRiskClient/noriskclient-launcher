@@ -21,7 +21,6 @@
       const { shouldUpdate, manifest } = await checkUpdate();
 
       if (shouldUpdate) {
-        interval = animateLoadingText();
         noriskLog(`Installing update: ${manifest?.version} ${manifest?.body}`);
 
         // Install the update. This will also restart the app on Windows!
