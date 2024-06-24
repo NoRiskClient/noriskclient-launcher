@@ -59,7 +59,7 @@
     },
   ];
   let filters = {};
-  
+
   listen("tauri://file-drop", files => {
     if (currentTabIndex != 1) {
       return;

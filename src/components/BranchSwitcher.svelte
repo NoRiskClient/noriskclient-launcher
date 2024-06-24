@@ -54,7 +54,6 @@
         align-content: space-evenly;
         flex-direction: row;
         gap: 200px;
-        border: 1px solid red;
     }
 
     .branch-font {

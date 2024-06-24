@@ -36,7 +36,6 @@
     .skin-kopf-container {
         display: flex;
         justify-content: center;
-        border: 1px solid red;
         position: relative;
     }
 

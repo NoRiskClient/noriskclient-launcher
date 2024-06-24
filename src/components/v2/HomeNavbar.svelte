@@ -64,6 +64,7 @@
         position: absolute;
         width: 720px;
         height: 80vh;
+        pointer-events: none
     }
 
     .topright {
@@ -78,7 +79,7 @@
         display: flex;
         flex-direction: column;
         align-items: end;
-        border: 1px solid red;
+        pointer-events: all;
     }
 
     .home-navbar-wrapper h1 {

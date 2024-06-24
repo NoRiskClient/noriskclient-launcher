@@ -35,6 +35,5 @@
         width: 80%;
         max-width: 400px;
         image-rendering: pixelated;
-        border: 1px solid red;
     }
 </style>
