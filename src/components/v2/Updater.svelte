@@ -62,7 +62,7 @@
       if (dots.length > 6) {
         dots = "";
       }
-    }, 250);
+    }, 500);
   }
 </script>
 

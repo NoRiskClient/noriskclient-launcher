@@ -120,6 +120,7 @@ pub fn main() -> anyhow::Result<()> {
     info!("Creating launcher directories...");
     fs::create_dir_all(LAUNCHER_DIRECTORY.data_dir())?;
     fs::create_dir_all(LAUNCHER_DIRECTORY.config_dir())?;
+    info!("Finish launcher directories...");
 
     // app
     app::gui::gui_main();
