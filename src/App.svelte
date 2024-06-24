@@ -7,26 +7,35 @@
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress } from "./utils/noriskUtils.js";
 
   onMount(async () => {
     await fetchOptions();
     await fetchDefaultUserOrError(false);
     await fetchBranches();
     await fetchProfiles();
-  });
 
-  defaultUser.subscribe(async value => {
-    console.log("Default User Was Updated", value);
-    await fetchBranches();
-    await fetchProfiles();
-  });
+    let unlisten = await listen("client-exited", () => {
+      isClientRunning.set(false);
+      startProgress.set({
+        progressBarMax: 0,
+        progressBarProgress: 0,
+        progressBarLabel: "",
+      });
+      if ($location !== "/logs") {
+        push("/");
+      }
+    });
 
-  listen("client-exited", () => {
-    isClientRunning.set(false);
-    if ($location !== "/logs") {
-      push("/");
-    }
+    defaultUser.subscribe(async value => {
+      console.log("Default User Was Updated", value);
+      await fetchBranches();
+      await fetchProfiles();
+    });
+
+    return () => {
+      unlisten();
+    };
   });
 </script>
 

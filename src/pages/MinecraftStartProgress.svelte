@@ -3,13 +3,13 @@
   import TransitionWrapper from "./TransitionWrapper.svelte";
   import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../utils/svelteUtils.js";
-  import { isClientRunning, stopClient } from "../utils/noriskUtils.js";
+  import { isClientRunning, startProgress, stopClient } from "../utils/noriskUtils.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
 
-  let progressBarMax = 0;
-  let progressBarProgress = 0;
-  let progressBarLabel = "";
+  $: progressBarMax = $startProgress.progressBarMax;
+  $: progressBarProgress = $startProgress.progressBarProgress;
+  $: progressBarLabel = $startProgress.progressBarLabel;
   $: isFinished = $isClientRunning;
 
   $: progress = progressBarProgress / progressBarMax;
@@ -19,15 +19,21 @@
 
     switch (progressUpdate.type) {
       case "max": {
-        progressBarMax = progressUpdate.value;
+        startProgress.update(value => {
+          return { ...value, progressBarMax: progressUpdate.value };
+        });
         break;
       }
       case "progress": {
-        progressBarProgress = progressUpdate.value;
+        startProgress.update(value => {
+          return { ...value, progressBarProgress: progressUpdate.value };
+        });
         break;
       }
       case "label": {
-        progressBarLabel = progressUpdate.value;
+        startProgress.update(value => {
+          return { ...value, progressBarLabel: progressUpdate.value };
+        });
         break;
       }
     }
@@ -36,9 +42,9 @@
   onMount(() => {
     //Jup hier kann ein bug auftreten und der Progress ist über > 1000% aber jcukt erstmal
     if (isFinished) {
-      progressBarProgress = 100;
-      progressBarMax = 100;
-      progressBarLabel = "Launching...";
+      //progressBarProgress = 100;
+      //progressBarMax = 100;
+      //progressBarLabel = "Launching...";
     }
   });
 

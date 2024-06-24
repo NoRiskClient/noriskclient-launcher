@@ -7,12 +7,17 @@ import { defaultUser } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
 export const isClientRunning = writable(false);
-export const isCheckingForUpdates = writable(true)
+export const isCheckingForUpdates = writable(true);
+export const startProgress = writable({
+  progressBarMax: 0,
+  progressBarProgress: 0,
+  progressBarLabel: ""
+});
 
 export async function runClient(branch) {
   if (get(isClientRunning)) {
-    addNotification("Client is already running")
-    return
+    addNotification("Client is already running");
+    return;
   }
   noriskLog("Client started");
 
