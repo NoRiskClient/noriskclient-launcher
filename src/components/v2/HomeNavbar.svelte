@@ -45,6 +45,14 @@
   ];
 
   navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+
+  branches.subscribe(value => {
+    navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+  })
+
+  defaultUser.subscribe(value => {
+    navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+  })
 </script>
 <div class="container">
   <div class="home-navbar-wrapper topright">
