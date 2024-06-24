@@ -6,7 +6,7 @@ use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
 use byteorder::BigEndian;
 use chrono::{DateTime, Duration, Utc};
-use log::debug;
+use log::{debug, error};
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::ecdsa::signature::Signer;
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{ApiEndpoints, get_api_base};
-use crate::app::app_data::LauncherOptions;
+use crate::app::app_data::{LauncherOptions, LauncherProfiles};
 use crate::error::ErrorKind;
 
 #[derive(Debug, Clone, Copy)]
@@ -107,28 +107,35 @@ pub struct MinecraftAuthStore {
     pub default_user: Option<Uuid>,
 }
 
+
+impl Default for MinecraftAuthStore {
+    fn default() -> Self {
+        Self {
+            users: HashMap::new(),
+            token: None,
+            default_user: None,
+        }
+    }
+}
+
 impl MinecraftAuthStore {
     //TODO
     pub async fn init(create_new: Option<bool>) -> Result<Self, crate::error::Error> {
         let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
         if auth_path.exists() || create_new.unwrap_or(false) {
-            let mut file = fs::File::open(&auth_path).await.map_err(|e| {
-                ErrorKind::FSError(format!("Failed to open accounts.json: {}", e))
-            })?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).await.map_err(|e| {
+            let contents = fs::read_to_string(&auth_path).await.map_err(|e| {
                 ErrorKind::FSError(format!("Failed to read accounts.json: {}", e))
             })?;
-            let store: MinecraftAuthStore = serde_json::from_str(&contents).map_err(|e| {
-                ErrorKind::JSONError(e)
-            })?;
-            Ok(store)
+
+            match serde_json::from_str::<MinecraftAuthStore>(&contents) {
+                Ok(store) => Ok(store),
+                Err(e) => {
+                    error!("JSON Error reading accounts.json: {:?}", e);
+                    Ok(MinecraftAuthStore::default())
+                }
+            }
         } else {
-            Ok(Self {
-                users: HashMap::new(),
-                token: None,
-                default_user: None,
-            })
+            Ok(MinecraftAuthStore::default())
         }
     }
 
@@ -414,7 +421,7 @@ impl MinecraftAuthStore {
                             Ok(Some(self.refresh_norisk_token(&val.unwrap().clone()).await?))
                         } else {
                             Err(ErrorKind::NoCredentialsError.as_error())
-                        }
+                        };
                     }
                     Err(err) => {
                         if let ErrorKind::MinecraftAuthenticationError(
@@ -920,12 +927,12 @@ async fn minecraft_entitlements(
 async fn auth_retry<F>(
     reqwest_request: impl Fn() -> F,
 ) -> Result<reqwest::Response, reqwest::Error>
-where
-    F: Future<Output=Result<Response, reqwest::Error>>,
+    where
+        F: Future<Output=Result<Response, reqwest::Error>>,
 {
     const RETRY_COUNT: usize = 5; // Does command 9 times
-    const RETRY_WAIT: std::time::Duration =
-        std::time::Duration::from_millis(250);
+const RETRY_WAIT: std::time::Duration =
+    std::time::Duration::from_millis(250);
 
     let mut resp = reqwest_request().await;
     for i in 0..RETRY_COUNT {

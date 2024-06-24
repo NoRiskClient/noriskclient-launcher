@@ -1,12 +1,13 @@
 <script>
-  import { removeUser, setDefaultUser, users } from "../../stores/credentialsStore.js";
+  import { removeUser, setDefaultUser, users, fetchDefaultUserOrError } from "../../stores/credentialsStore.js";
 
   export let account;
   export let isActive;
   export let dialog;
 
   async function handleRemoveAccount() {
-    await removeUser(account).then(value => {
+    await removeUser(account).then(async value => {
+      await fetchDefaultUserOrError()
       if ($users.length === 0) {
         dialog.close();
       }
