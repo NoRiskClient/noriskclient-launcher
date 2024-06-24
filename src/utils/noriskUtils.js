@@ -4,6 +4,7 @@ import { get, writable } from "svelte/store";
 import { launcherOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
 import { defaultUser } from "../stores/credentialsStore.js";
+import { profiles } from "../stores/profilesStore.js";
 
 export const isClientRunning = writable(false);
 
@@ -19,9 +20,9 @@ export async function runClient(branch) {
     branch: branch,
     options: options,
     mods: installedMods,
-    shaders: [],
-    resourcepacks: [],
-    datapacks: [],
+    shaders: get(profiles).addons[branch].shaders,
+    resourcepacks: get(profiles).addons[branch].resourcePacks,
+    datapacks: get(profiles).addons[branch].datapacks
   }).catch(reason => {
     isClientRunning.set(false)
     console.error("Error: ", reason);

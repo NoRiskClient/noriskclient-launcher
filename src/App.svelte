@@ -8,6 +8,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { push } from "svelte-spa-router";
   import { isClientRunning } from "./utils/noriskUtils.js";
+  import { location } from "svelte-spa-router";
+
 
   onMount(async () => {
     await fetchDefaultUserOrError(false);
@@ -24,7 +26,9 @@
 
   listen("client-exited", () => {
     isClientRunning.set(false);
-    push("/");
+    if ($location !== "/logs") {
+      push("/");
+    }
   });
 </script>
 

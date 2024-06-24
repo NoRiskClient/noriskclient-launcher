@@ -42,7 +42,7 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/"}
+  {#if $location !== "/" && $location !== "/logs"}
     <BackButton />
   {:else}
     {#if $isClientRunning}

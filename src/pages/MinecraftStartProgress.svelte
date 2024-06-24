@@ -66,6 +66,7 @@
     return Math.round(value * 100);
   }
 </script>
+
 <TransitionWrapper>
   <div class="start-progress-wrapper">
     {#if !isNaN(progress) && progressBarLabel !== undefined}
@@ -134,20 +135,5 @@
         font-size: 8px;
         margin: 0;
         cursor: default;
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
     }
 </style>

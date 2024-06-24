@@ -613,9 +613,9 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
 pub async fn get_latest_minecraft_logs(handle: tauri::AppHandle) -> Result<Vec<String>, crate::error::Error> {
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
     let latest_branch = if (options.experimental_mode) {
-        options.latest_branch
-    } else {
         options.latest_dev_branch
+    } else {
+        options.latest_branch
     }.ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
 
     let log_path: PathBuf = LAUNCHER_DIRECTORY.data_dir()
