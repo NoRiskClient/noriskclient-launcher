@@ -6,6 +6,7 @@
   import { stopClient } from "../utils/noriskUtils.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
+  import { push } from "svelte-spa-router";
 
   let log = [];
   let progressBarMax = 0;
@@ -35,6 +36,16 @@
     }
   });
 
+  listen("client-exited", () => {
+    push("/");
+  });
+
+  listen("client-error", (e) => {
+    //clientLogShown = true;
+    console.error(e.payload);
+    //forceServer = null;
+  });
+
   afterUpdate(() => {
     if (progressBarLabel === "Launching...") {
       isFinished = true;
@@ -55,13 +66,6 @@
 <TransitionWrapper>
   <div class="start-progress-wrapper">
     {#if !isNaN(progress) && progressBarLabel !== undefined}
-      {#if false}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="home-button" on:click={() => dispatch("home")}>[BACK]</h1>
-      {/if}
-      {#if false}
-        <ClientLog messages={log} on:hideClientLog={() => clientLogShown = false} />
-      {/if}
       <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
           class="nes-font-big">{convertToPercentage(progress)}%</h1>
       <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
@@ -82,7 +86,6 @@
 
 <style>
     .start-progress-wrapper {
-        border: 5px solid green;
         width: 100%;
         height: 100%;
         display: flex;

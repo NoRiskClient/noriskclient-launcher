@@ -11,6 +11,7 @@
         display: flex;
         flex-direction: column-reverse;
         align-items: flex-end;
+        z-index: 1000;
     }
 </style>
 

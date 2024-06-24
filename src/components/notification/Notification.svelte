@@ -14,6 +14,7 @@
         position: relative;
         border-radius: 4px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        text-shadow: none;
     }
 </style>
 
