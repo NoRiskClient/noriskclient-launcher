@@ -1,9 +1,9 @@
 <script>
-  import { push } from "svelte-spa-router";
+  import { pop } from "svelte-spa-router";
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="back-button" on:click={() => push("/")}>[BACK]</h1>
+<h1 class="back-button" on:click={() => pop()}>[BACK]</h1>
 
 <style>
     .back-button {
