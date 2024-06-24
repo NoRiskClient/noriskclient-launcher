@@ -5,6 +5,9 @@
   import { fetchOptions } from "./stores/optionsStore.js";
   import { fetchBranches } from "./stores/branchesStore.js";
   import { fetchProfiles } from "./stores/profilesStore.js";
+  import { listen } from "@tauri-apps/api/event";
+  import { push } from "svelte-spa-router";
+  import { isClientRunning } from "./utils/noriskUtils.js";
 
   onMount(async () => {
     await fetchDefaultUserOrError(false);
@@ -17,6 +20,11 @@
     console.log("Default User Was Updated", value);
     await fetchBranches();
     await fetchProfiles();
+  });
+
+  listen("client-exited", () => {
+    isClientRunning.set(false);
+    push("/");
   });
 </script>
 

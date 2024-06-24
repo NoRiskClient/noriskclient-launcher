@@ -1,19 +1,18 @@
 <script>
   import { listen } from "@tauri-apps/api/event";
   import TransitionWrapper from "./TransitionWrapper.svelte";
-  import { afterUpdate } from "svelte";
+  import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../utils/svelteUtils.js";
-  import { stopClient } from "../utils/noriskUtils.js";
+  import { isClientRunning, stopClient } from "../utils/noriskUtils.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
-  import { push } from "svelte-spa-router";
 
   let log = [];
   let progressBarMax = 0;
   let progressBarProgress = 0;
   let progressBarLabel = "";
   let loadingText = "Loading";
-  let isFinished = false;
+  $: isFinished = $isClientRunning;
 
   $: progress = progressBarProgress / progressBarMax;
 
@@ -36,13 +35,17 @@
     }
   });
 
-  listen("client-exited", () => {
-    push("/");
+  onMount(() => {
+    if (isFinished) {
+      progressBarProgress = 100;
+      progressBarMax = 100;
+      progressBarLabel = "Launching...";
+    }
   });
 
   listen("client-error", (e) => {
     //clientLogShown = true;
-    console.error(e.payload);
+    alert(e.payload);
     //forceServer = null;
   });
 

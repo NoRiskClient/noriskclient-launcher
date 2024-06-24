@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api";
 import { addNotification } from "../stores/notificationStore.js";
-import { get } from "svelte/store";
+import { get, writable } from "svelte/store";
 import { launcherOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
 import { defaultUser } from "../stores/credentialsStore.js";
+
+export const isClientRunning = writable(false);
 
 export async function runClient(branch) {
   console.log("Client started");
@@ -11,6 +13,7 @@ export async function runClient(branch) {
 
   let options = get(launcherOptions);
   let installedMods = [];
+  isClientRunning.set(true)
 
   await invoke("run_client", {
     branch: branch,
@@ -20,6 +23,7 @@ export async function runClient(branch) {
     resourcepacks: [],
     datapacks: [],
   }).catch(reason => {
+    isClientRunning.set(false)
     console.error("Error: ", reason);
     pop();
     addNotification(reason);

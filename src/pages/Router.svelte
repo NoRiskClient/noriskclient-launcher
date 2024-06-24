@@ -15,6 +15,8 @@
   import Shaders from "./Shaders.svelte";
   import Resourcepacks from "./Resourcepacks.svelte";
   import Datapacks from "./Datapacks.svelte";
+  import { isClientRunning } from "../utils/noriskUtils.js";
+  import GameButton from "../components/v2/buttons/GameButton.svelte";
 
   const routes = {
     "/": Home,
@@ -42,6 +44,10 @@
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
   {#if $location !== "/"}
     <BackButton />
+  {:else}
+    {#if $isClientRunning}
+      <GameButton />
+    {/if}
   {/if}
 </div>
 
