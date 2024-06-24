@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api";
 import { addNotification } from "../stores/notificationStore.js";
 import { get, writable } from "svelte/store";
-import { launcherOptions } from "../stores/optionsStore.js";
+import { launcherOptions, saveOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
 import { defaultUser } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
@@ -9,22 +9,54 @@ import { profiles } from "../stores/profilesStore.js";
 export const isClientRunning = writable(false);
 
 export async function runClient(branch) {
-  console.log("Client started");
-  push("/start-progress");
+  if (get(isClientRunning)) {
+    addNotification("Client is already running")
+    return
+  }
+  noriskLog("Client started");
 
   let options = get(launcherOptions);
+  let launcherProfiles = get(profiles);
   let installedMods = [];
-  isClientRunning.set(true)
+  isClientRunning.set(true);
+
+  if (options.experimentalMode) {
+    options.latestDevBranch = branch;
+  } else {
+    options.latestBranch = branch;
+  }
+
+  await saveOptions();
+
+  push("/start-progress");
+
+  let launcherProfile;
+  if (options.experimentalMode) {
+    const activeProfileId = launcherProfiles.selectedExperimentalProfiles[branch];
+    launcherProfile = launcherProfiles.experimentalProfiles.find(p => p.id === activeProfileId);
+  } else {
+    const activeProfileId = launcherProfiles.selectedMainProfiles[branch];
+    launcherProfile = launcherProfiles.mainProfiles.find(p => p.id === activeProfileId);
+  }
+
+  launcherProfile?.mods?.forEach(mod => {
+    noriskLog(`Pushing Mod: ${JSON.stringify(mod.value)}`);
+    installedMods.push(mod.value);
+    mod.dependencies.forEach((dependency) => {
+      noriskLog(`Pushing Dependency: ${JSON.stringify(dependency.value)}`);
+      installedMods.push(dependency.value);
+    });
+  });
 
   await invoke("run_client", {
     branch: branch,
     options: options,
     mods: installedMods,
-    shaders: get(profiles).addons[branch].shaders,
-    resourcepacks: get(profiles).addons[branch].resourcePacks,
-    datapacks: get(profiles).addons[branch].datapacks
+    shaders: get(profiles)?.addons[branch]?.shaders ?? [],
+    resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
+    datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).catch(reason => {
-    isClientRunning.set(false)
+    isClientRunning.set(false);
     console.error("Error: ", reason);
     pop();
     addNotification(reason);
@@ -42,4 +74,9 @@ export function getNoRiskToken() {
   let options = get(launcherOptions);
   let user = get(defaultUser);
   return options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value;
+}
+
+export function noriskLog(message) {
+  console.log(message);
+  invoke("console_log_info", { message }).catch(e => console.error(e));
 }
