@@ -1,6 +1,6 @@
 <!-- App.svelte -->
 <script>
-  import Router from "svelte-spa-router";
+  import Router, { location } from "svelte-spa-router";
   import Home from "./Home.svelte";
   import About from "./About.svelte";
   import Notifications from "../components/notification/Notifications.svelte";
@@ -8,6 +8,7 @@
   import MinecraftClientLogs from "./MinecraftClientLogs.svelte";
   import LauncherSettings from "./LauncherSettings.svelte";
   import Capes from "./Capes.svelte";
+  import BackButton from "../components/v2/buttons/BackButton.svelte";
 
   const routes = {
     "/": Home,
@@ -25,10 +26,19 @@
   <Notifications />
   <Router {routes} />
 </div>
-<div class="black-bar" data-tauri-drag-region></div>
+<div class="black-bar" data-tauri-drag-region>
+  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
+  {#if $location !== "/"}
+    <BackButton />
+  {/if}
+</div>
 
 <style>
     .black-bar {
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
         width: 100%;
         height: 10vh;
         background-color: #151515;

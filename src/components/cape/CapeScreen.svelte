@@ -5,7 +5,6 @@
   import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { push } from "svelte-spa-router";
   import { preventSelection } from "../../utils/svelteUtils.js";
 
   const dispatch = createEventDispatcher();
@@ -106,7 +105,6 @@
   {/if}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
 </div>
-<h1 class="home-button" on:click={() => push("/")}>[BACK]</h1>
 
 <style>
     .wrapper {
@@ -130,20 +128,6 @@
     }
 
     .wrapper h1:hover {
-        transform: scale(1.2);
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
         transform: scale(1.2);
     }
 </style>

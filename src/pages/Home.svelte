@@ -16,6 +16,7 @@
     <SkinButton />
     <CopyrightLabel />
   </div>
+  <h1 slot="footer">Blog Post Title</h1>
 </TransitionWrapper>
 
 <style>
