@@ -94,15 +94,17 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={handleNextRequest}>
     <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
-  {#if currentRequest === 0}
-    {#if !isLoading}
-      <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
+  <div class="cape-wrapper">
+    {#if currentRequest === 0}
+      {#if !isLoading}
+        <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
+      {/if}
+    {:else}
+      {#if capes != null}
+        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
+      {/if}
     {/if}
-  {:else}
-    {#if capes != null}
-      <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
-    {/if}
-  {/if}
+  </div>
   <!-- svelte-ignore a11y-click-events-have-key-events -->
 </div>
 
@@ -114,11 +116,15 @@
         align-items: center;
     }
 
+    .cape-wrapper {
+        height: 100%;
+    }
+
     .wrapper h1 {
         font-family: 'Press Start 2P', serif;
+        padding: 1em;
         font-size: 35px;
         cursor: pointer;
-        margin-top: 2em;
         transition: transform 0.3s;
     }
 
