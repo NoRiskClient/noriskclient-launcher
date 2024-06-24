@@ -3,6 +3,7 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { get } from "svelte/store";
   import { push } from "svelte-spa-router";
+  import { appWindow } from "@tauri-apps/api/window";
 
   let navItems = [
     { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
@@ -36,7 +37,11 @@
       onClick: () => push("/skin"),
       condition: () => get(defaultUser) != null,
     },*/
-    { name: "QUIT", onClick: () => console.log("Quit clicked"), condition: true, className: "quit" },
+    {
+      name: "QUIT", onClick: () => {
+        appWindow.close();
+      }, condition: true, className: "quit",
+    },
   ];
 
   navItems = navItems.sort((a, b) => b.name.length - a.name.length);
