@@ -326,10 +326,9 @@ impl MinecraftAuthStore {
         debug!("Refreshing NoRisk Token");
         let cred_id = creds.id;
 
-        let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await
-            .map_err(|e| ErrorKind::LauncherError(e.to_string()).as_error())?;
+        let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await?;
 
-        //TODO maybe ganzen norisk_user speichern für rank information und discordId?
+
         let mut copied_credentials = creds.clone();
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         if options.experimental_mode {
@@ -927,12 +926,12 @@ async fn minecraft_entitlements(
 async fn auth_retry<F>(
     reqwest_request: impl Fn() -> F,
 ) -> Result<reqwest::Response, reqwest::Error>
-    where
-        F: Future<Output=Result<Response, reqwest::Error>>,
+where
+    F: Future<Output=Result<Response, reqwest::Error>>,
 {
     const RETRY_COUNT: usize = 5; // Does command 9 times
-const RETRY_WAIT: std::time::Duration =
-    std::time::Duration::from_millis(250);
+    const RETRY_WAIT: std::time::Duration =
+        std::time::Duration::from_millis(250);
 
     let mut resp = reqwest_request().await;
     for i in 0..RETRY_COUNT {

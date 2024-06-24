@@ -11,6 +11,9 @@
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
   import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
+  import { onDestroy } from "svelte";
+  import { defaultUser } from "../stores/credentialsStore.js";
+  import { updateNoRiskToken } from "../stores/credentialsStore.js";
 
   $: lightTheme = $launcherOptions?.theme === "LIGHT";
   let showExperimentalTokenModal = false;
@@ -44,12 +47,16 @@
       $launcherOptions.experimentalMode = false;
       return;
     }
+
     await saveOptions();
   }
 
+  onDestroy(async () => {
+    await saveOptions();
+  });
+
   async function closeAndSave() {
     await pop();
-    await saveOptions();
   }
 </script>
 

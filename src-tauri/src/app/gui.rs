@@ -668,6 +668,12 @@ pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Er
 }
 
 #[tauri::command]
+pub async fn minecraft_auth_update_norisk_token(credentials: Credentials) -> Result<Credentials, crate::error::Error> {
+    let mut accounts = minecraft_auth_get_store().await?;
+    Ok(accounts.refresh_norisk_token(&credentials).await?)
+}
+
+#[tauri::command]
 async fn get_options() -> Result<LauncherOptions, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
@@ -1575,6 +1581,7 @@ pub fn gui_main() {
             minecraft_auth_set_default_user,
             minecraft_auth_remove_user,
             minecraft_auth_users,
+            minecraft_auth_update_norisk_token,
             store_options,
             check_maintenance_mode,
             request_norisk_branches,

@@ -4,6 +4,8 @@
   import { launcherOptions, saveOptions } from "../../stores/optionsStore.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
+  import { fetchDefaultUserOrError, updateNoRiskToken } from "../../stores/credentialsStore.js";
+  import { defaultUser } from "../../stores/credentialsStore.js";
 
   export let showModal;
 
@@ -26,6 +28,10 @@
         $launcherOptions.experimentalMode = allowed;
         await saveOptions();
         hideModal();
+        if ($defaultUser) {
+          await updateNoRiskToken($defaultUser);
+          await fetchDefaultUserOrError();
+        }
       })
       .catch(async (e) => {
         $launcherOptions.experimentalMode = false;
