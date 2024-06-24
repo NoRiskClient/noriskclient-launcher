@@ -122,7 +122,12 @@ impl MinecraftAuthStore {
     //TODO
     pub async fn init(create_new: Option<bool>) -> Result<Self, crate::error::Error> {
         let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
-        if auth_path.exists() || create_new.unwrap_or(false) {
+
+        if (create_new.unwrap_or(false)) {
+            return Ok(MinecraftAuthStore::default());
+        }
+
+        if auth_path.exists() {
             let contents = fs::read_to_string(&auth_path).await.map_err(|e| {
                 ErrorKind::FSError(format!("Failed to read accounts.json: {}", e))
             })?;

@@ -1267,6 +1267,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
     auth_store.save().await?;
 
     let _ = store_options(LauncherOptions::default()).await;
+    let _ = store_launcher_profiles(LauncherProfiles::default()).await;
 
     ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
         .iter()

@@ -12,8 +12,10 @@
   import { addNotification } from "../stores/notificationStore.js";
   import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
   import { onDestroy } from "svelte";
-  import { defaultUser } from "../stores/credentialsStore.js";
+  import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
   import { updateNoRiskToken } from "../stores/credentialsStore.js";
+  import { fetchBranches } from "../stores/branchesStore.js";
+  import { fetchProfiles } from "../stores/profilesStore.js";
 
   $: lightTheme = $launcherOptions?.theme === "LIGHT";
   let showExperimentalTokenModal = false;
@@ -31,6 +33,9 @@
         .then(async () => {
           alert("Data cleared.");
           await fetchOptions();
+          await fetchDefaultUserOrError(false);
+          await fetchBranches();
+          await fetchProfiles();
         })
         .catch(e => {
           addNotification(e);
