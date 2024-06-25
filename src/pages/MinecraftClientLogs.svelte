@@ -10,29 +10,32 @@
 
   let autoScroll = true;
 
-  onMount(() => {
+  onMount(async () => {
     invoke("get_latest_minecraft_logs").then(value => {
       minecraftLogs.set(value.map(string => string + "\n"));
     }).catch(reason => {
       addNotification(reason);
     });
 
-    listen("process-output", event => {
+    const logsUnlisten = await listen("process-output", event => {
       minecraftLogs.update(value => {
         return [...value, event.payload];
       });
     });
+    return () => {
+      logsUnlisten();
+    };
   });
 
   async function uploadLogs() {
     await invoke("upload_logs", {
-      log: $minecraftLogs.join("")
+      log: $minecraftLogs.join(""),
     }).then((result) => {
-      console.debug("Received Result", result)
-      navigator.clipboard.writeText(result.url)
+      console.debug("Received Result", result);
+      navigator.clipboard.writeText(result.url);
     }).catch((error) => {
-      addNotification(error)
-    })
+      addNotification(error);
+    });
   }
 
   function toggleAutoScroll() {
@@ -46,7 +49,8 @@
       <LogMessage text={item} />
     </VirtualList>
     <div class="logs-button-wrapper">
-      <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll} on:click={toggleAutoScroll}>
+      <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
+          on:click={toggleAutoScroll}>
         [Auto Scroll]
       </h1>
       <h1 class="copy-button" on:click={uploadLogs}>

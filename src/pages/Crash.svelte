@@ -1,6 +1,5 @@
 <script>
   import TransitionWrapper2 from "./TransitionWrapper2.svelte";
-  import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "../components/log/LogMessage.svelte";
   import { onMount } from "svelte";
@@ -15,12 +14,6 @@
       minecraftLogs.set(value.map(string => string + "\n"));
     }).catch(reason => {
       addNotification(reason);
-    });
-
-    listen("process-output", event => {
-      minecraftLogs.update(value => {
-        return [...value, event.payload];
-      });
     });
   });
 
