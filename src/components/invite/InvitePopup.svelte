@@ -2,6 +2,9 @@
   import { invoke } from "@tauri-apps/api";
   import { createEventDispatcher } from "svelte";
   import ConfigTextInput from "../config/inputs/ConfigTextInput.svelte";
+  import { addNotification } from "../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskError } from "../../utils/noriskUtils.js";
+  import { defaultUser } from "../../stores/credentialsStore.js";
 
   const dispatch = createEventDispatcher();
 
@@ -23,17 +26,16 @@
 
   async function inviteFriend() {
     if (friendIdentifier !== "") {
-      const loginData = options.accounts.find(acc => acc.uuid == options.currentUuid);
       await invoke("add_player_to_whitelist", {
         identifier: friendIdentifier,
-        noriskToken: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-        requestUuid: options.currentUuid,
+        noriskToken: getNoRiskToken(),
+        requestUuid: $defaultUser.id,
       }).then(() => {
         alert("Successfully invited " + friendIdentifier + " to the NRC closed beta!");
         hideSettings();
       }).catch((e) => {
-        alert("An error occurred while inviting " + friendIdentifier + " to the NRC closed beta: " + e);
-        console.error(e);
+        noriskError(e);
+        addNotification("An error occurred while inviting " + friendIdentifier + " to the NRC closed beta: " + e);
       });
     }
   }
@@ -58,7 +60,7 @@
       <hr>
       <div class="settings-wrapper">
         <p>You have
-          <b>{ friendInviteSlots.availableSlots == -1 ? '∞' : `${friendInviteSlots.availableSlots - friendInviteSlots.previousInvites}/${friendInviteSlots.availableSlots}`}</b>
+          <b>{ friendInviteSlots.availableSlots === -1 ? '∞' : `${friendInviteSlots.availableSlots - friendInviteSlots.previousInvites}/${friendInviteSlots.availableSlots}`}</b>
           invites left.<br>You can use them to invite a friend to the NRC closed beta.</p>
         <ConfigTextInput title="Username / UUID" bind:value={friendIdentifier} />
       </div>

@@ -5,63 +5,74 @@
   import { push } from "svelte-spa-router";
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api";
+  import { getNoRiskToken, noriskError, noriskLog } from "../../utils/noriskUtils.js";
+  import InvitePopup from "../invite/InvitePopup.svelte";
+  import { addNotification } from "../../stores/notificationStore.js";
 
-  let navItems = [
-    { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
-    {
-      name: "PROFILES",
-      onClick: () => push("/profiles"),
-      condition: () => get(branches).length > 0 && get(defaultUser) != null,
-    },
-    /*
-      Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
-      ich setze mich nochmal dran wenn du mich pingst
-    {
-      name: "SERVERS",
-      onClick: () => console.log("Servers clicked"),
-      condition: () => get(branches).length > 0 && get(defaultUser) != null,
-    },*/
-    {
-      name: "ADDONS",
-      onClick: () => push("/addons"),
-      condition: () => get(branches).length > 0 && get(defaultUser) != null,
-    },
-    {
-      name: "CAPES",
-      onClick: () => push("/capes"),
-      condition: () => get(branches).length > 0 && get(defaultUser) != null,
-    },
-    /*
-    Ich habs wirklich probiert aber Overflow hat gekickt
-    {
-      name: "SKIN",
-      onClick: () => push("/skin"),
-      condition: () => get(defaultUser) != null,
-    },*/
-    {
-      name: "QUIT", onClick: () => {
-        appWindow.close();
-      }, condition: true, className: "quit",
-    },
-  ];
+  let showInvitePopup = false;
+  let featureWhitelist = [];
+  let friendInviteSlots = {};
 
-  navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+  let navItems = [];
 
-  branches.subscribe(value => {
-    navItems = navItems.sort((a, b) => b.name.length - a.name.length);
-  });
+  function updateNavItems() {
+    navItems = [
+      { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
+      {
+        name: "PROFILES",
+        onClick: () => push("/profiles"),
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      },
+      /*
+        Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
+        ich setze mich nochmal dran wenn du mich pingst
+      {
+        name: "SERVERS",
+        onClick: () => console.log("Servers clicked"),
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      },*/
+      {
+        name: "ADDONS",
+        onClick: () => push("/addons"),
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      },
+      {
+        name: "CAPES",
+        onClick: () => push("/capes"),
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      },
+      {
+        name: "INVITE",
+        onClick: () => showInvitePopup = true,
+        condition: () => get(branches).length > 0 && get(defaultUser) != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites),
+      },
+      /*
+      Ich habs wirklich probiert aber Overflow hat gekickt
+      {
+        name: "SKIN",
+        onClick: () => push("/skin"),
+        condition: () => get(defaultUser) != null,
+      },*/
+      {
+        name: "QUIT", onClick: () => {
+          appWindow.close();
+        }, condition: true, className: "quit",
+      },
+    ].sort((a, b) => b.name.length - a.name.length);
+  }
 
-  defaultUser.subscribe(value => {
-    navItems = navItems.sort((a, b) => b.name.length - a.name.length);
-  });
 
   onMount(async () => {
-    const branchesUnlisten = branches.subscribe(value => {
-      navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+    const branchesUnlisten = branches.subscribe(async value => {
+      await fetchFeatures();
+      updateNavItems();
     });
 
-    const userUnlisten = defaultUser.subscribe(value => {
-      navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+    const userUnlisten = defaultUser.subscribe(async value => {
+      await fetchFeatures();
+      updateNavItems();
+      console.log(featureWhitelist, friendInviteSlots)
     });
 
     return () => {
@@ -69,7 +80,51 @@
       userUnlisten();
     };
   });
+
+  async function fetchFeatures() {
+    featureWhitelist = [];
+    await checkFeatureWhitelist("INVITE_FRIENDS");
+
+    if (featureWhitelist.includes("INVITE_FRIENDS")) {
+      await loadFriendInvites();
+    }
+  }
+
+  async function checkFeatureWhitelist(feature) {
+    if (!$defaultUser) return;
+    await invoke("check_feature_whitelist", {
+      feature: feature,
+      noriskToken: getNoRiskToken(),
+      uuid: $defaultUser.id,
+    }).then((result) => {
+      console.debug(feature + ":", result);
+      if (!result) return;
+      featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
+    }).catch((reason) => {
+      noriskError(reason);
+      featureWhitelist = [];
+    });
+  }
+
+  async function loadFriendInvites() {
+    if (!$defaultUser) return;
+    await invoke("get_whitelist_slots", {
+      noriskToken: getNoRiskToken(),
+      uuid: $defaultUser.id,
+    }).then((result) => {
+      noriskLog("Received Whitelist Slots" + JSON.stringify(result));
+      friendInviteSlots = result;
+    }).catch((reason) => {
+      noriskError(reason);
+      addNotification(reason);
+      friendInviteSlots = {};
+    });
+  }
 </script>
+
+{#if showInvitePopup}
+  <InvitePopup on:getInviteSlots={loadFriendInvites} bind:showModal={showInvitePopup} bind:friendInviteSlots />
+{/if}
 <div class="container">
   <div class="home-navbar-wrapper topleft">
     {#each navItems as item (item.name)}
