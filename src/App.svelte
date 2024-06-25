@@ -8,8 +8,10 @@
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
   import { isClientRunning, startProgress } from "./utils/noriskUtils.js";
+  import { appWindow } from "@tauri-apps/api/window";
 
   onMount(async () => {
+    await appWindow.show();
     await fetchOptions();
     await fetchDefaultUserOrError(false);
     await fetchBranches();

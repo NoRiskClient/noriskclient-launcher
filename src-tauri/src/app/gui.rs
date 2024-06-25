@@ -1565,7 +1565,7 @@ pub fn gui_main() {
         })
         .plugin(tauri_plugin_fs_watch::init())
         .setup(|app| {
-            let _window = app.get_window("main").unwrap();
+            //let _window = app.get_window("main").unwrap();
             Ok(())
         })
         .manage(AppState {

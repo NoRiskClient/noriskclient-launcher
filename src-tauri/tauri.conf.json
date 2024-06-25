@@ -23,6 +23,9 @@
           "$APPDATA/",
           "$APPDATA"
         ]
+      },
+      "window": {
+        "show": true
       }
     },
     "bundle": {
@@ -103,7 +106,8 @@
         "resizable": false,
         "fullscreen": false,
         "decorations": false,
-        "center": true
+        "center": true,
+        "visible": false
       }
     ]
   }
