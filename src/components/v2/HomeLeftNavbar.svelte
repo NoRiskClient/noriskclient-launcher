@@ -54,7 +54,7 @@
     let options = get(launcherOptions);
     if (!credentials) return false;
     if (!options) return false;
-    return await invoke("discord_auth_status", { options, credentials })
+    return await invoke("discord_auth_status")
       .then((value) => {
         discordLinked = value;
         noriskLog("Is Discord Linked: " + discordLinked);

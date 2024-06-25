@@ -15,7 +15,7 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject, ModrinthSearchRequestParams};
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, LauncherError};
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
@@ -970,9 +970,11 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
 }
 
 #[tauri::command]
-async fn discord_auth_status(credentials: Credentials, options: LauncherOptions) -> Result<bool, crate::error::Error> {
-    let status = ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?;
-    Ok(status)
+async fn discord_auth_status() -> Result<bool, crate::error::Error> {
+    let options = get_options().await.map_err(|e| ErrorKind::LauncherError(e))?;
+    let user = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
+    let norisk_token = user.norisk_credentials.get_token(options.experimental_mode)?;
+    Ok(ApiEndpoints::discord_link_status(&norisk_token, &user.id.to_string()).await?)
 }
 
 #[tauri::command]
