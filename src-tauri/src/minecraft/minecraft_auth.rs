@@ -512,6 +512,16 @@ pub struct NoRiskToken {
     //TODO habs nichts hinbekommen jetzt erstmal bei jedem restart, pub expires: DateTime<Utc>,
 }
 
+impl NoRiskCredentials {
+    pub fn get_token(&self, experimental_mode: bool) -> Result<String, crate::error::Error> {
+        return if experimental_mode {
+            Ok(self.clone().experimental.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
+        } else {
+            Ok(self.clone().production.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
+        };
+    }
+}
+
 const MICROSOFT_CLIENT_ID: &str = "00000000402b5328";
 const REDIRECT_URL: &str = "https://login.live.com/oauth20_desktop.srf";
 const REQUESTED_SCOPES: &str = "service::user.auth.xboxlive.com::MBI_SSL";

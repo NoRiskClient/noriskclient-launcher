@@ -6,10 +6,12 @@
   import NoRiskLogoColor from "../images/norisk_logo_color.png";
   import CopyrightLabel from "../components/v2/CopyrightLabel.svelte";
   import HomeNavbar from "../components/v2/HomeNavbar.svelte";
+  import HomeLeftNavbar from "../components/v2/HomeLeftNavbar.svelte";
 </script>
 
 <TransitionWrapper>
   <div class="home-wrapper">
+    <HomeLeftNavbar />
     <HomeNavbar />
     <img class="pokemon-title" src={NoRiskLogoColor} alt="Pokemon Title">
     <BranchSwitcher />

@@ -83,14 +83,13 @@ async fn check_online_status() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: &str, size: (u32, u32), handle: tauri::AppHandle) -> Result<(), String> {
+fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
         &handle,
         "external", /* the unique window label */
         tauri::WindowUrl::External(url.parse().unwrap()),
     ).build().unwrap();
     let _ = window.set_title("NoRiskClient");
-    let _ = window.set_size(LogicalSize::new(size.0, size.1));
     let _ = window.set_resizable(false);
     let _ = window.set_focus();
     let _ = window.set_minimizable(false);
@@ -929,56 +928,57 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 }
 
 #[tauri::command]
-async fn connect_discord_intigration(options: LauncherOptions, login_data: LoginData, handle: tauri::AppHandle) -> Result<(), String> {
-    let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, if options.experimental_mode.clone() { login_data.experimental_token.unwrap() } else { login_data.norisk_token });
-    let _ = open_url(url.as_str(), (1200, 900), handle);
+async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, app: tauri::AppHandle) -> Result<(), crate::error::Error> {
+    let token = credentials.norisk_credentials.get_token(options.experimental_mode)?;
+    let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, token);
 
+    if let Some(window) = app.get_window("discord-signin") {
+        window.close()?;
+    }
+
+    let start = Utc::now();
+
+    let window = tauri::WindowBuilder::new(
+        &app,
+        "discord-signin",
+        tauri::WindowUrl::External(url.parse().unwrap()),
+    )
+        .title("Discord X NoRiskClient")
+        .always_on_top(true)
+        .center()
+        .build()?;
+
+    window.request_user_attention(Some(UserAttentionType::Critical))?;
+
+    while (Utc::now() - start) < chrono::Duration::minutes(10) {
+        if window.title().is_err() {
+            // user closed window, cancelling flow
+            return Ok(());
+        }
+
+        if (window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete")) {
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            window.close()?;
+            return Ok(());
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    window.close()?;
     Ok(())
 }
 
 #[tauri::command]
-async fn check_discord_intigration(norisk_token: &str, uuid: &str) -> Result<bool, String> {
-    let status = ApiEndpoints::discord_link_status(norisk_token, uuid).await
-        .map_err(|e| format!("unable to check discord intigration: {:?}", e))?;
+async fn discord_auth_status(credentials: Credentials, options: LauncherOptions) -> Result<bool, crate::error::Error> {
+    let status = ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?;
     Ok(status)
 }
 
 #[tauri::command]
-async fn unlink_discord_intigration(norisk_token: &str, uuid: &str) -> Result<(), String> {
-    ApiEndpoints::unlink_discord(norisk_token, uuid).await
-        .map_err(|e| format!("unable to unlink discord: {:?}", e))?;
+async fn discord_auth_unlink(credentials: Credentials, options: LauncherOptions) -> Result<(), crate::error::Error> {
+    ApiEndpoints::unlink_discord(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?;
     Ok(())
-}
-
-#[tauri::command]
-async fn login_norisk_microsoft(options: LauncherOptions, handle: tauri::AppHandle) -> Result<LoginData, String> {
-    let auth_prepare_response = ApiEndpoints::auth_prepare_response().await;
-    match auth_prepare_response {
-        Ok(response) => {
-            // Hier kannst du auf die Daten von 'response' zugreifen
-            let url = response.url;
-            let id = response.id;
-            let _ = open_url(url.as_str(), (1200, 800), handle);
-
-            let login_data = ApiEndpoints::await_auth_response(id).await;
-            match login_data {
-                Ok(response) => {
-                    info!("Received NoRisk Auth Response");
-                    Ok(LoginData {
-                        norisk_token: if options.experimental_mode { String::from("") } else { response.norisk_token.clone() },
-                        experimental_token: Some(if options.experimental_mode { response.norisk_token.clone() } else { String::from("") }),
-                        ..response
-                    })
-                }
-                Err(err) => {
-                    Err(format!("await auth error: {:?}", err))
-                }
-            }
-        }
-        Err(err) => {
-            Err(format!("await prepare response error: {:?}", err))
-        }
-    }
 }
 
 #[tauri::command]
@@ -1588,10 +1588,9 @@ pub fn gui_main() {
             store_options,
             check_maintenance_mode,
             request_norisk_branches,
-            connect_discord_intigration,
-            check_discord_intigration,
-            unlink_discord_intigration,
-            login_norisk_microsoft,
+            discord_auth_link,
+            discord_auth_status,
+            discord_auth_unlink,
             upload_cape,
             equip_cape,
             get_player_skins,

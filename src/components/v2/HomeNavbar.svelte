@@ -4,6 +4,7 @@
   import { get } from "svelte/store";
   import { push } from "svelte-spa-router";
   import { appWindow } from "@tauri-apps/api/window";
+  import { onMount } from "svelte";
 
   let navItems = [
     { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
@@ -48,14 +49,29 @@
 
   branches.subscribe(value => {
     navItems = navItems.sort((a, b) => b.name.length - a.name.length);
-  })
+  });
 
   defaultUser.subscribe(value => {
     navItems = navItems.sort((a, b) => b.name.length - a.name.length);
-  })
+  });
+
+  onMount(async () => {
+    const branchesUnlisten = branches.subscribe(value => {
+      navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+    });
+
+    const userUnlisten = defaultUser.subscribe(value => {
+      navItems = navItems.sort((a, b) => b.name.length - a.name.length);
+    });
+
+    return () => {
+      branchesUnlisten();
+      userUnlisten();
+    };
+  });
 </script>
 <div class="container">
-  <div class="home-navbar-wrapper topright">
+  <div class="home-navbar-wrapper topleft">
     {#each navItems as item (item.name)}
       {#if typeof item.condition === 'function' ? item.condition() : item.condition}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -75,7 +91,7 @@
         pointer-events: none
     }
 
-    .topright {
+    .topleft {
         position: absolute;
         top: 0;
         right: 0;
