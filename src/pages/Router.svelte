@@ -2,7 +2,6 @@
 <script>
   import Router, { location } from "svelte-spa-router";
   import Home from "./Home.svelte";
-  import About from "./About.svelte";
   import Notifications from "../components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./MinecraftStartProgress.svelte";
   import MinecraftClientLogs from "./MinecraftClientLogs.svelte";
@@ -17,12 +16,14 @@
   import Datapacks from "./Datapacks.svelte";
   import { isClientRunning } from "../utils/noriskUtils.js";
   import GameButton from "../components/v2/buttons/GameButton.svelte";
+  import Crash from "./Crash.svelte";
+  import CrashHeader from "../components/v2/CrashHeader.svelte";
 
   const routes = {
     "/": Home,
-    "/about": About,
     "/start-progress": MinecraftStartProgress,
     "/logs": MinecraftClientLogs,
+    "/crash": Crash,
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
     "/profiles": Profiles,
@@ -35,6 +36,10 @@
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
+  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
+  {#if $location === "/crash"}
+    <CrashHeader />
+  {/if}
 </div>
 <div class="content">
   <Notifications />
@@ -42,7 +47,7 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/logs"}
+  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash"}
     <BackButton />
   {:else}
     {#if $isClientRunning}

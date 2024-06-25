@@ -11,7 +11,7 @@ export const isCheckingForUpdates = writable(true);
 export const startProgress = writable({
   progressBarMax: 0,
   progressBarProgress: 0,
-  progressBarLabel: ""
+  progressBarLabel: "",
 });
 
 export async function runClient(branch) {
@@ -73,6 +73,12 @@ export async function runClient(branch) {
 export async function stopClient() {
   push("/");
   await invoke("terminate").catch(reason => {
+    addNotification(reason);
+  });
+}
+
+export async function openMinecraftLogsWindow() {
+  await invoke("open_minecraft_logs_window").catch(reason => {
     addNotification(reason);
   });
 }

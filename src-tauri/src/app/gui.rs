@@ -609,6 +609,19 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
 }
 
 #[tauri::command]
+pub async fn open_minecraft_crash_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
+    let window = tauri::WindowBuilder::new(
+        &handle,
+        "crash",
+        tauri::WindowUrl::App("/#/crash".into()),
+    ).build()?;
+    let _ = window.set_title("Crash Report");
+    let _ = window.set_resizable(true);
+    let _ = window.set_focus();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_latest_minecraft_logs(handle: tauri::AppHandle) -> Result<Vec<String>, crate::error::Error> {
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
     let latest_branch = if (options.experimental_mode) {
@@ -1580,6 +1593,7 @@ pub fn gui_main() {
             check_online_status,
             get_options,
             open_minecraft_logs_window,
+            open_minecraft_crash_window,
             get_latest_minecraft_logs,
             minecraft_auth_get_store,
             minecraft_auth_get_default_user,

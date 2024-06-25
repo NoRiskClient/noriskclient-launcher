@@ -9,6 +9,8 @@
   import { location, push } from "svelte-spa-router";
   import { isClientRunning, startProgress } from "./utils/noriskUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
+  import { invoke } from "@tauri-apps/api";
+  import { addNotification } from "./stores/notificationStore.js";
 
   onMount(async () => {
     setTimeout(async () => {
@@ -31,7 +33,13 @@
       }
     });
 
-    defaultUser.subscribe(async value => {
+    const errorUnlisten = await listen("client-error", async (e) => {
+      await invoke("open_minecraft_crash_window").catch(reason => {
+        addNotification(reason);
+      });
+    });
+
+    const userUnlisten = defaultUser.subscribe(async value => {
       console.log("Default User Was Updated", value);
       await fetchBranches();
       await fetchProfiles();
@@ -39,6 +47,8 @@
 
     return () => {
       unlisten();
+      errorUnlisten();
+      userUnlisten();
     };
   });
 </script>
