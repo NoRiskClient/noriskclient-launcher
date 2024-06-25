@@ -11,7 +11,9 @@
   import { appWindow } from "@tauri-apps/api/window";
 
   onMount(async () => {
-    await appWindow.show();
+    setTimeout(async () => {
+      await appWindow.show();
+    }, 300);
     await fetchOptions();
     await fetchDefaultUserOrError(false);
     await fetchBranches();
