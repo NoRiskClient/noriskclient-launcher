@@ -69,6 +69,12 @@
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
+        -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%;
+        animation: effect 4.5s;
+  }
+  
+   @keyframes effect {
+   100% {-webkit-mask-position:left}
     }
 
     .switch:hover {

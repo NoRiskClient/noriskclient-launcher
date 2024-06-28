@@ -4,11 +4,9 @@
   import { quintOut } from "svelte/easing";
   import { scale } from "svelte/transition";
 
-  let microsoftOutput = "Sign in";
-  let dots = "";
+  let microsoftOutput = "Sign in:";
 
   onMount(async () => {
-    let interval = animateLoadingText();
 
     const unlisten = await listen("microsoft-output", event => {
       microsoftOutput = event.payload;
@@ -16,22 +14,13 @@
 
     return () => {
       unlisten();
-      clearInterval(interval);
     };
   });
 
-  function animateLoadingText() {
-    return setInterval(function() {
-      dots += " .";
-      if (dots.length > 6) {
-        dots = "";
-      }
-    }, 500);
-  }
 </script>
 
 <h1 class="branch-font" style="position:absolute"
-    transition:scale={{ x: 15, duration: 300, easing: quintOut }}>{microsoftOutput}{dots}</h1>
+    transition:scale={{ x: 15, duration: 300, easing: quintOut }}>{microsoftOutput}</h1>
 
 <style>
     .branch-font {
@@ -41,5 +30,5 @@
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
-    }
+  }
 </style>
