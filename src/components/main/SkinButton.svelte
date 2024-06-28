@@ -25,7 +25,7 @@
     <div on:click={() => (showModal = true)} class="tag">*</div>
   {:else}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <img class="login-kopf"
+    <img class="skin-kopf zoom"
          src={SteveSkin}
          alt="Skin Kopf"
          on:click={startMicrosoftAuth}
@@ -43,13 +43,6 @@
         cursor: pointer;
         box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
         border-radius: 0.2em;
-    }
-
-    .login-kopf {
-        cursor: pointer;
-        box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
-        border-radius: 0.2em;
-        animation: zoom 2s ease infinite;
     }
     
     .skin-kopf-container:hover {
@@ -79,6 +72,12 @@
         color: var(--secondary-color);
     }
     
+    .zoom {
+        cursor: pointer;
+        box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
+        border-radius: 0.2em;
+        animation: zoom 2s ease infinite;
+    }
     @keyframes zoom {
   0% {
     transform: scale(1, 1);

@@ -13,7 +13,7 @@
   <div class="home-wrapper">
     <HomeLeftNavbar />
     <HomeNavbar />
-    <img class="pokemon-title" src={NoRiskLogoColor} alt="Pokemon Title">
+    <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title">
     <BranchSwitcher />
     <SkinButton />
     <CopyrightLabel />
@@ -37,11 +37,15 @@
         width: 80%;
         max-width: 400px;
         image-rendering: pixelated;
-        -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%; /* right/275% 100%: length and hight of mask */
-        animation: effect 4.5s infinite; /* remove infinite to trigger once */
   }
   
-   @keyframes effect {
+    .title-effect {
+      -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%; /* right/275% 100%: length and hight of mask */
+      animation: effect 4.5s infinite; /* remove infinite to trigger once */
+    }
+  
+    @keyframes effect {
    100% {-webkit-mask-position:left} /* transformation, 50 to swipe left->right->left; 100 to swipe left->right. 50 needs double effect duration */
   }
+
 </style>

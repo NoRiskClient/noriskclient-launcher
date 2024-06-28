@@ -28,7 +28,7 @@
         {#each $branches as branch, i}
           {#if $currentBranchIndex === i}
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                class="branch-font"
+                class="branch-font branch-effect"
                 style="position:absolute"
                 on:selectstart={preventSelection}
                 on:mousedown={preventSelection}
@@ -69,16 +69,20 @@
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
-        -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%;
-        animation: effect 4.5s;
   }
   
-   @keyframes effect {
-   100% {-webkit-mask-position:left}
-    }
-
     .switch:hover {
         color: var(--hover-color);
         text-shadow: 2px 2px var(--hover-color-text-shadow);
     }
+  
+    .branch-effect{
+        -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%;
+        animation: effect 4.5s;
+    }
+
+    @keyframes effect {
+   100% {-webkit-mask-position:left}
+    }
+
 </style>
