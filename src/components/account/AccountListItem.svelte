@@ -7,7 +7,7 @@
 
   async function handleRemoveAccount() {
     await removeUser(account).then(async value => {
-      await fetchDefaultUserOrError()
+      await fetchDefaultUserOrError();
       if ($users.length === 0) {
         dialog.close();
       }
@@ -18,7 +18,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
   <div class="skin-text-wrapper">
-    <img src={`https://mineskin.eu/helm/${account.id}/100.png`} alt="{account.username}'s Kopf">
+    <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
     <h1 class:active={isActive}>{account.username}</h1>
   </div>
   <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
@@ -61,7 +61,6 @@
     }
 
     img {
-        width: 50px;
         box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
     }
 
