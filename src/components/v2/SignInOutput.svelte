@@ -4,13 +4,18 @@
   import { quintOut } from "svelte/easing";
   import { scale } from "svelte/transition";
 
-  let microsoftOutput = "Sign in";
+  let microsoftOutput = "PRESS START";
   let dots = "";
+  let microsoftFlag = false;
 
   onMount(async () => {
-    let interval = animateLoadingText();
+    let interval;
 
     const unlisten = await listen("microsoft-output", event => {
+      if (!microsoftFlag) {
+        interval = animateLoadingText();
+        microsoftFlag = true;
+      }
       microsoftOutput = event.payload;
     });
 
@@ -28,6 +33,7 @@
       }
     }, 500);
   }
+
 </script>
 
 <h1 class="branch-font" style="position:absolute"
