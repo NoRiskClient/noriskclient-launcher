@@ -315,9 +315,12 @@
 </div>
 
 <style>
+    * {
+      overflow: hidden;
+    }
+
     .skin-wrapper {
-        overflow: hidden;
-        border: 1px solid green;
+        height: 80vh;
     }
 
     .wrapper {
@@ -336,8 +339,8 @@
     .klickField {
         position: absolute;
         top: 10vh;
-        height: 520px;
-        width: 720px;
+        height: 80vh;
+        width: 99vw;
     }
 
     .slider {

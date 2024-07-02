@@ -27,11 +27,12 @@
       /*
         Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
         ich setze mich nochmal dran wenn du mich pingst
-      {
-        name: "SERVERS",
-        onClick: () => console.log("Servers clicked"),
-        condition: () => get(branches).length > 0 && get(defaultUser) != null,
-      },*/
+      */
+      // {
+      //   name: "SERVERS",
+      //   onClick: () => push("/servers"),
+      //   condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      // },
       {
         name: "ADDONS",
         onClick: () => push("/addons"),
@@ -47,13 +48,11 @@
         onClick: () => showInvitePopup = true,
         condition: () => get(branches).length > 0 && get(defaultUser) != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites),
       },
-      /*
-      Ich habs wirklich probiert aber Overflow hat gekickt
       {
         name: "SKIN",
         onClick: () => push("/skin"),
         condition: () => get(defaultUser) != null,
-      },*/
+      },
       {
         name: "QUIT", onClick: () => {
           appWindow.close();

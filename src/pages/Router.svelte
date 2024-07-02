@@ -11,6 +11,7 @@
   import Profiles from "./Profiles.svelte";
   import Addons from "./Addons.svelte";
   import Mods from "./Mods.svelte";
+  import Skin from "./Skin.svelte";
   import Shaders from "./Shaders.svelte";
   import Resourcepacks from "./Resourcepacks.svelte";
   import Datapacks from "./Datapacks.svelte";
@@ -27,6 +28,7 @@
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
     "/profiles": Profiles,
+    "/skin": Skin,
     "/addons": Addons,
     "/addons/mods": Mods,
     "/addons/resourcepacks": Resourcepacks,
