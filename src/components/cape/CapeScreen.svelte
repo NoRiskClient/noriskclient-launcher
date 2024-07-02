@@ -56,8 +56,8 @@
     }
   }
 
-  async function handleNextRequest() {
-    currentRequest = (currentRequest + 1) % requests.length;
+  async function handleNextRequest(inverted) {
+    currentRequest = inverted ? (currentRequest > 0 ? currentRequest - 1 : requests.length - 1) : (currentRequest + 1) % requests.length;
     capes = null;
     if (currentRequest === 1) {
       await requestTrendingCapes(1);
@@ -91,9 +91,14 @@
 </script>
 
 <div class="wrapper">
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={handleNextRequest}>
-    <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
+  <div class="navbar">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="arrow" on:click={() => handleNextRequest(true)}>&lt;</h1>
+    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}>
+      <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="arrow" on:click={() => handleNextRequest(false)}>&gt;</h1>
+  </div>
   <div class="cape-wrapper">
     {#if currentRequest === 0}
       {#if !isLoading}
@@ -109,6 +114,14 @@
 </div>
 
 <style>
+    .navbar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: row;
+        margin-top: 1em;
+    }
+
     .wrapper {
         height: 100%;
         display: flex;
@@ -120,20 +133,24 @@
         height: 100%;
     }
 
-    .wrapper h1 {
+    .navbar h1 {
         font-family: 'Press Start 2P', serif;
         padding: 1em;
         font-size: 35px;
-        cursor: pointer;
         transition: transform 0.3s;
     }
 
-    .wrapper h1 span {
+    .navbar h1 span {
         color: gold;
         text-shadow: 3px 2px #5d4c03;
     }
 
-    .wrapper h1:hover {
+    .navbar h1.arrow {
+        cursor: pointer;
+        font-size: 25px;
+    }
+
+    .navbar h1.arrow:hover {
         transform: scale(1.2);
     }
 </style>
