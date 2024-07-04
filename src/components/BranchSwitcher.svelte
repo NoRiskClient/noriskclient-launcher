@@ -10,13 +10,15 @@
 </script>
 
 <div class="branch-wrapper">
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-      on:selectstart={preventSelection} style="cursor: pointer"
-      on:mousedown={preventSelection} class="branch-font switch"
-      on:click={() => switchBranch(true)}
-      style:opacity={($defaultUser == null || $isCheckingForUpdates)? 0 : 100}>
-    &lt;</h1>
+  {#if $branches.length > 0}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+        on:selectstart={preventSelection} style="cursor: pointer"
+        on:mousedown={preventSelection} class="branch-font switch"
+        on:click={() => switchBranch(true)}
+        style:opacity={($defaultUser == null || $isCheckingForUpdates)? 0 : 100}>
+      &lt;</h1>
+  {/if}
   <section style="display:flex;justify-content:center">
 
     {#if $isCheckingForUpdates}
@@ -45,13 +47,15 @@
       {/if}
     {/if}
   </section>
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-      on:selectstart={preventSelection}
-      style="cursor: pointer" on:mousedown={preventSelection}
-      class="branch-font switch" on:click={() => switchBranch(false)}
-      style:opacity={($defaultUser == null || $isCheckingForUpdates) ? 0 : 100}>
-    &gt;</h1>
+  {#if $branches.length > 0}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+        on:selectstart={preventSelection}
+        style="cursor: pointer" on:mousedown={preventSelection}
+        class="branch-font switch" on:click={() => switchBranch(false)}
+        style:opacity={($defaultUser == null || $isCheckingForUpdates) ? 0 : 100}>
+      &gt;</h1>
+  {/if}
 </div>
 
 <style>

@@ -12,8 +12,7 @@
   import { addNotification } from "../stores/notificationStore.js";
   import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
   import { onDestroy } from "svelte";
-  import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
-  import { updateNoRiskToken } from "../stores/credentialsStore.js";
+  import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
   import { fetchBranches } from "../stores/branchesStore.js";
   import { fetchProfiles } from "../stores/profilesStore.js";
 
@@ -72,11 +71,7 @@
   {/if}
   <div on:click|stopPropagation class="divider">
     <div>
-      <div class="header-wrapper">
-        <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
-        <h1 class="nes-font red-text-clickable close-button" on:click={closeAndSave}>X</h1>
-      </div>
-      <hr>
+      <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
       <div class="settings-wrapper">
         <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
         <div class="experimental-mode-wrapper">
@@ -111,28 +106,18 @@
 </TransitionWrapper>
 
 <style>
-    .header-wrapper {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        padding: 1em;
-    }
-
-    .close-button {
-        transition: transform 0.3s;
-    }
-
-    .close-button:hover {
-        transition: transform 0.3s;
-        transform: scale(1.2);
-    }
-
     .divider {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        align-items: center;
         height: 100%;
         padding: 1em;
+    }
+
+    .title {
+      text-align: center;
+      margin-top: 10px;
     }
 
     @keyframes fade {
@@ -147,8 +132,9 @@
     .settings-wrapper {
         display: flex;
         flex-direction: column;
-        margin-top: 1.5em;
+        margin-top: 2em;
         gap: 1em;
+        width: 75vw;
     }
 
     .nes-font {
@@ -196,6 +182,7 @@
         align-content: center;
         align-items: center;
         justify-content: center;
+        margin-top: 0.5em;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;

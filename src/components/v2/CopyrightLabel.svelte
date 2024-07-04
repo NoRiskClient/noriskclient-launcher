@@ -1,10 +1,12 @@
 <script>
   import { preventSelection } from "../../utils/svelteUtils.js";
+
+  export let showCreditsModal;
 </script>
 
-
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <div on:selectstart={preventSelection}
-     on:mousedown={preventSelection} class="copyright">
+     on:mousedown={preventSelection} class="copyright" on:click={() => showCreditsModal = true}>
   © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.2
 </div>
 
@@ -15,6 +17,6 @@
         margin-top: 0.3em;
         text-shadow: 1px 1px var(--hover-color-text-shadow);
         color: var(--hover-color);
-        cursor: default;
+        cursor: pointer;
     }
 </style>

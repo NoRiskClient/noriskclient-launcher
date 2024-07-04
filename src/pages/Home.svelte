@@ -7,16 +7,27 @@
   import CopyrightLabel from "../components/v2/CopyrightLabel.svelte";
   import HomeNavbar from "../components/v2/HomeNavbar.svelte";
   import HomeLeftNavbar from "../components/v2/HomeLeftNavbar.svelte";
+  import CreditModal from "../components/main/CreditsModal.svelte";
+
+  let showCreditsModal = false;
+
+  function showCredits() {
+    showCreditsModal = true;
+  }
 </script>
 
+{#if showCreditsModal}
+  <CreditModal bind:showModal={showCreditsModal} />
+{/if}
 <TransitionWrapper>
   <div class="home-wrapper">
     <HomeLeftNavbar />
     <HomeNavbar />
-    <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title" on:click={showCredits}>
     <BranchSwitcher />
     <SkinButton />
-    <CopyrightLabel />
+    <CopyrightLabel bind:showCreditsModal />
   </div>
   <h1 slot="footer">Blog Post Title</h1>
 </TransitionWrapper>
@@ -37,6 +48,7 @@
         width: 80%;
         max-width: 400px;
         image-rendering: pixelated;
+        cursor: pointer;
   }
   
     .title-effect {

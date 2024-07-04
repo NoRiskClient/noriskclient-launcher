@@ -42,12 +42,17 @@
     .skin-kopf {
         cursor: pointer;
         box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
-        border-radius: 0.2em;
+        border-radius: 0.35em;
+        transition-duration: 200ms;
     }
 
     .skin-kopf-container:hover {
         position: relative;
         transform: scale(1.2);
+    }
+    
+    .skin-kopf-container:hover .skin-kopf {
+        border-radius: 0.25em;
     }
 
     .tag {
