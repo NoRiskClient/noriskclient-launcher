@@ -5,6 +5,7 @@
   import ConfigSlider from "../components/config/inputs/ConfigSlider.svelte";
   import ConfigRadioButton from "../components/config/inputs/ConfigRadioButton.svelte";
   import ConfigFolderInput from "../components/config/inputs/ConfigFolderInput.svelte";
+  import McRealAppModal from "../components/mcRealApp/McRealAppModal.svelte";
   import { fetchOptions, launcherOptions, saveOptions } from "../stores/optionsStore.js";
   import { preventSelection } from "../utils/svelteUtils.js";
   import { pop } from "svelte-spa-router";
@@ -15,9 +16,11 @@
   import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
   import { fetchBranches } from "../stores/branchesStore.js";
   import { fetchProfiles } from "../stores/profilesStore.js";
+  import { featureWhitelist } from "../utils/noriskUtils.js";
 
   $: lightTheme = $launcherOptions?.theme === "LIGHT";
   let showExperimentalTokenModal = false;
+  let showMcRealAppModal = false;
 
   function toggleTheme() {
     $launcherOptions.toggleTheme();
@@ -68,6 +71,8 @@
 <TransitionWrapper>
   {#if showExperimentalTokenModal}
     <ExperimentalTokenModal bind:showModal={showExperimentalTokenModal} />
+  {:else if showMcRealAppModal}
+    <McRealAppModal bind:showModal={showMcRealAppModal} />
   {/if}
   <div on:click|stopPropagation class="divider">
     <div>
@@ -79,14 +84,12 @@
                              text="Experimental Mode" />
         </div>
         <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${$launcherOptions.theme}`} />
-        <!-- TODO Sorry Tim aber die Invalid Session ist bei mir im Reallife angekommen
-        {#if featureWhitelist.includes("MCREAL_APP")}
+        {#if $featureWhitelist.includes("MCREAL_APP")}
           <div class="mcreal-app-wrapper">
             <h1 class="title">MCReal App</h1>
-            <h1 class="button" on:click={() => { hideSettings(); showMcRealAppModal = true; }}>Details</h1>
+            <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
           </div>
         {/if}
-        -->
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage}
                       step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads}
@@ -182,7 +185,8 @@
         align-content: center;
         align-items: center;
         justify-content: center;
-        margin-top: 0.5em;
+        margin-top: 1em;
+        margin-bottom: 2em;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;

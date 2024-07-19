@@ -6,33 +6,29 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api";
-  import { getNoRiskToken, noriskError, noriskLog } from "../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist } from "../../utils/noriskUtils.js";
   import InvitePopup from "../invite/InvitePopup.svelte";
   import { addNotification } from "../../stores/notificationStore.js";
 
   let showInvitePopup = false;
-  let featureWhitelist = [];
   let friendInviteSlots = {};
 
   let navItems = [];
 
   function updateNavItems() {
     navItems = [
+      
       { name: "SETTINGS", onClick: () => push("/launcher-settings"), condition: true },
       {
         name: "PROFILES",
         onClick: () => push("/profiles"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
-      /*
-        Hallo Tim ich habe wirklich probiert es zu fixen, aber ich muss jetzt weitermachen damit wir ich schlafen kann ok
-        ich setze mich nochmal dran wenn du mich pingst
-      */
-      // {
-      //   name: "SERVERS",
-      //   onClick: () => push("/servers"),
-      //   condition: () => get(branches).length > 0 && get(defaultUser) != null,
-      // },
+      {
+        name: "SERVERS",
+        onClick: () => push("/servers"),
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
+      },
       {
         name: "ADDONS",
         onClick: () => push("/addons"),
@@ -45,8 +41,8 @@
       },
       {
         name: "INVITE",
-        onClick: () => showInvitePopup = true,
-        condition: () => get(branches).length > 0 && get(defaultUser) != null && featureWhitelist.includes("INVITE_FRIENDS") && (friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots > friendInviteSlots.previousInvites),
+        onClick: () => { showInvitePopup = true; },
+        condition: () => get(branches).length > 0 && get(defaultUser) != null && $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1,
       },
       {
         name: "SKIN",
@@ -81,28 +77,11 @@
   });
 
   async function fetchFeatures() {
-    featureWhitelist = [];
-    await checkFeatureWhitelist("INVITE_FRIENDS");
+    await getFeatureWhitelist();
 
-    if (featureWhitelist.includes("INVITE_FRIENDS")) {
+    if ($featureWhitelist.includes("INVITE_FRIENDS")) {
       await loadFriendInvites();
     }
-  }
-
-  async function checkFeatureWhitelist(feature) {
-    if (!$defaultUser) return;
-    await invoke("check_feature_whitelist", {
-      feature: feature,
-      noriskToken: getNoRiskToken(),
-      uuid: $defaultUser.id,
-    }).then((result) => {
-      console.debug(feature + ":", result);
-      if (!result) return;
-      featureWhitelist.push(feature.toUpperCase().replaceAll(" ", "_"));
-    }).catch((reason) => {
-      noriskError(reason);
-      featureWhitelist = [];
-    });
   }
 
   async function loadFriendInvites() {
@@ -126,6 +105,12 @@
 {/if}
 <div class="container">
   <div class="home-navbar-wrapper topleft">
+    {#if $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots - friendInviteSlots.previousInvites > 0}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class="invite-button" on:click={() => showInvitePopup = true}>
+        <p>✨ INVITE ✨</p>
+      </h1>
+    {/if}
     {#each navItems as item (item.name)}
       {#if typeof item.condition === 'function' ? item.condition() : item.condition}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -142,7 +127,7 @@
         position: absolute;
         width: 720px;
         height: 80vh;
-        pointer-events: none
+        pointer-events: none;
     }
 
     .topleft {

@@ -75,6 +75,7 @@
     if (!options) return;
     return await invoke("discord_auth_unlink", { options, credentials })
       .then((value) => {
+        discordLinked = false;
         noriskLog("Unlinked Discord" + discordLinked);
       })
       .catch((err) => {
@@ -100,7 +101,7 @@
         position: absolute;
         width: 720px;
         height: 80vh;
-        pointer-events: none
+        pointer-events: none;
     }
 
     .topleft {

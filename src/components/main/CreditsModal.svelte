@@ -36,7 +36,7 @@
         </div>
         <div class="credit">
           <img src="src/images/ranks/bug_bounty.png" alt="bug bounty rank" title="Bug Hunter">
-          <p class="nes-font">MrKavatch</p>
+          <p class="nes-font" title="Er leidet einfach 'nur' mit mir (Tim) 😭">MrKavatch</p>
         </div>
         <div class="credit">
           <p title="We love you!">❤️</p>

@@ -37,6 +37,7 @@
     .skin-kopf-container {
         position: relative;
         transition: transform 0.3s;
+        margin-top: 10px;
     }
 
     .skin-kopf {

@@ -16,13 +16,13 @@
     import PurpurIcon from "../../../images/custom-servers/purpur.png";
     import BukkitIcon from "../../../images/custom-servers/bukkit.png";
     import SpigotIcon from "../../../images/custom-servers/spigot.png";
-    import {createEventDispatcher} from "svelte";
+    import { createEventDispatcher } from "svelte";
+    import { launcherOptions } from "../../../stores/optionsStore.js";
+    import { defaultUser } from "../../../stores/credentialsStore.js";
+    import { customServerBaseDomain } from "../../../stores/customServerStore.js";
+    import { customServerProgress, setCustomServerProgress } from "../../../utils/noriskUtils.js";
 
     const dispatch = createEventDispatcher()
-
-    export let options;
-    export let customServerProgress;
-    export let baseDomain;
 
     let createdServer;
 
@@ -67,7 +67,7 @@
         "FORGE": {
             "name": "Forge",
             "type": "FORGE",
-            "iconUrl": options.theme == "DARK" ? ForgeWhiteIcon : ForgeDarkIcon,
+            "iconUrl": $launcherOptions.theme == "DARK" ? ForgeWhiteIcon : ForgeDarkIcon,
             "requiresLoader": true,
             "versions": [],
             "loaderVersions": []
@@ -118,7 +118,6 @@
     };
 
     async function createServer() {
-        const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
         const server = {
             name: name,
             subdomain: subdomain,
@@ -133,12 +132,12 @@
             loaderVersion: server.loaderVersion,
             type: server.type,
             subdomain: server.subdomain,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-            uuid: options.currentUuid,
+            token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+            uuid: $defaultUser.id,
         }).then(async (newServer) => {
             console.log('Created Server:', newServer);
             createdServer = newServer;
-            customServerProgress[newServer._id] = { label: "Initializing...", progress: 0, max: 0 };
+            setCustomServerProgress(newServer._id, { label: "Initializing...", progress: 0, max: 0 });
             
             let additionalData = null;
             if (newServer.type == "VANILLA") {
@@ -150,7 +149,7 @@
             await invoke("initialize_custom_server", {
                 customServer: newServer,
                 additionalData: additionalData,
-                token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
+                token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             }).then(() => {
                 console.log('Initialized Server:', newServer);
                 currentTab = "COMPLETED";
@@ -169,12 +168,10 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" style="left: 220px;" on:click={createdServer != null ? () => dispatch("backAndUpdate") : () => dispatch("back")}>[BACK]</h1>
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
+<h1 on:click={createdServer != null ? () => dispatch("backAndUpdate") : () => dispatch("back")}>[BACK]</h1>
 <div class="create-server-wrapper">
     {#if currentTab === "NAME_ICON_SUBDOMAIN"}
-        <NameIconSubdomainTab bind:options={options} bind:name={name} bind:icon={icon} bind:subdomain={subdomain} baseDomain={baseDomain} on:next={() => currentTab = "TYPE"}/>
+        <NameIconSubdomainTab bind:name={name} bind:icon={icon} bind:subdomain={subdomain} baseDomain={$customServerBaseDomain} on:next={() => currentTab = "TYPE"}/>
     {:else if currentTab === "TYPE"}
         <TypeTab bind:type={type} bind:version={mcVersion} bind:majorVersion={majorVersion} bind:loaderVersion={loaderVersion} bind:availableTypes={availableTypes} on:back={() => currentTab = "NAME_ICON_SUBDOMAIN"} on:next={() => currentTab = "VERSIONS"}/>
     {:else if currentTab === "VERSIONS"}
@@ -185,7 +182,7 @@
         <EulaTab bind:eula={eula} on:back={() => currentTab = availableTypes[type].requiresLoader ? "LOADER_VERSIONS" : "VERSIONS"} on:next={createServer} />
     {:else if currentTab === "INITIALIZING"}
         <div class="center">
-            <h1>{customServerProgress[createdServer._id] ? customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
+            <h1>{$customServerProgress[createdServer._id] ? $customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
         </div>
     {:else if currentTab = "COMPLETED"}
         <div class="center">

@@ -12,12 +12,14 @@
     import PurpurIcon from "../../../images/custom-servers/purpur.png";
     import BukkitIcon from "../../../images/custom-servers/bukkit.png";
     import SpigotIcon from "../../../images/custom-servers/spigot.png";
+    import { customServerLogs } from "../../../stores/customServerLogsStore.js";
+    import { launcherOptions } from "../../../stores/optionsStore.js";
 
     const dispatch = createEventDispatcher()
 
-    export let options;
     export let server;
-    export let logs = [];
+
+    let logs = $customServerLogs[server._id] ?? [];
 
     let loaderIcon;
     switch (server.type.toUpperCase()) {
@@ -25,7 +27,7 @@
             loaderIcon = VanillaIcon
             break;
         case "FORGE":
-            loaderIcon = options.theme == "DARK" ? ForgeWhiteIcon : ForgeDarkIcon
+            loaderIcon = $launcherOptions.theme == "DARK" ? ForgeWhiteIcon : ForgeDarkIcon
             break;
         case "NEO_FORGE":
             loaderIcon = NeoForgeIcon

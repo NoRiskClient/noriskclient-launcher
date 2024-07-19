@@ -1096,14 +1096,14 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
+async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
     let credentials = minecraft_auth_get_store().await?.get_default_credential().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
-        force_server: None, //TODO ich fix das noch <3
+        force_server: force_server,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },

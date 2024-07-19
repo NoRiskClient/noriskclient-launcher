@@ -13,6 +13,9 @@ export const startProgress = writable({
   progressBarProgress: 0,
   progressBarLabel: "",
 });
+export const featureWhitelist = writable([]);
+export const customServerProgress = writable({});
+export const forceServer = writable("");
 
 export async function runClient(branch) {
   if (get(isClientRunning)) {
@@ -56,15 +59,18 @@ export async function runClient(branch) {
   await invoke("run_client", {
     branch: branch,
     options: options,
+    forceServer: get(forceServer),
     mods: installedMods,
     shaders: get(profiles)?.addons[branch]?.shaders ?? [],
     resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
     datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).then(() => {
     isClientRunning.set(true);
+    forceServer.set(get(forceServer) + ":RUNNING");
   }).catch(reason => {
     isClientRunning.set(false);
     console.error("Error: ", reason);
+    forceServer.set("");
     pop();
     addNotification(reason);
   });
@@ -97,4 +103,39 @@ export function noriskLog(message) {
 export function noriskError(message) {
   console.error(message);
   invoke("console_log_error", { message }).catch(e => console.error(e));
+}
+
+export async function setForceServer(server) {
+  forceServer.set(server);
+}
+
+export async function setCustomServerProgress(serverId, progress) {
+  let currentProgress = get(customServerProgress);
+  currentProgress[serverId] = progress;
+  customServerProgress.set(currentProgress);
+}
+
+export async function fetchFeature(feature) {
+  let options = get(launcherOptions);
+  let user = get(defaultUser);
+
+  feature = feature.toUpperCase().replaceAll(" ", "_");
+
+  await invoke("check_feature_whitelist", {
+    feature: feature,
+    noriskToken: options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value,
+    uuid: user.id
+  }).then(result => {
+    let currentFeatures = get(featureWhitelist);
+    if (currentFeatures.includes(feature)) { return; }
+    featureWhitelist.set([...currentFeatures, feature]);
+  })
+}
+
+export async function getFeatureWhitelist() {
+  featureWhitelist.set([]);
+  await fetchFeature("INVITE_FRIENDS");
+  await fetchFeature("CUSTOM_SERVERS");
+  await fetchFeature("MCREAL_APP");
+  console.log(get(featureWhitelist).join(", "));
 }

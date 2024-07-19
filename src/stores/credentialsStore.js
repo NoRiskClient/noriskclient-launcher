@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api";
 import { addNotification } from "./notificationStore.js";
+import { getFeatureWhitelist } from "../utils/noriskUtils.js";
 import { writable } from "svelte/store";
 
 export const defaultUser = writable();

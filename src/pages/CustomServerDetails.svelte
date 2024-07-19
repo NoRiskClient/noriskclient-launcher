@@ -1,10 +1,10 @@
 <script>
   import TransitionWrapper from "./TransitionWrapper.svelte";
-  import SkinScreen from "../components/skin/SkinScreen.svelte";
+  import CustomServerDetailsScreen from "../components/servers/custom/CustomServerDetailsScreen.svelte";
 </script>
 
 <TransitionWrapper>
   <div>
-    <SkinScreen />
+    <CustomServerDetailsScreen />
   </div>
 </TransitionWrapper>

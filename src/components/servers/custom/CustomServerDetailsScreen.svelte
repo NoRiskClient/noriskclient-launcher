@@ -3,24 +3,26 @@
     import VirtualList from "../../utils/VirtualList.svelte";
     import CustomServerInfoPopup from "./CustomServerInfoPopup.svelte";
     import {createEventDispatcher} from "svelte";
+    import { customServerLogs, clearCustomServerLogs } from "../../../stores/customServerLogsStore.js";
+    import { launcherOptions } from "../../../stores/optionsStore.js";
+    import { customServers, activeCustomServerId } from "../../../stores/customServerStore.js";
+    import { defaultUser } from "../../../stores/credentialsStore.js";
 
     const dispatch = createEventDispatcher()
 
-    export let options;
-    export let customServer;
-    export let logs = [];
+    let customServer = $customServers[$activeCustomServerId]
+
+    let logs = $customServerLogs[customServer._id] ?? [];
 
     let showInfoPopup = false;
-
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
 
     async function runServer() {
         console.log(customServer);
         await invoke("run_custom_server", {
             customServer,
-            options,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-            uuid: options.currentUuid
+            options: $launcherOptions,
+            token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+            uuid: $defaultUser.id
         }).then(() => {
             console.log("YAY!");
         }).catch((error) => {
@@ -31,7 +33,7 @@
 
     async function stopServer() {
         await invoke("terminate_custom_server").then(() => {
-            dispatch("terminated");
+            clearCustomServerLogs(customServer._id);
             console.log("YAY!");
         }).catch((error) => {
             console.error(error);
@@ -45,7 +47,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 {#if showInfoPopup}
-<CustomServerInfoPopup bind:options={options} bind:customServer={customServer} bind:showModal={showInfoPopup} />
+<CustomServerInfoPopup bind:customServer={customServer} bind:showModal={showInfoPopup} />
 {/if}
 <div class="create-server-wrapper">
     <div class="row">

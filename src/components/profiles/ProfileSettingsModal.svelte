@@ -149,7 +149,7 @@
         background-color: var(--background-color);
         border: 5px solid black;
         width: 34em;
-        height: 25em;
+        height: 23.25em;
         border-radius: 0.2em;
         padding: 0;
         position: fixed; /* Fixierte Positionierung */
@@ -199,6 +199,7 @@
 
     .create-profile-button-wrapper p {
         color: #00ff00;
+        text-shadow: 2px 2px #086b08;
         padding: 0.3em;
         cursor: pointer;
         transition: transform 0.3s;

@@ -1,10 +1,11 @@
 <script>
     import { invoke } from "@tauri-apps/api";
-    import { createEventDispatcher } from "svelte";
+    import { launcherOptions } from "../../stores/optionsStore.js";
+    import { defaultUser } from "../../stores/credentialsStore.js";
+    import { getNoRiskToken } from "../../utils/noriskUtils.js";
     // import qrcode from "qrcode-generator";
   
     export let showModal;
-    export let options;
   
     function hideModal() {
       showModal = false;
@@ -14,14 +15,13 @@
     let mobileAppToken;
     let codeContent;
     let showQrCode = false;
-    let activeAccount = options.accounts.find(acc => acc.uuid == options.currentUuid);
   
     $: if (dialog && showModal) dialog.showModal();
   
     async function getToken() {
-      invoke("get_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid }).then(token => {
+      invoke("get_mobile_app_token", { noriskToken: getNoRiskToken(), uuid: $defaultUser.id }).then(token => {
         mobileAppToken = token;
-        codeContent = `{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}"}`;
+        codeContent = `{"uuid":"${$defaultUser.id}","experimental":${$launcherOptions.experimentalMode},"token":"${mobileAppToken}"}`;
         // var qr = qrcode(4, 'L');
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);
         // qr.make();
@@ -34,9 +34,9 @@
     }
     
     async function resetToken() {
-      invoke("reset_mobile_app_token", { noriskToken: options.experimentalMode ? activeAccount.experimentalToken : activeAccount.noriskToken, uuid: activeAccount.uuid }).then(token => {
+      invoke("reset_mobile_app_token", { noriskToken: getNoRiskToken(), uuid: $defaultUser.id }).then(token => {
         mobileAppToken = token;
-        codeContent = `{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}"}`;
+        codeContent = `{"uuid":"${$defaultUser.id}","experimental":${$launcherOptions.experimentalMode},"token":"${mobileAppToken}"}`;
         showQrCode = false;
         // var qr = qrcode(4, 'L');
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);

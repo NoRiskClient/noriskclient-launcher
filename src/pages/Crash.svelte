@@ -35,6 +35,7 @@
       <LogMessage text={item} />
     </VirtualList>
     <div class="logs-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="copy-button" on:click={uploadLogs}>
         [Copy]
       </h1>

@@ -69,7 +69,7 @@
         --background-contrast-color: #e7e7e7;
         --font-color: #161616;
         --font-color-text-shadow: #d0d0d0;
-        transition: background-color 0.2s
+        transition: background-color 0.2s;
     }
 
     :global(body.dark-mode) {

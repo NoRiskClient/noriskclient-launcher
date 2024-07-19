@@ -3,31 +3,29 @@
   import VirtualList from "../utils/VirtualList.svelte";
   import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
   import CustomServerItem from "./custom/CustomServerItem.svelte";
-  import CustomServerDetails from "./custom/CustomServerDetails.svelte";
+  import CustomServerDetails from "./custom/CustomServerDetailsScreen.svelte";
   import CreateCustomServerScreen from "./custom/CreateCustomServerScreen.svelte";
   import { createEventDispatcher } from "svelte";
+  import { launcherOptions } from "../../stores/optionsStore.js";
+  import { featureWhitelist } from "../../utils/noriskUtils.js";
+  import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
+  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { customServers, clearCustomServers, addCustomServer, customServerBaseDomain, setCustomServerBaseDomain, activeCustomServerId, setActiveCustomServerId } from "../../stores/customServerStore.js";
+  import { get } from "svelte/store";
 
   const dispatch = createEventDispatcher();
 
-  export let currentBranch;
-  export let featureWhitelist;
-  export let forceServer;
-  export let customServerLogs;
-  export let customServerProgress;
   let featuredServers = [];
-  let customServers = [];
   let customServerLimit = 0;
-  let baseDomain;
   let currentTabIndex = 0;
   let createCustomServer = false;
   let customServerDetails = null;
 
   async function loadData() {
     featuredServers = null;
-    customServers = null;
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
+    clearCustomServers();
 
-    await invoke("get_featured_servers", { branch: currentBranch }).then((result) => {
+    await invoke("get_featured_servers", { branch: $branches[$currentBranchIndex] }).then((result) => {
       featuredServers = result;
     }).catch((e) => {
       featuredServers = [];
@@ -35,50 +33,36 @@
       alert("Failed to load featured servers:\n" + e);
     });
 
-    if (featureWhitelist.includes("CUSTOM_SERVERS")) {
+    if ($featureWhitelist.includes("CUSTOM_SERVERS")) {
       await invoke("get_custom_servers", {
-        token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-        uuid: options.currentUuid,
+        token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+        uuid: $defaultUser.id,
       }).then((result) => {
-        console.log(`Loaded custom servers: `);
-        console.log(result);
-        customServers = result.servers;
+        console.log(`Loaded custom servers: `, result);
+        result.servers.forEach((server) => addCustomServer(server));
         customServerLimit = result.limit;
-        baseDomain = result.baseUrl;
-        customServers.forEach(server => {
-          if (!customServerLogs[server._id]) {
-            customServerLogs[server._d] = [];
-          }
-        });
+        setCustomServerBaseDomain(result.baseUrl);
       }).catch((e) => {
-        customServers = [];
+        clearCustomServers();
         console.error(e);
         alert("Failed to load custom servers:\n" + e);
       });
     }
-
+    console.log($customServers)
   }
 
   loadData();
-  console.log(featureWhitelist);
 </script>
 
 {#if createCustomServer}
   <CreateCustomServerScreen on:back={() => createCustomServer = false}
                             on:backAndUpdate={() => { loadData(); createCustomServer = false; }}
-                            on:home={() => dispatch('home')}
-                            on:details={(details) => {customServerDetails = details.detail; customServerLogs[customServerDetails['_id']] = []; createCustomServer = false;}}
-                            bind:customServerProgress={customServerProgress}
-                            baseDomain={baseDomain} />
+                            on:details={(details) => {customServerDetails = details.detail; createCustomServer = false;}} />
 {:else if customServerDetails != null}
-  <CustomServerDetails on:back={() => customServerDetails = null} on:home={() => dispatch('home')}
-                       on:terminated={() => customServerLogs[customServerDetails._id] = []}
-                       bind:customServer={customServerDetails} bind:logs={customServerLogs[customServerDetails._id]} />
+  <CustomServerDetails on:back={() => customServerDetails = null} on:home={() => dispatch('home')} />
 {:else}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 class="home-button" on:click={() => dispatch("home")}>[HOME]</h1>
   <div class="servers-wrapper">
-    {#if featureWhitelist.includes("CUSTOM_SERVERS")}
+    {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
       <div class="navbar">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
@@ -90,23 +74,22 @@
       <div class="navbar">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <h1>Featured Servers</h1>
-      </div>
+      </div>/*
     {/if}
     {#if currentTabIndex === 0}
       {#if featuredServers !== null && featuredServers.length > 0 }
-        <VirtualList height="30em" items={featuredServers} let:item>
-          <FeaturedServerItem
-            on:play={() => dispatch("play")}
-            bind:forceServer={forceServer}
-            server={item} />
-        </VirtualList>
+        <div class="serverList">
+          <VirtualList height="30em" items={featuredServers} let:item>
+            <FeaturedServerItem on:play={() => dispatch("play")} server={item} />
+          </VirtualList>
+        </div>
       {:else}
         <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
       {/if}
     {:else if currentTabIndex === 1}
       <div class="customServerToolbar">
-        <h4>Servers: {customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
-        {#if customServerLimit == -1 || customServers?.length < customServerLimit}
+        <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
+        {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <h4 class="create-server-button" on:click={() => createCustomServer = true}>Create</h4>
         {:else}
@@ -114,16 +97,15 @@
             reached</h4>
         {/if}
       </div>
-      {#if customServers !== null && customServers.length > 0}
-        <VirtualList height="30em" items={customServers} let:item>
-          <CustomServerItem
-            on:openDetails={() => customServerDetails = item}
-            server={item}
-            bind:logs={customServerLogs[item._id]} />
-        </VirtualList>
+      {#if customServers !== null && $customServers.length > 0}
+        <div class="serverList">
+          <VirtualList height="30em" items={$customServers} let:item>
+            <CustomServerItem on:openDetails={() => setActiveCustomServerId(item._id)} server={item} />
+          </VirtualList>
+        </div>
       {:else}
         <h1
-          class="loading-indicator">{customServers != null ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
+          class="loading-indicator">{$customServers.length == 0 ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
       {/if}
     {/if}
   </div>
@@ -132,7 +114,7 @@
 <style>
     .navbar {
         display: flex;
-        gap: 1em;
+        margin-top: 2em;
         justify-content: center;
     }
 
@@ -213,18 +195,10 @@
         color: red;
     }
 
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
+    .serverList {
+        display: flex;
+        flex-direction: column;
+        padding-left: 1em;
+        padding-right: 1em;
     }
 </style>

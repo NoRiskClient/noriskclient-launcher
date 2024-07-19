@@ -32,6 +32,11 @@
       border-radius: 5px;
     }
 
+    input:disabled {
+      opacity: 0.65;
+      text-shadow: none;
+    }
+
     .input-container {
         display: flex;
         flex-direction: column;
@@ -53,6 +58,7 @@
         background-color: var(--background-contrast-color);
         width: 100%;
         outline: none;
+        text-shadow: none;
         transition: background-color 0.3s ease-in-out;
     }
 

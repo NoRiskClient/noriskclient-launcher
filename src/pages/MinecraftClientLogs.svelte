@@ -49,10 +49,12 @@
       <LogMessage text={item} />
     </VirtualList>
     <div class="logs-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
           on:click={toggleAutoScroll}>
         [Auto Scroll]
       </h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="copy-button" on:click={uploadLogs}>
         [Copy]
       </h1>

@@ -19,6 +19,7 @@
   import GameButton from "../components/v2/buttons/GameButton.svelte";
   import Crash from "./Crash.svelte";
   import CrashHeader from "../components/v2/CrashHeader.svelte";
+  import Servers from "./Servers.svelte";
 
   const routes = {
     "/": Home,
@@ -29,6 +30,7 @@
     "/capes": Capes,
     "/profiles": Profiles,
     "/skin": Skin,
+    "/servers": Servers,
     "/addons": Addons,
     "/addons/mods": Mods,
     "/addons/resourcepacks": Resourcepacks,
