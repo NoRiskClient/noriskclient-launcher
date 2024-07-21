@@ -12,7 +12,7 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input">
+    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input" autocomplete="new-password">
     {#if suffix != ""}
       <p class="suffix">{suffix}</p>
     {/if}
