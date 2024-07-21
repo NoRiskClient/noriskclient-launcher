@@ -20,6 +20,8 @@
   import Crash from "./Crash.svelte";
   import CrashHeader from "../components/v2/CrashHeader.svelte";
   import Servers from "./Servers.svelte";
+  import CustomServerDetails from "./CustomServerDetails.svelte";
+  import CreateCustomServer from "./CreateCustomServer.svelte";
 
   const routes = {
     "/": Home,
@@ -31,6 +33,8 @@
     "/profiles": Profiles,
     "/skin": Skin,
     "/servers": Servers,
+    "/servers/custom/create": CreateCustomServer,
+    "/servers/custom/details": CustomServerDetails,
     "/addons": Addons,
     "/addons/mods": Mods,
     "/addons/resourcepacks": Resourcepacks,

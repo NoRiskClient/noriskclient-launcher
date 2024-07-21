@@ -113,7 +113,7 @@
               <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             {/if}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div on:click={handleEquipCape(cape._id)} class="equip-text">
+            <div on:click={() => handleEquipCape(cape._id)} class="equip-text">
               EQUIP
             </div>
           </div>
@@ -153,7 +153,7 @@
         flex-direction: row;
         gap: 5rem;
         flex-grow: 1;
-        justify-content: center;
+        width: 100vw;
     }
 
     .cape-wrapper {

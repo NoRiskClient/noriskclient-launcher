@@ -37,6 +37,10 @@
       text-shadow: none;
     }
 
+    input::placeholder {
+      color: var(--font-color-text-shadow);
+    }
+
     .input-container {
         display: flex;
         flex-direction: column;

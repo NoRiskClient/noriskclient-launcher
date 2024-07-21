@@ -74,7 +74,7 @@
   {:else if showMcRealAppModal}
     <McRealAppModal bind:showModal={showMcRealAppModal} />
   {/if}
-  <div on:click|stopPropagation class="divider">
+  <div on:click|stopPropagation class="settings-container">
     <div>
       <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
       <div class="settings-wrapper">
@@ -90,10 +90,12 @@
             <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
           </div>
         {/if}
-        <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage}
-                      step={1} />
-        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads}
-                      step={1} />
+        <div class="sliders">
+          <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage}
+                        step={1} />
+          <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads}
+                        step={1} />
+        </div>
         <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
         <!-- <ConfigFolderInput title="Java Path" bind:value={$launcherOptions.customJavaPath} /> -->
         <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
@@ -109,12 +111,13 @@
 </TransitionWrapper>
 
 <style>
-    .divider {
+    .settings-container {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
-        height: 100%;
+        overflow-y: hidden;
+        height: 80vh;
         padding: 1em;
     }
 
@@ -172,12 +175,20 @@
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
         color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition: transform 0.3s;
     }
 
     .mcreal-app-wrapper > .button:hover {
         transform: scale(1.15);
+    }
+
+    .sliders {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 2em;
     }
 
     .clear-data-button-wrapper {

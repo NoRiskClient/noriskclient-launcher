@@ -6,6 +6,7 @@
   import { getNoRiskToken } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
+  import CapePlayer from "./CapePlayer.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -58,13 +59,13 @@
 <div in:fade={{ duration: 400 }} class="wrapper">
   {#if capeHash !== null}
     <h1 class="header-text">Your Cape</h1>
-    <div class="crop">
-      {#if $launcherOptions.experimentalMode}
-        <img src={`https://dl-staging.norisk.gg/capes/prod/${capeHash}.png`} alt="Current Cape">
-      {:else}
-        <img src={`https://dl.norisk.gg/capes/prod/${capeHash}.png`} alt="Current Cape">
-      {/if}
-    </div>
+    <CapePlayer
+      cape={`https://dl${$launcherOptions.experimentalMode ? "-staging" : ""}.norisk.gg/capes/prod/${capeHash}.png`}
+      player={$defaultUser.id}
+      capeRank={null}
+      width={200}
+      height={250}
+    />
   {:else}
     <h1 class="red-text empty-text">[No Cape Uploaded]</h1>
     <div class="empty-cape-wrapper">
@@ -94,6 +95,7 @@
     .header-text {
         font-family: 'Press Start 2P', serif;
         font-size: 10px;
+        margin-bottom: 2em;
         cursor: default;
     }
 
@@ -105,7 +107,7 @@
 
     .button-wrapper {
         display: flex;
-        gap: 3em;
+        gap: 5em;
     }
 
     .button-wrapper h1 {
@@ -121,7 +123,7 @@
     }
 
     .button-wrapper h1:hover {
-        transform: scale(1.5);
+        transform: scale(1.25);
     }
 
     .empty-cape-wrapper {

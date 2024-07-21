@@ -143,12 +143,34 @@ impl ApiEndpoints {
 
     /// Request mcreal app token
     pub async fn get_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken", norisk_token, request_uuid).await
+        // BRUDER WIESO GEHT DAS HIER NT MIT DEM JSON PARSEN ABER OEBN SCHON!?!?!? Aber egal, brauchen eh nur String also von mir aus dann halt so :(
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), "mcreal/user/mobileAppToken");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Reset mcreal app token
     pub async fn reset_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken/reset", norisk_token, request_uuid).await
+        // BRUDER WIESO GEHT DAS HIER NT MIT DEM JSON PARSEN ABER OEBN SCHON!?!?!? Aber egal, brauchen eh nur String also von mir aus dann halt so :(
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), "mcreal/user/mobileAppToken/reset");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Request discord link status

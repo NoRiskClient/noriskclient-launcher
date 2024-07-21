@@ -1,12 +1,12 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import CapeCarousel from "./CapeCarousel.svelte";
-  import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
-
+  import CapeCarousel from "./CapeCarousel.svelte";
+  import CapeEditor from "./CapeEditor.svelte";
+  
   const dispatch = createEventDispatcher();
 
   let capes = null;
@@ -19,10 +19,6 @@
     { text: "OWNED" },
   ];
   let currentRequest = 0;
-
-  onMount(() => {
-    //requestTrendingCapes(1)
-  });
 
   async function requestTrendingCapes(alltime) {
     if ($defaultUser) {
@@ -116,7 +112,9 @@
 <style>
     .navbar {
         display: flex;
-        justify-content: center;
+        justify-content: space-between;
+        width: 100vw;
+        padding: 0px 1em;
         align-items: center;
         flex-direction: row;
         margin-top: 1em;

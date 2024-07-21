@@ -32,11 +32,12 @@
         align-items: start;
         flex-direction: column;
         margin-top: 1em;
+        width: 100%;
     }
 
     .slider-container h1 {
         font-family: 'Press Start 2P', serif;
-        font-size: 18px;
+        font-size: 15px;
         margin-bottom: 0.8em;
     }
 
@@ -47,6 +48,7 @@
         background: #000000;
         outline: none;
         opacity: 0.7;
+        border-radius: 3.5px;
         -webkit-transition: .2s;
         transition: opacity .2s;
     }
@@ -57,7 +59,7 @@
         width: 16px;
         height: 16px;
         background: var(--secondary-color);
-        border-radius: 0.2em;
+        border-radius: 5px;
         cursor: pointer;
     }
 

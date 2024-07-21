@@ -126,7 +126,7 @@
           background-color: var(--background-color);
           border: 5px solid black;
           width: 35em;
-          height: 27.5em;
+          height: 25em;
           border-radius: 0.2em;
           padding: 0;
           position: fixed; /* Fixierte Positionierung */
@@ -196,7 +196,7 @@
 
       .delete-button-wrapper p {
         cursor: pointer;
-        font-size: 30px;
+        font-size: 22.5px;
         font-family: 'Press Start 2P', serif;
         transition-duration: 200ms;
       }

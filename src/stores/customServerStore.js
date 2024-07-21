@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { push } from "svelte-spa-router";
 import { get } from "svelte/store";
 
 export const customServers = writable([]);
@@ -23,6 +24,9 @@ export async function clearCustomServers() {
 
 export async function setActiveCustomServerId(serverId) {
     activeCustomServerId.set(serverId);
+    if (serverId != "") {
+        push("/servers/custom/details");
+    }
 }
 
 export async function setCustomServerBaseDomain(baseDomain) {

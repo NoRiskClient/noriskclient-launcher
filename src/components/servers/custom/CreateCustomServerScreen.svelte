@@ -1,5 +1,6 @@
 <script>
-    import {invoke} from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api";
+    import { pop } from "svelte-spa-router";
     import NameIconSubdomainTab from "./create/NameIconSubdomainTab.svelte";
     import VersionTab from "./create/VersionTab.svelte";
     import LoaderVersionTab from "./create/LoaderVersionTab.svelte";
@@ -21,6 +22,7 @@
     import { defaultUser } from "../../../stores/credentialsStore.js";
     import { customServerBaseDomain } from "../../../stores/customServerStore.js";
     import { customServerProgress, setCustomServerProgress } from "../../../utils/noriskUtils.js";
+    import { addCustomServer, setActiveCustomServerId } from "../../../stores/customServerStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -137,6 +139,7 @@
         }).then(async (newServer) => {
             console.log('Created Server:', newServer);
             createdServer = newServer;
+            addCustomServer(newServer);
             setCustomServerProgress(newServer._id, { label: "Initializing...", progress: 0, max: 0 });
             
             let additionalData = null;
@@ -167,8 +170,6 @@
     }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 on:click={createdServer != null ? () => dispatch("backAndUpdate") : () => dispatch("back")}>[BACK]</h1>
 <div class="create-server-wrapper">
     {#if currentTab === "NAME_ICON_SUBDOMAIN"}
         <NameIconSubdomainTab bind:name={name} bind:icon={icon} bind:subdomain={subdomain} baseDomain={$customServerBaseDomain} on:next={() => currentTab = "TYPE"}/>
@@ -188,7 +189,12 @@
         <div class="center">
             <h1>Server successfully created!</h1>
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="details" on:click={() => dispatch('details', createdServer)}>Open Details Page</h1>
+            <h1 class="details" on:click={() => {
+                pop();
+                setTimeout(() => {
+                    setActiveCustomServerId(createdServer._id);
+                }, 100);
+            }}>Open Details Page</h1>
         </div>
     {/if}
 </div>
@@ -199,27 +205,13 @@
         height: 100%;
         display: flex;
         flex-direction: column;
+        padding: 1.5em;
         gap: 0.7em;
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
     }
 
     h1 {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
     }
 
     .details {
@@ -237,5 +229,7 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        height: 100vh;
+        width: 100vw;
     }
 </style>

@@ -1,25 +1,22 @@
 <script>
   import { invoke } from "@tauri-apps/api";
+  import { push } from "svelte-spa-router";
   import VirtualList from "../utils/VirtualList.svelte";
   import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
   import CustomServerItem from "./custom/CustomServerItem.svelte";
   import CustomServerDetails from "./custom/CustomServerDetailsScreen.svelte";
-  import CreateCustomServerScreen from "./custom/CreateCustomServerScreen.svelte";
   import { createEventDispatcher } from "svelte";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { featureWhitelist } from "../../utils/noriskUtils.js";
   import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
   import { defaultUser } from "../../stores/credentialsStore.js";
-  import { customServers, clearCustomServers, addCustomServer, customServerBaseDomain, setCustomServerBaseDomain, activeCustomServerId, setActiveCustomServerId } from "../../stores/customServerStore.js";
-  import { get } from "svelte/store";
+  import { customServers, clearCustomServers, addCustomServer, setCustomServerBaseDomain, setActiveCustomServerId } from "../../stores/customServerStore.js";
 
   const dispatch = createEventDispatcher();
 
   let featuredServers = [];
   let customServerLimit = 0;
   let currentTabIndex = 0;
-  let createCustomServer = false;
-  let customServerDetails = null;
 
   async function loadData() {
     featuredServers = null;
@@ -54,62 +51,55 @@
   loadData();
 </script>
 
-{#if createCustomServer}
-  <CreateCustomServerScreen on:back={() => createCustomServer = false}
-                            on:backAndUpdate={() => { loadData(); createCustomServer = false; }}
-                            on:details={(details) => {customServerDetails = details.detail; createCustomServer = false;}} />
-{:else if customServerDetails != null}
-  <CustomServerDetails on:back={() => customServerDetails = null} on:home={() => dispatch('home')} />
-{:else}
-  <div class="servers-wrapper">
-    {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
-      <div class="navbar">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
-        <h2>|</h2>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+
+<div class="servers-wrapper">
+  {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
+    <div class="navbar">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+      <h2>|</h2>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+    </div>
+  {:else}
+    <div class="navbar">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1>Featured Servers</h1>
+    </div>/*
+  {/if}
+  {#if currentTabIndex === 0}
+    {#if featuredServers !== null && featuredServers.length > 0 }
+      <div class="serverList">
+        <VirtualList height="30em" items={featuredServers} let:item>
+          <FeaturedServerItem on:play={() => dispatch("play")} server={item} />
+        </VirtualList>
       </div>
     {:else}
-      <div class="navbar">
+      <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
+    {/if}
+  {:else if currentTabIndex === 1}
+    <div class="customServerToolbar">
+      <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
+      {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1>Featured Servers</h1>
-      </div>/*
-    {/if}
-    {#if currentTabIndex === 0}
-      {#if featuredServers !== null && featuredServers.length > 0 }
-        <div class="serverList">
-          <VirtualList height="30em" items={featuredServers} let:item>
-            <FeaturedServerItem on:play={() => dispatch("play")} server={item} />
-          </VirtualList>
-        </div>
+        <h4 class="create-server-button" on:click={() => push("/servers/custom/create")}>Create</h4>
       {:else}
-        <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
+        <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit
+          reached</h4>
       {/if}
-    {:else if currentTabIndex === 1}
-      <div class="customServerToolbar">
-        <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
-        {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h4 class="create-server-button" on:click={() => createCustomServer = true}>Create</h4>
-        {:else}
-          <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit
-            reached</h4>
-        {/if}
+    </div>
+    {#if customServers !== null && $customServers.length > 0}
+      <div class="serverList">
+        <VirtualList height="30em" items={$customServers} let:item>
+          <CustomServerItem on:openDetails={() => setActiveCustomServerId(item._id)} server={item} />
+        </VirtualList>
       </div>
-      {#if customServers !== null && $customServers.length > 0}
-        <div class="serverList">
-          <VirtualList height="30em" items={$customServers} let:item>
-            <CustomServerItem on:openDetails={() => setActiveCustomServerId(item._id)} server={item} />
-          </VirtualList>
-        </div>
-      {:else}
-        <h1
-          class="loading-indicator">{$customServers.length == 0 ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
-      {/if}
+    {:else}
+      <h1
+        class="loading-indicator">{$customServers.length == 0 ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
     {/if}
-  </div>
-{/if}
+  {/if}
+</div>
 
 <style>
     .navbar {

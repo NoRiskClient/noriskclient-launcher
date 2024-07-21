@@ -19,7 +19,8 @@
     $: if (dialog && showModal) dialog.showModal();
   
     async function getToken() {
-      invoke("get_mobile_app_token", { noriskToken: getNoRiskToken(), uuid: $defaultUser.id }).then(token => {
+      const token = getNoRiskToken();
+      invoke("get_mobile_app_token", { noriskToken: token, uuid: $defaultUser.id }).then(token => {
         mobileAppToken = token;
         codeContent = `{"uuid":"${$defaultUser.id}","experimental":${$launcherOptions.experimentalMode},"token":"${mobileAppToken}"}`;
         // var qr = qrcode(4, 'L');

@@ -90,7 +90,7 @@ impl CustomServerManager {
         //Das sollte anders gelöst werden
         let todo_credentials = minecraft_auth_get_default_user().await?.unwrap();
 
-        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("custom-servers/{}/token", &custom_server.id), &token, &todo_credentials.id.to_string()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
+        let tokens: GetTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("launcher/custom-servers/{}/token", &custom_server.id), &token, &todo_credentials.id.to_string()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
 
         java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 
