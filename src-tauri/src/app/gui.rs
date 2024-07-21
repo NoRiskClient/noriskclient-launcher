@@ -578,7 +578,7 @@ async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, 
             Ok(result)
         }
         Err(_err) => {
-            Err("Error Requesting mcreal App token".to_string())
+            Err(format!("Error Requesting mcreal App token: {:?}", _err))
         }
     }
 }
@@ -958,6 +958,9 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
     )
         .title("Discord X NoRiskClient")
         .always_on_top(true)
+        .inner_size(1000.0, 900.0)
+        .resizable(false)
+        .minimizable(false)
         .center()
         .build()?;
 
