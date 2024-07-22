@@ -39,7 +39,7 @@
           <p class="nes-font" title="Er leidet einfach 'nur' mit mir (Tim) 😭">MrKavatch</p>
         </div>
         <div class="credit">
-          <p title="We love you!">❤️</p>
+          <p title="We love you!" class="all-contributers-icon">❤️</p>
           <p class="nes-font all-contributers">All contributers and bug reporters</p>
         </div>
       </div>
@@ -83,6 +83,10 @@
     .credit > img {
       height: 25px;
       width: 25px;
+    }
+
+    .credit > .all-contributers-icon {
+      text-shadow: none;
     }
 
     .credit > .all-contributers {

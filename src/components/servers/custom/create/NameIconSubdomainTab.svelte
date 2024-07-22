@@ -83,6 +83,7 @@
 
     img {
         height: 200px;
+        width: 200px;
         background-color: var(--background-contrast-color);
         border-radius: 10px;
     }

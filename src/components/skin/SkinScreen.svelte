@@ -414,6 +414,7 @@
 
     .change-button.no-slide:hover {
         color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 0.3s;
         transform: scale(1.2);
     }
