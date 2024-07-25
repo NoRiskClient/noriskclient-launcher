@@ -2,11 +2,11 @@ use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::BufRead;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{LogicalSize, Manager, UserAttentionType, Window, WindowEvent};
+use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
@@ -15,12 +15,12 @@ use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject, ModrinthSearchRequestParams};
-use crate::error::{Error, ErrorKind, LauncherError};
+use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{self, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,

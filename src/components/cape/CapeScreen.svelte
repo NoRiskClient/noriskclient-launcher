@@ -100,10 +100,8 @@
       {#if !isLoading}
         <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
       {/if}
-    {:else}
-      {#if capes != null}
-        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
-      {/if}
+    {:else if capes != null}
+        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes isOwned={requests[currentRequest].text == "OWNED"} />
     {/if}
   </div>
   <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -121,14 +119,25 @@
     }
 
     .wrapper {
-        height: 100%;
+        height: min-content;
         display: flex;
         flex-direction: column;
         align-items: center;
+        height: 80vh;
+        overflow: hidden;
+        background-color: green;
     }
 
     .cape-wrapper {
-        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5em;
+        width: 100vw;
+        height: 80vh;
+        background-color: red;
+        overflow: hidden;
     }
 
     .navbar h1 {

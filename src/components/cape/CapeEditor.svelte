@@ -60,9 +60,10 @@
   {#if capeHash !== null}
     <h1 class="header-text">Your Cape</h1>
     <CapePlayer
-      cape={`https://dl${$launcherOptions.experimentalMode ? "-staging" : ""}.norisk.gg/capes/prod/${capeHash}.png`}
+      cape={capeHash}
       player={$defaultUser.id}
       capeRank={null}
+      isEquippable={false}
       width={200}
       height={250}
     />

@@ -526,7 +526,7 @@ const MICROSOFT_CLIENT_ID: &str = "00000000402b5328";
 const REDIRECT_URL: &str = "https://login.live.com/oauth20_desktop.srf";
 const REQUESTED_SCOPES: &str = "service::user.auth.xboxlive.com::MBI_SSL";
 
-struct RequestWithDate<T> {
+pub struct RequestWithDate<T> {
     pub date: DateTime<Utc>,
     pub value: T,
 }
