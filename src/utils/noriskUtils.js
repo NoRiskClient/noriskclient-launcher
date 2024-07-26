@@ -22,6 +22,22 @@ export async function runClient(branch) {
     addNotification("Client is already running");
     return;
   }
+
+  let showNewBranchScreen = false;
+  await invoke("check_for_new_branch", { branch: branch }).then(result => {
+    showNewBranchScreen = result;
+  }).catch(reason => {
+    showNewBranchScreen = null;
+    addNotification(reason);
+  });
+
+  if (showNewBranchScreen === null) {
+    return;
+  } else if (showNewBranchScreen) {
+    await push("/new-branch");
+    return;
+  }
+
   noriskLog("Client started");
 
   let options = get(launcherOptions);

@@ -10,7 +10,7 @@ use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, error, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
@@ -622,9 +622,9 @@ pub async fn open_minecraft_crash_window(handle: tauri::AppHandle) -> Result<(),
 }
 
 #[tauri::command]
-pub async fn get_latest_minecraft_logs(handle: tauri::AppHandle) -> Result<Vec<String>, crate::error::Error> {
+pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Error> {
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-    let latest_branch = if (options.experimental_mode) {
+    let latest_branch = if options.experimental_mode {
         options.latest_dev_branch
     } else {
         options.latest_branch
@@ -659,7 +659,7 @@ pub async fn minecraft_auth_remove_user(uuid: uuid::Uuid) -> Result<Option<Crede
 
 #[tauri::command]
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, crate::error::Error> {
-    let mut accounts = minecraft_auth_get_store().await?;
+    let accounts = minecraft_auth_get_store().await?;
     Ok(accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).cloned())
 }
 
@@ -675,7 +675,7 @@ pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), cra
 // invoke('plugin:auth|auth_users',user)
 #[tauri::command]
 pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Error> {
-    let mut accounts = minecraft_auth_get_store().await?;
+    let accounts = minecraft_auth_get_store().await?;
     Ok(accounts.users.values().cloned().collect())
 }
 
@@ -972,7 +972,7 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
             return Ok(());
         }
 
-        if (window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete")) {
+        if window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete") {
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             window.close()?;
             return Ok(());
@@ -1095,6 +1095,44 @@ fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow:
 
 fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: ProgressUpdate) -> anyhow::Result<()> {
     window.lock().unwrap().emit("progress-update", progress_update)?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn check_for_new_branch(branch: &str) -> Result<bool, String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let branch_path = options.data_path_buf().join("gameDir").join(branch);
+
+    Ok(!branch_path.exists())
+    // Ok(true)
+}
+
+#[tauri::command]
+async fn copy_branch_data(old_branch: &str, new_branch: &str) -> Result<(), String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let old_branch_path = options.data_path_buf().join("gameDir").join(old_branch);
+    let new_branch_path = options.data_path_buf().join("gameDir").join(new_branch);
+
+    if !old_branch_path.exists() {
+        error!("Old branch directory does not exist: {:?}", old_branch_path);
+    } else if !new_branch_path.exists() {
+        fs::create_dir_all(&new_branch_path).await.map_err(|e| format!("unable to create new branch directory: {:?}", e))?;
+    }
+
+    let old_servers_path = old_branch_path.join("servers.dat");
+    let new_servers_path = new_branch_path.join("servers.dat");
+
+    if old_servers_path.exists() {
+        fs::copy(&old_servers_path, &new_servers_path).await.map_err(|e| format!("unable to copy servers.dat: {:?}", e))?;
+    }
+
+    let old_options_path = old_branch_path.join("options.txt");
+    let new_options_path = new_branch_path.join("options.txt");
+
+    if old_options_path.exists() {
+        fs::copy(&old_options_path, &new_options_path).await.map_err(|e| format!("unable to copy options.txt: {:?}", e))?;
+    }
+
     Ok(())
 }
 
@@ -1582,8 +1620,7 @@ pub fn gui_main() {
             _ => {}
         })
         .plugin(tauri_plugin_fs_watch::init())
-        .setup(|app| {
-            //let _window = app.get_window("main").unwrap();
+        .setup(|_| {
             Ok(())
         })
         .manage(AppState {
@@ -1627,6 +1664,8 @@ pub fn gui_main() {
             get_featured_datapacks,
             get_whitelist_slots,
             add_player_to_whitelist,
+            check_for_new_branch,
+            copy_branch_data,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,

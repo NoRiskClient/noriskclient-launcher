@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::path::Path;
 
 use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
@@ -20,13 +19,11 @@ use serde_json::json;
 use sha2::Digest;
 use tauri::Window;
 use tokio::fs;
-use tokio::io::AsyncReadExt;
-use tracing::field::debug;
 use uuid::Uuid;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
-use crate::app::api::{ApiEndpoints, get_api_base};
-use crate::app::app_data::{LauncherOptions, LauncherProfiles};
+use crate::app::api::ApiEndpoints;
+use crate::app::app_data::LauncherOptions;
 use crate::error::ErrorKind;
 
 #[derive(Debug, Clone, Copy)]
@@ -82,8 +79,6 @@ pub enum MinecraftAuthenticationError {
     NoUserHash,
 }
 
-const AUTH_JSON: &str = "minecraft_auth.json";
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveDeviceToken {
     pub id: String,
@@ -124,7 +119,7 @@ impl MinecraftAuthStore {
     pub async fn init(create_new: Option<bool>) -> Result<Self, crate::error::Error> {
         let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
 
-        if (create_new.unwrap_or(false)) {
+        if create_new.unwrap_or(false) {
             return Ok(MinecraftAuthStore::default());
         }
 

@@ -7,7 +7,7 @@ windows_subsystem = "windows"
 use std::fs;
 
 use directories::ProjectDirs;
-use log::{debug, info, LevelFilter};
+use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -20,7 +20,6 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 
 pub mod app;
 pub mod minecraft;

@@ -1,4 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io, thread};
 use std::io::{Read, Write};
 use std::net::TcpStream;

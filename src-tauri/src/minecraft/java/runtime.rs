@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use std::thread;
 use tokio::sync::oneshot::Receiver;
 use tokio::process::{Child, Command};

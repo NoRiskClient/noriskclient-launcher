@@ -5,14 +5,13 @@ use chrono::{DateTime, Utc};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
-use sha1::digest::typenum::op;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::app_data::LauncherOptions;
 use crate::app::gui::minecraft_auth_get_default_user;
 use crate::custom_servers::models::CustomServer;
 use crate::error::ErrorKind;
-use crate::minecraft::minecraft_auth::{NoRiskCredentials, NoRiskToken};
+use crate::minecraft::minecraft_auth::NoRiskToken;
 use crate::minecraft::version::AssetObject;
 use crate::utils::get_maven_artifact_path;
 
@@ -213,7 +212,7 @@ impl ApiEndpoints {
         let credentials = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         //TODO brauchen wir das wirklich? diesen token also zukünftig
-        let token = if (options.experimental_mode) {
+        let token = if options.experimental_mode {
             credentials.norisk_credentials.experimental.ok_or(ErrorKind::NoCredentialsError)?
         } else {
             credentials.norisk_credentials.production.ok_or(ErrorKind::NoCredentialsError)?
