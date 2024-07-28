@@ -5,7 +5,7 @@
 
 <div on:selectstart={preventSelection}
      on:mousedown={preventSelection} class="copyright">
-  © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.3
+  © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.5
 </div>
 
 <style>
