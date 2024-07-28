@@ -413,6 +413,46 @@ impl MinecraftAuthStore {
         Ok(Some(val))
     }
 
+    //TODO norisktoken zu jwt token mit expire datum ändern damit wir es nicht jedes mal updaten?
+    pub async fn update_norisk_and_microsoft_token(&mut self, creds: &Credentials) -> Result<Option<Credentials>, crate::error::Error> {
+        debug!("Mojang Creds Expire Check {:?} {:?}", creds.expires, Utc::now());
+        if creds.expires < Utc::now() {
+            debug!("Refreshing expired Token {:?} {:?}", creds.expires, creds.id);
+            let old_credentials = creds.clone();
+
+            let res = self.refresh_token(&old_credentials).await;
+
+            match res {
+                Ok(val) => {
+                    return if val.is_some() {
+                        Ok(Some(self.refresh_norisk_token(&val.unwrap().clone()).await?))
+                    } else {
+                        Err(ErrorKind::NoCredentialsError.as_error())
+                    };
+                }
+                Err(err) => {
+                    if let ErrorKind::MinecraftAuthenticationError(
+                        MinecraftAuthenticationError::Request {
+                            ref source,
+                            ..
+                        },
+                    ) = *err.raw
+                    {
+                        if source.is_connect() || source.is_timeout() {
+                            return Ok(Some(old_credentials));
+                        }
+                    }
+
+                    Err(err)
+                }
+            }
+        } else {
+            debug!("Token is still valid {:?} {:?}", creds.expires, creds.id);
+            //Refresh NoRisk Token
+            Ok(Some(self.refresh_norisk_token(&creds.clone()).await?))
+        }
+    }
+
     pub async fn get_default_credential(
         &mut self,
     ) -> Result<Option<Credentials>, crate::error::Error> {
@@ -432,40 +472,7 @@ impl MinecraftAuthStore {
                 self.save().await?;
             }
 
-            if creds.expires < Utc::now() {
-                debug!("Refreshing expired Token {:?} {:?}", creds.expires, creds.id);
-                let old_credentials = creds.clone();
-
-                let res = self.refresh_token(&old_credentials).await;
-
-                match res {
-                    Ok(val) => {
-                        return if val.is_some() {
-                            Ok(Some(self.refresh_norisk_token(&val.unwrap().clone()).await?))
-                        } else {
-                            Err(ErrorKind::NoCredentialsError.as_error())
-                        };
-                    }
-                    Err(err) => {
-                        if let ErrorKind::MinecraftAuthenticationError(
-                            MinecraftAuthenticationError::Request {
-                                ref source,
-                                ..
-                            },
-                        ) = *err.raw
-                        {
-                            if source.is_connect() || source.is_timeout() {
-                                return Ok(Some(old_credentials));
-                            }
-                        }
-
-                        Err(err)
-                    }
-                }
-            } else {
-                //Refresh NoRisk Token
-                Ok(Some(self.refresh_norisk_token(&creds.clone()).await?))
-            }
+            Ok(self.update_norisk_and_microsoft_token(&creds.clone()).await?)
         } else {
             Ok(None)
         }

@@ -686,6 +686,11 @@ pub async fn minecraft_auth_update_norisk_token(credentials: Credentials) -> Res
 }
 
 #[tauri::command]
+pub async fn minecraft_auth_update_mojang_and_norisk_token(credentials: Credentials) -> Result<Credentials, crate::error::Error> {
+    return Ok(minecraft_auth_get_store().await?.update_norisk_and_microsoft_token(&credentials).await?.ok_or(ErrorKind::NoCredentialsError)?);
+}
+
+#[tauri::command]
 async fn get_options() -> Result<LauncherOptions, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
@@ -917,8 +922,8 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn request_norisk_branches() -> Result<Vec<String>, crate::error::Error> {
-    Ok(ApiEndpoints::norisk_branches().await?)
+async fn request_norisk_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, crate::error::Error> {
+    Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
@@ -983,11 +988,8 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
 }
 
 #[tauri::command]
-async fn discord_auth_status() -> Result<bool, crate::error::Error> {
-    let options = get_options().await.map_err(|e| ErrorKind::LauncherError(e))?;
-    let user = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
-    let norisk_token = user.norisk_credentials.get_token(options.experimental_mode)?;
-    Ok(ApiEndpoints::discord_link_status(&norisk_token, &user.id.to_string()).await?)
+async fn discord_auth_status(options: LauncherOptions, credentials: Credentials) -> Result<bool, crate::error::Error> {
+    Ok(ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
@@ -1601,6 +1603,7 @@ pub fn gui_main() {
             minecraft_auth_remove_user,
             minecraft_auth_users,
             minecraft_auth_update_norisk_token,
+            minecraft_auth_update_mojang_and_norisk_token,
             store_options,
             check_maintenance_mode,
             request_norisk_branches,

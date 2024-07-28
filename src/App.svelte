@@ -1,7 +1,12 @@
 <script>
   import Router from "./pages/Router.svelte";
   import { onMount } from "svelte";
-  import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
+  import {
+    defaultUser,
+    fetchDefaultUserOrError,
+    updateMojangAndNoRiskToken,
+    updateNoRiskToken,
+  } from "./stores/credentialsStore.js";
   import { fetchOptions } from "./stores/optionsStore.js";
   import { fetchBranches } from "./stores/branchesStore.js";
   import { fetchProfiles } from "./stores/profilesStore.js";

@@ -3,7 +3,7 @@ import { addNotification } from "../stores/notificationStore.js";
 import { get, writable } from "svelte/store";
 import { launcherOptions, saveOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
-import { defaultUser } from "../stores/credentialsStore.js";
+import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
 export const isClientRunning = writable(false);
@@ -68,6 +68,9 @@ export async function runClient(branch) {
     pop();
     addNotification(reason);
   });
+
+  // NoRisk Token Changed So Update
+  await fetchDefaultUserOrError(false)
 }
 
 export async function stopClient() {
