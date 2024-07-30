@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
+use std::{io, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::BufRead;
 
@@ -10,7 +10,7 @@ use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, error, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
@@ -69,6 +69,19 @@ struct PlayerDBEntry {
 #[derive(serde::Deserialize)]
 struct PlayerDBPlayer {
     id: String,
+}
+
+async fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+    fs::create_dir_all(&dst).await?;
+    let mut entries = fs::read_dir(src).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        let file_type = entry.file_type().await?;
+        if !file_type.is_dir() {
+            fs::copy(&path, dst.as_ref().join(path.file_name().unwrap())).await?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1101,10 +1114,19 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 #[tauri::command]
 async fn check_for_new_branch(branch: &str) -> Result<bool, String> {
     let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
-    let branch_path = options.data_path_buf().join("gameDir").join(branch);
+    let game_dir_path = options.data_path_buf().join("gameDir");
+    if !game_dir_path.exists() {
+        return Ok(false);
+    }
+
+    let all_branches = game_dir_path.read_dir().map_err(|e| format!("unable to read branches: {:?}", e))?.filter(|entry| entry.as_ref().map(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false)).unwrap_or(false)).map(|entry| entry.map(|e| e.file_name().into_string().unwrap())).collect::<Result<Vec<String>, _>>().map_err(|e| format!("unable to read branches: {:?}", e))?;
+    if all_branches.len() <= 0 {
+        return Ok(false);
+    }
+    
+    let branch_path = game_dir_path.join(branch);
 
     Ok(!branch_path.exists())
-    // Ok(true)
 }
 
 #[tauri::command]
@@ -1131,6 +1153,20 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str) -> Result<(), Stri
 
     if old_options_path.exists() {
         fs::copy(&old_options_path, &new_options_path).await.map_err(|e| format!("unable to copy options.txt: {:?}", e))?;
+    }
+
+    let old_resource_packs_path = old_branch_path.join("resourcepacks");
+    let new_resource_packs_path = new_branch_path.join("resourcepacks");
+
+    if old_resource_packs_path.exists() {
+        copy_dir_all(&old_resource_packs_path, &new_resource_packs_path).await.map_err(|e| format!("unable to copy resourcepacks: {:?}", e))?;
+    }
+
+    let old_shader_packs_path = old_branch_path.join("shaderpacks");
+    let new_shader_packs_path = new_branch_path.join("shaderpacks");
+
+    if old_shader_packs_path.exists() {
+        copy_dir_all(&old_shader_packs_path, &new_shader_packs_path).await.map_err(|e| format!("unable to copy shaderpacks: {:?}", e))?;
     }
 
     Ok(())

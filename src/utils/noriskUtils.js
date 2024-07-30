@@ -17,26 +17,30 @@ export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
 
-export async function runClient(branch) {
+export async function runClient(branch, checkedForNewBranch = false) {
   if (get(isClientRunning)) {
     addNotification("Client is already running");
     return;
   }
 
-  let showNewBranchScreen = false;
-  await invoke("check_for_new_branch", { branch: branch }).then(result => {
-    showNewBranchScreen = result;
-  }).catch(reason => {
-    showNewBranchScreen = null;
-    addNotification(reason);
-  });
+  if (!checkedForNewBranch) {
+    let showNewBranchScreen = false;
 
-  if (showNewBranchScreen === null) {
-    return;
-  } else if (showNewBranchScreen) {
-    await push("/new-branch");
-    return;
+    await invoke("check_for_new_branch", { branch: branch }).then(result => {
+      showNewBranchScreen = result;
+    }).catch(reason => {
+      showNewBranchScreen = null;
+      addNotification(reason);
+    });
+
+    if (showNewBranchScreen === null) {
+      return;
+    } else if (showNewBranchScreen) {
+      await push("/new-branch");
+      return;
+    }
   }
+
 
   noriskLog("Client started");
 
@@ -75,14 +79,16 @@ export async function runClient(branch) {
   await invoke("run_client", {
     branch: branch,
     options: options,
-    forceServer: get(forceServer),
+    forceServer: get(forceServer).length > 0 ? get(forceServer) : null,
     mods: installedMods,
     shaders: get(profiles)?.addons[branch]?.shaders ?? [],
     resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
     datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).then(() => {
     isClientRunning.set(true);
-    forceServer.set(get(forceServer) + ":RUNNING");
+    if (get(forceServer).length > 0) {
+      forceServer.set(get(forceServer) + ":RUNNING");
+    }
   }).catch(reason => {
     isClientRunning.set(false);
     console.error("Error: ", reason);

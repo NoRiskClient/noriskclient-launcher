@@ -22,9 +22,11 @@
   import Servers from "./Servers.svelte";
   import CustomServerDetails from "./CustomServerDetails.svelte";
   import CreateCustomServer from "./CreateCustomServer.svelte";
+  import NewBranch from "./NewBranch.svelte";
 
   const routes = {
     "/": Home,
+    "/new-branch": NewBranch,
     "/start-progress": MinecraftStartProgress,
     "/logs": MinecraftClientLogs,
     "/crash": Crash,
