@@ -6,6 +6,7 @@
     import { invoke } from "@tauri-apps/api/tauri";
     import { onMount } from "svelte";
     import { runClient } from "../../utils/noriskUtils.js";
+    import { addNotification } from "../../stores/notificationStore.js";
 
     const dontCloneDataText = "Don't clone any data";
 
@@ -18,6 +19,7 @@
         }).catch(err => {
             console.error("Error getting branches", err);
             alert("An error occurred while getting the branches: \n" + err);
+            addNotification("An error occurred while getting the branches: " + err);
         });
     });
 
@@ -36,7 +38,7 @@
             runClient($branches[$currentBranchIndex], true);
         }).catch(err => {
             console.error("Error copying data", err);
-            alert("An error occurred while copying the data: \n" + err);
+            addNotification("An error occurred while copying the data: " + err);
         });
     }
 </script>

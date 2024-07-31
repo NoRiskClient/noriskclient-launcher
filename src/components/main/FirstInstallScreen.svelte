@@ -1,6 +1,6 @@
 <script>
     import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
-    import { launcherOptions } from "../../stores/optionsStore.js";
+    import { addNotification } from "../../stores/notificationStore.js";
     import { onMount } from "svelte";
     import { pop, replace } from "svelte-spa-router";
     import { invoke } from "@tauri-apps/api/tauri";
@@ -15,7 +15,7 @@
         }).catch(err => {
             path = null;
             console.error("Error getting default minecraft folder", err);
-            alert("An error occurred while getting the default minecraft folder: \n" + err);
+            addNotification("An error occurred while getting the default minecraft folder: " + err);
         });
     });
 
@@ -35,7 +35,7 @@
         }).catch(err => {
             pop();
             console.error("Error copying data", err);
-            alert("An error occurred while copying the data: \n" + err);
+            addNotification("An error occurred while copying the data: " + err);
         });
     }
 </script>
