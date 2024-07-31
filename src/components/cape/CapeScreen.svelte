@@ -1,13 +1,10 @@
 <script>
-  import { createEventDispatcher, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
+  import CapeCarousel from "./CapeCarousel.svelte";
+  import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
-  import CapeCarousel from "./CapeCarousel.svelte";
-  import CapeEditor from "./CapeEditor.svelte";
-  
-  const dispatch = createEventDispatcher();
 
   let capes = null;
   let capeHash = null;
@@ -100,14 +97,24 @@
       {#if !isLoading}
         <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
       {/if}
-    {:else if capes != null}
-        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes isOwned={requests[currentRequest].text == "OWNED"} />
+    {:else}
+      {#if capes != null}
+        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
+      {/if}
     {/if}
   </div>
   <!-- svelte-ignore a11y-click-events-have-key-events -->
 </div>
 
 <style>
+    .wrapper {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
     .navbar {
         display: flex;
         justify-content: space-between;
@@ -118,26 +125,8 @@
         margin-top: 1em;
     }
 
-    .wrapper {
-        height: min-content;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 80vh;
-        overflow: hidden;
-        background-color: green;
-    }
-
     .cape-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 5em;
-        width: 100vw;
-        height: 80vh;
-        background-color: red;
-        overflow: hidden;
+        height: 100%;
     }
 
     .navbar h1 {

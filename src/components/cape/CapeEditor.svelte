@@ -5,7 +5,6 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { getNoRiskToken } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
-  import { launcherOptions } from "../../stores/optionsStore.js";
   import CapePlayer from "./CapePlayer.svelte";
 
   const dispatch = createEventDispatcher();
@@ -59,18 +58,10 @@
 <div in:fade={{ duration: 400 }} class="wrapper">
   {#if capeHash !== null}
     <h1 class="header-text">Your Cape</h1>
-    <CapePlayer
-      cape={capeHash}
-      player={$defaultUser.id}
-      capeRank={null}
-      isEquippable={false}
-      width={200}
-      height={250}
-    />
+    <CapePlayer cape={capeHash} player={$defaultUser.id} />
   {:else}
     <h1 class="red-text empty-text">[No Cape Uploaded]</h1>
-    <div class="empty-cape-wrapper">
-    </div>
+    <div class="empty-cape-wrapper"></div>
   {/if}
   <div class="button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -95,20 +86,21 @@
 
     .header-text {
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
-        margin-bottom: 2em;
+        font-size: 12.5px;
+        margin-bottom: 3em;
         cursor: default;
     }
 
     .empty-text {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
+        margin-top: 25vh;
         cursor: default;
     }
 
     .button-wrapper {
         display: flex;
-        gap: 5em;
+        gap: 4em;
     }
 
     .button-wrapper h1 {
@@ -124,7 +116,7 @@
     }
 
     .button-wrapper h1:hover {
-        transform: scale(1.25);
+        transform: scale(1.5);
     }
 
     .empty-cape-wrapper {
@@ -132,19 +124,6 @@
         padding: 10px;
         width: 512px;
         height: 280px;
-        box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.75);
-    }
-
-    .crop {
-        transform: scale(0.8);
-        padding: 10px;
-        width: max-content;
-        height: 280px;
-    }
-
-    .crop img {
-        width: 100%;
-        height: 100%;
         box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.75);
     }
 </style>

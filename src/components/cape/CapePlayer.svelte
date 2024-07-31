@@ -6,12 +6,8 @@
 
     export let cape;
     export let player;
-    export let capeRank;
-    export let isEquippable;
-    export let uses;
-    export let handleEquipCape = (_) => {};
-    export let height = 200;
-    export let width = 200;
+    export let height = 275;
+    export let width = 275;
 
     let skinViewer;
     let capeData;
@@ -52,17 +48,6 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img src={Elytra} alt={"Elytra toggle"} style={"margin-left: " + (width - 25) + "px;"} class="setting" on:click={() => toggleElytra()} />
     <div id={"player-" + cape} class="player" style={"height: " + height + "px; width: " + width + "px;"} />
-    {#if isEquippable}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class="equip-button" style={"margin-right: " + width / 5 + "px;"} on:click={() => handleEquipCape(cape)}>EQUIP</div>
-    {/if}
-    {#if capeRank == 0}
-        <h1 class="placement-text first" style={"margin-bottom: " + (height + 65) + "px;"}>#1</h1>
-    {:else if capeRank == 1}
-        <h1 class="placement-text second" style={"margin-bottom: " + (height + 65) + "px;"}>#2</h1>
-    {:else if capeRank == 2}
-        <h1 class="placement-text third" style={"margin-bottom: " + (height + 65) + "px;"}>#3</h1>
-    {/if}
 </div>
 
 <style>
@@ -71,17 +56,22 @@
         align-items: center;
         overflow: scroll;
         margin-bottom: 1em;
-        background-color: aqua;
     }
 
     .player {
+        position: absolute;
+        margin-left: 30px;
         display: flex;
+        justify-self: center;
+        align-self: center;
+        z-index: -1;
     }
 
     .setting {
+        position: absolute;
         display: flex;
-        height: 20px;
-        width: 20px;
+        height: 25px;
+        width: 25px;
         justify-self: flex-start;
         align-self: flex-start;
         margin-top: 0.5em;
@@ -94,52 +84,5 @@
     .capePlayer:hover .setting {
         opacity: 100%;
         transition-duration: 200ms;
-    }
-
-    .equip-button {
-        font-family: 'Press Start 2P', serif;
-        height: 30px;
-        width: 80%;
-        z-index: 10;
-        text-shadow: none;
-        text-align: center;
-        justify-content: center;
-        margin-left: 10%;
-        margin-top: -20%;
-        padding: 7px;
-        color: #0a7000;
-        cursor: pointer;
-        background-color: #7cff00;
-        border: 3px solid black;
-        opacity: 100%;
-        transform: translateY(70px);
-        transition-duration: 200ms;
-    }
-
-    .capePlayer:hover .equip-button {
-        transform: translateY(-30px);
-        opacity: 100%;
-    }
-
-    .placement-text {
-        font-family: 'Press Start 2P', serif;
-        font-size: 18px;
-        text-align: center;
-        margin-top: 10%;
-    }
-
-    .first {
-        color: gold;
-        text-shadow: 2px 2px goldenrod;
-    }
-
-    .second {
-        color: silver;
-        text-shadow: 2px 2px #9a9a9a;
-    }
-
-    .third {
-        color: #cd7f32;
-        text-shadow: 2px 2px #8b4513;
     }
 </style>
