@@ -97,41 +97,41 @@
 </div>
 
 <style>
-    .container {
-        position: absolute;
-        width: 720px;
-        height: 80vh;
-        pointer-events: none;
-    }
+  .container {
+    position: absolute;
+    width: 720px;
+    height: 80vh;
+    pointer-events: none;
+  }
 
-    .topleft {
-        position: absolute;
-        top: 0;
-        left: 0;
-    }
+  .topleft {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
 
-    .home-navbar-wrapper {
-        position: absolute;
-        padding: 10px;
-        display: flex;
-        flex-direction: column;
-        align-items: end;
-        pointer-events: all;
-    }
+  .home-navbar-wrapper {
+    position: absolute;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: end;
+    pointer-events: all;
+  }
 
-    .home-navbar-wrapper h1 {
-        font-size: 11px;
-        font-family: 'Press Start 2P', serif;
-        margin-bottom: 1em;
-        cursor: pointer;
-        color: var(--secondary-color);
-        text-shadow: 1px 1px var(--secondary-color-text-shadow);
-        transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
-    }
+  .home-navbar-wrapper h1 {
+    font-size: 11px;
+    font-family: 'Press Start 2P', serif;
+    margin-bottom: 1em;
+    cursor: pointer;
+    color: var(--secondary-color);
+    text-shadow: 1px 1px var(--secondary-color-text-shadow);
+    transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+  }
 
-    .home-navbar-wrapper h1:hover {
-        color: var(--hover-color);
-        text-shadow: 1px 1px var(--hover-color-text-shadow);
-        transform: scale(1.2);
-    }
+  .home-navbar-wrapper h1:hover {
+    color: var(--hover-color);
+    text-shadow: 1px 1px var(--hover-color-text-shadow);
+    transform: scale(1.2) translateX(12.5px);
+  }
 </style>
