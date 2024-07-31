@@ -24,16 +24,20 @@ export async function runClient(branch, checkedForNewBranch = false) {
   }
 
   if (!checkedForNewBranch) {
-    let showNewBranchScreen = false;
+    let showNewBranchScreen;
 
     await invoke("check_for_new_branch", { branch: branch }).then(result => {
+      console.log("Checked for new branch: ", result);
       showNewBranchScreen = result;
     }).catch(reason => {
-      showNewBranchScreen = null;
+      showNewBranchScreen = "ERROR";
       addNotification(reason);
     });
 
-    if (showNewBranchScreen === null) {
+    if (showNewBranchScreen === "ERROR") {
+      return;
+    } else if (showNewBranchScreen == null) {
+      await push("/first-install");
       return;
     } else if (showNewBranchScreen) {
       await push("/new-branch");
@@ -118,12 +122,11 @@ export function getNoRiskToken() {
 }
 
 export function noriskLog(message) {
-  console.log(message);
   invoke("console_log_info", { message }).catch(e => console.error(e));
 }
 
 export function noriskError(message) {
-  console.error(message);
+  console.error(`Norisk Error: ${message}`);
   invoke("console_log_error", { message }).catch(e => console.error(e));
 }
 
@@ -159,5 +162,5 @@ export async function getFeatureWhitelist() {
   await fetchFeature("INVITE_FRIENDS");
   await fetchFeature("CUSTOM_SERVERS");
   await fetchFeature("MCREAL_APP");
-  console.log(get(featureWhitelist).join(", "));
+  console.log("Feature Whitelist: " + get(featureWhitelist).join(", "));
 }

@@ -2,7 +2,7 @@
 name = "noriskclient"
 version = "0.5.5"
 description = "A NoRiskClient launcher for Minecraft, written in Rust using Tauri."
-authors = ["NoRiskk"]
+authors = ["NoRiskk, TimLohrer (Aim_shock)"]
 license = "GNU General Public License v3.0"
 repository = "https://github.com/noriskclient/noriskclient-launcher"
 edition = "2021"
@@ -43,6 +43,8 @@ tokio-tar = "0.3.0"
 async-compression = { version= "0.3.15", features = ["gzip"] }
 sanitize-filename = "0.4.0"
 path-absolutize = "3.0.14"
+dirs = "4.0"
+async-walkdir = "2.0.0"
 
 # OS
 os_info = "3"

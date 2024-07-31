@@ -23,10 +23,14 @@
   import CustomServerDetails from "./CustomServerDetails.svelte";
   import CreateCustomServer from "./CreateCustomServer.svelte";
   import NewBranch from "./NewBranch.svelte";
+  import FirstInstall from "./FirstInstall.svelte";
+  import CopyMcDataProgress from "./CopyMcDataProgress.svelte";
 
   const routes = {
     "/": Home,
+    "/first-install": FirstInstall,
     "/new-branch": NewBranch,
+    "/copy-mc-data-progress": CopyMcDataProgress,
     "/start-progress": MinecraftStartProgress,
     "/logs": MinecraftClientLogs,
     "/crash": Crash,

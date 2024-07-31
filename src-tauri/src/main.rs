@@ -99,7 +99,7 @@ pub fn main() -> anyhow::Result<()> {
             Root::builder()
                 .appender("logfile")
                 .appender("stderr")
-                .build(LevelFilter::Trace),
+                .build(LevelFilter::Debug),
         )
         .unwrap();
 

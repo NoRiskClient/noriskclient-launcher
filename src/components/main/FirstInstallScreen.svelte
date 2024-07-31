@@ -1,40 +1,39 @@
 <script>
     import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
     import { launcherOptions } from "../../stores/optionsStore.js";
-    import { pop, replace } from "svelte-spa-router";
-    import VirtualList from "../utils/VirtualList.svelte";
-    import { invoke } from "@tauri-apps/api/tauri";
     import { onMount } from "svelte";
+    import { pop, replace } from "svelte-spa-router";
+    import { invoke } from "@tauri-apps/api/tauri";
     import { runClient } from "../../utils/noriskUtils.js";
+    import ConfigFolderInput from "../config/inputs/ConfigFolderInput.svelte";
 
-    const dontCloneDataText = "Don't clone any data";
+    $: path = '';
 
-    let availableBranches = [];
-
-    onMount(() => {
-        invoke("get_branches_from_folder").then(branches_from_folder => {
-            availableBranches = branches_from_folder.filter(b => b != $branches[$currentBranchIndex]).map(b => b == ($launcherOptions.experimentalMode ? $launcherOptions.latestDevBranch : $launcherOptions.latestBranch) ? `${b} (last played)` : b)
-            availableBranches.push(dontCloneDataText);
+    onMount(async () => {
+        invoke("get_default_mc_folder").then(res => {
+            path = res;
         }).catch(err => {
-            console.error("Error getting branches", err);
-            alert("An error occurred while getting the branches: \n" + err);
+            path = null;
+            console.error("Error getting default minecraft folder", err);
+            alert("An error occurred while getting the default minecraft folder: \n" + err);
         });
     });
 
-    async function copyBranchData(branch) {
-        if (branch == null) {
+    async function copyMinecraftData(dontClone = false) {
+        if (dontClone) {
             pop();
             runClient($branches[$currentBranchIndex], true);
             return;
         }
 
-        console.log("Copying data from branch", branch);
+        console.log("Copying data from minecraft: ", path);
         replace("/copy-mc-data-progress");
-        invoke("copy_branch_data", { oldBranch: branch, newBranch: $branches[$currentBranchIndex] }).then(() => {
+        invoke("copy_mc_data", { path: path, branch: $branches[$currentBranchIndex] }).then(() => {
             console.log("Data copied successfully");
             pop();
             runClient($branches[$currentBranchIndex], true);
         }).catch(err => {
+            pop();
             console.error("Error copying data", err);
             alert("An error occurred while copying the data: \n" + err);
         });
@@ -43,34 +42,41 @@
 
 <div class="container">
     <div class="header">
-        <h1>New Branch Detected</h1>
-        <p>You have just started "{$branches[$currentBranchIndex]}" for the fist time.<br>To make the transition cleaner and faster you can copy your settings and servers from other branches below.</p>
+        <h1>First Install detected</h1>
+        <p>You have just started NoRiskClient for the fist time.<br>To make the transition cleaner and faster you can copy your settings and servers from minecraft below.</p>
+    </div>
+    <div class="mcFolder">
+        <ConfigFolderInput title="Minecraft Data Folder" bind:value={path} />
     </div>
     <div class="branches">
-        <VirtualList height="20em" items={availableBranches} let:item>
-            <div class="branch">
-                <p class="branchName" class:red-text={item == dontCloneDataText}>{item}</p>
-                {#if item == dontCloneDataText}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <p class="staticArrow" on:click={() => copyBranchData(null)}>-&gt;</p>
-                {:else}
-                    <div class="buttons">
-                        <p class="arrow">&gt;</p>
-                        <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <p class="cloneButton" on:click={() => copyBranchData(item.replace(' (last played)', ''))}>Clone</p>
-                    </div>
-                {/if}
+        <div class="branch">
+            <p class="branchName green-text">Clone Minecraft Data</p>
+            <div class="buttons">
+                <p class="arrow">&gt;</p>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <p class="cloneButton" on:click={() => copyMinecraftData()}>Clone</p>
             </div>
-        </VirtualList>
+        </div>
+        <div class="branch">
+            <p class="branchName red-text">Don't clone any data</p>
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <p class="staticArrow" on:click={() => copyMinecraftData(true)}>-&gt;</p>
+        </div>
     </div>
 </div>
     
 <style>
+    .green-text {
+        color: #0bb00b;
+        text-shadow: 2px 2px #086b08;
+    }
+
     .container {
         display: flex;
         flex-direction: column;
         align-items: center;
         height: 80vh;
+        width: 100vw;
         font-family: 'Press Start 2P', serif;
         color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
@@ -81,7 +87,7 @@
         flex-direction: column;
         text-align: center;
         gap: 3em;
-        height: 17.5em;
+        height: 15em;
         padding-top: 2em;
     }
 
@@ -93,6 +99,14 @@
         font-size: 12.5px;
         line-height: 17.5px;
         padding: 20px;
+    }
+
+    .mcFolder {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 80%;
+        margin-bottom: 4em;
     }
 
     .branches {
@@ -112,6 +126,7 @@
         background-color: var(--background-contrast-color);
         border-radius: 5px;
         margin-bottom: 1em;
+        overflow-x: hidden;
         width: 80vw;
     }
 
@@ -121,6 +136,7 @@
 
     .branch:hover > * > .arrow {
         transform: translateX(60px);
+        opacity: 0%;
     }
 
     .branch:hover > * > .cloneButton {

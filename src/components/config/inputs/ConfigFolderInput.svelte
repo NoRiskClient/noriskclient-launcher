@@ -31,6 +31,10 @@
 </div>
 
 <style>
+    .input-container {
+      width: 100%;
+    }
+
     .input-button-wrapper {
         width: 100%;
         display: flex;
