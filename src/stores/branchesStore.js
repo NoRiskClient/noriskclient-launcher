@@ -1,14 +1,23 @@
 import { invoke } from "@tauri-apps/api";
 import { launcherOptions } from "./optionsStore.js";
 import { get, writable } from "svelte/store";
+import { defaultUser } from "./credentialsStore.js";
 
 export const branches = writable([]);
 export const currentBranchIndex = writable(0);
 
 export async function fetchBranches() {
+  let credentials = get(defaultUser);
   let options = get(launcherOptions);
-
-  await invoke("request_norisk_branches").then(result => {
+  if (!credentials) {
+    branches.set([])
+    return;
+  }
+  if (!options) {
+    branches.set([])
+    return
+  }
+  await invoke("request_norisk_branches", { options, credentials }).then(result => {
     const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
     result.sort(function(a, b) {
       if (a === latestBranch) {

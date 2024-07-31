@@ -35,8 +35,8 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn norisk_branches() -> core::result::Result<Vec<String>, crate::error::Error> {
-        Self::request_from_noriskclient_endpoint("launcher/branches").await
+    pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> core::result::Result<Vec<String>, crate::error::Error> {
+        Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid).await
     }
 
     /// Request all available branches
@@ -194,6 +194,22 @@ impl ApiEndpoints {
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request JSON formatted data from launcher API
+    //TODO lol rename die methode wenn wir aufräumen
+    pub async fn request_from_norisk_endpoint_with_error_handling<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> core::result::Result<T, crate::error::Error> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
         info!("URL: {}", url); // Den formatierten String ausgeben

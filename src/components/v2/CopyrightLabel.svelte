@@ -5,8 +5,7 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div on:selectstart={preventSelection}
-     on:mousedown={preventSelection} class="copyright" on:click={() => showCreditsModal = true}>
+<div on:selectstart={preventSelection} on:mousedown={preventSelection} class="copyright" on:click={() => showCreditsModal = true}>
   © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.5
 </div>
 
