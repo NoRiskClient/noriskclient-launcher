@@ -33,8 +33,6 @@
       }
       capeCount++;
     }
-
-    console.log(visibleCapes);
   }
 
   async function handleEquipCape(hash) {

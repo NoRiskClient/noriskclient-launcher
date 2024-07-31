@@ -67,7 +67,6 @@
     const userUnlisten = defaultUser.subscribe(async value => {
       await fetchFeatures();
       updateNavItems();
-      console.log(featureWhitelist, friendInviteSlots)
     });
 
     return () => {

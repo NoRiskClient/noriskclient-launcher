@@ -45,7 +45,6 @@
         alert("Failed to load custom servers:\n" + e);
       });
     }
-    console.log($customServers)
   }
 
   loadData();

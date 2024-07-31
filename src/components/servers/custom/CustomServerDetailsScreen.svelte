@@ -27,7 +27,6 @@
     let showInfoPopup = false;
 
     async function runServer() {
-        console.log(customServer);
         await invoke("run_custom_server", {
             customServer: customServer,
             options: $launcherOptions,

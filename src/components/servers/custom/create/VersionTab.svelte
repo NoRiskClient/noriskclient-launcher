@@ -216,7 +216,6 @@
                 console.error(err);
             });
         }
-        console.log(availableTypes);
     }
 
     load()
