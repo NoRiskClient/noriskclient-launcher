@@ -33,31 +33,30 @@
 </TransitionWrapper>
 
 <style>
-    .home-wrapper {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-content: center;
-        align-items: center;
-        gap: 1.2em;
-    }
+  .home-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    gap: 1.2em;
+  }
 
-    .pokemon-title {
-        width: 80%;
-        max-width: 400px;
-        image-rendering: pixelated;
-        cursor: pointer;
+  .pokemon-title {
+    width: 80%;
+    max-width: 400px;
+    image-rendering: pixelated;
+    cursor: pointer;
   }
   
-    .title-effect {
-      -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%; /* right/275% 100%: length and hight of mask */
-      animation: effect 4.5s infinite; /* remove infinite to trigger once */
-    }
+  .title-effect {
+    -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%; /* right/275% 100%: length and hight of mask */
+    animation: effect 4.5s infinite; /* remove infinite to trigger once */
+  }
   
-    @keyframes effect {
+  @keyframes effect {
    100% {-webkit-mask-position:left} /* transformation, 50 to swipe left->right->left; 100 to swipe left->right. 50 needs double effect duration */
   }
-
 </style>

@@ -25,9 +25,11 @@
   import NewBranch from "./NewBranch.svelte";
   import FirstInstall from "./FirstInstall.svelte";
   import CopyMcDataProgress from "./CopyMcDataProgress.svelte";
+  import Legal from "./Legal.svelte";
 
   const routes = {
     "/": Home,
+    "/legal": Legal,
     "/first-install": FirstInstall,
     "/new-branch": NewBranch,
     "/copy-mc-data-progress": CopyMcDataProgress,
