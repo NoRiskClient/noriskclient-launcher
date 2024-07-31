@@ -1,19 +1,18 @@
 import { invoke } from "@tauri-apps/api";
 import { addNotification } from "./notificationStore.js";
-import { getFeatureWhitelist } from "../utils/noriskUtils.js";
 import { writable } from "svelte/store";
+import { noriskError } from "../utils/noriskUtils.js";
 
 export const defaultUser = writable();
 export const users = writable([]);
 
 export async function fetchDefaultUserOrError(printError = false) {
   await fetchUsers();
-  console.log("Default User Fetch");
   return await invoke("minecraft_auth_get_default_user").then(async value => {
-    console.log("Received DefaultUser: ", value);
     defaultUser.set(value);
   }).catch((reason) => {
     defaultUser.set();
+    noriskError("Default User Error: " + reason);
     if (printError === true) {
       addNotification(reason);
     }
@@ -40,6 +39,13 @@ export async function setDefaultUser(account) {
 export async function removeUser(account) {
   console.log("Removing User", account);
   return await invoke("minecraft_auth_remove_user", { uuid: account.id }).catch((reason) => {
+    addNotification(reason);
+  });
+}
+
+export async function updateMojangAndNoRiskToken(credentials) {
+  console.log("Updating Mojang And NoRisk Token", credentials);
+  return await invoke("minecraft_auth_update_mojang_and_norisk_token", { credentials }).catch((reason) => {
     addNotification(reason);
   });
 }
