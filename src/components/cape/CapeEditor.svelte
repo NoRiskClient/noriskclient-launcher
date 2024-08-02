@@ -94,7 +94,6 @@
     .empty-text {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
-        margin-top: 25vh;
         cursor: default;
     }
 
