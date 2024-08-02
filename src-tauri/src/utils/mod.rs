@@ -3,6 +3,7 @@ mod extract;
 mod download;
 mod maven;
 mod checksum;
+mod copy_mc_data;
 
 pub use {
     sys::*,
@@ -10,5 +11,6 @@ pub use {
     download::*,
     maven::*,
     checksum::*,
+    copy_mc_data::*,
 };
 
