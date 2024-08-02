@@ -64,7 +64,7 @@
     <div class="navbar">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1>Featured Servers</h1>
-    </div>/*
+    </div>
   {/if}
   {#if currentTabIndex === 0}
     {#if featuredServers !== null && featuredServers.length > 0 }
