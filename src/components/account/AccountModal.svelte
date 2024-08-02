@@ -58,6 +58,7 @@
         position: fixed; /* Fixierte Positionierung */
         top: 50%; /* 50% von oben */
         left: 50%; /* 50% von links */
+        overflow: hidden;
         transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
         background-color: var(--background-color);
     }
@@ -98,6 +99,11 @@
         padding: 1em;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
+        transition-duration: 200ms;
         cursor: pointer;
+    }
+
+    .add-account-button:hover {
+        transform: scale(1.15);
     }
 </style>
