@@ -7,9 +7,6 @@
   import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
 
   let showModal = false;
-
-  let image = null;
-  $: image;
 </script>
 
 <Modal bind:showModal></Modal>
@@ -17,7 +14,7 @@
   {#if $defaultUser}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img class="skin-kopf"
-         src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
+         src={`https://mc-heads.net/avatar/${$defaultUser.id}/150`}
          alt="Skin Kopf"
          on:click={() => { runClient($branches[$currentBranchIndex])}}
     >

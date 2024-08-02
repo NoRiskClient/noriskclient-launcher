@@ -18,7 +18,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
   <div class="skin-text-wrapper">
-    <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
+    <img src={`https://mc-heads.net/avatar/${account.id}/50`} alt="{account.username}'s Kopf">
     <h1 class:active={isActive}>{account.username}</h1>
   </div>
   <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
@@ -29,6 +29,7 @@
     h1 {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
+        margin-left: 10px;
     }
 
     .flex-wrapper {
@@ -62,9 +63,17 @@
 
     img {
         box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
+        border-radius: 0.2em;
     }
 
     .remove-button {
         cursor: pointer;
+        transition-duration: 200ms;
+    }
+
+    .remove-button:hover {
+        color: red;
+        text-shadow: 2px 2px #8b0000;
+        transform: scale(1.15);
     }
 </style>
