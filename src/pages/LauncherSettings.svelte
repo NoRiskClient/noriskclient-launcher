@@ -100,9 +100,8 @@
         <!-- <ConfigFolderInput title="Java Path" bind:value={$launcherOptions.customJavaPath} /> -->
         <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
         <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
-        <div class="clear-data-button-wrapper">
-          <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>
-            [CLEAR DATA]</p>
+        <div class="clear-data-button-wrapper" style={`margin-top: ${$featureWhitelist.includes("MCREAL_APP") ? "0.25" : "1.5"}em;`}>
+          <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
         </div>
       </div>
     </div>
@@ -196,8 +195,7 @@
         align-content: center;
         align-items: center;
         justify-content: center;
-        margin-top: 1em;
-        margin-bottom: 2em;
+        height: 3em;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;
