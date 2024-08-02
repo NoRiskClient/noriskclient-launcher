@@ -1,6 +1,7 @@
 <!-- App.svelte -->
 <script>
   import Router, { location } from "svelte-spa-router";
+  import { onMount } from "svelte";
   import Home from "./Home.svelte";
   import Notifications from "../components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./MinecraftStartProgress.svelte";
@@ -15,7 +16,7 @@
   import Shaders from "./Shaders.svelte";
   import Resourcepacks from "./Resourcepacks.svelte";
   import Datapacks from "./Datapacks.svelte";
-  import { isClientRunning } from "../utils/noriskUtils.js";
+  import { isInMaintenanceMode, getMaintenanceMode, isClientRunning } from "../utils/noriskUtils.js";
   import GameButton from "../components/v2/buttons/GameButton.svelte";
   import Crash from "./Crash.svelte";
   import CrashHeader from "../components/v2/CrashHeader.svelte";
@@ -26,6 +27,7 @@
   import FirstInstall from "./FirstInstall.svelte";
   import CopyMcDataProgress from "./CopyMcDataProgress.svelte";
   import Legal from "./Legal.svelte";
+  import MaintenanceMode from "../components/maintenance-mode/MaintenanceModeScreen.svelte";
 
   const routes = {
     "/": Home,
@@ -49,6 +51,10 @@
     "/addons/datapacks": Datapacks,
     "/addons/shaders": Shaders,
   };
+
+  onMount(() => {
+    getMaintenanceMode();
+  });
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
@@ -59,7 +65,11 @@
 </div>
 <div class="content">
   <Notifications />
-  <Router {routes} />
+  {#if $isInMaintenanceMode == true}
+    <MaintenanceMode />
+  {:else if $isInMaintenanceMode == false}
+    <Router {routes} />
+  {/if}
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
@@ -85,5 +95,19 @@
 
     .content {
         height: 80vh;
+    }
+
+    .center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+    }
+
+    .center h1 {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+        font-family: 'Press Start 2P', serif;
+        font-size: 25px;
     }
 </style>

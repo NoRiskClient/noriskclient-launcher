@@ -6,6 +6,7 @@ import { pop, push } from "svelte-spa-router";
 import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
+export const isInMaintenanceMode = writable(null);
 export const isClientRunning = writable(false);
 export const isCheckingForUpdates = writable(true);
 export const startProgress = writable({
@@ -167,4 +168,18 @@ export async function getFeatureWhitelist() {
   await fetchFeature("CUSTOM_SERVERS");
   await fetchFeature("MCREAL_APP");
   console.log("Feature Whitelist: " + get(featureWhitelist).join(", "));
+}
+
+export function getMaintenanceMode() {
+  isInMaintenanceMode.set(null);
+  invoke("check_maintenance_mode").then(result => {
+    isInMaintenanceMode.set(result);
+    console.log("Maintenance Mode: " + result);
+  }).catch(reason => {
+    noriskError(reason);
+  });
+}
+
+export function setMaintenanceMode(mode) {
+  isInMaintenanceMode.set(mode);
 }

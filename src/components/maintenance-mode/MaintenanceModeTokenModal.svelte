@@ -1,11 +1,8 @@
 <script>
     import ConfigTextInput from "../config/inputs/ConfigTextInput.svelte";
-    import { createEventDispatcher } from "svelte";
-  
-    const dispatch = createEventDispatcher();
+    import { setMaintenanceMode } from "../../utils/noriskUtils.js";
   
     export let showModal;
-    export let maintenanceMode;
     let token = "";
   
     function hideModal() {
@@ -18,7 +15,7 @@
 
     function toggleMaintenanceMode() {
       if (token == "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl") {
-        maintenanceMode = false;
+        setMaintenanceMode(false);
       }
       hideModal();
     }
@@ -132,14 +129,14 @@
         align-content: center;
         align-items: center;
         justify-content: center;
+        padding: 1em;
+      }
+      
+      .save-token-button-wrapper p {
         font-family: 'Press Start 2P', serif;
         font-size: 25px;
-        padding: 1em;
-        text-shadow: 2px 2px #086b08;
-    }
-
-    .save-token-button-wrapper p {
         color: #00ff00;
+        text-shadow: 2px 2px #086b08;
         padding: 0.3em;
         cursor: pointer;
         transition: transform 0.3s;
