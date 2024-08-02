@@ -1,6 +1,6 @@
 <script>
   import TransitionWrapper from "./TransitionWrapper.svelte";
-  import NewBranchScreen from "../components/main/NewBranchScreen.svelte";
+  import NewBranchScreen from "../components/clone-mc-data/NewBranchScreen.svelte";
 </script>
 
 <TransitionWrapper>

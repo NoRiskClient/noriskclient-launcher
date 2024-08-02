@@ -8,17 +8,19 @@
         total_type_entry_count: 0,
         current_type_entry_count: 0
     };
+    let percentage;
 
     onMount(async () => {
         await listen("copy-mc-data", event => {
             progress = event.payload;
-            console.log("Progress: ", progress);
+            const newPercentage = Math.min(Math.max(0, (progress.current_type_entry_count / progress.total_type_entry_count) * 100), 100).toFixed(2);
+            percentage = newPercentage == 'NaN' ? 0 : newPercentage;
         });
     });
 </script>
 
 <div class="container">
-    <h1 class="percentage">{Math.min(Math.max(0, (progress.current_type_entry_count / progress.total_type_entry_count) * 100), 100).toFixed(2)}%</h1>
+    <h1 class="percentage">{percentage ?? 0}%</h1>
     <p class="info">Cloning {progress.type == 'NoRiskClient' ? `${progress.type} data` : progress.type}...</p>  
     <p class="currentFile">{progress.file}</p>
 </div>

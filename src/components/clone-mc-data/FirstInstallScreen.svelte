@@ -19,7 +19,7 @@
         });
     });
 
-    async function copyMinecraftData(dontClone = false) {
+    async function cloneMinecraftData(dontClone = false) {
         if (dontClone) {
             pop();
             runClient($branches[$currentBranchIndex], true);
@@ -54,13 +54,13 @@
             <div class="buttons">
                 <p class="arrow">&gt;</p>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <p class="cloneButton" on:click={() => copyMinecraftData()}>Clone</p>
+                <p class="cloneButton" on:click={() => cloneMinecraftData()}>Clone</p>
             </div>
         </div>
         <div class="branch">
             <p class="branchName red-text">Don't clone any data</p>
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <p class="staticArrow" on:click={() => copyMinecraftData(true)}>-&gt;</p>
+            <p class="staticArrow" on:click={() => cloneMinecraftData(true)}>-&gt;</p>
         </div>
     </div>
 </div>
