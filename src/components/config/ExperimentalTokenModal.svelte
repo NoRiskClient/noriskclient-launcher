@@ -147,14 +147,14 @@
         align-content: center;
         align-items: center;
         justify-content: center;
+        padding: 1em;
+      }
+      
+      .save-token-button-wrapper p {
         font-family: 'Press Start 2P', serif;
         font-size: 25px;
-        padding: 1em;
-        text-shadow: 2px 2px #086b08;
-    }
-
-    .save-token-button-wrapper p {
         color: #00ff00;
+        text-shadow: 2px 2px #086b08;
         padding: 0.3em;
         cursor: pointer;
         transition: transform 0.3s;

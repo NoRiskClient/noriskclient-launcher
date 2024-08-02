@@ -182,6 +182,7 @@
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         color: red;
+        text-shadow: 1px 1px #8b0000;
     }
 
     .serverList {
