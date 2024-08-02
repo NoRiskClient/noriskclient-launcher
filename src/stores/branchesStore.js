@@ -63,5 +63,4 @@ export function switchBranch(isLeft) {
       return (value + 1) % totalBranches;
     });
   }
-  console.log("Branches and Index", get(branches), get(currentBranchIndex));
 }
