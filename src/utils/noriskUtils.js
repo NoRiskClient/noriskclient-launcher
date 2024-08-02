@@ -154,6 +154,7 @@ export async function fetchFeature(feature) {
     noriskToken: options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value,
     uuid: user.id
   }).then(result => {
+    if (!result) return;
     let currentFeatures = get(featureWhitelist);
     if (currentFeatures.includes(feature)) { return; }
     featureWhitelist.set([...currentFeatures, feature]);
