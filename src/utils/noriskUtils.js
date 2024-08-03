@@ -127,6 +127,9 @@ export function getNoRiskToken() {
 }
 
 export function getNoRiskUser() {
+  const user = get(defaultUser);
+  if (!user) return;
+
   invoke("get_norisk_user", {
     options: get(launcherOptions),
     credentials: get(defaultUser),
