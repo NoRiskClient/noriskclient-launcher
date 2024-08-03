@@ -69,11 +69,11 @@
 
   onMount(async () => {
     const branchesUnlisten = branches.subscribe(async value => {
-      await fetchFeatures();
       updateNavItems();
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
+      updateNavItems();
       await fetchFeatures();
       await getNoRiskUser();
       updateNavItems();
