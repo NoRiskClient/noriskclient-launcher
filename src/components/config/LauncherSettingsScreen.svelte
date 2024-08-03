@@ -54,7 +54,6 @@
             }
         } else {
             invoke("enable_experimental_mode", {
-              options: $launcherOptions,
               credentials: $defaultUser
             }).then(async () => {
                 console.log("Experimental mode enabled");

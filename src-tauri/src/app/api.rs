@@ -63,8 +63,18 @@ impl ApiEndpoints {
     }
 
     /// Request token for experimental mode
-    pub async fn enable_experimental_mode(norisk_token: &str, request_uuid: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint("launcher/experimental-mode", norisk_token, request_uuid).await
+    pub async fn enable_experimental_mode(norisk_token: &str, request_uuid: &str) -> Result<String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(false), "launcher/experimental-mode");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Request featured mods
