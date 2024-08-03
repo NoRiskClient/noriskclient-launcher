@@ -31,7 +31,7 @@
           cape: capeData,
           enableControls: false,
         });
-        skinViewer.camera.position.set(-15, 30, -75);
+        skinViewer.camera.position.set(0, 25, -75);
         skinViewer.zoom = 1.0;
         document.getElementById(`player-${cape}`).appendChild(canvas);
     };
