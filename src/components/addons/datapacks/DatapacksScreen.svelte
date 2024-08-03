@@ -12,7 +12,7 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken } from "../../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -21,6 +21,7 @@
   let launcherProfile = null;
   let customDatapacks = [];
   let featuredDatapacks = [];
+  let blacklistedDatapacks = [];
   let datapacks = [];
   let launchManifest = null;
   let searchterm = "";
@@ -99,6 +100,15 @@
     });
   }
 
+  async function getBlacklistedDatapacks() {
+    await invoke("get_blacklisted_datapacks").then((result) => {
+      console.debug("Blacklisted Datapacks", result);
+      blacklistedDatapacks = result;
+    }).catch((err) => {
+      console.error(err);
+    });
+  }
+
   async function getCustomDatapacksFilenames() {
     await invoke("get_custom_datapacks_filenames", {
       options: options,
@@ -167,8 +177,16 @@
       },
     }).then((result) => {
       console.debug("Search Datapack Result", result);
+
+      if (!$noriskUser?.isDev) {
+        console.debug("Filtering Blacklisted Datapacks", blacklistedDatapacks);
+        const length = result.hits.length;
+        result.hits = result.hits.filter(datapack => !blacklistedDatapacks.includes(datapack.slug));
+        console.debug(`Filtered ${length - result.hits.length} Blacklisted Datapacks`);
+      }
       result.hits.forEach(datapack => {
-        datapack.featured = featuredDatapacks.filter(featuredDatapack => featuredDatapack.slug === datapack.slug).length > 0;
+        datapack.featured = featuredDatapacks.find(featuredDatapack => featuredDatapack.slug === datapack.slug);
+        datapack.blacklisted = blacklistedDatapacks.includes(datapack.slug);
       });
       if (result.hits.length === 0) {
         datapacks = null;
@@ -299,6 +317,7 @@
       }
     }
     await getLaunchManifest();
+    await getBlacklistedDatapacks();
     await searchDatapacks();
   }
 
