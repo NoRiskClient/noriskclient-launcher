@@ -12,6 +12,7 @@
   async function selectFolderPath() {
     try {
       const result = await open({
+        title: `Select File ${requiredFileName.length > 0 ? `(${requiredFileName})` : ''}`,
         defaultPath: value,
         directory: false,
         filters: [{ name: 'Extentions Filter', extensions: extentions }]
@@ -39,9 +40,9 @@
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
     <input placeholder="Internal" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
-    <button on:click={selectFolderPath} aria-label="Select Folder">📂</button>
+    <button on:click={selectFolderPath} aria-label="Select File" title="Select File">📂</button>
     {#if defaultValue != undefined}
-      <button on:click={resetFilePathToDefault} aria-label="Reset">🗑️</button>
+      <button on:click={resetFilePathToDefault} aria-label="Reset" title="Reset">🗑️</button>
     {/if}
   </div>
 </div>
