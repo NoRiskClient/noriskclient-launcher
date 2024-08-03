@@ -51,10 +51,6 @@
     "/addons/datapacks": Datapacks,
     "/addons/shaders": Shaders,
   };
-
-  onMount(() => {
-    getMaintenanceMode();
-  });
 </script>
 
 <div class="black-bar" data-tauri-drag-region>

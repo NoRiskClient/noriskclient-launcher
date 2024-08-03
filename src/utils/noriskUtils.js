@@ -189,9 +189,8 @@ export async function getFeatureWhitelist() {
 }
 
 export async function getMaintenanceMode() {
-  isInMaintenanceMode.set(null);
   invoke("check_maintenance_mode").then(result => {
-    if (result == true && get(noriskUser)?.isDev) {
+    if (result == true && get(noriskUser)?.isDev && get(isInMaintenanceMode) == null) {
       alert("Skipped Maintenance Mode Screen Because You Are A Developer / Admin.");
     }
     isInMaintenanceMode.set(result);
