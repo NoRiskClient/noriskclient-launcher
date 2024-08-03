@@ -4,6 +4,7 @@
 
   export let value;
   export let text;
+  export let isDevOnly = false;
   export let reversed = false;
   export let spaced = false;
 
@@ -14,16 +15,20 @@
 
 <div class="wrapper" class:spaced={spaced}>
   {#if reversed}
-    <h1 on:selectstart={preventSelection}
-        on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    {#if isDevOnly}
+      <h1 class="nes-font devOnly">(Dev Only)</h1>
+    {/if}
   {/if}
   <label class="nes-switch">
     <input type="checkbox" bind:checked={value} on:change={(e) => dispatch("toggle")}>
     <span class="nes-slider"></span>
   </label>
   {#if !reversed}
-    <h1 on:selectstart={preventSelection}
-        on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
+    {#if isDevOnly}
+      <h1 class="nes-font devOnly">(Dev)</h1>
+    {/if}
   {/if}
 </div>
 
@@ -32,6 +37,12 @@
         display: flex;
         align-items: center;
         gap: 1em;
+    }
+
+    .devOnly {
+      font-size: 12.5px;
+      color: gold;
+      text-shadow: 1.25px 1.25px rgb(189, 161, 2);
     }
 
     .spaced {
@@ -50,6 +61,7 @@
         display: inline-block;
         width: 40px;
         height: 24px;
+        border-radius: 5px;
     }
 
     .nes-slider {
