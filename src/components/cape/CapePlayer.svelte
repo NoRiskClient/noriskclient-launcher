@@ -54,7 +54,7 @@
     .capePlayer {
         justify-content: center;
         align-items: center;
-        overflow: scroll;
+        overflow: hidden;
         margin-bottom: 1em;
     }
 

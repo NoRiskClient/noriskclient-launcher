@@ -160,7 +160,7 @@
         gap: 1.15em;
         width: 80vw;
         padding: 0px 2em 2em 2em;
-        overflow: scroll;
+        overflow-y: scroll;
     }
 
     .nes-font {
