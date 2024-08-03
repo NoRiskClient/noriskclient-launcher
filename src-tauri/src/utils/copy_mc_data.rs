@@ -11,10 +11,6 @@ use crate::app::gui::get_options;
 pub struct McDataHandler {}
 
 impl McDataHandler {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub async fn copy_mc_data(path: &str, branch: &str, app: tauri::AppHandle) -> Result<(), String> {
         let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
         let mc_folder_path = PathBuf::from(path);
