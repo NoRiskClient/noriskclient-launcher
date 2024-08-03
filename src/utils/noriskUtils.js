@@ -19,6 +19,19 @@ export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
 
+export async function checkApiStatus() {
+  let apiIsOnline = null;
+  await invoke("check_online_status").then((apiOnlineState) => {
+    apiIsOnline = apiOnlineState;
+    console.log(`API is ${apiIsOnline ? 'online' : 'offline'}!`);
+  }).catch(() => {
+    apiIsOnline = false;
+    console.error("API is offline!");
+  });
+  return apiIsOnline;
+}
+
+
 export async function runClient(branch, checkedForNewBranch = false) {
   if (get(isClientRunning)) {
     addNotification("Client is already running");

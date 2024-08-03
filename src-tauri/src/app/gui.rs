@@ -73,14 +73,8 @@ struct PlayerDBPlayer {
 }
 
 #[tauri::command]
-async fn check_online_status() -> Result<(), String> {
-    //TODO
-    // HTTP_CLIENT.get("https://api.norisk.gg/launcherapi")
-    //     .send().await
-    //     .map_err(|e| format!("unable to connect to api.norisk.gg: {:}", e))?
-    //     .error_for_status()
-    //     .map_err(|e| format!("api.norisk.gg returned an error: {:}", e))?;
-    Ok(())
+async fn check_online_status() -> Result<bool, String> {
+    ApiEndpoints::norisk_api_status().await.map_err(|e| format!("unable to check online status: {:?}", e))
 }
 
 #[tauri::command]

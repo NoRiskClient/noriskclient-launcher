@@ -2,6 +2,7 @@
 <script>
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
+  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
@@ -16,7 +17,6 @@
   import Shaders from "./pages/Shaders.svelte";
   import Resourcepacks from "./pages/Resourcepacks.svelte";
   import Datapacks from "./pages/Datapacks.svelte";
-  import { isInMaintenanceMode, isClientRunning, noriskUser } from "./utils/noriskUtils.js";
   import GameButton from "./components/v2/buttons/GameButton.svelte";
   import Crash from "./pages/Crash.svelte";
   import CrashHeader from "./components/v2/CrashHeader.svelte";
@@ -28,6 +28,7 @@
   import CopyMcDataProgress from "./pages/CopyMcDataProgress.svelte";
   import Legal from "./pages/Legal.svelte";
   import MaintenanceMode from "./components/maintenance-mode/MaintenanceModeScreen.svelte";
+  import ApiOfflineScreen from "./components/maintenance-mode/ApiOfflineScreen.svelte";
 
   const routes = {
     "/": Home,
@@ -51,6 +52,13 @@
     "/addons/datapacks": Datapacks,
     "/addons/shaders": Shaders,
   };
+
+  let apiIsOnline = null;
+
+  onMount(async () => {
+    apiIsOnline = await checkApiStatus();
+    
+  });
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
@@ -60,16 +68,20 @@
   {/if}
 </div>
 <div class="content">
-  <Notifications />
-  {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
-    <MaintenanceMode />
-  {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
-    <Router {routes} />
+  {#if apiIsOnline == false}
+  <ApiOfflineScreen />
+  {:else if apiIsOnline == true}
+    <Notifications />
+    {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
+      <MaintenanceMode />
+    {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
+      <Router {routes} />
+    {/if}
   {/if}
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev)}
+  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline == true}
     <BackButton />
   {:else}
     {#if $isClientRunning}

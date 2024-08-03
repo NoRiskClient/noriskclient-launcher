@@ -29,6 +29,14 @@ pub fn get_api_base(is_experimental: bool) -> String {
 }
 
 impl ApiEndpoints {
+    /// Check API status
+    pub async fn norisk_api_status() -> Result<bool> {
+        let core = Self::request_from_norisk_endpoint("core/online", "", "").await.unwrap_or(false);
+        let launcher = Self::request_from_norisk_endpoint("launcher/online", "", "").await.unwrap_or(false);
+        info!("Core API online state: {}, Launcher API online state: {}", core, launcher);
+        Ok(core && launcher)
+    }
+
     /// Request maintenance mode
     pub async fn get_norisk_user(norisk_token: &str, request_uuid: &str) -> Result<NoRiskUserMinimal> {
         Self::request_from_norisk_endpoint("core/user", norisk_token, request_uuid).await
