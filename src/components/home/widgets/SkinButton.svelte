@@ -1,10 +1,10 @@
 <script>
-  import Modal from "../account/AccountModal.svelte";
-  import SteveSkin from "../../images/steve_head.png";
-  import { defaultUser } from "../../stores/credentialsStore.js";
-  import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
-  import { runClient } from "../../utils/noriskUtils.js";
-  import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
+  import Modal from "../../account/AccountModal.svelte";
+  import SteveSkin from "../../../images/steve_head.png";
+  import { defaultUser } from "../../../stores/credentialsStore.js";
+  import { startMicrosoftAuth } from "../../../utils/microsoftUtils.js";
+  import { runClient } from "../../../utils/noriskUtils.js";
+  import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
 
   let showModal = false;
 </script>

@@ -1,14 +1,14 @@
 <script>
-  import { branches } from "../../stores/branchesStore.js";
-  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { branches } from "../../../stores/branchesStore.js";
+  import { defaultUser } from "../../../stores/credentialsStore.js";
   import { get } from "svelte/store";
   import { push } from "svelte-spa-router";
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api";
-  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../utils/noriskUtils.js";
-  import InvitePopup from "../invite/InvitePopup.svelte";
-  import { addNotification } from "../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
+  import InvitePopup from "../../invite/InvitePopup.svelte";
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   let showInvitePopup = false;
   let friendInviteSlots = {};

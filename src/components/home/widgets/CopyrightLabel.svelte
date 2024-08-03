@@ -1,5 +1,5 @@
 <script>
-  import { preventSelection } from "../../utils/svelteUtils.js";
+  import { preventSelection } from "../../../utils/svelteUtils.js";
 
   export let showCreditsModal;
 </script>

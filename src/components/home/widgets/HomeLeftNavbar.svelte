@@ -1,13 +1,13 @@
 <script>
-  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { defaultUser } from "../../../stores/credentialsStore.js";
   import { onMount } from "svelte";
-  import { openDiscordIntegration } from "../../utils/discordUtils.js";
+  import { openDiscordIntegration } from "../../../utils/discordUtils.js";
   import { get } from "svelte/store";
-  import { branches } from "../../stores/branchesStore.js";
-  import { launcherOptions } from "../../stores/optionsStore.js";
+  import { branches } from "../../../stores/branchesStore.js";
+  import { launcherOptions } from "../../../stores/optionsStore.js";
   import { invoke } from "@tauri-apps/api";
-  import { noriskError, noriskLog } from "../../utils/noriskUtils.js";
-  import { addNotification } from "../../stores/notificationStore.js";
+  import { noriskError, noriskLog } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   let discordLinked = false;
   let navItems = [];

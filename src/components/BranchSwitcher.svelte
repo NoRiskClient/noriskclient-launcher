@@ -6,7 +6,7 @@
   import { scale } from "svelte/transition";
   import { isCheckingForUpdates } from "../utils/noriskUtils.js";
   import Updater from "./v2/Updater.svelte";
-  import SignInOutput from "./v2/SignInOutput.svelte";
+  import SignInOutput from "./home/widgets/SignInOutput.svelte";
 </script>
 
 <div class="branch-wrapper">

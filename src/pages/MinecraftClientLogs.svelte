@@ -1,5 +1,5 @@
 <script>
-  import TransitionWrapper2 from "./TransitionWrapper2.svelte";
+  import PopuotWindowTransitionWrapper from "./PopuotWindowTransitionWrapper.svelte";
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "../components/log/LogMessage.svelte";
@@ -43,7 +43,7 @@
   }
 </script>
 
-<TransitionWrapper2>
+<PopuotWindowTransitionWrapper>
   <div class="logs-wrapper">
     <VirtualList items={$minecraftLogs} let:item {autoScroll}>
       <LogMessage text={item} />
@@ -60,7 +60,7 @@
       </h1>
     </div>
   </div>
-</TransitionWrapper2>
+</PopuotWindowTransitionWrapper>
 
 
 <style>
