@@ -1,18 +1,13 @@
 <script>
-  import Router from "./pages/Router.svelte";
+  import Router from "./Router.svelte";
   import { onMount } from "svelte";
-  import {
-    defaultUser,
-    fetchDefaultUserOrError,
-    updateMojangAndNoRiskToken,
-    updateNoRiskToken,
-  } from "./stores/credentialsStore.js";
+  import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
   import { fetchOptions } from "./stores/optionsStore.js";
   import { fetchBranches } from "./stores/branchesStore.js";
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning, startProgress } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode } from "./utils/noriskUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
@@ -23,8 +18,10 @@
     }, 300);
     await fetchOptions();
     await fetchDefaultUserOrError(false);
+    await getNoRiskUser();
     await fetchBranches();
     await fetchProfiles();
+    await getMaintenanceMode();
 
     let unlisten = await listen("client-exited", () => {
       isClientRunning.set(false);
@@ -74,7 +71,10 @@
         --background-contrast-color: #e7e7e7;
         --font-color: #161616;
         --font-color-text-shadow: #d0d0d0;
-        transition: background-color 0.2s
+        --font-color-disabled: #858585;
+        --dev-font-color: rgb(194, 165, 0);
+        --dev-font-color-text-shadow: rgb(170, 144, 0);
+        transition: background-color 0.2s;
     }
 
     :global(body.dark-mode) {
@@ -88,6 +88,9 @@
         --background-contrast-color: #222126;
         --font-color: #e8e8e8;
         --font-color-text-shadow: #7a7777;
+        --font-color-disabled: #878787;
+        --dev-font-color: gold;
+        --dev-font-color-text-shadow: rgb(189, 161, 2);
     }
 
     :global(*) {

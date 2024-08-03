@@ -12,7 +12,7 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input">
+    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input" autocomplete="new-password">
     {#if suffix != ""}
       <p class="suffix">{suffix}</p>
     {/if}
@@ -30,6 +30,15 @@
     input {
       margin-right: 5px;
       border-radius: 5px;
+    }
+
+    input:disabled {
+      opacity: 0.65;
+      text-shadow: none;
+    }
+
+    input::placeholder {
+      color: var(--font-color-text-shadow);
     }
 
     .input-container {
@@ -53,11 +62,13 @@
         background-color: var(--background-contrast-color);
         width: 100%;
         outline: none;
+        text-shadow: none;
         transition: background-color 0.3s ease-in-out;
     }
 
     .nes-input::placeholder {
       color: var(--font-color);
+      opacity: 0.65;
     }
 
     .suffix {

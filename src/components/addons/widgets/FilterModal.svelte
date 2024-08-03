@@ -122,6 +122,7 @@
       margin-top: 30px;
       margin-bottom: 15px;
       color: var(--primary-color);
+      text-shadow: 2px 2px var(--primary-color-text-shadow);
       user-select: none;
       cursor: default;
     }

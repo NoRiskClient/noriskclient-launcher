@@ -4,11 +4,9 @@ use std::path::PathBuf;
 use std::vec;
 
 use anyhow::Result;
-use keyring::Entry as KeyringEntry;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use crate::app::api::{LoginData, LoginDataMinimal};
 use crate::LAUNCHER_DIRECTORY;
 
 use super::modrinth_api::CustomMod;
@@ -92,24 +90,18 @@ impl LauncherOptions {
         PathBuf::from(&self.data_path)
     }
 }
+
 impl Default for LauncherOptions {
     fn default() -> Self {
-        let mut theme = "";
         let mode = dark_light::detect();
-        match mode {
+        let theme = match mode {
             // Dark mode
-            dark_light::Mode::Dark => {
-                theme = "DARK";
-            }
+            dark_light::Mode::Dark => "DARK",
             // Light mode
-            dark_light::Mode::Light => {
-                theme = "LIGHT";
-            }
+            dark_light::Mode::Light => "LIGHT",
             // Unspecified
-            dark_light::Mode::Default => {
-                theme = "LIGHT";
-            }
-        }
+            dark_light::Mode::Default => "LIGHT",
+        };
         Self {
             keep_launcher_open: true,
             experimental_mode: false,

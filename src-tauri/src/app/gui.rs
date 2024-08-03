@@ -1,26 +1,27 @@
 use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::BufRead;
+use dirs::data_dir;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{LogicalSize, Manager, UserAttentionType, Window, WindowEvent};
+use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, HTTP_CLIENT, LAUNCHER_DIRECTORY, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::McDataHandler, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
 use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject, ModrinthSearchRequestParams};
-use crate::error::{Error, ErrorKind, LauncherError};
+use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{self, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -72,14 +73,8 @@ struct PlayerDBPlayer {
 }
 
 #[tauri::command]
-async fn check_online_status() -> Result<(), String> {
-    //TODO
-    /*HTTP_CLIENT.get("https://api.norisk.gg/launcherapi")
-        .send().await
-        .map_err(|e| format!("unable to connect to api.norisk.gg: {:}", e))?
-        .error_for_status()
-        .map_err(|e| format!("api.norisk.gg returned an error: {:}", e))?;*/
-    Ok(())
+async fn check_online_status() -> Result<bool, String> {
+    ApiEndpoints::norisk_api_status().await.map_err(|e| format!("unable to check online status: {:?}", e))
 }
 
 #[tauri::command]
@@ -287,6 +282,76 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
         }
         Err(err) => {
             message(Some(&window), "Modrinth Error", err.to_string());
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_mods() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Mods...");
+
+    match ApiEndpoints::norisk_blacklisted_mods().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted ResourcePacks...");
+
+    match ApiEndpoints::norisk_blacklisted_resourcepacks().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_shaders() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Shaders...");
+
+    match ApiEndpoints::norisk_blacklisted_shaders().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_datapacks() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Datapacks...");
+
+    match ApiEndpoints::norisk_blacklisted_datapacks().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
+    debug!("Getting Blacklisted Servers...");
+
+    match ApiEndpoints::norisk_blacklisted_servers().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
             Err(err.to_string())
         }
     }
@@ -578,7 +643,7 @@ async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, 
             Ok(result)
         }
         Err(_err) => {
-            Err("Error Requesting mcreal App token".to_string())
+            Err(format!("Error Requesting mcreal App token: {:?}", _err))
         }
     }
 }
@@ -622,9 +687,9 @@ pub async fn open_minecraft_crash_window(handle: tauri::AppHandle) -> Result<(),
 }
 
 #[tauri::command]
-pub async fn get_latest_minecraft_logs(handle: tauri::AppHandle) -> Result<Vec<String>, crate::error::Error> {
+pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Error> {
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-    let latest_branch = if (options.experimental_mode) {
+    let latest_branch = if options.experimental_mode {
         options.latest_dev_branch
     } else {
         options.latest_branch
@@ -659,7 +724,7 @@ pub async fn minecraft_auth_remove_user(uuid: uuid::Uuid) -> Result<Option<Crede
 
 #[tauri::command]
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, crate::error::Error> {
-    let mut accounts = minecraft_auth_get_store().await?;
+    let accounts = minecraft_auth_get_store().await?;
     Ok(accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).cloned())
 }
 
@@ -675,7 +740,7 @@ pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), cra
 // invoke('plugin:auth|auth_users',user)
 #[tauri::command]
 pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Error> {
-    let mut accounts = minecraft_auth_get_store().await?;
+    let accounts = minecraft_auth_get_store().await?;
     Ok(accounts.users.values().cloned().collect())
 }
 
@@ -691,7 +756,7 @@ pub async fn minecraft_auth_update_mojang_and_norisk_token(credentials: Credenti
 }
 
 #[tauri::command]
-async fn get_options() -> Result<LauncherOptions, String> {
+pub async fn get_options() -> Result<LauncherOptions, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
 
@@ -914,6 +979,14 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
+async fn get_norisk_user(options: LauncherOptions, credentials: Credentials) -> Result<NoRiskUserMinimal, String> {
+    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
+        .await
+        .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+    Ok(user)
+}
+
+#[tauri::command]
 async fn check_maintenance_mode() -> Result<bool, String> {
     let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
         .await
@@ -927,10 +1000,10 @@ async fn request_norisk_branches(options: LauncherOptions, credentials: Credenti
 }
 
 #[tauri::command]
-async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, String> {
-    return ApiEndpoints::enable_experimental_mode(experimental_token)
-        .await
-        .map_err(|e| format!("unable to validate experimental token: {:?}", e));
+async fn enable_experimental_mode(credentials: Credentials) -> Result<String, String> {
+    // This requires the production token to be present!!!
+    return ApiEndpoints::enable_experimental_mode(&credentials.norisk_credentials.production.unwrap().value, &credentials.id.to_string()).await
+        .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
 }
 
 #[tauri::command]
@@ -963,6 +1036,9 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
     )
         .title("Discord X NoRiskClient")
         .always_on_top(true)
+        .inner_size(1000.0, 900.0)
+        .resizable(false)
+        .minimizable(false)
         .center()
         .build()?;
 
@@ -974,7 +1050,7 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
             return Ok(());
         }
 
-        if (window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete")) {
+        if window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete") {
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             window.close()?;
             return Ok(());
@@ -1098,14 +1174,65 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
-async fn run_client(branch: String, options: LauncherOptions, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
+async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let game_dir_path = options.data_path_buf().join("gameDir");
+    if !game_dir_path.exists() {
+        return Ok(None);
+    }
+
+    let all_branches = game_dir_path.read_dir().map_err(|e| format!("unable to read branches: {:?}", e))?.filter(|entry| entry.as_ref().map(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false)).unwrap_or(false)).map(|entry| entry.map(|e| e.file_name().into_string().unwrap())).collect::<Result<Vec<String>, _>>().map_err(|e| format!("unable to read branches: {:?}", e))?;
+    if all_branches.len() <= 0 {
+        return Ok(None);
+    }
+    
+    let branch_path = game_dir_path.join(branch);
+
+    Ok(Some(!branch_path.exists()))
+}
+
+#[tauri::command]
+async fn get_branches_from_folder() -> Result<Vec<String>, String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let game_dir_path = options.data_path_buf().join("gameDir");
+    if !game_dir_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let branches = game_dir_path.read_dir().map_err(|e| format!("unable to read branches: {:?}", e))?.filter(|entry| entry.as_ref().map(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false)).unwrap_or(false)).map(|entry| entry.map(|e| e.file_name().into_string().unwrap())).collect::<Result<Vec<String>, _>>().map_err(|e| format!("unable to read branches: {:?}", e))?;
+
+    Ok(branches)
+}
+
+#[tauri::command]
+async fn get_default_mc_folder() -> Result<String, String> {
+    if let Some(appdata_dir) = data_dir() {
+        let minecraft_folder = appdata_dir.join(".minecraft");
+        Ok(minecraft_folder.as_os_str().to_str().unwrap().to_string())
+    } else {
+        Err("Unable to find default Minecraft folder".to_string())
+    }
+}
+
+#[tauri::command]
+async fn copy_mc_data(path: &str, branch: &str, app: tauri::AppHandle) -> Result<(), String> {
+    McDataHandler::copy_mc_data(path, branch, app).await
+}
+
+#[tauri::command]
+async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHandle) -> Result<(), String> {
+    McDataHandler::copy_branch_data(old_branch, new_branch, app).await
+}
+
+#[tauri::command]
+async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
     let credentials = minecraft_auth_get_store().await?.get_default_credential().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
-        force_server: None, //TODO ich fix das noch <3
+        force_server: force_server,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
@@ -1288,7 +1415,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
     let _ = store_options(LauncherOptions::default()).await;
     let _ = store_launcher_profiles(LauncherProfiles::default()).await;
 
-    ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
+    ["assets", "gameDir", "libraries", "mod_cache", "custom_mods", "natives", "runtimes", "versions"]
         .iter()
         .map(|dir| options.data_path_buf().join(dir))
         .filter(|dir| dir.exists())
@@ -1375,7 +1502,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 }
 
 #[tauri::command]
-async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     let custom_server_process_mutex = Arc::new(std::sync::Mutex::new(None));
 
@@ -1562,11 +1689,21 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 }
 
 ///
+/// Get All feature toggles
+///
+#[tauri::command]
+async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, String> {
+    let all_features = ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await
+        .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))?;
+    Ok(all_features)
+}
+
+///
 /// Get Launcher feature toggles
 ///
 #[tauri::command]
-async fn check_feature_whitelist(feature: &str, norisk_token: &str, uuid: &str) -> Result<bool, String> {
-    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token, uuid).await
+async fn check_feature_whitelist(feature: &str, options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await
         .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
     Ok(is_whitelisted)
 }
@@ -1581,8 +1718,7 @@ pub fn gui_main() {
             _ => {}
         })
         .plugin(tauri_plugin_fs_watch::init())
-        .setup(|app| {
-            //let _window = app.get_window("main").unwrap();
+        .setup(|_| {
             Ok(())
         })
         .manage(AppState {
@@ -1605,6 +1741,7 @@ pub fn gui_main() {
             minecraft_auth_update_norisk_token,
             minecraft_auth_update_mojang_and_norisk_token,
             store_options,
+            get_norisk_user,
             check_maintenance_mode,
             request_norisk_branches,
             discord_auth_link,
@@ -1625,8 +1762,18 @@ pub fn gui_main() {
             get_featured_resourcepacks,
             get_featured_shaders,
             get_featured_datapacks,
+            get_blacklisted_mods,
+            get_blacklisted_resourcepacks,
+            get_blacklisted_shaders,
+            get_blacklisted_datapacks,
+            get_blacklisted_servers,
             get_whitelist_slots,
             add_player_to_whitelist,
+            check_for_new_branch,
+            get_branches_from_folder,
+            get_default_mc_folder,
+            copy_mc_data,
+            copy_branch_data,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,
@@ -1694,6 +1841,7 @@ pub fn gui_main() {
             get_all_spigot_game_versions,
             get_all_bukkit_game_versions,
             check_feature_whitelist,
+            get_full_feature_whitelist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -12,7 +12,9 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken } from "../../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+
+  export let isServersideInstallation = false;
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -21,6 +23,7 @@
   let customMods = [];
   let mods = [];
   let featuredMods = [];
+  let blacklistedMods = [];
   let launchManifest = null;
   let searchterm = "";
   let filterterm = "";
@@ -66,6 +69,10 @@
   ];
   let filters = {};
 
+  if (!isServersideInstallation) {
+    filterCategories.shift();
+  }
+
   $: loginData = $defaultUser;
 
   listen("tauri://file-drop", files => {
@@ -104,6 +111,15 @@
       createFileWatcher();
     }).catch((err) => {
       console.error(err);
+    });
+  }
+
+  async function getBlacklistedMods() {
+    await invoke("get_blacklisted_mods").then((mods) => {
+      console.debug("Blacklisted Mods", mods);
+      blacklistedMods = mods;
+    }).catch((error) => {
+      console.error(error);
     });
   }
 
@@ -224,8 +240,16 @@
       },
     }).then((result) => {
       console.debug("Search Mod Result", result);
+      
+      if (!$noriskUser?.isDev) {
+        console.debug("Filtering blacklisted mods...");
+        const length = result.hits.length;
+        result.hits = result.hits.filter(mod => !blacklistedMods.includes(mod.slug));
+        console.debug(`Filtered ${length - result.hits.length} blacklisted mods.`);
+      }
       result.hits.forEach(mod => {
-        mod.featured = featuredMods.filter(featuredMod => featuredMod.slug === mod.slug).length > 0;
+        mod.featured = featuredMods.find(featuredMod => featuredMod.slug === mod.slug);
+        mod.blacklisted = blacklistedMods.includes(mod.slug);
       });
       if (result.hits.length === 0) {
         mods = null;
@@ -427,6 +451,7 @@
       }
     }
     await getLaunchManifest();
+    await getBlacklistedMods();
     searchMods();
   }
 

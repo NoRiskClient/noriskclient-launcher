@@ -8,7 +8,7 @@
     export let type;
 </script>
 
-<div class="datapack-item-wrapper">
+<div class="datapack-item-wrapper" class:blacklisted={datapack?.blacklisted}>
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
         {#if type != 'CUSTOM'}
@@ -96,6 +96,10 @@
         gap: 1em;
         margin-top: 0.3em;
         cursor: pointer;
+    }
+
+    .blacklisted {
+        border: 3.5px solid red;
     }
 
     .buttons {

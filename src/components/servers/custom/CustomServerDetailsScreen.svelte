@@ -3,24 +3,35 @@
     import VirtualList from "../../utils/VirtualList.svelte";
     import CustomServerInfoPopup from "./CustomServerInfoPopup.svelte";
     import {createEventDispatcher} from "svelte";
+    import { customServerLogs, clearCustomServerLogs } from "../../../stores/customServerLogsStore.js";
+    import { launcherOptions } from "../../../stores/optionsStore.js";
+    import { customServers, activeCustomServerId } from "../../../stores/customServerStore.js";
+    import { defaultUser } from "../../../stores/credentialsStore.js";
 
     const dispatch = createEventDispatcher()
 
-    export let options;
-    export let customServer;
-    export let logs = [];
+    let customServer = $customServers.find(s => s._id == $activeCustomServerId) ?? {};
+
+    if (customServer._id == undefined) {
+        alert("Failed to load custom server details.");
+    }
+
+    console.log($customServerLogs);
+
+    let logs = $customServerLogs[customServer._id] ?? [];
+
+    customServerLogs.subscribe(value => {
+        logs = value[customServer._id] ?? [];
+    });
 
     let showInfoPopup = false;
 
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-
     async function runServer() {
-        console.log(customServer);
         await invoke("run_custom_server", {
-            customServer,
-            options,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-            uuid: options.currentUuid
+            customServer: customServer,
+            options: $launcherOptions,
+            token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+            uuid: $defaultUser.id
         }).then(() => {
             console.log("YAY!");
         }).catch((error) => {
@@ -31,7 +42,7 @@
 
     async function stopServer() {
         await invoke("terminate_custom_server").then(() => {
-            dispatch("terminated");
+            clearCustomServerLogs(customServer._id);
             console.log("YAY!");
         }).catch((error) => {
             console.error(error);
@@ -40,12 +51,8 @@
     }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" style="left: 220px;" on:click={() => dispatch("back")}>[BACK]</h1>
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="home-button" style="right: 220px;" on:click={() => dispatch("home")}>[HOME]</h1>
 {#if showInfoPopup}
-<CustomServerInfoPopup bind:options={options} bind:customServer={customServer} bind:showModal={showInfoPopup} />
+    <CustomServerInfoPopup bind:customServer={customServer} bind:showModal={showInfoPopup} />
 {/if}
 <div class="create-server-wrapper">
     <div class="row">
@@ -59,7 +66,7 @@
                 <h1 class="starting">Starting...</h1>
             {/if}
         </div>
-        <div>
+        <div class="start-stop-button-wrapper">
             {#if logs.length < 1}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="startServer-button" on:click={runServer}>Start</h1>
@@ -101,22 +108,8 @@
         height: 100%;
         display: flex;
         flex-direction: column;
+        margin: 1em;
         gap: 0.7em;
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 0.5em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
     }
 
     p {
@@ -166,6 +159,11 @@
         text-align: center;
         margin-top: 25%;
         line-height: 30px;
+    }
+
+    .start-stop-button-wrapper {
+        margin-right: 2em;
+        text-align: right;
     }
 
     .startServer-button {

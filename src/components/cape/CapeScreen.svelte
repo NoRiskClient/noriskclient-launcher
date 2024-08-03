@@ -1,13 +1,10 @@
 <script>
-  import { createEventDispatcher, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import CapeCarousel from "./CapeCarousel.svelte";
   import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
-
-  const dispatch = createEventDispatcher();
 
   let capes = null;
   let capeHash = null;
@@ -19,10 +16,6 @@
     { text: "OWNED" },
   ];
   let currentRequest = 0;
-
-  onMount(() => {
-    //requestTrendingCapes(1)
-  });
 
   async function requestTrendingCapes(alltime) {
     if ($defaultUser) {
@@ -38,7 +31,6 @@
         console.error(e);
       });
     }
-
   }
 
   async function requestOwnedCapes() {
@@ -56,8 +48,8 @@
     }
   }
 
-  async function handleNextRequest() {
-    currentRequest = (currentRequest + 1) % requests.length;
+  async function switchTab(tab) {
+    currentRequest = tab;
     capes = null;
     if (currentRequest === 1) {
       await requestTrendingCapes(1);
@@ -91,9 +83,14 @@
 </script>
 
 <div class="wrapper">
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={handleNextRequest}>
-    <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
+  <div class="tab-wrapper">
+    <h1 on:click={() => switchTab(0)} class:active-tab={currentRequest === 0}>EDITOR</h1>
+    <div class="button-wrapper">
+      <h2 on:click={() => switchTab(1)} class:active-tab={currentRequest === 1}>ALL TIME</h2>
+      <h2 on:click={() => switchTab(2)} class:active-tab={currentRequest === 2}>WEEKLY</h2>
+      <h2 on:click={() => switchTab(3)} class:active-tab={currentRequest === 3}>OWNED</h2>
+    </div>
+  </div>
   <div class="cape-wrapper">
     {#if currentRequest === 0}
       {#if !isLoading}
@@ -105,7 +102,6 @@
       {/if}
     {/if}
   </div>
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
 </div>
 
 <style>
@@ -114,26 +110,45 @@
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
     }
 
     .cape-wrapper {
         height: 100%;
     }
 
-    .wrapper h1 {
+    .tab-wrapper h1,
+    .tab-wrapper h2 {
         font-family: 'Press Start 2P', serif;
         padding: 1em;
-        font-size: 35px;
-        cursor: pointer;
-        transition: transform 0.3s;
+        font-size: 1em;
+        transition: transform 0.3s, color 0.3s;
     }
 
-    .wrapper h1 span {
-        color: gold;
-        text-shadow: 3px 2px #5d4c03;
+    .tab-wrapper h1:hover,
+    .tab-wrapper h2:hover {
+        transform: scale(1.5);
     }
 
-    .wrapper h1:hover {
-        transform: scale(1.2);
+    .tab-wrapper h1 {
+        font-size: 1.5em;
+    }
+
+    .tab-wrapper {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .button-wrapper {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .active-tab {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 </style>

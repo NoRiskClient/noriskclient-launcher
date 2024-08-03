@@ -2,22 +2,22 @@
     import {invoke} from "@tauri-apps/api";
     import TextInput from "../../../config/inputs/ConfigTextInput.svelte";
     import {createEventDispatcher} from "svelte";
+    import { launcherOptions } from "../../../../stores/optionsStore.js";
+    import { defaultUser } from "../../../../stores/credentialsStore.js";
+    
 
     const dispatch = createEventDispatcher()
 
-    export let options;
     export let name;
     export let icon;
     export let subdomain;
     export let baseDomain;
 
-    const loginData = options.accounts.find(obj => obj.uuid === options.currentUuid);
-
     async function next() {
         await invoke('check_custom_server_subdomain', {
             subdomain: subdomain,
-            token: options.experimentalMode ? loginData.experimentalToken : loginData.noriskToken,
-            uuid: options.currentUuid
+            token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+            uuid: $defaultUser.id
         }).then(() => {
             dispatch('next');
         }).catch(err => {
@@ -83,6 +83,7 @@
 
     img {
         height: 200px;
+        width: 200px;
         background-color: var(--background-contrast-color);
         border-radius: 10px;
     }

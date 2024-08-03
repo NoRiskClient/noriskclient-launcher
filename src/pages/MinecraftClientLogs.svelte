@@ -1,5 +1,5 @@
 <script>
-  import TransitionWrapper2 from "./TransitionWrapper2.svelte";
+  import PopuotWindowTransitionWrapper from "./PopuotWindowTransitionWrapper.svelte";
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "../components/log/LogMessage.svelte";
@@ -43,22 +43,24 @@
   }
 </script>
 
-<TransitionWrapper2>
+<PopuotWindowTransitionWrapper>
   <div class="logs-wrapper">
     <VirtualList items={$minecraftLogs} let:item {autoScroll}>
       <LogMessage text={item} />
     </VirtualList>
     <div class="logs-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
           on:click={toggleAutoScroll}>
         [Auto Scroll]
       </h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="copy-button" on:click={uploadLogs}>
         [Copy]
       </h1>
     </div>
   </div>
-</TransitionWrapper2>
+</PopuotWindowTransitionWrapper>
 
 
 <style>

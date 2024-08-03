@@ -1,11 +1,12 @@
 <script>
     import {createEventDispatcher} from "svelte";
     import NRCLogo from "../../../images/norisk_logo.png";
+    import { forceServer, setForceServer, runClient } from "../../../utils/noriskUtils.js";
+    import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
 
     const dispatch = createEventDispatcher()
 
     export let server;
-    export let forceServer;
 </script>
 
 <div class="server-item-wrapper">
@@ -23,15 +24,15 @@
         </div>
     </div>
     <div class="buttons">
-        {#if forceServer === `${server.name}:${server.ip}:${server.port}`}
+        {#if $forceServer === `${server.name}:${server.ip}:${server.port}`}
             <h1 class="launching-button">LAUNCHING...</h1>
-        {:else if forceServer === `${server.name}:${server.ip}:${server.port}:LAUNCHED`}
+        {:else if $forceServer === `${server.name}:${server.ip}:${server.port}:LAUNCHED`}
             <h1 class="launching-button">PLAYING...</h1>
         {:else}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <h1 class="play-button" on:click={() => {
-                    forceServer = `${server.name}:${server.ip}:${server.port}`;
-                    dispatch("play")
+                    setForceServer(`${server.name}:${server.ip}:${server.port}`);
+                    runClient($branches[$currentBranchIndex]);
                 }}>
                 PLAY
             </h1>

@@ -5,14 +5,13 @@ use chrono::{DateTime, Utc};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
-use sha1::digest::typenum::op;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::app_data::LauncherOptions;
 use crate::app::gui::minecraft_auth_get_default_user;
 use crate::custom_servers::models::CustomServer;
 use crate::error::ErrorKind;
-use crate::minecraft::minecraft_auth::{NoRiskCredentials, NoRiskToken};
+use crate::minecraft::minecraft_auth::NoRiskToken;
 use crate::minecraft::version::AssetObject;
 use crate::utils::get_maven_artifact_path;
 
@@ -30,6 +29,19 @@ pub fn get_api_base(is_experimental: bool) -> String {
 }
 
 impl ApiEndpoints {
+    /// Check API status
+    pub async fn norisk_api_status() -> Result<bool> {
+        let core = Self::request_from_norisk_endpoint("core/online", "", "").await.unwrap_or(false);
+        let launcher = Self::request_from_norisk_endpoint("launcher/online", "", "").await.unwrap_or(false);
+        info!("Core API online state: {}, Launcher API online state: {}", core, launcher);
+        Ok(core && launcher)
+    }
+
+    /// Request maintenance mode
+    pub async fn get_norisk_user(norisk_token: &str, request_uuid: &str) -> Result<NoRiskUserMinimal> {
+        Self::request_from_norisk_endpoint("core/user", norisk_token, request_uuid).await
+    }
+    
     /// Request maintenance mode
     pub async fn norisk_maintenance_mode() -> Result<bool> {
         Self::request_from_norisk_endpoint("launcher/maintenance-mode", "", "").await
@@ -41,13 +53,27 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
+    pub async fn norisk_full_feature_whitelist(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint("core/whitelist/features", norisk_token, request_uuid).await
+    }
+    
+    /// Request all available branches
     pub async fn norisk_feature_whitelist(feature: &str, norisk_token: &str, request_uuid: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint(format!("core/whitelist/feature/{}", feature).as_str(), norisk_token, request_uuid).await
     }
 
     /// Request token for experimental mode
-    pub async fn enable_experimental_mode(experimental_token: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint_with_experimental("launcher/experimental-mode", experimental_token, "").await
+    pub async fn enable_experimental_mode(norisk_token: &str, request_uuid: &str) -> Result<String> {
+        let url = format!("{}/{}", get_api_base(false), "launcher/experimental-mode");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Request featured mods
@@ -73,6 +99,31 @@ impl ApiEndpoints {
     /// Request featured servers
     pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/servers", branch), "", "").await
+    }
+
+    /// Request blacklisted mods
+    pub async fn norisk_blacklisted_mods() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/mods"), "", "").await
+    }
+
+    /// Request blacklisted resourcepacks
+    pub async fn norisk_blacklisted_resourcepacks() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/resourcepacks"), "", "").await
+    }
+
+    /// Request blacklisted shaders
+    pub async fn norisk_blacklisted_shaders() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/shaders"), "", "").await
+    }
+
+    /// Request blacklisted datapacks
+    pub async fn norisk_blacklisted_datapacks() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/datapacks"), "", "").await
+    }
+
+    /// Request blacklisted servers
+    pub async fn norisk_blacklisted_servers() -> Result<Vec<FeaturedServer>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/servers"), "", "").await
     }
 
     /// Request custom servers
@@ -143,12 +194,34 @@ impl ApiEndpoints {
 
     /// Request mcreal app token
     pub async fn get_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken", norisk_token, request_uuid).await
+        // BRUDER WIESO GEHT DAS HIER NT MIT DEM JSON PARSEN ABER OEBN SCHON!?!?!? Aber egal, brauchen eh nur String also von mir aus dann halt so :(
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), "mcreal/user/mobileAppToken");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Reset mcreal app token
     pub async fn reset_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::request_from_norisk_endpoint("mcreal/user/mobileAppToken/reset", norisk_token, request_uuid).await
+        // BRUDER WIESO GEHT DAS HIER NT MIT DEM JSON PARSEN ABER OEBN SCHON!?!?!? Aber egal, brauchen eh nur String also von mir aus dann halt so :(
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), "mcreal/user/mobileAppToken/reset");
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Request discord link status
@@ -207,7 +280,7 @@ impl ApiEndpoints {
         let credentials = minecraft_auth_get_default_user().await?.ok_or(ErrorKind::NoCredentialsError)?;
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         //TODO brauchen wir das wirklich? diesen token also zukünftig
-        let token = if (options.experimental_mode) {
+        let token = if options.experimental_mode {
             credentials.norisk_credentials.experimental.ok_or(ErrorKind::NoCredentialsError)?
         } else {
             credentials.norisk_credentials.production.ok_or(ErrorKind::NoCredentialsError)?
@@ -350,6 +423,17 @@ pub struct NoRiskUser {
     pub uuid: String,
     pub token: String,
     pub ign: String,
+    #[serde(rename = "discordId")]
+    pub discord_id: Option<String>,
+    pub rank: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NoRiskUserMinimal {
+    pub uuid: String,
+    pub ign: String,
+    #[serde(rename = "discordId")]
+    pub discord_id: Option<String>,
     pub rank: String,
 }
 

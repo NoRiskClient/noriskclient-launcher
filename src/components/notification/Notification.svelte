@@ -2,7 +2,6 @@
   import { fade } from "svelte/transition";
 
   export let message = "";
-  export let id;
 </script>
 
 <style>

@@ -29,6 +29,7 @@
     h1 {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
+        margin-left: 10px;
     }
 
     .flex-wrapper {
@@ -62,9 +63,17 @@
 
     img {
         box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
+        border-radius: 0.2em;
     }
 
     .remove-button {
         cursor: pointer;
+        transition-duration: 200ms;
+    }
+
+    .remove-button:hover {
+        color: red;
+        text-shadow: 2px 2px #8b0000;
+        transform: scale(1.15);
     }
 </style>

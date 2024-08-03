@@ -12,16 +12,15 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken } from "../../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
   $: launcherProfiles = $profiles;
-  $: loginData = $defaultUser;
-
   let launcherProfile = null;
   let customShaders = [];
   let featuredShaders = [];
+  let blacklistedShaders = [];
   let shaders = [];
   let launchManifest = null;
   let searchterm = "";
@@ -110,6 +109,15 @@
     });
   }
 
+  async function getBlacklistedShaders() {
+    await invoke("get_blacklisted_shaders").then((result) => {
+      console.debug("Blacklisted Shaders", result);
+      blacklistedShaders = result;
+    }).catch((err) => {
+      console.error(err);
+    });
+  }
+
   async function getCustomShadersFilenames() {
     await invoke("get_custom_shaders_filenames", {
       options: options,
@@ -176,8 +184,16 @@
       },
     }).then((result) => {
       console.debug("Search Shader Result", result);
+
+      if (!$noriskUser?.isDev) {
+        console.debug("Filtering Blacklisted Shaders", blacklistedShaders);
+        const length = result.hits.length;
+        result.hits = result.hits.filter(shader => !blacklistedShaders.includes(shader.slug));
+        console.debug(`Filtered ${length - result.hits.length} Blacklisted Shaders`);
+      }
       result.hits.forEach(shader => {
-        shader.featured = featuredShaders.filter(featuredShader => featuredShader.slug === shader.slug).length > 0;
+        shader.featured = featuredShaders.find(featuredShader => featuredShader.slug === shader.slug);
+        shader.blacklisted = blacklistedShaders.includes(shader.slug);
       });
       if (result.hits.length === 0) {
         shaders = null;
@@ -308,6 +324,7 @@
       }
     }
     await getLaunchManifest();
+    await getBlacklistedShaders();
     searchShaders();
   }
 

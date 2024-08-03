@@ -265,7 +265,7 @@
     <div class="slider slide"></div>
     <h1 class="title slider">Skin</h1>
     {#if isLoading}
-      <h2>Loading...</h2>
+      <h2 class="loading">Loading...</h2>
     {/if}
     <div
       id="skin"
@@ -315,9 +315,12 @@
 </div>
 
 <style>
+    * {
+      overflow: hidden;
+    }
+
     .skin-wrapper {
-        overflow: hidden;
-        border: 1px solid green;
+        height: 80vh;
     }
 
     .wrapper {
@@ -333,11 +336,19 @@
         top: 2.5em;
     }
 
+    .loading {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      justify-content: center;
+      align-items: center;
+    }
+
     .klickField {
         position: absolute;
         top: 10vh;
-        height: 520px;
-        width: 720px;
+        height: 80vh;
+        width: 99vw;
     }
 
     .slider {
@@ -403,6 +414,7 @@
 
     .change-button.no-slide:hover {
         color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 0.3s;
         transform: scale(1.2);
     }
@@ -429,20 +441,5 @@
     .save-button {
         color: #1cc009;
         text-shadow: 2px 2px #114609;
-    }
-
-    .home-button {
-        position: absolute;
-        bottom: 1em; /* Abstand vom oberen Rand anpassen */
-        transition: transform 0.3s;
-        font-size: 20px;
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
-    }
-
-    .home-button:hover {
-        transform: scale(1.2);
     }
 </style>

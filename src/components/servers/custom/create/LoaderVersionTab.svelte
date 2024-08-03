@@ -41,7 +41,6 @@
             availableTypes["NEO_FORGE"].loaderVersions = versions.map(v => v.id);
             availableTypes = availableTypes;
         }
-        console.log(availableTypes);
     }
 
     load()

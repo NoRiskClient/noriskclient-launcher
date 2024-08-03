@@ -12,7 +12,7 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken } from "../../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
 
   const dispatch = createEventDispatcher();
 
@@ -22,6 +22,7 @@
   let launcherProfile = null;
   let customResourcePacks = [];
   let featuredResourcePacks = [];
+  let blacklistedResourcePacks = [];
   let resourcePacks = [];
   let launchManifest = null;
   let searchterm = "";
@@ -120,6 +121,15 @@
     });
   }
 
+  async function getBlacklistedResourcePacks() {
+    await invoke("get_blacklisted_resourcepacks").then((resourcePacks) => {
+      console.debug("Blacklisted ResourcePacks", resourcePacks);
+      blacklistedResourcePacks = resourcePacks;
+    }).catch((error) => {
+      console.error(error);
+    });
+  }
+
   async function getCustomResourcePacksFilenames() {
     await invoke("get_custom_resourcepacks_filenames", {
       options: options,
@@ -186,8 +196,16 @@
       },
     }).then((result) => {
       console.debug("Search ResourcePack Result", result);
+
+      if (!$noriskUser?.isDev) {
+        console.debug("Filtering blacklisted ResourcePacks");
+        const length = result.hits.length;
+        result.hits = result.hits.filter(resourcePack => !blacklistedResourcePacks.includes(resourcePack.slug));
+        console.debug(`Removed ${length - result.hits.length} blacklisted ResourcePacks`);
+      }
       result.hits.forEach(resourcePack => {
-        resourcePack.featured = featuredResourcePacks.filter(featuredResourcePack => featuredResourcePack.slug === resourcePack.slug).length > 0;
+        resourcePack.featured = featuredResourcePacks.find(featuredResourcePack => featuredResourcePack.slug === resourcePack.slug);
+        resourcePack.blacklisted = blacklistedResourcePacks.includes(resourcePack.slug);
       });
       if (result.hits.length === 0) {
         resourcePacks = null;
@@ -315,6 +333,7 @@
       }
     }
     await getLaunchManifest();
+    await getBlacklistedResourcePacks();
     await searchResourcePacks();
   }
 

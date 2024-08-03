@@ -108,6 +108,7 @@
 	svelte-virtual-list-viewport {
 		position: relative;
 		overflow-y: auto;
+		overflow-x: hidden;
 		-webkit-overflow-scrolling:touch;
 		display: block;
 	}

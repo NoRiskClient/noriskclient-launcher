@@ -7,7 +7,7 @@ windows_subsystem = "windows"
 use std::fs;
 
 use directories::ProjectDirs;
-use log::{debug, info, LevelFilter};
+use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -20,7 +20,6 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 
 pub mod app;
 pub mod minecraft;
@@ -38,9 +37,9 @@ static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
 });
 
 static APP_USER_AGENT: &str = concat!(
-env!("CARGO_PKG_NAME"),
-"/",
-env!("CARGO_PKG_VERSION"),
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
 );
 
 /// HTTP Client with launcher agent
@@ -59,6 +58,9 @@ const TRIGGER_FILE_SIZE: u64 = 2 * 1024 * 1000;
 const LOG_FILE_COUNT: u32 = 10;
 
 pub fn main() -> anyhow::Result<()> {
+    // Path fix
+    let _ = fix_path_env::fix();
+
     let log_folder = LAUNCHER_DIRECTORY.data_dir().join("logs");
     let latest_log = log_folder.join("latest.log");
     let archive_folder = log_folder.join("archive").join("launcher.{}.log");
@@ -97,7 +99,7 @@ pub fn main() -> anyhow::Result<()> {
             Root::builder()
                 .appender("logfile")
                 .appender("stderr")
-                .build(LevelFilter::Trace),
+                .build(LevelFilter::Debug),
         )
         .unwrap();
 

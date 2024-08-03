@@ -12,7 +12,6 @@
   const dispatch = createEventDispatcher();
 
   currentBranchIndex.subscribe(async value => {
-    console.log("New Index:", value);
     await fetchProfiles();
   });
 

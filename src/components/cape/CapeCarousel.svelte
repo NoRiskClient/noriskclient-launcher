@@ -100,9 +100,7 @@
           <h1>{getIndex(cape._id) + 1}.</h1>
           <div
             class="crop"
-            on:mouseenter={() =>{
-                            cape.hovered = true
-                            return getNameByUUID(cape.firstSeen); }}
+            on:mouseenter={() => { cape.hovered = true; return getNameByUUID(cape.firstSeen); }}
             on:mouseleave={() => cape.hovered = false}
           >
             {#if $launcherOptions.experimentalMode}
@@ -113,16 +111,14 @@
               <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
             {/if}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div on:click={handleEquipCape(cape._id)} class="equip-text">
-              EQUIP
-            </div>
+            <div on:click={() => handleEquipCape(cape._id)} class="equip-text">EQUIP</div>
           </div>
           {#if cape.hovered}
             <div in:fade={{ duration: 300 }} out:fade={{ duration: 300 }} class="info-text">
               by {responseData}
             </div>
             <div in:fade={{ duration: 300 }} out:fade={{ duration: 300 }} class="info-text-bottom">
-              {cape.uses} Uses
+              Used by {cape.uses} players
             </div>
           {/if}
         </div>
@@ -192,9 +188,9 @@
     }
 
     .crop {
-        position: relative;
-        width: 96px;
-        height: 136px;
+        /* position: relative; */
+        width: 80px;
+        height: 128px;
         overflow: hidden;
         transform: scale(1.2);
         transition: transform 0.3s;
@@ -206,8 +202,11 @@
     }
 
     .crop img {
+      position: absolute;
         width: 512px;
         height: 256px;
+        left: -8px;
+        top: -8px;
     }
 
     .equip-text {
@@ -233,7 +232,7 @@
 
     .info-text {
         position: absolute;
-        bottom: 7em;
+        bottom: 5.75em;
         left: 50%;
         transform: translateX(-50%);
         padding: 4px 8px;
@@ -246,15 +245,15 @@
     }
 
     .info-text-bottom {
-        bottom: 11em;
+        bottom: 7.5em;
         left: 50%;
         transform: translateX(-50%);
         position: absolute;
         transition: opacity 0.3s;
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
-        color: #7e7e7e;
-        text-shadow: 2px 2px #d0d0d0;
+        font-size: 11px;
+        color: white;
+        text-shadow: 1.25px 1.25px #d0d0d0;
         cursor: default;
     }
 
