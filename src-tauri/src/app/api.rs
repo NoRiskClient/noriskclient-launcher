@@ -43,7 +43,7 @@ impl ApiEndpoints {
     pub async fn toggle_norisk_maintenance_mode(maintenance_mode: bool, norisk_token: &str, request_uuid: &str) -> Result<String> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}", get_api_base(options.experimental_mode), "launcher/maintenance-mode");
-        info!("URL: {}\nVALUE: {}", url, &maintenance_mode); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.put(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .query(&[("uuid", request_uuid)])
