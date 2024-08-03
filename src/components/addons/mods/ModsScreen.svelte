@@ -14,6 +14,8 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { getNoRiskToken } from "../../../utils/noriskUtils.js";
 
+  export let isServersideInstallation = false;
+
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
   $: launcherProfiles = $profiles;
@@ -21,6 +23,7 @@
   let customMods = [];
   let mods = [];
   let featuredMods = [];
+  let blacklistedMods = [];
   let launchManifest = null;
   let searchterm = "";
   let filterterm = "";
@@ -65,6 +68,10 @@
     },
   ];
   let filters = {};
+
+  if (!isServersideInstallation) {
+    filterCategories.shift();
+  }
 
   $: loginData = $defaultUser;
 
