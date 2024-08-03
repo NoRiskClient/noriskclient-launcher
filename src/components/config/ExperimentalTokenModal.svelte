@@ -4,8 +4,9 @@
   import { launcherOptions, saveOptions } from "../../stores/optionsStore.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
-  import { fetchDefaultUserOrError, updateNoRiskToken } from "../../stores/credentialsStore.js";
-  import { defaultUser } from "../../stores/credentialsStore.js";
+  import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../../stores/credentialsStore.js";
+  import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
+  import { getNoRiskToken } from "../../utils/noriskUtils.js";
 
   export let showModal;
 
@@ -26,17 +27,24 @@
       .then(async (allowed) => {
         $launcherOptions.experimentalModeToken = experimentalModeToken;
         $launcherOptions.experimentalMode = allowed;
-        await saveOptions();
+        await saveOptions(false);
         hideModal();
-        if ($defaultUser) {
+        if (getNoRiskToken() == null) {
+          await startMicrosoftAuth();
+        } else {
           await updateNoRiskToken($defaultUser);
-          await fetchDefaultUserOrError();
         }
+        await fetchDefaultUserOrError();
       })
       .catch(async (e) => {
         $launcherOptions.experimentalMode = false;
         $launcherOptions.experimentalModeToken = "";
-        await saveOptions();
+        await saveOptions(false);
+        if (getNoRiskToken() == null) {
+          await startMicrosoftAuth();
+        } else {
+          await updateNoRiskToken($defaultUser);
+        }
         addNotification(`Failed to enable experimental mode: ${e}`);
       });
   }

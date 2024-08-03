@@ -7,29 +7,30 @@
   import ConfigFolderInput from "../components/config/inputs/ConfigFolderInput.svelte";
   import ConfigFileInput from "../components/config/inputs/ConfigFileInput.svelte";
   import McRealAppModal from "../components/mcRealApp/McRealAppModal.svelte";
+  import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
   import { fetchOptions, launcherOptions, saveOptions } from "../stores/optionsStore.js";
   import { preventSelection } from "../utils/svelteUtils.js";
-  import { pop } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
-  import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
   import { onDestroy } from "svelte";
-  import { fetchDefaultUserOrError, defaultUser } from "../stores/credentialsStore.js";
+  import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../stores/credentialsStore.js";
   import { fetchBranches } from "../stores/branchesStore.js";
   import { fetchProfiles } from "../stores/profilesStore.js";
-  import { featureWhitelist, noriskUser, isInMaintenanceMode, setMaintenanceMode } from "../utils/noriskUtils.js";
+  import { featureWhitelist, noriskUser } from "../utils/noriskUtils.js";
+  import { startMicrosoftAuth } from "../utils/microsoftUtils.js";
+  import { getNoRiskToken } from "../utils/noriskUtils.js";
 
   $: lightTheme = $launcherOptions?.theme === "LIGHT";
-  let showExperimentalTokenModal = false;
   let showMcRealAppModal = false;
+  let showExperimentalTokenModal = false;
 
   function toggleTheme() {
     $launcherOptions.toggleTheme();
     lightTheme = $launcherOptions.theme === "LIGHT";
   }
+  
 
   async function clearData() {
-    // we need await!
     const confirm = await window.confirm("Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.");
     if (confirm) {
       invoke("clear_data", { options: $launcherOptions })
@@ -48,40 +49,22 @@
 
   async function toggleExperimentalMode() {
     if (!$launcherOptions.experimentalMode) {
+      await saveOptions(false);
+      if (getNoRiskToken() == null) {
+        await startMicrosoftAuth();
+      } else {
+        await updateNoRiskToken($defaultUser);
+      }
       return;
-    }
-    if ($launcherOptions.experimentalMode) {
+    } else if ($launcherOptions.experimentalMode) {
       showExperimentalTokenModal = true;
       $launcherOptions.experimentalMode = false;
-      return;
     }
-
-    await saveOptions();
-  }
-
-  function toggleMaintenanceMode() {
-    invoke("toggle_maintenance_mode", {
-      maintenanceMode: $isInMaintenanceMode,
-      options: $launcherOptions,
-      credentials: $defaultUser
-    })
-      .then(async (result) => {
-        const newState = result.includes("true");
-        setMaintenanceMode(newState);
-        alert("Maintenance mode is now " + (newState ? "enabled" : "disabled") + "!");
-      })
-      .catch(e => {
-        addNotification(`Failed to toggle maintenance mode: ${e}`);
-      });
   }
 
   onDestroy(async () => {
     await saveOptions();
   });
-
-  async function closeAndSave() {
-    await pop();
-  }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -96,9 +79,8 @@
     <hr>
     <div class="settings-wrapper">
       <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
-      {#if $noriskUser?.isDev}
-        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isDevOnly={true} on:toggle={toggleExperimentalMode} />
-        <ConfigRadioButton text="Launcher Maintenance Mode" bind:value={$isInMaintenanceMode} isDevOnly={true} on:toggle={toggleMaintenanceMode} />
+      {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
+        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isDevOnly={$noriskUser?.isDev} on:toggle={toggleExperimentalMode} />
       {/if}
       <ConfigRadioButton text={`Theme: ${$launcherOptions.theme}`} bind:value={lightTheme} on:toggle={toggleTheme} />
       {#if $featureWhitelist.includes("MCREAL_APP")}
@@ -135,7 +117,7 @@
 
     hr {
         width: 85%;
-        border: 1px solid white;
+        border: 1px solid var(--font-color);
         margin-top: 1.5em;
     }
 
@@ -181,7 +163,8 @@
     .mcreal-app-wrapper > .title {
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
-        color: white;
+        color: var(--font-color);
+        text-shadow: 2px 2px var(--font-color-text-shadow);
     }
 
     .mcreal-app-wrapper > .button {

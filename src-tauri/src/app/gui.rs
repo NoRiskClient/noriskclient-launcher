@@ -1001,23 +1001,14 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn toggle_maintenance_mode(maintenance_mode: bool, options: LauncherOptions, credentials: Credentials) -> Result<String, String> {
-    let maintenance_mode = ApiEndpoints::toggle_norisk_maintenance_mode(maintenance_mode, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
-        .await
-        .map_err(|e| format!("unable to update maintenance mode: {:?}", e))?;
-    Ok(maintenance_mode)
-}
-
-#[tauri::command]
 async fn request_norisk_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, crate::error::Error> {
     Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
 async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, String> {
-    return ApiEndpoints::enable_experimental_mode(experimental_token)
-        .await
-        .map_err(|e| format!("unable to validate experimental token: {:?}", e));
+    return ApiEndpoints::enable_experimental_mode(experimental_token).await
+        .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
 }
 
 #[tauri::command]
@@ -1703,11 +1694,21 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 }
 
 ///
+/// Get All feature toggles
+///
+#[tauri::command]
+async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, String> {
+    let all_features = ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await
+        .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))?;
+    Ok(all_features)
+}
+
+///
 /// Get Launcher feature toggles
 ///
 #[tauri::command]
-async fn check_feature_whitelist(feature: &str, norisk_token: &str, uuid: &str) -> Result<bool, String> {
-    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, norisk_token, uuid).await
+async fn check_feature_whitelist(feature: &str, options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
+    let is_whitelisted = ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await
         .map_err(|e| format!("unable to check feature whitelist: {:?}", e))?;
     Ok(is_whitelisted)
 }
@@ -1747,7 +1748,6 @@ pub fn gui_main() {
             store_options,
             get_norisk_user,
             check_maintenance_mode,
-            toggle_maintenance_mode,
             request_norisk_branches,
             discord_auth_link,
             discord_auth_status,
@@ -1767,6 +1767,11 @@ pub fn gui_main() {
             get_featured_resourcepacks,
             get_featured_shaders,
             get_featured_datapacks,
+            get_blacklisted_mods,
+            get_blacklisted_resourcepacks,
+            get_blacklisted_shaders,
+            get_blacklisted_datapacks,
+            get_blacklisted_servers,
             get_whitelist_slots,
             add_player_to_whitelist,
             check_for_new_branch,
@@ -1841,6 +1846,7 @@ pub fn gui_main() {
             get_all_spigot_game_versions,
             get_all_bukkit_game_versions,
             check_feature_whitelist,
+            get_full_feature_whitelist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -39,27 +39,16 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint("launcher/maintenance-mode", "", "").await
     }
 
-    /// Update maintenance mode
-    pub async fn toggle_norisk_maintenance_mode(maintenance_mode: bool, norisk_token: &str, request_uuid: &str) -> Result<String> {
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/{}", get_api_base(options.experimental_mode), "launcher/maintenance-mode");
-        info!("URL: {}", url); // Den formatierten String ausgeben
-        Ok(HTTP_CLIENT.put(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .query(&[("uuid", request_uuid)])
-            .json(&maintenance_mode)
-            .send().await?
-            .error_for_status()?
-            .text()
-            .await?
-        )
-    }
-
     /// Request all available branches
     pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> core::result::Result<Vec<String>, crate::error::Error> {
         Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid).await
     }
 
+    /// Request all available branches
+    pub async fn norisk_full_feature_whitelist(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint("core/whitelist/features", norisk_token, request_uuid).await
+    }
+    
     /// Request all available branches
     pub async fn norisk_feature_whitelist(feature: &str, norisk_token: &str, request_uuid: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint(format!("core/whitelist/feature/{}", feature).as_str(), norisk_token, request_uuid).await

@@ -123,7 +123,7 @@ export async function openMinecraftLogsWindow() {
 export function getNoRiskToken() {
   let options = get(launcherOptions);
   let user = get(defaultUser);
-  return options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value;
+  return options.experimentalMode ? user.norisk_credentials.experimental?.value ?? null : user.norisk_credentials.production?.value ?? null;
 }
 
 export function getNoRiskUser() {
@@ -162,32 +162,21 @@ export async function setCustomServerProgress(serverId, progress) {
   customServerProgress.set(currentProgress);
 }
 
-export async function fetchFeature(feature) {
-  let options = get(launcherOptions);
-  let user = get(defaultUser);
+export async function getFeatureWhitelist() {
+  featureWhitelist.set([]);
+  const user = get(defaultUser);
+  if (!user) return;
 
-  feature = feature.toUpperCase().replaceAll(" ", "_");
-
-  await invoke("check_feature_whitelist", {
-    feature: feature,
-    noriskToken: options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value,
-    uuid: user.id
+  await invoke("get_full_feature_whitelist", {
+    options: get(launcherOptions),
+    credentials: user,
   }).then(result => {
-    if (!result) return;
-    let currentFeatures = get(featureWhitelist);
-    if (currentFeatures.includes(feature)) { return; }
-    featureWhitelist.set([...currentFeatures, feature]);
+    if (!result || result.length < 1) return;
+    featureWhitelist.set(result);
   }).catch(reason => {
     noriskError(reason);
     addNotification(`Failed to fetch Feature: ${reason}`);
   });
-}
-
-export async function getFeatureWhitelist() {
-  featureWhitelist.set([]);
-  await fetchFeature("INVITE_FRIENDS");
-  await fetchFeature("CUSTOM_SERVERS");
-  await fetchFeature("MCREAL_APP");
   console.log("Feature Whitelist: " + get(featureWhitelist).join(", "));
 }
 

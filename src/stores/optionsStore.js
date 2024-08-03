@@ -46,11 +46,12 @@ export async function fetchOptions() {
   });
 }
 
-export async function saveOptions() {
+export async function saveOptions(refreshBranches = true) {
   let options = get(launcherOptions);
   console.log("Saving Launcher Options: ", options);
   await invoke("store_options", {
     options,
   }).catch((e) => addNotification(e));
+  if (!refreshBranches) return;
   await fetchBranches()
 }

@@ -22,8 +22,8 @@
 
 <style>
     .text {
-        color: #e8e8e8;
-        text-shadow: 2px 2px #7a7777;
+        color: var(--font-color);
+        text-shadow: 2px 2px var(--font-color-text-shadow);
         font-family: 'Press Start 2P', serif;
         text-align: center;
     }
