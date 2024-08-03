@@ -18,7 +18,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
   <div class="skin-text-wrapper">
-    <img src={`https://mc-heads.net/avatar/${account.id}/50`} alt="{account.username}'s Kopf">
+    <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
     <h1 class:active={isActive}>{account.username}</h1>
   </div>
   <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>

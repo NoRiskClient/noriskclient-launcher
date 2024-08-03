@@ -14,7 +14,7 @@
   {#if $defaultUser}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img class="skin-kopf"
-         src={`https://mc-heads.net/avatar/${$defaultUser.id}/150`}
+         src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
          alt="Skin Kopf"
          on:click={() => { runClient($branches[$currentBranchIndex])}}
     >
