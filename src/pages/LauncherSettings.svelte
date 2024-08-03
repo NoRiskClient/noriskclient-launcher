@@ -5,6 +5,7 @@
   import ConfigSlider from "../components/config/inputs/ConfigSlider.svelte";
   import ConfigRadioButton from "../components/config/inputs/ConfigRadioButton.svelte";
   import ConfigFolderInput from "../components/config/inputs/ConfigFolderInput.svelte";
+  import ConfigFileInput from "../components/config/inputs/ConfigFileInput.svelte";
   import McRealAppModal from "../components/mcRealApp/McRealAppModal.svelte";
   import { fetchOptions, launcherOptions, saveOptions } from "../stores/optionsStore.js";
   import { preventSelection } from "../utils/svelteUtils.js";
@@ -110,8 +111,7 @@
         <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
       </div>
-      <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
-      <!-- <ConfigFolderInput title="Java Path" bind:value={$launcherOptions.customJavaPath} /> -->
+      <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} extentions={["exe"]} requiredFileName={"javaw"} defaultValue={""} />
       <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
       <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
       <div class="clear-data-button-wrapper">
