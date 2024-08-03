@@ -2,32 +2,32 @@
 <script>
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
-  import Home from "./Home.svelte";
-  import Notifications from "../components/notification/Notifications.svelte";
-  import MinecraftStartProgress from "./MinecraftStartProgress.svelte";
-  import MinecraftClientLogs from "./MinecraftClientLogs.svelte";
-  import LauncherSettings from "./LauncherSettings.svelte";
-  import Capes from "./Capes.svelte";
-  import BackButton from "../components/v2/buttons/BackButton.svelte";
-  import Profiles from "./Profiles.svelte";
-  import Addons from "./Addons.svelte";
-  import Mods from "./Mods.svelte";
-  import Skin from "./Skin.svelte";
-  import Shaders from "./Shaders.svelte";
-  import Resourcepacks from "./Resourcepacks.svelte";
-  import Datapacks from "./Datapacks.svelte";
-  import { isInMaintenanceMode, getMaintenanceMode, isClientRunning, noriskUser } from "../utils/noriskUtils.js";
-  import GameButton from "../components/v2/buttons/GameButton.svelte";
-  import Crash from "./Crash.svelte";
-  import CrashHeader from "../components/v2/CrashHeader.svelte";
-  import Servers from "./Servers.svelte";
-  import CustomServerDetails from "./CustomServerDetails.svelte";
-  import CreateCustomServer from "./CreateCustomServer.svelte";
-  import NewBranch from "./NewBranch.svelte";
-  import FirstInstall from "./FirstInstall.svelte";
-  import CopyMcDataProgress from "./CopyMcDataProgress.svelte";
-  import Legal from "./Legal.svelte";
-  import MaintenanceMode from "../components/maintenance-mode/MaintenanceModeScreen.svelte";
+  import Home from "./pages/Home.svelte";
+  import Notifications from "./components/notification/Notifications.svelte";
+  import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
+  import MinecraftClientLogs from "./pages/MinecraftClientLogs.svelte";
+  import LauncherSettings from "./pages/LauncherSettings.svelte";
+  import Capes from "./pages/Capes.svelte";
+  import BackButton from "./components/v2/buttons/BackButton.svelte";
+  import Profiles from "./pages/Profiles.svelte";
+  import Addons from "./pages/Addons.svelte";
+  import Mods from "./pages/Mods.svelte";
+  import Skin from "./pages/Skin.svelte";
+  import Shaders from "./pages/Shaders.svelte";
+  import Resourcepacks from "./pages/Resourcepacks.svelte";
+  import Datapacks from "./pages/Datapacks.svelte";
+  import { isInMaintenanceMode, isClientRunning, noriskUser } from "./utils/noriskUtils.js";
+  import GameButton from "./components/v2/buttons/GameButton.svelte";
+  import Crash from "./pages/Crash.svelte";
+  import CrashHeader from "./components/v2/CrashHeader.svelte";
+  import Servers from "./pages/Servers.svelte";
+  import CustomServerDetails from "./pages/CustomServerDetails.svelte";
+  import CreateCustomServer from "./pages/CreateCustomServer.svelte";
+  import NewBranch from "./pages/NewBranch.svelte";
+  import FirstInstall from "./pages/FirstInstall.svelte";
+  import CopyMcDataProgress from "./pages/CopyMcDataProgress.svelte";
+  import Legal from "./pages/Legal.svelte";
+  import MaintenanceMode from "./components/maintenance-mode/MaintenanceModeScreen.svelte";
 
   const routes = {
     "/": Home,
