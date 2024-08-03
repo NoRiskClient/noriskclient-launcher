@@ -4,7 +4,7 @@
   import { quintOut } from "svelte/easing";
   import { scale } from "svelte/transition";
 
-  let microsoftOutput = "SIGN IN";
+  let microsoftOutput = "PRESS START";
   let dots = "";
   let microsoftFlag = false;
 
