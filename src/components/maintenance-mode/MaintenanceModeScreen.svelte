@@ -74,4 +74,4 @@
     .quit-button:hover {
         transform: scale(1.3);
     }
-</style>/
+</style>
