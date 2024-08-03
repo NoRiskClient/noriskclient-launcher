@@ -31,7 +31,6 @@
         console.error(e);
       });
     }
-
   }
 
   async function requestOwnedCapes() {
@@ -49,8 +48,8 @@
     }
   }
 
-  async function handleNextRequest(inverted) {
-    currentRequest = inverted ? (currentRequest > 0 ? currentRequest - 1 : requests.length - 1) : (currentRequest + 1) % requests.length;
+  async function switchTab(tab) {
+    currentRequest = tab;
     capes = null;
     if (currentRequest === 1) {
       await requestTrendingCapes(1);
@@ -84,13 +83,13 @@
 </script>
 
 <div class="wrapper">
-  <div class="navbar">
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class="arrow" on:click={() => handleNextRequest(true)}>&lt;</h1>
-    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}>
-      <span>&star;</span> {requests[currentRequest].text} <span>&star;</span></h1>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class="arrow" on:click={() => handleNextRequest(false)}>&gt;</h1>
+  <div class="tab-wrapper">
+    <h1 on:click={() => switchTab(0)} class:active-tab={currentRequest === 0}>EDITOR</h1>
+    <div class="button-wrapper">
+      <h2 on:click={() => switchTab(1)} class:active-tab={currentRequest === 1}>ALL TIME</h2>
+      <h2 on:click={() => switchTab(2)} class:active-tab={currentRequest === 2}>WEEKLY</h2>
+      <h2 on:click={() => switchTab(3)} class:active-tab={currentRequest === 3}>OWNED</h2>
+    </div>
   </div>
   <div class="cape-wrapper">
     {#if currentRequest === 0}
@@ -103,7 +102,6 @@
       {/if}
     {/if}
   </div>
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
 </div>
 
 <style>
@@ -115,38 +113,42 @@
         justify-content: center;
     }
 
-    .navbar {
-        display: flex;
-        justify-content: space-between;
-        width: 100vw;
-        padding: 0px 1em;
-        align-items: center;
-        flex-direction: row;
-        margin-top: 1em;
-    }
-
     .cape-wrapper {
         height: 100%;
     }
 
-    .navbar h1 {
+    .tab-wrapper h1,
+    .tab-wrapper h2 {
         font-family: 'Press Start 2P', serif;
         padding: 1em;
-        font-size: 35px;
-        transition: transform 0.3s;
+        font-size: 1em;
+        transition: transform 0.3s, color 0.3s;
     }
 
-    .navbar h1 span {
-        color: gold;
-        text-shadow: 3px 2px #5d4c03;
+    .tab-wrapper h1:hover,
+    .tab-wrapper h2:hover {
+        transform: scale(1.5);
     }
 
-    .navbar h1.arrow {
-        cursor: pointer;
-        font-size: 25px;
+    .tab-wrapper h1 {
+        font-size: 1.5em;
     }
 
-    .navbar h1.arrow:hover {
-        transform: scale(1.2);
+    .tab-wrapper {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .button-wrapper {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .active-tab {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 </style>
