@@ -294,6 +294,76 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
 }
 
 #[tauri::command]
+async fn get_blacklisted_mods() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Mods...");
+
+    match ApiEndpoints::norisk_blacklisted_mods().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted ResourcePacks...");
+
+    match ApiEndpoints::norisk_blacklisted_resourcepacks().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_shaders() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Shaders...");
+
+    match ApiEndpoints::norisk_blacklisted_shaders().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_datapacks() -> Result<Vec<String>, String> {
+    debug!("Getting Blacklisted Datapacks...");
+
+    match ApiEndpoints::norisk_blacklisted_datapacks().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
+    debug!("Getting Blacklisted Servers...");
+
+    match ApiEndpoints::norisk_blacklisted_servers().await {
+        Ok(result) => {
+            Ok(result)
+        }
+        Err(err) => {
+            Err(err.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
 

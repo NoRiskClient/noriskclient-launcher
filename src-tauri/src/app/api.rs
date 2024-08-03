@@ -95,6 +95,31 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/servers", branch), "", "").await
     }
 
+    /// Request blacklisted mods
+    pub async fn norisk_blacklisted_mods() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/mods"), "", "").await
+    }
+
+    /// Request blacklisted resourcepacks
+    pub async fn norisk_blacklisted_resourcepacks() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/resourcepacks"), "", "").await
+    }
+
+    /// Request blacklisted shaders
+    pub async fn norisk_blacklisted_shaders() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/shaders"), "", "").await
+    }
+
+    /// Request blacklisted datapacks
+    pub async fn norisk_blacklisted_datapacks() -> Result<Vec<String>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/datapacks"), "", "").await
+    }
+
+    /// Request blacklisted servers
+    pub async fn norisk_blacklisted_servers() -> Result<Vec<FeaturedServer>> {
+        Self::request_from_norisk_endpoint(&*format!("launcher/blacklisted/servers"), "", "").await
+    }
+
     /// Request custom servers
     pub async fn norisk_custom_servers(token: &str, request_uuid: &str) -> Result<CustomServersResponse> {
         Self::request_from_norisk_endpoint("launcher/custom-servers", token, request_uuid).await
