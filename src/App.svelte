@@ -7,7 +7,7 @@
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning, startProgress } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode } from "./utils/noriskUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
@@ -18,8 +18,10 @@
     }, 300);
     await fetchOptions();
     await fetchDefaultUserOrError(false);
+    await getNoRiskUser();
     await fetchBranches();
     await fetchProfiles();
+    await getMaintenanceMode();
 
     let unlisten = await listen("client-exited", () => {
       isClientRunning.set(false);

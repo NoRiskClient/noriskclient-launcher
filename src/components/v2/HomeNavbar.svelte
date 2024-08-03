@@ -6,7 +6,7 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api";
-  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist } from "../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../utils/noriskUtils.js";
   import InvitePopup from "../invite/InvitePopup.svelte";
   import { addNotification } from "../../stores/notificationStore.js";
 
@@ -75,6 +75,7 @@
 
     const userUnlisten = defaultUser.subscribe(async value => {
       await fetchFeatures();
+      await getNoRiskUser();
       updateNavItems();
     });
 

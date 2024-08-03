@@ -30,8 +30,29 @@ pub fn get_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Request maintenance mode
+    pub async fn get_norisk_user(norisk_token: &str, request_uuid: &str) -> Result<NoRiskUserMinimal> {
+        Self::request_from_norisk_endpoint("core/user", norisk_token, request_uuid).await
+    }
+    
+    /// Request maintenance mode
     pub async fn norisk_maintenance_mode() -> Result<bool> {
         Self::request_from_norisk_endpoint("launcher/maintenance-mode", "", "").await
+    }
+
+    /// Update maintenance mode
+    pub async fn toggle_norisk_maintenance_mode(maintenance_mode: bool, norisk_token: &str, request_uuid: &str) -> Result<String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), "launcher/maintenance-mode");
+        info!("URL: {}\nVALUE: {}", url, &maintenance_mode); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.put(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .json(&maintenance_mode)
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
     }
 
     /// Request all available branches
@@ -371,6 +392,17 @@ pub struct NoRiskUser {
     pub uuid: String,
     pub token: String,
     pub ign: String,
+    #[serde(rename = "discordId")]
+    pub discord_id: Option<String>,
+    pub rank: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NoRiskUserMinimal {
+    pub uuid: String,
+    pub ign: String,
+    #[serde(rename = "discordId")]
+    pub discord_id: Option<String>,
     pub rank: String,
 }
 

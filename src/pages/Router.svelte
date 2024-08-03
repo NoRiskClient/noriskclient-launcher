@@ -16,7 +16,7 @@
   import Shaders from "./Shaders.svelte";
   import Resourcepacks from "./Resourcepacks.svelte";
   import Datapacks from "./Datapacks.svelte";
-  import { isInMaintenanceMode, getMaintenanceMode, isClientRunning } from "../utils/noriskUtils.js";
+  import { isInMaintenanceMode, getMaintenanceMode, isClientRunning, noriskUser } from "../utils/noriskUtils.js";
   import GameButton from "../components/v2/buttons/GameButton.svelte";
   import Crash from "./Crash.svelte";
   import CrashHeader from "../components/v2/CrashHeader.svelte";
@@ -65,15 +65,15 @@
 </div>
 <div class="content">
   <Notifications />
-  {#if $isInMaintenanceMode == true}
+  {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
     <MaintenanceMode />
-  {:else if $isInMaintenanceMode == false}
+  {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
     <Router {routes} />
   {/if}
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash"}
+  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev)}
     <BackButton />
   {:else}
     {#if $isClientRunning}
@@ -95,19 +95,5 @@
 
     .content {
         height: 80vh;
-    }
-
-    .center {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-    }
-
-    .center h1 {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-        font-family: 'Press Start 2P', serif;
-        font-size: 25px;
     }
 </style>

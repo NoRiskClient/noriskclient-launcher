@@ -13,10 +13,10 @@
   import { addNotification } from "../stores/notificationStore.js";
   import ExperimentalTokenModal from "../components/config/ExperimentalTokenModal.svelte";
   import { onDestroy } from "svelte";
-  import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
+  import { fetchDefaultUserOrError, defaultUser } from "../stores/credentialsStore.js";
   import { fetchBranches } from "../stores/branchesStore.js";
   import { fetchProfiles } from "../stores/profilesStore.js";
-  import { featureWhitelist } from "../utils/noriskUtils.js";
+  import { featureWhitelist, noriskUser, isInMaintenanceMode, setMaintenanceMode } from "../utils/noriskUtils.js";
 
   $: lightTheme = $launcherOptions?.theme === "LIGHT";
   let showExperimentalTokenModal = false;
@@ -58,6 +58,22 @@
     await saveOptions();
   }
 
+  function toggleMaintenanceMode() {
+    invoke("toggle_maintenance_mode", {
+      maintenanceMode: $isInMaintenanceMode,
+      options: $launcherOptions,
+      credentials: $defaultUser
+    })
+      .then(async (result) => {
+        const newState = result.includes("true");
+        setMaintenanceMode(newState);
+        alert("Maintenance mode is now " + (newState ? "enabled" : "disabled") + "!");
+      })
+      .catch(e => {
+        addNotification(`Failed to toggle maintenance mode: ${e}`);
+      });
+  }
+
   onDestroy(async () => {
     await saveOptions();
   });
@@ -75,38 +91,35 @@
     <McRealAppModal bind:showModal={showMcRealAppModal} />
   {/if}
   <div on:click|stopPropagation class="settings-container">
-    <div>
-      <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
-      <div class="settings-wrapper">
-        <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
-        <div class="experimental-mode-wrapper">
-          <ConfigRadioButton on:toggle={toggleExperimentalMode} bind:value={$launcherOptions.experimentalMode}
-                             text="Experimental Mode" />
+    <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
+    <hr>
+    <div class="settings-wrapper">
+      <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
+      {#if $noriskUser?.isDev}
+        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isDevOnly={true} on:toggle={toggleExperimentalMode} />
+        <ConfigRadioButton text="Launcher Maintenance Mode" bind:value={$isInMaintenanceMode} isDevOnly={true} on:toggle={toggleMaintenanceMode} />
+      {/if}
+      <ConfigRadioButton text={`Theme: ${$launcherOptions.theme}`} bind:value={lightTheme} on:toggle={toggleTheme} />
+      {#if $featureWhitelist.includes("MCREAL_APP")}
+        <div class="mcreal-app-wrapper">
+          <h1 class="title">MCReal App</h1>
+          <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
         </div>
-        <ConfigRadioButton bind:value={lightTheme} on:toggle={toggleTheme} text={`Theme: ${$launcherOptions.theme}`} />
-        {#if $featureWhitelist.includes("MCREAL_APP")}
-          <div class="mcreal-app-wrapper">
-            <h1 class="title">MCReal App</h1>
-            <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
-          </div>
-        {/if}
-        <div class="sliders">
-          <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage}
-                        step={1} />
-          <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads}
-                        step={1} />
-        </div>
-        <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
-        <!-- <ConfigFolderInput title="Java Path" bind:value={$launcherOptions.customJavaPath} /> -->
-        <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
-        <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
-        <div class="clear-data-button-wrapper" style={`margin-top: ${$featureWhitelist.includes("MCREAL_APP") ? "0.25" : "1.5"}em;`}>
-          <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
-        </div>
+      {/if}
+      <div class="sliders">
+        <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage} step={1} />
+        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
+      </div>
+      <!-- disabled for now since the rust backend for that feature does not work properly and nobody uses it anyways!? -->
+      <!-- <ConfigFolderInput title="Java Path" bind:value={$launcherOptions.customJavaPath} /> -->
+      <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
+      <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
+      <div class="clear-data-button-wrapper">
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
       </div>
     </div>
-    <!-- svelte-ignore a11y-autofocus -->
   </div>
+  <!-- svelte-ignore a11y-autofocus -->
 </TransitionWrapper>
 
 <style>
@@ -115,9 +128,15 @@
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
-        overflow-y: hidden;
+        overflow: hidden;
         height: 80vh;
-        padding: 1em;
+        padding-top: 1em;
+    }
+
+    hr {
+        width: 85%;
+        border: 1px solid white;
+        margin-top: 1.5em;
     }
 
     .title {
@@ -138,8 +157,10 @@
         display: flex;
         flex-direction: column;
         margin-top: 2em;
-        gap: 1em;
-        width: 75vw;
+        gap: 1.15em;
+        width: 80vw;
+        padding: 0px 2em 2em 2em;
+        overflow: scroll;
     }
 
     .nes-font {
@@ -147,13 +168,6 @@
         font-size: 30px;
         user-select: none;
         cursor: default;
-    }
-
-    .experimental-mode-wrapper {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
     }
 
     .mcreal-app-wrapper {
@@ -196,6 +210,7 @@
         align-items: center;
         justify-content: center;
         height: 3em;
+        margin-top: 1.5em;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;

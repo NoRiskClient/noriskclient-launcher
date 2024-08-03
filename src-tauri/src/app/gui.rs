@@ -21,7 +21,7 @@ use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUser, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -915,10 +915,26 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 }
 
 #[tauri::command]
+async fn get_norisk_user(options: LauncherOptions, credentials: Credentials) -> Result<NoRiskUserMinimal, String> {
+    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
+        .await
+        .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+    Ok(user)
+}
+
+#[tauri::command]
 async fn check_maintenance_mode() -> Result<bool, String> {
     let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
         .await
         .map_err(|e| format!("unable to request maintenance mode: {:?}", e))?;
+    Ok(maintenance_mode)
+}
+
+#[tauri::command]
+async fn toggle_maintenance_mode(maintenance_mode: bool, options: LauncherOptions, credentials: Credentials) -> Result<String, String> {
+    let maintenance_mode = ApiEndpoints::toggle_norisk_maintenance_mode(maintenance_mode, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
+        .await
+        .map_err(|e| format!("unable to update maintenance mode: {:?}", e))?;
     Ok(maintenance_mode)
 }
 
@@ -1430,7 +1446,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 }
 
 #[tauri::command]
-async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     let custom_server_process_mutex = Arc::new(std::sync::Mutex::new(None));
 
@@ -1659,7 +1675,9 @@ pub fn gui_main() {
             minecraft_auth_update_norisk_token,
             minecraft_auth_update_mojang_and_norisk_token,
             store_options,
+            get_norisk_user,
             check_maintenance_mode,
+            toggle_maintenance_mode,
             request_norisk_branches,
             discord_auth_link,
             discord_auth_status,

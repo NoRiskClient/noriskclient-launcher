@@ -6,6 +6,7 @@ import { pop, push } from "svelte-spa-router";
 import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
+export const noriskUser = writable(null);
 export const isInMaintenanceMode = writable(null);
 export const isClientRunning = writable(false);
 export const isCheckingForUpdates = writable(true);
@@ -125,6 +126,20 @@ export function getNoRiskToken() {
   return options.experimentalMode ? user.norisk_credentials.experimental.value : user.norisk_credentials.production.value;
 }
 
+export function getNoRiskUser() {
+  invoke("get_norisk_user", {
+    options: get(launcherOptions),
+    credentials: get(defaultUser),
+  }).then(result => {
+    result.isDev = result?.rank == "DEVELOPER" || result?.rank == "ADMIN";
+    noriskUser.set(result);
+    console.log("NoRisk User: ", result);
+  }).catch(reason => {
+    noriskError(reason);
+    addNotification(`Failed to fetch NoRisk User: ${reason}`);
+  });
+}
+
 export function noriskLog(message) {
   invoke("console_log_info", { message }).catch(e => console.error(e));
 }
@@ -159,7 +174,10 @@ export async function fetchFeature(feature) {
     let currentFeatures = get(featureWhitelist);
     if (currentFeatures.includes(feature)) { return; }
     featureWhitelist.set([...currentFeatures, feature]);
-  })
+  }).catch(reason => {
+    noriskError(reason);
+    addNotification(`Failed to fetch Feature: ${reason}`);
+  });
 }
 
 export async function getFeatureWhitelist() {
@@ -170,13 +188,17 @@ export async function getFeatureWhitelist() {
   console.log("Feature Whitelist: " + get(featureWhitelist).join(", "));
 }
 
-export function getMaintenanceMode() {
+export async function getMaintenanceMode() {
   isInMaintenanceMode.set(null);
   invoke("check_maintenance_mode").then(result => {
+    if (result == true && get(noriskUser)?.isDev) {
+      alert("Skipped Maintenance Mode Screen Because You Are A Developer / Admin.");
+    }
     isInMaintenanceMode.set(result);
     console.log("Maintenance Mode: " + result);
   }).catch(reason => {
     noriskError(reason);
+    addNotification(`Failed to fetch Maintenance Mode: ${reason}`);
   });
 }
 
