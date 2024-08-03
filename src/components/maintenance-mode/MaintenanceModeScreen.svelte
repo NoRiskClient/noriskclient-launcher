@@ -26,6 +26,7 @@
         text-shadow: 2px 2px var(--font-color-text-shadow);
         font-family: 'Press Start 2P', serif;
         text-align: center;
+        width: 95%;
     }
 
     .maintenance-mode {
@@ -39,7 +40,7 @@
     .maintenance-mode .title {
         margin-top: 50px;
         font-size: 30px;
-        margin-bottom: 20px;
+        margin-bottom: 1em;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
@@ -57,6 +58,11 @@
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 20px;
+        transition-duration: 200ms;
+    }
+
+    .maintenance-mode .discord:hover {
+        transform: scale(1.2);
     }
 
     .quit-button {
