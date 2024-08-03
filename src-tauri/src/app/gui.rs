@@ -1000,7 +1000,7 @@ async fn request_norisk_branches(options: LauncherOptions, credentials: Credenti
 }
 
 #[tauri::command]
-async fn enable_experimental_mode(options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
+async fn enable_experimental_mode(credentials: Credentials) -> Result<String, String> {
     // This requires the production token to be present!!!
     return ApiEndpoints::enable_experimental_mode(&credentials.norisk_credentials.production.unwrap().value, &credentials.id.to_string()).await
         .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
