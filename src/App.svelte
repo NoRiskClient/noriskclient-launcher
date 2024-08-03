@@ -1,5 +1,5 @@
 <script>
-  import Router from "./pages/Router.svelte";
+  import Router from "./Router.svelte";
   import { onMount } from "svelte";
   import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
   import { fetchOptions } from "./stores/optionsStore.js";
