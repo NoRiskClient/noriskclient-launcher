@@ -322,7 +322,7 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: Self::init(None).await?.users.get(&profile_id.clone()).unwrap().norisk_credentials.clone(),
+            norisk_credentials: if Self::init(None).await?.users.len() > 0 { Self::init(None).await?.users.get(&profile_id.clone()).unwrap().norisk_credentials.clone() } else { NoRiskCredentials { production: None, experimental: None } },
         };
 
         self.users.insert(profile_id, credentials.clone());

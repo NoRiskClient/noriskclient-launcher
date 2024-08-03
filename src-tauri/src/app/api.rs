@@ -55,8 +55,8 @@ impl ApiEndpoints {
     }
 
     /// Request token for experimental mode
-    pub async fn enable_experimental_mode(experimental_token: &str) -> Result<bool> {
-        Self::request_from_norisk_endpoint_with_experimental("launcher/experimental-mode", experimental_token, "").await
+    pub async fn enable_experimental_mode(norisk_token: &str, request_uuid: &str) -> Result<bool> {
+        Self::request_from_norisk_endpoint("launcher/experimental-mode", norisk_token, request_uuid).await
     }
 
     /// Request featured mods

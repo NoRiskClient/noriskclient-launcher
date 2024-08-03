@@ -5,7 +5,6 @@
     import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
     import ConfigFileInput from "./inputs/ConfigFileInput.svelte";
     import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
-    import ExperimentalTokenModal from "./ExperimentalTokenModal.svelte";
     import { fetchOptions, launcherOptions, saveOptions } from "../../stores/optionsStore.js";
     import { preventSelection } from "../../utils/svelteUtils.js";
     import { invoke } from "@tauri-apps/api";
@@ -20,7 +19,6 @@
   
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
-    let showExperimentalTokenModal = false;
   
     function toggleTheme() {
       $launcherOptions.toggleTheme();
@@ -46,18 +44,33 @@
     }
   
     async function toggleExperimentalMode() {
-      if (!$launcherOptions.experimentalMode) {
-        await saveOptions(false);
-        if (getNoRiskToken() == null) {
-          await startMicrosoftAuth();
+        if (!$launcherOptions.experimentalMode) {
+            await saveOptions(false);
+            if (getNoRiskToken() == null) {
+                await startMicrosoftAuth();
+            } else {
+                await updateNoRiskToken($defaultUser);
+                await fetchDefaultUserOrError(true);
+            }
         } else {
-          await updateNoRiskToken($defaultUser);
+            invoke("enable_experimental_mode", {
+              options: $launcherOptions,
+              credentials: $defaultUser
+            }).then(async () => {
+                console.log("Experimental mode enabled");
+                $launcherOptions.experimentalMode = true;
+                await saveOptions(false);
+                if (getNoRiskToken() == null) {
+                    await startMicrosoftAuth();
+                } else {
+                    await updateNoRiskToken($defaultUser);
+                    await fetchDefaultUserOrError(true);
+                }
+            }).catch(async (e) => {
+                $launcherOptions.experimentalMode = false;
+                addNotification(`Failed to enable experimental mode: ${e}`);
+            });
         }
-        return;
-      } else if ($launcherOptions.experimentalMode) {
-        showExperimentalTokenModal = true;
-        $launcherOptions.experimentalMode = false;
-      }
     }
   
     onDestroy(async () => {
@@ -65,9 +78,7 @@
     });
 </script>
   
-{#if showExperimentalTokenModal}
-    <ExperimentalTokenModal bind:showModal={showExperimentalTokenModal} />
-{:else if showMcRealAppModal}
+{#if showMcRealAppModal}
     <McRealAppModal bind:showModal={showMcRealAppModal} />
 {/if}
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -82,8 +93,8 @@
     <ConfigRadioButton text={`Theme: ${$launcherOptions.theme}`} bind:value={lightTheme} on:toggle={toggleTheme} />
     {#if $featureWhitelist.includes("MCREAL_APP")}
         <div class="mcreal-app-wrapper">
-        <h1 class="title">MCReal App</h1>
-        <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
+            <h1 class="title">MCReal App<p class="devOnly">(Alpha)</p></h1>
+            <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
         </div>
     {/if}
     <div class="sliders">
@@ -91,7 +102,7 @@
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
     </div>
     <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} extentions={["exe"]} requiredFileName={"javaw"} defaultValue={""} />
-    <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} />
+    <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} placeholder={"None"} />
     <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
     <div class="clear-data-button-wrapper">
         <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
@@ -156,6 +167,9 @@
     }
   
     .mcreal-app-wrapper > .title {
+        display: flex;
+        flex-direction: row;
+        gap: 1em;
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
         color: var(--font-color);
@@ -173,6 +187,12 @@
   
     .mcreal-app-wrapper > .button:hover {
         transform: scale(1.15);
+    }
+
+    .devOnly {
+      font-size: 12.5px;
+      color: var(--dev-font-color);
+      text-shadow: 1.25px 1.25px var(--dev-font-color-text-shadow);
     }
   
     .sliders {

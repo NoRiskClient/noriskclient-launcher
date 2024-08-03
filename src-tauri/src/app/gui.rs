@@ -75,11 +75,11 @@ struct PlayerDBPlayer {
 #[tauri::command]
 async fn check_online_status() -> Result<(), String> {
     //TODO
-    /*HTTP_CLIENT.get("https://api.norisk.gg/launcherapi")
-        .send().await
-        .map_err(|e| format!("unable to connect to api.norisk.gg: {:}", e))?
-        .error_for_status()
-        .map_err(|e| format!("api.norisk.gg returned an error: {:}", e))?;*/
+    // HTTP_CLIENT.get("https://api.norisk.gg/launcherapi")
+    //     .send().await
+    //     .map_err(|e| format!("unable to connect to api.norisk.gg: {:}", e))?
+    //     .error_for_status()
+    //     .map_err(|e| format!("api.norisk.gg returned an error: {:}", e))?;
     Ok(())
 }
 
@@ -1006,8 +1006,9 @@ async fn request_norisk_branches(options: LauncherOptions, credentials: Credenti
 }
 
 #[tauri::command]
-async fn enable_experimental_mode(experimental_token: &str) -> Result<bool, String> {
-    return ApiEndpoints::enable_experimental_mode(experimental_token).await
+async fn enable_experimental_mode(options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
+    // This requires the production token to be present!!!
+    return ApiEndpoints::enable_experimental_mode(&credentials.norisk_credentials.production.unwrap().value, &credentials.id.to_string()).await
         .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
 }
 
