@@ -21,7 +21,7 @@ use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUser, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -1359,7 +1359,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
     let _ = store_options(LauncherOptions::default()).await;
     let _ = store_launcher_profiles(LauncherProfiles::default()).await;
 
-    ["assets", "gameDir", "libraries", "mod_cache", "natives", "runtimes", "versions"]
+    ["assets", "gameDir", "libraries", "mod_cache", "custom_mods", "natives", "runtimes", "versions"]
         .iter()
         .map(|dir| options.data_path_buf().join(dir))
         .filter(|dir| dir.exists())
