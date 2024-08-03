@@ -17,7 +17,7 @@
   {#if reversed}
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
     {#if isDevOnly}
-      <h1 class="nes-font devOnly">(Dev Only)</h1>
+      <h1 class="nes-font devOnly" title="You can see this because you are a Developer / Admin.">(Dev Only)</h1>
     {/if}
   {/if}
   <label class="nes-switch">
@@ -27,7 +27,7 @@
   {#if !reversed}
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
     {#if isDevOnly}
-      <h1 class="nes-font devOnly">(Dev)</h1>
+      <h1 class="nes-font devOnly" title="You can see this because you are a Developer / Admin.">(Dev)</h1>
     {/if}
   {/if}
 </div>
@@ -41,8 +41,8 @@
 
     .devOnly {
       font-size: 12.5px;
-      color: gold;
-      text-shadow: 1.25px 1.25px rgb(189, 161, 2);
+      color: var(--dev-font-color);
+      text-shadow: 1.25px 1.25px var(--dev-font-color-text-shadow);
     }
 
     .spaced {

@@ -71,6 +71,8 @@
         --background-contrast-color: #e7e7e7;
         --font-color: #161616;
         --font-color-text-shadow: #d0d0d0;
+        --dev-font-color: rgb(194, 165, 0);
+        --dev-font-color-text-shadow: rgb(170, 144, 0);
         transition: background-color 0.2s;
     }
 
@@ -85,6 +87,8 @@
         --background-contrast-color: #222126;
         --font-color: #e8e8e8;
         --font-color-text-shadow: #7a7777;
+        --dev-font-color: gold;
+        --dev-font-color-text-shadow: rgb(189, 161, 2);
     }
 
     :global(*) {
