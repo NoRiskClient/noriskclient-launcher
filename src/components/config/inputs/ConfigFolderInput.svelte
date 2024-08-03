@@ -25,8 +25,8 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="Internal" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
-    <button on:click={selectFolderPath} aria-label="Select Folder">📂</button>
+    <input placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <button on:click={selectFolderPath} aria-label="Select Folder" title="Select Folder">📂</button>
   </div>
 </div>
 
@@ -77,13 +77,21 @@
         font-size: 10px;
         padding: 6px 8px;
         border: 1px solid #212121;
+        color: var(--font-color-disabled);
+        text-shadow: 1.25px 1.25px var(--font-color-text-shadow);
         background-color: var(--background-contrast-color);
         width: 100%;
         outline: none;
         transition: background-color 0.3s ease-in-out;
     }
 
+    .nes-input::target-text {
+      color: var(--font-color);
+      opacity: 0.65;
+    }
+
     .nes-input::placeholder {
       color: var(--font-color);
+      opacity: 0.65;
     }
 </style>

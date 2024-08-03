@@ -68,6 +68,7 @@
 
     .nes-input::placeholder {
       color: var(--font-color);
+      opacity: 0.65;
     }
 
     .suffix {
