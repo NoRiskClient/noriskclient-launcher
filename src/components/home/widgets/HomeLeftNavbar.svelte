@@ -1,4 +1,5 @@
 <script>
+  import { openInfoPopup, openConfirmPopup, openInputPopup, openErrorPopup } from "../../../utils/popupUtils.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { onMount } from "svelte";
   import { openDiscordIntegration } from "../../../utils/discordUtils.js";
@@ -27,7 +28,52 @@
         },
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
-    ].sort((a, b) => b.name.length - a.name.length);
+      {
+        name: "INFO POPUP",
+        onClick: () => {
+          openInfoPopup({ title: "Welcome to NoRiskClient!", content: "We are happy to see you here! If you have any questions or problems, feel free to ask us in our Discord server. You can find the link in the footer of the launcher.", onClose: () => { alert("CLOSED!") }, titleFontSize: "17.5px", contentFontSize: "15px" });
+        },
+        condition: () => true,
+      },
+      {
+        name: "CONFIRM POPUP",
+        onClick: () => {
+          openConfirmPopup({
+            title: "Are you sure?",
+            content: "This action is irreversible!",
+            onConfirm: () => { },
+            onCancel: () => { }
+          });
+        },
+        condition: () => true,
+      },
+      {
+        name: "INPUT POPUP",
+        onClick: () => {
+          openInputPopup({
+            title: "Enter your name",
+            content: "Please enter your name:",
+            inputType: "FOLDER",
+            inputName: "Minecraft Directory",
+            inputValue: "",
+            inputPlaceholder: "Detect Automatically",
+            confirmButton: "Apply",
+            validateInput: (input) => { alert(`Validating: ${input}`) },
+            onConfirm: (input) => { alert("You entered: " + input) },
+            onCancel: () => { alert("CANCELLED!") },
+            titleFontSize: "20px"
+          });
+        },
+        condition: () => true,
+      },
+      {
+        name: "ERROR POPUP",
+        onClick: () => {
+          openErrorPopup({ title: "An error occurred!", content: "Something went wrong!", onClose: () => { alert("CLOSED!") }, titleFontSize: "25px" });
+        },
+        condition: () => true,
+      },
+    ];
   }
 
   onMount(async () => {
@@ -115,7 +161,7 @@
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: end;
+    align-items: start;
     pointer-events: all;
   }
 
