@@ -20,6 +20,8 @@
   
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
+    let totalSystemMemory = 0;
+    let selectedMemory = 0;
   
     function toggleTheme() {
       $launcherOptions.toggleTheme();
@@ -77,9 +79,17 @@
             });
         }
     }
+
+    (async () => {
+        const totalBytes = await invoke("get_total_memory");
+        totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024));
+        selectedMemory = $launcherOptions.memoryPercentage / 1024;
+        noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
+    })();
   
     onDestroy(async () => {
-      await saveOptions();
+        $launcherOptions.memoryPercentage = selectedMemory * 1024;
+        await saveOptions();
     });
 </script>
   
@@ -103,7 +113,7 @@
         </div>
     {/if}
     <div class="sliders">
-        <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage} step={1} />
+        <ConfigSlider title="RAM" suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
     </div>
     <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} extentions={["exe"]} requiredFileName={"javaw"} defaultValue={""} />

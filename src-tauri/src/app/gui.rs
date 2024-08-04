@@ -11,7 +11,7 @@ use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::McDataHandler, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::{total_memory, McDataHandler}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
@@ -19,7 +19,6 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
-use crate::utils::percentage_of_total_memory;
 
 use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
@@ -1238,7 +1237,7 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
         force_server: force_server,
-        memory: percentage_of_total_memory(options.memory_percentage),
+        memory: options.memory_limit,
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
         custom_java_args: options.custom_java_args,
@@ -1334,6 +1333,11 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
 }
 
 #[tauri::command]
+async fn get_total_memory() -> Result<i64, String> {
+    Ok(total_memory())
+}
+
+#[tauri::command]
 async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> {
     let account = login_data.refresh_maybe_fixed().await
         .map_err(|e| format!("unable to refresh: {:?}", e))?;
@@ -1395,11 +1399,6 @@ async fn add_player_to_whitelist(identifier: &str, norisk_token: &str, request_u
             Err(err.to_string())
         }
     }
-}
-
-#[tauri::command]
-async fn mem_percentage(memory_percentage: i32) -> i64 {
-    percentage_of_total_memory(memory_percentage)
 }
 
 #[tauri::command]
@@ -1820,7 +1819,6 @@ pub fn gui_main() {
             get_world_folders,
             upload_logs,
             get_launch_manifest,
-            mem_percentage,
             default_data_folder_path,
             terminate,
             get_featured_servers,
@@ -1845,6 +1843,7 @@ pub fn gui_main() {
             get_all_folia_build_versions,
             get_all_purpur_game_versions,
             get_all_spigot_game_versions,
+            get_total_memory,
             get_all_bukkit_game_versions,
             check_feature_whitelist,
             get_full_feature_whitelist,
