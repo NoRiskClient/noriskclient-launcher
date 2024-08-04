@@ -29,7 +29,7 @@
   
     $: if (dialog) dialog.showModal();
     let animateOutNow = false;
-    let isInputValid = popupType != "INPUT" || !liveValidation;
+    let isInputValid = (popupType != "INPUT" || popupInputType != "TEXT") || !liveValidation;
 
     function closePopup() {
         if (popupType == "CONFIRM" || popupType == "INPUT") {
