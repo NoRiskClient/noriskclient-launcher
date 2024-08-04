@@ -33,6 +33,7 @@
         });
         skinViewer.camera.position.set(0, 25, -75);
         skinViewer.zoom = 1.0;
+        skinViewer.controls.enableZoom = false;
         document.getElementById(`player-${cape}`).appendChild(canvas);
     };
 
