@@ -23,10 +23,10 @@ export async function checkApiStatus() {
   let apiIsOnline = null;
   await invoke("check_online_status").then((apiOnlineState) => {
     apiIsOnline = apiOnlineState;
-    console.log(`API is ${apiIsOnline ? 'online' : 'offline'}!`);
+    noriskLog(`API is ${apiIsOnline ? 'online' : 'offline'}!`);
   }).catch(() => {
     apiIsOnline = false;
-    console.error("API is offline!");
+    noriskError("API is offline!");
   });
   return apiIsOnline;
 }
@@ -42,7 +42,7 @@ export async function runClient(branch, checkedForNewBranch = false) {
     let showNewBranchScreen;
 
     await invoke("check_for_new_branch", { branch: branch }).then(result => {
-      console.log("Checked for new branch: ", result);
+      noriskLog("Checked for new branch: " + result);
       showNewBranchScreen = result;
     }).catch(reason => {
       showNewBranchScreen = "ERROR";
@@ -108,12 +108,11 @@ export async function runClient(branch, checkedForNewBranch = false) {
     if (get(forceServer).length > 0) {
       forceServer.set(get(forceServer) + ":RUNNING");
     }
-  }).catch(reason => {
+  }).catch(error => {
     isClientRunning.set(false);
-    console.error("Error: ", reason);
     forceServer.set("");
     pop();
-    addNotification(reason);
+    addNotification("Failed to run client: " + error);
   });
 
   // NoRisk Token Changed So Update
@@ -149,15 +148,20 @@ export function getNoRiskUser() {
   }).then(result => {
     result.isDev = result?.rank == "DEVELOPER" || result?.rank == "ADMIN";
     noriskUser.set(result);
-    console.log("NoRisk User: ", result);
+    noriskLog("NoRisk User: " + JSON.stringify(result));
   }).catch(reason => {
-    noriskError(reason);
     addNotification(`Failed to fetch NoRisk User: ${reason}`);
   });
 }
 
 export function noriskLog(message) {
+  console.info(`Norisk Log: ${message}`);
   invoke("console_log_info", { message }).catch(e => console.error(e));
+}
+
+export function noriskWarning(message) {
+  console.warn(`Norisk Warning: ${message}`);
+  invoke("console_log_warning", { message }).catch(e => console.error(e));
 }
 
 export function noriskError(message) {
@@ -187,21 +191,19 @@ export async function getFeatureWhitelist() {
     if (!result || result.length < 1) return;
     featureWhitelist.set(result);
   }).catch(reason => {
-    noriskError(reason);
     addNotification(`Failed to fetch Feature: ${reason}`);
   });
-  console.log("Feature Whitelist: " + get(featureWhitelist).join(", "));
+  noriskLog("Feature Whitelist: " + get(featureWhitelist).join(", "));
 }
 
 export async function getMaintenanceMode() {
   invoke("check_maintenance_mode").then(result => {
     if (result == true && get(noriskUser)?.isDev && get(isInMaintenanceMode) == null) {
-      alert("Skipped Maintenance Mode Screen Because You Are A Developer / Admin.");
+      addNotification(`Skipped maintenance mode screen because you are a ${get(noriskUser).rank.toLowerCase()}.`, "INFO");
     }
     isInMaintenanceMode.set(result);
-    console.log("Maintenance Mode: " + result);
+    noriskLog("Maintenance Mode: " + result);
   }).catch(reason => {
-    noriskError(reason);
     addNotification(`Failed to fetch Maintenance Mode: ${reason}`);
   });
 }

@@ -7,7 +7,7 @@
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode, noriskLog } from "./utils/noriskUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
@@ -42,7 +42,7 @@
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
-      console.log("Default User Was Updated", value);
+      noriskLog("Default User Was Updated.");
       await fetchBranches();
       await fetchProfiles();
     });

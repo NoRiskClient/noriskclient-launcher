@@ -12,7 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
 
   export let isServersideInstallation = false;
 
@@ -109,8 +110,8 @@
       launchManifest = result;
       getCustomModsFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification("Failed to get launch manifest: " + error);
     });
   }
 
@@ -132,7 +133,7 @@
       console.debug("Custom Mods", mods);
       customMods = mods;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -150,8 +151,8 @@
       mods = mods;
       launcherProfile.mods = launcherProfile.mods;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -196,8 +197,8 @@
                 author = info.author ?? null;
                 iconUrl = info.icon_url;
                 description = info.description;
-              }).catch((err) => {
-                console.error(err);
+              }).catch((error) => {
+                addNotification(error);
               });
             }
             if (!mod.enabled) disableRecomendedMod(slug);
@@ -210,8 +211,8 @@
             });
           }
         });
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -262,8 +263,8 @@
           return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase();
         })))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -341,10 +342,10 @@
       await removeFile(folder + "/" + filename).then(() => {
         getCustomModsFilenames();
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -358,17 +359,17 @@
         await renameFile(folder + "/" + filename, folder + "/" + filename.replace(".disabled", "")).then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
-          alert(error);
+          addNotification(error);
         });
       } else {
         await renameFile(folder + "/" + filename, folder + "/" + filename + ".disabled").then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
-          alert(error);
+          addNotification(error);
         });
       }
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -386,7 +387,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -400,8 +401,8 @@
       if (locations instanceof Array) {
         installCustomMods(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -417,14 +418,14 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom Mod ${fileName}`);
+      noriskLog(`Installing custom Mod ${fileName}`);
       await invoke("save_custom_mods_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         mcVersion: launchManifest.build.mcVersion,
         file: { name: fileName, location: location },
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomModsFilenames();
     });
@@ -452,7 +453,7 @@
     }
     await getLaunchManifest();
     await getBlacklistedMods();
-    searchMods();
+    await searchMods();
   }
 
   onMount(() => {

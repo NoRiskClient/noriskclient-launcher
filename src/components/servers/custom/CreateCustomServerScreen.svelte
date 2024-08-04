@@ -21,8 +21,9 @@
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
     import { customServerBaseDomain } from "../../../stores/customServerStore.js";
-    import { customServerProgress, setCustomServerProgress } from "../../../utils/noriskUtils.js";
+    import { customServerProgress, setCustomServerProgress, noriskLog } from "../../../utils/noriskUtils.js";
     import { addCustomServer, setActiveCustomServerId } from "../../../stores/customServerStore.js";
+    import { addNotification } from "../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -137,7 +138,7 @@
             token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             uuid: $defaultUser.id,
         }).then(async (newServer) => {
-            console.log('Created Server:', newServer);
+            noriskLog("Created Server: " + JSON.stringify(newServer));
             createdServer = newServer;
             addCustomServer(newServer);
             setCustomServerProgress(newServer._id, { label: "Initializing...", progress: 0, max: 0 });
@@ -154,18 +155,16 @@
                 additionalData: additionalData,
                 token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             }).then(() => {
-                console.log('Initialized Server:', newServer);
+                noriskLog("Initialized Server: " + JSON.stringify(newServer));
                 currentTab = "COMPLETED";
                 // delete customServerProgress[newServer._id];
             }).catch((error) => {
-                console.error(error);
                 dispatch("back");
-                alert(error);
+                addNotification("Failed to initialize server: " + error);
             });
         }).catch((error) => {
-            console.error(error);
             dispatch("back");
-            alert(error);
+            addNotification("Failed to create server: " + error);
         });
     }
 </script>

@@ -4,17 +4,12 @@
   import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { preventSelection } from "../../utils/svelteUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
+  import { noriskLog } from "../../utils/noriskUtils.js";
 
   let capes = null;
   let capeHash = null;
   let isLoading = true;
-  let requests = [
-    { text: "CAPE EDIT" },
-    { text: "ALLTIME" },
-    { text: "WEEKLY" },
-    { text: "OWNED" },
-  ];
   let currentRequest = 0;
 
   async function requestTrendingCapes(alltime) {
@@ -25,10 +20,10 @@
         alltime: alltime,
         limit: 30,
       }).then((result) => {
-        console.log("Requesting Trending capes", result);
+        noriskLog("Requesting Trending capes: " + JSON.stringify(result));
         capes = result;
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification(error);
       });
     }
   }
@@ -40,10 +35,10 @@
         uuid: $defaultUser.id,
         limit: 30,
       }).then((result) => {
-        console.debug("Requesting owned capes", result);
+        noriskLog("Requesting Owned capes: " + JSON.stringify(result));
         capes = result;
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification(error);
       });
     }
   }
@@ -68,12 +63,11 @@
         if (user) {
           capeHash = user;
         } else {
-          console.log("No Cape Found");
+          noriskLog("No cape found for user: " + $defaultUser.id);
         }
         isLoading = false;
-      }).catch(e => {
-        alert("Failed to Request User by UUID: " + e);
-        console.error(e);
+      }).catch(error => {
+        addNotification("Failed to Request User by UUID: " + error);
         isLoading = false;
       });
     }

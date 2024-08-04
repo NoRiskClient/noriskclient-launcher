@@ -7,6 +7,7 @@
   export let isDevOnly = false;
   export let reversed = false;
   export let spaced = false;
+  export let id = "";
 
   function preventSelection(event) {
     event.preventDefault();
@@ -21,7 +22,7 @@
     {/if}
   {/if}
   <label class="nes-switch">
-    <input type="checkbox" bind:checked={value} on:change={(e) => dispatch("toggle")}>
+    <input id={id} type="checkbox" bind:checked={value} on:change={(e) => dispatch("toggle")}>
     <span class="nes-slider"></span>
   </label>
   {#if !reversed}

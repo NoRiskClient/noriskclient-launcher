@@ -12,7 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -95,8 +96,8 @@
       launchManifest = result;
       getCustomDatapacksFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification("Failed to get launch manifest: " + error);
     });
   }
 
@@ -104,8 +105,8 @@
     await invoke("get_blacklisted_datapacks").then((result) => {
       console.debug("Blacklisted Datapacks", result);
       blacklistedDatapacks = result;
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      console.error(error);
     });
   }
 
@@ -119,7 +120,7 @@
       console.debug("Custom Datapacks", datapacks);
       customDatapacks = datapacks;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -138,8 +139,8 @@
       datapacks = datapacks;
       launcherProfiles.addons[currentBranch].datapacks = launcherProfiles.addons[currentBranch].datapacks;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -162,8 +163,8 @@
         result.forEach(datapack => datapack.featured = true);
         datapacks = result;
         featuredDatapacks = result;
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -195,8 +196,8 @@
       } else {
         datapacks = [...datapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -231,10 +232,10 @@
         getCustomDatapacksFilenames();
       }).catch((error) => {
         if (!showError) return;
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -252,7 +253,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -266,8 +267,8 @@
       if (locations instanceof Array) {
         installCustomDatapacks(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -283,14 +284,14 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom Datapack ${fileName}`);
+      noriskLog(`Installing custom Datapack ${fileName}`);
       await invoke("save_custom_datapacks_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
         world: world,
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomDatapacksFilenames();
     });

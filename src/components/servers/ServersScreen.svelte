@@ -4,13 +4,13 @@
   import VirtualList from "../utils/VirtualList.svelte";
   import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
   import CustomServerItem from "./custom/CustomServerItem.svelte";
-  import CustomServerDetails from "./custom/CustomServerDetailsScreen.svelte";
   import { createEventDispatcher } from "svelte";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { featureWhitelist } from "../../utils/noriskUtils.js";
+  import { featureWhitelist, noriskLog } from "../../utils/noriskUtils.js";
   import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { customServers, clearCustomServers, addCustomServer, setCustomServerBaseDomain, setActiveCustomServerId } from "../../stores/customServerStore.js";
+  import { addNotification } from "../../stores/notificationStore.js";
 
   const dispatch = createEventDispatcher();
 
@@ -24,10 +24,9 @@
 
     await invoke("get_featured_servers", { branch: $branches[$currentBranchIndex] }).then((result) => {
       featuredServers = result;
-    }).catch((e) => {
+    }).catch((error) => {
       featuredServers = [];
-      console.error(e);
-      alert("Failed to load featured servers:\n" + e);
+      addNotification("Failed to load featured servers: " + error);
     });
 
     if ($featureWhitelist.includes("CUSTOM_SERVERS")) {
@@ -35,14 +34,13 @@
         token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
         uuid: $defaultUser.id,
       }).then((result) => {
-        console.log(`Loaded custom servers: `, result);
+        noriskLog("Loaded custom servers: " + JSON.stringify(result));
         result.servers.forEach((server) => addCustomServer(server));
         customServerLimit = result.limit;
         setCustomServerBaseDomain(result.baseUrl);
-      }).catch((e) => {
+      }).catch((error) => {
         clearCustomServers();
-        console.error(e);
-        alert("Failed to load custom servers:\n" + e);
+        addNotification("Failed to load custom servers: " + error);
       });
     }
   }

@@ -3,7 +3,7 @@
   import { fade } from "svelte/transition";
   import { createEventDispatcher, onMount } from "svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
-  import { getNoRiskToken } from "../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import CapePlayer from "./CapePlayer.svelte";
 
@@ -34,23 +34,20 @@
         noriskToken: getNoRiskToken(),
         uuid: $defaultUser.id,
       }).then(() => {
-        console.debug("Deleted Cape...");
+        addNotification("Cape deleted successfully.", "INFO");
         capeHash = null;
         dispatch("fetchNoRiskUser");
-      }).catch(e => {
-        alert("Failed to Request User by UUID: " + e);
-        console.error(e);
-        addNotification(e);
+      }).catch(error => {
+        addNotification("Failed to Request User by UUID: " + error);
       });
     }
   }
 
   async function downloadTemplate() {
     await invoke("download_template_and_open_explorer").then(() => {
-      console.debug("Downloaded Template Cape...");
-    }).catch(e => {
-      alert("Failed to Download Template: " + e);
-      console.error(e);
+      noriskLog("Downloaded Template Cape...");
+    }).catch(error => {
+      addNotification("Failed to Download Template: " + error);
     });
   }
 </script>

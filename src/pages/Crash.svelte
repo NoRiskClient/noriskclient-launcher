@@ -21,7 +21,7 @@
     await invoke("upload_logs", {
       log: $minecraftLogs.join(""),
     }).then((result) => {
-      console.debug("Received Result", result);
+      addNotification("Logs uploaded successfully. URL copied to clipboard.", "INFO");
       navigator.clipboard.writeText(result.url);
     }).catch((error) => {
       addNotification(error);

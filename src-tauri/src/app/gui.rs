@@ -378,6 +378,11 @@ async fn console_log_info(message: String) {
 }
 
 #[tauri::command]
+async fn console_log_warning(message: String) {
+    log::warn!("{}" ,message);
+}
+
+#[tauri::command]
 async fn console_log_error(message: String) {
     log::error!("{}" ,message);
 }
@@ -1785,6 +1790,7 @@ pub fn gui_main() {
             clear_data,
             get_mod_info,
             console_log_info,
+            console_log_warning,
             console_log_error,
             get_launcher_profiles,
             store_launcher_profiles,

@@ -8,6 +8,8 @@
   import { fetchOptions, launcherOptions } from "../../stores/optionsStore.js";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
+  import { noriskLog } from "../../utils/noriskUtils.js";
 
   const dispatch = createEventDispatcher();
 
@@ -57,8 +59,8 @@
         settings.showCapeBefore = capeLocation ? true : false;
         document.getElementById("skin").appendChild(canvas);
       })
-      .catch((err) => {
-        alert(err);
+      .catch((error) => {
+        addNotification("Failed to load player skins: " + error);
       });
     isLoading = false;
   }
@@ -73,17 +75,16 @@
           await invoke("read_remote_image_file", { location: url })
             .then((capeData) => {
               capeLocation = `data:image/png;base64,${capeData}`;
-            }).catch((err) => {
-              console.error(err);
+            }).catch((error) => {
+              addNotification("Failed to load player capes: " + error);
             });
         } else {
           capeLocation = profileTexture.textures.CAPE?.url ?? "";
-          console.log("No NoRisk Cape Found");
+          noriskLog("No NoRisk Cape Found");
         }
         isLoading = false;
-      }).catch(e => {
-        alert("Failed to Request User by UUID: " + e);
-        console.error(e);
+      }).catch(error => {
+        addNotification("Failed to load player cape hash by uuid: " + error);
         isLoading = false;
       });
     }
@@ -97,8 +98,8 @@
         skinViewer.controls.enabled = true;
         settings.lockControlls = false;
         skinViewer.zoom = 0.7;
-      }).catch((err) => {
-        alert(err);
+      }).catch((error) => {
+        addNotification("Failed to load skin: " + error);
       });
   }
 
@@ -114,11 +115,11 @@
     if (settings.open) {
       return;
     }
-    console.log(`Saving new player skin: ${location}`);
+    noriskLog(`Saving new player skin: ${location}`);
 
     const slim = skinViewer.scene.children[2].children[0].children[0].slim;
 
-    console.log(`Model Type: ${slim ? "slim" : "classic"}`);
+    noriskLog(`Model Type: ${slim ? "slim" : "classic"}`);
 
     let failed = false;
     const trySave = async () => {
@@ -132,14 +133,14 @@
           dispatch("home");
           isLoading = true;
         })
-        .catch(async (err) => {
-          if (!failed && err.split(" ").includes("401")) {
+        .catch(async (error) => {
+          if (!failed && error.split(" ").includes("401")) {
             failed = true;
             isLoading = true;
             await fetchOptions.bind(async () => await trySave());
             return;
           }
-          console.error(err);
+          addNotification("Failed to save skin: " + error);
         });
     };
     if (!failed) {
@@ -166,10 +167,10 @@
         skinViewer.controls.enabled = true;
         settings.lockControls = false;
       }
-    } catch (e) {
+    } catch (error) {
       skinViewer.controls.enabled = true;
       settings.lockControls = false;
-      alert("Failed to select file using dialog");
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 

@@ -3,6 +3,8 @@
     import { createEventDispatcher } from "svelte";
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
+    import { addNotification } from "../../../stores/notificationStore.js";
+    import { openConfirmPopup } from "../../../utils/popupUtils.js";
   
     const dispatch = createEventDispatcher();
   
@@ -21,20 +23,26 @@
     let dialog; // HTMLDialogElement
   
     $: if (dialog && showModal) dialog.showModal();
+
+    function confirmDelete() {
+      openConfirmPopup({
+        title: "Delete Server",
+        content: "Are you sure you want to delete this server?",
+        onConfirm: deleteServer
+      });
+    }
   
     async function deleteServer() {
-        if (!confirm("Are you sure you want to delete this server?")) return;
-        await invoke("delete_custom_server", {
-          customServer,
-          options: $launcherOptions,
-          uuid: $defaultUser.id
-        }).then(() => {
-          console.log("YAY!");
-          dispatch("deleted");
-        }).catch((error) => {
-          console.error(error);
-          alert(error);
-        });
+      await invoke("delete_custom_server", {
+        customServer,
+        options: $launcherOptions,
+        uuid: $defaultUser.id
+      }).then(() => {
+        addNotification("Server deleted successfully.", "INFO");
+        dispatch("deleted");
+      }).catch((error) => {
+        addNotification("Failed to delete server: " + error);
+      });
     }
     
     function preventSelection(event) {
@@ -95,7 +103,7 @@
         </div>
       </div>
       <div class="delete-button-wrapper">
-        <p class="red-text-clickable" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={deleteServer}>DELETE</p>
+        <p class="red-text-clickable" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>DELETE</p>
       </div>
     </div>
   </dialog>

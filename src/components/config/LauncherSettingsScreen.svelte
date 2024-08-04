@@ -13,9 +13,10 @@
     import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../../stores/credentialsStore.js";
     import { fetchBranches } from "../../stores/branchesStore.js";
     import { fetchProfiles } from "../../stores/profilesStore.js";
-    import { featureWhitelist, noriskUser } from "../../utils/noriskUtils.js";
+    import { featureWhitelist, noriskUser, noriskLog } from "../../utils/noriskUtils.js";
     import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
+    import { openConfirmPopup } from "../../utils/popupUtils.js";
   
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
@@ -26,21 +27,26 @@
     }
     
   
+    async function confirmClearData() {
+        openConfirmPopup({
+            title: "Are you sure?",
+            content: "Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.",
+            onConfirm: clearData
+        });
+    }
+
     async function clearData() {
-      const confirm = await window.confirm("Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.");
-      if (confirm) {
         invoke("clear_data", { options: $launcherOptions })
-          .then(async () => {
-            alert("Data cleared.");
-            await fetchOptions();
-            await fetchDefaultUserOrError(false);
-            await fetchBranches();
-            await fetchProfiles();
-          })
-          .catch(e => {
-            addNotification(e);
-          });
-      }
+            .then(async () => {
+                addNotification("Data cleared successfully!", "INFO");
+                await fetchOptions();
+                await fetchDefaultUserOrError(false);
+                await fetchBranches();
+                await fetchProfiles();
+            })
+            .catch((error) => {
+                addNotification(error);
+            });
     }
   
     async function toggleExperimentalMode() {
@@ -56,7 +62,7 @@
             invoke("enable_experimental_mode", {
               credentials: $defaultUser
             }).then(async () => {
-                console.log("Experimental mode enabled");
+                noriskLog("Experimental mode enabled");
                 $launcherOptions.experimentalMode = true;
                 await saveOptions(false);
                 if (getNoRiskToken() == null) {
@@ -104,7 +110,7 @@
     <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} placeholder={"None"} />
     <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
     <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[CLEAR DATA]</p>
     </div>
     </div>
 </div>

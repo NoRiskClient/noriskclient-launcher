@@ -12,9 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
-
-  const dispatch = createEventDispatcher();
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -116,8 +115,8 @@
       launchManifest = result;
       getCustomResourcePacksFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -126,7 +125,7 @@
       console.debug("Blacklisted ResourcePacks", resourcePacks);
       blacklistedResourcePacks = resourcePacks;
     }).catch((error) => {
-      console.error(error);
+      addNotification(error);
     });
   }
 
@@ -139,7 +138,7 @@
       console.debug("Custom ResourcePacks", resourcePacks);
       customResourcePacks = resourcePacks;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -157,8 +156,8 @@
       resourcePacks = resourcePacks;
       launcherProfiles.addons[currentBranch].resourcePacks = launcherProfiles.addons[currentBranch].resourcePacks;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -181,8 +180,8 @@
         result.forEach(resourcePack => resourcePack.featured = true);
         resourcePacks = result;
         featuredResourcePacks = result;
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -214,8 +213,8 @@
       } else {
         resourcePacks = [...resourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -249,10 +248,10 @@
         getCustomResourcePacksFilenames();
       }).catch((error) => {
         if (!showError) return;
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -269,7 +268,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -283,8 +282,8 @@
       if (locations instanceof Array) {
         installCustomResourcePacks(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -300,13 +299,13 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom ResourcePack ${fileName}`);
+      noriskLog(`Installing custom ResourcePack ${fileName}`);
       await invoke("save_custom_resourcepacks_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomResourcePacksFilenames();
     });

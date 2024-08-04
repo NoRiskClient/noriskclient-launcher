@@ -4,7 +4,7 @@
     import {createEventDispatcher} from "svelte";
     import { launcherOptions } from "../../../../stores/optionsStore.js";
     import { defaultUser } from "../../../../stores/credentialsStore.js";
-    
+    import { addNotification } from "../../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -20,10 +20,8 @@
             uuid: $defaultUser.id
         }).then(() => {
             dispatch('next');
-        }).catch(err => {
-            console.error(err);
-            alert(err);
-            return;
+        }).catch((error) => {
+            addNotification("Failed to check subdomain: " + error);
         });
     }
 </script>

@@ -8,6 +8,7 @@
   import { fetchProfiles, profiles } from "../../stores/profilesStore.js";
   import BranchSwitcher from "../BranchSwitcher.svelte";
   import { v4 as uuidv4 } from "uuid";
+  import { noriskLog } from "../../utils/noriskUtils.js";
 
   const dispatch = createEventDispatcher();
 
@@ -42,7 +43,7 @@
   }
 
   function selectProfile(profile) {
-    console.log("Selected Profile:", profile);
+    noriskLog("Selected profile: " + profile.name);
     if ($launcherOptions.experimentalMode) {
       $profiles.selectedExperimentalProfiles[profile.branch] = profile.id;
     } else {

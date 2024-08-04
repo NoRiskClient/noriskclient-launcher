@@ -1,5 +1,4 @@
 <script>
-  import { openInfoPopup, openConfirmPopup, openInputPopup, openErrorPopup } from "../../../utils/popupUtils.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { onMount } from "svelte";
   import { openDiscordIntegration } from "../../../utils/discordUtils.js";
@@ -7,7 +6,7 @@
   import { branches } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { invoke } from "@tauri-apps/api";
-  import { noriskError, noriskLog } from "../../../utils/noriskUtils.js";
+  import { noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
   let discordLinked = false;
@@ -27,63 +26,17 @@
           }
         },
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
-      },
-      {
-        name: "INFO POPUP",
-        onClick: () => {
-          openInfoPopup({ title: "Welcome to NoRiskClient!", content: "We are happy to see you here! If you have any questions or problems, feel free to ask us in our Discord server. You can find the link in the footer of the launcher.", onClose: () => { alert("CLOSED!") }, titleFontSize: "17.5px", contentFontSize: "15px" });
-        },
-        condition: () => true,
-      },
-      {
-        name: "CONFIRM POPUP",
-        onClick: () => {
-          openConfirmPopup({
-            title: "Are you sure?",
-            content: "This action is irreversible!",
-            onConfirm: () => { },
-            onCancel: () => { }
-          });
-        },
-        condition: () => true,
-      },
-      {
-        name: "INPUT POPUP",
-        onClick: () => {
-          openInputPopup({
-            title: "Enter your name",
-            content: "Please enter your name:",
-            inputType: "FOLDER",
-            inputName: "Minecraft Directory",
-            inputValue: "",
-            inputPlaceholder: "Detect Automatically",
-            confirmButton: "Apply",
-            validateInput: (input) => { alert(`Validating: ${input}`) },
-            onConfirm: (input) => { alert("You entered: " + input) },
-            onCancel: () => { alert("CANCELLED!") },
-            titleFontSize: "20px"
-          });
-        },
-        condition: () => true,
-      },
-      {
-        name: "ERROR POPUP",
-        onClick: () => {
-          openErrorPopup({ title: "An error occurred!", content: "Something went wrong!", onClose: () => { alert("CLOSED!") }, titleFontSize: "25px" });
-        },
-        condition: () => true,
-      },
+      }
     ];
   }
 
   onMount(async () => {
-    const userUnlisten = defaultUser.subscribe(async value => {
+    const userUnlisten = defaultUser.subscribe(async () => {
       await fetchDiscordLinkStatus();
       updateNavItems();
     });
 
-    const branchesUnlisten = branches.subscribe(async value => {
-      await fetchDiscordLinkStatus();
+    const branchesUnlisten = branches.subscribe(async () => {
       updateNavItems();
     });
 
@@ -106,10 +59,9 @@
         noriskLog("Is Discord Linked: " + discordLinked);
         updateNavItems();
       })
-      .catch((err) => {
+      .catch((error) => {
         discordLinked = false;
-        noriskError(err);
-        addNotification(err);
+        addNotification(error);
         updateNavItems();
       });
   }
@@ -124,8 +76,8 @@
         discordLinked = false;
         noriskLog("Unlinked Discord" + discordLinked);
       })
-      .catch((err) => {
-        noriskError(err);
+      .catch((error) => {
+        addNotification(error);
       });
   }
 </script>

@@ -6,11 +6,10 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api";
-  import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
-  import InvitePopup from "../../invite/InvitePopup.svelte";
+  import { getNoRiskToken, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
+  import { openInputPopup } from "../../../utils/popupUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
-  let showInvitePopup = false;
   let friendInviteSlots = {};
 
   let navItems = [];
@@ -44,7 +43,7 @@
       },
       {
         name: "INVITE",
-        onClick: () => { showInvitePopup = true; },
+        onClick: openInviteFriendsPopup,
         condition: () => get(branches).length > 0 && get(defaultUser) != null && $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1,
       },
       {
@@ -101,22 +100,40 @@
     }).then((result) => {
       noriskLog("Received Whitelist Slots" + JSON.stringify(result));
       friendInviteSlots = result;
+      friendInviteSlots.text = friendInviteSlots.availableSlots === -1 ? '∞' : `${friendInviteSlots.availableSlots - friendInviteSlots.previousInvites}/${friendInviteSlots.availableSlots}`;
     }).catch((reason) => {
-      noriskError(reason);
       addNotification(reason);
       friendInviteSlots = {};
     });
   }
+
+  function openInviteFriendsPopup() {
+    openInputPopup({
+      title: "Invite Friends",
+      content: `You have ${friendInviteSlots.text} invites left.\nYou can use them to invite a friend to the NRC closed beta.`,
+      inputPlaceholder: "Username / UUID",
+      confirmButton: "Invite",
+      validateInput: (input) => input.length > 2 && input.length <= 16,
+      onConfirm: async (identifier) => {        
+        await invoke("add_player_to_whitelist", {
+          identifier: identifier,
+          noriskToken: getNoRiskToken(),
+          requestUuid: $defaultUser.id,
+        }).then(() => {
+          addNotification("Successfully invited " + identifier + " to the NRC closed beta!", "INFO");
+        }).catch((error) => {
+          addNotification("An error occurred while inviting " + identifier + " to the NRC closed beta: " + error);
+        });
+      }
+    })
+  }
 </script>
 
-{#if showInvitePopup}
-  <InvitePopup on:getInviteSlots={loadFriendInvites} bind:showModal={showInvitePopup} bind:friendInviteSlots />
-{/if}
 <div class="container">
   <div class="home-navbar-wrapper topleft">
     {#if $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots - friendInviteSlots.previousInvites > 0}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="invite-button" on:click={() => showInvitePopup = true}>
+      <h1 class="invite-button" on:click={openInviteFriendsPopup}>
         <p>✨ INVITE ✨</p>
       </h1>
     {/if}

@@ -1,8 +1,9 @@
 import { get } from "svelte/store";
 import { defaultUser } from "../stores/credentialsStore.js";
 import { launcherOptions } from "../stores/optionsStore.js";
-import { noriskError, noriskLog } from "./noriskUtils.js";
+import { noriskLog } from "./noriskUtils.js";
 import { invoke } from "@tauri-apps/api";
+import { addNotification } from "../stores/notificationStore.js";
 
 export async function openDiscordIntegration() {
   let credentials = get(defaultUser);
@@ -14,8 +15,8 @@ export async function openDiscordIntegration() {
     .then(() => {
       noriskLog("Closed Discord Integration");
     })
-    .catch((err) => {
-      noriskError(err);
+    .catch((error) => {
+      addNotification(error);
     });
 }
 

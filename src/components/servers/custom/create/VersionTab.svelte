@@ -1,6 +1,7 @@
 <script>
-    import {invoke} from "@tauri-apps/api";
-    import {createEventDispatcher} from "svelte";
+    import { invoke } from "@tauri-apps/api";
+    import { createEventDispatcher } from "svelte";
+    import { addNotification } from "../../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -28,8 +29,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get vanilla versions: " + error);
             });
         } else if (type == "FABRIC" && availableTypes["FABRIC"].versions.length <= 0) {
             await invoke("get_all_fabric_game_versions").then((response) => {
@@ -48,8 +49,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get fabric versions: " + error);
             });
         } else if (type == "QUILT" && availableTypes["QUILT"].versions.length <= 0) {
             await invoke("get_quilt_manifest").then((response) => {
@@ -70,8 +71,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get quilt versions: " + error);
             });
         } else if (type == "FORGE" && availableTypes["FORGE"].versions.length <= 0) {
             await invoke("get_forge_manifest").then((response) => {
@@ -91,8 +92,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get forge versions: " + error);
             });
         } else if (type == "NEO_FORGE" && availableTypes["NEO_FORGE"].versions.length <= 0) {
             await invoke("get_neoforge_manifest").then((response) => {
@@ -112,8 +113,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get neoforge versions: " + error);
             });
         } else if (type == "PAPER" && availableTypes["PAPER"].versions.length <= 0) {
             await invoke("get_all_paper_game_versions").then((response) => {
@@ -132,8 +133,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get paper versions: " + error);
             });
         } else if (type == "FOLIA" && availableTypes["FOLIA"].versions.length <= 0) {
             await invoke("get_all_folia_game_versions").then((response) => {
@@ -152,8 +153,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get folia versions: " + error);
             });
         } else if (type == "PURPUR" && availableTypes["PURPUR"].versions.length <= 0) {
             await invoke("get_all_purpur_game_versions").then((response) => {
@@ -172,8 +173,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get purpur versions: " + error);
             });
         } else if (type == "SPIGOT" && availableTypes["SPIGOT"].versions.length <= 0) {
             await invoke("get_all_spigot_game_versions").then((response) => {
@@ -192,8 +193,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get spigot versions: " + error);
             });
         } else if (type == "BUKKIT" && availableTypes["BUKKIT"].versions.length <= 0) {
             await invoke("get_all_bukkit_game_versions").then((response) => {
@@ -212,8 +213,8 @@
                     });
                 });
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get bukkit versions: " + error);
             });
         }
     }

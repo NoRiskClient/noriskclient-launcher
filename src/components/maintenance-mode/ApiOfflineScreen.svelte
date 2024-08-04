@@ -1,13 +1,7 @@
 <script>
-    import MaintenanceModeTokenModal from "./MaintenanceModeTokenModal.svelte";
     import { appWindow } from "@tauri-apps/api/window";
-
-    let maintenanceModeTokenPopup = false;
 </script>
 
-{#if maintenanceModeTokenPopup}
-    <MaintenanceModeTokenModal bind:showModal={maintenanceModeTokenPopup}/>
-{/if}
 <div class="container">
     <div class="api-offline">
         <h1 class="title text primary-text">API Offline!</h1>
@@ -22,8 +16,6 @@
 <style>
     .text {
         font-family: 'Press Start 2P', serif;
-        color: var(--font-color);
-        text-shadow: 1.25px 1.25px var(--font-color-text-shadow);
         text-align: center;
         line-height: 17.5px;
         width: 95%;

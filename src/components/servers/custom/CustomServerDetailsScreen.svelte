@@ -7,14 +7,15 @@
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { customServers, activeCustomServerId } from "../../../stores/customServerStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
+    import { addNotification } from "../../../stores/notificationStore.js";
 
     let customServer = $customServers.find(s => s._id == $activeCustomServerId) ?? {};
 
     if (customServer._id == undefined) {
-        alert("Failed to load custom server details.");
+        addNotification("Failed to load custom server details.");
     }
 
-    console.log($customServerLogs);
+    console.debug($customServerLogs);
 
     let logs = $customServerLogs[customServer._id] ?? [];
 
@@ -31,20 +32,18 @@
             token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             uuid: $defaultUser.id
         }).then(() => {
-            console.log("YAY!");
+            console.debug("YAY!");
         }).catch((error) => {
-            console.error(error);
-            alert(error);
+            addNotification("Failed to start server: " + error);
         });
     }
 
     async function stopServer() {
         await invoke("terminate_custom_server").then(() => {
             clearCustomServerLogs(customServer._id);
-            console.log("YAY!");
+            console.debug("YAY!");
         }).catch((error) => {
-            console.error(error);
-            alert(error);
+            addNotification("Failed to stop server: " + error);
         });
     }
 </script>

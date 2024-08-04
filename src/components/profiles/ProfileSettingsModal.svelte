@@ -1,7 +1,10 @@
 <script>
-  import {createEventDispatcher} from "svelte";
-
+  import { createEventDispatcher } from "svelte";
   import ConfigTextInput from "../config/inputs/ConfigTextInput.svelte";
+  import { openConfirmPopup } from "../../utils/popupUtils.js";
+  import { noriskLog } from "../../utils/noriskUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
+
   const dispatch = createEventDispatcher()
 
   export let showModal;
@@ -34,26 +37,31 @@
     dispatch('update');
   }
 
+  function confirmDelete() {
+    openConfirmPopup({
+      title: "Delete Profile",
+      content: "Are you sure you want to delete this profile?",
+      onConfirm: deleteProfile
+    });
+  }
+
   async function deleteProfile() {
-    // we need await!
-    const confirm = await window.confirm("Are you sure you want to delete this profile?")
-    if (confirm) {
-        console.info("DELETING PROFILE", settingsProfile);
-        if (experimentalMode) {
-            launcherProfiles.experimentalProfiles.splice(launcherProfiles.experimentalProfiles.indexOf(settingsProfile), 1);
-            launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = launcherProfiles.experimentalProfiles[0].id;
-        } else {
-            launcherProfiles.mainProfiles.splice(launcherProfiles.mainProfiles.indexOf(settingsProfile), 1);
-            launcherProfiles.selectedMainProfiles[settingsProfile.branch] = launcherProfiles.mainProfiles[0].id;
-        }
-        closeSettings();
-        dispatch('update');
+    noriskLog(`DELETING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);
+    if (experimentalMode) {
+        launcherProfiles.experimentalProfiles.splice(launcherProfiles.experimentalProfiles.indexOf(settingsProfile), 1);
+        launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = launcherProfiles.experimentalProfiles[0].id;
+    } else {
+        launcherProfiles.mainProfiles.splice(launcherProfiles.mainProfiles.indexOf(settingsProfile), 1);
+        launcherProfiles.selectedMainProfiles[settingsProfile.branch] = launcherProfiles.mainProfiles[0].id;
     }
+    closeSettings();
+    addNotification(`Profile "${settingsProfile.name}" has been deleted.`, "INFO");
+    dispatch('update');
   }
 
   async function createProfile() {
     if (settingsProfile.name == '' || settingsProfile.name.toLowerCase() == `${settingsProfile.branch} - Default`.toLowerCase()) return;
-    console.info("CREATING PROFILE " + settingsProfile);
+    noriskLog(`CREATING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);
     if (experimentalMode) {
         launcherProfiles.experimentalProfiles.push(settingsProfile);
         launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = settingsProfile.id;
@@ -63,6 +71,7 @@
     }
     launcherProfiles.store();
     closeSettings();
+    addNotification(`Profile "${settingsProfile.name}" has been created.`, "INFO");
     dispatch('update');
   }
 
@@ -100,7 +109,7 @@
       </div>
     {:else}
       <div class="delete-profile-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={deleteProfile}>DELETE PROFILE</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>DELETE PROFILE</p>
       </div>
     {/if}
   </div>

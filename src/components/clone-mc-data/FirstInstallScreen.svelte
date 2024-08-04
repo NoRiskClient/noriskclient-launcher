@@ -4,7 +4,7 @@
     import { onMount } from "svelte";
     import { pop, replace } from "svelte-spa-router";
     import { invoke } from "@tauri-apps/api/tauri";
-    import { runClient } from "../../utils/noriskUtils.js";
+    import { runClient, noriskLog } from "../../utils/noriskUtils.js";
     import ConfigFolderInput from "../config/inputs/ConfigFolderInput.svelte";
 
     $: path = '';
@@ -14,7 +14,6 @@
             path = res;
         }).catch(err => {
             path = null;
-            console.error("Error getting default minecraft folder", err);
             addNotification("An error occurred while getting the default minecraft folder: " + err);
         });
     });
@@ -26,15 +25,14 @@
             return;
         }
 
-        console.log("Copying data from minecraft: ", path);
+        noriskLog("Copying data from minecraft: " + path);
         replace("/copy-mc-data-progress");
         invoke("copy_mc_data", { path: path, branch: $branches[$currentBranchIndex] }).then(() => {
-            console.log("Data copied successfully");
+            noriskLog("Data copied successfully!");
             pop();
             runClient($branches[$currentBranchIndex], true);
         }).catch(err => {
             pop();
-            console.error("Error copying data", err);
             addNotification("An error occurred while copying the data: " + err);
         });
     }
@@ -43,7 +41,7 @@
 <div class="container">
     <div class="header">
         <h1>First Install detected</h1>
-        <p>You have just started NoRiskClient for the fist time.<br>To make the transition cleaner and faster you can copy your settings and servers from minecraft below.</p>
+        <p>You have just started NoRiskClient for the first time.<br>To make the transition cleaner and faster you can copy your settings and servers from minecraft below.</p>
     </div>
     <div class="mcFolder">
         <ConfigFolderInput title="Minecraft Data Folder" bind:value={path} />

@@ -3,6 +3,7 @@
     import { launcherOptions } from "../../stores/optionsStore.js";
     import { defaultUser } from "../../stores/credentialsStore.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
+    import { addNotification } from "../../stores/notificationStore.js";
     // import qrcode from "qrcode-generator";
   
     export let showModal;
@@ -27,9 +28,8 @@
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
-      }).catch(e => {
-        console.error(e);
-        alert("You have to start your game at least once to use the McReal App!");
+      }).catch(error => {
+        addNotification("An error occurred while getting the mobile app token: " + error);
         dialog.close();
       });
     }
@@ -43,8 +43,8 @@
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification("An error occurred while resetting the mobile app token: " + error);
       });
     }
 
