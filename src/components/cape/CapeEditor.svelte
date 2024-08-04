@@ -20,10 +20,12 @@
       await invoke("upload_cape", {
         noriskToken: getNoRiskToken(),
         uuid: $defaultUser.id,
-      }).then(() => {
+      }).then((text) => {
         dispatch("fetchNoRiskUser");
+        if (text == "") return;
+        addNotification(text, "INFO");
       }).catch(reason => {
-        addNotification(reason);
+        addNotification(`Failed to upload cape: ${reason}`);
       });
     }
   }
