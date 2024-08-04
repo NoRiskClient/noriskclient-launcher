@@ -93,7 +93,7 @@
     {#if $featureWhitelist.includes("MCREAL_APP")}
         <div class="mcreal-app-wrapper">
             <h1 class="title">MCReal App<p class="devOnly">(Alpha)</p></h1>
-            <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
+            <h1 class="button primary-text" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
         </div>
     {/if}
     <div class="sliders">
@@ -178,8 +178,6 @@
     .mcreal-app-wrapper > .button {
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition: transform 0.3s;
     }

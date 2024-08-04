@@ -38,7 +38,7 @@
       <div class="content">
         <p>Please select the minecraft data path you want to clone the data from.<br>The default value is your normal ".minecraft" folder.</p>
         <ConfigFolderInput title={""} bind:value={path} />
-        <h1 on:click={clone}>Clone</h1>
+        <h1 class="primary-text" on:click={clone}>Clone</h1>
       </div>
     </div>
   </div>
@@ -133,8 +133,6 @@
         width: min-content;
         margin-top: 2em;
         margin-bottom: 1em;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
     }
 

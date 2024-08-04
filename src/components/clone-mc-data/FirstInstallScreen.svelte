@@ -54,7 +54,7 @@
             <div class="buttons">
                 <p class="arrow">&gt;</p>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <p class="cloneButton" on:click={() => cloneMinecraftData()}>Clone</p>
+                <p class="cloneButton primary-text" on:click={() => cloneMinecraftData()}>Clone</p>
             </div>
         </div>
         <div class="branch">
@@ -66,11 +66,6 @@
 </div>
     
 <style>
-    .green-text {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
-    }
-
     .container {
         display: flex;
         flex-direction: column;
@@ -155,8 +150,6 @@
     .cloneButton {
         font-size: 15px;
         padding: 5px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         border-radius: 7.5px;
         cursor: pointer;
         transform: translateX(100px);

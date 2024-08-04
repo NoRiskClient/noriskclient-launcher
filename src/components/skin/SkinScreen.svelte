@@ -301,7 +301,7 @@
       </div>
       {#if !unsavedSkin}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="change-button slider no-slide" on:click={selectSkin}>Change</h1>
+        <h1 class="change-button slider no-slide primary-text" on:click={selectSkin}>Change</h1>
       {:else}
         <div class="unsavedSkinActionWrapper slider no-slide">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -413,8 +413,6 @@
     }
 
     .change-button.no-slide:hover {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 0.3s;
         transform: scale(1.2);
     }

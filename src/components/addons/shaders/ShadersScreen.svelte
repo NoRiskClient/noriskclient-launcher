@@ -340,10 +340,10 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleSelectCustomShaders}>Custom</h1>
@@ -358,7 +358,7 @@
       <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
         {#if item == 'LOAD_MORE_SHADERS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
         {:else if item != null}
           <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
                       on:delete={() => deleteInstalledShader(item)}
@@ -421,11 +421,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -449,11 +444,6 @@
 
     .load-more-button:hover {
         transform: scale(1.2);
-    }
-
-    .load-more-button p {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .modrinth-wrapper {

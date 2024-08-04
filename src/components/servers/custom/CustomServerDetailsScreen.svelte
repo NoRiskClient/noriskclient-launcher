@@ -8,8 +8,6 @@
     import { customServers, activeCustomServerId } from "../../../stores/customServerStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
 
-    const dispatch = createEventDispatcher()
-
     let customServer = $customServers.find(s => s._id == $activeCustomServerId) ?? {};
 
     if (customServer._id == undefined) {
@@ -61,7 +59,7 @@
             {#if logs.length < 1}
                 <h1 class="offline">Offline</h1>
             {:else if logs.join(' ').includes('Done')}
-                <h1 class="online">Running</h1>
+                <h1 class="online green-text">Running</h1>
             {:else}
                 <h1 class="starting">Starting...</h1>
             {/if}
@@ -69,12 +67,12 @@
         <div class="start-stop-button-wrapper">
             {#if logs.length < 1}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="startServer-button" on:click={runServer}>Start</h1>
+                <h1 class="startServer-button green-text" on:click={runServer}>Start</h1>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>
+                <h1 class="stopServer-button red-text" on:click={stopServer}>Stop</h1>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="stopServer-button" on:click={stopServer}>Stop</h1>
+                <h1 class="stopServer-button red-text" on:click={stopServer}>Stop</h1>
             {/if}
         </div>
     </div>
@@ -135,11 +133,6 @@
         cursor: default;
     }
 
-    .online {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
-    }
-
     .starting {
         color: #ff9100;
         text-shadow: 2px 2px #d67900;
@@ -169,8 +162,6 @@
     .startServer-button {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
     }

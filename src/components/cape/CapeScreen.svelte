@@ -84,11 +84,13 @@
 
 <div class="wrapper">
   <div class="tab-wrapper">
-    <h1 on:click={() => switchTab(0)} class:active-tab={currentRequest === 0}>EDITOR</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 on:click={() => switchTab(0)} class:primary-text={currentRequest === 0}>EDITOR</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="button-wrapper">
-      <h2 on:click={() => switchTab(1)} class:active-tab={currentRequest === 1}>ALL TIME</h2>
-      <h2 on:click={() => switchTab(2)} class:active-tab={currentRequest === 2}>WEEKLY</h2>
-      <h2 on:click={() => switchTab(3)} class:active-tab={currentRequest === 3}>OWNED</h2>
+      <h2 on:click={() => switchTab(1)} class:primary-text={currentRequest === 1}>ALL TIME</h2>
+      <h2 on:click={() => switchTab(2)} class:primary-text={currentRequest === 2}>WEEKLY</h2>
+      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>OWNED</h2>
     </div>
   </div>
   <div class="cape-wrapper">
@@ -145,10 +147,5 @@
     .button-wrapper {
         display: flex;
         flex-direction: row;
-    }
-
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 </style>

@@ -46,7 +46,7 @@
     <div class="bottom">
         <ConfigRadioButton bind:value={autoScroll} text="Auto Scroll"/>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <p on:click={uploadLogs}>COPY</p>
+        <p class="primary-text" on:click={uploadLogs}>COPY</p>
     </div>
 </div>
 
@@ -76,8 +76,6 @@
     .bottom p {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         user-select: none;
         cursor: pointer;
         transition: transform 0.3s;

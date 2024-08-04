@@ -88,12 +88,12 @@
     <div class="branches">
         <VirtualList height="20em" items={availableBranches} let:item>
             <div class="branch">
-                <p class="branchName" class:red-text={item == dontCloneDataText} class:cloneMinecraft={item == cloneMinecraftDataText}>{item}</p>
+                <p class="branchName" class:red-text={item == dontCloneDataText} class:green-text={item == cloneMinecraftDataText}>{item}</p>
                 {#if item == cloneMinecraftDataText}
                     <div class="buttons">
                         <p class="arrow cloneMinecraft">&gt;</p>
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <p class="cloneButton cloneMinecraft" on:click={openCloneMinecraftDataPopup}>Select Path</p>
+                        <p class="cloneButton cloneMinecraft primary-text" on:click={openCloneMinecraftDataPopup}>Select Path</p>
                     </div>
                 {:else if item == dontCloneDataText}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -102,7 +102,7 @@
                     <div class="buttons">
                         <p class="arrow">&gt;</p>
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <p class="cloneButton" on:click={() => cloneBranchData(item.replace(' (last played)', ''))}>Clone</p>
+                        <p class="cloneButton primary-text" on:click={() => cloneBranchData(item.replace(' (last played)', ''))}>Clone</p>
                     </div>
                 {/if}
             </div>
@@ -164,11 +164,6 @@
         font-size: 15px;
     }
 
-    .branchName.cloneMinecraft {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
-    }
-
     .branch:hover > * > .arrow {
         transform: translateX(60px);
     }
@@ -197,8 +192,6 @@
     .cloneButton {
         font-size: 15px;
         padding: 5px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         border-radius: 7.5px;
         cursor: pointer;
         transform: translateX(100px);

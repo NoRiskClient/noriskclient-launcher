@@ -67,7 +67,7 @@
 </script>
 
 
-<h1 class="branch-font" style="position:absolute"
+<h1 class="branch-font primary-text" style="position:absolute"
     transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Searching Updates{dots}</h1>
 
 <style>
@@ -75,8 +75,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
     }
 </style>

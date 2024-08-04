@@ -65,7 +65,7 @@
         <ConfigTextInput title="Username / UUID" bind:value={friendIdentifier} />
       </div>
     </div>
-    <h1 class="invite-button" on:click={inviteFriend}>Invite</h1>
+    <h1 class="invite-button green-text" on:click={inviteFriend}>Invite</h1>
   </div>
 </dialog>
 
@@ -156,8 +156,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 25px;
         margin-bottom: 30px;
-        color: #00ff00;
-        text-shadow: 2px 2px #086b08;
         transition-duration: 0.3s;
         cursor: pointer;
         text-align: center;

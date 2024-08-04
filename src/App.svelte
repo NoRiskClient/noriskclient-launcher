@@ -74,6 +74,8 @@
         --font-color-disabled: #858585;
         --dev-font-color: rgb(194, 165, 0);
         --dev-font-color-text-shadow: rgb(170, 144, 0);
+        --green-text: #057605;
+        --green-text-shadow: #074f07;
         transition: background-color 0.2s;
     }
 
@@ -91,6 +93,8 @@
         --font-color-disabled: #878787;
         --dev-font-color: gold;
         --dev-font-color-text-shadow: rgb(189, 161, 2);
+        --green-text: #00ff00;
+        --green-text-shadow: #086b08;
     }
 
     :global(*) {
@@ -103,15 +107,19 @@
         text-shadow: 2px 2px #460000;
     }
 
-    :global(.primary-text-clickable) {
+    :global(.red-text-clickable) {
         color: red;
         text-shadow: 2px 2px #460000;
         cursor: pointer;
     }
 
-    :global(.red-text-clickable) {
-        color: red;
-        text-shadow: 2px 2px #460000;
-        cursor: pointer;
+    :global(.primary-text) {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    :global(.green-text) {
+        color: var(--green-text);
+        text-shadow: 2px 2px var(--green-text-shadow);
     }
 </style>

@@ -55,10 +55,10 @@
   {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
     <div class="navbar">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+      <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
       <h2>|</h2>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+      <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
     </div>
   {:else}
     <div class="navbar">
@@ -81,7 +81,7 @@
       <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
       {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h4 class="create-server-button" on:click={() => push("/servers/custom/create")}>Create</h4>
+        <h4 class="create-server-button green-text" on:click={() => push("/servers/custom/create")}>Create</h4>
       {:else}
         <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit
           reached</h4>
@@ -128,11 +128,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -168,8 +163,6 @@
     .create-server-button {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
     }

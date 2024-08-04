@@ -35,7 +35,6 @@
         font-weight: 300;
         border-radius: 7.5px;
         background-color: var(--background-contrast-color);
-        text-shadow: 1px 1px var(--primary-color-text-shadow);
         border: 1.5px solid var(--background-contrast-color);
         align-items: center;
         justify-content: space-between;
@@ -71,8 +70,6 @@
 
     .default-info {
         cursor: default;
-        color: var(--primary-color);
-        text-shadow: 0.85px 0.85px var(--primary-color-text-shadow);
         font-weight: 200;
         font-size: 20px;
     }

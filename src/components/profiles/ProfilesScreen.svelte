@@ -72,8 +72,7 @@
     </VirtualList>
     <div class="create-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="create-button"
-          on:click={openSettings}>
+      <h1 class="create-button green-text" on:click={openSettings}>
         CREATE PROFILE
       </h1>
     </div>
@@ -95,8 +94,6 @@
     }
 
     .create-button {
-        color: #00ff00;
-        text-shadow: 2px 2px #086b08;
         transition-duration: 100ms;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;

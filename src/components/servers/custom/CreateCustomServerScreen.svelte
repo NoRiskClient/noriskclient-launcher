@@ -189,7 +189,7 @@
         <div class="center">
             <h1>Server successfully created!</h1>
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="details" on:click={() => {
+            <h1 class="details primary-text" on:click={() => {
                 pop();
                 setTimeout(() => {
                     setActiveCustomServerId(createdServer._id);
@@ -217,8 +217,6 @@
     .details {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition: transform 0.3s;
     }
