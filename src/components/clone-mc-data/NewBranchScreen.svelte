@@ -3,7 +3,6 @@
     import { launcherOptions } from "../../stores/optionsStore.js";
     import { pop, replace } from "svelte-spa-router";
     import VirtualList from "../utils/VirtualList.svelte";
-    import NewBranchMinecraftPathPopup from "./NewBranchMinecraftPathPopup.svelte";
     import { invoke } from "@tauri-apps/api/tauri";
     import { onMount } from "svelte";
     import { runClient, noriskLog } from "../../utils/noriskUtils.js";
