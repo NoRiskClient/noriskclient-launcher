@@ -5,6 +5,8 @@ use anyhow::{Ok, Result};
 use log::{debug, info};
 use tokio::fs;
 
+use tauri::WebviewWindow;
+
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
 use crate::app::modrinth_api::{Datapack, ResourcePack, Shader};
 use crate::error::LauncherError;
@@ -17,7 +19,7 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, progress: LauncherData<D>, window: Arc<Mutex<WebviewWindow>>) -> Result<()> {
     info!("Loading minecraft version manifest...");
     let mc_version_manifest = VersionManifest::download().await?;
 

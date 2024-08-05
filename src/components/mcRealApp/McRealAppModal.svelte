@@ -1,5 +1,5 @@
 <script>
-    import { invoke } from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import { launcherOptions } from "../../stores/optionsStore.js";
     import { defaultUser } from "../../stores/credentialsStore.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";

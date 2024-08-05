@@ -1,5 +1,5 @@
 <script>
-    import {invoke} from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import { createEventDispatcher } from "svelte";
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";

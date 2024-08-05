@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { addNotification } from "../stores/notificationStore.js";
 import { get, writable } from "svelte/store";
 import { launcherOptions, saveOptions } from "../stores/optionsStore.js";

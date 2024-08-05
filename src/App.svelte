@@ -8,13 +8,13 @@
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
   import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode } from "./utils/noriskUtils.js";
-  import { appWindow } from "@tauri-apps/api/window";
-  import { invoke } from "@tauri-apps/api";
+  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { invoke } from "@tauri-apps/api/core";
   import { addNotification } from "./stores/notificationStore.js";
 
   onMount(async () => {
     setTimeout(async () => {
-      await appWindow.show();
+      await WebviewWindow.show();
     }, 300);
     await fetchOptions();
     await fetchDefaultUserOrError(false);

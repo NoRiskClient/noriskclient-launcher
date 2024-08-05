@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { open } from "@tauri-apps/api/dialog";
+  import { invoke } from "@tauri-apps/api/core";
+  import { open } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
   import ConfigRadioButton from "../config/inputs/ConfigRadioButton.svelte";
   import { IdleAnimation, SkinViewer } from "skinview3d";

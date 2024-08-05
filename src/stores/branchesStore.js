@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { launcherOptions } from "./optionsStore.js";
 import { get, writable } from "svelte/store";
 import { defaultUser } from "./credentialsStore.js";

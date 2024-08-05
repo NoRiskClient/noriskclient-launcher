@@ -1,5 +1,5 @@
 <script>
-  import { invoke } from "@tauri-apps/api";
+  import { invoke } from "@tauri-apps/api/core";
   import { push } from "svelte-spa-router";
   import VirtualList from "../utils/VirtualList.svelte";
   import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";

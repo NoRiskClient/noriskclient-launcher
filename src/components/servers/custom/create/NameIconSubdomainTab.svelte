@@ -1,5 +1,5 @@
 <script>
-    import {invoke} from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import TextInput from "../../../config/inputs/ConfigTextInput.svelte";
     import {createEventDispatcher} from "svelte";
     import { launcherOptions } from "../../../../stores/optionsStore.js";

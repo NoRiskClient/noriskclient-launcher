@@ -1,5 +1,5 @@
 <script>
-  import { invoke } from "@tauri-apps/api/tauri";
+  import { invoke } from "@tauri-apps/api/core";
   import { fade } from "svelte/transition";
   import { createEventDispatcher } from "svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";

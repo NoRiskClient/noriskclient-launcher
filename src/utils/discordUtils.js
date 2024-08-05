@@ -2,7 +2,7 @@ import { get } from "svelte/store";
 import { defaultUser } from "../stores/credentialsStore.js";
 import { launcherOptions } from "../stores/optionsStore.js";
 import { noriskError, noriskLog } from "./noriskUtils.js";
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 
 export async function openDiscordIntegration() {
   let credentials = get(defaultUser);

@@ -1,7 +1,7 @@
 <script>
-  import { invoke } from "@tauri-apps/api";
-  import { removeFile } from "@tauri-apps/api/fs";
-  import { open } from "@tauri-apps/api/dialog";
+  import { invoke } from "@tauri-apps/api/core";
+  import { remove } from "@tauri-apps/plugin-fs";
+  import { open } from "@tauri-apps/plugin-dialog";
   import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ShaderItem from "./ShaderItem.svelte";
@@ -232,14 +232,14 @@
       options: options,
       branch: launchManifest.build.branch,
     }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
+      await remove(folder + "/" + filename).then(() => {
         getCustomShadersFilenames();
       }).catch((error) => {
         if (!showError) return;
         alert(error);
       });
       // remove potential shader settings txt
-      await removeFile(folder + "/" + filename + ".txt").catch((error) => {
+      await remove(folder + "/" + filename + ".txt").catch((error) => {
         return;
       });
     }).catch((error) => {

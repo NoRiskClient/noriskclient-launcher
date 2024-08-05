@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.57"
 
 [build-dependencies]
-tauri-build = { version = "1.4.0", features = [] }
+tauri-build = { version = "2.0.0-rc", features = [] }
 
 [dependencies]
 # Path fix
@@ -24,7 +24,7 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 
 # File Watcher
-tauri-plugin-fs-watch = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
+# tauri-plugin-fs-watch = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v2" }
 
 # Error handling
 anyhow = "1.0.69"
@@ -60,7 +60,8 @@ sha1 = "0.10.5"
 base16ct = {version = "0.2.0", features = ["alloc"] }
 
 # UI library
-tauri = {version = "1.4.0", features = ["api-all", "updater"] }
+tauri = {version = "2.0.0-rc", features = [] }
+tauri-plugin-dialog = "2.0.0-rc"
 
 # HTTP library
 reqwest = { version = "0.12.4", features = ["json", "multipart"] }
@@ -85,6 +86,7 @@ p256 = "0.13.2"
 sha2 = "0.10.8"
 tracing-error = "0.2.0"
 tracing = "0.1.40"
+tauri-plugin-notification = "2.0.0-alpha.3"
 
 [features]
 # by default Tauri runs in production mode

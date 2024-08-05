@@ -1,6 +1,6 @@
 <script>
     import { SkinViewer } from "skinview3d";
-    import { invoke } from "@tauri-apps/api/tauri";
+    import { invoke } from "@tauri-apps/api/core";
     import { launcherOptions } from "../../stores/optionsStore.js";
     import Elytra from "../../images/elytra.webp";
 

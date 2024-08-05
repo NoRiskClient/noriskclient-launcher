@@ -1,7 +1,7 @@
 <script>
-  import { invoke } from "@tauri-apps/api";
-  import { removeFile } from "@tauri-apps/api/fs";
-  import { open } from "@tauri-apps/api/dialog";
+  import { invoke } from "@tauri-apps/api/core";
+  import { remove } from "@tauri-apps/plugin-fs";
+  import { open } from "@tauri-apps/plugin-dialog";
   import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import DatapackItem from "./DatapackItem.svelte";
@@ -227,7 +227,8 @@
       branch: launchManifest.build.branch,
       world: world,
     }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
+      await remove
+  (folder + "/"/core + filename).then(() => {
         getCustomDatapacksFilenames();
       }).catch((error) => {
         if (!showError) return;

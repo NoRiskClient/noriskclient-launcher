@@ -5,7 +5,7 @@
   import LogMessage from "../components/log/LogMessage.svelte";
   import { onMount } from "svelte";
   import { minecraftLogs } from "../stores/logsStore.js";
-  import { invoke } from "@tauri-apps/api";
+  import { invoke } from "@tauri-apps/api/core";
   import { addNotification } from "../stores/notificationStore.js";
 
   let autoScroll = true;

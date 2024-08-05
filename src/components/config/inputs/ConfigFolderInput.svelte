@@ -1,6 +1,6 @@
 
 <script>
-  import { open } from '@tauri-apps/api/dialog';
+  import { open } from '@tauri-apps/plugin-dialog';
 
   export let title;
   export let value; // value of the text field

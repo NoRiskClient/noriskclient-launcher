@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 
 export function startMicrosoftAuth() {

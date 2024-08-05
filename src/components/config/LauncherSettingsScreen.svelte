@@ -7,7 +7,7 @@
     import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
     import { fetchOptions, launcherOptions, saveOptions } from "../../stores/optionsStore.js";
     import { preventSelection } from "../../utils/svelteUtils.js";
-    import { invoke } from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import { addNotification } from "../../stores/notificationStore.js";
     import { onDestroy } from "svelte";
     import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../../stores/credentialsStore.js";

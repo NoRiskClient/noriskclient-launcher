@@ -3,7 +3,7 @@
     import { addNotification } from "../../stores/notificationStore.js";
     import { onMount } from "svelte";
     import { pop, replace } from "svelte-spa-router";
-    import { invoke } from "@tauri-apps/api/tauri";
+    import { invoke } from "@tauri-apps/api/core";
     import { runClient } from "../../utils/noriskUtils.js";
     import ConfigFolderInput from "../config/inputs/ConfigFolderInput.svelte";
 

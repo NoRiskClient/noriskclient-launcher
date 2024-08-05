@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::fs::File;
 #[cfg(target_os = "linux")]
-use std::fs::metadata;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Command;
 
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};

@@ -1,5 +1,5 @@
 <script>
-    import { invoke } from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import { pop } from "svelte-spa-router";
     import NameIconSubdomainTab from "./create/NameIconSubdomainTab.svelte";
     import VersionTab from "./create/VersionTab.svelte";

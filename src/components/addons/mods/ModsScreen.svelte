@@ -1,7 +1,7 @@
 <script>
-  import { invoke } from "@tauri-apps/api";
-  import { removeFile, renameFile } from "@tauri-apps/api/fs";
-  import { open } from "@tauri-apps/api/dialog";
+  import { invoke } from "@tauri-apps/api/core";
+  import { remove, rename } from "@tauri-apps/plugin-fs";
+  import { open } from "@tauri-apps/plugin-dialog";
   import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ModItem from "./ModItem.svelte";
@@ -338,7 +338,7 @@
       branch: launchManifest.build.branch,
       mcVersion: launchManifest.build.mcVersion,
     }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
+      await remove(folder + "/" + filename).then(() => {
         getCustomModsFilenames();
       }).catch((error) => {
         alert(error);
@@ -355,13 +355,13 @@
       mcVersion: launchManifest.build.mcVersion,
     }).then(async (folder) => {
       if (filename.endsWith(".disabled")) {
-        await renameFile(folder + "/" + filename, folder + "/" + filename.replace(".disabled", "")).then(() => {
+        await rename(folder + "/" + filename, folder + "/" + filename.replace(".disabled", "")).then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
           alert(error);
         });
       } else {
-        await renameFile(folder + "/" + filename, folder + "/" + filename + ".disabled").then(() => {
+        await rename(folder + "/" + filename, folder + "/" + filename + ".disabled").then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
           alert(error);

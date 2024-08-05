@@ -1,5 +1,5 @@
 <script>
-    import {invoke} from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import VirtualList from "../../../utils/VirtualList.svelte";
     import {createEventDispatcher} from "svelte";
 
