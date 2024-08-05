@@ -65,7 +65,7 @@
         "fullscreen": false,
         "decorations": false,
         "center": true,
-        "visible": false
+        "visible": true
       }
     ],
     "security": {
