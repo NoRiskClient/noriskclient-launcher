@@ -1715,6 +1715,7 @@ pub fn gui_main() {
             }
             _ => {}
         })
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // .plugin(tauri_plugin_fs_watch::init())
         .setup(|_| {
             Ok(())
