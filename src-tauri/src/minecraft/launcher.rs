@@ -14,6 +14,8 @@ use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 use walkdir::WalkDir;
 
+use tauri::WebviewWindow;
+
 use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::AssetObject};
 use crate::app::api::NoRiskLaunchManifest;
 use crate::error::LauncherError;
@@ -39,7 +41,7 @@ impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
     }
 }
 
-pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<WebviewWindow>>) -> Result<()> {
     let launcher_data_arc = Arc::new(launcher_data);
 
     let features: HashSet<String> = HashSet::new();
@@ -395,7 +397,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
 pub struct LaunchingParameter {
     pub dev_mode: bool,
     pub force_server: Option<String>,
-    pub memory: i64,
+    pub memory: i32,
     pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
     pub custom_java_args: String,

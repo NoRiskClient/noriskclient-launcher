@@ -1,5 +1,8 @@
 <script>
   import { preventSelection } from "../../../utils/svelteUtils.js";
+  import AdminIcon from "../../../images/ranks/admin.png";
+  import DeveloperIcon from "../../../images/ranks/developer.png";
+  import BugBountyIcon from "../../../images/ranks/bug_bounty.png";
 
   export let showModal;
 
@@ -27,15 +30,15 @@
       <hr>
       <div class="content">
         <div class="credit">
-          <img src="src/images/ranks/admin.png" alt="admin rank" title="Admin / Owner">
+          <img src={AdminIcon} alt="admin rank" title="Admin / Owner">
           <p class="nes-font">NoRisk</p>
         </div>
         <div class="credit">
-          <img src="src/images/ranks/developer.png" alt="developer rank" title="Developer">
+          <img src={DeveloperIcon} alt="developer rank" title="Developer">
           <p class="nes-font">Tim (aim_shock)</p>
         </div>
         <div class="credit">
-          <img src="src/images/ranks/bug_bounty.png" alt="bug bounty rank" title="Bug Hunter">
+          <img src={BugBountyIcon} alt="bug bounty rank" title="Bug Hunter">
           <p class="nes-font" title="Er leidet einfach 'nur' mit mir (Tim) 😭">MrKavatch</p>
         </div>
         <div class="credit">

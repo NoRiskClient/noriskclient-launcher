@@ -16,6 +16,6 @@ export async function clearCustomServerLogs(serverId) {
 }
 
 listen("custom-server-process-output", event => {
-    console.log("Received process-output event", event.payload);
+    console.debug("Received process-output event", event.payload);
     addCustomServerLog(event.payload.server_id, event.payload.data);
 });
