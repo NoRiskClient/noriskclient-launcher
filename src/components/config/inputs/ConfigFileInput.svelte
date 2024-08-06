@@ -1,12 +1,14 @@
 
 <script>
   import { open } from '@tauri-apps/plugin-dialog';
+  import { addNotification } from '../../../stores/notificationStore.js';
 
   export let title;
-  export let value; // value of the text field
+  export let value;
   export let extentions = ['*'];
   export let requiredFileName = "";
   export let defaultValue = undefined;
+  export let id = "";
 
   // Try to get user-desired folder path via system dialog
   async function selectFolderPath() {
@@ -20,13 +22,13 @@
       if (typeof result == 'string' && result.length > 0) {
         const splitter = result.includes('\\') ? '\\' : '/';
         if (requiredFileName.length > 0 && result.split(splitter).pop().split('.')[result.split(splitter).pop().split('.').length - 2] != requiredFileName) {
-          alert(`Please select a file with the name ${requiredFileName}!`);
+          addNotification(`Please select a file with the name "${requiredFileName}"!`);
           return;
         }
         value = result
       }
-    } catch (e) {
-      alert("Failed to select file using dialog")
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -39,7 +41,7 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <input id={id} placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
     <button on:click={selectFolderPath} aria-label="Select File" title="Select File">📂</button>
     {#if defaultValue != undefined}
       <button on:click={resetFilePathToDefault} aria-label="Reset" title="Reset">🗑️</button>

@@ -1,13 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
+import { noriskLog } from "./noriskUtils.js";
 
 export function startMicrosoftAuth() {
   invoke("microsoft_auth")
     .then(async result => {
-      console.log("Microsoft Auth Result", result)
+      noriskLog("Microsoft Auth Result: " + JSON.stringify(result));
       await fetchDefaultUserOrError();
-    }).catch(async e => {
-    await fetchDefaultUserOrError();
-    //addNotification(e);
-  });
+    }).catch(async () => {
+      await fetchDefaultUserOrError();
+    });
 }

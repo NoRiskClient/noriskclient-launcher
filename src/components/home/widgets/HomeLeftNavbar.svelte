@@ -6,7 +6,7 @@
   import { branches } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { invoke } from "@tauri-apps/api/core";
-  import { noriskError, noriskLog } from "../../../utils/noriskUtils.js";
+  import { noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
   let discordLinked = false;
@@ -26,18 +26,17 @@
           }
         },
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
-      },
-    ].sort((a, b) => b.name.length - a.name.length);
+      }
+    ];
   }
 
   onMount(async () => {
-    const userUnlisten = defaultUser.subscribe(async value => {
+    const userUnlisten = defaultUser.subscribe(async () => {
       await fetchDiscordLinkStatus();
       updateNavItems();
     });
 
-    const branchesUnlisten = branches.subscribe(async value => {
-      await fetchDiscordLinkStatus();
+    const branchesUnlisten = branches.subscribe(async () => {
       updateNavItems();
     });
 
@@ -60,10 +59,9 @@
         noriskLog("Is Discord Linked: " + discordLinked);
         updateNavItems();
       })
-      .catch((err) => {
+      .catch((error) => {
         discordLinked = false;
-        noriskError(err);
-        addNotification(err);
+        addNotification(error);
         updateNavItems();
       });
   }
@@ -78,8 +76,8 @@
         discordLinked = false;
         noriskLog("Unlinked Discord" + discordLinked);
       })
-      .catch((err) => {
-        noriskError(err);
+      .catch((error) => {
+        addNotification(error);
       });
   }
 </script>
@@ -115,7 +113,7 @@
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: end;
+    align-items: start;
     pointer-events: all;
   }
 

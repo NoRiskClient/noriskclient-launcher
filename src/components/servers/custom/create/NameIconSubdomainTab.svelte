@@ -4,7 +4,7 @@
     import {createEventDispatcher} from "svelte";
     import { launcherOptions } from "../../../../stores/optionsStore.js";
     import { defaultUser } from "../../../../stores/credentialsStore.js";
-    
+    import { addNotification } from "../../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -20,10 +20,8 @@
             uuid: $defaultUser.id
         }).then(() => {
             dispatch('next');
-        }).catch(err => {
-            console.error(err);
-            alert(err);
-            return;
+        }).catch((error) => {
+            addNotification("Failed to check subdomain: " + error);
         });
     }
 </script>
@@ -43,7 +41,7 @@
     </div>
     {#if name.length > 0 && subdomain.length > 0}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="next-button" on:click={next}>-&gt;</h1>
+        <h1 class="next-button primary-text" on:click={next}>-&gt;</h1>
     {/if}
 </div>
 
@@ -128,8 +126,6 @@
         margin-left: 82.5%;
         text-align: center;
         cursor: pointer;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
     }
 

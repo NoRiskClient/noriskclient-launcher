@@ -12,12 +12,12 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="before-button" on:click={() => dispatch('back')}>&lt;-</h1>
     <div class="column content">
-        <p class="eula-text">Hereby you agree to the <a href="https://www.minecraft.net/en-us/eula" target="_blank" title="Minecraft EULA">EULA</a> of Minecraft.</p>
+        <p class="eula-text">Hereby you agree to the <a class="primary-text" href="https://www.minecraft.net/en-us/eula" target="_blank" title="Minecraft EULA">EULA</a> of Minecraft.</p>
         <ConfigRadioButton bind:value={eula} text="" />
     </div>
     {#if eula == true}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="next-button" on:click={() => dispatch('next')}>Finish</h1>
+        <h1 class="next-button primary-text" on:click={() => dispatch('next')}>Finish</h1>
     {/if}
 </div>
 
@@ -46,11 +46,6 @@
 
     .content {
         margin-top: 6em;
-    }
-
-    a {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     h1 {
@@ -84,8 +79,6 @@
         margin-left: 65%;
         text-align: center;
         cursor: pointer;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
     }
 

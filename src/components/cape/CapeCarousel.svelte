@@ -5,6 +5,7 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { getNoRiskToken } from "../../utils/noriskUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
 
   const dispatch = createEventDispatcher();
 
@@ -48,27 +49,27 @@
   let responseData = "";
 
   async function getNameByUUID(uuid) {
-    console.debug("UUID", uuid);
     await invoke("mc_name_by_uuid", {
       uuid: uuid,
     }).then((user) => {
       responseData = user ?? "Unknown";
-    }).catch(e => {
+    }).catch(error => {
       responseData = "Unknown";
+      addNotification("Failed to get name by UUID: " + error);
     });
   }
 
   async function handleEquipCape(hash) {
-    console.debug("CLICKED", hash);
     if ($defaultUser) {
       await invoke("equip_cape", {
         noriskToken: getNoRiskToken(),
         uuid: $defaultUser.id,
         hash: hash,
       }).then(() => {
+        addNotification("Cape equipped!", "INFO");
         dispatch("fetchNoRiskUser");
       }).catch((error) => {
-        console.error(error);
+        addNotification("Failed to equip cape: " + error);
       });
     }
   }

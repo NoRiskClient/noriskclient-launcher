@@ -7,7 +7,7 @@
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode, noriskLog } from "./utils/noriskUtils.js";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { invoke } from "@tauri-apps/api/core";
   import { addNotification } from "./stores/notificationStore.js";
@@ -42,7 +42,7 @@
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
-      console.log("Default User Was Updated", value);
+      noriskLog("Default User Was Updated.");
       await fetchBranches();
       await fetchProfiles();
     });
@@ -74,6 +74,8 @@
         --font-color-disabled: #858585;
         --dev-font-color: rgb(194, 165, 0);
         --dev-font-color-text-shadow: rgb(170, 144, 0);
+        --green-text: #057605;
+        --green-text-shadow: #074f07;
         transition: background-color 0.2s;
     }
 
@@ -91,6 +93,8 @@
         --font-color-disabled: #878787;
         --dev-font-color: gold;
         --dev-font-color-text-shadow: rgb(189, 161, 2);
+        --green-text: #00ff00;
+        --green-text-shadow: #086b08;
     }
 
     :global(*) {
@@ -103,15 +107,19 @@
         text-shadow: 2px 2px #460000;
     }
 
-    :global(.primary-text-clickable) {
+    :global(.red-text-clickable) {
         color: red;
         text-shadow: 2px 2px #460000;
         cursor: pointer;
     }
 
-    :global(.red-text-clickable) {
-        color: red;
-        text-shadow: 2px 2px #460000;
-        cursor: pointer;
+    :global(.primary-text) {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    :global(.green-text) {
+        color: var(--green-text);
+        text-shadow: 2px 2px var(--green-text-shadow);
     }
 </style>

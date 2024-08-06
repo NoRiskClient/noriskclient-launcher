@@ -6,13 +6,14 @@
   export let suffix = "";
   export let autofocus = false;
   export let disabled = false;
+  export let id = "";
 </script>
 
 <div class="input-container">
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input" autocomplete="new-password">
+    <input id={id} placeholder={placeholder} disabled={disabled} autofocus={autofocus} bind:value={value} type="text" class="nes-input" autocomplete="new-password">
     {#if suffix != ""}
       <p class="suffix">{suffix}</p>
     {/if}

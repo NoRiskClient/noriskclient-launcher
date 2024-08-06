@@ -4,17 +4,12 @@
   import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { preventSelection } from "../../utils/svelteUtils.js";
+  import { addNotification } from "../../stores/notificationStore.js";
+  import { noriskLog } from "../../utils/noriskUtils.js";
 
   let capes = null;
   let capeHash = null;
   let isLoading = true;
-  let requests = [
-    { text: "CAPE EDIT" },
-    { text: "ALLTIME" },
-    { text: "WEEKLY" },
-    { text: "OWNED" },
-  ];
   let currentRequest = 0;
 
   async function requestTrendingCapes(alltime) {
@@ -25,10 +20,10 @@
         alltime: alltime,
         limit: 30,
       }).then((result) => {
-        console.log("Requesting Trending capes", result);
+        noriskLog("Requesting Trending capes: " + JSON.stringify(result));
         capes = result;
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification(error);
       });
     }
   }
@@ -40,10 +35,10 @@
         uuid: $defaultUser.id,
         limit: 30,
       }).then((result) => {
-        console.debug("Requesting owned capes", result);
+        noriskLog("Requesting Owned capes: " + JSON.stringify(result));
         capes = result;
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification(error);
       });
     }
   }
@@ -68,12 +63,11 @@
         if (user) {
           capeHash = user;
         } else {
-          console.log("No Cape Found");
+          noriskLog("No cape found for user: " + $defaultUser.id);
         }
         isLoading = false;
-      }).catch(e => {
-        alert("Failed to Request User by UUID: " + e);
-        console.error(e);
+      }).catch(error => {
+        addNotification("Failed to Request User by UUID: " + error);
         isLoading = false;
       });
     }
@@ -84,11 +78,13 @@
 
 <div class="wrapper">
   <div class="tab-wrapper">
-    <h1 on:click={() => switchTab(0)} class:active-tab={currentRequest === 0}>EDITOR</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 on:click={() => switchTab(0)} class:primary-text={currentRequest === 0}>EDITOR</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="button-wrapper">
-      <h2 on:click={() => switchTab(1)} class:active-tab={currentRequest === 1}>ALL TIME</h2>
-      <h2 on:click={() => switchTab(2)} class:active-tab={currentRequest === 2}>WEEKLY</h2>
-      <h2 on:click={() => switchTab(3)} class:active-tab={currentRequest === 3}>OWNED</h2>
+      <h2 on:click={() => switchTab(1)} class:primary-text={currentRequest === 1}>ALL TIME</h2>
+      <h2 on:click={() => switchTab(2)} class:primary-text={currentRequest === 2}>WEEKLY</h2>
+      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>OWNED</h2>
     </div>
   </div>
   <div class="cape-wrapper">
@@ -145,10 +141,5 @@
     .button-wrapper {
         display: flex;
         flex-direction: row;
-    }
-
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 </style>

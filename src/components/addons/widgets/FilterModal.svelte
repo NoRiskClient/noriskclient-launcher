@@ -74,7 +74,7 @@
         {#if !reload}
         <VirtualList height="27.5em" items={list} let:item>
             {#if item?.id == undefined || item?.id == null}
-              <p class="filter-type" class:first={list.indexOf(item) == 0}>{item}</p>
+              <p class="filter-type primary-text" class:first={list.indexOf(item) == 0}>{item}</p>
             {:else}
               <ConfigRadioButton bind:value={activeFilters[item.id].enabled} text={item.name} reversed={true} spaced={true} on:toggle={() => dispatch('search')} />
               <div style="height: 7.5px;"></div>
@@ -121,8 +121,6 @@
       font-size: 20px;
       margin-top: 30px;
       margin-bottom: 15px;
-      color: var(--primary-color);
-      text-shadow: 2px 2px var(--primary-color-text-shadow);
       user-select: none;
       cursor: default;
     }

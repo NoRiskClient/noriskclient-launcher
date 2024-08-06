@@ -1,29 +1,35 @@
 <script>
-    import MaintenanceModeTokenModal from "./MaintenanceModeTokenModal.svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { openInputPopup } from "../../utils/popupUtils.js";
+    import { setMaintenanceMode } from "../../utils/noriskUtils.js";
 
-    let maintenanceModeTokenPopup = false;
+    function openMaintenanceModeTokenPopup() {
+        openInputPopup({
+            title: "Maintenance Mode",
+            content: "Please enter the maintenance mode token.",
+            inputPlaceholder: "Your Token...",
+            validateInput: (input) => input == "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl",
+            liveValidation: false,
+            onConfirm: () => setMaintenanceMode(false),
+            titleFontSize: "20px",
+        });
+    }
 </script>
 
-{#if maintenanceModeTokenPopup}
-    <MaintenanceModeTokenModal bind:showModal={maintenanceModeTokenPopup}/>
-{/if}
 <div class="container">
     <div class="maintenance-mode">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="title text" on:click={() => maintenanceModeTokenPopup = true}>Maintenance Mode</h1>
+        <h1 class="title text primary-text" on:click={openMaintenanceModeTokenPopup}>Maintenance Mode</h1>
         <p class="text">We are currently in maintenance mode.<br>Please try again later or check or Discord for more information.</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="quit-button" on:click={() => { getCurrentWebviewWindow().close(); }}>Exit</h1>
+        <h1 class="quit-button red-text" on:click={() => { getCurrentWebviewWindow().close(); }}>Exit</h1>
     </div>
 </div>
 
 <style>
     .text {
-        color: var(--font-color);
-        text-shadow: 2px 2px var(--font-color-text-shadow);
         font-family: 'Press Start 2P', serif;
         text-align: center;
         width: 95%;
@@ -41,8 +47,6 @@
         margin-top: 50px;
         font-size: 30px;
         margin-bottom: 1em;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .maintenance-mode p {
@@ -68,8 +72,6 @@
     .quit-button {
         cursor: pointer;
         margin-top: 100px;
-        color: red;
-        text-shadow: 4px 4px #460000;
         font-family: 'Press Start 2P', serif;
         text-align: center;
         font-size: 40px;

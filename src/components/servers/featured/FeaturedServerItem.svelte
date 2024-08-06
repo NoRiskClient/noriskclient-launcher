@@ -25,12 +25,12 @@
     </div>
     <div class="buttons">
         {#if $forceServer === `${server.name}:${server.ip}:${server.port}`}
-            <h1 class="launching-button">LAUNCHING...</h1>
+            <h1 class="launching-button primary-text">LAUNCHING...</h1>
         {:else if $forceServer === `${server.name}:${server.ip}:${server.port}:LAUNCHED`}
-            <h1 class="launching-button">PLAYING...</h1>
+            <h1 class="launching-button primary-text">PLAYING...</h1>
         {:else}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="play-button" on:click={() => {
+            <h1 class="play-button  green-text" on:click={() => {
                     setForceServer(`${server.name}:${server.ip}:${server.port}`);
                     runClient($branches[$currentBranchIndex]);
                 }}>
@@ -111,8 +111,6 @@
     .play-button {
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
     }
@@ -121,8 +119,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
         margin-right: 1em;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .play-button:hover {

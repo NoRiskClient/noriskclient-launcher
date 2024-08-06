@@ -2,6 +2,7 @@ import { writable, get } from "svelte/store";
 import { invoke } from "@tauri-apps/api/core";
 import { addNotification } from "./notificationStore.js";
 import { fetchBranches } from "./branchesStore.js";
+import { noriskLog } from "../utils/noriskUtils.js";
 
 export const launcherOptions = writable();
 
@@ -48,7 +49,7 @@ export async function fetchOptions() {
 
 export async function saveOptions(refreshBranches = true) {
   let options = get(launcherOptions);
-  console.log("Saving Launcher Options: ", options);
+  noriskLog("Saving Launcher Options: " + JSON.stringify(options));
   await invoke("store_options", {
     options,
   }).catch((e) => addNotification(e));

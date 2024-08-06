@@ -4,6 +4,7 @@ import { addNotification } from "./notificationStore.js";
 import { launcherOptions } from "./optionsStore.js";
 import { v4 as uuidv4 } from "uuid";
 import { branches } from "./branchesStore.js";
+import { noriskLog } from "../utils/noriskUtils.js";
 
 export const profiles = writable();
 
@@ -47,14 +48,14 @@ export async function fetchProfiles() {
     });
 
     result.store = function() {
-      console.debug("storing launcher profiles", result);
+      console.debug("Storing Launcher Profiles: ", result);
+      noriskLog("Storing Launcher Profiles...");
       invoke("store_launcher_profiles", { launcherProfiles: result }).catch(e => addNotification(e));
     };
 
     result.store();
     profiles.set(result);
-  }).catch((err) => {
-    console.error(`Failed to load launcher profiles: ${err}`);
-    addNotification(err);
+  }).catch((error) => {
+    addNotification("Failed to load launcher profiles: " + error);
   });
 }

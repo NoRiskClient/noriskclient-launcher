@@ -13,12 +13,15 @@
     import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../../stores/credentialsStore.js";
     import { fetchBranches } from "../../stores/branchesStore.js";
     import { fetchProfiles } from "../../stores/profilesStore.js";
-    import { featureWhitelist, noriskUser } from "../../utils/noriskUtils.js";
+    import { featureWhitelist, noriskUser, noriskLog } from "../../utils/noriskUtils.js";
     import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
+    import { openConfirmPopup } from "../../utils/popupUtils.js";
   
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
+    let totalSystemMemory = 0;
+    let selectedMemory = 0;
   
     function toggleTheme() {
       $launcherOptions.toggleTheme();
@@ -26,21 +29,26 @@
     }
     
   
+    async function confirmClearData() {
+        openConfirmPopup({
+            title: "Are you sure?",
+            content: "Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.",
+            onConfirm: clearData
+        });
+    }
+
     async function clearData() {
-      const confirm = await window.confirm("Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.");
-      if (confirm) {
         invoke("clear_data", { options: $launcherOptions })
-          .then(async () => {
-            alert("Data cleared.");
-            await fetchOptions();
-            await fetchDefaultUserOrError(false);
-            await fetchBranches();
-            await fetchProfiles();
-          })
-          .catch(e => {
-            addNotification(e);
-          });
-      }
+            .then(async () => {
+                addNotification("Data cleared successfully!", "INFO");
+                await fetchOptions();
+                await fetchDefaultUserOrError(false);
+                await fetchBranches();
+                await fetchProfiles();
+            })
+            .catch((error) => {
+                addNotification(error);
+            });
     }
   
     async function toggleExperimentalMode() {
@@ -56,7 +64,7 @@
             invoke("enable_experimental_mode", {
               credentials: $defaultUser
             }).then(async () => {
-                console.log("Experimental mode enabled");
+                noriskLog("Experimental mode enabled");
                 $launcherOptions.experimentalMode = true;
                 await saveOptions(false);
                 if (getNoRiskToken() == null) {
@@ -71,9 +79,17 @@
             });
         }
     }
+
+    (async () => {
+        const totalBytes = await invoke("get_total_memory");
+        totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024));
+        selectedMemory = $launcherOptions.memoryPercentage / 1024;
+        noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
+    })();
   
     onDestroy(async () => {
-      await saveOptions();
+        $launcherOptions.memoryPercentage = selectedMemory * 1024;
+        await saveOptions();
     });
 </script>
   
@@ -93,18 +109,18 @@
     {#if $featureWhitelist.includes("MCREAL_APP")}
         <div class="mcreal-app-wrapper">
             <h1 class="title">MCReal App<p class="devOnly">(Alpha)</p></h1>
-            <h1 class="button" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
+            <h1 class="button primary-text" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
         </div>
     {/if}
     <div class="sliders">
-        <ConfigSlider title="RAM" suffix="%" min={20} max={100} bind:value={$launcherOptions.memoryPercentage} step={1} />
+        <ConfigSlider title="RAM" suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
     </div>
     <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} extentions={["exe"]} requiredFileName={"javaw"} defaultValue={""} />
     <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} placeholder={"None"} />
     <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
     <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={clearData}>[CLEAR DATA]</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[CLEAR DATA]</p>
     </div>
     </div>
 </div>
@@ -178,8 +194,6 @@
     .mcreal-app-wrapper > .button {
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition: transform 0.3s;
     }

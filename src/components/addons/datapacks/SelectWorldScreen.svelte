@@ -1,12 +1,11 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
-  import { createEventDispatcher, onMount } from "svelte";
+  import { onMount } from "svelte";
   import WorldItem from "./WorldItem.svelte";
   import DatapacksScreen from "./DatapacksScreen.svelte";
   import VirtualList from "../../utils/VirtualList.svelte";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
-
-  const dispatch = createEventDispatcher();
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   function preventSelection(event) {
     event.preventDefault();
@@ -20,8 +19,8 @@
   async function loadWorlds() {
     await invoke("get_world_folders", { branch: currentBranch }).then((result) => {
       worlds = result;
-    }).catch((e) => {
-      alert(e);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 

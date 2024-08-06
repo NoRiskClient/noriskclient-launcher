@@ -16,7 +16,7 @@ use crate::app::app_data::LauncherOptions;
 pub struct CapeApiEndpoints;
 
 impl CapeApiEndpoints {
-    pub async fn equip_cape(token: &str, uuid: &str, hash: &str) -> Result<String, String> {
+    pub async fn equip_cape(token: &str, uuid: &str, hash: &str) -> Result<(), String> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
 
         let image_url = if options.experimental_mode {
@@ -45,13 +45,13 @@ impl CapeApiEndpoints {
 
                 return match response.status() {
                     StatusCode::CREATED => {
-                        Ok("Cape was equipped.".to_string())
+                        Ok(())
                     }
                     StatusCode::OK => {
                         let response_text = response.text().await.map_err(|err| {
                             format!("Error reading the request: {}", err)
                         })?;
-                        Ok(response_text)
+                        Err(response_text)
                     }
                     _ => {
                         let response_text = response.text().await.map_err(|err| {
@@ -163,26 +163,24 @@ impl CapeApiEndpoints {
         debug!("Requesting Trending Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/cosmetics/cape/trending?uuid={}&alltime={}&limit={}", get_api_base(options.experimental_mode), uuid, alltime, limit);
-        let response = HTTP_CLIENT
+        Ok(HTTP_CLIENT
             .get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?;
-        let response_text = response.text().await?;
-        let trending_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
-        Ok(trending_capes)
+            .send().await?
+            .error_for_status()?
+            .json::<Vec<Cape>>().await?)
     }
 
     pub async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/cosmetics/cape/owned?uuid={}&limit={}", get_api_base(options.experimental_mode), uuid, limit);
-        let response = HTTP_CLIENT
+        Ok(HTTP_CLIENT
             .get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?;
-        let response_text = response.text().await?;
-        let owned_capes: Vec<Cape> = serde_json::from_str(&response_text)?;
-        Ok(owned_capes)
+            .send().await?
+            .error_for_status()?
+            .json::<Vec<Cape>>().await?)
     }
 
     pub fn show_in_folder(path: &str) {

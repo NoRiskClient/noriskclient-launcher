@@ -1,7 +1,8 @@
 <script>
     import { invoke } from "@tauri-apps/api/core";
     import VirtualList from "../../../utils/VirtualList.svelte";
-    import {createEventDispatcher} from "svelte";
+    import { createEventDispatcher } from "svelte";
+    import { addNotification } from "../../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -18,25 +19,25 @@
                 const versions = response.map(r => r.loader);
                 availableTypes["FABRIC"].loaderVersions = versions.map(v => v.version);
                 availableTypes = availableTypes;
-            }).catch((err) => {
-                console.error(err);
+            }).catch((error) => {
+                addNotification("Failed to get Fabric loader versions: " + error);
             });
         } else if (type == "QUILT" && availableTypes["QUILT"].loaderVersions.length <= 0) {
-            if (availableTypes["QUILT"]?.loaders_manifest == null) return console.error("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
+            if (availableTypes["QUILT"]?.loaders_manifest == null) return addNotification("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
             const versions = availableTypes["QUILT"].loaders_manifest.loaders;
             availableTypes["QUILT"].loaderVersions = versions.map(v => v.id).filter(v => !v.includes('-') && v.includes('.'));
             availableTypes = availableTypes;
         } else if (type == "FORGE" && (availableTypes["FORGE"].loaderVersions.length <= 0 || version_keep != version)) {
             version_keep = version;
             availableTypes["FORGE"].loaderVersions = []; // reset if version changed
-            if (availableTypes["FORGE"]?.loaders_manifest == null) return console.error("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
+            if (availableTypes["FORGE"]?.loaders_manifest == null) return addNotification("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
             const versions = availableTypes["FORGE"].loaders_manifest.find(v => v.id == version).loaders;
             availableTypes["FORGE"].loaderVersions = versions.map(v => v.id.split('-')[1]);
             availableTypes = availableTypes;
         } else if (type == "NEO_FORGE" && (availableTypes["NEO_FORGE"].loaderVersions.length <= 0 || version_keep != version)) {
             version_keep = version;
             availableTypes["NEO_FORGE"].loaderVersions = []; // reset if version changed
-            if (availableTypes["NEO_FORGE"]?.loaders_manifest == null) return console.error("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
+            if (availableTypes["NEO_FORGE"]?.loaders_manifest == null) return addNotification("How tf did that happen!?!?! Missing manifest that is usually required to get here...");
             const versions = availableTypes["NEO_FORGE"].loaders_manifest.find(v => v.id == version).loaders;
             availableTypes["NEO_FORGE"].loaderVersions = versions.map(v => v.id);
             availableTypes = availableTypes;
@@ -58,14 +59,14 @@
             {#each item as serverLoaderVersion}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <div class={`version row ${type.toLowerCase()}`} class:active={loaderVersion == serverLoaderVersion} on:click={() => loaderVersion = serverLoaderVersion}>
-                    <p class:latest={availableTypes[type].loaderVersions[0] == serverLoaderVersion} class:longName={(availableTypes[type].loaderVersions[0] == serverLoaderVersion ? 'Latest': serverLoaderVersion).length > 10}>{availableTypes[type].loaderVersions[0] == serverLoaderVersion ? 'Latest': serverLoaderVersion}</p>
+                    <p class:green-text={availableTypes[type].loaderVersions[0] == serverLoaderVersion} class:longName={(availableTypes[type].loaderVersions[0] == serverLoaderVersion ? 'Latest': serverLoaderVersion).length > 10}>{availableTypes[type].loaderVersions[0] == serverLoaderVersion ? 'Latest': serverLoaderVersion}</p>
                 </div>
             {/each}
         </div>
     </VirtualList>
     {#if loaderVersion != null}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="next-button" on:click={() => dispatch('next')}>-&gt;</h1>
+        <h1 class="next-button primary-text" on:click={() => dispatch('next')}>-&gt;</h1>
     {/if}
 </div>
 
@@ -137,11 +138,6 @@
     .version .longName {
         font-size: 11px;
     }
-
-    .version .latest {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
-    }
     
     .version:hover {
         transform: scale(1.1);
@@ -165,8 +161,6 @@
         margin-left: 82.5%;
         text-align: center;
         cursor: pointer;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
     }
 

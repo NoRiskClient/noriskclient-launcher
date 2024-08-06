@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { addNotification } from "./notificationStore.js";
 import { writable } from "svelte/store";
-import { noriskError } from "../utils/noriskUtils.js";
+import { noriskError, noriskLog } from "../utils/noriskUtils.js";
 
 export const defaultUser = writable();
 export const users = writable([]);
@@ -10,11 +10,12 @@ export async function fetchDefaultUserOrError(printError = false) {
   await fetchUsers();
   return await invoke("minecraft_auth_get_default_user").then(async value => {
     defaultUser.set(value);
-  }).catch((reason) => {
+  }).catch((error) => {
     defaultUser.set();
-    noriskError("Default User Error: " + reason);
     if (printError === true) {
-      addNotification(reason);
+      addNotification("Default User Error: " + error);
+    } else {
+      noriskError("Default User Error: " + error);
     }
   });
 }
@@ -37,21 +38,21 @@ export async function setDefaultUser(account) {
 }
 
 export async function removeUser(account) {
-  console.log("Removing User", account);
+  noriskLog("Removing User: " + account.id);
   return await invoke("minecraft_auth_remove_user", { uuid: account.id }).catch((reason) => {
     addNotification(reason);
   });
 }
 
 export async function updateMojangAndNoRiskToken(credentials) {
-  console.log("Updating Mojang And NoRisk Token", credentials);
+  noriskLog("Updating Mojang And NoRisk Token");
   return await invoke("minecraft_auth_update_mojang_and_norisk_token", { credentials }).catch((reason) => {
     addNotification(reason);
   });
 }
 
 export async function updateNoRiskToken(credentials) {
-  console.log("Updating NoRisk Token", credentials);
+  noriskLog("Updating NoRisk Token");
   return await invoke("minecraft_auth_update_norisk_token", { credentials }).catch((reason) => {
     addNotification(reason);
   });

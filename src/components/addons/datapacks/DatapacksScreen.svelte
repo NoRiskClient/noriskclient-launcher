@@ -11,7 +11,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -94,8 +95,8 @@
       launchManifest = result;
       getCustomDatapacksFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification("Failed to get launch manifest: " + error);
     });
   }
 
@@ -103,8 +104,8 @@
     await invoke("get_blacklisted_datapacks").then((result) => {
       console.debug("Blacklisted Datapacks", result);
       blacklistedDatapacks = result;
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      console.error(error);
     });
   }
 
@@ -118,7 +119,7 @@
       console.debug("Custom Datapacks", datapacks);
       customDatapacks = datapacks;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -137,8 +138,8 @@
       datapacks = datapacks;
       launcherProfiles.addons[currentBranch].datapacks = launcherProfiles.addons[currentBranch].datapacks;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -161,8 +162,8 @@
         result.forEach(datapack => datapack.featured = true);
         datapacks = result;
         featuredDatapacks = result;
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -194,8 +195,8 @@
       } else {
         datapacks = [...datapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -231,10 +232,10 @@
         getCustomDatapacksFilenames();
       }).catch((error) => {
         if (!showError) return;
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -252,7 +253,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -266,8 +267,8 @@
       if (locations instanceof Array) {
         installCustomDatapacks(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -283,14 +284,14 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom Datapack ${fileName}`);
+      noriskLog(`Installing custom Datapack ${fileName}`);
       await invoke("save_custom_datapacks_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
         world: world,
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomDatapacksFilenames();
     });
@@ -333,10 +334,10 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleSelectCustomDatapacks}>Custom</h1>
@@ -351,7 +352,7 @@
       <VirtualList height="30em" items={[...datapacks, datapacks.length >= 30 ? 'LOAD_MORE_DATAPACKS' : null]} let:item>
         {#if item === 'LOAD_MORE_DATAPACKS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
         {:else if item != null}
           <DatapackItem text={checkIfRequiredOrInstalled(item.slug)}
                         on:delete={() => deleteInstalledDatapack(item)}
@@ -414,11 +415,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -442,11 +438,6 @@
 
     .load-more-button:hover {
         transform: scale(1.2);
-    }
-
-    .load-more-button p {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .modrinth-wrapper {
