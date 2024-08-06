@@ -3,7 +3,7 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { get } from "svelte/store";
   import { push } from "svelte-spa-router";
-  // import { webviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { getNoRiskToken, noriskError, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
@@ -59,7 +59,7 @@
       },
       {
         name: "QUIT",
-        onClick: () => webviewWindow.close(),
+        onClick: () => getCurrentWebview.close(),
         condition: true,
         className: "quit",
       },

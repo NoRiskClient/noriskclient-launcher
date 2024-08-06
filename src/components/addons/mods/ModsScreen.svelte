@@ -1,12 +1,11 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
-  import { remove, rename } from "@tauri-apps/plugin-fs";
+  import { remove, rename, watch } from "@tauri-apps/plugin-fs";
   import { open } from "@tauri-apps/plugin-dialog";
   import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ModItem from "./ModItem.svelte";
   import { onDestroy, onMount } from "svelte";
-  import { watch } from "tauri-plugin-fs-watch-api";
   import { listen } from "@tauri-apps/api/event";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
