@@ -1,6 +1,6 @@
 <script>
     import MaintenanceModeTokenModal from "./MaintenanceModeTokenModal.svelte";
-    import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
     let maintenanceModeTokenPopup = false;
 </script>
@@ -16,7 +16,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="quit-button" on:click={() => { WebviewWindow.close(); }}>Exit</h1>
+        <h1 class="quit-button" on:click={() => { getCurrentWebviewWindow().close(); }}>Exit</h1>
     </div>
 </div>
 

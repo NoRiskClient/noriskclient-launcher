@@ -10,6 +10,8 @@
     "updater:default",
     "dialog:default",
     "notification:default",
-    "fs:default"
+    "fs:default",
+    "core:window:allow-close",
+    "core:window:allow-show"
   ]
 }
