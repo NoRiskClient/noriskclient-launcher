@@ -9,11 +9,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-<<<<<<< HEAD
-        <h1 class="quit-button" on:click={() => { getCurrentWebviewWindow().close(); }}>Exit</h1>
-=======
-        <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>Exit</h1>
->>>>>>> TimLohrer/main
+        <h1 class="quit-button red-text" on:click={() => { getCurrentWebviewWindow().close(); }}>Exit</h1>
     </div>
 </div>
 

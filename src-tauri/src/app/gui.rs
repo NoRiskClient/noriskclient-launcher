@@ -8,11 +8,10 @@ use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{Manager, UserAttentionType, WebviewWindow, WindowEvent, AppHandle};
+use tauri::{Manager, UserAttentionType, WebviewWindow, WindowEvent};
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
-use tauri::api::dialog::blocking::FileDialogBuilder;
 
 use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::{total_memory, McDataHandler}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
@@ -53,12 +52,6 @@ struct MinecraftProfileProperty {
     value: String,
 }
 
-#[derive(serde::Serialize)]
-struct NewMinecraftSkinBody {
-    variant: String,
-    file: Vec<u8>,
-}
-
 #[derive(serde::Deserialize)]
 struct PlayerDBData {
     data: PlayerDBEntry,
@@ -96,7 +89,7 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, uuid: &str, app: tauri::AppHandle) -> Result<(), String> {
+async fn upload_cape(norisk_token: &str, uuid: &str, app: tauri::AppHandle) -> Result<String, String> {
     debug!("Uploading Cape...");
 
     let dialog_result = app.dialog().file()
@@ -114,7 +107,7 @@ async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), St
 }
 
 #[tauri::command]
-async fn get_featured_mods(branch: &str, mc_version: &str, app: tauri::AppHandle) -> Result<Vec<ModInfo>, String> {
+async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo>, String> {
     debug!("Getting Featured Mods...");
 
     match ApiEndpoints::norisk_featured_mods(&branch).await {
@@ -150,7 +143,7 @@ async fn get_featured_mods(branch: &str, mc_version: &str, app: tauri::AppHandle
 }
 
 #[tauri::command]
-async fn get_featured_resourcepacks(branch: &str, mc_version: &str, app: tauri::AppHandle) -> Result<Vec<ResourcePackInfo>, String> {
+async fn get_featured_resourcepacks(branch: &str, mc_version: &str) -> Result<Vec<ResourcePackInfo>, String> {
     debug!("Getting Featured ResourcePacks...");
 
     match ApiEndpoints::norisk_featured_resourcepacks(&branch).await {
@@ -186,7 +179,7 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str, app: tauri::
 }
 
 #[tauri::command]
-async fn get_featured_shaders(branch: &str, mc_version: &str, app: tauri::AppHandle) -> Result<Vec<ShaderInfo>, String> {
+async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<ShaderInfo>, String> {
     debug!("Getting Featured Shaders...");
 
     match ApiEndpoints::norisk_featured_shaders(&branch).await {
@@ -222,7 +215,7 @@ async fn get_featured_shaders(branch: &str, mc_version: &str, app: tauri::AppHan
 }
 
 #[tauri::command]
-async fn get_featured_datapacks(branch: &str, mc_version: &str, app: tauri::AppHandle) -> Result<Vec<DatapackInfo>, String> {
+async fn get_featured_datapacks(branch: &str, mc_version: &str) -> Result<Vec<DatapackInfo>, String> {
     debug!("Getting Featured Datapacks...");
     
     match ApiEndpoints::norisk_featured_datapacks(&branch).await {
@@ -288,7 +281,7 @@ async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, app: AppHandle) -> Result<ModrinthModsSearchResponse, String> {
+async fn search_mods(params: ModrinthSearchRequestParams) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
     ModrinthApiEndpoints::search_mods(&params).await.map_err(|e| format!("unable to search mods: {:?}", e))
 }
@@ -309,7 +302,6 @@ async fn console_log_error(message: String) {
 }
 
 #[tauri::command]
-<<<<<<< HEAD
 async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
     debug!("Fetching mod info...");
     ModrinthApiEndpoints::get_mod_info(&slug).await.map_err(|e| format!("unable to get mod info: {:?}", e))
@@ -1496,7 +1488,7 @@ async fn check_feature_whitelist(feature: &str, options: LauncherOptions, creden
 /// Runs the GUI and returns when the window is closed.
 pub fn gui_main() {
     tauri::Builder::default()
-        .on_window_event(move |window, event| match event {
+        .on_window_event(move |_, event| match event {
             WindowEvent::Destroyed => {
                 info!("Window destroyed, quitting application");
             }
