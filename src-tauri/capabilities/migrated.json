@@ -12,6 +12,7 @@
     "notification:default",
     "fs:default",
     "core:window:allow-close",
-    "core:window:allow-show"
+    "core:window:allow-show",
+    "process:default"
   ]
 }
