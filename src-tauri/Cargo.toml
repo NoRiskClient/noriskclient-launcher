@@ -12,9 +12,6 @@ rust-version = "1.57"
 tauri-build = { version = "2.0.0-rc", features = [] }
 
 [dependencies]
-# Path fix
-fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-
 # Log
 log4rs = "1.3.0"
 log = "0.4.20"
