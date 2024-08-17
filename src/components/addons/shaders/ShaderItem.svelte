@@ -12,7 +12,9 @@
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
         {#if type != 'CUSTOM'}
-            <img class="icon" src={shader.icon_url} alt="Shader Icon">
+            <div class="icon-fallback">
+                <img class="icon" src={shader.icon_url} alt=" " onerror="this.style.display='none'">
+            </div>
         {:else}
             <div class="custom-shader-icon">🔮</div>
         {/if}
@@ -152,6 +154,15 @@
         object-fit: contain;
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
+    }
+
+    .icon-fallback {
+    background-image: url("https://docs.modrinth.com/img/logo.svg");
+    min-width: 90px; 
+    min-height: 90px;
+    background-position: center center;
+    background-size: 90%;
+    background-repeat: no-repeat;
     }
 
     .shader-title {
