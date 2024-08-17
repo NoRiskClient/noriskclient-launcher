@@ -95,7 +95,6 @@
         margin-bottom: 10px;
         gap: 1em;
         margin-top: 0.3em;
-        cursor: pointer;
     }
 
     .blacklisted {
