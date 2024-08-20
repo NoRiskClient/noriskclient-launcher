@@ -116,7 +116,7 @@
         <ConfigSlider title="RAM" suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
         <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
     </div>
-    <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} extentions={["exe"]} requiredFileName={"javaw"} defaultValue={""} />
+    <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} requiredFileName={["javaw", "java"]} defaultValue={""} />
     <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} placeholder={"None"} />
     <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
     <div class="clear-data-button-wrapper">
