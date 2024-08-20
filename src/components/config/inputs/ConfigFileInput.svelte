@@ -6,7 +6,7 @@
   export let title;
   export let value;
   export let extentions = ['*'];
-  export let requiredFileName = "";
+  export let requiredFileName = ["*"];
   export let defaultValue = undefined;
   export let id = "";
 
@@ -21,8 +21,8 @@
       })
       if (typeof result == 'string' && result.length > 0) {
         const splitter = result.includes('\\') ? '\\' : '/';
-        if (requiredFileName.length > 0 && result.split(splitter).pop().split('.')[result.split(splitter).pop().split('.').length - 2] != requiredFileName) {
-          addNotification(`Please select a file with the name "${requiredFileName}"!`);
+        if (!requiredFileName.includes("*") && !requiredFileName.includes(result.split(splitter).pop().split('.')[result.split(splitter).pop().split('.').length - 2])) {
+          addNotification(`Please select a file with the name ${requiredFileName.map(f => `"${f}"`).join(" or ")}, depending on your OS!`);
           return;
         }
         value = result
