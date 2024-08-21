@@ -242,7 +242,11 @@ dependencies = [
  "futures-lite 2.3.0",
  "parking",
  "polling 3.7.3",
+<<<<<<< HEAD
  "rustix 0.38.35",
+=======
+ "rustix 0.38.34",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "slab",
  "tracing",
  "windows-sys 0.59.0",
@@ -313,7 +317,11 @@ checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -348,7 +356,11 @@ checksum = "a27b8a3a6e1a44fa4c8baf1f653e4172e81486d4941f2237e20dc2d0cf4ddff1"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -541,9 +553,15 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "bytemuck"
+<<<<<<< HEAD
 version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773d90827bc3feecfb67fab12e24de0749aad83c74b9504ecde46237b5cd24e2"
+=======
+version = "1.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fd4c6dcc3b0aea2f5c0b4b82c2b15fe39ddbc76041a310848f4706edf76bb31"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 
 [[package]]
 name = "byteorder"
@@ -659,9 +677,15 @@ dependencies = [
 
 [[package]]
 name = "cc"
+<<<<<<< HEAD
 version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57b6a275aa2903740dc87da01c62040406b8812552e97129a63ea8850a17c6e6"
+=======
+version = "1.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72db2f7947ecee9b03b510377e8bb9077afa27176fdbff55c51027e976fdcc48"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "jobserver",
  "libc",
@@ -804,10 +828,23 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "core-foundation"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b55271e5c8c478ad3f38ad24ef34923091e0548492a266d19b3c0b4d82574c63"
+=======
+name = "core-foundation-sys"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
+
+[[package]]
+name = "core-graphics"
+version = "0.22.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2581bbab3b8ffc6fcbd550bf46c355135d16e9ff2a6ea032ad6b9bf1d7efe4fb"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "core-foundation-sys",
  "libc",
@@ -965,7 +1002,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13b588ba4ac1a99f7f2964d24b3d896ddc6bf847ee3855dbd4366f058cfcd331"
 dependencies = [
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -975,7 +1016,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edb49164822f3ee45b17acd4a208cfc1251410cf0cad9a833234c9890774dd9f"
 dependencies = [
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1015,7 +1060,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1026,7 +1075,11 @@ checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
 dependencies = [
  "darling_core",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1075,7 +1128,11 @@ checksum = "67e77553c4162a157adbf834ebae5b415acbecbeafc7a74b0e886657506a7611"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1088,7 +1145,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustc_version",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1261,12 +1322,15 @@ name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+<<<<<<< HEAD
 
 [[package]]
 name = "dyn-clone"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
+=======
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 
 [[package]]
 name = "ecdsa"
@@ -1361,7 +1425,11 @@ checksum = "de0d48a183585823424a4ce1aa132d174a6a81bd540895822eb4c8373a8e49e8"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1474,9 +1542,15 @@ dependencies = [
 
 [[package]]
 name = "filetime"
+<<<<<<< HEAD
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
+=======
+version = "0.2.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf401df4a4e3872c4fe8151134cf483738e74b67fc934d6532c882b3d24a4550"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "cfg-if",
  "libc",
@@ -1536,7 +1610,11 @@ checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -1654,7 +1732,11 @@ checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -2012,6 +2094,28 @@ dependencies = [
 name = "h2"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+<<<<<<< HEAD
+=======
+checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
+dependencies = [
+ "bytes",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "http 0.2.12",
+ "indexmap 2.4.0",
+ "slab",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "h2"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 checksum = "524e8ac6999421f49a846c2d4411f337e53497d8ec55d67753beffa43c5d9205"
 dependencies = [
  "atomic-waker",
@@ -2019,8 +2123,13 @@ dependencies = [
  "fnv",
  "futures-core",
  "futures-sink",
+<<<<<<< HEAD
  "http",
  "indexmap 2.5.0",
+=======
+ "http 1.1.0",
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "slab",
  "tokio",
  "tokio-util",
@@ -2159,9 +2268,15 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
+<<<<<<< HEAD
  "h2",
  "http",
  "http-body",
+=======
+ "h2 0.4.6",
+ "http 1.1.0",
+ "http-body 1.0.1",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "httparse",
  "itoa 1.0.11",
  "pin-project-lite",
@@ -2286,9 +2401,15 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
+<<<<<<< HEAD
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68b900aa2f7301e21c36462b170ee99994de34dff39a4a6a528e80e7376d07e5"
+=======
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93ead53efc7ea8ed3cfb0c79fc8023fbb782a5432b52830b6518941cebe6505c"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
@@ -2517,6 +2638,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
+<<<<<<< HEAD
 name = "libappindicator"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2544,6 +2666,11 @@ dependencies = [
 name = "libc"
 version = "0.2.158"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+=======
+name = "libc"
+version = "0.2.158"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
@@ -2766,6 +2893,21 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "minecraft-client-rs"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9d7111eb75f0736910124bb828b5555e7b1be8a81fce42f90cb5711fada9fb0"
+
+[[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 name = "minisign-verify"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2925,6 +3067,7 @@ dependencies = [
  "keyring",
  "log",
  "log4rs",
+ "minecraft-client-rs",
  "once_cell",
  "open",
  "os_info",
@@ -2932,7 +3075,11 @@ dependencies = [
  "path-absolutize",
  "rand 0.8.5",
  "regex",
+<<<<<<< HEAD
  "reqwest",
+=======
+ "reqwest 0.12.6",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "sanitize-filename",
  "serde",
  "serde_json",
@@ -3231,9 +3378,15 @@ dependencies = [
 
 [[package]]
 name = "object"
+<<<<<<< HEAD
 version = "0.36.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "084f1a5821ac4c651660a94a7153d27ac9d8a53736203f58b31945ded098070a"
+=======
+version = "0.36.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27b64972346851a39438c60b341ebc01bba47464ae329e55cf343eb93964efd9"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "memchr",
 ]
@@ -3278,7 +3431,11 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -3467,6 +3624,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "petgraph"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
+dependencies = [
+ "fixedbitset",
+ "indexmap 2.4.0",
+]
+
+[[package]]
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 name = "phf"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3570,7 +3740,11 @@ dependencies = [
  "phf_shared 0.11.2",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -3617,7 +3791,11 @@ checksum = "2f38a4412a78282e09a2cf38d195ea5420d15ba0602cb375210efbc877243965"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -3666,7 +3844,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42cf17e9a1800f5f396bc67d193dc9411b59012a5876445ef450d449881e1016"
 dependencies = [
  "base64 0.22.1",
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "quick-xml 0.32.0",
  "serde",
  "time",
@@ -4072,16 +4254,68 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 name = "reqwest"
 version = "0.12.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+<<<<<<< HEAD
 checksum = "f8f4955649ef5c38cc7f9e8aa41761d48fb9677197daea9984dc54f56aad5e63"
+=======
+checksum = "dd67538700a17451e7cba03ac727fb961abb7607553461627b97de0b89cf4a62"
+dependencies = [
+ "base64 0.21.7",
+ "bytes",
+ "encoding_rs",
+ "futures-core",
+ "futures-util",
+ "h2 0.3.26",
+ "http 0.2.12",
+ "http-body 0.4.6",
+ "hyper 0.14.30",
+ "hyper-tls 0.5.0",
+ "ipnet",
+ "js-sys",
+ "log",
+ "mime",
+ "native-tls",
+ "once_cell",
+ "percent-encoding",
+ "pin-project-lite",
+ "rustls-pemfile 1.0.4",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sync_wrapper 0.1.2",
+ "system-configuration 0.5.1",
+ "tokio",
+ "tokio-native-tls",
+ "tokio-util",
+ "tower-service",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-streams",
+ "web-sys",
+ "winreg 0.50.0",
+]
+
+[[package]]
+name = "reqwest"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6f6ddd79dc661ade721873783d159ec87d91d556ce92933e342bae8b87c48c0"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
  "futures-core",
  "futures-util",
+<<<<<<< HEAD
  "h2",
  "http",
  "http-body",
+=======
+ "h2 0.4.6",
+ "http 1.1.0",
+ "http-body 1.0.1",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "http-body-util",
  "hyper",
  "hyper-rustls",
@@ -4103,8 +4337,13 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+<<<<<<< HEAD
  "sync_wrapper",
  "system-configuration",
+=======
+ "sync_wrapper 1.0.1",
+ "system-configuration 0.6.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
@@ -4115,7 +4354,10 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
+<<<<<<< HEAD
  "webpki-roots",
+=======
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "windows-registry",
 ]
 
@@ -4432,9 +4674,15 @@ dependencies = [
 
 [[package]]
 name = "serde"
+<<<<<<< HEAD
 version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
+=======
+version = "1.0.208"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "serde_derive",
 ]
@@ -4462,6 +4710,7 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
+<<<<<<< HEAD
 version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5831b979fd7b5439637af1752d535ff49f4860c0f341d1baeb6faf0f4242170"
@@ -4480,14 +4729,31 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.77",
+=======
+version = "1.0.208"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24008e81ff7613ed8e5ba0cfaf24e2c2f1e5b8a0495711e44fcd4882fca62bcf"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
 name = "serde_json"
+<<<<<<< HEAD
 version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
 dependencies = [
+=======
+version = "1.0.125"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83c8e735a073ccf5be70aa8066aa984eaf2fa000db6c8d0100ae605b366d31ed"
+dependencies = [
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "itoa 1.0.11",
  "memchr",
  "ryu",
@@ -4502,7 +4768,11 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -4536,7 +4806,11 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 1.9.3",
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "serde",
  "serde_derive",
  "serde_json",
@@ -4553,7 +4827,11 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -4562,7 +4840,11 @@ version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
 dependencies = [
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "itoa 1.0.11",
  "ryu",
  "serde",
@@ -4631,6 +4913,12 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "shlex"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shlex"
@@ -4864,9 +5152,15 @@ dependencies = [
 
 [[package]]
 name = "syn"
+<<<<<<< HEAD
 version = "2.0.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
+=======
+version = "2.0.75"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6af063034fc1935ede7be0122941bafa9bacb949334d090b77ca98b5817c7d9"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4878,6 +5172,18 @@ name = "sync_wrapper"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
+<<<<<<< HEAD
+=======
+dependencies = [
+ "futures-core",
+]
+
+[[package]]
+name = "sys-locale"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8a11bd9c338fdba09f7881ab41551932ad42e405f61d01e8406baea71c07aee"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "futures-core",
 ]
@@ -4903,9 +5209,36 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
 dependencies = [
+<<<<<<< HEAD
  "bitflags 2.6.0",
  "core-foundation 0.9.4",
  "system-configuration-sys",
+=======
+ "bitflags 1.3.2",
+ "core-foundation",
+ "system-configuration-sys 0.5.0",
+]
+
+[[package]]
+name = "system-configuration"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bc6ee10a9b4fcf576e9b0819d95ec16f4d2c02d39fd83ac1c8789785c4a42"
+dependencies = [
+ "bitflags 2.6.0",
+ "core-foundation",
+ "system-configuration-sys 0.6.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
+]
+
+[[package]]
+name = "system-configuration-sys"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e1d1b10ced5ca923a1fcb8d03e96b8d3268065d724548c0211415ff6ac6bac4"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
 ]
 
 [[package]]
@@ -5111,10 +5444,16 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "tauri-plugin"
 version = "2.0.0-rc.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7dded420c86183f592d0fe925ef9447f41e26fa79f0bdfef8d3f17bfbcdbfb7"
+=======
+name = "tauri-plugin-fs-watch"
+version = "0.0.0"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#677bade9089f2963e5858cc5062e5504787eaf7f"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "anyhow",
  "glob",
@@ -5331,7 +5670,11 @@ dependencies = [
  "cfg-if",
  "fastrand 2.1.1",
  "once_cell",
+<<<<<<< HEAD
  "rustix 0.38.35",
+=======
+ "rustix 0.38.34",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "windows-sys 0.59.0",
 ]
 
@@ -5369,7 +5712,11 @@ checksum = "a4558b58466b9ad7ca0f102865eccc95938dca1a74a856f2b57b6629050da261"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -5440,14 +5787,24 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
+<<<<<<< HEAD
 version = "1.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2b070231665d27ad9ec9b8df639893f46727666c6767db40317fbe920a5d998"
+=======
+version = "1.39.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9babc99b9923bfa4804bd74722ff02c0381021eafa4db9949217e3be8e84fff5"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 dependencies = [
  "backtrace",
  "bytes",
  "libc",
+<<<<<<< HEAD
  "mio",
+=======
+ "mio 1.0.2",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
@@ -5465,7 +5822,11 @@ checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -5567,7 +5928,11 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -5580,7 +5945,11 @@ version = "0.20.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70f427fce4d84c72b5b732388bf4a9f4531b53f74e2887e3ecb2481f68f66d81"
 dependencies = [
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -5591,7 +5960,11 @@ version = "0.22.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "583c44c02ad26b0c3f3066fe629275e50627026c51ac2e595cca4c230ce1ce1d"
 dependencies = [
+<<<<<<< HEAD
  "indexmap 2.5.0",
+=======
+ "indexmap 2.4.0",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -5644,7 +6017,11 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -6009,7 +6386,11 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "wasm-bindgen-shared",
 ]
 
@@ -6043,7 +6424,11 @@ checksum = "afc340c74d9005395cf9dd098506f7f44e38f2b4a21c6aaacf9a105ea5e1e836"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -6255,7 +6640,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4698e52ed2d08f8658ab0c39512a7c00ee5fe2688c65f8c0a4f06750d729f2a6"
 dependencies = [
  "windows-implement 0.56.0",
+<<<<<<< HEAD
  "windows-interface 0.56.0",
+=======
+ "windows-interface",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "windows-result 0.1.2",
  "windows-targets 0.52.6",
 ]
@@ -6281,6 +6670,7 @@ checksum = "f6fc35f58ecd95a9b71c4f2329b911016e6bec66b3f2e6a4aad86bd2e99e2f9b"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
 ]
 
@@ -6293,6 +6683,9 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -6303,7 +6696,11 @@ checksum = "08990546bf4edef8f431fa6326e032865f27138718c587dc21bc0265bbcb57cc"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -6329,6 +6726,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-registry"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e400001bb720a623c1c69032f8e3e4cf09984deec740f007dd2b03ec864804b0"
+dependencies = [
+ "windows-result 0.2.0",
+ "windows-strings",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
 name = "windows-result"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6340,6 +6748,28 @@ dependencies = [
 [[package]]
 name = "windows-result"
 version = "0.2.0"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e"
+dependencies = [
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-strings"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
+dependencies = [
+ "windows-result 0.2.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.42.0"
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e"
 dependencies = [
@@ -6810,7 +7240,11 @@ dependencies = [
  "proc-macro-crate 3.2.0",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "zvariant_utils 2.1.0",
 ]
 
@@ -6854,7 +7288,11 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]
 
 [[package]]
@@ -6957,7 +7395,11 @@ dependencies = [
  "proc-macro-crate 3.2.0",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
  "zvariant_utils 2.1.0",
 ]
 
@@ -6980,5 +7422,9 @@ checksum = "c51bcff7cc3dbb5055396bcf774748c3dab426b4b8659046963523cee4808340"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.77",
+=======
+ "syn 2.0.75",
+>>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
 ]

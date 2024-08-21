@@ -16,7 +16,7 @@
 </style>
 
 <div class="notifications">
-  {#each $notifications as { id, type, message }}
-    <Notification id={id} type={type} message={message} />
+  {#each $notifications as { id, type, details, message }}
+    <Notification id={id} type={type} message={message} details={details} />
   {/each}
 </div>

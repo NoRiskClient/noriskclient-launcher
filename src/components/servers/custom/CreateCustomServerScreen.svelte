@@ -131,6 +131,7 @@
             eula: eula
         };
         await invoke("create_custom_server", {
+            name: server.name,
             mcVersion: server.mcVersion,
             loaderVersion: server.loaderVersion,
             type: server.type,

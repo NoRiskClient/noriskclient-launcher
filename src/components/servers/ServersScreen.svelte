@@ -99,6 +99,15 @@
 </div>
 
 <style>
+  .servers-wrapper {
+      width: 100%;
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      gap: 0.7em;
+    }
+
     .navbar {
         display: flex;
         margin-top: 2em;
@@ -133,14 +142,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 200px;
-    }
-
-    .servers-wrapper {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 0.7em;
     }
 
     .customServerToolbar {

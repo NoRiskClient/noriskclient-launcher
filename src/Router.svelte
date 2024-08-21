@@ -1,14 +1,12 @@
 <!-- App.svelte -->
 <script>
+	import { setStillRunningCustomServer } from './stores/customServerLogsStore.js';
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
-  import {
-    isInMaintenanceMode,
-    isClientRunning,
-    noriskUser,
-    checkApiStatus,
-    noriskError,
-  } from "./utils/noriskUtils.js";
+  import { invoke } from "@tauri-apps/api/core";
+  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
+  import { addNotification } from "./stores/notificationStore.js";
+  import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
@@ -63,20 +61,12 @@
   onMount(async () => {
     apiIsOnline = await checkApiStatus();
 
-    const clientLaunchError = await listen("client-error", async (event) => {
-      let reason = event.payload; // Extract the path from the event's payload
-      // Remove the prefix "Failed to launch client:" if it exists
-      if (reason.startsWith("Failed to launch client: ")) {
-        reason = reason.replace("Failed to launch client: ", "");
+    invoke("check_if_custom_server_running").then((value) => {
+      console.log(value);
+      if (value[0] == true) {
+        setStillRunningCustomServer(value[1]);
       }
-      noriskError(reason);
-      showLaunchErrorModal = true;
-      launchErrorReason = reason
-    });
-
-    return () => {
-      clientLaunchError();
-    };
+    }).catch(error => addNotification("Failed to check if custom server is running: " + error));
   });
 </script>
 

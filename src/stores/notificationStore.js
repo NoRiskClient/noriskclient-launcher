@@ -10,9 +10,9 @@ export const notifications = writable([]);
   gute nacht <3
  */
 
-export function addNotification(message, type = "ERROR", duration = 3000) {
+export function addNotification(message, type = "ERROR", details = null, duration = 3000) {
   const id = uuidv4();
-  notifications.update(n => [...n, { id, type, message, duration }]);
+  notifications.update(n => [...n, { id, type, message, details, duration }]);
   setTimeout(() => removeNotification(id), duration);
 }
 

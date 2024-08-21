@@ -1,10 +1,11 @@
 <script>
     import { invoke } from "@tauri-apps/api/core";
     import { createEventDispatcher } from "svelte";
-    import { launcherOptions } from "../../../stores/optionsStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
     import { addNotification } from "../../../stores/notificationStore.js";
+    import { getNoRiskToken } from "../../../utils/noriskUtils.js";
     import { openConfirmPopup } from "../../../utils/popupUtils.js";
+    import { pop } from "svelte-spa-router";
   
     const dispatch = createEventDispatcher();
   
@@ -34,12 +35,13 @@
   
     async function deleteServer() {
       await invoke("delete_custom_server", {
-        customServer,
-        options: $launcherOptions,
+        id: customServer._id,
+        token: getNoRiskToken(),
         uuid: $defaultUser.id
       }).then(() => {
+        hideModal();
+        pop();
         addNotification("Server deleted successfully.", "INFO");
-        dispatch("deleted");
       }).catch((error) => {
         addNotification("Failed to delete server: " + error);
       });
@@ -70,6 +72,10 @@
                     <p class="nes-font" style="font-size: 10px;">{customServer._id}</p>
                 </div>
             {/if}
+            <div class="setting">
+                <p class="nes-font">Name</p>
+                <p class="nes-font" style="font-size: 13.5px;">{customServer.name}</p>
+            </div>
             <div class="setting">
                 <p class="nes-font">IP</p>
                 <p class="nes-font" style="font-size: 13.5px;">{customServer.subdomain}.{customServer.domain}</p>
@@ -134,7 +140,7 @@
           background-color: var(--background-color);
           border: 5px solid black;
           width: 35em;
-          height: 25em;
+          height: 26.75em;
           border-radius: 0.2em;
           padding: 0;
           position: fixed; /* Fixierte Positionierung */

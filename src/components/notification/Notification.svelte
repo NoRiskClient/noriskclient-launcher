@@ -7,18 +7,19 @@
   export let id = "0";
   export let type = "ERROR";
   export let message = "";
+  export let details = null;
 
   function open() {
     if (!$notifications.find(n => n.id == id)) { return; }
     if (type === "ERROR") {
       noriskError(message);
-      openErrorPopup({ title: "Error", content: message, contentFontSize: message.length > 100 ? "12.5px" : "15px", onClose: () => removeNotification(id) });
+      openErrorPopup({ title: "Error", content: details ?? message, contentFontSize: message.length > 100 ? "12.5px" : "15px", onClose: () => removeNotification(id) });
     } else if (type === "WARNING") {
       noriskWarning(message);
-      openErrorPopup({ title: "Warning", content: message, closeButton: "OK", onClose: () => removeNotification(id) });
+      openErrorPopup({ title: "Warning", content: details ?? message, closeButton: "OK", onClose: () => removeNotification(id) });
     } else {
       noriskLog(message);
-      openInfoPopup({ title: "Info", content: message, onClose: () => removeNotification(id) });
+      openInfoPopup({ title: "Info", content: details ?? message, onClose: () => removeNotification(id) });
     }
     removeNotification(id);
   }
