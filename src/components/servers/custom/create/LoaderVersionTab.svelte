@@ -51,7 +51,7 @@
     <h1 class="title">Loader Version</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="before-button" on:click={() => dispatch('back')}>&lt;-</h1>
-    <VirtualList height="30em" items={
+    <VirtualList height="28em" items={
         Array.from({ length: Math.ceil(availableTypes[type].loaderVersions.length / 3) }, (v, i) =>
             availableTypes[type].loaderVersions.slice(i * 3, i * 3 + 3) // split the versions into chucks of 3 to properly display them in the VirtualList
         )} let:item>
