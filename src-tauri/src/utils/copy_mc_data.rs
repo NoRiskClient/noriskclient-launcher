@@ -156,7 +156,7 @@ impl McDataHandler {
                         }
                     },
                     Some(Err(e)) => {
-                        eprintln!("error: {}", e);
+                        error!("error: {}", e);
                         break;
                     }
                     None => break,
