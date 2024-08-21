@@ -157,8 +157,7 @@
                 token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             }).then(() => {
                 noriskLog("Initialized Server: " + JSON.stringify(newServer));
-                currentTab = "COMPLETED";
-                // delete customServerProgress[newServer._id];
+                setActiveCustomServerId(newServer._id, true);
             }).catch((error) => {
                 dispatch("back");
                 addNotification("Failed to initialize server: " + error);
@@ -185,17 +184,6 @@
         <div class="center">
             <h1>{$customServerProgress[createdServer._id] ? $customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
         </div>
-    {:else if currentTab = "COMPLETED"}
-        <div class="center">
-            <h1>Server successfully created!</h1>
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="details primary-text" on:click={() => {
-                pop();
-                setTimeout(() => {
-                    setActiveCustomServerId(createdServer._id);
-                }, 100);
-            }}>Open Details Page</h1>
-        </div>
     {/if}
 </div>
 
@@ -214,20 +202,9 @@
         font-size: 20px;
     }
 
-    .details {
-        font-family: 'Press Start 2P', serif;
-        font-size: 20px;
-        cursor: pointer;
-        transition: transform 0.3s;
-    }
-
     .center {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        width: 100vw;
+        display: grid;
+        place-items: center;
+        height: 100%;
     }
 </style>
