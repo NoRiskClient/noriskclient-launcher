@@ -1,8 +1,11 @@
 <!-- App.svelte -->
 <script>
+	import { setStillRunningCustomServer } from './stores/customServerLogsStore.js';
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/tauri";
   import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
+  import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
@@ -59,6 +62,13 @@
 
   onMount(async () => {
     apiIsOnline = await checkApiStatus();
+
+    invoke("check_if_custom_server_running").then((value) => {
+      console.log(value);
+      if (value[0] == true) {
+        setStillRunningCustomServer(value[1]);
+      }
+    }).catch(error => addNotification("Failed to check if custom server is running: " + error));
   });
 </script>
 

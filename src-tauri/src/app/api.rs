@@ -149,13 +149,21 @@ impl ApiEndpoints {
     }
 
     /// Create custom server
-    pub async fn norisk_create_custom_server(mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str, request_uuid: &str) -> Result<CustomServer> {
-        Self::post_from_norisk_endpoint_with_body("launcher/custom-servers", CreateCustomServerRequest { mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token, request_uuid).await
+    pub async fn norisk_create_custom_server(name: &str, mc_version: &str, loader_version: Option<&str>, r#type: &str, subdomain: &str, token: &str, request_uuid: &str) -> Result<CustomServer> {
+        Self::post_from_norisk_endpoint_with_body("launcher/custom-servers", CreateCustomServerRequest { name: name.to_owned(), mc_version: mc_version.to_owned(), loader_version: loader_version.map(|s| s.to_owned()), r#type: r#type.to_owned(), subdomain: subdomain.to_owned() }, token, request_uuid).await
     }
 
     /// Delete custom server
     pub async fn norisk_delete_custom_server(server_id: &str, token: &str, request_uuid: &str) -> Result<()> {
-        Self::delete_from_norisk_endpoint(&format!("launcher/custom-servers/{}", server_id), token, request_uuid).await
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), format!("launcher/custom-servers/{}", server_id));
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        HTTP_CLIENT.delete(url)
+            .header("Authorization", format!("Bearer {}", token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?;
+        Ok(())
     }
 
     /// Request all available branches
@@ -343,7 +351,7 @@ impl ApiEndpoints {
     pub async fn post_from_norisk_endpoint_with_body<T: DeserializeOwned, B: Serialize>(endpoint: &str, body: B, norisk_token: &str, request_uuid: &str) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.post(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
             .query(&[("uuid", request_uuid)])
@@ -439,6 +447,7 @@ pub struct NoRiskUserMinimal {
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateCustomServerRequest {
+    pub name: String,
     #[serde(rename = "mcVersion")]
     pub mc_version: String,
     #[serde(rename = "loaderVersion")]
