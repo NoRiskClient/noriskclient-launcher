@@ -70,9 +70,9 @@
                 <div
                     class="statusBlob"
                     class:stopped={($customServerLogs[server._id] ?? []).length < 1}
-                    class:starting={($customServerLogs[server._id] ?? []).length > 1 && !($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
-                    class:running={($customServerLogs[server._id] ?? []).length > 1 && ($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
-                    class:stopping={($customServerLogs[server._id] ?? []).length > 1 && ($customServerLogs[server._id] ?? []).join(' ').includes('Stopping server')}
+                    class:starting={($customServerLogs[server._id] ?? []).length > 0 && !($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
+                    class:running={($customServerLogs[server._id] ?? []).length > 0 && ($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
+                    class:stopping={($customServerLogs[server._id] ?? []).length > 0 && ($customServerLogs[server._id] ?? []).join(' ').includes('Stopping server')}
                 />
                 <p> | {server.subdomain}.{server.domain} | {server.mcVersion}</p>
             </div>
