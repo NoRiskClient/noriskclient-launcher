@@ -1355,8 +1355,8 @@ async fn get_rcon_server_info() -> Result<HashMap<String, String>, String> {
     let mut server_info: HashMap<String, String> = HashMap::new();
 
     server_info.insert(String::from("seed"), client.send_command(String::from("seed")).unwrap().body);
+    server_info.insert(String::from("difficulty"), client.send_command(String::from("difficulty")).unwrap().body);
     server_info.insert(String::from("list"), client.send_command(String::from("list")).unwrap().body);
-    server_info.insert(String::from("whitelist_status"), client.send_command(String::from("whitelist status")).unwrap().body);
     server_info.insert(String::from("whitelist"), client.send_command(String::from("whitelist list")).unwrap().body);
 
     Ok(server_info)
@@ -1613,6 +1613,7 @@ pub fn gui_main() {
             check_if_custom_server_running,
             terminate_custom_server,
             execute_rcon_command,
+            get_rcon_server_info,
             delete_custom_server,
             get_all_vanilla_versions,
             get_vanilla_manifest,
