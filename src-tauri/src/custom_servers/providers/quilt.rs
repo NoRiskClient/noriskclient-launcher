@@ -5,7 +5,6 @@ use tokio::fs;
 use log::info;
 
 use crate::app::app_data::LauncherOptions;
-use crate::custom_servers::models::CustomServer;
 use crate::utils::download_file;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
