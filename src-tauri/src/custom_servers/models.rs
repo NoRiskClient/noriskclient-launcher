@@ -102,6 +102,8 @@ pub struct CustomServerProgressEventPayload {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LatestRunningServer {
+    #[serde(rename = "forwarderProcessId")]
+    pub forwarder_process_id: Option<u32>,
     #[serde(rename = "processId")]
     pub process_id: Option<u32>,
     #[serde(rename = "serverId")]
@@ -111,6 +113,7 @@ pub struct LatestRunningServer {
 impl Default for LatestRunningServer {
     fn default() -> Self {
         Self {
+            forwarder_process_id: None,
             process_id: None,
             server_id: None,
         }
@@ -119,7 +122,7 @@ impl Default for LatestRunningServer {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CustomServerTokenResponse {
-    jwt: String,
+    pub jwt: String,
     #[serde(rename = "privateKey")]
-    private_key: String,
+    pub private_key: String,
 }

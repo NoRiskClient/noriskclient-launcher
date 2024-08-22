@@ -6,7 +6,7 @@ use tauri::WebviewWindow;
 use tauri::Emitter;
 use tokio::{fs, process::Child};
 
-use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions}, custom_servers::{models::{CustomServerEventPayload, CustomServerTokenResponse}, providers::forwarding_manager::ForwardingManagerProvider}, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
+use crate::{app::{api::ApiEndpoints, app_data::LauncherOptions, gui::get_options}, custom_servers::{models::{CustomServerEventPayload, CustomServerTokenResponse}, providers::forwarding_manager::ForwardingManagerProvider}, minecraft::{java::{find_java_binary, jre_downloader, JavaRuntime}, progress::ProgressUpdate}, LAUNCHER_DIRECTORY};
 use crate::app::gui::minecraft_auth_get_default_user;
 
 use super::{models::{CustomServer, CustomServerProgressEventPayload, CustomServerType, LatestRunningServer}, providers::{forge::ForgeProvider, vanilla::VanillaProvider}};
@@ -90,7 +90,7 @@ impl CustomServerManager {
 
         let mut running_task = java_runtime.run_server(2048, 2048, &custom_server_path).await?;
 
-        Self::store_latest_running_server(&options, running_task.id(), Some(custom_server.id.clone())).await?;
+        Self::store_latest_running_server(None, running_task.id(), Some(custom_server.id.clone())).await?;
 
         let custom_server_clone = custom_server.clone();
 
@@ -99,17 +99,18 @@ impl CustomServerManager {
 
         let tokens: CustomServerTokenResponse = ApiEndpoints::request_from_norisk_endpoint(&format!("launcher/custom-servers/{}/token", &custom_server.id), &token, &todo_credentials.id.to_string()).await.map_err(|err| format!("Failed to get token: {}", err)).unwrap();
 
-        let _ = java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
+        let _ = java_runtime.handle_server_io(&mut running_task, &custom_server_clone, &tokens, Self::handle_stdout, Self::handle_stderr, &java_runtime, &window_mutex).await.map_err(|e| format!("Failed to handle server IO: {}", e));
 
         Ok(running_task)
     }
 
-    pub async fn read_and_process_server_log_file(window: &Arc<Mutex<WebviewWindow>>, options: &LauncherOptions, server_id: &str) -> Result<()> {
+    pub async fn read_and_process_server_log_file(window: &Arc<Mutex<WebviewWindow>>, server_id: &str) -> Result<()> {
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(server_id).join("logs").join("latest.log");
         let content = fs::read_to_string(&path).await.map_err(|e| format!("Failed to read log file: {}", e)).unwrap();
         let lines: Vec<String> = content.lines().collect::<Vec<&str>>().iter().map(|line| line.to_string()).collect();
         if lines.last().unwrap().contains("Thread RCON Listener stopped") {
-            Self::store_latest_running_server(options, None, None).await?;
+            
+            Self::store_latest_running_server(None, None, None).await?;
         } else {
             lines.iter().for_each(|line| {
                 let _ = window.lock().unwrap().emit("custom-server-process-output", CustomServerEventPayload { server_id: server_id.to_owned(), data: line.to_owned() }).map_err(|e| format!("Failed to emit custom-server-process-output: {}", e)).unwrap();
@@ -141,7 +142,7 @@ impl CustomServerManager {
         force_defauls.push(("enable-rcon".to_owned(), "true".to_owned()));
         force_defauls.push(("rcon.port".to_owned(), "25594".to_owned()));
         force_defauls.push(("rcon.password".to_owned(), "minecraft".to_owned()));
-        force_defauls.push(("max-players".to_owned(), "10".to_owned()));
+        force_defauls.push(("max-players".to_owned(), "10".to_owned())); // TODO: Add slider support
         force_defauls.push(("broadcast-rcon-to-ops".to_owned(), "false".to_owned()));
         if properties.is_empty() {
             force_defauls.push(("white-list".to_owned(), "true".to_owned()));
@@ -165,7 +166,7 @@ impl CustomServerManager {
 
     fn handle_stdout(window: &Arc<Mutex<WebviewWindow>>, server_id: &str, data: &[u8]) -> anyhow::Result<()> {
         let data = String::from_utf8(data.to_vec())?;
-        if data.is_empty() {
+        if data.is_empty() || data.to_string().contains("RCON Client /127.0.0.1") {
             return Ok(()); // ignore empty lines
         }
     
@@ -190,9 +191,9 @@ impl CustomServerManager {
         Ok(())
     }
 
-    pub async fn load_latest_running_server(options: &LauncherOptions) -> Result<LatestRunningServer> {
+    pub async fn load_latest_running_server() -> Result<LatestRunningServer> {
         // load the options from the file
-        let path = options.data_path_buf().join("custom_servers");
+        let path = get_options().await.unwrap().data_path_buf().join("custom_servers");
         if !path.exists() {
             fs::create_dir_all(&path).await?;
         }
@@ -200,19 +201,13 @@ impl CustomServerManager {
         Ok(latest_running_server)
     }
 
-<<<<<<< HEAD
-#[derive(serde::Serialize, Clone, Debug)]
-struct CustomServerProgressEventPayload {
-    server_id: String,
-    data: ProgressUpdate
-}
-=======
-    pub async fn store_latest_running_server(options: &LauncherOptions, process_id: Option<u32>, server_id: Option<String>) -> Result<()> {
-        let path = options.data_path_buf().join("custom_servers");
+    pub async fn store_latest_running_server(forwarder_process_id: Option<u32>, process_id: Option<u32>, server_id: Option<String>) -> Result<()> {
+        let path = get_options().await.unwrap().data_path_buf().join("custom_servers");
         if !path.exists() {
             fs::create_dir_all(&path).await?;
         }
         let latest_running_server = LatestRunningServer {
+            forwarder_process_id,
             process_id,
             server_id,
         };
@@ -220,4 +215,3 @@ struct CustomServerProgressEventPayload {
         Ok(())
     }
 }
->>>>>>> b43250e (feature: dump commit (implement start, stop, rcon & logs after launcher restart))
