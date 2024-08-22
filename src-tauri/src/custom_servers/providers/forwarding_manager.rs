@@ -1,8 +1,10 @@
 use anyhow::Result;
 use log::info;
 use tokio::fs;
+use tokio::process::Child;
 
 use crate::app::app_data::LauncherOptions;
+use crate::minecraft::java::JavaRuntime;
 use crate::utils::download_file_untracked;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
@@ -58,6 +60,25 @@ impl ForwardingManagerProvider {
             }
         }
         Ok(())
+    }
+
+    pub fn start_forwarding_manager(java_runtime: &JavaRuntime, base_domain: &str, subdomain: &str, jwt: &str, private_key: &str) -> Result<Child> {
+        info!("Starting forwarding manager");
+        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("forwarding_manager");
+        let forwarding_manager_path = path.join("forwarding_manager.jar");
+
+        let args = vec![
+            "-jar".to_owned(), forwarding_manager_path.to_str().unwrap().to_owned(),
+            "--host".to_owned(), base_domain.to_owned(),
+            "--domain".to_owned(), base_domain.to_owned(),
+            "--subdomain".to_owned(), subdomain.to_owned(),
+            "--jwt".to_owned(), jwt.to_owned(),
+            "--pk".to_owned(), private_key.to_owned()
+        ];
+
+        let child = java_runtime.execute(args, &path)?;
+
+        Ok(child)
     }
 
     /// Request JSON formatted data from launcher API

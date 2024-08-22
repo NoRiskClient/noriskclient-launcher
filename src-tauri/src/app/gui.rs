@@ -9,7 +9,7 @@ use directories::UserDirs;
 use log::{debug, error, info};
 use minecraft_client_rs::Client;
 use reqwest::multipart::{Form, Part};
-use sysinfo::{Pid, System, SystemExt};
+use sysinfo::{Pid, ProcessExt, System, SystemExt};
 use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tokio::{fs, io::AsyncReadExt};
 use tauri::api::dialog::blocking::FileDialogBuilder;
@@ -1209,7 +1209,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 
 #[tauri::command]
 async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window) -> Result<(), String> {
-    let window_mutex = Arc::new(std::sync::Mutex::new(window));
+    let window_mutex = Arc::new(std::sync::Mutex::new(window.clone()));
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -1219,7 +1219,7 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
             .block_on(async {
                 CustomServerManager::run_server(custom_server, &options, token, window_mutex.clone()).await.unwrap();
                 window_mutex.lock().unwrap().emit("server-exited", ()).unwrap();
-                CustomServerManager::store_latest_running_server(&options, None, None).await.unwrap();
+                terminate_custom_server(false, window).await.unwrap();
                 info!("Server exited!");
             });
     });
@@ -1229,53 +1229,63 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 #[tauri::command]
 async fn check_if_custom_server_running(window: Window) -> Result<(bool, String), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
-    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
 
-    let latest_running_server = CustomServerManager::load_latest_running_server(&options).await.unwrap();
-    if latest_running_server.process_id.is_none() || latest_running_server.process_id.is_none() {
+    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
+    if latest_running_server.forwarder_process_id.is_none() && latest_running_server.process_id.is_none() {
         return Ok((false, String::new()));
     }
+
 
     let mut system = System::new_all();
     system.refresh_all();
     // check if process is still running
-    let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
-    match custom_server_forwarder_process.is_some() {
+    let custom_server_process = system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
+    match custom_server_process.is_some() {
         true => {
             info!("Custom server is already / still running!");
-            CustomServerManager::read_and_process_server_log_file(&window_mutex, &options, &latest_running_server.server_id.clone().unwrap()).await.unwrap();
+            CustomServerManager::read_and_process_server_log_file(&window_mutex, &latest_running_server.server_id.clone().unwrap()).await.unwrap();
             Ok((true, latest_running_server.server_id.unwrap()))
         }
         false => {
             info!("No custom server is running!");
-            CustomServerManager::store_latest_running_server(&options, None, None).await.unwrap();
+            let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
+            if custom_server_forwarder_process.is_some() {
+                custom_server_forwarder_process.unwrap().kill();
+            }
+            CustomServerManager::store_latest_running_server(None, None, None).await.unwrap();
             Ok((false, String::new()))
         }
     }
 }
 
 #[tauri::command]
-async fn terminate_custom_server(options: LauncherOptions, window: Window) -> Result<(), String> {
-    let latest_running_server = CustomServerManager::load_latest_running_server(&options).await.unwrap();
+pub async fn terminate_custom_server(launcher_was_closed: bool, window: Window) -> Result<(), String> {
+    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
     
     let mut system = System::new_all();
     system.refresh_all();
     
-    // Create a new client and connect to the server.
-    let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
-    client.authenticate("minecraft".to_string()).unwrap();
+    info!("Killing Forwarding Manager");
+    let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
+    if custom_server_forwarder_process.is_some() {
+        custom_server_forwarder_process.unwrap().kill();
+    }    
     
     info!("Killing Custom Server");
-    client.send_command("stop".to_string()).unwrap();
-    window.emit("custom-server-process-output", CustomServerEventPayload { server_id: latest_running_server.server_id.clone().unwrap(), data: String::from("Stopping server") }).map_err(|e| format!("Failed to emit custom-server-process-output: {}", e)).unwrap();
-    window.emit("custom-server-process-output", CustomServerEventPayload { server_id: latest_running_server.server_id.clone().unwrap(), data: String::from("Thread RCON Listener stopped") }).map_err(|e| format!("Failed to emit custom-server-process-output: {}", e)).unwrap();
+    let custom_server_process = system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
+    if custom_server_process.is_some() {
+        // Create a new client and connect to the server.
+        let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
+        client.authenticate("minecraft".to_string()).unwrap();
+        client.send_command("stop".to_string()).unwrap();
+    }
 
-    // info!("Killing Forwarding Manager");
-    // This is currently still the mc server id but will be the forwarder once it's also run as an external process
-    // let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.process_id.unwrap() as usize)).unwrap();
-    // custom_server_forwarder_process.kill();
+    if launcher_was_closed {
+        window.emit("custom-server-process-output", CustomServerEventPayload { server_id: latest_running_server.server_id.clone().unwrap(), data: String::from("Stopping server") }).map_err(|e| format!("Failed to emit custom-server-process-output: {}", e)).unwrap();
+        window.emit("custom-server-process-output", CustomServerEventPayload { server_id: latest_running_server.server_id.clone().unwrap(), data: String::from("Thread RCON Listener stopped") }).map_err(|e| format!("Failed to emit custom-server-process-output: {}", e)).unwrap();
+    }
 
-    CustomServerManager::store_latest_running_server(&options, None, None).await.unwrap();
+    CustomServerManager::store_latest_running_server(None, None, None).await.unwrap();
 
     Ok(())
 }

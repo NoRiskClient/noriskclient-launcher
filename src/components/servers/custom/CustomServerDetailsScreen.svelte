@@ -104,7 +104,7 @@
 
     async function stopServer() {
         await invoke("terminate_custom_server", {
-            options: $launcherOptions,
+            launcherWasClosed: $stillRunningCustomServer == customServer._id,
         }).catch((error) => {
             addNotification("Failed to stop server: " + error);
         });
@@ -230,13 +230,13 @@
         {:else if currentTab == 2}
             <h1 class="center">Coming soon...</h1>
         {/if}
-        <!-- Keep this here so the eventlistener doesnt die on tab switch -->
-        {#if serverRunning}
-            <form id="console-form">
-                <input class="console" type="text" placeholder="Enter a command and press enter to execute..." hidden={!serverRunning || currentTab != 0}>
-            </form>
-        {/if}
     </div>
+    <!-- Keep this here so the eventlistener doesnt die on tab switch -->
+    {#if serverRunning}
+        <form id="console-form">
+            <input class="console" type="text" placeholder="Enter a command and press enter to execute..." hidden={!serverRunning || currentTab != 0}>
+        </form>
+    {/if}
 </div>
 
 <style>
@@ -410,7 +410,7 @@
         padding: 6px 8px;
         border: 1px solid #212121;
         background-color: var(--background-contrast-color);
-        width: 96%;
+        width: 99%;
         outline: none;
         text-shadow: none;
         transition: background-color 0.3s ease-in-out;

@@ -1,12 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::thread;
-use tokio::sync::oneshot::Receiver;
-use tokio::process::{Child, Command};
 use anyhow::{Result, bail};
-use tokio::io::AsyncReadExt;
+use tokio::{io::AsyncReadExt, sync::oneshot::Receiver, process::{Child, Command}};
 use log::debug;
+use crate::custom_servers::manager::CustomServerManager;
 use crate::custom_servers::models::{CustomServer, CustomServerTokenResponse};
+use crate::custom_servers::providers::forwarding_manager::ForwardingManagerProvider;
 
 pub struct JavaRuntime(PathBuf);
 
@@ -16,7 +15,7 @@ impl JavaRuntime {
         JavaRuntime(path)
     }
 
-    pub async fn execute(&self, arguments: Vec<String>, game_dir: &Path) -> Result<Child> {
+    pub fn execute(&self, arguments: Vec<String>, game_dir: &Path) -> Result<Child> {
         let mut command = Command::new(&self.0);
         command.current_dir(game_dir);
         command.args(arguments);
@@ -80,7 +79,7 @@ impl JavaRuntime {
         Ok(())
     }
 
-    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, tokens: &CustomServerTokenResponse, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, data: &D) -> Result<()> {
+    pub async fn handle_server_io<D: Send + Sync>(&self, running_task: &mut Child, server: &CustomServer, tokens: &CustomServerTokenResponse, on_stdout: fn(&D, &str, &[u8]) -> Result<()>, on_stderr: fn(&D, &str, &[u8]) -> Result<()>, java_runtime: &JavaRuntime, data: &D) -> Result<()> {
         let mut stdout = running_task.stdout.take().unwrap();
         let mut stderr = running_task.stderr.take().unwrap();
     
@@ -94,12 +93,11 @@ impl JavaRuntime {
                 read_len = stdout.read(&mut stdout_buf) => {
                     let content = &stdout_buf[..read_len?];
                     if String::from_utf8_lossy(content).contains("Done") && !startet_forwarding {
-                        // let server_clone = server.clone();
-                        // let tokens_clone = tokens.clone();
-                        thread::spawn(move || {
-                            // let _ = start_forwarding(server_clone, tokens_clone).map_err(|e| format!("Failed to start forwarding: {}", e));
-
-                        });
+                        let server_clone = server.clone();
+                        let tokens_clone = tokens.clone();
+                        let forwarder: Child = ForwardingManagerProvider::start_forwarding_manager(java_runtime, &server_clone.domain, &server_clone.subdomain, &tokens_clone.jwt, &tokens_clone.private_key).unwrap();
+                        let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
+                        CustomServerManager::store_latest_running_server(forwarder.id(), latest_running_server.process_id.clone(), latest_running_server.server_id).await.unwrap();
                         startet_forwarding = true;
                     }
                     let _ = (on_stdout)(&data, &server.id, content);
