@@ -62,33 +62,32 @@
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
-  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
   {#if $location === "/crash"}
     <CrashHeader />
   {/if}
 </div>
+
 <div class="content">
-  {#if apiIsOnline == false}
-  <ApiOfflineScreen />
-  {:else if apiIsOnline == true}
+  {#if !apiIsOnline}
+    <ApiOfflineScreen />
+  {:else}
     <Notifications />
-    {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
+    {#if $isInMaintenanceMode && !$noriskUser?.isDev}
       <MaintenanceMode />
-    {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
+    {:else}
       <Router {routes} />
     {/if}
   {/if}
 </div>
+
 <div class="black-bar" data-tauri-drag-region>
-  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline == true}
+  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline}
     <BackButton />
-  {:else}
-    {#if $isClientRunning}
-      <GameButton />
-    {/if}
+  {:else if $isClientRunning}
+    <GameButton />
   {/if}
 </div>
+
 
 <style>
     .black-bar {
