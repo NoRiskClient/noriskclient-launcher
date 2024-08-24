@@ -53,6 +53,6 @@
   }
   
   @keyframes effect {
-   100% {-webkit-mask-position:left} /* transformation, 50 to swipe left->right->left; 100 to swipe left->right. 50 needs double effect duration */
+    100% {-webkit-mask-position:left}
   }
 </style>
