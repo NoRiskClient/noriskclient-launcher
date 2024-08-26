@@ -95,6 +95,7 @@ export async function runClient(branch, checkedForNewBranch = false) {
     });
   });
 
+  isClientRunning.set(true);
   await invoke("run_client", {
     branch: branch,
     options: options,
@@ -104,7 +105,6 @@ export async function runClient(branch, checkedForNewBranch = false) {
     resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
     datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).then(() => {
-    isClientRunning.set(true);
     if (get(forceServer).length > 0) {
       forceServer.set(get(forceServer) + ":RUNNING");
     }
