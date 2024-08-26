@@ -123,7 +123,7 @@
     async function createServer() {
         const server = {
             name: name,
-            subdomain: subdomain,
+            subdomain: subdomain.toLowerCase(),
             icon: icon,
             type: type,
             mcVersion: mcVersion,
