@@ -92,12 +92,16 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
 async fn upload_cape(norisk_token: &str, uuid: &str, app: tauri::AppHandle) -> Result<String, String> {
     debug!("Uploading Cape...");
 
-    let dialog_result = app.dialog().file()
+    let dialog_result = match app.dialog().file()
         .set_title("Select Cape")
         .add_filter("Pictures", &["png"])
-        .blocking_pick_file();
+        .blocking_pick_file()
+        .unwrap() {
+            tauri_plugin_dialog::FilePath::Path(p) => Some(p),
+            _ => None,
+    };
 
-    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap().path).await
+    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
 }
 
 #[tauri::command]
