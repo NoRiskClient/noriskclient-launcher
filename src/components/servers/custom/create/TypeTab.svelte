@@ -25,7 +25,7 @@
     </div>
     {#if type != ""}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="next-button" on:click={() => dispatch('next')}>-&gt;</h1>
+        <h1 class="next-button primary-text" on:click={() => dispatch('next')}>-&gt;</h1>
     {/if}
 </div>
 
@@ -109,8 +109,6 @@
         margin-left: 82.5%;
         text-align: center;
         cursor: pointer;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
     }
 

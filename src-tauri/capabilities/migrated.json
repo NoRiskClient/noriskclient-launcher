@@ -1,0 +1,18 @@
+{
+  "identifier": "migrated",
+  "description": "permissions that were migrated from v1",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "dialog:default",
+    "notification:default",
+    "fs:default",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "process:default"
+  ]
+}

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use async_walkdir::{Filtering, WalkDir};
 use futures::StreamExt;
 use tauri::Manager;
+use tauri::Emitter;
 use tokio::fs;
 use tracing::error;
 
@@ -145,13 +146,13 @@ impl McDataHandler {
                                 current_type = entry.path().parent().unwrap().file_name().unwrap().to_str().unwrap().to_string();
                                 total_type_entry_count = children.filter(|c| async move { if c.file_type().await.unwrap().is_file() { Filtering::Continue } else { Filtering::Ignore } }).count().await;
                                 current_type_entry_count = 0;
-                                let _ = &app_clone.get_window("main").unwrap().emit("copy-mc-data", CopyMcDataEventPayload { r#type: current_type.clone(), file: String::new(), total_type_entry_count: total_type_entry_count, current_type_entry_count: current_type_entry_count }).unwrap_or_default();
+                                let _ = &app_clone.get_webview_window("main").unwrap().emit("copy-mc-data", CopyMcDataEventPayload { r#type: current_type.clone(), file: String::new(), total_type_entry_count: total_type_entry_count, current_type_entry_count: current_type_entry_count }).unwrap_or_default();
                             }
                         } else {
                             let _  = fs::create_dir_all(dst_path.parent().unwrap()).await;
                             let _  = fs::copy(path, dst_path).await;
                             current_type_entry_count += 1;
-                            let _ = &app_clone.get_window("main").unwrap().emit("copy-mc-data", CopyMcDataEventPayload { r#type: current_type.clone(), file: entry.file_name().to_str().unwrap().to_string(), total_type_entry_count: total_type_entry_count, current_type_entry_count: current_type_entry_count }).unwrap_or_default();
+                            let _ = &app_clone.get_webview_window("main").unwrap().emit("copy-mc-data", CopyMcDataEventPayload { r#type: current_type.clone(), file: entry.file_name().to_str().unwrap().to_string(), total_type_entry_count: total_type_entry_count, current_type_entry_count: current_type_entry_count }).unwrap_or_default();
                         }
                     },
                     Some(Err(e)) => {

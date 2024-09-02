@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::Digest;
-use tauri::Window;
+use tauri::WebviewWindow;
+use tauri::Emitter;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -271,7 +272,7 @@ impl MinecraftAuthStore {
         &mut self,
         code: &str,
         flow: MinecraftLoginFlow,
-        window: Window,
+        window: WebviewWindow,
     ) -> Result<Credentials, crate::error::Error> {
         debug!("refresh_and_get_device_token");
         window.emit("microsoft-output", "Device Token").unwrap_or_default();

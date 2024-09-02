@@ -40,7 +40,7 @@
     </div>
     <div class="buttons">
         {#if datapack?.loading ?? false}
-            <h1 class="required-button">
+            <h1 class="required-button primary-text">
                 LOADING
             </h1>
         {:else if text === "INSTALL"}
@@ -50,13 +50,13 @@
                         FEATURED
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="install-button" on:click={() => dispatch("install")}>
+                    <h1 class="install-button green-text" on:click={() => dispatch("install")}>
                         INSTALL
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="install-button" on:click={() => dispatch("install")}>
+                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
                     INSTALL
                 </h1>
             {/if}
@@ -175,8 +175,6 @@
     .install-button {
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
     }
@@ -192,8 +190,6 @@
     .required-button {
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
     }
 

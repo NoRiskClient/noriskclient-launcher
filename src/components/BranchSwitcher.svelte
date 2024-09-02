@@ -14,7 +14,7 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection} style="cursor: pointer"
-        on:mousedown={preventSelection} class="branch-font switch"
+        on:mousedown={preventSelection} class="branch-font switch primary-text"
         on:click={() => switchBranch(true)}
         style:opacity={($defaultUser == null || $isCheckingForUpdates)? 0 : 100}>
       &lt;</h1>
@@ -30,7 +30,7 @@
         {#each $branches as branch, i}
           {#if $currentBranchIndex === i}
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                class="branch-font branch-effect"
+                class="branch-font primary-text branch-effect"
                 style="position:absolute"
                 on:selectstart={preventSelection}
                 on:mousedown={preventSelection}
@@ -39,7 +39,7 @@
         {/each}
       {:else}
         <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-            class="branch-font"
+            class="branch-font primary-text"
             style="position:absolute"
             on:selectstart={preventSelection}
             on:mousedown={preventSelection}
@@ -52,7 +52,7 @@
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection}
         style="cursor: pointer" on:mousedown={preventSelection}
-        class="branch-font switch" on:click={() => switchBranch(false)}
+        class="branch-font primary-text switch" on:click={() => switchBranch(false)}
         style:opacity={($defaultUser == null || $isCheckingForUpdates) ? 0 : 100}>
       &gt;</h1>
   {/if}
@@ -70,8 +70,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
   }
   

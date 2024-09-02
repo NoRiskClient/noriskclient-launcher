@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Norisk Client
+Exec=noriskclient
+Type=Application
+Icon=gg.norisk.noriskclient
+Categories=Game;

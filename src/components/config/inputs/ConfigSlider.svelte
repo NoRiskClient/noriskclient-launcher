@@ -5,6 +5,7 @@
   export let min;
   export let max;
   export let step;
+  export let id = "";
 
   function preventSelection(event) {
     event.preventDefault();
@@ -16,7 +17,7 @@
     <h1>{title}</h1>
     <h1>{value} {suffix}</h1>
   </div>
-  <input type="range" bind:value={value} min={min} max={max} step={step} class="nes-range" />
+  <input id={id} type="range" bind:value={value} min={min} max={max} step={step} class="nes-range" />
 </div>
 
 <style>

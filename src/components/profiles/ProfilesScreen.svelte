@@ -8,6 +8,7 @@
   import { fetchProfiles, profiles } from "../../stores/profilesStore.js";
   import BranchSwitcher from "../BranchSwitcher.svelte";
   import { v4 as uuidv4 } from "uuid";
+  import { noriskLog } from "../../utils/noriskUtils.js";
 
   const dispatch = createEventDispatcher();
 
@@ -42,7 +43,7 @@
   }
 
   function selectProfile(profile) {
-    console.log("Selected Profile:", profile);
+    noriskLog("Selected profile: " + profile.name);
     if ($launcherOptions.experimentalMode) {
       $profiles.selectedExperimentalProfiles[profile.branch] = profile.id;
     } else {
@@ -72,8 +73,7 @@
     </VirtualList>
     <div class="create-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="create-button"
-          on:click={openSettings}>
+      <h1 class="create-button green-text" on:click={openSettings}>
         CREATE PROFILE
       </h1>
     </div>
@@ -95,8 +95,6 @@
     }
 
     .create-button {
-        color: #00ff00;
-        text-shadow: 2px 2px #086b08;
         transition-duration: 100ms;
         font-family: 'Press Start 2P', serif;
         font-size: 18px;

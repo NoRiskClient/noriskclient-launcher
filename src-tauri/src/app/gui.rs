@@ -1,5 +1,6 @@
 use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
+use std::io::Write;
 use std::io::BufRead;
 use dirs::data_dir;
 
@@ -7,11 +8,12 @@ use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
 use reqwest::multipart::{Form, Part};
-use tauri::{Manager, UserAttentionType, Window, WindowEvent};
-use tauri::api::dialog::blocking::message;
+use tauri::{Manager, UserAttentionType, WebviewWindow, WindowEvent};
+use tauri::Emitter;
+use tauri_plugin_dialog::DialogExt;
 use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}, process::Child};
 
-use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::McDataHandler, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::{custom_servers::{manager::CustomServerManager, models::CustomServer, providers::{bukkit::BukkitProvider, fabric::{FabricLoaderVersion, FabricProvider, FabricVersion}, folia::{FoliaBuilds, FoliaManifest, FoliaProvider}, forge::{ForgeManifest, ForgeProvider}, neoforge::{NeoForgeManifest, NeoForgeProvider}, paper::{PaperBuilds, PaperManifest, PaperProvider}, purpur::{PurpurProvider, PurpurVersions}, quilt::{QuiltManifest, QuiltProvider}, spigot::SpigotProvider, vanilla::{VanillaManifest, VanillaProvider, VanillaVersions}}}, minecraft::{launcher::{LauncherData, LaunchingParameter}, prelauncher, progress::ProgressUpdate}, utils::{total_memory, McDataHandler}, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
@@ -19,7 +21,6 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
-use crate::utils::percentage_of_total_memory;
 
 use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
@@ -51,12 +52,6 @@ struct MinecraftProfileProperty {
     value: String,
 }
 
-#[derive(serde::Serialize)]
-struct NewMinecraftSkinBody {
-    variant: String,
-    file: Vec<u8>,
-}
-
 #[derive(serde::Deserialize)]
 struct PlayerDBData {
     data: PlayerDBEntry,
@@ -79,10 +74,10 @@ async fn check_online_status() -> Result<bool, String> {
 
 #[tauri::command]
 fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
-    let window = tauri::WindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &handle,
         "external", /* the unique window label */
-        tauri::WindowUrl::External(url.parse().unwrap()),
+        tauri::WebviewUrl::External(url.parse().unwrap()),
     ).build().unwrap();
     let _ = window.set_title("NoRiskClient");
     let _ = window.set_resizable(false);
@@ -94,45 +89,29 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, uuid: &str, window: tauri::Window) -> Result<(), String> {
+async fn upload_cape(norisk_token: &str, uuid: &str, app: tauri::AppHandle) -> Result<String, String> {
     debug!("Uploading Cape...");
-    use tauri::api::dialog::blocking::FileDialogBuilder; // Note the updated import
 
-    let dialog_result = FileDialogBuilder::new()
+    let dialog_result = match app.dialog().file()
         .set_title("Select Cape")
         .add_filter("Pictures", &["png"])
-        .pick_file();
+        .blocking_pick_file()
+        .unwrap() {
+            tauri_plugin_dialog::FilePath::Path(p) => Some(p),
+            _ => None,
+    };
 
-    // dialog_result will be of type Option<PathBuf> now.
-
-    match CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await {
-        Ok(result) => {
-            message(Some(&window), "Cape Upload", result);
-        }
-        Err(err) => {
-            message(Some(&window), "Cape Error", err);
-        }
-    }
-    Ok(())
+    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
 }
 
 #[tauri::command]
-async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str, window: tauri::Window) -> Result<(), String> {
+async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), String> {
     debug!("Equiping Cape...");
-
-    match CapeApiEndpoints::equip_cape(norisk_token, uuid, hash).await {
-        Ok(result) => {
-            message(Some(&window), "Cape Upload", result);
-        }
-        Err(err) => {
-            message(Some(&window), "Cape Error", err);
-        }
-    }
-    Ok(())
+    CapeApiEndpoints::equip_cape(norisk_token, uuid, hash).await
 }
 
 #[tauri::command]
-async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ModInfo>, String> {
+async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo>, String> {
     debug!("Getting Featured Mods...");
 
     match ApiEndpoints::norisk_featured_mods(&branch).await {
@@ -156,22 +135,19 @@ async fn get_featured_mods(branch: &str, mc_version: &str, window: tauri::Window
                             }
                         }
                     }
-                    Err(err) => {
-                        message(Some(&window), "Modrinth Error", err.to_string());
-                    }
+                    Err(_) => { () }
                 }
             }
             Ok(mod_infos)
         }
         Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
             Err(err.to_string())
         }
     }
 }
 
 #[tauri::command]
-async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ResourcePackInfo>, String> {
+async fn get_featured_resourcepacks(branch: &str, mc_version: &str) -> Result<Vec<ResourcePackInfo>, String> {
     debug!("Getting Featured ResourcePacks...");
 
     match ApiEndpoints::norisk_featured_resourcepacks(&branch).await {
@@ -195,22 +171,19 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str, window: taur
                             }
                         }
                     }
-                    Err(err) => {
-                        message(Some(&window), "Modrinth Error", err.to_string());
-                    }
+                    Err(_) => { () }
                 }
             }
             Ok(resourcepack_infos)
         }
         Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
             Err(err.to_string())
         }
     }
 }
 
 #[tauri::command]
-async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<ShaderInfo>, String> {
+async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<ShaderInfo>, String> {
     debug!("Getting Featured Shaders...");
 
     match ApiEndpoints::norisk_featured_shaders(&branch).await {
@@ -234,24 +207,21 @@ async fn get_featured_shaders(branch: &str, mc_version: &str, window: tauri::Win
                             }
                         }
                     }
-                    Err(err) => {
-                        message(Some(&window), "Modrinth Error", err.to_string());
-                    }
+                    Err(_) => { () }
                 }
             }
             Ok(shader_infos)
         }
         Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
             Err(err.to_string())
         }
     }
 }
 
 #[tauri::command]
-async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::Window) -> Result<Vec<DatapackInfo>, String> {
+async fn get_featured_datapacks(branch: &str, mc_version: &str) -> Result<Vec<DatapackInfo>, String> {
     debug!("Getting Featured Datapacks...");
-
+    
     match ApiEndpoints::norisk_featured_datapacks(&branch).await {
         Ok(result) => {
             // fetch datapack info for each resourcepack
@@ -273,15 +243,12 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
                             }
                         }
                     }
-                    Err(err) => {
-                        message(Some(&window), "Modrinth Error", err.to_string());
-                    }
+                    Err(_) => { () }
                 }
             }
             Ok(datapack_infos)
         }
         Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
             Err(err.to_string())
         }
     }
@@ -290,86 +257,37 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str, window: tauri::W
 #[tauri::command]
 async fn get_blacklisted_mods() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Mods...");
-
-    match ApiEndpoints::norisk_blacklisted_mods().await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
+    ApiEndpoints::norisk_blacklisted_mods().await.map_err(|e| format!("unable to get blacklisted mods: {:?}", e))
 }
 
 #[tauri::command]
 async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted ResourcePacks...");
-
-    match ApiEndpoints::norisk_blacklisted_resourcepacks().await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
+    ApiEndpoints::norisk_blacklisted_resourcepacks().await.map_err(|e| format!("unable to get blacklisted resourcepacks: {:?}", e))
 }
 
 #[tauri::command]
 async fn get_blacklisted_shaders() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Shaders...");
-
-    match ApiEndpoints::norisk_blacklisted_shaders().await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
+    ApiEndpoints::norisk_blacklisted_shaders().await.map_err(|e| format!("unable to get blacklisted shaders: {:?}", e))
 }
 
 #[tauri::command]
 async fn get_blacklisted_datapacks() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Datapacks...");
-
-    match ApiEndpoints::norisk_blacklisted_datapacks().await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
+    ApiEndpoints::norisk_blacklisted_datapacks().await.map_err(|e| format!("unable to get blacklisted datapacks: {:?}", e))
 }
 
 #[tauri::command]
 async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
     debug!("Getting Blacklisted Servers...");
-
-    match ApiEndpoints::norisk_blacklisted_servers().await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            Err(err.to_string())
-        }
-    }
+    ApiEndpoints::norisk_blacklisted_servers().await.map_err(|e| format!("unable to get blacklisted servers: {:?}", e))
 }
 
 #[tauri::command]
-async fn search_mods(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthModsSearchResponse, String> {
+async fn search_mods(params: ModrinthSearchRequestParams) -> Result<ModrinthModsSearchResponse, String> {
     debug!("Searching Mods...");
-
-    match ModrinthApiEndpoints::search_mods(&params).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::search_mods(&params).await.map_err(|e| format!("unable to search mods: {:?}", e))
 }
 
 #[tauri::command]
@@ -378,184 +296,85 @@ async fn console_log_info(message: String) {
 }
 
 #[tauri::command]
+async fn console_log_warning(message: String) {
+    log::warn!("{}" ,message);
+}
+
+#[tauri::command]
 async fn console_log_error(message: String) {
     log::error!("{}" ,message);
 }
 
 #[tauri::command]
-async fn get_mod_info(slug: String, window: Window) -> Result<ModInfo, String> {
+async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
     debug!("Fetching mod info...");
-
-    match ModrinthApiEndpoints::get_mod_info(&slug).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::get_mod_info(&slug).await.map_err(|e| format!("unable to get mod info: {:?}", e))
 }
 
 #[tauri::command]
-async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>, window: Window) -> Result<CustomMod, String> {
+async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>) -> Result<CustomMod, String> {
     info!("Installing Mod And Dependencies...");
-    match ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await {
-        Ok(installed_mod) => {
-            Ok(installed_mod)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await.map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
 }
 
 #[tauri::command]
-async fn get_project_version(slug: &str, params: &str, window: Window) -> Result<Vec<ModrinthProject>, String> {
+async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthProject>, String> {
     info!("Searching Project Version...");
-
-    match ModrinthApiEndpoints::get_project_version(slug, params).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::get_project_version(slug, params).await.map_err(|e| format!("unable to search project version: {:?}", e))
 }
 
 #[tauri::command]
-async fn search_shaders(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthShadersSearchResponse, String> {
+async fn search_shaders(params: ModrinthSearchRequestParams) -> Result<ModrinthShadersSearchResponse, String> {
     debug!("Searching Shaders...");
-
-    match ModrinthApiEndpoints::search_shaders(&params).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::search_shaders(&params).await.map_err(|e| format!("unable to search shaders: {:?}", e))
 }
 
 #[tauri::command]
-async fn get_shader_info(slug: String, window: Window) -> Result<ShaderInfo, String> {
+async fn get_shader_info(slug: String) -> Result<ShaderInfo, String> {
     debug!("Fetching shader info...");
-
-    match ModrinthApiEndpoints::get_shader_info(&slug).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::get_shader_info(&slug).await.map_err(|e| format!("unable to get shader info: {:?}", e))
 }
 
 #[tauri::command]
-async fn install_shader(slug: &str, params: &str, window: Window) -> Result<Shader, String> {
+async fn install_shader(slug: &str, params: &str) -> Result<Shader, String> {
     info!("Installing Shader...");
-    match ModrinthApiEndpoints::install_shader(slug, params).await {
-        Ok(installed_shader) => {
-            Ok(installed_shader)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::install_shader(slug, params).await.map_err(|e| format!("unable to install shader: {:?}", e))
 }
 
 #[tauri::command]
-async fn search_resourcepacks(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthResourcePacksSearchResponse, String> {
+async fn search_resourcepacks(params: ModrinthSearchRequestParams) -> Result<ModrinthResourcePacksSearchResponse, String> {
     debug!("Searching ResourcePacks...");
-
-    match ModrinthApiEndpoints::search_resourcepacks(&params).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::search_resourcepacks(&params).await.map_err(|e| format!("unable to search resourcepacks: {:?}", e))
 }
 
 #[tauri::command]
-async fn get_resourcepack_info(slug: String, window: Window) -> Result<ResourcePackInfo, String> {
+async fn get_resourcepack_info(slug: String) -> Result<ResourcePackInfo, String> {
     debug!("Fetching ResourcePack info...");
-
-    match ModrinthApiEndpoints::get_resourcepack_info(&slug).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::get_resourcepack_info(&slug).await.map_err(|e| format!("unable to get resourcepack info: {:?}", e))
 }
 
 #[tauri::command]
-async fn install_resourcepack(slug: &str, params: &str, window: Window) -> Result<ResourcePack, String> {
+async fn install_resourcepack(slug: &str, params: &str) -> Result<ResourcePack, String> {
     info!("Installing ResourcePack...");
-    match ModrinthApiEndpoints::install_resourcepack(slug, params).await {
-        Ok(installed_resourcepack) => {
-            Ok(installed_resourcepack)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::install_resourcepack(slug, params).await.map_err(|e| format!("unable to install resourcepack: {:?}", e))
 }
 
 #[tauri::command]
-async fn search_datapacks(params: ModrinthSearchRequestParams, window: Window) -> Result<ModrinthDatapacksSearchResponse, String> {
+async fn search_datapacks(params: ModrinthSearchRequestParams) -> Result<ModrinthDatapacksSearchResponse, String> {
     debug!("Searching Datapacks...");
-
-    match ModrinthApiEndpoints::search_datapacks(&params).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::search_datapacks(&params).await.map_err(|e| format!("unable to search datapacks: {:?}", e))
 }
 
 #[tauri::command]
-async fn get_datapack_info(slug: String, window: Window) -> Result<DatapackInfo, String> {
+async fn get_datapack_info(slug: String) -> Result<DatapackInfo, String> {
     debug!("Fetching Datapack info...");
-
-    match ModrinthApiEndpoints::get_datapack_info(&slug).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::get_datapack_info(&slug).await.map_err(|e| format!("unable to get datapack info: {:?}", e))
 }
 
 #[tauri::command]
-async fn install_datapack(slug: &str, params: &str, world: &str, window: Window) -> Result<Datapack, String> {
+async fn install_datapack(slug: &str, params: &str, world: &str) -> Result<Datapack, String> {
     info!("Installing Datapack...");
-    match ModrinthApiEndpoints::install_datapack(slug, params, world).await {
-        Ok(installed_datapack) => {
-            Ok(installed_datapack)
-        }
-        Err(err) => {
-            message(Some(&window), "Modrinth Error", err.to_string());
-            Err(err.to_string())
-        }
-    }
+    ModrinthApiEndpoints::install_datapack(slug, params, world).await.map_err(|e| format!("unable to install datapack: {:?}", e))
 }
 
 #[tauri::command]
@@ -575,47 +394,23 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, uuid: &str, window: Window) -> Result<(), String> {
+async fn delete_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
     debug!("Deleting Cape...");
-    // dialog_result will be of type Option<PathBuf> now.
-
-    match CapeApiEndpoints::delete_cape(norisk_token, uuid).await {
-        Ok(_) => { () }
-        Err(err) => {
-            message(Some(&window), "Cape Error", err);
-        }
-    }
-    Ok(())
+    CapeApiEndpoints::delete_cape(norisk_token, uuid).await
 }
 
 #[tauri::command]
 async fn request_trending_capes(norisk_token: &str, uuid: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(_err) => {
-            Err("Error Requesting Trending Capes".to_string())
-        }
-    }
+    CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit).await.map_err(|e| format!("unable to request trending capes: {:?}", e))   
 }
 
 #[tauri::command]
 async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, String> {
-    match CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(_err) => {
-            Err("Error Requesting Owned Capes".to_string())
-        }
-    }
+    CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit).await.map_err(|e| format!("unable to request owned capes: {:?}", e))
 }
 
 #[tauri::command]
 async fn download_template_and_open_explorer() -> Result<(), String> {
-    use std::fs::File;
-    use std::io::Write;
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
     let template_url = if options.experimental_mode {
         "https://dl-staging.norisk.gg/capes/prod/template.png"
@@ -638,34 +433,20 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 
 #[tauri::command]
 async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
-    match ApiEndpoints::get_mcreal_app_token(norisk_token, uuid).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(_err) => {
-            Err(format!("Error Requesting mcreal App token: {:?}", _err))
-        }
-    }
+    ApiEndpoints::get_mcreal_app_token(norisk_token, uuid).await.map_err(|e| format!("unable to get mcreal app token: {:?}", e))
 }
 
 #[tauri::command]
 async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
-    match ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid).await {
-        Ok(result) => {
-            Ok(result)
-        }
-        Err(_err) => {
-            Err("Error Requesting mcreal App token".to_string())
-        }
-    }
+    ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid).await.map_err(|e| format!("unable to reset mcreal app token: {:?}", e))
 }
 
 #[tauri::command]
 pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
-    let window = tauri::WindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &handle,
         "local",
-        tauri::WindowUrl::App("/#/logs".into()),
+        tauri::WebviewUrl::App("/#/logs".into()),
     ).build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
@@ -675,10 +456,10 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
 
 #[tauri::command]
 pub async fn open_minecraft_crash_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
-    let window = tauri::WindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &handle,
         "crash",
-        tauri::WindowUrl::App("/#/crash".into()),
+        tauri::WebviewUrl::App("/#/crash".into()),
     ).build()?;
     let _ = window.set_title("Crash Report");
     let _ = window.set_resizable(true);
@@ -1023,16 +804,16 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
     let token = credentials.norisk_credentials.get_token(options.experimental_mode)?;
     let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, token);
 
-    if let Some(window) = app.get_window("discord-signin") {
+    if let Some(window) = app.get_webview_window("discord-signin") {
         window.close()?;
     }
 
     let start = Utc::now();
 
-    let window = tauri::WindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &app,
         "discord-signin",
-        tauri::WindowUrl::External(url.parse().unwrap()),
+        tauri::WebviewUrl::External(url.parse().unwrap()),
     )
         .title("Discord X NoRiskClient")
         .always_on_top(true)
@@ -1050,7 +831,7 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
             return Ok(());
         }
 
-        if window.url().as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete") {
+        if window.url()?.as_str().starts_with("https://api.norisk.gg/api/v1/core/oauth/discord/complete") {
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             window.close()?;
             return Ok(());
@@ -1082,14 +863,14 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
 
     let start = Utc::now();
 
-    if let Some(window) = app.get_window("signin") {
+    if let Some(window) = app.get_webview_window("signin") {
         window.close()?;
     }
 
-    let window = tauri::WindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &app,
         "signin",
-        tauri::WindowUrl::External(flow.redirect_uri.parse().map_err(
+        tauri::WebviewUrl::External(flow.redirect_uri.parse().map_err(
             |_| {
                 crate::error::ErrorKind::OtherError(
                     "Error parsing auth redirect URL".to_string(),
@@ -1112,17 +893,17 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
         }
 
         if window
-            .url()
+            .url()?
             .as_str()
             .starts_with("https://login.live.com/oauth20_desktop.srf")
         {
             if let Some((_, code)) =
-                window.url().query_pairs().find(|x| x.0 == "code")
+                window.url()?.query_pairs().find(|x| x.0 == "code")
             {
                 window.close()?;
-                let credentials = accounts.login_finish(&code.clone(), flow, app.get_window("main").unwrap()).await?;
+                let credentials = accounts.login_finish(&code.clone(), flow, app.get_webview_window("main").unwrap()).await?;
 
-                app.get_window("main").unwrap().emit("microsoft-output", "NoRisk Token").unwrap_or_default();
+                app.get_webview_window("main").unwrap().emit("microsoft-output", "NoRisk Token").unwrap_or_default();
 
                 match accounts.refresh_norisk_token(&credentials.clone()).await {
                     Ok(credentials_with_norisk) => {
@@ -1146,7 +927,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
     Ok(None)
 }
 
-fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+fn handle_stdout(window: &Arc<Mutex<WebviewWindow>>, data: &[u8]) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
@@ -1157,7 +938,7 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()>
     Ok(())
 }
 
-fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+fn handle_stderr(window: &Arc<std::sync::Mutex<WebviewWindow>>, data: &[u8]) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
@@ -1168,7 +949,7 @@ fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow:
     Ok(())
 }
 
-fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: ProgressUpdate) -> anyhow::Result<()> {
+fn handle_progress(window: &Arc<std::sync::Mutex<WebviewWindow>>, progress_update: ProgressUpdate) -> anyhow::Result<()> {
     window.lock().unwrap().emit("progress-update", progress_update)?;
     Ok(())
 }
@@ -1225,7 +1006,7 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHan
 }
 
 #[tauri::command]
-async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
+async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, app_state: tauri::State<'_, AppState>, window: WebviewWindow) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
     let credentials = minecraft_auth_get_store().await?.get_default_credential().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
@@ -1233,7 +1014,7 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
         force_server: force_server,
-        memory: percentage_of_total_memory(options.memory_percentage),
+        memory: options.memory_limit,
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
         custom_java_args: options.custom_java_args,
@@ -1329,6 +1110,11 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
 }
 
 #[tauri::command]
+async fn get_total_memory() -> Result<i64, String> {
+    Ok(total_memory())
+}
+
+#[tauri::command]
 async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> {
     let account = login_data.refresh_maybe_fixed().await
         .map_err(|e| format!("unable to refresh: {:?}", e))?;
@@ -1390,11 +1176,6 @@ async fn add_player_to_whitelist(identifier: &str, norisk_token: &str, request_u
             Err(err.to_string())
         }
     }
-}
-
-#[tauri::command]
-async fn mem_percentage(memory_percentage: i32) -> i64 {
-    percentage_of_total_memory(memory_percentage)
 }
 
 #[tauri::command]
@@ -1489,7 +1270,7 @@ async fn create_custom_server(mc_version: &str, loader_version: Option<&str>, r#
 }
 
 #[tauri::command]
-async fn initialize_custom_server(custom_server: CustomServer, additional_data: Option<&str>, window: Window) -> Result<(), String> {
+async fn initialize_custom_server(custom_server: CustomServer, additional_data: Option<&str>, window: WebviewWindow) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     match CustomServerManager::initialize_server(&window_mutex, custom_server, additional_data).await {
         Ok(_) => {
@@ -1502,7 +1283,7 @@ async fn initialize_custom_server(custom_server: CustomServer, additional_data: 
 }
 
 #[tauri::command]
-async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: Window) -> Result<(), String> {
+async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions, token: String, window: WebviewWindow) -> Result<(), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     let custom_server_process_mutex = Arc::new(std::sync::Mutex::new(None));
 
@@ -1711,13 +1492,17 @@ async fn check_feature_whitelist(feature: &str, options: LauncherOptions, creden
 /// Runs the GUI and returns when the window is closed.
 pub fn gui_main() {
     tauri::Builder::default()
-        .on_window_event(move |event| match event.event() {
+        .on_window_event(move |_, event| match event {
             WindowEvent::Destroyed => {
                 info!("Window destroyed, quitting application");
             }
             _ => {}
         })
-        .plugin(tauri_plugin_fs_watch::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|_| {
             Ok(())
         })
@@ -1785,6 +1570,7 @@ pub fn gui_main() {
             clear_data,
             get_mod_info,
             console_log_info,
+            console_log_warning,
             console_log_error,
             get_launcher_profiles,
             store_launcher_profiles,
@@ -1814,7 +1600,6 @@ pub fn gui_main() {
             get_world_folders,
             upload_logs,
             get_launch_manifest,
-            mem_percentage,
             default_data_folder_path,
             terminate,
             get_featured_servers,
@@ -1839,6 +1624,7 @@ pub fn gui_main() {
             get_all_folia_build_versions,
             get_all_purpur_game_versions,
             get_all_spigot_game_versions,
+            get_total_memory,
             get_all_bukkit_game_versions,
             check_feature_whitelist,
             get_full_feature_whitelist,

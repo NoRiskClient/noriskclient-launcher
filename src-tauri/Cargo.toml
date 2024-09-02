@@ -9,12 +9,9 @@ edition = "2021"
 rust-version = "1.57"
 
 [build-dependencies]
-tauri-build = { version = "1.4.0", features = [] }
+tauri-build = { version = "2.0.0-rc", features = [] }
 
 [dependencies]
-# Path fix
-fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-
 # Log
 log4rs = "1.3.0"
 log = "0.4.20"
@@ -22,9 +19,6 @@ log = "0.4.20"
 # Async IO
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
-
-# File Watcher
-tauri-plugin-fs-watch = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 
 # Error handling
 anyhow = "1.0.69"
@@ -59,8 +53,13 @@ chrono = { version = "0.4", features = ["serde"] }
 sha1 = "0.10.5"
 base16ct = {version = "0.2.0", features = ["alloc"] }
 
-# UI library
-tauri = {version = "1.4.0", features = ["api-all", "updater"] }
+# tauri stuff
+tauri = {version = "2.0.0-rc", features = [] }
+tauri-plugin-dialog = "2.0.0-rc"
+tauri-plugin-updater = "2.0.0-rc"
+tauri-plugin-notification = "2.0.0-rc"
+tauri-plugin-fs = "2.0.0-rc"
+tauri-plugin-process = "2.0.0-rc"
 
 # HTTP library
 reqwest = { version = "0.12.4", features = ["json", "multipart"] }
@@ -93,3 +92,6 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.0.0-rc.0"

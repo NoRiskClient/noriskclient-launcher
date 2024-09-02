@@ -19,7 +19,7 @@
 <div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
   <div class="skin-text-wrapper">
     <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
-    <h1 class:active={isActive}>{account.username}</h1>
+    <h1 class:green-text={isActive}>{account.username}</h1>
   </div>
   <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
 </div>
@@ -46,11 +46,6 @@
 
     .flex-wrapper:hover {
         background: var(--background-contrast-color);
-    }
-
-    .active {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
     }
 
     .skin-text-wrapper {

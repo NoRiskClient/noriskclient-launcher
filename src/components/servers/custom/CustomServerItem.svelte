@@ -76,7 +76,7 @@
     </div>
     <div class="buttons">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="details-button" on:click={() => dispatch("openDetails")}>
+        <h1 class="details-button primary-text" on:click={() => dispatch("openDetails")}>
             DETAILS
         </h1>
     </div>
@@ -154,8 +154,6 @@
     .details-button {
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition-duration: 200ms;
     }
@@ -196,10 +194,10 @@
     }
     
     .statusBlob.running {
-        background-color: #0bb00b;
-        -webkit-box-shadow:0px 0px 5px 2px #086b08;
-        -moz-box-shadow: 0px 0px 5px 2px #086b08;
-        box-shadow: 0px 0px 5px 2px #086b08;
+        background-color: var(--green-text);
+        -webkit-box-shadow:0px 0px 5px 2px var(--green-text-shadow);
+        -moz-box-shadow: 0px 0px 5px 2px var(--green-text-shadow);
+        box-shadow: 0px 0px 5px 2px var(--green-text-shadow);
         animation: statusBlob 1.5s infinite;
     }
 

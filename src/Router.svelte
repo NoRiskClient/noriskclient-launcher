@@ -3,6 +3,7 @@
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
+  import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
@@ -29,6 +30,7 @@
   import Legal from "./pages/Legal.svelte";
   import MaintenanceMode from "./components/maintenance-mode/MaintenanceModeScreen.svelte";
   import ApiOfflineScreen from "./components/maintenance-mode/ApiOfflineScreen.svelte";
+  import Popup from "./components/utils/Popup.svelte";
 
   const routes = {
     "/": Home,
@@ -57,7 +59,6 @@
 
   onMount(async () => {
     apiIsOnline = await checkApiStatus();
-    
   });
 </script>
 
@@ -72,6 +73,9 @@
   <ApiOfflineScreen />
   {:else if apiIsOnline == true}
     <Notifications />
+    {#if $activePopup != null}
+      <Popup />
+    {/if}
     {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
       <MaintenanceMode />
     {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
