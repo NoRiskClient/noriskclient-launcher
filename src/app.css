@@ -36,8 +36,8 @@ body {
     --font-color-disabled: #858585;
     --dev-font-color: rgb(194, 165, 0);
     --dev-font-color-text-shadow: rgb(170, 144, 0);
-    --green-text: #057605;
-    --green-text-shadow: #074f07;
+    --green-text: #00cc00;
+    --green-text-shadow: #086b08;
     transition: background-color 0.2s;
     /* border-radius: 14px; */
 }
