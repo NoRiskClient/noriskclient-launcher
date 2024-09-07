@@ -1036,9 +1036,6 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
     )
         .title("Discord X NoRiskClient")
         .always_on_top(true)
-        .inner_size(1000.0, 900.0)
-        .resizable(false)
-        .minimizable(false)
         .center()
         .build()?;
 
