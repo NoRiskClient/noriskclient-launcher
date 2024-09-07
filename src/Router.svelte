@@ -83,19 +83,23 @@
   }
 
   function handleRouteLoaded(event) {
-    const elements = document.querySelectorAll('#transition-wrapper');
-    //Yep ihr seht richtig anstatt das problem an der wurzel zu bekämpfen mache ich ihn hier
-    //aber es ballert so böse ich weiß nicht warum es passiert und deswegen jo
-    //und ja das window moved trotzdem noch bisschen aber wird dann gecleared....
-    //alter alter
-    if (elements.length > 1) {
-      let element = elements[0]
-      const inlineStyles = element.getAttribute('style');
-      if (inlineStyles.includes("animation: 300ms linear 0ms 1 normal both running")) {
+    //wir delayen es weil mein gehirn ein delay hat ganz groß
+    setTimeout(() => {
+      const elements = document.querySelectorAll('#transition-wrapper');
+      //Yep ihr seht richtig anstatt das problem an der wurzel zu bekämpfen mache ich ihn hier
+      //aber es ballert so böse ich weiß nicht warum es passiert und deswegen jo
+      //und ja das window moved trotzdem noch bisschen aber wird dann gecleared....
+      //alter alter
+      console.log("Elements: ", elements)
+      if (elements.length > 1) {
+        let element = elements[0]
+        const inlineStyles = element.getAttribute('style');
+        //if (inlineStyles.includes("animation: 300ms linear 0ms 1 normal both running")) {
         elements[0].remove()
+        //}
       }
-    }
-    console.log('Route Loaded:', event.detail);
+      console.log('Route Loaded:', event.detail);
+    },300)
   }
 </script>
 
