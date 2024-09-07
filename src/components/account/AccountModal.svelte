@@ -29,7 +29,7 @@
       {/if}
     </div>
     <!-- svelte-ignore a11y-autofocus -->
-    <div class="add-account-button" on:click={startMicrosoftAuth}>ADD ACCOUNT</div>
+    <div class="add-account-button primary-text" on:click={startMicrosoftAuth}>ADD ACCOUNT</div>
   </div>
 </dialog>
 
@@ -97,8 +97,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 1em;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         transition-duration: 200ms;
         cursor: pointer;
     }

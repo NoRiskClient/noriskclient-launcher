@@ -21,8 +21,9 @@
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
     import { customServerBaseDomain } from "../../../stores/customServerStore.js";
-    import { customServerProgress, setCustomServerProgress } from "../../../utils/noriskUtils.js";
+    import { customServerProgress, setCustomServerProgress, noriskLog } from "../../../utils/noriskUtils.js";
     import { addCustomServer, setActiveCustomServerId } from "../../../stores/customServerStore.js";
+    import { addNotification } from "../../../stores/notificationStore.js";
 
     const dispatch = createEventDispatcher()
 
@@ -122,7 +123,7 @@
     async function createServer() {
         const server = {
             name: name,
-            subdomain: subdomain,
+            subdomain: subdomain.toLowerCase(),
             icon: icon,
             type: type,
             mcVersion: mcVersion,
@@ -130,6 +131,7 @@
             eula: eula
         };
         await invoke("create_custom_server", {
+            name: server.name,
             mcVersion: server.mcVersion,
             loaderVersion: server.loaderVersion,
             type: server.type,
@@ -137,7 +139,7 @@
             token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             uuid: $defaultUser.id,
         }).then(async (newServer) => {
-            console.log('Created Server:', newServer);
+            noriskLog("Created Server: " + JSON.stringify(newServer));
             createdServer = newServer;
             addCustomServer(newServer);
             setCustomServerProgress(newServer._id, { label: "Initializing...", progress: 0, max: 0 });
@@ -154,18 +156,15 @@
                 additionalData: additionalData,
                 token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
             }).then(() => {
-                console.log('Initialized Server:', newServer);
-                currentTab = "COMPLETED";
-                // delete customServerProgress[newServer._id];
+                noriskLog("Initialized Server: " + JSON.stringify(newServer));
+                setActiveCustomServerId(newServer._id, true);
             }).catch((error) => {
-                console.error(error);
                 dispatch("back");
-                alert(error);
+                addNotification("Failed to initialize server: " + error);
             });
         }).catch((error) => {
-            console.error(error);
             dispatch("back");
-            alert(error);
+            addNotification("Failed to create server: " + error);
         });
     }
 </script>
@@ -185,17 +184,6 @@
         <div class="center">
             <h1>{$customServerProgress[createdServer._id] ? $customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
         </div>
-    {:else if currentTab = "COMPLETED"}
-        <div class="center">
-            <h1>Server successfully created!</h1>
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="details" on:click={() => {
-                pop();
-                setTimeout(() => {
-                    setActiveCustomServerId(createdServer._id);
-                }, 100);
-            }}>Open Details Page</h1>
-        </div>
     {/if}
 </div>
 
@@ -214,22 +202,9 @@
         font-size: 20px;
     }
 
-    .details {
-        font-family: 'Press Start 2P', serif;
-        font-size: 20px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-        cursor: pointer;
-        transition: transform 0.3s;
-    }
-
     .center {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        width: 100vw;
+        display: grid;
+        place-items: center;
+        height: 100%;
     }
 </style>

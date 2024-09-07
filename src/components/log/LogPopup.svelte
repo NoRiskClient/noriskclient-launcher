@@ -1,10 +1,11 @@
 <script>
-    import {fly} from "svelte/transition";
+    import { fly } from "svelte/transition";
     import {createEventDispatcher} from "svelte";
     import VirtualList from "../utils/VirtualList.svelte";
     import LogMessage from "./LogMessage.svelte";
     import ConfigRadioButton from "../config/inputs/ConfigRadioButton.svelte";
-    import {invoke} from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api";
+    import { addNotification } from "../../stores/notificationStore.js";
 
     export let messages;
 
@@ -16,10 +17,10 @@
         await invoke("upload_logs", {
             log: messages.join("")
         }).then((result) => {
-            console.debug("Received Result", result)
+            addNotification("Logs uploaded successfully. URL copied to clipboard.", "INFO");
             navigator.clipboard.writeText(result.url)
         }).catch((error) => {
-            console.error(error)
+            addNotification("Failed to upload logs: " + error);
         })
     }
 
@@ -46,7 +47,7 @@
     <div class="bottom">
         <ConfigRadioButton bind:value={autoScroll} text="Auto Scroll"/>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <p on:click={uploadLogs}>COPY</p>
+        <p class="primary-text" on:click={uploadLogs}>COPY</p>
     </div>
 </div>
 
@@ -76,8 +77,6 @@
     .bottom p {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         user-select: none;
         cursor: pointer;
         transition: transform 0.3s;

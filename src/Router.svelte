@@ -1,14 +1,12 @@
 <!-- App.svelte -->
 <script>
+	import { setStillRunningCustomServer } from './stores/customServerLogsStore.js';
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
-  import {
-    isInMaintenanceMode,
-    isClientRunning,
-    noriskUser,
-    checkApiStatus,
-    noriskError,
-  } from "./utils/noriskUtils.js";
+  import { invoke } from "@tauri-apps/api/tauri";
+  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus, noriskError, } from "./utils/noriskUtils.js";
+  import { addNotification } from "./stores/notificationStore.js";
+  import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
@@ -34,6 +32,7 @@
   import ApiOfflineScreen from "./components/maintenance-mode/ApiOfflineScreen.svelte";
   import { listen } from "@tauri-apps/api/event";
   import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
+  import Popup from "./components/utils/Popup.svelte";
 
   const routes = {
     "/": Home,
@@ -74,6 +73,13 @@
       launchErrorReason = reason
     });
 
+    invoke("check_if_custom_server_running").then((value) => {
+      console.log(value);
+      if (value[0] == true) {
+        setStillRunningCustomServer(value[1]);
+      }
+    }).catch(error => addNotification("Failed to check if custom server is running: " + error));
+
     return () => {
       clientLaunchError();
     };
@@ -89,6 +95,9 @@
     <ApiOfflineScreen />
   {:else if apiIsOnline === true}
     <Notifications />
+    {#if $activePopup != null}
+      <Popup />
+    {/if}
     {#if $isInMaintenanceMode === true && !$noriskUser?.isDev}
       <MaintenanceMode />
     {:else if $isInMaintenanceMode === false || $noriskUser?.isDev}

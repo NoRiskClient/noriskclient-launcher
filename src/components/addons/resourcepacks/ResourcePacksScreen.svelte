@@ -12,9 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
-
-  const dispatch = createEventDispatcher();
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -116,8 +115,8 @@
       launchManifest = result;
       getCustomResourcePacksFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -126,7 +125,7 @@
       console.debug("Blacklisted ResourcePacks", resourcePacks);
       blacklistedResourcePacks = resourcePacks;
     }).catch((error) => {
-      console.error(error);
+      addNotification(error);
     });
   }
 
@@ -139,7 +138,7 @@
       console.debug("Custom ResourcePacks", resourcePacks);
       customResourcePacks = resourcePacks;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -157,8 +156,8 @@
       resourcePacks = resourcePacks;
       launcherProfiles.addons[currentBranch].resourcePacks = launcherProfiles.addons[currentBranch].resourcePacks;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -181,8 +180,8 @@
         result.forEach(resourcePack => resourcePack.featured = true);
         resourcePacks = result;
         featuredResourcePacks = result;
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -214,8 +213,8 @@
       } else {
         resourcePacks = [...resourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -249,10 +248,10 @@
         getCustomResourcePacksFilenames();
       }).catch((error) => {
         if (!showError) return;
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -269,7 +268,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -283,8 +282,8 @@
       if (locations instanceof Array) {
         installCustomResourcePacks(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -300,13 +299,13 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom ResourcePack ${fileName}`);
+      noriskLog(`Installing custom ResourcePack ${fileName}`);
       await invoke("save_custom_resourcepacks_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomResourcePacksFilenames();
     });
@@ -349,10 +348,10 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleSelectCustomResourcePacks}>Custom</h1>
@@ -368,7 +367,7 @@
                    items={[...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null]} let:item>
         {#if item == 'LOAD_MORE_RESOURCEPACKS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
         {:else if item != null}
           <ResourcePackItem text={checkIfRequiredOrInstalled(item.slug)}
                             on:delete={() => deleteInstalledResourcePack(item)}
@@ -432,11 +431,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -460,11 +454,6 @@
 
     .load-more-button:hover {
         transform: scale(1.2);
-    }
-
-    .load-more-button p {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .modrinth-wrapper {

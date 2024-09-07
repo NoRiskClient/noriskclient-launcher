@@ -12,7 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
 
   export let isServersideInstallation = false;
 
@@ -109,8 +110,8 @@
       launchManifest = result;
       getCustomModsFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification("Failed to get launch manifest: " + error);
     });
   }
 
@@ -132,7 +133,7 @@
       console.debug("Custom Mods", mods);
       customMods = mods;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -150,8 +151,8 @@
       mods = mods;
       launcherProfile.mods = launcherProfile.mods;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -196,8 +197,8 @@
                 author = info.author ?? null;
                 iconUrl = info.icon_url;
                 description = info.description;
-              }).catch((err) => {
-                console.error(err);
+              }).catch((error) => {
+                addNotification(error);
               });
             }
             if (!mod.enabled) disableRecomendedMod(slug);
@@ -210,8 +211,8 @@
             });
           }
         });
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -262,8 +263,8 @@
           return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase();
         })))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -341,10 +342,10 @@
       await removeFile(folder + "/" + filename).then(() => {
         getCustomModsFilenames();
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -358,17 +359,17 @@
         await renameFile(folder + "/" + filename, folder + "/" + filename.replace(".disabled", "")).then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
-          alert(error);
+          addNotification(error);
         });
       } else {
         await renameFile(folder + "/" + filename, folder + "/" + filename + ".disabled").then(() => {
           getCustomModsFilenames();
         }).catch((error) => {
-          alert(error);
+          addNotification(error);
         });
       }
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -386,7 +387,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -400,8 +401,8 @@
       if (locations instanceof Array) {
         installCustomMods(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -417,14 +418,14 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom Mod ${fileName}`);
+      noriskLog(`Installing custom Mod ${fileName}`);
       await invoke("save_custom_mods_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         mcVersion: launchManifest.build.mcVersion,
         file: { name: fileName, location: location },
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomModsFilenames();
     });
@@ -452,7 +453,7 @@
     }
     await getLaunchManifest();
     await getBlacklistedMods();
-    searchMods();
+    await searchMods();
   }
 
   onMount(() => {
@@ -467,10 +468,10 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleSelectCustomMods}>Custom</h1>
@@ -485,7 +486,7 @@
       <VirtualList height="30em" items={[...mods, mods.length >= 30 ? 'LOAD_MORE_MODS' : null]} let:item>
         {#if item === 'LOAD_MORE_MODS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
         {:else if item != null}
           <ModItem
             text={checkIfRequiredOrInstalled(item.slug)}
@@ -557,11 +558,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -585,11 +581,6 @@
 
     .load-more-button:hover {
         transform: scale(1.2);
-    }
-
-    .load-more-button p {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .modrinth-wrapper {

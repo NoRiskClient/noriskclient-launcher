@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api";
 import { launcherOptions } from "./optionsStore.js";
 import { get, writable } from "svelte/store";
 import { defaultUser } from "./credentialsStore.js";
+import { noriskLog } from "../utils/noriskUtils.js";
 
 export const branches = writable([]);
 export const currentBranchIndex = writable(0);
@@ -33,7 +34,7 @@ export async function fetchBranches() {
     branches.set([]);
     //addNotification(reason);
   });
-  console.log("Fetches Branches: ", get(branches))
+  noriskLog("Fetches Branches: " + JSON.stringify(get(branches)))
 
   let latestBranch = options?.experimentalMode ? options?.latestDevBranch : options?.latestBranch;
   let _branches = get(branches);
@@ -48,7 +49,7 @@ export async function fetchBranches() {
     }
   }
 
-  console.log("Current Branch", get(branches)[get(currentBranchIndex)])
+  noriskLog("Current Branch: " + get(branches)[get(currentBranchIndex)])
 }
 
 export function switchBranch(isLeft) {

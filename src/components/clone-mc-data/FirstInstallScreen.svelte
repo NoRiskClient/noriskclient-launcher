@@ -4,7 +4,7 @@
     import { onMount } from "svelte";
     import { pop, replace } from "svelte-spa-router";
     import { invoke } from "@tauri-apps/api/tauri";
-    import { runClient } from "../../utils/noriskUtils.js";
+    import { runClient, noriskLog } from "../../utils/noriskUtils.js";
     import ConfigFolderInput from "../config/inputs/ConfigFolderInput.svelte";
 
     $: path = '';
@@ -14,7 +14,6 @@
             path = res;
         }).catch(err => {
             path = null;
-            console.error("Error getting default minecraft folder", err);
             addNotification("An error occurred while getting the default minecraft folder: " + err);
         });
     });
@@ -26,15 +25,14 @@
             return;
         }
 
-        console.log("Copying data from minecraft: ", path);
+        noriskLog("Copying data from minecraft: " + path);
         replace("/copy-mc-data-progress");
         invoke("copy_mc_data", { path: path, branch: $branches[$currentBranchIndex] }).then(() => {
-            console.log("Data copied successfully");
+            noriskLog("Data copied successfully!");
             pop();
             runClient($branches[$currentBranchIndex], true);
         }).catch(err => {
             pop();
-            console.error("Error copying data", err);
             addNotification("An error occurred while copying the data: " + err);
         });
     }
@@ -43,7 +41,7 @@
 <div class="container">
     <div class="header">
         <h1>First Install detected</h1>
-        <p>You have just started NoRiskClient for the fist time.<br>To make the transition cleaner and faster you can copy your settings and servers from minecraft below.</p>
+        <p>You have just started NoRiskClient for the first time.<br>To make the transition cleaner and faster you can copy your settings and servers from minecraft below.</p>
     </div>
     <div class="mcFolder">
         <ConfigFolderInput title="Minecraft Data Folder" bind:value={path} />
@@ -54,7 +52,7 @@
             <div class="buttons">
                 <p class="arrow">&gt;</p>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <p class="cloneButton" on:click={() => cloneMinecraftData()}>Clone</p>
+                <p class="cloneButton primary-text" on:click={() => cloneMinecraftData()}>Clone</p>
             </div>
         </div>
         <div class="branch">
@@ -66,11 +64,6 @@
 </div>
     
 <style>
-    .green-text {
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
-    }
-
     .container {
         display: flex;
         flex-direction: column;
@@ -155,8 +148,6 @@
     .cloneButton {
         font-size: 15px;
         padding: 5px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         border-radius: 7.5px;
         cursor: pointer;
         transform: translateX(100px);

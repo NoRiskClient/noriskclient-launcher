@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+use crate::minecraft::progress::ProgressUpdate;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CustomServer {
     #[serde(rename = "_id")]
     pub id: String,
+    pub name: String,
     pub owner: String,
     #[serde(rename = "mcVersion")]
     pub mc_version: String,
@@ -83,4 +86,43 @@ impl<'de> Deserialize<'de> for CustomServerType {
         let s = String::deserialize(deserializer)?;
         Ok(CustomServerType::from_string(&s))
     }
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct CustomServerEventPayload {
+    pub server_id: String,
+    pub data: String
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct CustomServerProgressEventPayload {
+    pub server_id: String,
+    pub data: ProgressUpdate
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LatestRunningServer {
+    #[serde(rename = "forwarderProcessId")]
+    pub forwarder_process_id: Option<u32>,
+    #[serde(rename = "processId")]
+    pub process_id: Option<u32>,
+    #[serde(rename = "serverId")]
+    pub server_id: Option<String>,
+}
+
+impl Default for LatestRunningServer {
+    fn default() -> Self {
+        Self {
+            forwarder_process_id: None,
+            process_id: None,
+            server_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CustomServerTokenResponse {
+    pub jwt: String,
+    #[serde(rename = "privateKey")]
+    pub private_key: String,
 }

@@ -3,6 +3,7 @@
     import { launcherOptions } from "../../stores/optionsStore.js";
     import { defaultUser } from "../../stores/credentialsStore.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
+    import { addNotification } from "../../stores/notificationStore.js";
     // import qrcode from "qrcode-generator";
   
     export let showModal;
@@ -27,9 +28,8 @@
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
-      }).catch(e => {
-        console.error(e);
-        alert("You have to start your game at least once to use the McReal App!");
+      }).catch(error => {
+        addNotification("An error occurred while getting the mobile app token: " + error);
         dialog.close();
       });
     }
@@ -43,8 +43,8 @@
         // qr.addData(`{"uuid":"${activeAccount.uuid}","experimental":${options.experimentalMode},"token":"${mobileAppToken}`);
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
-      }).catch(e => {
-        console.error(e);
+      }).catch(error => {
+        addNotification("An error occurred while resetting the mobile app token: " + error);
       });
     }
 
@@ -75,7 +75,7 @@
             <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}&fill_color=%2300afe8`} alt="">
             <h4 class="nes-font red-text-clickable warning reset" on:click={() => resetToken()}>Reset QR Code</h4>
           {:else}
-            <h1 class="nes-font showButton" on:click={() => showQrCode = true}>Show QR Code</h1>
+            <h1 class="nes-font showButton primary-text" on:click={() => showQrCode = true}>Show QR Code</h1>
           {/if}
         </div>
       </div>
@@ -165,7 +165,6 @@
       }
 
       .showButton {
-        color: var(--primary-color);
         font-size: 20px;
         margin-top: 30%;
         text-align: center;

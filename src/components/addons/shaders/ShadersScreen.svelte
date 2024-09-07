@@ -12,7 +12,8 @@
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { profiles } from "../../../stores/profilesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
-  import { getNoRiskToken, noriskUser } from "../../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
+  import { addNotification } from "../../../stores/notificationStore.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -104,8 +105,8 @@
       launchManifest = result;
       getCustomShadersFilenames();
       createFileWatcher();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -113,8 +114,8 @@
     await invoke("get_blacklisted_shaders").then((result) => {
       console.debug("Blacklisted Shaders", result);
       blacklistedShaders = result;
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -127,7 +128,7 @@
       console.debug("Custom Shaders", shaders);
       customShaders = shaders;
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -145,8 +146,8 @@
       shaders = shaders;
       launcherProfiles.addons[currentBranch].shaders = launcherProfiles.addons[currentBranch].shaders;
       launcherProfiles.store();
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -169,8 +170,8 @@
         result.forEach(shader => shader.featured = true);
         shaders = result;
         featuredShaders = result;
-      }).catch((err) => {
-        console.error(err);
+      }).catch((error) => {
+        addNotification(error);
       });
     }
 
@@ -202,8 +203,8 @@
       } else {
         shaders = [...shaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))];
       }
-    }).catch((err) => {
-      console.error(err);
+    }).catch((error) => {
+      addNotification(error);
     });
   }
 
@@ -236,14 +237,14 @@
         getCustomShadersFilenames();
       }).catch((error) => {
         if (!showError) return;
-        alert(error);
+        addNotification(error);
       });
       // remove potential shader settings txt
       await removeFile(folder + "/" + filename + ".txt").catch((error) => {
         return;
       });
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -260,7 +261,7 @@
         { recursive: true },
       );
     }).catch((error) => {
-      alert(error);
+      addNotification(error);
     });
   }
 
@@ -274,8 +275,8 @@
       if (locations instanceof Array) {
         installCustomShaders(locations);
       }
-    } catch (e) {
-      alert("Failed to select file using dialog");
+    } catch (error) {
+      addNotification("Failed to select file using dialog: " + error);
     }
   }
 
@@ -291,13 +292,13 @@
         splitter = "\\";
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
-      console.log(`Installing custom Shader ${fileName}`);
+      noriskLog(`Installing custom Shader ${fileName}`);
       await invoke("save_custom_shaders_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
       }).catch((error) => {
-        alert(error);
+        addNotification(error);
       });
       getCustomShadersFilenames();
     }
@@ -340,10 +341,10 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleSelectCustomShaders}>Custom</h1>
@@ -358,7 +359,7 @@
       <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
         {#if item == 'LOAD_MORE_SHADERS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
         {:else if item != null}
           <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
                       on:delete={() => deleteInstalledShader(item)}
@@ -421,11 +422,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -449,11 +445,6 @@
 
     .load-more-button:hover {
         transform: scale(1.2);
-    }
-
-    .load-more-button p {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .modrinth-wrapper {

@@ -19,8 +19,6 @@
 
     export let server;
 
-    let logs = $customServerLogs[server._id] ?? [];
-
     let loaderIcon;
     switch (server.type.toUpperCase()) {
         case "VANILLA":
@@ -66,17 +64,23 @@
         <div class="text-item-wrapper">
             <div class="name-wrapper">
                 <img src={loaderIcon} alt="server-loader-icon">
-                <h4 class="server-name">{"NAME"}</h4>
+                <h4 class="server-name">{server.name}</h4>
             </div>
             <div class="infoBar">
-                <div class="statusBlob" class:stopped={logs.length < 1} class:starting={logs.length > 1 && !logs.join(' ').includes('Done')} class:running={logs.length > 1 && logs.join(' ').includes('Done')} />
+                <div
+                    class="statusBlob"
+                    class:stopped={($customServerLogs[server._id] ?? []).length < 1}
+                    class:starting={($customServerLogs[server._id] ?? []).length > 0 && !($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
+                    class:running={($customServerLogs[server._id] ?? []).length > 0 && ($customServerLogs[server._id] ?? []).join(' ').includes('Done')}
+                    class:stopping={($customServerLogs[server._id] ?? []).length > 0 && ($customServerLogs[server._id] ?? []).join(' ').includes('Stopping server')}
+                />
                 <p> | {server.subdomain}.{server.domain} | {server.mcVersion}</p>
             </div>
         </div>
     </div>
     <div class="buttons">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="details-button" on:click={() => dispatch("openDetails")}>
+        <h1 class="details-button primary-text" on:click={() => dispatch("openDetails")}>
             DETAILS
         </h1>
     </div>
@@ -154,8 +158,6 @@
     .details-button {
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
         transition-duration: 200ms;
     }
@@ -196,10 +198,18 @@
     }
     
     .statusBlob.running {
-        background-color: #0bb00b;
-        -webkit-box-shadow:0px 0px 5px 2px #086b08;
-        -moz-box-shadow: 0px 0px 5px 2px #086b08;
-        box-shadow: 0px 0px 5px 2px #086b08;
+        background-color: var(--green-text);
+        -webkit-box-shadow:0px 0px 5px 2px var(--green-text-shadow);
+        -moz-box-shadow: 0px 0px 5px 2px var(--green-text-shadow);
+        box-shadow: 0px 0px 5px 2px var(--green-text-shadow);
+        animation: statusBlob 1.5s infinite;
+    }
+
+    .statusBlob.stopping {
+        background-color: #ff7300;
+        -webkit-box-shadow:0px 0px 5px 2px #d66000;
+        -moz-box-shadow: 0px 0px 5px 2px #d66000;
+        box-shadow: 0px 0px 5px 2px #d66000;
         animation: statusBlob 1.5s infinite;
     }
 

@@ -30,7 +30,7 @@
     await invoke("upload_logs", {
       log: $minecraftLogs.join(""),
     }).then((result) => {
-      console.debug("Received Result", result);
+      addNotification("Logs uploaded successfully. URL copied to clipboard.", "INFO");
       navigator.clipboard.writeText(result.url);
     }).catch((error) => {
       addNotification(error);
@@ -55,10 +55,13 @@
 <div class="black-bar" data-tauri-drag-region>
   <div class="logs-button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
-        on:click={toggleAutoScroll}>
-      [Auto Scroll]
-    </h1>
+    <h1
+      class:auto-scroll-button-on={autoScroll}
+      class:green-text={autoScroll}
+      class:auto-scroll-button-off={!autoScroll}
+      class:red-text={!autoScroll}
+      on:click={toggleAutoScroll}
+    >[Auto Scroll]</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="copy-button" on:click={uploadLogs}>
       [Copy]
@@ -99,8 +102,6 @@
         transition: 0.3s;
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: pointer;
     }
 
@@ -108,8 +109,6 @@
         transition: 0.3s;
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
     }
 
@@ -117,8 +116,6 @@
         transition: 0.3s;
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
-        color: red;
-        text-shadow: 2px 2px #460000;
         cursor: pointer;
     }
 

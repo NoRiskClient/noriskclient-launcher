@@ -2,6 +2,7 @@
     import { SkinViewer } from "skinview3d";
     import { invoke } from "@tauri-apps/api/tauri";
     import { launcherOptions } from "../../stores/optionsStore.js";
+    import { addNotification } from "../../stores/notificationStore.js";
     import Elytra from "../../images/elytra.webp";
 
     export let cape;
@@ -18,8 +19,8 @@
             location: $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${cape}.png` : `https://dl.norisk.gg/capes/prod/${cape}.png`
         }).then((data) => {
             capeData = `data:image/png;base64,${data}`;
-        }).catch((err) => {
-            console.error(err);
+        }).catch((error) => {
+            addNotification("Failed to load cape: " + error);
         });
 
         const canvas = document.createElement("canvas");
@@ -29,10 +30,10 @@
           height: height,
           skin: "https://crafatar.com/skins/" + player,
           cape: capeData,
-          enableControls: false,
         });
         skinViewer.camera.position.set(0, 25, -75);
         skinViewer.zoom = 1.0;
+        skinViewer.controls.enableZoom = false;
         document.getElementById(`player-${cape}`).appendChild(canvas);
     };
 
@@ -64,7 +65,7 @@
         display: flex;
         justify-self: center;
         align-self: center;
-        z-index: -1;
+        z-index: 5;
     }
 
     .setting {

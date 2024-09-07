@@ -8,3 +8,4 @@ pub mod quilt;
 pub mod neoforge;
 pub mod spigot;
 pub mod bukkit;
+pub mod forwarding_manager;

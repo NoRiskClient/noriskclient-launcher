@@ -4,7 +4,7 @@
   import { onMount } from "svelte";
   import { checkUpdate, installUpdate, onUpdaterEvent } from "@tauri-apps/api/updater";
   import { relaunch } from "@tauri-apps/api/process";
-  import { isCheckingForUpdates, noriskError, noriskLog } from "../../utils/noriskUtils.js";
+  import { isCheckingForUpdates, noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { delay } from "../../utils/svelteUtils.js";
 
@@ -27,7 +27,6 @@
         // Install the update. This will also restart the app on Windows!
         await installUpdate().catch(reason => {
           addNotification(reason);
-          noriskError(reason);
         });
         noriskLog(`Update was installed`);
 
@@ -37,7 +36,6 @@
 
         await relaunch().catch(reason => {
           addNotification(reason);
-          noriskError(reason);
         });
       } else {
         //TODO das kann in production weg
@@ -47,7 +45,6 @@
     } catch (error) {
       isCheckingForUpdates.set(false);
       addNotification(error);
-      noriskError(`${error}`);
     }
 
     return () => {
@@ -67,7 +64,7 @@
 </script>
 
 
-<h1 class="branch-font" style="position:absolute"
+<h1 class="branch-font primary-text" style="position:absolute"
     transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Searching Updates{dots}</h1>
 
 <style>
@@ -75,8 +72,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0;
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
         cursor: default;
     }
 </style>

@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use tokio::fs;
+use log::info;
 
 use crate::custom_servers::models::CustomServer;
 use crate::utils::download_file;
@@ -27,18 +28,10 @@ impl PurpurProvider {
         Ok(())
     }
 
-    pub async fn create_eula_file(custom_server: &CustomServer) -> Result<()> {
-        let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
-        fs::create_dir_all(&path).await?;
-        let content = "# USER HAS AGREED TO THIS THROUGH THE GUI OF THE NRC LAUNCHER!\neula=true";
-        let _ = fs::write(path.join("eula.txt"), Vec::from(content)).await.map_err(|e| e);
-        Ok(())
-    }
-
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
         let url = format!("{}/{}", base, endpoint);
-        println!("URL: {}", url); // Den formatierten String ausgeben
+        info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?
             .error_for_status()?

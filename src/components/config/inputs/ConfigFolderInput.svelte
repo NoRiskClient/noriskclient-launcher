@@ -1,9 +1,11 @@
 
 <script>
   import { open } from '@tauri-apps/api/dialog';
+  import { addNotification } from '../../../stores/notificationStore.js';
 
   export let title;
-  export let value; // value of the text field
+  export let value;
+  export let id = "";
 
   // Try to get user-desired folder path via system dialog
   async function selectFolderPath() {
@@ -15,8 +17,8 @@
       if (result) {
         value = result
       }
-    } catch (e) {
-      alert("Failed to select folder using dialog")
+    } catch (error) {
+      addNotification("Failed to select folder using dialog: " + error);
     }
   }
 </script>
@@ -25,7 +27,7 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <input id={id} placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
     <button on:click={selectFolderPath} aria-label="Select Folder" title="Select Folder">📂</button>
   </div>
 </div>

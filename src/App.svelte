@@ -13,6 +13,7 @@
     getNoRiskUser,
     getMaintenanceMode,
     noriskError,
+    noriskLog
   } from "./utils/noriskUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
@@ -50,7 +51,7 @@
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
-      console.log("Default User Was Updated", value);
+      noriskLog("Default User Was Updated.");
       await fetchBranches();
       await fetchProfiles();
     });
@@ -73,15 +74,19 @@
         text-shadow: 2px 2px #460000;
     }
 
-    :global(.primary-text-clickable) {
+    :global(.red-text-clickable) {
         color: red;
         text-shadow: 2px 2px #460000;
         cursor: pointer;
     }
 
-    :global(.red-text-clickable) {
-        color: red;
-        text-shadow: 2px 2px #460000;
-        cursor: pointer;
+    :global(.primary-text) {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
+    }
+
+    :global(.green-text) {
+        color: var(--green-text);
+        text-shadow: 2px 2px var(--green-text-shadow);
     }
 </style>

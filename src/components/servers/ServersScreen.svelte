@@ -4,13 +4,13 @@
   import VirtualList from "../utils/VirtualList.svelte";
   import FeaturedServerItem from "./featured/FeaturedServerItem.svelte";
   import CustomServerItem from "./custom/CustomServerItem.svelte";
-  import CustomServerDetails from "./custom/CustomServerDetailsScreen.svelte";
   import { createEventDispatcher } from "svelte";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { featureWhitelist } from "../../utils/noriskUtils.js";
+  import { featureWhitelist, noriskLog } from "../../utils/noriskUtils.js";
   import { branches, currentBranchIndex } from "../../stores/branchesStore.js";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { customServers, clearCustomServers, addCustomServer, setCustomServerBaseDomain, setActiveCustomServerId } from "../../stores/customServerStore.js";
+  import { addNotification } from "../../stores/notificationStore.js";
 
   const dispatch = createEventDispatcher();
 
@@ -24,10 +24,9 @@
 
     await invoke("get_featured_servers", { branch: $branches[$currentBranchIndex] }).then((result) => {
       featuredServers = result;
-    }).catch((e) => {
+    }).catch((error) => {
       featuredServers = [];
-      console.error(e);
-      alert("Failed to load featured servers:\n" + e);
+      addNotification("Failed to load featured servers: " + error);
     });
 
     if ($featureWhitelist.includes("CUSTOM_SERVERS")) {
@@ -35,14 +34,13 @@
         token: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
         uuid: $defaultUser.id,
       }).then((result) => {
-        console.log(`Loaded custom servers: `, result);
+        noriskLog("Loaded custom servers: " + JSON.stringify(result));
         result.servers.forEach((server) => addCustomServer(server));
         customServerLimit = result.limit;
         setCustomServerBaseDomain(result.baseUrl);
-      }).catch((e) => {
+      }).catch((error) => {
         clearCustomServers();
-        console.error(e);
-        alert("Failed to load custom servers:\n" + e);
+        addNotification("Failed to load custom servers: " + error);
       });
     }
   }
@@ -55,10 +53,10 @@
   {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
     <div class="navbar">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:active-tab={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+      <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
       <h2>|</h2>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:active-tab={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+      <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
     </div>
   {:else}
     <div class="navbar">
@@ -81,7 +79,7 @@
       <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
       {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h4 class="create-server-button" on:click={() => push("/servers/custom/create")}>Create</h4>
+        <h4 class="create-server-button green-text" on:click={() => push("/servers/custom/create")}>Create</h4>
       {:else}
         <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit
           reached</h4>
@@ -101,6 +99,15 @@
 </div>
 
 <style>
+  .servers-wrapper {
+      width: 100%;
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      gap: 0.7em;
+    }
+
     .navbar {
         display: flex;
         margin-top: 2em;
@@ -128,11 +135,6 @@
         cursor: default;
     }
 
-    .active-tab {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
     .loading-indicator {
         display: flex;
         justify-content: center;
@@ -140,14 +142,6 @@
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 200px;
-    }
-
-    .servers-wrapper {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 0.7em;
     }
 
     .customServerToolbar {
@@ -168,8 +162,6 @@
     .create-server-button {
         font-family: 'Press Start 2P', serif;
         font-size: 18px;
-        color: #0bb00b;
-        text-shadow: 2px 2px #086b08;
         cursor: pointer;
         transition: transform 0.3s;
     }

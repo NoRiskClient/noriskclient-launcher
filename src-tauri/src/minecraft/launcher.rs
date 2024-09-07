@@ -333,7 +333,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     launcher_data_arc.progress_update(ProgressUpdate::set_label("Launching..."));
     launcher_data_arc.progress_update(ProgressUpdate::set_to_max());
 
-    let mut running_task = java_runtime.execute(mapped, &game_dir).await?;
+    let mut running_task = java_runtime.execute(mapped, &game_dir)?;
 
     if !launching_parameter.keep_launcher_open {
         // Hide launcher window
@@ -395,7 +395,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
 pub struct LaunchingParameter {
     pub dev_mode: bool,
     pub force_server: Option<String>,
-    pub memory: i64,
+    pub memory: i32,
     pub data_path: PathBuf,
     pub custom_java_path: Option<String>,
     pub custom_java_args: String,
