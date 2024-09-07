@@ -36,6 +36,8 @@ body {
     --font-color-disabled: #858585;
     --dev-font-color: rgb(194, 165, 0);
     --dev-font-color-text-shadow: rgb(170, 144, 0);
+    --green-text: #057605;
+    --green-text-shadow: #074f07;
     transition: background-color 0.2s;
     /* border-radius: 14px; */
 }
@@ -54,6 +56,8 @@ body.dark-mode {
     --font-color-disabled: #878787;
     --dev-font-color: gold;
     --dev-font-color-text-shadow: rgb(189, 161, 2);
+    --green-text: #00ff00;
+    --green-text-shadow: #086b08;
 }
 
 ::-webkit-scrollbar {
