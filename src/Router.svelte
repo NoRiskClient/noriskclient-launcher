@@ -84,6 +84,35 @@
       clientLaunchError();
     };
   });
+
+  // Event Handler
+  function handleRouteEvent(event) {
+    console.log('Route Event:', event.detail);
+  }
+
+  function handleConditionsFailed(event) {
+    console.log('Conditions Failed:', event.detail);
+  }
+
+  function handleRouteLoading(event) {
+    console.log('Route Loading:', event.detail);
+  }
+
+  function handleRouteLoaded(event) {
+    const elements = document.querySelectorAll('#transition-wrapper');
+    //Yep ihr seht richtig anstatt das problem an der wurzel zu bekämpfen mache ich ihn hier
+    //aber es ballert so böse ich weiß nicht warum es passiert und deswegen jo
+    //und ja das window moved trotzdem noch bisschen aber wird dann gecleared....
+    //alter alter
+    if (elements.length > 1) {
+      let element = elements[0]
+      const inlineStyles = element.getAttribute('style');
+      if (inlineStyles.includes("animation: 300ms linear 0ms 1 normal both running")) {
+        elements[0].remove()
+      }
+    }
+    console.log('Route Loaded:', event.detail);
+  }
 </script>
 
 <div class="black-bar" data-tauri-drag-region></div>
@@ -101,7 +130,12 @@
     {#if $isInMaintenanceMode === true && !$noriskUser?.isDev}
       <MaintenanceMode />
     {:else if $isInMaintenanceMode === false || $noriskUser?.isDev}
-      <Router {routes} />
+      <Router {routes}
+              on:routeEvent={handleRouteEvent}
+              on:conditionsFailed={handleConditionsFailed}
+              on:routeLoading={handleRouteLoading}
+              on:routeLoaded={handleRouteLoaded}
+      />
     {/if}
   {/if}
 </div>

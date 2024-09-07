@@ -14,7 +14,7 @@
 </script>
 
 {#if visible}
-  <div class="box" transition:scale={{  duration: 300, easing: quintOut }}>
+  <div class="box" id="transition-wrapper" transition:scale={{  duration: 300, easing: quintOut }}>
     <slot />
   </div>
 {/if}
