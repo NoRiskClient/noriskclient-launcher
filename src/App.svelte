@@ -69,24 +69,4 @@
 </main>
 
 <style>
-    :global(.red-text) {
-        color: red;
-        text-shadow: 2px 2px #460000;
-    }
-
-    :global(.red-text-clickable) {
-        color: red;
-        text-shadow: 2px 2px #460000;
-        cursor: pointer;
-    }
-
-    :global(.primary-text) {
-        color: var(--primary-color);
-        text-shadow: 2px 2px var(--primary-color-text-shadow);
-    }
-
-    :global(.green-text) {
-        color: var(--green-text);
-        text-shadow: 2px 2px var(--green-text-shadow);
-    }
 </style>

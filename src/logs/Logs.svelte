@@ -63,7 +63,7 @@
       on:click={toggleAutoScroll}
     >[Auto Scroll]</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class="copy-button" on:click={uploadLogs}>
+    <h1 class="copy-button primary-text" on:click={uploadLogs}>
       [Copy]
     </h1>
   </div>
