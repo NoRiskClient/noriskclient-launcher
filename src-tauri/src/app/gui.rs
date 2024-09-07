@@ -6,6 +6,7 @@ use dirs::data_dir;
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
+use rand::Rng;
 use reqwest::multipart::{Form, Part};
 use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::message;
@@ -662,10 +663,14 @@ async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String
 
 #[tauri::command]
 pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
+    // Generate a random number
+    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
+    // Create a unique label using the random number
+    let unique_label = format!("logs-{}", random_number);
     let window = tauri::WindowBuilder::new(
         &handle,
-        "local",
-        tauri::WindowUrl::App("/#/logs".into()),
+        unique_label,
+        tauri::WindowUrl::App("logs.html".into())
     ).build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
@@ -1182,7 +1187,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
     if all_branches.len() <= 0 {
         return Ok(None);
     }
-    
+
     let branch_path = game_dir_path.join(branch);
 
     Ok(Some(!branch_path.exists()))

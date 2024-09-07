@@ -1,5 +1,4 @@
 <script>
-  import PopuotWindowTransitionWrapper from "./PopuotWindowTransitionWrapper.svelte";
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "../components/log/LogMessage.svelte";
@@ -43,27 +42,45 @@
   }
 </script>
 
-<PopuotWindowTransitionWrapper>
+
+<div class="black-bar" data-tauri-drag-region>
+</div>
+<main class="content">
   <div class="logs-wrapper">
     <VirtualList items={$minecraftLogs} let:item {autoScroll}>
       <LogMessage text={item} />
     </VirtualList>
-    <div class="logs-button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
-          on:click={toggleAutoScroll}>
-        [Auto Scroll]
-      </h1>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="copy-button" on:click={uploadLogs}>
-        [Copy]
-      </h1>
-    </div>
   </div>
-</PopuotWindowTransitionWrapper>
-
+</main>
+<div class="black-bar" data-tauri-drag-region>
+  <div class="logs-button-wrapper">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
+        on:click={toggleAutoScroll}>
+      [Auto Scroll]
+    </h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="copy-button" on:click={uploadLogs}>
+      [Copy]
+    </h1>
+  </div>
+</div>
 
 <style>
+    .black-bar {
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 10vh;
+        background-color: #151515;
+    }
+
+    .content {
+        height: 80vh;
+    }
+
     .logs-wrapper {
         height: 100%;
         display: flex;
@@ -75,6 +92,7 @@
         display: flex;
         justify-content: space-between;
         padding: 1em;
+        gap: 2em;
     }
 
     .copy-button {
