@@ -2,8 +2,13 @@
 <script>
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
-  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
-  import { activePopup } from "./utils/popupUtils.js";
+  import {
+    isInMaintenanceMode,
+    isClientRunning,
+    noriskUser,
+    checkApiStatus,
+    noriskError,
+  } from "./utils/noriskUtils.js";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
@@ -27,7 +32,8 @@
   import Legal from "./pages/Legal.svelte";
   import MaintenanceMode from "./components/maintenance-mode/MaintenanceModeScreen.svelte";
   import ApiOfflineScreen from "./components/maintenance-mode/ApiOfflineScreen.svelte";
-  import Popup from "./components/utils/Popup.svelte";
+  import { listen } from "@tauri-apps/api/event";
+  import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
 
   const routes = {
     "/": Home,
@@ -51,16 +57,36 @@
   };
 
   let apiIsOnline = null;
+  let showLaunchErrorModal = false;
+  let launchErrorReason;
 
   onMount(async () => {
     apiIsOnline = await checkApiStatus();
+
+    const clientLaunchError = await listen("client-error", async (event) => {
+      let reason = event.payload; // Extract the path from the event's payload
+      // Remove the prefix "Failed to launch client:" if it exists
+      if (reason.startsWith("Failed to launch client: ")) {
+        reason = reason.replace("Failed to launch client: ", "");
+      }
+      noriskError(reason);
+      showLaunchErrorModal = true;
+      launchErrorReason = reason
+    });
+
+    return () => {
+      clientLaunchError();
+    };
   });
 </script>
 
 <div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
+  {#if showLaunchErrorModal}
+    <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason}/>
+  {/if}
   {#if apiIsOnline === false}
-  <ApiOfflineScreen />
+    <ApiOfflineScreen />
   {:else if apiIsOnline === true}
     <Notifications />
     {#if $isInMaintenanceMode === true && !$noriskUser?.isDev}
