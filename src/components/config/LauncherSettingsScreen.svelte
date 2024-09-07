@@ -17,18 +17,18 @@
     import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
     import { openConfirmPopup } from "../../utils/popupUtils.js";
-  
+
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
     let totalSystemMemory = 0;
     let selectedMemory = 0;
-  
+
     function toggleTheme() {
       $launcherOptions.toggleTheme();
       lightTheme = $launcherOptions.theme === "LIGHT";
     }
-    
-  
+
+
     async function confirmClearData() {
         openConfirmPopup({
             title: "Are you sure?",
@@ -50,7 +50,7 @@
                 addNotification(error);
             });
     }
-  
+
     async function toggleExperimentalMode() {
         if (!$launcherOptions.experimentalMode) {
             await saveOptions(false);
@@ -81,18 +81,22 @@
     }
 
     (async () => {
-        const totalBytes = await invoke("get_total_memory");
-        totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024));
-        selectedMemory = $launcherOptions.memoryPercentage / 1024;
-        noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
+      const totalBytes = await invoke("get_total_memory");
+      totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
+      const memoryPercentage = $launcherOptions.memoryPercentage; // Verwende den Wert aus $launcherOptions
+      selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
+      noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
+      noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
     })();
-  
+
     onDestroy(async () => {
-        $launcherOptions.memoryPercentage = selectedMemory * 1024;
-        await saveOptions();
+      //wir runden es weil wir es in der config als int speichern
+      $launcherOptions.memoryPercentage = Math.round((selectedMemory / totalSystemMemory) * 100);
+      noriskLog(`Selected memory: ${selectedMemory} GB (${$launcherOptions.memoryPercentage}%).`);
+      await saveOptions();
     });
 </script>
-  
+
 {#if showMcRealAppModal}
     <McRealAppModal bind:showModal={showMcRealAppModal} />
 {/if}
@@ -124,7 +128,7 @@
     </div>
     </div>
 </div>
-  
+
 <style>
     .settings-container {
         display: flex;
@@ -135,18 +139,18 @@
         height: 80vh;
         padding-top: 1em;
     }
-  
+
     hr {
         width: 85%;
         border: 1px solid var(--font-color);
         margin-top: 1.5em;
     }
-  
+
     .title {
         text-align: center;
         margin-top: 10px;
     }
-  
+
     @keyframes fade {
         from {
             opacity: 0;
@@ -155,7 +159,7 @@
             opacity: 1;
         }
     }
-  
+
     .settings-wrapper {
         display: flex;
         flex-direction: column;
@@ -165,14 +169,14 @@
         padding: 0px 2em 2em 2em;
         overflow-y: scroll;
     }
-  
+
     .nes-font {
         font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
     }
-  
+
     .mcreal-app-wrapper {
         display: flex;
         flex-direction: row;
@@ -180,7 +184,7 @@
         justify-content: space-between;
         margin-top: 10px;
     }
-  
+
     .mcreal-app-wrapper > .title {
         display: flex;
         flex-direction: row;
@@ -190,14 +194,14 @@
         color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }
-  
+
     .mcreal-app-wrapper > .button {
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
         cursor: pointer;
         transition: transform 0.3s;
     }
-  
+
     .mcreal-app-wrapper > .button:hover {
         transform: scale(1.15);
     }
@@ -207,14 +211,14 @@
       color: var(--dev-font-color);
       text-shadow: 1.25px 1.25px var(--dev-font-color-text-shadow);
     }
-  
+
     .sliders {
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         gap: 2em;
     }
-  
+
     .clear-data-button-wrapper {
         display: flex;
         align-content: center;
@@ -226,13 +230,13 @@
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;
     }
-  
+
     .clear-data-button-wrapper p {
         color: #ff0000;
         cursor: pointer;
         transition: transform 0.3s;
     }
-  
+
     .clear-data-button-wrapper p:hover {
         transform: scale(1.2);
     }
