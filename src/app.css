@@ -60,6 +60,27 @@ body.dark-mode {
     --green-text-shadow: #086b08;
 }
 
+.red-text {
+    color: red;
+    text-shadow: 2px 2px #460000;
+}
+
+.red-text-clickable {
+    color: red;
+    text-shadow: 2px 2px #460000;
+    cursor: pointer;
+}
+
+.primary-text {
+    color: var(--primary-color);
+    text-shadow: 2px 2px var(--primary-color-text-shadow);
+}
+
+.green-text {
+    color: var(--green-text);
+    text-shadow: 2px 2px var(--green-text-shadow);
+}
+
 ::-webkit-scrollbar {
     width: 3px;
 }
