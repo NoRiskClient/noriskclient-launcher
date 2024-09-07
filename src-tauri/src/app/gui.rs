@@ -25,6 +25,7 @@ use crate::app::modrinth_api::{CustomMod, ModInfo, ModrinthApiEndpoints, Modrint
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
+use crate::utils::percentage_of_total_memory;
 
 use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
@@ -1069,7 +1070,7 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
         force_server: force_server,
-        memory: options.memory_limit,
+        memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() { Some(options.custom_java_path) } else { None },
         custom_java_args: options.custom_java_args,
