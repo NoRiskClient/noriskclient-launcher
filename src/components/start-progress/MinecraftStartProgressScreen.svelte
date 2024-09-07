@@ -70,6 +70,11 @@
         </h1>
       </div>
     {/if}
+  {:else}
+    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
+        class="nes-font-big">{convertToPercentage(0)}%</h1>
+    <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
+        class="nes-font-small progress-label-text">Waiting...</h1>
   {/if}
 </div>
 
