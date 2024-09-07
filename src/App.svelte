@@ -7,7 +7,7 @@
   import { fetchProfiles } from "./stores/profilesStore.js";
   import { listen } from "@tauri-apps/api/event";
   import { location, push } from "svelte-spa-router";
-  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode, noriskLog } from "./utils/noriskUtils.js";
+  import { isClientRunning, startProgress, getNoRiskUser, getMaintenanceMode, noriskError } from "./utils/noriskUtils.js";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { invoke } from "@tauri-apps/api/core";
   import { addNotification } from "./stores/notificationStore.js";
@@ -33,10 +33,14 @@
       push("/");
     });
 
-    const errorUnlisten = await listen("client-error", async (e) => {
-      await invoke("open_minecraft_crash_window").catch(reason => {
-        addNotification(reason);
-      });
+    const errorUnlisten = await listen("minecraft-crash", async (event) => {
+      const crashReportPath = event.payload; // Extract the path from the event's payload
+      noriskError("Crash Report Path: " + crashReportPath)
+      await invoke("open_minecraft_crash_window", { crashReportPath: crashReportPath })
+        .catch(reason => {
+          addNotification(reason);
+          noriskError(reason)
+        });
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {

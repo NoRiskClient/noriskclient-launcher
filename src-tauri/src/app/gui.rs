@@ -2,12 +2,14 @@ use std::{io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::Write;
 use std::io::BufRead;
+use std::thread::sleep;
 use dirs::data_dir;
 
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
 use rand::Rng;
+use regex::Regex;
 use reqwest::multipart::{Form, Part};
 use tauri::{Manager, UserAttentionType, WebviewWindow, WindowEvent};
 use tauri::Emitter;
@@ -451,7 +453,7 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
     let window = tauri::WebviewWindowBuilder::new(
         &handle,
         unique_label,
-        tauri::WebviewUrl::App("logs.html".into())
+        tauri::WebviewUrl::App("logs.html".into()),
     ).build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
@@ -460,15 +462,28 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
 }
 
 #[tauri::command]
-pub async fn open_minecraft_crash_window(handle: tauri::AppHandle) -> Result<(), crate::error::Error> {
+pub async fn open_minecraft_crash_window(handle: tauri::AppHandle, crash_report_path: String) -> Result<(), crate::error::Error> {
+    // Generate a random number
+    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
+    // Create a unique label using the random number
+    let unique_label = format!("crash-{}", random_number);
+    // Create the new window
     let window = tauri::WebviewWindowBuilder::new(
         &handle,
-        "crash",
-        tauri::WebviewUrl::App("/#/crash".into()),
+        unique_label,
+        tauri::WebviewUrl::App("crash.html".into()),
     ).build()?;
+
+    // Set window properties
     let _ = window.set_title("Crash Report");
     let _ = window.set_resizable(true);
     let _ = window.set_focus();
+
+    // we delay it so window has time to build hopefully this works lol
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    // Trigger an event to send the crash report path to the window
+    window.emit("crash-report", crash_report_path)?;
+
     Ok(())
 }
 
@@ -492,6 +507,24 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Er
     }
 
     let file = File::open(log_path)?;
+    let reader = io::BufReader::new(file);
+    let lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+
+    Ok(lines)
+}
+
+#[tauri::command]
+pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, crate::error::Error> {
+    debug!("Incoming Path {:?}",file_path.clone());
+    let normalized_path = file_path.trim().replace("\\", "/");
+    let path = std::path::Path::new(&normalized_path);
+    debug!("Normalized Path {:?}",normalized_path.clone());
+
+    if !path.exists() {
+        return Err(ErrorKind::OtherError(format!("File does not exist: {:?}", path)).as_error());
+    }
+
+    let file = File::open(path)?;
     let reader = io::BufReader::new(file);
     let lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
 
@@ -936,7 +969,26 @@ fn handle_stdout(window: &Arc<Mutex<WebviewWindow>>, data: &[u8]) -> anyhow::Res
     }
 
     info!("{}", data);
-    window.lock().unwrap().emit("process-output", data)?;
+
+    // Regex to detect the crash message and extract the file path
+    let crash_regex = Regex::new(r"#@!@# Game crashed! Crash report saved to: #@!@# (?P<path>.+)").unwrap();
+
+    // Check if the data contains a crash report
+    if let Some(captures) = crash_regex.captures(&data) {
+        if let Some(crash_path) = captures.name("path") {
+            let crash_path_str = crash_path.as_str();
+            info!("Game crashed! Crash report located at: {}", crash_path_str);
+
+            // Use the show_in_folder method to open the file in the system's file explorer
+            //CapeApiEndpoints::show_in_folder(crash_path_str);
+
+            // Emit an event with the crash path to the front-end
+            window.lock().unwrap().emit("minecraft-crash", crash_path_str)?;
+        }
+    } else {
+        // Emit the regular process output
+        window.lock().unwrap().emit("process-output", data)?;
+    }
     Ok(())
 }
 
@@ -1519,6 +1571,7 @@ pub fn gui_main() {
             get_options,
             open_minecraft_logs_window,
             open_minecraft_crash_window,
+            read_txt_file,
             get_latest_minecraft_logs,
             minecraft_auth_get_store,
             minecraft_auth_get_default_user,

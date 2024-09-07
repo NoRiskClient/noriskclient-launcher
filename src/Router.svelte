@@ -18,8 +18,6 @@
   import Resourcepacks from "./pages/Resourcepacks.svelte";
   import Datapacks from "./pages/Datapacks.svelte";
   import GameButton from "./components/v2/buttons/GameButton.svelte";
-  import Crash from "./pages/Crash.svelte";
-  import CrashHeader from "./components/v2/CrashHeader.svelte";
   import Servers from "./pages/Servers.svelte";
   import CustomServerDetails from "./pages/CustomServerDetails.svelte";
   import CreateCustomServer from "./pages/CreateCustomServer.svelte";
@@ -38,7 +36,6 @@
     "/new-branch": NewBranch,
     "/copy-mc-data-progress": CopyMcDataProgress,
     "/start-progress": MinecraftStartProgress,
-    "/crash": Crash,
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
     "/profiles": Profiles,
@@ -60,30 +57,22 @@
   });
 </script>
 
-<div class="black-bar" data-tauri-drag-region>
-  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location === "/crash"}
-    <CrashHeader />
-  {/if}
-</div>
+<div class="black-bar" data-tauri-drag-region></div>
 <div class="content">
-  {#if apiIsOnline == false}
+  {#if apiIsOnline === false}
   <ApiOfflineScreen />
-  {:else if apiIsOnline == true}
+  {:else if apiIsOnline === true}
     <Notifications />
-    {#if $activePopup != null}
-      <Popup />
-    {/if}
-    {#if $isInMaintenanceMode == true && !$noriskUser?.isDev}
+    {#if $isInMaintenanceMode === true && !$noriskUser?.isDev}
       <MaintenanceMode />
-    {:else if $isInMaintenanceMode == false || $noriskUser?.isDev}
+    {:else if $isInMaintenanceMode === false || $noriskUser?.isDev}
       <Router {routes} />
     {/if}
   {/if}
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline == true}
+  {#if $location !== "/" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
     <BackButton />
   {:else}
     {#if $isClientRunning}
