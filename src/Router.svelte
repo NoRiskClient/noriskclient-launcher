@@ -7,7 +7,6 @@
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import MinecraftStartProgress from "./pages/MinecraftStartProgress.svelte";
-  import MinecraftClientLogs from "./pages/MinecraftClientLogs.svelte";
   import LauncherSettings from "./pages/LauncherSettings.svelte";
   import Capes from "./pages/Capes.svelte";
   import BackButton from "./components/v2/buttons/BackButton.svelte";
@@ -39,7 +38,6 @@
     "/new-branch": NewBranch,
     "/copy-mc-data-progress": CopyMcDataProgress,
     "/start-progress": MinecraftStartProgress,
-    "/logs": MinecraftClientLogs,
     "/crash": Crash,
     "/launcher-settings": LauncherSettings,
     "/capes": Capes,
@@ -85,7 +83,7 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/logs" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline == true}
+  {#if $location !== "/" && $location !== "/crash" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline == true}
     <BackButton />
   {:else}
     {#if $isClientRunning}
