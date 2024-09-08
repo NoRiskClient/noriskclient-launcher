@@ -60,21 +60,21 @@
         class="nes-font-big">{convertToPercentage(progress)}%</h1>
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
         class="nes-font-small progress-label-text">{progressBarLabel} </h1>
-    {#if isFinished}
-      <div class="button-wrapper">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="nes-font-big logs" on:click={openMinecraftLogsWindow}>LOGS</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="nes-font-big close red-text-clickable" on:click={stopClient}>
-          CLOSE
-        </h1>
-      </div>
-    {/if}
   {:else}
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
         class="nes-font-big">{convertToPercentage(0)}%</h1>
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
         class="nes-font-small progress-label-text">Waiting...</h1>
+  {/if}
+  {#if isFinished}
+    <div class="button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class="nes-font-big logs" on:click={openMinecraftLogsWindow}>LOGS</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class="nes-font-big close red-text-clickable" on:click={stopClient}>
+        CLOSE
+      </h1>
+    </div>
   {/if}
 </div>
 

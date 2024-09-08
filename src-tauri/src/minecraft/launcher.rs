@@ -38,6 +38,8 @@ pub struct LauncherData<D: Send + Sync> {
 impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
     fn progress_update(&self, progress_update: ProgressUpdate) {
         let _ = (self.on_progress)(&self.data, progress_update);
+        //ui update
+        let _ = (self.on_progress)(&self.data, ProgressUpdate::set_max());
     }
 }
 
