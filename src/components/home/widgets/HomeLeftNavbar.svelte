@@ -130,6 +130,6 @@
   .home-navbar-wrapper h1:hover {
     color: var(--hover-color);
     text-shadow: 1px 1px var(--hover-color-text-shadow);
-    transform: scale(1.2) translateX(12.5px);
+    transform: scale(1.2) translateX(12.5px) perspective(1px);
   }
 </style>
