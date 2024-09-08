@@ -1059,8 +1059,23 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHan
 }
 
 #[tauri::command]
-async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, app_state: tauri::State<'_, AppState>, window: WebviewWindow) -> Result<(), crate::error::Error> {
+async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<bool, crate::error::Error> {
+    let runner_instance = &app_state.runner_instance;
+
+    if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
+        return Ok(true);
+    }
+
+    return Ok(false);
+}
+
+#[tauri::command]
+async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: WebviewWindow, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
+    if is_client_running(app_state.clone()).await? {
+        return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
+    }
+
     let credentials = minecraft_auth_get_store().await?.get_default_credential().await?.ok_or(ErrorKind::NoCredentialsError)?;
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
@@ -1081,12 +1096,6 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
         concurrent_downloads: options.concurrent_downloads,
     };
 
-    let runner_instance = &app_state.runner_instance;
-
-    if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
-        return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
-    }
-
     let token = if options.experimental_mode {
         credentials.norisk_credentials.experimental.ok_or(ErrorKind::NoCredentialsError)?.value
     } else {
@@ -1099,6 +1108,7 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
 
     let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
 
+    let runner_instance = &app_state.runner_instance;
     *runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?
         = Some(RunnerInstance { terminator: terminator_tx });
 
@@ -1571,6 +1581,7 @@ pub fn gui_main() {
             get_default_mc_folder,
             copy_mc_data,
             copy_branch_data,
+            is_client_running,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,

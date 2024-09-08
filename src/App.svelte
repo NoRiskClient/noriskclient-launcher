@@ -13,6 +13,8 @@
     getNoRiskUser,
     getMaintenanceMode,
     noriskError,
+    noriskLog,
+    checkIfClientIsRunning,
   } from "./utils/noriskUtils.js";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { invoke } from "@tauri-apps/api/core";
@@ -22,6 +24,7 @@
     setTimeout(async () => {
       await getCurrentWebviewWindow().show();
     }, 300);
+    await checkIfClientIsRunning()
     await fetchOptions();
     await fetchDefaultUserOrError(false);
     await getNoRiskUser();
