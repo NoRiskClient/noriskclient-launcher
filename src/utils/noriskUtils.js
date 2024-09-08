@@ -31,6 +31,15 @@ export async function checkApiStatus() {
   return apiIsOnline;
 }
 
+export async function checkIfClientIsRunning() {
+  await invoke("is_client_running").then((isRunning) => {
+    noriskLog(`IsClientRunning is ${isRunning}`);
+    isClientRunning.set(isRunning)
+  }).catch((reason) => {
+    noriskError(reason);
+  });
+}
+
 
 export async function runClient(branch, checkedForNewBranch = false) {
   if (get(isClientRunning)) {
