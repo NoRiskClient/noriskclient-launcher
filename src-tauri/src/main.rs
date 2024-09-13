@@ -109,6 +109,7 @@ pub fn main() -> anyhow::Result<()> {
     // once you are done.
     let _handle = log4rs::init_config(config)?;
 
+    info!("");
     info!("###############################");
     info!("");
     info!("");
@@ -116,6 +117,7 @@ pub fn main() -> anyhow::Result<()> {
     info!("");
     info!("");
     info!("###############################");
+    info!("");
 
 
     // application directory
