@@ -186,13 +186,13 @@
   .home-navbar-wrapper h1:hover {
     color: var(--hover-color);
     text-shadow: 1px 1px var(--hover-color-text-shadow);
-    transform: scale(1.2) translateX(-10px);
+    transform: scale(1.2) translateX(-10px) perspective(1px);
   }
 
   .home-navbar-wrapper h1.quit:hover {
     color: red;
     text-shadow: 1px 1px #460000;
-    transform: scale(1.2);
+    transform: scale(1.2) perspective(1px);
   }
 
   .home-navbar-wrapper h1.invite-button {
