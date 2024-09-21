@@ -156,9 +156,11 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   {#if apiIsOnline}
-    <div class="column">
-      <SettingsButton />
-    </div>
+    {#if $location === "/"}
+      <div class="column">
+        <SettingsButton />
+      </div>
+    {/if}
     <div class="column center">
       {#if $location !== "/" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
         <BackButton />
@@ -166,9 +168,11 @@
         <GameButton />
       {/if}
     </div>
-    <div class="column">
-      <LegalInfoButton />
-    </div>
+    {#if $location === "/"}
+      <div class="column">
+        <LegalInfoButton />
+      </div>
+    {/if}
   {/if}
 </div>
 
