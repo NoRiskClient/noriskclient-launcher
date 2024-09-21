@@ -75,7 +75,7 @@ jobs:
           mv ./src-tauri/target/release/bundle/appimage/no-risk-client**.AppImage.tar.gz.sig ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage.tar.gz.sig
           mv ./src-tauri/target/release/bundle/deb/no-risk-client**.deb ./src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.deb
         if: matrix.platform == 'ubuntu-latest'
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: matrix.platform == 'ubuntu-latest'
         with:
           name: noriskclient-linux
@@ -88,7 +88,7 @@ jobs:
           mv nsis/NoRiskClient**.nsis.zip nsis/NoRiskClient-Windows-setup.nsis.zip
           mv nsis/NoRiskClient**.nsis.zip.sig nsis/NoRiskClient-Windows-setup.nsis.zip.sig
         if: matrix.platform == 'windows-latest'
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: matrix.platform == 'windows-latest'
         with:
           name: noriskclient-windows
@@ -100,7 +100,7 @@ jobs:
           mv ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient.app.tar.gz ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz
           mv ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient.app.tar.gz.sig ./src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoRiskClient-MacOS.app.tar.gz.sig
         if: matrix.platform == 'macos-latest'
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: matrix.platform == 'macos-latest'
         with:
           name: noriskclient-macos
@@ -116,19 +116,19 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Download Artifact Outputs - macOS
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: noriskclient-macos
           path: noriskclient-macos
 
       - name: Download Artifact Outputs - Ubuntu
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: noriskclient-linux
           path: noriskclient-linux
 
       - name: Download Artifact Outputs - Windows
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: noriskclient-windows
           path: noriskclient-windows
