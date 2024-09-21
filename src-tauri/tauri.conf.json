@@ -44,7 +44,7 @@
     "createUpdaterArtifacts": "v1Compatible"
   },
   "productName": "NoRiskClient",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "identifier": "gg.norisk.noriskclient",
   "plugins": {
     "updater": {
