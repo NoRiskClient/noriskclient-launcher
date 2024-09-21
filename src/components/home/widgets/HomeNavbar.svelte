@@ -3,7 +3,6 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { get } from "svelte/store";
   import { push } from "svelte-spa-router";
-  import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api";
   import { getNoRiskToken, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
@@ -55,12 +54,6 @@
         name: "SKIN",
         onClick: () => push("/skin"),
         condition: () => get(defaultUser) != null,
-      },
-      {
-        name: "QUIT",
-        onClick: () => appWindow.close(),
-        condition: true,
-        className: "quit",
       },
     ];
   }
@@ -187,12 +180,6 @@
     color: var(--hover-color);
     text-shadow: 1px 1px var(--hover-color-text-shadow);
     transform: scale(1.2) translateX(-10px) perspective(1px);
-  }
-
-  .home-navbar-wrapper h1.quit:hover {
-    color: red;
-    text-shadow: 1px 1px #460000;
-    transform: scale(1.2) perspective(1px);
   }
 
   .home-navbar-wrapper h1.invite-button {

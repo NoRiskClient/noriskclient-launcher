@@ -33,6 +33,7 @@
   import { listen } from "@tauri-apps/api/event";
   import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
   import Popup from "./components/utils/Popup.svelte";
+  import WindowControl from "./components/WindowControl.svelte";
 
   const routes = {
     "/": Home,
@@ -119,7 +120,9 @@
   }
 </script>
 
-<div class="black-bar" data-tauri-drag-region></div>
+<div class="black-bar">
+  <WindowControl/>
+</div>
 <div class="content">
   {#if showLaunchErrorModal}
     <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason}/>
