@@ -1,10 +1,16 @@
 <!-- App.svelte -->
 <script>
-	import { setStillRunningCustomServer } from './stores/customServerLogsStore.js';
+  import { setStillRunningCustomServer } from "./stores/customServerLogsStore.js";
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus, noriskError, } from "./utils/noriskUtils.js";
+  import {
+    isInMaintenanceMode,
+    isClientRunning,
+    noriskUser,
+    checkApiStatus,
+    noriskError,
+  } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
@@ -34,6 +40,8 @@
   import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
   import Popup from "./components/utils/Popup.svelte";
   import WindowControl from "./components/WindowControl.svelte";
+  import LegalInfoButton from "./components/v2/buttons/LegalInfoButton.svelte";
+  import SettingsButton from "./components/v2/buttons/SettingsButton.svelte";
 
   const routes = {
     "/": Home,
@@ -71,7 +79,7 @@
       }
       noriskError(reason);
       showLaunchErrorModal = true;
-      launchErrorReason = reason
+      launchErrorReason = reason;
     });
 
     invoke("check_if_custom_server_running").then((value) => {
@@ -88,44 +96,44 @@
 
   // Event Handler
   function handleRouteEvent(event) {
-    console.log('Route Event:', event.detail);
+    console.log("Route Event:", event.detail);
   }
 
   function handleConditionsFailed(event) {
-    console.log('Conditions Failed:', event.detail);
+    console.log("Conditions Failed:", event.detail);
   }
 
   function handleRouteLoading(event) {
-    console.log('Route Loading:', event.detail);
+    console.log("Route Loading:", event.detail);
   }
 
   function handleRouteLoaded(event) {
     //wir delayen es weil mein gehirn ein delay hat ganz groß
     setTimeout(() => {
-      const elements = document.querySelectorAll('#transition-wrapper');
+      const elements = document.querySelectorAll("#transition-wrapper");
       //Yep ihr seht richtig anstatt das problem an der wurzel zu bekämpfen mache ich ihn hier
       //aber es ballert so böse ich weiß nicht warum es passiert und deswegen jo
       //und ja das window moved trotzdem noch bisschen aber wird dann gecleared....
       //alter alter
-      console.log("Elements: ", elements)
+      console.log("Elements: ", elements);
       if (elements.length > 1) {
-        let element = elements[0]
-        const inlineStyles = element.getAttribute('style');
+        let element = elements[0];
+        const inlineStyles = element.getAttribute("style");
         //if (inlineStyles.includes("animation: 300ms linear 0ms 1 normal both running")) {
-        elements[0].remove()
+        elements[0].remove();
         //}
       }
-      console.log('Route Loaded:', event.detail);
-    },300)
+      console.log("Route Loaded:", event.detail);
+    }, 300);
   }
 </script>
 
 <div class="black-bar">
-  <WindowControl/>
+  <WindowControl />
 </div>
 <div class="content">
   {#if showLaunchErrorModal}
-    <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason}/>
+    <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason} />
   {/if}
   {#if apiIsOnline === false}
     <ApiOfflineScreen />
@@ -147,25 +155,44 @@
   {/if}
 </div>
 <div class="black-bar" data-tauri-drag-region>
-  <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
-    <BackButton />
-  {:else}
-    {#if $isClientRunning}
-      <GameButton />
-    {/if}
+  {#if apiIsOnline}
+    <div class="column">
+      <SettingsButton />
+    </div>
+    <div class="column center">
+      {#if $location !== "/" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
+        <BackButton />
+      {:else if $isClientRunning}
+        <GameButton />
+      {/if}
+    </div>
+    <div class="column">
+      <LegalInfoButton />
+    </div>
   {/if}
 </div>
 
 <style>
     .black-bar {
         display: flex;
-        align-content: center;
-        justify-content: center;
-        align-items: center;
         width: 100%;
         height: 10vh;
         background-color: #151515;
+    }
+
+    .black-bar .column {
+        flex: 1;
+        padding: 0 0.75rem 0 0.75rem;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        align-content: center;
     }
 
     .content {

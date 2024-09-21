@@ -3,12 +3,11 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="back-button" on:click={() => pop()}>[BACK]</h1>
+<h1 on:click={() => pop()}>[BACK]</h1>
 
 <style>
-    .back-button {
+    h1 {
         transition: transform 0.3s;
-        position: absolute;
         font-size: 20px;
         color: #e8e8e8;
         text-shadow: 2px 2px #7a7777;
@@ -16,7 +15,7 @@
         cursor: pointer;
     }
 
-    .back-button:hover {
+    h1:hover {
         transform: scale(1.2);
     }
 </style>

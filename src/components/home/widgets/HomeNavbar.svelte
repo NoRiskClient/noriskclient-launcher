@@ -16,16 +16,6 @@
   function updateNavItems() {
     navItems = [
       {
-        name: "LEGAL-INFO",
-        onClick: () => push("/legal"),
-        condition: () => true,
-      },
-      {
-        name: "SETTINGS",
-        onClick: () => push("/launcher-settings"),
-        condition: true
-      },
-      {
         name: "PROFILES",
         onClick: () => push("/profiles"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
