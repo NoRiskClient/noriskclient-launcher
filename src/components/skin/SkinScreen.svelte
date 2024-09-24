@@ -43,6 +43,8 @@
           await getNoRiskUserByUUID(profileTexture);
         }
         currentSkinLocation = profileTexture != null ? profileTexture.textures.SKIN.url : "";
+        const isSlim = (profileTexture.textures?.SKIN?.metadata?.model ?? "") === "slim"
+        const model = isSlim ? "slim" : "default"
         const canvas = document.createElement("canvas");
         skinViewer = new SkinViewer({
           canvas: canvas,
@@ -51,6 +53,7 @@
           skin: currentSkinLocation,
           cape: settings.showCape ? capeLocation : "",
           animation: new IdleAnimation,
+          model: model,
         });
         skinViewer.zoom = 0.7;
         skinViewer.controls.enableZoom = settings.enableZoom;
