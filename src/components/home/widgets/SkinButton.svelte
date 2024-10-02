@@ -39,6 +39,7 @@
 
   .skin-kopf {
     cursor: pointer;
+    -webkit-user-drag: none;
     box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
     border-radius: 0.45em;
     transition-duration: 200ms;
