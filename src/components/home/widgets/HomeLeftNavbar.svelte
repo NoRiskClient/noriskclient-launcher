@@ -55,7 +55,11 @@
     if (!options) return false;
     return await invoke("discord_auth_status", { options, credentials })
       .then((value) => {
+        const before = discordLinked;
         discordLinked = value;
+        if (before !== discordLinked && discordLinked) {
+          addNotification("Discord linked successfully!", "INFO");
+        }
         noriskLog("Is Discord Linked: " + discordLinked);
         updateNavItems();
       })
@@ -74,6 +78,7 @@
     return await invoke("discord_auth_unlink", { options, credentials })
       .then((value) => {
         discordLinked = false;
+        addNotification("Discord unlinked successfully!", "INFO");
         noriskLog("Unlinked Discord" + discordLinked);
       })
       .catch((error) => {

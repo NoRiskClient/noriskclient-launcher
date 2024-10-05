@@ -239,7 +239,7 @@ impl ApiEndpoints {
 
     /// Request discord link status
     pub async fn unlink_discord(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::delete_from_norisk_endpoint("core/oauth/discord/unlink", norisk_token, request_uuid).await
+        Self::delete_from_norisk_endpoint_text("core/oauth/discord/unlink", norisk_token, request_uuid).await
     }
 
     /// Request whitelist slots
@@ -374,6 +374,21 @@ impl ApiEndpoints {
             .send().await?
             .error_for_status()?
             .json::<T>()
+            .await?
+        )
+    }
+
+    /// Request **TEXT** formatted data from launcher API
+    pub async fn delete_from_norisk_endpoint_text(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.delete(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
             .await?
         )
     }
