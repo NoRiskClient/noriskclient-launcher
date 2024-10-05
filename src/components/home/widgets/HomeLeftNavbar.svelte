@@ -9,7 +9,7 @@
   import { noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
-  let discordLinked = null;
+  let discordLinked = false;
   let navItems = [];
 
   function updateNavItems() {
@@ -55,11 +55,7 @@
     if (!options) return false;
     return await invoke("discord_auth_status", { options, credentials })
       .then((value) => {
-        const before = discordLinked;
         discordLinked = value;
-        if (before != null && before !== discordLinked && discordLinked) {
-          addNotification("Discord linked successfully!", "INFO");
-        }
         noriskLog("Is Discord Linked: " + discordLinked);
         updateNavItems();
       })
