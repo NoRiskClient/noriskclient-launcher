@@ -43,7 +43,7 @@
 <main class="content">
   <div class="logs-wrapper">
     <VirtualList items={$minecraftLogs} let:item>
-      <LogMessage text={item} />
+      <LogMessage item={item} />
     </VirtualList>
   </div>
 </main>
@@ -69,6 +69,7 @@
 
     .content {
         height: 80vh;
+        background-color: #1a191c;
     }
 
     .logs-wrapper {
