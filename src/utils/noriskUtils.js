@@ -147,6 +147,11 @@ export function getNoRiskToken() {
   return options.experimentalMode ? user.norisk_credentials.experimental?.value ?? null : user.norisk_credentials.production?.value ?? null;
 }
 
+export function getMcToken() {
+  let user = get(defaultUser);
+  return user.access_token ?? null;
+}
+
 export function getNoRiskUser() {
   const user = get(defaultUser);
   if (!user) return;
