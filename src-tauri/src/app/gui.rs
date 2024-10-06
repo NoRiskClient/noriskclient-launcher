@@ -2,7 +2,6 @@ use std::{collections::HashMap, io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::Write;
 use std::io::BufRead;
-use std::thread::sleep;
 use dirs::data_dir;
 
 use chrono::Utc;
@@ -27,7 +26,7 @@ use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{Announcement, ChangeLog, LastViewedPopups, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -1012,6 +1011,33 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
+async fn get_last_viewed_popups() -> Result<LastViewedPopups, String> {
+    let last_viewed_popups = LastViewedPopups::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+    Ok(last_viewed_popups)
+}
+
+
+#[tauri::command]
+async fn store_last_viewed_popups(last_viewed_popups: LastViewedPopups) -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    last_viewed_popups.store(config_dir)
+        .await
+        .map_err(|e| format!("unable to store last viewed popups data: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_changelogs() -> Result<Vec<ChangeLog>, String> {
+    ApiEndpoints::changelogs().await.map_err(|e| format!("unable to get changelogs: {:?}", e))
+}
+
+#[tauri::command]
+async fn get_announcements() -> Result<Vec<Announcement>, String> {
+    ApiEndpoints::announcements().await.map_err(|e| format!("unable to get announcements: {:?}", e))
+}
+
+#[tauri::command]
 async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
     let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
@@ -1591,6 +1617,10 @@ pub fn gui_main() {
             get_mobile_app_token,
             reset_mobile_app_token,
             clear_data,
+            get_changelogs,
+            get_announcements,
+            get_last_viewed_popups,
+            store_last_viewed_popups,
             get_mod_info,
             console_log_info,
             console_log_warning,

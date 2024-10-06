@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
-use crate::app::app_data::LauncherOptions;
 use crate::app::gui::minecraft_auth_get_default_user;
+use super::app_data::{Announcement, ChangeLog, LauncherOptions};
 use crate::custom_servers::models::CustomServer;
 use crate::error::ErrorKind;
 use crate::minecraft::minecraft_auth::NoRiskToken;
@@ -198,6 +198,16 @@ impl ApiEndpoints {
     /// Request norisk assets json for specific branch
     pub async fn norisk_assets(branch: String, norisk_token: &str, request_uuid: &str) -> Result<NoriskAssets> {
         Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token, request_uuid).await
+    }
+
+    /// Request changelogs
+    pub async fn changelogs() -> Result<Vec<ChangeLog>> {
+        Self::request_from_download_norisk_endpoint("launcher_popups/changelogs.json").await
+    }
+
+    /// Request announcements
+    pub async fn announcements() -> Result<Vec<Announcement>> {
+        Self::request_from_download_norisk_endpoint("launcher_popups/announcements.json").await
     }
 
     /// Request mcreal app token
@@ -412,12 +422,6 @@ pub struct Branches {
     #[serde(rename = "defaultBranch")]
     pub default_branch: String,
     pub branches: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Changelog {
-    pub build: Build,
-    pub changelog: String,
 }
 
 #[derive(Serialize, Deserialize)]
