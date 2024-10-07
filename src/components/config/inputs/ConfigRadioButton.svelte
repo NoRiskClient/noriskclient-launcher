@@ -86,7 +86,7 @@
         left: 2px;
         bottom: 2px;
         background-color: #ffffff;
-        border-radius: 50%;
+        border-radius: 5px;
         box-shadow: 0px 2px 5px var(--font-color-text-shadow);
         -webkit-transition: .4s;
         transition: .4s;
