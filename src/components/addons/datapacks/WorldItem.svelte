@@ -1,15 +1,11 @@
 <script>
-    function preventSelection(event) {
-      event.preventDefault();
-    }
-
     export let icon = null;
     export let name;
     export let onClick = () => {};
   </script>
 
   <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <div class="card" on:select={preventSelection} on:click={onClick}>
+  <div class="card" on:click={onClick}>
     <div class="content">
       <h2 class="icon" class:active={icon != null}>{icon}</h2>
       <h2>{name}</h2>

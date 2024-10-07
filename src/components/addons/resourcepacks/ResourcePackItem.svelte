@@ -154,6 +154,7 @@
         object-fit: contain;
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
+        -webkit-user-drag: none;
     }
 
     .icon-fallback {
@@ -172,6 +173,7 @@
         line-break: anywhere;
         font-size: 18px;
         cursor: pointer;
+        -webkit-user-drag: none;
     }
 
     .resourcepack-item-wrapper p {
