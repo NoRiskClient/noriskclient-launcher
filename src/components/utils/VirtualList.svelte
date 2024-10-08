@@ -20,6 +20,7 @@
 	let top = 0;
 	let bottom = 0;
 	let average_height;
+	let content_width = 0; 
 	$: visible = items.slice(start, end).map((data, i) => {
 		return { index: i + start, data };
 	});
@@ -36,6 +37,7 @@
 		let content_height = top - scrollTop;
 		let i = start;
 		let row_width;
+		let max_row_width = 0;
 		while (content_height < viewport_height && i < items.length) {
 			let row = rows[i - start];
 			if (!row) {
@@ -43,8 +45,9 @@
 				await tick(); // render the newly visible row
 				row = rows[i - start];
 			}
-			const row_height = height_map[i] = itemHeight || row.offsetHeight;
-			row_width = row.offsetWidth;
+			const row_height = height_map[i] = itemHeight || row.offsetHeight;			
+			row_width = row.scrollWidth;
+			if (row_width > max_row_width) max_row_width = row_width;
 			content_height += row_height;
 			i += 1;
 		}
@@ -54,6 +57,7 @@
 		bottom = remaining * average_height;
 		height_map.length = items.length;
 
+		content_width = Math.max(max_row_width, viewport.clientWidth);
 
         if (autoScroll) {
             viewport.scrollTop = viewport.scrollHeight;
@@ -152,7 +156,7 @@
 >
 	<svelte-virtual-list-contents
 		bind:this={contents}
-		style="padding-top: {top}px; padding-bottom: {bottom}px;"
+		style="padding-top: {top}px; padding-bottom: {bottom}px; width: {content_width}px;"
 	>
 		{#each visible as row (row.index)}
 			<svelte-virtual-list-row>

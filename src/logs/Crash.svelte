@@ -89,9 +89,6 @@
     outline: none;
     box-shadow: 0 0 10px rgba(0,0,0,0.2);
   }
-  .levels {
-    margin-right: 18px;
-  }
 
   .search-bar {
     margin-right: 20px;
