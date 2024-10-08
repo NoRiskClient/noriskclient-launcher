@@ -26,6 +26,11 @@
 	// whenever `items` changes, invalidate the current heightmap
 	$: if (mounted) refresh(items, viewport_height, itemHeight);
 	async function refresh(items, viewport_height, itemHeight) {
+		const isStartOverflow = items.length < start
+		
+		if (isStartOverflow) {
+			await scrollToIndex(items.length - 1, {behavior: 'auto'})
+		}
 		const { scrollTop } = viewport;
 		await tick(); // wait until the DOM is up to date
 		let content_height = top - scrollTop;
@@ -97,6 +102,21 @@
 		// rows would occupy we may need to add some
 		// more. maybe we can just call handle_scroll again?
 	}
+	export async function scrollToIndex (index, opts) {
+		const {scrollTop} = viewport;
+		const itemsDelta = index - start;
+		const _itemHeight = itemHeight || average_height;
+		const distance = itemsDelta * _itemHeight;
+		opts = {
+			left: 0,
+			top: scrollTop + distance,
+			behavior: 'smooth',
+			...opts
+		};
+		viewport.scrollTo(opts);
+	}
+	
+
 	// trigger initial refresh
 	onMount(() => {
 		rows = contents.getElementsByTagName('svelte-virtual-list-row');

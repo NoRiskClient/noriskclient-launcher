@@ -40,14 +40,75 @@
   function toggleAutoScroll() {
     autoScroll = !autoScroll;
   }
+
+  let searchQuery = "";
+  let filteredLogs = [];
+  let logLevel;
+
+
+  let logLevels = {
+    debug: false,
+    info: false,
+    warn: false,
+    error: false,
+    fatal: false,
+  };
+
+  $: {
+    minecraftLogs.subscribe(logs => {
+      const isAnyLevelSelected = Object.values(logLevels).some(level => level);
+      filteredLogs = logs.filter(log => {
+        const logMatch = log.match(/\[(.*?)\]/g);
+        if (logMatch && logMatch.length > 1) {
+          logLevel = logMatch[1].split('/')[1].replace(']', '');
+        }
+        if (isAnyLevelSelected) {
+          return logLevels[logLevel.toLowerCase()] && log.toLowerCase().includes(searchQuery.toLowerCase());
+        } else {
+          return log.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+      });
+    });
+  
+
+    if (searchQuery !== "") {
+      autoScroll = false;
+    } else {
+      autoScroll = true;
+    }
+  }
+
+  function countLogs(level) {
+    return $minecraftLogs.filter(log => {
+      const logMatch = log.match(/\[(.*?)\]/g);
+      if (logMatch && logMatch.length > 1) {
+        const logLevel = logMatch[1].split('/')[1].replace(']', '');
+        return logLevel.toLowerCase() === level;
+      }
+      return false;
+    }).length;
+  }
+
+
 </script>
 
-
 <div class="black-bar" data-tauri-drag-region>
+  <input class="search-bar" type="text" bind:value={searchQuery} placeholder="Search logs...">
+  {#each Object.keys(logLevels) as level (level)}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-label-has-associated-control -->
+    <p class="levels" class:loglevel-button-on={logLevels[level]}
+      class:green-text={logLevels[level]}
+      class:loglevel-button-off={!logLevels[level]}
+      class:red-text={!logLevels[level]}
+      on:click={() => logLevels[level] = !logLevels[level]}>
+      {level} ({countLogs(level)})
+    </p>
+  {/each}
 </div>
 <main class="content">
-  <div class="logs-wrapper">
-    <VirtualList items={$minecraftLogs} let:item {autoScroll}>
+  <div class="logs-wrapper" >
+    <VirtualList items={filteredLogs} let:item {autoScroll}>
       <LogMessage text={item} />
     </VirtualList>
   </div>
@@ -70,59 +131,89 @@
 </div>
 
 <style>
-    .black-bar {
-        display: flex;
-        align-content: center;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        height: 10vh;
-        background-color: #151515;
-    }
+  .search-bar {
+    margin-right: 20px;
+    padding: 10px;
+    border: 3px solid #ccc;
+    border-radius: 0; 
+    outline: none;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  }
+  .levels {
+    margin-right: 18px;
+  }
 
-    .content {
-        height: 80vh;
-    }
+  .search-bar {
+    margin-right: 20px;
+  }
+  .black-bar {
+      display: flex;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 10vh;
+      background-color: #151515;
+  }
 
-    .logs-wrapper {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 1em;
-    }
+  .content {
+      height: 80vh;
+  }
 
-    .logs-button-wrapper {
-        display: flex;
-        justify-content: space-between;
-        padding: 1em;
-        gap: 2em;
-    }
+  .logs-wrapper {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      overflow-y: auto; 
+      max-height: 80vh;
+  }
 
-    .copy-button {
-        transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
-        font-size: 17px;
-        cursor: pointer;
-    }
+  .logs-button-wrapper {
+      display: flex;
+      justify-content: space-between;
+      padding: 1em;
+      gap: 2em;
+  }
 
-    .auto-scroll-button-on {
-        transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
-        font-size: 17px;
-        cursor: pointer;
-    }
+  .copy-button {
+      transition: 0.3s;
+      font-family: 'Press Start 2P', serif;
+      font-size: 17px;
+      cursor: pointer;
+  }
 
-    .auto-scroll-button-off {
-        transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
-        font-size: 17px;
-        cursor: pointer;
-    }
+  .auto-scroll-button-on {
+      transition: 0.3s;
+      font-family: 'Press Start 2P', serif;
+      font-size: 17px;
+      cursor: pointer;
+  }
 
+  .auto-scroll-button-off {
+      transition: 0.3s;
+      font-family: 'Press Start 2P', serif;
+      font-size: 17px;
+      cursor: pointer;
+  }
 
-    .copy-button:hover,
-    .auto-scroll-button-on:hover,
-    .auto-scroll-button-off:hover {
-        transform: scale(1.2);
-    }
+  .loglevel-button-on {
+      transition: 0.2s;
+      font-family: 'Press Start 2P', serif;
+      font-size: 11px;
+      cursor: pointer;
+  }
+
+  .loglevel-button-off {
+      transition: 0.2s;
+      font-family: 'Press Start 2P', serif;
+      font-size: 11px;
+      cursor: pointer;
+  }
+
+  .copy-button:hover,
+  .auto-scroll-button-on:hover,
+  .auto-scroll-button-off:hover {
+      transform: scale(1.2);
+  }
 </style>
