@@ -47,7 +47,7 @@
         word-break: break-word;
         overflow-wrap: anywhere;
         text-shadow: none;
-        color: white;
+        color: var(--font-color);
     }
 
     .timestamp {
