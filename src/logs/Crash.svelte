@@ -37,43 +37,12 @@
 
   let searchQuery = "";
   let filteredLogs = [];
-  let logLevel;
-  let logCounts = {};
-
-
-  let logLevels = {
-    debug: false,
-    info: false,
-    warn: false,
-    error: false,
-    fatal: false,
-  };
 
   $: {
     minecraftLogs.subscribe(logs => {
-      const isAnyLevelSelected = Object.values(logLevels).some(level => level);
       filteredLogs = logs.filter(log => {
-        const logMatch = log.match(/\[(.*?)\]/g);
-        if (logMatch && logMatch.length > 1) {
-          logLevel = logMatch[1].split('/')[1].replace(']', '');
-        }
-        if (isAnyLevelSelected) {
-          return logLevels[logLevel.toLowerCase()] && log.toLowerCase().includes(searchQuery.toLowerCase());
-        } else {
           return log.toLowerCase().includes(searchQuery.toLowerCase());
-        }
       });
-    });
-
-    Object.keys(logLevels).forEach(level => {
-      logCounts[level] = $minecraftLogs.filter(log => {
-        const logMatch = log.match(/\[(.*?)\]/g);
-        if (logMatch && logMatch.length > 1) {
-          const logLevel = logMatch[1].split('/')[1].replace(']', '');
-          return logLevel.toLowerCase() === level;
-        }
-        return false;
-      }).length;
     });
   }
 
@@ -89,20 +58,9 @@
 
 
 
-<div class="black-bar" data-tauri-drag-region>
+<div class="black-bar-top" data-tauri-drag-region>
   <h1 class="back-button">CRASHED :(</h1>
   <input class="search-bar" type="text" bind:value={searchQuery} placeholder="Search logs...">
-  {#each Object.keys(logLevels) as level (level)}
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-label-has-associated-control -->
-    <p class="levels" class:loglevel-button-on={logLevels[level]}
-      class:green-text={logLevels[level]}
-      class:loglevel-button-off={!logLevels[level]}
-      class:red-text={!logLevels[level]}
-      on:click={() => logLevels[level] = !logLevels[level]}>
-      {level} ({logCounts[level]})
-    </p>
-  {/each}
 </div>
 <main class="content">
   <div class="logs-wrapper">
@@ -113,7 +71,7 @@
     </div>
   </div>
 </main>
-<div class="black-bar" data-tauri-drag-region>
+<div class="black-bar-bottom" data-tauri-drag-region>
   <div class="logs-button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="copy-button" on:click={uploadLogs}>
@@ -123,8 +81,8 @@
 </div>
 
 <style>
-    .search-bar {
-    margin-right: 20px;
+   .search-bar {
+    margin-left: 10px; /* Abstand von 10px zum linken Rand */
     padding: 10px;
     border: 3px solid #ccc;
     border-radius: 0; 
@@ -138,7 +96,16 @@
   .search-bar {
     margin-right: 20px;
   }
-  .black-bar {
+  .black-bar-top {
+      display: flex;
+      align-content: center;
+      align-items: center;
+      width: 100%;
+      height: 10vh;
+      background-color: #151515;
+  }
+
+  .black-bar-bottom {
       display: flex;
       align-content: center;
       justify-content: center;
@@ -160,16 +127,14 @@
   }
 
   .back-button {
-      transition: transform 0.3s;
-      position: absolute;
-      font-size: 20px;
-      color: #e8e8e8;
-      text-shadow: 2px 2px #7a7777;
-      font-family: 'Press Start 2P', serif;
-  }
-
-  .back-button:hover {
-      transform: scale(1.2);
+    transition: transform 0.3s;
+    font-size: 20px;
+    color: #e8e8e8;
+    text-shadow: 2px 2px #7a7777;
+    font-family: 'Press Start 2P', serif;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .logs-button-wrapper {
@@ -190,19 +155,5 @@
 
   .copy-button:hover {
       transform: scale(1.2);
-  }
-
-    .loglevel-button-on {
-      transition: 0.2s;
-      font-family: 'Press Start 2P', serif;
-      font-size: 11px;
-      cursor: pointer;
-  }
-
-  .loglevel-button-off {
-      transition: 0.2s;
-      font-family: 'Press Start 2P', serif;
-      font-size: 11px;
-      cursor: pointer;
   }
 </style>
