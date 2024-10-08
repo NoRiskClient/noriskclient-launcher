@@ -44,6 +44,7 @@
   let searchQuery = "";
   let filteredLogs = [];
   let logLevel;
+  let logCounts = {};
 
 
   let logLevels = {
@@ -76,19 +77,26 @@
     } else {
       autoScroll = true;
     }
+
+    Object.keys(logLevels).forEach(level => {
+      logCounts[level] = $minecraftLogs.filter(log => {
+        const logMatch = log.match(/\[(.*?)\]/g);
+        if (logMatch && logMatch.length > 1) {
+          const logLevel = logMatch[1].split('/')[1].replace(']', '');
+          return logLevel.toLowerCase() === level;
+        }
+        return false;
+      }).length;
+    });
   }
 
-  function countLogs(level) {
-    return $minecraftLogs.filter(log => {
-      const logMatch = log.match(/\[(.*?)\]/g);
-      if (logMatch && logMatch.length > 1) {
-        const logLevel = logMatch[1].split('/')[1].replace(']', '');
-        return logLevel.toLowerCase() === level;
-      }
-      return false;
-    }).length;
+  function highlightSearchQuery(text) {
+    if (searchQuery === "") {
+      return text;
+    }
+    const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'));
+    return parts.map(part => part.toLowerCase() === searchQuery.toLowerCase() ? `<span style="background-color:yellow;">${part}</span>` : part).join('');
   }
-
 
 </script>
 
@@ -102,14 +110,14 @@
       class:loglevel-button-off={!logLevels[level]}
       class:red-text={!logLevels[level]}
       on:click={() => logLevels[level] = !logLevels[level]}>
-      {level} ({countLogs(level)})
+      {level} ({logCounts[level]})
     </p>
   {/each}
 </div>
 <main class="content">
   <div class="logs-wrapper" >
     <VirtualList items={filteredLogs} let:item {autoScroll}>
-      <LogMessage text={item} />
+      <LogMessage text={highlightSearchQuery(item)} />
     </VirtualList>
   </div>
 </main>
@@ -166,6 +174,7 @@
       flex-direction: column;
       gap: 1em;
       overflow-y: auto; 
+      overflow-x: auto;
       max-height: 80vh;
   }
 

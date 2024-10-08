@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "1.4.0",
+    "dompurify": "^3.1.7",
     "nouislider": "^15.6.1",
     "siema": "^1.5.1",
     "skinview3d": "^3.0.1",

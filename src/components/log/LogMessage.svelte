@@ -1,9 +1,12 @@
 <script>
+  import DOMPurify from 'dompurify';
   export let text;
+
+  $: sanitizedText = DOMPurify.sanitize(text, {ALLOWED_TAGS: ['span']});
 </script>
 
 <!-- TODO Log Highlighting -->
-<pre class="message">{text}</pre>
+<pre class="message">{@html sanitizedText}</pre>
 
 <style>
     .message {

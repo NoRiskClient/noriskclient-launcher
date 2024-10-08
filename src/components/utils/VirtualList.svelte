@@ -35,6 +35,7 @@
 		await tick(); // wait until the DOM is up to date
 		let content_height = top - scrollTop;
 		let i = start;
+		let row_width;
 		while (content_height < viewport_height && i < items.length) {
 			let row = rows[i - start];
 			if (!row) {
@@ -43,6 +44,7 @@
 				row = rows[i - start];
 			}
 			const row_height = height_map[i] = itemHeight || row.offsetHeight;
+			row_width = row.offsetWidth;
 			content_height += row_height;
 			i += 1;
 		}
@@ -52,8 +54,10 @@
 		bottom = remaining * average_height;
 		height_map.length = items.length;
 
+
         if (autoScroll) {
             viewport.scrollTop = viewport.scrollHeight;
+			viewport.scrollLeft = viewport.scrollWidth - row_width;
         }
 	}
 	async function handle_scroll() {
@@ -128,7 +132,7 @@
 	svelte-virtual-list-viewport {
 		position: relative;
 		overflow-y: auto;
-		overflow-x: hidden;
+		overflow-x: auto;
 		-webkit-overflow-scrolling:touch;
 		display: block;
 	}
