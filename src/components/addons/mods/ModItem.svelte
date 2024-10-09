@@ -7,6 +7,8 @@
     export let enabled = mod?.value?.enabled ?? null;
     export let text;
     export let type;
+
+    const name = typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name;
 </script>
 
 <div class="mod-item-wrapper" class:blacklisted={mod?.blacklisted}>
@@ -23,8 +25,8 @@
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
                     <div class="name-div">
-                        <a class="mod-title" href={`https://modrinth.com/mod/${mod.slug ?? mod.value.source.artifact.split(":")[1]}`} target="_blank" title="Modrinth Page">
-                            {typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name}
+                        <a class="mod-title" href={`https://modrinth.com/mod/${mod.slug ?? mod.value.source.artifact.split(":")[1]}`} target="_blank" title={name}>
+                            {name.length > 20 ? name.substring(0, 20) + '...' : name}
                         </a>
                         {#if mod?.featured}
                             <p title="Featured">⭐️</p>
@@ -61,10 +63,10 @@
                     </h1>
                 </div>
             {:else}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                INSTALL
-            </h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    INSTALL
+                </h1>
             {/if}
         {:else if text === "RECOMENDED"}
             <div style="display: flex; flex-direction: column; align-items: center;">

@@ -21,22 +21,25 @@
         <div class="text-item-wrapper">
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
-                    <a class="resourcepack-title" href={"https://modrinth.com/resourcepack/"+resourcePack.slug} target="_blank" title="Modrinth Page">
-                        {resourcePack.title}
-                    </a>
-                    {#if resourcePack?.featured}
-                        <p title="Featured" style="font-size: 20px;">⭐️</p>
-                    {/if}
+                    <div class="name-div">
+                        <a class="resourcepack-title" href={`https://modrinth.com/mod/${resourcePack.slug}`} target="_blank" title={resourcePack.title}>
+                            {resourcePack.title.length > 20 ? resourcePack.title.substring(0, resourcePack?.featured ? 17 : 20) + '...' : resourcePack.title}
+                        </a>
+                        {#if resourcePack?.featured}
+                            <p class="featured" title="Featured">⭐️</p>
+                        {/if}
+                    </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
-                    <a class="resourcepack-title">{resourcePack.replace('.zip', '')}</a>
+                    <a class="resourcepack-title">{resourcePack.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if resourcePack?.author != undefined && resourcePack?.author != null}
-                    <div>by {resourcePack.author}</div>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <p class="author">by {resourcePack.author ?? resourcePack.value.author}</p>
                 {/if}
             </div>
             {#if resourcePack?.description != undefined && resourcePack?.description != null}
-                <p>{resourcePack.description}</p>
+                <p class="description">{resourcePack.description.length > 85 ? resourcePack.description.substring(0, 85) + '...' : resourcePack.description}</p>
             {/if}
         </div>
     </div>
@@ -89,7 +92,7 @@
     .resourcepack-item-wrapper {
         display: flex;
         align-items: center;
-        justify-content: start;
+        justify-content: space-between;
         background: var(--background-contrast-color);
         height: 120px;
         border-radius: 10px;
@@ -132,20 +135,29 @@
 
     .href-wrapper {
         display: flex;
-        align-items: center;
-        gap: 0.7em;
+        flex-direction: column;
+        align-items: start;
     }
 
-    .href-wrapper div {
+    .href-wrapper .name-div {
+        display: flex;
+        flex-direction: row;
+        gap: 0.5em;
+    }
+
+    .href-wrapper .author {
         white-space: nowrap;
         font-family: 'Press Start 2P', serif;
         font-size: 9px;
-        margin-top: 0.7em;
+        margin-top: 1em;
     }
 
     .text-item-wrapper {
         height: 100%;
         max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .icon {
@@ -174,13 +186,18 @@
         cursor: pointer;
     }
 
-    .resourcepack-item-wrapper p {
-        width: 350px;
+    .featured {
+        font-size: 20px;
+        padding-bottom: 10px;
+    }
+
+    .description {
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
+        font-size: 9px;
         line-height: 1.2em;
-        cursor: default;
         padding-top: 2em;
+        cursor: default;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
     .install-button {
