@@ -43,7 +43,7 @@ export async function checkIfClientIsRunning() {
 
 export async function runClient(branch, checkedForNewBranch = false) {
   if (get(isClientRunning)) {
-    addNotification("Client is already running");
+    push('/start-progress');
     return;
   }
 

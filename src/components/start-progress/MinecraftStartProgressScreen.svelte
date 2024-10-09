@@ -1,4 +1,5 @@
 <script>
+	import { pop } from 'svelte-spa-router';
   import { listen } from "@tauri-apps/api/event";
   import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../../utils/svelteUtils.js";
@@ -46,6 +47,10 @@
   afterUpdate(() => {
     if (progressBarLabel === "Launching...") {
       isFinished = true;
+
+      setTimeout(() => {
+        pop();
+      }, 30 * 1000);
     }
   });
 
