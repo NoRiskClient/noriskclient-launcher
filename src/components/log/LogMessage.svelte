@@ -1,9 +1,27 @@
 <script>
   export let text;
+  export let logLevel = 'inherit';
+  export let logStyles = {};
+
+  function getLogStyle(logLevel) {
+
+    if (logLevel === 'WARN') {
+      const style = logStyles.warn || { color: 'inherit', textShadow: 'none' };
+      return `color: ${style.color}; text-shadow: ${style.textShadow};`;
+    }
+    if (logLevel === 'ERROR') {
+      const style = logStyles.error || { color: 'inherit', textShadow: 'none' };
+      return `color: ${style.color}; text-shadow: ${style.textShadow};`;
+    }
+    if (logLevel === "FATAL") {
+      const style = logStyles.fatal || { color: 'inherit', textShadow: 'none' };
+      return `color: ${style.color}; text-shadow: ${style.textShadow};`;
+    }
+    return 'color: inherit; text-shadow: none;';
+  }
 </script>
 
-<!-- TODO Log Highlighting -->
-<pre class="message">{text}</pre>
+<pre class="message" style={getLogStyle(logLevel)}>{text}</pre>
 
 <style>
     .message {
