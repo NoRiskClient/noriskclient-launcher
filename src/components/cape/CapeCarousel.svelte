@@ -106,13 +106,15 @@
           >
             {#if $launcherOptions.experimentalMode}
               <!-- svelte-ignore a11y-img-redundant-alt -->
-              <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
+              <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
             {:else}
               <!-- svelte-ignore a11y-img-redundant-alt -->
-              <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image">
+              <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
             {/if}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div on:click={() => handleEquipCape(cape._id)} class="equip-text">EQUIP</div>
+            {#if !cape._id.includes("NO_COPY") || cape.firstSeen === $defaultUser.id}
+              <!-- svelte-ignore a11y-click-events-have-key-events -->
+              <div on:click={() => handleEquipCape(cape._id)} class="equip-text">EQUIP</div>
+            {/if}
           </div>
           {#if cape.hovered}
             <div in:fade={{ duration: 300 }} out:fade={{ duration: 300 }} class="info-text">
@@ -203,11 +205,15 @@
     }
 
     .crop img {
-      position: absolute;
+        position: absolute;
         width: 512px;
         height: 256px;
         left: -8px;
         top: -8px;
+    }
+
+    .crop img.custom {
+        /* Implement custom fitting for dynamic size here */
     }
 
     .equip-text {

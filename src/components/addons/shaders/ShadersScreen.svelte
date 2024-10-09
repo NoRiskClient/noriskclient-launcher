@@ -359,7 +359,7 @@
       <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
         {#if item == 'LOAD_MORE_SHADERS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
         {:else if item != null}
           <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
                       on:delete={() => deleteInstalledShader(item)}

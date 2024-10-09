@@ -74,6 +74,7 @@
     return await invoke("discord_auth_unlink", { options, credentials })
       .then((value) => {
         discordLinked = false;
+        addNotification("Discord unlinked successfully!", "INFO");
         noriskLog("Unlinked Discord" + discordLinked);
       })
       .catch((error) => {

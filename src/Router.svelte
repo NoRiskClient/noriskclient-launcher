@@ -1,10 +1,12 @@
 <!-- App.svelte -->
 <script>
+	import Announcement from './pages/Announcement.svelte';
+	import ChangeLog from './pages/ChangeLog.svelte';
 	import { setStillRunningCustomServer } from './stores/customServerLogsStore.js';
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus, noriskError, } from "./utils/noriskUtils.js";
+  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus, noriskError } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
@@ -36,6 +38,8 @@
 
   const routes = {
     "/": Home,
+    "/changeLog": ChangeLog,
+    "/announcement": Announcement,
     "/legal": Legal,
     "/first-install": FirstInstall,
     "/new-branch": NewBranch,
@@ -145,7 +149,7 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
+  {#if $location !== "/" && $location !== "/announcement" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
     <BackButton />
   {:else}
     {#if $isClientRunning}

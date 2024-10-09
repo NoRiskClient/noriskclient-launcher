@@ -87,6 +87,13 @@
             "external"
           ],
           "enableTauriAPI": true
+        },
+        {
+          "domain": "sessionserver.mojang.com",
+          "windows": [
+            "external"
+          ],
+          "enableTauriAPI": true
         }
       ]
     },

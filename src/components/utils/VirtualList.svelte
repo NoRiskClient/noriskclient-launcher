@@ -9,6 +9,7 @@
 	export let start = 0;
 	export let end = 0;
     export let autoScroll = false;
+	export let disableCustomScrollLogic = false;
 	// local state
 	let height_map = [];
 	let rows;
@@ -20,38 +21,42 @@
 	let top = 0;
 	let bottom = 0;
 	let average_height;
-	$: visible = items.slice(start, end).map((data, i) => {
-		return { index: i + start, data };
+	$: visible = (disableCustomScrollLogic ? items : items.slice(start, end)).map((data, i) => {
+		return { index: i + (disableCustomScrollLogic ? 0 : start), data };
 	});
 	// whenever `items` changes, invalidate the current heightmap
 	$: if (mounted) refresh(items, viewport_height, itemHeight);
 	async function refresh(items, viewport_height, itemHeight) {
-		const { scrollTop } = viewport;
-		await tick(); // wait until the DOM is up to date
-		let content_height = top - scrollTop;
-		let i = start;
-		while (content_height < viewport_height && i < items.length) {
-			let row = rows[i - start];
-			if (!row) {
-				end = i + 1;
-				await tick(); // render the newly visible row
-				row = rows[i - start];
+		if (!disableCustomScrollLogic) {
+			const { scrollTop } = viewport;
+			await tick(); // wait until the DOM is up to date
+			let content_height = top - scrollTop;
+			let i = start;
+			while (content_height < viewport_height && i < items.length) {
+				let row = rows[i - start];
+				if (!row) {
+					end = i + 1;
+					await tick(); // render the newly visible row
+					row = rows[i - start];
+				}
+				const row_height = height_map[i] = itemHeight || row.offsetHeight;
+				content_height += row_height;
+				i += 1;
 			}
-			const row_height = height_map[i] = itemHeight || row.offsetHeight;
-			content_height += row_height;
-			i += 1;
+			end = i;
+			const remaining = items.length - end;
+			average_height = (top + content_height) / end;
+			bottom = remaining * average_height;
+			height_map.length = items.length;
 		}
-		end = i;
-		const remaining = items.length - end;
-		average_height = (top + content_height) / end;
-		bottom = remaining * average_height;
-		height_map.length = items.length;
 
         if (autoScroll) {
             viewport.scrollTop = viewport.scrollHeight;
         }
 	}
 	async function handle_scroll() {
+		if (disableCustomScrollLogic) return;
+
 		const { scrollTop } = viewport;
 		const old_start = start;
 		for (let v = 0; v < rows.length; v += 1) {

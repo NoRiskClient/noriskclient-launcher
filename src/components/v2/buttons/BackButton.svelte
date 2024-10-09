@@ -1,9 +1,29 @@
 <script>
-  import { pop } from "svelte-spa-router";
+    import { pop, location } from "svelte-spa-router";
+    import { activeChangeLog, lastViewedPopups, saveLastViewedPopups } from "../../../utils/popupUtils.js";
+
+    function back() {
+        if ($location == "/changeLog") {
+            const version = $activeChangeLog?.version;
+            
+            lastViewedPopups.update(value => {
+                value.changelog = version;
+                return value;
+            });
+
+            // Pop before setting to null to prevent null exception
+            pop();
+
+            activeChangeLog.set(null);
+            saveLastViewedPopups();
+        } else {
+            pop();
+        }
+    }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="back-button" on:click={() => pop()}>[BACK]</h1>
+<h1 class="back-button" on:click={back}>[BACK]</h1>
 
 <style>
     .back-button {
