@@ -87,7 +87,10 @@
     {:else if !reloadLogs}
       <div class="logs-wrapper">
         <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
-          <LogMessage item={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(0).join(']: ') + item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : item} />
+          <LogMessage
+            {item}
+            log={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : null}
+          />
         </VirtualList>
       </div>
     {/if}

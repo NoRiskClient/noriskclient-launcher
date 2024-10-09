@@ -1,5 +1,6 @@
 <script>
     export let item;
+    export let log = null;
 
     function getCurrentTimestamp() {
         const date = new Date();
@@ -11,7 +12,7 @@
     <div class="logRow">
         <p class="timestamp">{item.split(' ')[0]}</p>
         <p class={`${item.split('/')[1].split(']: ')[0]}`}>{item.split('/')[1].split(']: ')[0]}</p>
-        <p style={item.split('/')[1].split(']: ')[0] == 'WARN' ? 'color: #ff9100;' : item.split('/')[1].split(']: ')[0] == 'ERROR' ? 'color: #ff0000;' : ''} class:ERROR={item.split('/')[1].split(']: ')[0] == 'ERROR'}>{@html item.split(']: ').slice(1).join(']: ')}</p>
+        <p style={item.split('/')[1].split(']: ')[0] == 'WARN' ? 'color: #ff9100;' : item.split('/')[1].split(']: ')[0] == 'ERROR' ? 'color: #ff0000;' : ''} class:ERROR={item.split('/')[1].split(']: ')[0] == 'ERROR'}>{@html log != null ? log : item.split(']: ').slice(1).join(']: ')}</p>
     </div>
 {:else if item.trim() != ''}
     <div class="logRow">
