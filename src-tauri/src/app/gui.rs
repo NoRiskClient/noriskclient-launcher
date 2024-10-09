@@ -54,12 +54,6 @@ struct MinecraftProfileProperty {
     value: String,
 }
 
-#[derive(serde::Serialize)]
-struct NewMinecraftSkinBody {
-    variant: String,
-    file: Vec<u8>,
-}
-
 #[derive(serde::Deserialize)]
 struct PlayerDBData {
     data: PlayerDBEntry,
