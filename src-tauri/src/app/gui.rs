@@ -455,7 +455,9 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
         &handle,
         unique_label,
         tauri::WindowUrl::App("logs.html".into()),
-    ).build()?;
+    )
+        .inner_size(1000.0, 800.0)
+        .build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
     let _ = window.set_focus();

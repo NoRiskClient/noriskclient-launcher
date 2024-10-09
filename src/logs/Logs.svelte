@@ -72,7 +72,7 @@
       <div class="filter">
         {#each Object.keys(logLevels) as level (level)}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <p class={"logLevelFilter red-text"} class:active={logLevels[level] == true} on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}</p>
+          <p class={"logLevelFilter red-text"} class:active={logLevels[level] == true} on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}({logItems.filter(l => l.split('/')[1]?.split(']: ')[0] == level).length ?? 0})</p>
         {/each}
       </div>
     </div>
@@ -87,7 +87,7 @@
     {:else if !reloadLogs}
       <div class="logs-wrapper">
         <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
-          <LogMessage item={item} />
+          <LogMessage item={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(0).join(']: ') + item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : item} />
         </VirtualList>
       </div>
     {/if}
@@ -132,7 +132,7 @@
     }
 
     .header input {
-      width: 300px;
+      width: 250px;
       height: 30px;
       border: none;
       padding: 0.5em;
@@ -150,12 +150,13 @@
     .header .filter {
         display: flex;
         flex-direction: row;
-        gap: 1em;
+        gap: 2em;
+        overflow: hidden;
     }
 
     .header .filter .logLevelFilter {
       font-family: 'Press Start 2P', serif;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
     }
 
