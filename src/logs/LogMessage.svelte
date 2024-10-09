@@ -46,6 +46,7 @@
         user-select: text;
         word-break: break-word;
         overflow-wrap: anywhere;
+        line-break: anywhere;
         text-shadow: none;
         color: var(--font-color);
     }
