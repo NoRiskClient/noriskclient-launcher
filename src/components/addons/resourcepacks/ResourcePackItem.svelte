@@ -89,13 +89,13 @@
     .resourcepack-item-wrapper {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: start;
         background: var(--background-contrast-color);
         height: 120px;
         border-radius: 10px;
         padding: 1em;
         margin-bottom: 10px;
-        gap: 1em;
+        gap: 0.5em;
         margin-top: 0.3em;
     }
     
@@ -157,12 +157,12 @@
     }
 
     .icon-fallback {
-    background-image: url("https://docs.modrinth.com/img/logo.svg");
-    min-width: 90px; 
-    min-height: 90px;
-    background-position: center center;
-    background-size: 90%;
-    background-repeat: no-repeat;
+        background-image: url("https://docs.modrinth.com/img/logo.svg");
+        min-width: 90px; 
+        min-height: 90px;
+        background-position: center center;
+        background-size: 90%;
+        background-repeat: no-repeat;
     }
 
     .resourcepack-title {
@@ -170,7 +170,7 @@
         text-decoration: underline;
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
-        font-size: 18px;
+        font-size: 16px;
         cursor: pointer;
     }
 
