@@ -7,6 +7,8 @@
     export let enabled = mod?.value?.enabled ?? null;
     export let text;
     export let type;
+
+    const name = typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name;
 </script>
 
 <div class="mod-item-wrapper" class:blacklisted={mod?.blacklisted}>
@@ -22,22 +24,25 @@
         <div class="text-item-wrapper" style={type != "INSTALLED" && type != "CUSTOM" ? 'height: 95px;' : ''}>
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
-                    <a class="mod-title" href={"https://modrinth.com/mod/"+mod.slug ?? mod.value.source.artifact.split(":")[1]} target="_blank" title="Modrinth Page">
-                        {typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name}
-                    </a>
-                    {#if mod?.featured}
-                        <p title="Featured">⭐️</p>
-                    {/if}
+                    <div class="name-div">
+                        <a class="mod-title" href={`https://modrinth.com/mod/${mod.slug ?? mod.value.source.artifact.split(":")[1]}`} target="_blank" title={name}>
+                            {name.length > 20 ? name.substring(0, 20) + '...' : name}
+                        </a>
+                        {#if mod?.featured}
+                            <p title="Featured">⭐️</p>
+                        {/if}
+                    </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
                     <a class="mod-title">{mod.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if mod?.author != undefined && mod?.author != null}
-                    <div>by {mod.author ?? mod.value.author}</div>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <p class="author">by {mod.author ?? mod.value.author}</p>
                 {/if}
             </div>
             {#if mod?.description != undefined && mod?.description != null}
-                <p class="description">{mod.description}</p>
+                <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
             {/if}
         </div>
     </div>
@@ -58,10 +63,10 @@
                     </h1>
                 </div>
             {:else}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                INSTALL
-            </h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    INSTALL
+                </h1>
             {/if}
         {:else if text === "RECOMENDED"}
             <div style="display: flex; flex-direction: column; align-items: center;">
@@ -185,20 +190,25 @@
 
     .href-wrapper {
         display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
+    }
+    
+    .href-wrapper .name-div {
+        display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 0.7em;
+        gap: 0.3em;
     }
 
-    .href-wrapper div {
+    .href-wrapper .author {
         white-space: nowrap;
         font-family: 'Press Start 2P', serif;
         font-size: 9px;
         margin-top: 0.7em;
-    }
-
-    .href-wrapper p {
-        font-size: 20px;
     }
 
     .text-item-wrapper {
@@ -216,12 +226,12 @@
     }
 
     .icon-fallback {
-    background-image: url("https://docs.modrinth.com/img/logo.svg");
-    min-width: 90px; 
-    min-height: 90px;
-    background-position: center center;
-    background-size: 90%;
-    background-repeat: no-repeat;
+        background-image: url("https://docs.modrinth.com/img/logo.svg");
+        min-width: 90px; 
+        min-height: 90px;
+        background-position: center center;
+        background-size: 90%;
+        background-repeat: no-repeat;
     }
 
     .mod-title {
@@ -229,18 +239,18 @@
         text-decoration: underline;
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
-        font-size: 18px;
+        font-size: 16px;
         cursor: pointer;
         -webkit-user-drag: none;
     }
 
     .description {
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
+        font-size: 9px;
         line-height: 1.2em;
         padding-top: 2em;
         cursor: default;
-        overflow-y: scroll;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
     .install-button {

@@ -367,7 +367,7 @@
                    items={[...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null]} let:item>
         {#if item == 'LOAD_MORE_RESOURCEPACKS'}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
+          <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
         {:else if item != null}
           <ResourcePackItem text={checkIfRequiredOrInstalled(item.slug)}
                             on:delete={() => deleteInstalledResourcePack(item)}

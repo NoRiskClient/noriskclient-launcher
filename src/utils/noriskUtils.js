@@ -43,7 +43,7 @@ export async function checkIfClientIsRunning() {
 
 export async function runClient(branch, checkedForNewBranch = false) {
   if (get(isClientRunning)) {
-    addNotification("Client is already running");
+    push('/start-progress');
     return;
   }
 
@@ -145,6 +145,11 @@ export function getNoRiskToken() {
   let options = get(launcherOptions);
   let user = get(defaultUser);
   return options.experimentalMode ? user.norisk_credentials.experimental?.value ?? null : user.norisk_credentials.production?.value ?? null;
+}
+
+export function getMcToken() {
+  let user = get(defaultUser);
+  return user.access_token ?? null;
 }
 
 export function getNoRiskUser() {

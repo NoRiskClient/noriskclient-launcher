@@ -1,4 +1,5 @@
 <script>
+	import { defaultUser } from './../../stores/credentialsStore.js';
     import { SkinViewer } from "skinview3d";
     import { invoke } from "@tauri-apps/api/tauri";
     import { launcherOptions } from "../../stores/optionsStore.js";
@@ -6,15 +7,29 @@
     import Elytra from "../../images/elytra.webp";
 
     export let cape;
-    export let player;
     export let height = 275;
     export let width = 275;
 
     let skinViewer;
     let capeData;
+    let skinData;
     let showElytra = false;
 
     async function load() {
+        // Load current skin
+        await invoke("get_player_skins", {
+            uuid: $defaultUser.id
+        }).then(async (profileTextures) => {
+            let profileTexture = profileTextures[0];
+            if (profileTexture) {
+                profileTexture = JSON.parse(atob(profileTexture));
+            }
+            skinData = profileTexture != null ? profileTexture.textures.SKIN.url : "";
+        }).catch((error) => {
+            addNotification("Failed to load player skin: " + error);
+        });
+
+        // Load current cape
         await invoke("read_remote_image_file", {
             location: $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${cape}.png` : `https://dl.norisk.gg/capes/prod/${cape}.png`
         }).then((data) => {
@@ -28,7 +43,7 @@
           canvas: canvas,
           width: width - 50,
           height: height,
-          skin: "https://crafatar.com/skins/" + player,
+          skin: skinData,
           cape: capeData,
         });
         skinViewer.camera.position.set(0, 25, -75);

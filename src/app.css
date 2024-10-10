@@ -71,6 +71,17 @@ body.dark-mode {
     cursor: pointer;
 }
 
+.green-text {
+    color: var(--green-text);
+    text-shadow: 2px 2px var(--green-text-shadow);
+}
+
+.green-text-clickable {
+    color: var(--green-text);
+    text-shadow: 2px 2px var(--green-text-shadow);
+    cursor: pointer;
+}
+
 .primary-text {
     color: var(--primary-color);
     text-shadow: 2px 2px var(--primary-color-text-shadow);

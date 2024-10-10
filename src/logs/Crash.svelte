@@ -1,14 +1,17 @@
 <script>
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
-  import LogMessage from "../components/log/LogMessage.svelte";
+  import LogMessage from "./LogMessage.svelte";
   import { onMount } from "svelte";
   import { minecraftLogs } from "../stores/logsStore.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
   import { noriskError } from "../utils/noriskUtils.js";
+  import { launcherOptions, fetchOptions } from "../stores/optionsStore.js";
 
   onMount(async () => {
+    fetchOptions();
+
     const crashReportUnlisten = await listen("crash-report", async (event) => {
       const crashReportPath = event.payload;
       try {
@@ -37,24 +40,26 @@
 </script>
 
 
-<div class="black-bar" data-tauri-drag-region>
-  <h1 class="back-button">CRASHED :(</h1>
-</div>
-<main class="content">
-  <div class="logs-wrapper">
-    <VirtualList items={$minecraftLogs} let:item>
-      <LogMessage text={item} />
-    </VirtualList>
+<body class:dark-mode={$launcherOptions?.theme == "DARK"}>
+  <div class="black-bar" data-tauri-drag-region>
+    <h1 class="back-button">CRASHED :(</h1>
   </div>
-</main>
-<div class="black-bar" data-tauri-drag-region>
-  <div class="logs-button-wrapper">
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class="copy-button" on:click={uploadLogs}>
-      [Copy]
-    </h1>
+  <main class="content">
+    <div class="logs-wrapper">
+      <VirtualList items={$minecraftLogs} let:item>
+        <LogMessage item={item} />
+      </VirtualList>
+    </div>
+  </main>
+  <div class="black-bar" data-tauri-drag-region>
+    <div class="logs-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class="copy-button" on:click={uploadLogs}>
+        [Copy]
+      </h1>
+    </div>
   </div>
-</div>
+</body>
 
 <style>
     .black-bar {

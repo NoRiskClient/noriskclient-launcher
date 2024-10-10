@@ -21,22 +21,25 @@
         <div class="text-item-wrapper">
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
-                    <a class="shader-title" href={"https://modrinth.com/shader/"+shader.slug} target="_blank" title="Modrinth Page">
-                        {shader.title}
-                    </a>
-                    {#if shader?.featured}
-                        <p title="Featured" style="font-size: 20px;">⭐️</p>
-                    {/if}
+                    <div class="name-div">
+                        <a class="shader-title" href={`https://modrinth.com/mod/${shader.slug}`} target="_blank" title={shader.title}>
+                            {shader.title.length > 20 ? shader.title.substring(0, shader?.featured ? 17 : 20) + '...' : shader.title}
+                        </a>
+                        {#if shader?.featured}
+                            <p class="featured" title="Featured">⭐️</p>
+                        {/if}
+                    </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
-                    <a class="shader-title">{shader.replace('.zip', '')}</a>
+                    <a class="shader-title">{shader.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if shader?.author != undefined && shader?.author != null}
-                    <div>by {shader.author}</div>
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                    <p class="author">by {shader.author ?? shader.value.author}</p>
                 {/if}
             </div>
             {#if shader?.description != undefined && shader?.description != null}
-                <p>{shader.description}</p>
+                <p class="description">{shader.description.length > 85 ? shader.description.substring(0, 85) + '...' : shader.description}</p>
             {/if}
         </div>
     </div>
@@ -132,20 +135,29 @@
 
     .href-wrapper {
         display: flex;
-        align-items: center;
-        gap: 0.7em;
+        flex-direction: column;
+        align-items: start;
     }
 
-    .href-wrapper div {
+    .href-wrapper .name-div {
+        display: flex;
+        flex-direction: row;
+        gap: 0.5em;
+    }
+
+    .href-wrapper .author {
         white-space: nowrap;
         font-family: 'Press Start 2P', serif;
         font-size: 9px;
-        margin-top: 0.7em;
+        margin-top: 1em;
     }
 
     .text-item-wrapper {
         height: 100%;
         max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .icon {
@@ -158,12 +170,12 @@
     }
 
     .icon-fallback {
-    background-image: url("https://docs.modrinth.com/img/logo.svg");
-    min-width: 90px; 
-    min-height: 90px;
-    background-position: center center;
-    background-size: 90%;
-    background-repeat: no-repeat;
+        background-image: url("https://docs.modrinth.com/img/logo.svg");
+        min-width: 90px; 
+        min-height: 90px;
+        background-position: center center;
+        background-size: 90%;
+        background-repeat: no-repeat;
     }
 
     .shader-title {
@@ -171,18 +183,23 @@
         text-decoration: underline;
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
-        font-size: 18px;
+        font-size: 16px;
         cursor: pointer;
         -webkit-user-drag: none;
     }
 
-    .shader-item-wrapper p {
-        width: 350px;
+    .featured {
+        font-size: 20px;
+        padding-bottom: 10px;
+    }
+
+    .description {
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
+        font-size: 9px;
         line-height: 1.2em;
-        cursor: default;
         padding-top: 2em;
+        cursor: default;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
     .install-button {

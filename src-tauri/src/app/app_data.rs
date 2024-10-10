@@ -48,6 +48,27 @@ pub(crate) struct LauncherProfiles {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ChangeLog {
+    pub version: String,
+    pub date: String,
+    pub changes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Announcement {
+    pub author: String,
+    pub date: String,
+    pub title: String,
+    pub content: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LastViewedPopups {
+    pub changelog: String,
+    pub announcements: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
@@ -150,5 +171,28 @@ impl Default for Addons {
             resourcepacks: vec![],
             datapacks: vec![],
         }
+    }
+}
+
+impl Default for LastViewedPopups {
+    fn default() -> Self {
+        Self {
+            changelog: String::new(),
+            announcements: vec![],
+        }
+    }
+}
+
+impl LastViewedPopups {
+    pub async fn load(app_data: &Path) -> Result<Self> {
+        // load the launcher_profiles from the file
+        let last_viewed_popups = serde_json::from_slice::<LastViewedPopups>(&fs::read(app_data.join("last_viewed_popups.json")).await?).map_err(|err| -> String { format!("Failed to write last_viewed_popups.json: {}", err.to_string()).into() }).unwrap_or_default();
+        Ok(last_viewed_popups)
+    }
+
+    pub async fn store(&self, app_data: &Path) -> Result<()> {
+        // save the launcher_profiles to the file
+        let _ = fs::write(app_data.join("last_viewed_popups.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write last_viewed_popups.json: {}", err).into() });
+        Ok(())
     }
 }

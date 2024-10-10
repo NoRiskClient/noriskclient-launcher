@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "NoRiskClient",
-    "version": "0.5.7"
+    "version": "0.5.10"
   },
   "tauri": {
     "allowlist": {
@@ -83,6 +83,13 @@
         },
         {
           "domain": "api-staging.norisk.gg",
+          "windows": [
+            "external"
+          ],
+          "enableTauriAPI": true
+        },
+        {
+          "domain": "sessionserver.mojang.com",
           "windows": [
             "external"
           ],
