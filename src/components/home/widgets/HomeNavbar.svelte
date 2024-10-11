@@ -54,7 +54,7 @@
       {
         name: "SKIN",
         onClick: () => push("/skin"),
-        condition: () => get(defaultUser) != null,
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
         name: "QUIT",
