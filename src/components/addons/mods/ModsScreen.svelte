@@ -109,16 +109,20 @@
 
   async function updateMods(newMods) {
     mods = newMods;
-    await tick();
-    document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-    await tick();
+    if (document.getElementById('scrollList') != null) {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+      await tick();
+    }
   }
 
   async function updateProfileMods(newMods) {
     launcherProfile.mods = newMods;
-    await tick();
-    document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-    await tick();
+    if (document.getElementById('scrollList') != null) {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+      await tick();
+    }
   }
 
   async function getLaunchManifest() {
