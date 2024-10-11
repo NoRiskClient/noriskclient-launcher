@@ -152,20 +152,26 @@ export function getMcToken() {
   return user.access_token ?? null;
 }
 
-export function getNoRiskUser() {
+export async function getNoRiskUser() {
   const user = get(defaultUser);
-  if (!user) return;
+  if (!user) return false;
 
-  invoke("get_norisk_user", {
+  let isTokenValid = false;
+  await invoke("get_norisk_user", {
     options: get(launcherOptions),
     credentials: get(defaultUser),
   }).then(result => {
     result.isDev = result?.rank == "DEVELOPER" || result?.rank == "ADMIN";
     noriskUser.set(result);
     noriskLog("NoRisk User: " + JSON.stringify(result));
+    isTokenValid = true;
   }).catch(reason => {
-    addNotification(`Failed to fetch NoRisk User: ${reason}`);
+    if (!reason.includes("401")) {
+      addNotification(`Failed to fetch NoRisk User: ${reason}`);
+    }
   });
+
+  return isTokenValid;
 }
 
 export function noriskLog(message) {
