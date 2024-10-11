@@ -8,7 +8,7 @@
     export let text;
     export let type;
 
-    const name = typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name;
+    const name = mod?.title ?? mod?.value?.name;
 </script>
 
 <div class="mod-item-wrapper" class:blacklisted={mod?.blacklisted}>
@@ -26,7 +26,7 @@
                 {#if type != 'CUSTOM'}
                     <div class="name-div">
                         <a class="mod-title" href={`https://modrinth.com/mod/${mod.slug ?? mod.value.source.artifact.split(":")[1]}`} target="_blank" title={name}>
-                            {name.length > 20 ? name.substring(0, 20) + '...' : name}
+                            {name.length > 20 && (text == 'INSTALL' || text == 'REQUIRED' || text == 'DEPENDENCY') ? name.substring(0, 19) + '...' : name}
                         </a>
                         {#if mod?.featured}
                             <p title="Featured">⭐️</p>
@@ -34,14 +34,20 @@
                     </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
-                    <a class="mod-title">{mod.replace('.jar', '').replace('.disabled', '')}</a>
+                    <a class="mod-title">{mod.title.replace('.jar', '')}</a>
                 {/if}
                 {#if mod?.author != undefined && mod?.author != null}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <p class="author">by {mod.author ?? mod.value.author}</p>
                 {/if}
             </div>
-            {#if mod?.description != undefined && mod?.description != null}
+            {#if mod.isMissing}
+                <p class="description isMissing red-text"><span style="text-shadow: none; font-size: 20px;">⚠️</span> File does not exist!</p>
+            {:else if type == "CUSTOM"}
+                <p class="description custom-mod-label">Custom Mod</p>
+            {:else if mod.parents != undefined && mod.parents.length > 0}
+                <p class="description" style="margin-top: 1em; opacity: 0.65;">Used by: {mod.parents.join(", ")}</p>
+            {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
             {/if}
         </div>
@@ -118,6 +124,10 @@
         {:else if text === "REQUIRED"}
             <h1 class="required-button primary-text">
                 REQUIRED
+            </h1>
+        {:else if text === "DEPENDENCY"}
+            <h1 class="required-button primary-text">
+                DEPENDENCY
             </h1>
         {:else if type == "CUSTOM"}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -244,6 +254,12 @@
         -webkit-user-drag: none;
     }
 
+    .custom-mod-label {
+        font-size: 14px !important;
+        font-style: italic;
+        opacity: 0.5;
+    }
+
     .description {
         font-family: 'Press Start 2P', serif;
         font-size: 9px;
@@ -251,6 +267,11 @@
         padding-top: 2em;
         cursor: default;
         text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .isMissing {
+        font-size: 14px;
+        font-style: italic;
     }
 
     .install-button {

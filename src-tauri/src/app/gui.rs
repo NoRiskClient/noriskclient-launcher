@@ -588,26 +588,39 @@ async fn get_launcher_profiles() -> Result<LauncherProfiles, String> {
 }
 
 #[tauri::command]
-async fn get_custom_mods_filenames(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<Vec<String>, String> {
-    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
+async fn get_custom_mods_filenames(options: LauncherOptions, profile_name: &str) -> Result<Vec<String>, String> {
+    let custom_mod_folder = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name);
     let names = ModrinthApiEndpoints::get_custom_mod_names(&custom_mod_folder).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
     Ok(names)
 }
 
 #[tauri::command]
-async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<String, String> {
-    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
-    return custom_mod_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+async fn save_custom_mods_to_folder(options: LauncherOptions, profile_name: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name).join(&file.name);
+
+    info!("Saving {} to {} custom mods folder.", &file.name, &profile_name);
+
+    fs::create_dir_all(&file_path.parent().unwrap()).await.map_err(|e| format!("unable to create custom mod folder: {:?}", e))?;
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom mod {}: {}", &file.name, err));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
-async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
-    let file_path = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+async fn delete_custom_mod_file(options: LauncherOptions, profile_name: &str, file: &str) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name).join(&file);
 
-    info!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
+    if !file_path.exists() {
+        return Ok(());
+    }
 
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    info!("Deleting {} from {} custom mods folder.", &file, &profile_name);
+
+    if let Err(err) = fs::remove_file(&file_path).await {
+        return Err(format!("Error deleting custom mod {}: {}", &file, err));
     }
 
     Ok(())
@@ -1624,10 +1637,10 @@ pub fn gui_main() {
             get_launcher_profiles,
             store_launcher_profiles,
             get_project_version,
-            get_custom_mods_folder,
-            save_custom_mods_to_folder,
-            install_mod_and_dependencies,
             get_custom_mods_filenames,
+            save_custom_mods_to_folder,
+            delete_custom_mod_file,
+            install_mod_and_dependencies,
             get_custom_shaders_folder,
             save_custom_shaders_to_folder,
             get_custom_shaders_filenames,

@@ -669,7 +669,9 @@ impl ModSource {
         match self {
             ModSource::Repository { repository: _repository, artifact, url: _ } => {
                 let parts: Vec<&str> = artifact.split(":").collect();
-                if parts.len() > 1 {
+                if parts[0] == "CUSTOM" {
+                    parts[2].to_string()
+                } else if parts.len() > 1 {
                     parts[1].to_string()
                 } else {
                     "".to_string()

@@ -20,6 +20,8 @@
     showModal = false;
   }
 
+  const ILLIGAL_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+
   let dialog; // HTMLDialogElement
 
   $: if (dialog && showModal) dialog.showModal();
@@ -27,6 +29,9 @@
   async function saveData() {
     if (settingsProfile.name == '') {
         settingsProfile.name = "Empty Name?";
+    } else if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
+        addNotification("Profile name contains illegal characters.", "ERROR");
+        return;
     }
     if (experimentalMode) {
         launcherProfiles.experimentalProfiles[launcherProfiles.experimentalProfiles.indexOf(settingsProfile)] = settingsProfile;
@@ -61,6 +66,10 @@
 
   async function createProfile() {
     if (settingsProfile.name == '' || settingsProfile.name.toLowerCase() == `${settingsProfile.branch} - Default`.toLowerCase()) return;
+    if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
+        addNotification("Profile name contains illegal characters.", "ERROR");
+        return;
+    }
     noriskLog(`CREATING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);
     if (experimentalMode) {
         launcherProfiles.experimentalProfiles.push(settingsProfile);

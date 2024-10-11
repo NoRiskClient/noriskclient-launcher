@@ -37,8 +37,6 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
     retrieve_resourcepacks(&data_directory, &launch_manifest, &resourcepacks, &progress).await?;
     retrieve_datapacks(&data_directory, &launch_manifest, &datapacks, &progress).await?;
 
-    copy_custom_mods(&data_directory, &launch_manifest, &progress).await?;
-
     info!("Loading version profile...");
     let manifest_url = match subsystem {
         LoaderSubsystem::Fabric { manifest, .. } => manifest
