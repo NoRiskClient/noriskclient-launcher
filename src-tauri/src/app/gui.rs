@@ -1349,9 +1349,11 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
         }
         false => {
             info!("No custom server is running!");
-            let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
-            if custom_server_forwarder_process.is_some() {
-                custom_server_forwarder_process.unwrap().kill();
+            if latest_running_server.forwarder_process_id.is_some() {
+                let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
+                if custom_server_forwarder_process.is_some() {
+                    custom_server_forwarder_process.unwrap().kill();
+                }
             }
             CustomServerManager::store_latest_running_server(None, None, None).await.unwrap();
             Ok((false, String::new()))
