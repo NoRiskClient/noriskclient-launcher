@@ -160,7 +160,7 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
     let mut installed_shaders: Vec<Shader> = Vec::new();
 
     // Download shaders
-    let max = get_max(shaders.len());
+    let mut max = get_max(shaders.len());
 
     for (shader_idx, current_shader) in shaders.iter().enumerate() {
         if installed_shaders.iter().any(|shader| {
@@ -169,7 +169,8 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
             let already_installed = installed_shaders.iter().find(|&shader| {
                 return shader.slug == current_shader.slug;
             }).unwrap();
-            info!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
+            println!("Skipping Shader {:?} cuz {:?} is already installed", &current_shader, already_installed);
+            max -= 100;
             continue;
         }
 
@@ -194,7 +195,8 @@ pub async fn retrieve_shaders(data: &Path, manifest: &NoRiskLaunchManifest, shad
                 info!("Installed Shader {}", &current_shader.file_name);
             }
         } else {
-            info!("Shader {} is already downloaded", &current_shader.file_name);
+            println!("Shader {} is already downloaded", &current_shader.file_name);
+            max -= 100;
         }
 
         installed_shaders.push(current_shader.clone())
