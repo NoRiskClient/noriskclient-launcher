@@ -1,11 +1,9 @@
 <script>
-  import { preventSelection } from "../../../utils/svelteUtils.js";
-
   export let showCreditsModal;
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div on:selectstart={preventSelection} on:mousedown={preventSelection} class="copyright" on:click={() => showCreditsModal = true}>
+<div class="copyright" on:click={() => showCreditsModal = true}>
   © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.10
 </div>
 

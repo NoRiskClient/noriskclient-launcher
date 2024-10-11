@@ -1,5 +1,4 @@
 <script>
-  import { preventSelection } from "../../../utils/svelteUtils.js";
   import AdminIcon from "../../../images/ranks/admin.png";
   import DeveloperIcon from "../../../images/ranks/developer.png";
   import BugBountyIcon from "../../../images/ranks/bug_bounty.png";
@@ -24,7 +23,7 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>LAUNCHER CREDITS</h1>
+        <h1 class="nes-font title">LAUNCHER CREDITS</h1>
         <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
       </div>
       <hr>
@@ -65,6 +64,7 @@
     .close-button:hover {
         transition: transform 0.3s;
         transform: scale(1.2);
+        cursor: pointer;
     }
 
     .content {
@@ -72,6 +72,7 @@
         flex-direction: column;
         margin-top: 1.5em;
         gap: 1em;
+        user-select: none;
     }
 
     .content > .credit {
@@ -86,6 +87,7 @@
     .credit > img {
       height: 25px;
       width: 25px;
+      -webkit-user-drag: none;
     }
 
     .credit > .all-contributers-icon {

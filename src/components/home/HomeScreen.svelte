@@ -45,6 +45,7 @@
     max-width: 400px;
     image-rendering: pixelated;
     cursor: pointer;
+    -webkit-user-drag: none;
   }
   
   .title-effect {
