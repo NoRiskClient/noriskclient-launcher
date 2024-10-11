@@ -25,7 +25,7 @@
   <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title" on:click={showCredits}>
   <BranchSwitcher />
   <SkinButton />
-  <CopyrightLabel bind:showCreditsModal />
+  <CopyrightLabel />
 </div>
 
 <style>

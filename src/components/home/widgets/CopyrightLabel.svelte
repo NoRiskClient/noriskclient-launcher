@@ -1,9 +1,9 @@
 <script>
-  export let showCreditsModal;
+	import { push } from 'svelte-spa-router';
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div class="copyright" on:click={() => showCreditsModal = true}>
+<div class="copyright" on:click={() => push("/legal")}>
   © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.10
 </div>
 
