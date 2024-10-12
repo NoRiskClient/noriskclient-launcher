@@ -309,22 +309,3 @@ pub async fn retrieve_datapacks(data: &Path, manifest: &NoRiskLaunchManifest, da
 
     Ok(())
 }
-
-pub async fn copy_custom_mods(data: &Path, manifest: &NoRiskLaunchManifest, progress: &impl ProgressReceiver) -> Result<()> {
-    let mod_cache_path = data.join("custom_mods").join(format!("{}-{}", manifest.build.branch, manifest.build.mc_version));
-    let mods_path = data.join("gameDir").join(&manifest.build.branch).join("mods");
-
-    fs::create_dir_all(&mod_cache_path).await?;
-    fs::create_dir_all(&mods_path).await?;
-
-    // Copy all mods from custom_mods to mods
-    let mut mods_read = fs::read_dir(&mod_cache_path).await?;
-    while let Some(entry) = mods_read.next_entry().await? {
-        if entry.file_type().await?.is_file() {
-            progress.progress_update(ProgressUpdate::set_label(format!("Copied custom mod {}", entry.file_name().to_str().unwrap_or_default())));
-            fs::copy(entry.path(), mods_path.join(entry.file_name())).await?;
-        }
-    }
-
-    Ok(())
-}
