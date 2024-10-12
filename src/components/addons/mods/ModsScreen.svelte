@@ -160,6 +160,8 @@
   }
 
   async function installModAndDependencies(mod) {
+    mod.loading = true;
+    updateMods(mods);
     await invoke("install_mod_and_dependencies", {
       slug: mod.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
@@ -256,12 +258,12 @@
 
   async function searchMods() {
     if (searchterm === "" && search_offset === 0) {
-      updateMods([]);
       await getBaseMods();
+      updateMods(baseMods);
     } else {
       // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
       // Update: Ich habe ne eigene Virtual List gemacht 📉
-      updateMods(baseMods);
+      updateMods([]);
     }
 
     let client_server_side_filters = "";

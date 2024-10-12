@@ -8,6 +8,9 @@
     export let text;
     export let type;
 
+    console.log(mod);
+    
+
     const name = mod?.title ?? mod?.value?.name;
 </script>
 
