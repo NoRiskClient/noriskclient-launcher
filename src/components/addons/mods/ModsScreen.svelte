@@ -19,7 +19,7 @@
   $: launcherProfiles = $profiles;
   let launcherProfile = null;
   let customModFiles = [];
-  let baseMods = [];
+  let baseMods = null;
   let mods = [];
   let featuredMods = [];
   let blacklistedMods = [];
@@ -257,8 +257,10 @@
   }
 
   async function searchMods() {
-    if (searchterm === "" && search_offset === 0) {
-      await getBaseMods();
+    if (searchterm == "" && search_offset === 0) {
+      if (baseMods == null) {
+        await getBaseMods();
+      }
       updateMods(baseMods);
     } else {
       // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
