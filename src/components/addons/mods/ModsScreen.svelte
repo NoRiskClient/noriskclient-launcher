@@ -415,10 +415,6 @@
   }
 
   async function installCustomMods(locations) {
-    console.log(locations);
-    console.log(customModFiles);
-    
-
     locations.forEach(async (location) => {
       let splitter = "";
       if (location.split("/")[0] == "") {
@@ -465,8 +461,6 @@
         customModFiles.push(fileName);
         launcherProfiles.store();
       }).catch((error) => {
-        console.log(error);
-        
         if (error.includes("os error 32")) return;
         addNotification(error);
       });
