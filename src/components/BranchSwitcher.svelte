@@ -6,11 +6,11 @@
   import { scale } from "svelte/transition";
   import { isCheckingForUpdates } from "../utils/noriskUtils.js";
   import Updater from "./v2/Updater.svelte";
-  import SignInOutput from "./home/widgets/SignInOutput.svelte";
+  import SignInOutput from "./home/widgets/SignInOutput.svelte";  
 </script>
 
 <div class="branch-wrapper">
-  {#if $branches.length > 0}
+  {#if $branches.length > 1}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection} style="cursor: pointer"
@@ -19,7 +19,7 @@
         style:opacity={($defaultUser == null || $isCheckingForUpdates)? 0 : 100}>
       &lt;</h1>
   {/if}
-  <section style="display:flex;justify-content:center">
+  <section style="display: flex; justify-content: center; margin-bottom: 1em;">
 
     {#if $isCheckingForUpdates}
       <Updater />
@@ -47,7 +47,7 @@
       {/if}
     {/if}
   </section>
-  {#if $branches.length > 0}
+  {#if $branches.length > 1}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection}
