@@ -1127,7 +1127,6 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHan
 async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<(bool, bool), crate::error::Error> {
     let runner_instance = &app_state.runner_instance;
 
-    println!("{:?}", &runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some());
     if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
         return Ok((true, false));
     }
