@@ -267,7 +267,7 @@
     });
 
     if (index !== -1) {
-      (launcherProfiles.addons[currentBranch].resourcePacks).splice(index, 1);
+      launcherProfiles.addons[currentBranch].resourcePacks.splice(index, 1);
       deleteResourcePackFile(resourcePack?.file_name ?? resourcePack, false);
       updateResourcePacks(resourcePacks);
       updateProfileResourcePacks(launcherProfiles.addons[currentBranch].resourcePacks);
