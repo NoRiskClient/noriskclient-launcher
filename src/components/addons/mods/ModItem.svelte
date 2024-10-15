@@ -9,6 +9,16 @@
     export let type;
 
     const name = mod?.title ?? mod?.value?.name;
+
+    function getMinimalisticDownloadCount() {
+        if (mod?.downloads < 1000) {
+            return mod?.downloads;
+        } else if (mod?.downloads < 1000000) {
+            return (mod?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (mod?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="mod-item-wrapper" class:blacklisted={mod?.blacklisted}>
@@ -37,8 +47,11 @@
                     <a class="mod-title">{mod.title.replace('.jar', '')}</a>
                 {/if}
                 {#if mod?.author != undefined && mod?.author != null}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <p class="author">by {mod.author ?? mod.value.author}</p>
+                    <div class="author-container">
+                        <p class="author">by {mod.author ?? mod.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
             {#if mod.isMissing}
@@ -214,13 +227,6 @@
         gap: 0.3em;
     }
 
-    .href-wrapper .author {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 0.7em;
-    }
-
     .text-item-wrapper {
         max-width: 400px;
         overflow: hidden;
@@ -252,6 +258,28 @@
         font-size: 16px;
         cursor: pointer;
         -webkit-user-drag: none;
+    }
+
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .custom-mod-label {

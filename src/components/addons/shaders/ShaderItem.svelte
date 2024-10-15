@@ -6,6 +6,16 @@
     export let shader;
     export let text;
     export let type;
+
+    function getMinimalisticDownloadCount() {
+        if (shader?.downloads < 1000) {
+            return shader?.downloads;
+        } else if (shader?.downloads < 1000000) {
+            return (shader?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (shader?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="shader-item-wrapper" class:blacklisted={shader?.blacklisted}>
@@ -26,7 +36,7 @@
                             {shader.title.length > 20 ? shader.title.substring(0, shader?.featured ? 17 : 20) + '...' : shader.title}
                         </a>
                         {#if shader?.featured}
-                            <p class="featured" title="Featured">⭐️</p>
+                            <p title="Featured">⭐️</p>
                         {/if}
                     </div>
                 {:else}
@@ -34,8 +44,11 @@
                     <a class="shader-title">{shader.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if shader?.author != undefined && shader?.author != null}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <p class="author">by {shader.author ?? shader.value.author}</p>
+                    <div class="author-container">
+                        <p class="author">by {shader.author ?? shader.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
             {#if shader?.description != undefined && shader?.description != null}
@@ -136,20 +149,17 @@
     .href-wrapper {
         display: flex;
         flex-direction: column;
-        align-items: start;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
     }
 
     .href-wrapper .name-div {
         display: flex;
         flex-direction: row;
-        gap: 0.5em;
-    }
-
-    .href-wrapper .author {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 1em;
+        align-items: center;
+        gap: 0.3em;
     }
 
     .text-item-wrapper {
@@ -188,9 +198,26 @@
         -webkit-user-drag: none;
     }
 
-    .featured {
-        font-size: 20px;
-        padding-bottom: 10px;
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .description {

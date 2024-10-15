@@ -6,6 +6,16 @@
     export let resourcePack;
     export let text;
     export let type;
+
+    function getMinimalisticDownloadCount() {
+        if (resourcePack?.downloads < 1000) {
+            return resourcePack?.downloads;
+        } else if (resourcePack?.downloads < 1000000) {
+            return (resourcePack?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (resourcePack?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="resourcepack-item-wrapper" class:blacklisted={resourcePack?.blacklisted}>
@@ -34,8 +44,11 @@
                     <a class="resourcepack-title">{resourcePack.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if resourcePack?.author != undefined && resourcePack?.author != null}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <p class="author">by {resourcePack.author ?? resourcePack.value.author}</p>
+                    <div class="author-container">
+                        <p class="author">by {resourcePack.author ?? resourcePack.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
             {#if resourcePack?.description != undefined && resourcePack?.description != null}
@@ -136,20 +149,17 @@
     .href-wrapper {
         display: flex;
         flex-direction: column;
-        align-items: start;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
     }
 
     .href-wrapper .name-div {
         display: flex;
         flex-direction: row;
-        gap: 0.5em;
-    }
-
-    .href-wrapper .author {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 1em;
+        align-items: center;
+        gap: 0.3em;
     }
 
     .text-item-wrapper {
@@ -191,6 +201,28 @@
     .featured {
         font-size: 20px;
         padding-bottom: 10px;
+    }
+
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .description {

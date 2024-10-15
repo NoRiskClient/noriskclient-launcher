@@ -6,6 +6,16 @@
     export let datapack;
     export let text;
     export let type;
+
+    function getMinimalisticDownloadCount() {
+        if (datapack?.downloads < 1000) {
+            return datapack?.downloads;
+        } else if (datapack?.downloads < 1000000) {
+            return (datapack?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (datapack?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="datapack-item-wrapper" class:blacklisted={datapack?.blacklisted}>
@@ -26,7 +36,7 @@
                             {datapack.title.length > 20 ? datapack.title.substring(0, datapack?.featured ? 17 : 20) + '...' : datapack.title}
                         </a>
                         {#if datapack?.featured}
-                            <p class="featured" title="Featured">⭐️</p>
+                            <p title="Featured">⭐️</p>
                         {/if}
                     </div>
                 {:else}
@@ -34,8 +44,11 @@
                     <a class="datapack-title">{datapack.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if datapack?.author != undefined && datapack?.author != null}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <p class="author">by {datapack.author ?? datapack.value.author}</p>
+                    <div class="author-container">
+                        <p class="author">by {datapack.author ?? datapack.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
             {#if datapack?.description != undefined && datapack?.description != null}
@@ -136,24 +149,22 @@
     .href-wrapper {
         display: flex;
         flex-direction: column;
-        align-items: start;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
     }
 
     .href-wrapper .name-div {
         display: flex;
         flex-direction: row;
-        gap: 0.5em;
-    }
-
-    .href-wrapper .author {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 1em;
+        align-items: center;
+        gap: 0.3em;
     }
 
     .text-item-wrapper {
         height: 100%;
+        max-width: 400px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -187,9 +198,26 @@
         -webkit-user-drag: none;
     }
 
-    .featured {
-        font-size: 20px;
-        padding-bottom: 10px;
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .description {
