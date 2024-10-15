@@ -91,6 +91,13 @@
     }
 
     .credit > .all-contributers-icon {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      height: 25px;
+      width: 31px;
+      color: red;
       text-shadow: none;
     }
 
