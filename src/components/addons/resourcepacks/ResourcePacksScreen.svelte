@@ -19,7 +19,7 @@
   $: launcherProfiles = $profiles;
   let launcherProfile = null;
   let customResourcePacks = [];
-  let featuredResourcePacks = [];
+  let featuredResourcePacks = null;
   let blacklistedResourcePacks = [];
   let resourcePacks = [];
   let launchManifest = null;
