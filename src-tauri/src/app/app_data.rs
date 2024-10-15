@@ -69,6 +69,11 @@ pub struct LastViewedPopups {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LatestRunningGame {
+    pub id: Option<u32>
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LauncherOptions {
     #[serde(rename = "keepLauncherOpen")]
     pub keep_launcher_open: bool,
@@ -193,6 +198,28 @@ impl LastViewedPopups {
     pub async fn store(&self, app_data: &Path) -> Result<()> {
         // save the launcher_profiles to the file
         let _ = fs::write(app_data.join("last_viewed_popups.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write last_viewed_popups.json: {}", err).into() });
+        Ok(())
+    }
+}
+
+impl Default for LatestRunningGame {
+    fn default() -> Self {
+        Self {
+            id: None
+        }
+    }
+}
+
+impl LatestRunningGame {
+    pub async fn load(app_data: &Path) -> Result<Self> {
+        // load the launcher_profiles from the file
+        let latest_running_game = serde_json::from_slice::<LatestRunningGame>(&fs::read(app_data.join("latest_running_game.json")).await?).map_err(|err| -> String { format!("Failed to write latest_running_game.json: {}", err.to_string()).into() }).unwrap_or_default();
+        Ok(latest_running_game)
+    }
+
+    pub async fn store(&self, app_data: &Path) -> Result<()> {
+        // save the launcher_profiles to the file
+        let _ = fs::write(app_data.join("latest_running_game.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write latest_running_game.json: {}", err).into() });
         Ok(())
     }
 }

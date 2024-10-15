@@ -151,7 +151,7 @@
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
   {#if $location !== "/" && $location !== "/announcement" && (!$isInMaintenanceMode || $noriskUser?.isDev) && apiIsOnline === true}
     <BackButton />
-  {:else if $isClientRunning}
+  {:else if $isClientRunning[0]}
     <GameButton />
   {/if}
 </div>

@@ -14,7 +14,7 @@ use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 use walkdir::WalkDir;
 
-use crate::{LAUNCHER_VERSION, utils::{OS, OS_VERSION}, app::api::ApiEndpoints, minecraft::version::AssetObject};
+use crate::{app::{api::ApiEndpoints, app_data::LatestRunningGame}, minecraft::version::AssetObject, utils::{OS, OS_VERSION}, LAUNCHER_VERSION};
 use crate::app::api::NoRiskLaunchManifest;
 use crate::error::LauncherError;
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
@@ -336,6 +336,11 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     launcher_data_arc.progress_update(ProgressUpdate::set_to_max());
 
     let mut running_task = java_runtime.execute(mapped, &game_dir)?;
+
+    if running_task.id().clone().is_some() {
+        let latest_running_game = LatestRunningGame { id: Some(running_task.id().clone().unwrap())  };
+        latest_running_game.store(data).await?;
+    }
 
     if !launching_parameter.keep_launcher_open {
         // Hide launcher window

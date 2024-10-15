@@ -1,4 +1,5 @@
 <script>
+	import { isClientRunning, checkIfClientIsRunning } from './../utils/noriskUtils.js';
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "./LogMessage.svelte";
@@ -13,6 +14,7 @@
 
   onMount(async () => {
     fetchOptions();
+    checkIfClientIsRunning();
     
     invoke("get_latest_minecraft_logs").then(value => {
       minecraftLogs.set(value.map(string => string + "\n"));
@@ -53,6 +55,7 @@
     ERROR: false,
     FATAL: false,
   };
+  let hideNoLiveLogs = false;
 
   function filterLogs(log) {
     const level = log.split('/')[1]?.split(']: ')[0];
@@ -78,6 +81,12 @@
     </div>
   </div>
   <main class="content">
+    {#if $isClientRunning[1] && !hideNoLiveLogs}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <div class="noLiveLogs" on:click={() => hideNoLiveLogs = !hideNoLiveLogs}>
+        <h1 class="noLiveLogsText">Live logs are unavailable because your launcher was closed since your last game start.</h1>
+      </div>
+    {/if}
     {#if logItems.length == 0}
       <div class="center">
         {#if !reloadLogs}
@@ -122,6 +131,23 @@
         width: 100%;
         height: 10vh;
         background-color: #151515;
+    }
+
+    .noLiveLogs {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 60px;
+      padding: 10px;
+      background-color: #ff5252;
+      position: absolute;
+      z-index: 100;
+    }
+
+    .noLiveLogsText {
+      font-family: 'Press Start 2P', serif;
+      font-size: 14px;
+      color: var(--background-contrast-color);
     }
 
     .header {

@@ -8,7 +8,7 @@
   $: progressBarMax = $startProgress.progressBarMax;
   $: progressBarProgress = $startProgress.progressBarProgress;
   $: progressBarLabel = $startProgress.progressBarLabel;
-  $: isFinished = $isClientRunning;
+  $: isFinished = $isClientRunning[0];
 
   $: progress = progressBarProgress / progressBarMax;
 
@@ -53,6 +53,14 @@
       }, 30 * 1000);
     }
   });
+
+  onMount(() => {
+    if ($isClientRunning[0]) {
+      progressBarLabel = "Running...";
+      progress = 1;
+    }
+  });
+
 
   function convertToPercentage(value) {
     return Math.round(value * 100);

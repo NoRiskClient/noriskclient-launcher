@@ -46,7 +46,7 @@
     }
 
     let unlisten = await listen("client-exited", () => {
-      isClientRunning.set(false);
+      isClientRunning.set([false, false]);
       startProgress.set({
         progressBarMax: 0,
         progressBarProgress: 0,

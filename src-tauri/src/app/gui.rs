@@ -26,7 +26,7 @@ use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{Announcement, ChangeLog, LastViewedPopups, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{Announcement, ChangeLog, LastViewedPopups, LatestRunningGame, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -1122,21 +1122,39 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHan
     McDataHandler::copy_branch_data(old_branch, new_branch, app).await
 }
 
+// The return type is 1. is the client running 2. is the client running without the launcher being closed after launch -> important info for the frontend
 #[tauri::command]
-async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<bool, crate::error::Error> {
+async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<(bool, bool), crate::error::Error> {
     let runner_instance = &app_state.runner_instance;
 
+    println!("{:?}", &runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some());
     if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
-        return Ok(true);
+        return Ok((true, false));
     }
 
-    return Ok(false);
+    let options = get_options().await.map_err(|e| ErrorKind::LauncherError(format!("unable to load options: {:?}", e)).as_error())?;
+    let mut latest_running_game = LatestRunningGame::load(&options.data_path_buf()).await.unwrap_or_default();
+
+    if latest_running_game.id.is_some() {
+        let mut system = System::new_all();
+        system.refresh_all();
+        // check if process is still running
+        let game_process = system.process(Pid::from(latest_running_game.id.unwrap() as usize));
+        if game_process.is_some() {
+            return Ok((true, true));
+        } else {
+            latest_running_game.id = None;
+            latest_running_game.store(&options.data_path_buf()).await?;
+        }
+    }
+
+    return Ok((false, false));
 }
 
 #[tauri::command]
 async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
-    if is_client_running(app_state.clone()).await? {
+    if is_client_running(app_state.clone()).await?.0 {
         return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
     }
 
@@ -1225,13 +1243,30 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
 
 #[tauri::command]
 async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let latest_running_game = LatestRunningGame::load(&options.data_path_buf()).await.unwrap_or_default();
     let runner_instance = app_state.runner_instance.clone();
     let mut lck = runner_instance.lock()
         .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
 
     if let Some(inst) = lck.take() {
-        info!("Sending sigterm");
+        info!("Sending sigterm - soft game kill");
         inst.terminator.send(()).unwrap();
+        info!("Sigterm sent - game killed softly");
+    } else {
+        let mut system = System::new_all();
+        system.refresh_all();
+
+        if let Some(pid) = latest_running_game.id {
+            let game_process = system.process(Pid::from(pid as usize));
+            if let Some(game_process) = game_process {
+                if game_process.name().contains("java") {
+                    info!("Killing game process with pid: {} and name: {}", pid, game_process.name().clone());
+                    let _ = game_process.kill();
+                    info!("Game process killed");
+                }
+            }
+        }
     }
     Ok(())
 }
