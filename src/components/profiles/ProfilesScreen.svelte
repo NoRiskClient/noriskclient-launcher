@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from "svelte";
   import VirtualList from "../utils/VirtualList.svelte";
   import Profile from "./Profile.svelte";
   import ProfileSettingsModal from "./ProfileSettingsModal.svelte";
@@ -10,9 +9,7 @@
   import { v4 as uuidv4 } from "uuid";
   import { noriskLog } from "../../utils/noriskUtils.js";
 
-  const dispatch = createEventDispatcher();
-
-  currentBranchIndex.subscribe(async value => {
+  currentBranchIndex.subscribe(async _ => {
     await fetchProfiles();
   });
 
@@ -63,10 +60,11 @@
       bind:launcherProfiles={$profiles}
       bind:showModal={settingsOpen}
       on:update={() => {launcherProfiles = $launcherOptions.experimentalMode ? $profiles.experimentalProfiles : $profiles.mainProfiles}}
-    ></ProfileSettingsModal>
+    />
   {/if}
   {#if !closed}
-    <BranchSwitcher />
+    <BranchSwitcher allowBranchSwitching={false} />
+    <hr class="devider">
     <VirtualList height="27em" items={launcherProfiles.filter(p => p.branch == currentBranch)} let:item>
       <Profile profile={item} active={profileById(activeProfile()).id == item.id} on:settings={() => openSettings(item)}
                on:select={() => selectProfile(item)}></Profile>
@@ -87,6 +85,12 @@
         justify-content: space-evenly;
         flex-direction: column;
         height: 100%;
+    }
+
+    .devider {
+      width: 90%;
+      height: 1px;
+      opacity: 0.5;
     }
 
     .create-wrapper {
