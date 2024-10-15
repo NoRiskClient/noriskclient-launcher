@@ -261,6 +261,9 @@
       if (baseMods == null) {
         await getBaseMods();
       }
+      updateMods([]);
+      // Wait for the UI to update
+      await tick();
       updateMods(baseMods);
     } else {
       // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT

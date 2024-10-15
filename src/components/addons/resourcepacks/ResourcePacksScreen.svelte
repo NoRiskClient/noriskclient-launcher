@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api";
   import { removeFile } from "@tauri-apps/api/fs";
   import { open } from "@tauri-apps/api/dialog";
-  import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ResourcePackItem from "./ResourcePackItem.svelte";
   import { tick, onDestroy, onMount } from "svelte";
@@ -214,6 +213,9 @@
       if (featuredResourcePacks == null) {
         await getFeaturedResourcePacks();
       }
+      updateResourcePacks([]);
+      // Wait for the UI to update
+      await tick();
       updateResourcePacks(featuredResourcePacks);
     } else {
       // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
