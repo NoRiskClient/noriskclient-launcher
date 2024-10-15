@@ -17,7 +17,7 @@
     if (!createMode) {
         saveData()
     }
-    showModal = false;
+    animateOut();
   }
 
   const ILLIGAL_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
@@ -25,6 +25,7 @@
   let dialog; // HTMLDialogElement
 
   $: if (dialog && showModal) dialog.showModal();
+  let animateOutNow = false;
 
   async function saveData() {
     if (settingsProfile.name == '') {
@@ -84,6 +85,14 @@
     dispatch('update');
   }
 
+  function animateOut() {
+    animateOutNow = true;
+    setTimeout(() => {
+      showModal = false;
+      dialog.close();
+    }, 100);
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -92,6 +101,8 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <dialog
   bind:this={dialog}
+  class:animateOut={animateOutNow}
+  class:animateIn={!animateOutNow}
   on:close={closeSettings}
   on:click|self={() => dialog.close()}
 >
@@ -188,12 +199,42 @@
         animation: fade 0.2s ease-out;
     }
 
+    dialog.animateIn {
+        animation: open 0.2s ease-out;
+    }
+
+    dialog.animateOut {
+        animation: close 0.2s ease-out;
+    }
+
     @keyframes fade {
         from {
             opacity: 0;
         }
         to {
             opacity: 1;
+        }
+    }
+
+    @keyframes open {
+        from {
+            transform: translate(-50%, 200%);
+            opacity: 0;
+        }
+        to {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+    }
+
+    @keyframes close {
+        from {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+        to {
+            transform: translate(-50%, 200%);
+            opacity: 0;
         }
     }
 
