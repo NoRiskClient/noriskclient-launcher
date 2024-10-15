@@ -117,12 +117,19 @@ async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo
             // fetch mod info for each mod
             let mut mod_infos: Vec<ModInfo> = Vec::new();
             for mod_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&mod_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
-                    Ok(mod_info) => {
+                    Ok(mut mod_info) => {
                         // Filter featured mods based on mc version
                         match &mod_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            mod_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
+
                                     mod_infos.push(mod_info);
                                 } else {
                                     debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
@@ -153,12 +160,18 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str) -> Result<Ve
             // fetch resourcepack info for each resourcepack
             let mut resourcepack_infos: Vec<ResourcePackInfo> = Vec::new();
             for resourcepack_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&resourcepack_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_resourcepack_info(&*resourcepack_id).await {
-                    Ok(resourcepack_info) => {
+                    Ok(mut resourcepack_info) => {
                         // Filter featured resourcepacks based on mc version
                         match &resourcepack_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            resourcepack_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     resourcepack_infos.push(resourcepack_info);
                                 } else {
                                     debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
@@ -189,12 +202,18 @@ async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<Shad
             // fetch shader info for each resourcepack
             let mut shader_infos: Vec<ShaderInfo> = Vec::new();
             for shader_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&shader_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_shader_info(&*shader_id).await {
-                    Ok(shader_info) => {
+                    Ok(mut shader_info) => {
                         // Filter featured shaders based on mc version
                         match &shader_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            shader_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     shader_infos.push(shader_info);
                                 } else {
                                     debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
@@ -225,12 +244,18 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str) -> Result<Vec<Da
             // fetch datapack info for each resourcepack
             let mut datapack_infos: Vec<DatapackInfo> = Vec::new();
             for datapack_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&datapack_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_datapack_info(&*datapack_id).await {
-                    Ok(datapack_info) => {
+                    Ok(mut datapack_info) => {
                         // Filter featured datapacks based on mc version
                         match &datapack_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            datapack_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     datapack_infos.push(datapack_info);
                                 } else {
                                     debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);

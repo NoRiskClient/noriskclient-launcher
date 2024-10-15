@@ -12,6 +12,19 @@ use crate::HTTP_CLIENT;
 pub struct ModrinthApiEndpoints;
 
 impl ModrinthApiEndpoints {
+    // PROJECTS
+    pub async fn get_project_members(slug: &str) -> Result<Vec<ModrinthTeamMember>, Box<dyn Error>> {
+        let url = format!("https://api.modrinth.com/v2/project/{}/members", slug);
+        let response = HTTP_CLIENT.get(url)
+            .send()
+            .await
+            .map_err(|e| format!("Modrinth Team Members Request error: {:?}", e))?;
+        match response.json::<Vec<ModrinthTeamMember>>().await {
+            Ok(json) => Ok(json),
+            Err(e) => Err(Box::new(e) as Box<dyn Error>),
+        }
+    }
+
     // MODS
     pub async fn search_mods(params: &ModrinthSearchRequestParams) -> Result<ModrinthModsSearchResponse, Box<dyn Error>> {
         let url = format!("https://api.modrinth.com/v2/search?facets={}&index={}&limit={}&offset={}&query={}", params.facets, params.index, params.limit, params.offset, params.query);
@@ -316,6 +329,17 @@ impl ModrinthApiEndpoints {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct ModrinthTeamMember {
+    pub user: ModrinthUser,
+    pub role: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModrinthUser {
+    pub username: String
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ModrinthModsSearchResponse {
     hits: Vec<ModInfo>,
     offset: u32,
@@ -363,6 +387,7 @@ pub struct ModInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -381,6 +406,7 @@ pub struct ShaderInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -401,6 +427,7 @@ pub struct ResourcePackInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -421,6 +448,7 @@ pub struct DatapackInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
