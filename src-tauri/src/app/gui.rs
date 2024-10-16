@@ -665,6 +665,23 @@ async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Re
 }
 
 #[tauri::command]
+async fn delete_shader_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file_name.clone());
+    let settings_file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(format!("{}.txt", file_name.clone()));
+    
+    if file.exists() {
+        info!("Deleting {} from {} shaders folder.", file_name, branch);
+        fs::remove_file(&file).await.map_err(|e| format!("unable to delete shader file: {:?}", e))?;
+    }
+    if settings_file.exists() {
+        info!("Deleting {}.txt from {} shaders folder.", file_name, branch);
+        fs::remove_file(&settings_file).await.map_err(|e| format!("unable to delete shader settings file: {:?}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn save_custom_shaders_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file.name.clone());
 
@@ -691,6 +708,19 @@ async fn get_custom_resourcepacks_folder(options: LauncherOptions, branch: &str)
 }
 
 #[tauri::command]
+async fn delete_resourcepack_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file_name.clone());
+    if !file.exists() {
+        return Ok(());
+    }
+
+    info!("Deleting {} from {} resourcepacks folder.", file_name, branch);
+    fs::remove_file(&file).await.map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn save_custom_resourcepacks_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file.name.clone());
 
@@ -714,6 +744,19 @@ async fn get_custom_datapacks_filenames(options: LauncherOptions, installed_data
 async fn get_custom_datapacks_folder(options: LauncherOptions, branch: &str, world: &str) -> Result<String, String> {
     let custom_datapack_folder = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks");
     return custom_datapack_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn delete_datapack_file(file_name: &str, options: LauncherOptions, branch: &str, world: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("saves").join(&world).join("datapacks").join(file_name.clone());
+    if !file.exists() {
+        return Ok(());
+    }
+
+    info!("Deleting {} from {} ({}) datapacks folder.", file_name, branch, world);
+    fs::remove_file(&file).await.map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1703,18 +1746,21 @@ pub fn gui_main() {
             delete_custom_mod_file,
             install_mod_and_dependencies,
             get_custom_shaders_folder,
+            delete_shader_file,
             save_custom_shaders_to_folder,
             get_custom_shaders_filenames,
             search_shaders,
             get_shader_info,
             install_shader,
             get_custom_resourcepacks_folder,
+            delete_resourcepack_file,
             save_custom_resourcepacks_to_folder,
             get_custom_resourcepacks_filenames,
             search_resourcepacks,
             get_resourcepack_info,
             install_resourcepack,
             get_custom_datapacks_folder,
+            delete_datapack_file,
             save_custom_datapacks_to_folder,
             get_custom_datapacks_filenames,
             search_datapacks,

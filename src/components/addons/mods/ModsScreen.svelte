@@ -666,7 +666,7 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{launcherProfile.mods.length < 1 ? 'No Mods installed.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{launcherProfile.mods.length < 1 ? 'No mods installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>

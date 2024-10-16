@@ -104,19 +104,21 @@
 
   async function updateShaders(newShaders) {
     shaders = newShaders;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
   }
   async function updateProfileShaders(newShaders) {
     launcherProfiles.addons[currentBranch].shaders = newShaders;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
   }
 
   async function getLaunchManifest() {
@@ -257,30 +259,27 @@
     });
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
-      deleteShaderFile(shader?.file_name ?? shader, false);
-      updateShaders(shaders);
-      updateProfileShaders(launcherProfiles.addons[currentBranch].shaders);
+      deleteShaderFile(shader?.file_name ?? shader);
       launcherProfiles.store();
+
+      const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];
+      updateShaders([]);
+      updateProfileShaders([]);
+      await tick();
+      updateShaders(prev[0]);
+      updateProfileShaders(prev[1]);
     } else {
       deleteShaderFile(shader);
     }
   }
 
-  async function deleteShaderFile(filename, showError = true) {
-    await invoke("get_custom_shaders_folder", {
+  async function deleteShaderFile(filename) {
+    await invoke("delete_shader_file", {
+      fileName: filename,
       options: options,
       branch: launchManifest.build.branch,
-    }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
-        getCustomShadersFilenames();
-      }).catch((error) => {
-        if (!showError) return;
-        addNotification(error);
-      });
-      // remove potential shader settings txt
-      await removeFile(folder + "/" + filename + ".txt").catch((error) => {
-        return;
-      });
+    }).then(async () => {
+      getCustomShadersFilenames();
     }).catch((error) => {
       addNotification(error);
     });
@@ -435,6 +434,8 @@
           {/if}
         {/each}
       </div>
+      {:else}
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].shaders.length < 1 ? 'No shaders installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>

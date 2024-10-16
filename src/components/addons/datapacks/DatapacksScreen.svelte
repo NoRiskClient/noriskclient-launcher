@@ -94,19 +94,21 @@
 
   async function updateDatapacks(newDatapacks) {
     datapacks = newDatapacks;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
   }
   async function updateProfileDatapacks(newDatapacks) {
     launcherProfiles.addons[currentBranch].datapacks = newDatapacks;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
   }
 
   async function getLaunchManifest() {
@@ -250,27 +252,28 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].datapacks.splice(index, 1);
-      deleteDatapackFile(datapack?.file_name ?? datapack, false);
-      updateDatapacks(datapacks);
-      updateProfileDatapacks(launcherProfiles.addons[currentBranch].datapacks);
+      deleteDatapackFile(datapack?.file_name ?? datapack);
       launcherProfiles.store();
+
+      const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
+      updateDatapacks([]);
+      updateProfileDatapacks([]);
+      await tick();
+      updateDatapacks(prev[0]);
+      updateProfileDatapacks(prev[1]);
     } else {
       deleteDatapackFile(datapack);
     }
   }
 
-  async function deleteDatapackFile(filename, showError = true) {
-    await invoke("get_custom_datapacks_folder", {
+  async function deleteDatapackFile(filename) {
+    await invoke("delete_datapack_file", {
+      fileName: filename,
       options: options,
       branch: launchManifest.build.branch,
       world: world,
-    }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
-        getCustomDatapacksFilenames();
-      }).catch((error) => {
-        if (!showError) return;
-        addNotification(error);
-      });
+    }).then(async () => {
+      getCustomDatapacksFilenames();
     }).catch((error) => {
       addNotification(error);
     });
@@ -406,7 +409,7 @@
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Datapacks..." />
-    {#if launcherProfiles.addons[currentBranch].datapacks.length > 0 || datapacks.length > 0}
+    {#if launcherProfiles.addons[currentBranch].datapacks.length > 0 || customDatapacks.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...customDatapacks,...launcherProfiles.addons[currentBranch].datapacks].filter((datapack) => {
             let name = (datapack?.title ?? datapack).toUpperCase()
@@ -427,6 +430,8 @@
           {/if}
         {/each}
       </div>
+      {:else}
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].datapacks.length < 1 ? 'No datapacks installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>
