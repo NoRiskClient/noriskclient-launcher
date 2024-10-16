@@ -1,5 +1,5 @@
 <script>
-	import { pop } from 'svelte-spa-router';
+	import { pop, location } from 'svelte-spa-router';
   import { listen } from "@tauri-apps/api/event";
   import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../../utils/svelteUtils.js";
@@ -49,7 +49,9 @@
       isFinished = true;
 
       setTimeout(() => {
-        pop();
+        if ($location == "/start-progress") {
+          pop();
+        }
       }, 30 * 1000);
     }
   });
