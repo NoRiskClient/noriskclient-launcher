@@ -335,9 +335,9 @@ async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
 }
 
 #[tauri::command]
-async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>) -> Result<CustomMod, String> {
+async fn install_mod_and_dependencies(slug: &str, version: Option<&str>, params: &str, required_mods: Vec<LoaderMod>) -> Result<CustomMod, String> {
     info!("Installing Mod And Dependencies...");
-    ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await.map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
+    ModrinthApiEndpoints::install_mod_and_dependencies(slug, version, params, &required_mods).await.map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
 }
 
 #[tauri::command]

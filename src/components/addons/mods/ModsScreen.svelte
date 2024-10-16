@@ -23,6 +23,7 @@
   let mods = [];
   let featuredMods = [];
   let blacklistedMods = [];
+  let modVersions = {};
   let launchManifest = null;
   let searchterm = "";
   let filterterm = "";
@@ -109,20 +110,29 @@
 
   async function updateMods(newMods) {
     mods = newMods;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
   }
 
   async function updateProfileMods(newMods) {
     launcherProfile.mods = newMods;
-    if (document.getElementById('scrollList') != null) {
+    
+    // Try to scroll to the previous position
+    try {
       await tick();
       document.getElementById('scrollList').scrollTop = listScroll ?? 0;
-      await tick();
-    }
+    } catch(_) {}
+  }
+
+  function scroll_to_bottom() {
+    // Try to scroll to the bottom
+    try {
+      document.getElementById('scrollList').scrollTop = document.getElementById('scrollList').scrollHeight;
+    } catch (_) {}
   }
 
   async function getLaunchManifest() {
@@ -159,11 +169,31 @@
     });
   }
 
+  async function getModVersions(slug) {
+    if (modVersions[slug]) {
+      return modVersions[slug];
+    }
+
+    await invoke("get_project_version", {
+      slug: slug,
+      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
+    }).then(async (result) => {
+      modVersions[slug] = result.map(v => v.version_number);
+      console.debug(`Project Versions of ${slug}`, modVersions[slug]);
+    }).catch((error) => {
+      addNotification(error);
+      modVersions[slug] = [];
+    });
+
+    return modVersions[slug];
+  }
+
   async function installModAndDependencies(mod) {
     mod.loading = true;
     updateMods(mods);
     await invoke("install_mod_and_dependencies", {
       slug: mod.slug,
+      version: null,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
       requiredMods: launchManifest.mods,
     }).then((result) => {
@@ -180,6 +210,41 @@
       mod.loading = false;
       updateMods(mods);
       updateProfileMods(launcherProfile.mods);
+      launcherProfiles.store();
+    }).catch((error) => {
+      addNotification(error);
+    });
+  }
+
+  async function changeModVersion(slug, version) {
+    let mod = launcherProfile.mods.find(mod => mod.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase());
+    if (!mod) {
+      addNotification(`Failed to change version of ${slug} because it is not installed.`);
+      return;
+    }
+
+    await invoke("install_mod_and_dependencies", {
+      slug: slug,
+      version: version,
+      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
+      requiredMods: launchManifest.mods,
+    }).then(async (result) => {
+      const blockedDependencies = result.dependencies.filter(d => blacklistedMods.some(slug => slug == d.value.source.artifact.split(":")[1]))
+      if (blockedDependencies.length > 0) {
+        addNotification(`Failed to install mod because of incompatible dependencies:<br><br>${blockedDependencies.map(d => d.value.name).join(', ')}`, "ERROR", null, 5000);
+        return;
+      }
+
+      const original = mod;
+      // Replace with new version info 
+      mod.value = result.value;
+      mod.dependencies = result.dependencies;
+      launcherProfile.mods.splice(launcherProfile.mods.indexOf(original), 1, mod);
+     
+      const before = launcherProfile.mods;
+      updateProfileMods([]);
+      await tick();
+      updateProfileMods(before);
       launcherProfiles.store();
     }).catch((error) => {
       addNotification(error);
@@ -346,9 +411,15 @@
     
     if (index !== -1) {
       launcherProfile.mods.splice(index, 1);
-      updateMods(mods);
-      updateProfileMods(launcherProfile.mods);
       launcherProfiles.store();
+
+      // Fragt nicht, sonst squashen mod item names ineinander?????
+      const prev = [mods, launcherProfile.mods];
+      updateMods([]);
+      updateProfileMods([]);
+      await tick();
+      updateMods(prev[0]);
+      updateProfileMods(prev[1]);
     }
   }
 
@@ -533,6 +604,7 @@
               on:disable={() => disableRecomendedMod(item.slug)}
               on:delete={() => deleteInstalledMod(item.slug)}
               type="RESULT"
+              modVersions={null}
               mod={item} />
           {/if}
         {/each}
@@ -572,6 +644,7 @@
               on:delete={() => deleteCustomModFile(item.value.source.artifact.split(":")[2])}
               on:toggle={() => toggleInstalledMod(item)}
               type="CUSTOM"
+              modVersions={null}
               mod={item} />
           {:else}
             <ModItem
@@ -583,7 +656,11 @@
               ? "DEPENDENCY" : "INSTALLED"}
               on:delete={() => deleteInstalledMod(item.value.source.artifact.split(":")[1])}
               on:toggle={() => toggleInstalledMod(item)}
+              on:changeVersion={(data) => changeModVersion(item.value.source.artifact.split(":")[1], data.detail.version)}
+              on:getVersions={async () => await getModVersions(item.value.source.artifact.split(":")[1])}
+              on:scrollToBottom={scroll_to_bottom}
               type="INSTALLED"
+              bind:modVersions={modVersions}
               mod={item} />
           {/if}
         {/each}

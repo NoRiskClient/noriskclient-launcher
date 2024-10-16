@@ -1,5 +1,6 @@
 <script>
-    import {createEventDispatcher} from "svelte";
+    import { createEventDispatcher } from "svelte";
+    import { onMount, tick } from "svelte";
 
     const dispatch = createEventDispatcher()
 
@@ -7,8 +8,28 @@
     export let enabled = mod?.value?.enabled ?? null;
     export let text;
     export let type;
+    export let modVersions;
 
+    const slug = mod?.slug ?? mod?.value?.source?.artifact?.split(":")[1];
     const name = mod?.title ?? mod?.value?.name;
+
+    let versionDropdownOpen = false;
+    let isChangingVersion = false;
+
+    onMount(() => {
+        isChangingVersion = false;
+        if (slug && text != "DEPENDENCY" && modVersions != null && modVersions[slug] == null) {
+            console.log("Fetching versions for " + name);
+            dispatch("getVersions");
+        }
+    })
+
+    async function changeVersion(version) {
+        console.log("Changing version of " + slug + " to " + version);
+        isChangingVersion = true;
+        versionDropdownOpen = false;
+        await dispatch("changeVersion", { version: version });
+    }
 
     function getMinimalisticDownloadCount() {
         if (mod?.downloads < 1000) {
@@ -35,7 +56,7 @@
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
                     <div class="name-div">
-                        <a class="mod-title" href={`https://modrinth.com/mod/${mod.slug ?? mod.value.source.artifact.split(":")[1]}`} target="_blank" title={name}>
+                        <a class="mod-title" href={`https://modrinth.com/mod/${slug}`} target="_blank" title={name}>
                             {name.length > 20 && (text == 'INSTALL' || text == 'REQUIRED' || text == 'DEPENDENCY') ? name.substring(0, 19) + '...' : name}
                         </a>
                         {#if mod?.featured}
@@ -62,6 +83,32 @@
                 <p class="description" style="margin-top: 1em; opacity: 0.65;">Used by: {mod.parents.join(", ")}</p>
             {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
+            {:else if modVersions != null && modVersions[slug]?.length > 1}
+                <div class="versionSelect">
+                    <p>Version:</p>
+                    <section class="dropdown">
+                        <button
+                            on:click={async () => {
+                                if (isChangingVersion) return;
+                                versionDropdownOpen = !versionDropdownOpen;
+                                await tick();
+                                dispatch('scrollToBottom');
+                            }}
+                        >
+                            {#if isChangingVersion}
+                                <span>⏳</span> Changing version...
+                            {:else}
+                                <span>{versionDropdownOpen ? '⮟' : '⮞'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
+                            {/if}
+                        </button>
+                        <div class="versions" class:show={versionDropdownOpen}>
+                            {#each modVersions[slug].filter(v => v != mod?.value?.source?.artifact?.split(':')[2]) as version}
+                                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                <p class="version" on:click={() => changeVersion(version)}>{version}</p>
+                            {/each}
+                        </div>
+                    </section>
+                </div>
             {/if}
         </div>
     </div>
@@ -295,6 +342,76 @@
         padding-top: 2em;
         cursor: default;
         text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .versionSelect {
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+        justify-content: center;
+        margin-top: 1.5em;
+        gap: 0.5em;
+    }
+
+    .versionSelect p {
+        font-family: 'Press Start 2P', serif;
+        font-size: 10px;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .versionSelect button {
+        display: flex;
+        font-family: 'Press Start 2P', serif;
+        font-size: 11px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+        cursor: pointer;
+        background: var(--background-color);
+        border: none;
+        border-radius: 5px;
+        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1em;
+    }
+
+    .versionSelect button span {
+        font-size: 12px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .versionSelect .dropdown {
+        display: inline-block;
+    }
+
+    .versionSelect .dropdown .versions {
+      display: none;
+      flex-direction: column;
+      gap: 1.5em;
+      position: absolute;
+      background-color: var(--background-color);
+      padding: 15px 15px 15px 1.5em;
+      margin-top: 5px;
+      border: none;
+      border-radius: 5px;
+      z-index: 100;
+    }
+
+    .versionSelect .dropdown .versions.show {
+        display: flex;
+    }
+
+    .versionSelect .dropdown .versions .version {
+        font-family: 'Press Start 2P', serif;
+        font-size: 12px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+        cursor: pointer;
+    }
+
+    .versionSelect .dropdown .versions .version:hover {
+        text-decoration: underline;
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
     }
 
     .isMissing {

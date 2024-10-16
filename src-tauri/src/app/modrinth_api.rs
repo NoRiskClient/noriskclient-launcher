@@ -110,11 +110,14 @@ impl ModrinthApiEndpoints {
         Ok(result)
     }
 
-    pub async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: &Vec<LoaderMod>) -> Result<CustomMod, Box<dyn Error>> {
+    pub async fn install_mod_and_dependencies(slug: &str, version: Option<&str>, params: &str, required_mods: &Vec<LoaderMod>) -> Result<CustomMod, Box<dyn Error>> {
         let mod_project = ModrinthApiEndpoints::get_mod_info(slug).await?;
         let mod_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
-        let project = mod_versions.first().ok_or("Mod not found")?;
-
+        let project = if version.is_some() {
+            mod_versions.iter().find(|project| project.version_number == version.unwrap()).ok_or("Mod not found")?
+        } else {
+            mod_versions.first().ok_or("Mod not found")?
+        };
         let dependencies = ModrinthApiEndpoints::get_dependencies(&project.dependencies, params, required_mods).await?;
 
         Ok(CustomMod {
