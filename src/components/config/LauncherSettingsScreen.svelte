@@ -23,6 +23,9 @@
     let totalSystemMemory = 0;
     let selectedMemory = 0;
 
+    let keepLocalAssets = false;
+    let keepLocalAssetsPernmission = ["ADMIN", "DEVELOPER", "DESIGNER"].includes($noriskUser?.rank?.toUpperCase());
+
     function toggleTheme() {
       $launcherOptions.toggleTheme();
       lightTheme = $launcherOptions.theme === "LIGHT";
@@ -80,6 +83,24 @@
         }
     }
 
+    async function toggleKeepLocalAssets() {
+        if (keepLocalAssets) {
+            invoke("enable_keep_local_assets").then(() => {
+                keepLocalAssets = true;
+            }).catch((e) => {
+                keepLocalAssets = false;
+                addNotification(`Failed to enable keep local assets: ${e}`);
+            });
+        } else {
+            invoke("disable_keep_local_assets").then(() => {
+                keepLocalAssets = false;
+            }).catch((e) => {
+                keepLocalAssets = true;
+                addNotification(`Failed to disable keep local assets: ${e}`);
+            });
+        }
+    }
+
     (async () => {
       const totalBytes = await invoke("get_total_memory");
       totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
@@ -87,6 +108,14 @@
       selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
       noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
       noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
+
+      if (keepLocalAssetsPernmission) {
+          await invoke("get_keep_local_assets").then((keepLocalAssets) => {
+            keepLocalAssets = keepLocalAssets;
+          }).catch((e) => {
+            addNotification(`Failed to get keep local assets: ${e}`);
+          });
+      }
     })();
 
     onDestroy(async () => {
@@ -107,7 +136,10 @@
     <div class="settings-wrapper">
     <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
     {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
-        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isDevOnly={$noriskUser?.isDev} on:toggle={toggleExperimentalMode} />
+        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
+    {/if}
+    {#if keepLocalAssetsPernmission}
+        <ConfigRadioButton text="Keep Local Assets" bind:value={keepLocalAssets} isExclusive={true} isExclusiveLabel={"Designer"} on:toggle={toggleKeepLocalAssets}/>
     {/if}
     <ConfigRadioButton text={`Theme: ${$launcherOptions.theme}`} bind:value={lightTheme} on:toggle={toggleTheme} />
     {#if $featureWhitelist.includes("MCREAL_APP")}

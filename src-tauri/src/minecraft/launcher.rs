@@ -14,6 +14,7 @@ use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
 use walkdir::WalkDir;
 
+use crate::app::gui::get_keep_local_assets;
 use crate::{app::{api::ApiEndpoints, app_data::LatestRunningGame}, minecraft::version::AssetObject, utils::{OS, OS_VERSION}, LAUNCHER_VERSION};
 use crate::app::api::NoRiskLaunchManifest;
 use crate::error::LauncherError;
@@ -233,59 +234,71 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     let game_dir = data.join("gameDir").join(manifest.build.branch.clone());
 
     // Norisk Assets
-    let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
-    fs::create_dir_all(&norisk_asset_dir).await?;
-
-    let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token, uuid).await;
-
-    let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
-        Ok(norisk_assets) => norisk_assets.objects,
+    let keep_local_assets = match get_keep_local_assets() {
+        Ok(keep_local_assets) => keep_local_assets,
         Err(err) => {
-            info!("Error fetching norisk_assets: {}", err);
-            HashMap::new()
+            error!("Error fetching keep_local_assets: {}", err);
+            false
         }
     };
 
-    if norisk_asset_objects_to_download.len() > 0 {
-        let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
-        let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
-
-        launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
-        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
-
-        let _: Vec<Result<()>> = stream::iter(
-            norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
-                let download_count = norisk_assets_downloaded.clone();
-                let data_clone = launcher_data_arc.clone();
-                let folder_clone = norisk_asset_dir.clone();
-                let branch_clone = manifest.build.branch.clone();
-
-                async move {
-                    let hash = asset_object.1.hash.clone();
-
-                    match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), folder_clone, data_clone.clone()).await {
-                        Ok(downloaded) => {
-                            let curr = download_count.fetch_add(1, Ordering::Relaxed);
-
-                            if downloaded {
-                                // the progress bar is only being updated when a asset has been downloaded to improve speeds
-                                data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
-                                data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+    if !keep_local_assets {
+        let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
+        fs::create_dir_all(&norisk_asset_dir).await?;
+    
+        let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token, uuid).await;
+    
+        let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
+            Ok(norisk_assets) => norisk_assets.objects,
+            Err(err) => {
+                info!("Error fetching norisk_assets: {}", err);
+                HashMap::new()
+            }
+        };
+    
+        if norisk_asset_objects_to_download.len() > 0 {
+            let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
+            let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
+    
+            launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
+            launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
+    
+            let _: Vec<Result<()>> = stream::iter(
+                norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
+                    let download_count = norisk_assets_downloaded.clone();
+                    let data_clone = launcher_data_arc.clone();
+                    let folder_clone = norisk_asset_dir.clone();
+                    let branch_clone = manifest.build.branch.clone();
+    
+                    async move {
+                        let hash = asset_object.1.hash.clone();
+    
+                        match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), folder_clone, data_clone.clone()).await {
+                            Ok(downloaded) => {
+                                let curr = download_count.fetch_add(1, Ordering::Relaxed);
+    
+                                if downloaded {
+                                    // the progress bar is only being updated when a asset has been downloaded to improve speeds
+                                    data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
+                                    data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+                                }
                             }
+                            Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                         }
-                        Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
+    
+                        Ok(())
                     }
-
-                    Ok(())
-                }
-            })
-        ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
-
-        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, norisk_asset_max, norisk_asset_max));
-
-        // Delete usused norisk assets
-
-        verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
+                })
+            ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
+    
+            launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, norisk_asset_max, norisk_asset_max));
+    
+            // Delete usused norisk assets
+    
+            verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
+        }
+    } else {
+        info!("Skipping Norisk assets check & download.");
     }
 
     // Game

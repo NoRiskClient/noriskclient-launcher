@@ -105,6 +105,9 @@ export async function runClient(branch, checkedForNewBranch = false) {
     });
   });
 
+  // Ensure keep local assets only exists if permission is granted
+  getNoRiskUser();
+
   await invoke("run_client", {
     branch: branch,
     options: options,

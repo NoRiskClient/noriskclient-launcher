@@ -7,6 +7,7 @@ use dirs::data_dir;
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
+use log4rs::append::file;
 use rand::Rng;
 use regex::Regex;
 use minecraft_client_rs::Client;
@@ -666,8 +667,8 @@ async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Re
 
 #[tauri::command]
 async fn delete_shader_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
-    let file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file_name.clone());
-    let settings_file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(format!("{}.txt", file_name.clone()));
+    let file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file_name);
+    let settings_file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(format!("{}.txt", file_name));
     
     if file.exists() {
         info!("Deleting {} from {} shaders folder.", file_name, branch);
@@ -709,7 +710,7 @@ async fn get_custom_resourcepacks_folder(options: LauncherOptions, branch: &str)
 
 #[tauri::command]
 async fn delete_resourcepack_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
-    let file = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file_name.clone());
+    let file = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file_name);
     if !file.exists() {
         return Ok(());
     }
@@ -748,7 +749,7 @@ async fn get_custom_datapacks_folder(options: LauncherOptions, branch: &str, wor
 
 #[tauri::command]
 async fn delete_datapack_file(file_name: &str, options: LauncherOptions, branch: &str, world: &str) -> Result<(), String> {
-    let file = options.data_path_buf().join("gameDir").join(branch).join("saves").join(&world).join("datapacks").join(file_name.clone());
+    let file = options.data_path_buf().join("gameDir").join(branch).join("saves").join(&world).join("datapacks").join(file_name);
     if !file.exists() {
         return Ok(());
     }
@@ -770,6 +771,44 @@ async fn save_custom_datapacks_to_folder(options: LauncherOptions, branch: &str,
     }
 
     Ok(())
+}
+
+#[tauri::command]
+async fn enable_keep_local_assets() -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+    
+    if !file.exists() {
+        info!("Creating keepLocalAssets file: {:?}", file);
+        let content = "Hi, what are you doing here?\nMsg me on discord (aim_shock) for a free cookie!\n\nBye <3";
+        fs::write(&file, Vec::from(content)).await.map_err(|e| format!("unable to create keepLocalAssets file: {:?}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_keep_local_assets() -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+
+    if file.exists() {
+        info!("Removing keepLocalAssets file: {:?}", file);
+        fs::remove_file(&file).await.map_err(|e| format!("unable to remove keepLocalAssets file: {:?}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_keep_local_assets() -> Result<bool, String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+
+    Ok(file.exists())
 }
 
 #[tauri::command]
@@ -880,6 +919,12 @@ async fn get_norisk_user(options: LauncherOptions, credentials: Credentials) -> 
     let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
         .await
         .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+
+    // ensure user does not have keepLocalAssets enabled depending on rank
+    let allowed_ranks = vec!["ADMIN".to_string(), "DEVELOPER".to_string(), "DESIGNER".to_string()];
+    if !allowed_ranks.contains(&user.rank) {
+        disable_keep_local_assets().await?;
+    }
     Ok(user)
 }
 
@@ -1303,7 +1348,7 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
             let game_process = system.process(Pid::from(pid as usize));
             if let Some(game_process) = game_process {
                 if game_process.name().contains("java") {
-                    info!("Killing game process with pid: {} and name: {}", pid, game_process.name().clone());
+                    info!("Killing game process with pid: {} and name: {}", pid, game_process.name());
                     let _ = game_process.kill();
                     info!("Game process killed");
                 }
@@ -1767,6 +1812,9 @@ pub fn gui_main() {
             get_datapack_info,
             install_datapack,
             get_world_folders,
+            enable_keep_local_assets,
+            disable_keep_local_assets,
+            get_keep_local_assets,
             upload_logs,
             get_launch_manifest,
             default_data_folder_path,

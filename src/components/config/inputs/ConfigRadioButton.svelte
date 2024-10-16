@@ -4,7 +4,8 @@
 
   export let value;
   export let text;
-  export let isDevOnly = false;
+  export let isExclusive = false;
+  export let isExclusiveLabel = "";
   export let reversed = false;
   export let spaced = false;
   export let id = "";
@@ -17,8 +18,8 @@
 <div class="wrapper" class:spaced={spaced}>
   {#if reversed}
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
-    {#if isDevOnly}
-      <h1 class="nes-font devOnly" title="You can see this because you are a Developer / Admin.">(Dev Only)</h1>
+    {#if isExclusive}
+      <h1 class="nes-font exclusive" title="You can see this because you have special permissions.">({isExclusiveLabel})</h1>
     {/if}
   {/if}
   <label class="nes-switch">
@@ -27,8 +28,8 @@
   </label>
   {#if !reversed}
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection} class="nes-font">{text}</h1>
-    {#if isDevOnly}
-      <h1 class="nes-font devOnly" title="You can see this because you are a Developer / Admin.">(Dev)</h1>
+    {#if isExclusive}
+      <h1 class="nes-font exclusive" title="You can see this because you have special permissions.">({isExclusiveLabel})</h1>
     {/if}
   {/if}
 </div>
@@ -40,7 +41,7 @@
         gap: 1em;
     }
 
-    .devOnly {
+    .exclusive {
       font-size: 12.5px;
       color: var(--dev-font-color);
       text-shadow: 1.25px 1.25px var(--dev-font-color-text-shadow);
