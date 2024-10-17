@@ -48,6 +48,7 @@
   async function downloadTemplate() {
     await invoke("download_template_and_open_explorer").then(() => {
       noriskLog("Downloaded Template Cape...");
+      addNotification("Template Cape Downloaded!", "INFO", "Template Cape Downloaded!<br><br>Check your downloads folder.", 5000);
     }).catch(error => {
       addNotification("Failed to Download Template: " + error);
     });
