@@ -128,7 +128,7 @@
     } catch(_) {}
   }
 
-  function scroll_to_bottom() {
+  function scrollToBottom() {
     // Try to scroll to the bottom
     try {
       document.getElementById('scrollList').scrollTop = document.getElementById('scrollList').scrollHeight;
@@ -658,7 +658,6 @@
               on:toggle={() => toggleInstalledMod(item)}
               on:changeVersion={(data) => changeModVersion(item.value.source.artifact.split(":")[1], data.detail.version)}
               on:getVersions={async () => await getModVersions(item.value.source.artifact.split(":")[1])}
-              on:scrollToBottom={scroll_to_bottom}
               type="INSTALLED"
               bind:modVersions={modVersions}
               mod={item} />

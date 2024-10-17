@@ -1,6 +1,7 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
+    import { openInfoPopup } from "../../../utils/popupUtils.js";
 
     const dispatch = createEventDispatcher()
 
@@ -80,7 +81,20 @@
             {:else if type == "CUSTOM"}
                 <p class="description custom-mod-label">Custom Mod</p>
             {:else if mod.parents != undefined && mod.parents.length > 0}
-                <p class="description" style="margin-top: 1em; opacity: 0.65;">Used by: {mod.parents.join(", ")}</p>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <p
+                    class="description"
+                    style="margin-top: 1em; opacity: 0.65;"
+                    on:click={
+                        mod.parents.join(", ").length > 180 ? () => openInfoPopup({
+                            title: "Used by:",
+                            content: mod.parents.join(", "),
+                            contentFontSize: "14px"
+                        }) : () => {}
+                    }
+                >
+                    Used by: {mod.parents.join(", ").length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", ")}
+                </p>
             {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
             {:else if modVersions != null && modVersions[slug]?.length > 1}
@@ -92,7 +106,6 @@
                                 if (isChangingVersion) return;
                                 versionDropdownOpen = !versionDropdownOpen;
                                 await tick();
-                                dispatch('scrollToBottom');
                             }}
                         >
                             {#if isChangingVersion}
