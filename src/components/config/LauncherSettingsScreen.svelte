@@ -9,7 +9,7 @@
     import { preventSelection } from "../../utils/svelteUtils.js";
     import { invoke } from "@tauri-apps/api";
     import { addNotification } from "../../stores/notificationStore.js";
-    import { onDestroy } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { fetchDefaultUserOrError, updateNoRiskToken, defaultUser } from "../../stores/credentialsStore.js";
     import { fetchBranches } from "../../stores/branchesStore.js";
     import { fetchProfiles } from "../../stores/profilesStore.js";
@@ -101,28 +101,28 @@
         }
     }
 
-    (async () => {
-      const totalBytes = await invoke("get_total_memory");
-      totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
-      const memoryPercentage = $launcherOptions.memoryPercentage; // Verwende den Wert aus $launcherOptions
-      selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
-      noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
-      noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
-
-      if (keepLocalAssetsPernmission) {
-          await invoke("get_keep_local_assets").then((keepLocalAssets) => {
-            keepLocalAssets = keepLocalAssets;
-          }).catch((e) => {
-            addNotification(`Failed to get keep local assets: ${e}`);
-          });
-      }
-    })();
+    onMount(async () => {
+        const totalBytes = await invoke("get_total_memory");
+        totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
+        const memoryPercentage = $launcherOptions.memoryPercentage; // Verwende den Wert aus $launcherOptions
+        selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
+        noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
+        noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
+        
+        if (keepLocalAssetsPernmission) {
+            await invoke("get_keep_local_assets").then((value) => {
+              keepLocalAssets = value;
+            }).catch((e) => {
+              addNotification(`Failed to get keep local assets: ${e}`);
+            });
+        }
+    });
 
     onDestroy(async () => {
-      //wir runden es weil wir es in der config als int speichern
-      $launcherOptions.memoryPercentage = Math.round((selectedMemory / totalSystemMemory) * 100);
-      noriskLog(`Selected memory: ${selectedMemory} GB (${$launcherOptions.memoryPercentage}%).`);
-      await saveOptions();
+        //wir runden es weil wir es in der config als int speichern
+        $launcherOptions.memoryPercentage = Math.round((selectedMemory / totalSystemMemory) * 100);
+        noriskLog(`Selected memory: ${selectedMemory} GB (${$launcherOptions.memoryPercentage}%).`);
+        await saveOptions();
     });
 </script>
 
