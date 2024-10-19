@@ -13,7 +13,7 @@ use regex::Regex;
 use minecraft_client_rs::Client;
 use reqwest::multipart::{Form, Part};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use tauri::{Manager, UserAttentionType, Window, WindowEvent};
+use tauri::{Manager, UserAttentionType, WebviewWindow, WindowEvent};
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 use tokio::{fs, io::AsyncReadExt};
@@ -1291,7 +1291,7 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 }
 
 #[tauri::command]
-async fn check_if_custom_server_running(window: Window) -> Result<(bool, String), String> {
+async fn check_if_custom_server_running(window: WebviewWindow) -> Result<(bool, String), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
@@ -1323,7 +1323,7 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
 }
 
 #[tauri::command]
-pub async fn terminate_custom_server(launcher_was_closed: bool, window: Window) -> Result<(), String> {
+pub async fn terminate_custom_server(launcher_was_closed: bool, window: WebviewWindow) -> Result<(), String> {
     let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
     
     let mut system = System::new_all();
@@ -1355,7 +1355,7 @@ pub async fn terminate_custom_server(launcher_was_closed: bool, window: Window) 
 }
 
 #[tauri::command]
-async fn execute_rcon_command(server_id: String, timestamp: String, log_type: String, command: String, window: Window) -> Result<String, String> {
+async fn execute_rcon_command(server_id: String, timestamp: String, log_type: String, command: String, window: WebviewWindow) -> Result<String, String> {
     let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
     client.authenticate("minecraft".to_string()).unwrap();
     
