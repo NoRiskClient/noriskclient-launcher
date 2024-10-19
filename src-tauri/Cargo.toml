@@ -53,13 +53,13 @@ chrono = { version = "0.4", features = ["serde"] }
 sha1 = "0.10.5"
 base16ct = {version = "0.2.0", features = ["alloc"] }
 
-# tauri stuff
-tauri = {version = "2.0.0-rc", features = [] }
-tauri-plugin-dialog = "2.0.0-rc"
-tauri-plugin-updater = "2.0.0-rc"
-tauri-plugin-notification = "2.0.0-rc"
-tauri-plugin-fs = "2.0.0-rc"
-tauri-plugin-process = "2.0.0-rc"
+# UI library
+tauri = { version = "2.0.4", features = [] }
+tauri-plugin-dialog = "2.0.1"
+tauri-plugin-updater = "2.0.2"
+tauri-plugin-notification = "2.0.1"
+tauri-plugin-fs = "2.0.1"
+tauri-plugin-process = "2.0.1"
 
 # HTTP library
 reqwest = { version = "0.12.4", features = ["json", "multipart"] }
@@ -95,6 +95,3 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
-
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.0.0-rc.0"
