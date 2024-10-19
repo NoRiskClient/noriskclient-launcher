@@ -19,50 +19,26 @@ impl CapeApiEndpoints {
     pub async fn equip_cape(token: &str, uuid: &str, hash: &str) -> Result<(), String> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
 
-        let image_url = if options.experimental_mode {
-            format!("https://dl-staging.norisk.gg/capes/prod/{}.png", hash)
-        } else {
-            format!("https://dl.norisk.gg/capes/prod/{}.png", hash)
-        };
+        // Baue die URL mit dem Token als Query-Parameter
+        let url = format!("{}/cosmetics/cape/{}/equip?uuid={}", get_api_base(options.experimental_mode), hash, uuid);
 
-        return match reqwest::get(image_url).await {
-            Ok(response) => {
-                let image_bytes = response.bytes().await;
+        // Sende den POST-Request
+        let response = HTTP_CLIENT
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
 
-                // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape?uuid={}", get_api_base(options.experimental_mode), uuid);
+        debug!("Cape equiped status {:?}",response.status());
 
-                // Sende den POST-Request
-                let response = HTTP_CLIENT
-                    .post(&url)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .body(image_bytes.unwrap())
-                    .send()
-                    .await
-                    .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
-
-                debug!("Cape equiped status {:?}",response.status());
-
-                return match response.status() {
-                    StatusCode::CREATED => {
-                        Ok(())
-                    }
-                    StatusCode::OK => {
-                        let response_text = response.text().await.map_err(|err| {
-                            format!("Error reading the request: {}", err)
-                        })?;
-                        Err(response_text)
-                    }
-                    _ => {
-                        let response_text = response.text().await.map_err(|err| {
-                            format!("Error reading the request: {}", err)
-                        })?;
-                        Err(response_text)
-                    }
-                };
-            }
-            Err(_err) => {
-                Err("Failed to equip cape.".parse().unwrap())
+        return match response.status() {
+            StatusCode::OK => Ok(()),
+            _ => {
+                let response_text = response.text().await.map_err(|err| {
+                    format!("Error reading the request: {}", err)
+                })?;
+                Err(response_text)
             }
         };
     }

@@ -2,10 +2,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { remove, watch } from "@tauri-apps/plugin-fs";
   import { open } from "@tauri-apps/plugin-dialog";
-  import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ResourcePackItem from "./ResourcePackItem.svelte";
-  import { createEventDispatcher, onDestroy, onMount } from "svelte";
+  import { tick, onDestroy, onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
@@ -19,7 +18,7 @@
   $: launcherProfiles = $profiles;
   let launcherProfile = null;
   let customResourcePacks = [];
-  let featuredResourcePacks = [];
+  let featuredResourcePacks = null;
   let blacklistedResourcePacks = [];
   let resourcePacks = [];
   let launchManifest = null;
@@ -27,6 +26,7 @@
   let filterterm = "";
   let currentTabIndex = 0;
   let fileWatcher;
+  let listScroll = 0;
 
   let search_offset = 0;
   let search_limit = 30;
@@ -80,11 +80,19 @@
   ];
   let filters = {};
   
+  let lastFileDrop = -1;
   listen("tauri://file-drop", files => {
     if (currentTabIndex != 1) {
       return;
     }
-    installCustomResourcePacks(files.payload);
+
+    const time = Date.now();
+    if (time - lastFileDrop < 1000) return;
+    lastFileDrop = time;
+    let todo = new Set();
+    files.payload.forEach(l => todo.add(l));
+
+    installCustomResourcePacks(todo);
   });
 
   // check if an element exists in array using a comparer function
@@ -103,6 +111,25 @@
       this.push(element);
     }
   };
+
+  async function updateResourcePacks(newResourcePacks) {
+    resourcePacks = newResourcePacks;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
+  async function updateProfileResourcePacks(newResourcePacks) {
+    launcherProfiles.addons[currentBranch].resourcePacks = newResourcePacks;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
 
   async function getLaunchManifest() {
     await invoke("get_launch_manifest", {
@@ -131,11 +158,11 @@
   async function getCustomResourcePacksFilenames() {
     await invoke("get_custom_resourcepacks_filenames", {
       options: options,
-      branch: launchManifest.build.branch,
       installedResourcepacks: launcherProfiles.addons[currentBranch].resourcePacks,
-    }).then((resourcePacks) => {
-      console.debug("Custom ResourcePacks", resourcePacks);
-      customResourcePacks = resourcePacks;
+      branch: launchManifest.build.branch,
+    }).then((fileNames) => {
+      console.debug("Custom ResourcePacks", fileNames);
+      customResourcePacks = fileNames;
     }).catch((error) => {
       addNotification(error);
     });
@@ -143,7 +170,7 @@
 
   async function installResourcePack(resourcePack) {
     resourcePack.loading = true;
-    resourcePacks = resourcePacks;
+    updateResourcePacks(resourcePacks);
     await invoke("install_resourcepack", {
       slug: resourcePack.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
@@ -152,8 +179,8 @@
         return e.slug === result.slug;
       });
       resourcePack.loading = false;
-      resourcePacks = resourcePacks;
-      launcherProfiles.addons[currentBranch].resourcePacks = launcherProfiles.addons[currentBranch].resourcePacks;
+      updateResourcePacks(resourcePacks);
+      updateProfileResourcePacks(launcherProfiles.addons[currentBranch].resourcePacks);
       launcherProfiles.store();
     }).catch((error) => {
       addNotification(error);
@@ -169,19 +196,32 @@
     return "INSTALL";
   }
 
+  async function getFeaturedResourcePacks() {
+    await invoke("get_featured_resourcepacks", {
+      branch: currentBranch,
+      mcVersion: launchManifest.build.mcVersion,
+    }).then((result) => {
+      console.debug("Featured ResourcePacks", result);
+      result.forEach(resourcePack => resourcePack.featured = true);
+      featuredResourcePacks = result;
+    }).catch((error) => {
+      addNotification(error);
+    });
+  }
+
   async function searchResourcePacks() {
-    if (searchterm === "" && search_offset === 0) {
-      await invoke("get_featured_resourcepacks", {
-        branch: currentBranch,
-        mcVersion: launchManifest.build.mcVersion,
-      }).then((result) => {
-        console.debug("Featured ResourcePacks", result);
-        result.forEach(resourcePack => resourcePack.featured = true);
-        resourcePacks = result;
-        featuredResourcePacks = result;
-      }).catch((error) => {
-        addNotification(error);
-      });
+    if (searchterm == "" && search_offset === 0) {
+      if (featuredResourcePacks == null) {
+        await getFeaturedResourcePacks();
+      }
+      updateResourcePacks([]);
+      // Wait for the UI to update
+      await tick();
+      updateResourcePacks(featuredResourcePacks);
+    } else {
+      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+      // Update: Ich habe ne eigene Virtual List gemacht 📉
+      updateResourcePacks([]);
     }
 
     await invoke("search_resourcepacks", {
@@ -206,11 +246,11 @@
         resourcePack.blacklisted = blacklistedResourcePacks.includes(resourcePack.slug);
       });
       if (result.hits.length === 0) {
-        resourcePacks = null;
+        updateResourcePacks(null);
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
-        resourcePacks = result.hits;
+        updateResourcePacks(result.hits);
       } else {
-        resourcePacks = [...resourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))];
+        updateResourcePacks([...resourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -229,26 +269,27 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].resourcePacks.splice(index, 1);
-      deleteResourcePackFile(resourcePack?.file_name ?? resourcePack, false);
-      resourcePacks = resourcePacks;
-      launcherProfiles.addons[currentBranch].resourcePacks = launcherProfiles.addons[currentBranch].resourcePacks;
+      deleteResourcePackFile(resourcePack?.file_name ?? resourcePack);
       launcherProfiles.store();
+
+      const prev = [resourcePacks, launcherProfiles.addons[currentBranch].resourcePacks]
+      updateResourcePacks([]);
+      updateProfileResourcePacks([]);
+      await tick();
+      updateResourcePacks(prev[0]);
+      updateProfileResourcePacks(prev[1]);
     } else {
       deleteResourcePackFile(resourcePack);
     }
   }
 
-  async function deleteResourcePackFile(filename, showError = true) {
-    await invoke("get_custom_resourcepacks_folder", {
+  async function deleteResourcePackFile(filename) {
+    await invoke("delete_resourcepack_file", {
+      fileName: filename,
       options: options,
       branch: launchManifest.build.branch,
-    }).then(async (folder) => {
-      await remove(folder + "/" + filename).then(() => {
-        getCustomResourcePacksFilenames();
-      }).catch((error) => {
-        if (!showError) return;
-        addNotification(error);
-      });
+    }).then(async () => {
+      getCustomResourcePacksFilenames();
     }).catch((error) => {
       addNotification(error);
     });
@@ -260,7 +301,6 @@
       branch: launchManifest.build.branch,
     }).then(async (folder) => {
       console.debug("File Watcher Folder", folder);
-      // can also watch an array of paths
       fileWatcher = await watch(
         folder,
         getCustomResourcePacksFilenames,
@@ -362,42 +402,50 @@
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Resource Packs on Modrinth..." />
     {#if resourcePacks !== null && resourcePacks.length > 0 }
-      <VirtualList height="30em"
-                   items={[...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null]} let:item>
-        {#if item == 'LOAD_MORE_RESOURCEPACKS'}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
-        {:else if item != null}
-          <ResourcePackItem text={checkIfRequiredOrInstalled(item.slug)}
-                            on:delete={() => deleteInstalledResourcePack(item)}
-                            on:install={() => installResourcePack(item)}
-                            type="RESULT"
-                            resourcePack={item} />
-        {/if}
-      </VirtualList>
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null] as item}
+          {#if item == 'LOAD_MORE_RESOURCEPACKS'}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
+          {:else if item != null}
+            <ResourcePackItem text={checkIfRequiredOrInstalled(item.slug)}
+              on:delete={() => deleteInstalledResourcePack(item)}
+              on:install={() => installResourcePack(item)}
+              type="RESULT"
+              resourcePack={item}
+            />
+          {/if}
+        {/each}
+      </div>
     {:else}
       <h1 class="loading-indicator">{resourcePacks == null ? 'No Resource Packs found.' : 'Loading...'}</h1>
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
                        placeHolder="Filter installed Resource Packs..." />
-    {#if launcherProfiles.addons[currentBranch].resourcePacks.length > 0 || resourcePacks.length > 0}
-      <VirtualList height="30em" items={[...customResourcePacks,...launcherProfiles.addons[currentBranch].resourcePacks].filter((resourcePack) => {
-                let name = (resourcePack?.title ?? resourcePack).toUpperCase()
-                return (resourcePack?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase())
-            }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b))} let:item>
-        {#if (typeof item === 'string' || item instanceof String)}
-          <ResourcePackItem text="INSTALLED"
-                            on:delete={() => deleteInstalledResourcePack(item)}
-                            type="CUSTOM"
-                            resourcePack={item} />
-        {:else}
-          <ResourcePackItem text="INSTALLED"
-                            on:delete={() => deleteInstalledResourcePack(item)}
-                            type="INSTALLED"
-                            resourcePack={item} />
-        {/if}
-      </VirtualList>
+    {#if launcherProfiles.addons[currentBranch].resourcePacks.length > 0 || customResourcePacks.length > 0}
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...customResourcePacks,...launcherProfiles.addons[currentBranch].resourcePacks].filter((resourcePack) => {
+          let name = (resourcePack?.title ?? resourcePack).toUpperCase()
+          return (resourcePack?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase())
+      }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) as item}
+          {#if (typeof item === 'string' || item instanceof String)}
+            <ResourcePackItem text="INSTALLED"
+              on:delete={() => deleteInstalledResourcePack(item)}
+              type="CUSTOM"
+              resourcePack={item}
+            />
+          {:else}
+            <ResourcePackItem text="INSTALLED"
+              on:delete={() => deleteInstalledResourcePack(item)}
+              type="INSTALLED"
+              resourcePack={item}
+            />
+          {/if}
+        {/each}
+      </div>
+    {:else}
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].resourcePacks.length < 1 ? 'No resourcepacks installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>
@@ -462,5 +510,14 @@
         display: flex;
         flex-direction: column;
         gap: 0.7em;
+    }
+
+    .scrollList {
+        height: 30em;
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling:touch;
+        display: block;
     }
 </style>

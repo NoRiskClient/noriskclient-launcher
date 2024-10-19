@@ -2,10 +2,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { remove, watch } from "@tauri-apps/plugin-fs";
   import { open } from "@tauri-apps/plugin-dialog";
-  import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import ShaderItem from "./ShaderItem.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { tick, onDestroy, onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
@@ -19,7 +18,7 @@
   $: launcherProfiles = $profiles;
   let launcherProfile = null;
   let customShaders = [];
-  let featuredShaders = [];
+  let featuredShaders = null;
   let blacklistedShaders = [];
   let shaders = [];
   let launchManifest = null;
@@ -27,6 +26,7 @@
   let filterterm = "";
   let currentTabIndex = 0;
   let fileWatcher;
+  let listScroll = 0;
 
   let search_offset = 0;
   let search_limit = 30;
@@ -70,11 +70,18 @@
   ];
   let filters = {};
 
+  let lastFileDrop = -1;
   listen("tauri://file-drop", files => {
     if (currentTabIndex !== 1) {
       return;
     }
-    installCustomShaders(files.payload);
+
+    const time = Date.now();
+    if (time - lastFileDrop < 1000) return;
+    lastFileDrop = time;
+    let todo = new Set();
+    files.payload.forEach(l => todo.add(l));
+    installCustomShaders(todo);
   });
 
   // check if an element exists in array using a comparer function
@@ -93,6 +100,25 @@
       this.push(element);
     }
   };
+
+  async function updateShaders(newShaders) {
+    shaders = newShaders;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
+  async function updateProfileShaders(newShaders) {
+    launcherProfiles.addons[currentBranch].shaders = newShaders;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
 
   async function getLaunchManifest() {
     await invoke("get_launch_manifest", {
@@ -123,9 +149,9 @@
       options: options,
       branch: launchManifest.build.branch,
       installedShaders: launcherProfiles.addons[currentBranch].shaders,
-    }).then((shaders) => {
-      console.debug("Custom Shaders", shaders);
-      customShaders = shaders;
+    }).then((fileNames) => {
+      console.debug("Custom Shaders", fileNames);
+      customShaders = fileNames;
     }).catch((error) => {
       addNotification(error);
     });
@@ -133,7 +159,7 @@
 
   async function installShader(shader) {
     shader.loading = true;
-    shaders = shaders;
+    updateShaders(shaders);
     await invoke("install_shader", {
       slug: shader.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`,
@@ -142,8 +168,8 @@
         return e.slug === result.slug;
       });
       shader.loading = false;
-      shaders = shaders;
-      launcherProfiles.addons[currentBranch].shaders = launcherProfiles.addons[currentBranch].shaders;
+      updateShaders(shaders);
+      updateProfileShaders(launcherProfiles.addons[currentBranch].shaders);
       launcherProfiles.store();
     }).catch((error) => {
       addNotification(error);
@@ -159,19 +185,33 @@
     return "INSTALL";
   }
 
-  async function searchShaders() {
-    if (searchterm === "" && search_offset === 0) {
-      await invoke("get_featured_shaders", {
+  async function getFeaturedShaders() {
+    await invoke("get_featured_shaders", {
         branch: currentBranch,
         mcVersion: launchManifest.build.mcVersion,
       }).then((result) => {
         console.debug("Featured Shaders", result);
         result.forEach(shader => shader.featured = true);
-        shaders = result;
         featuredShaders = result;
       }).catch((error) => {
         addNotification(error);
+        featuredShaders = [];
       });
+  }
+
+  async function searchShaders() {
+    if (searchterm == "" && search_offset === 0) {
+      if (featuredShaders == null) {
+        await getFeaturedShaders();
+      }
+      updateShaders([]);
+      // Wait for the UI to update
+      await tick();
+      updateShaders(featuredShaders);
+    } else {
+      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+      // Update: Ich habe ne eigene Virtual List gemacht 📉
+      updateShaders([]);
     }
 
     await invoke("search_shaders", {
@@ -196,11 +236,11 @@
         shader.blacklisted = blacklistedShaders.includes(shader.slug);
       });
       if (result.hits.length === 0) {
-        shaders = null;
+        updateShaders(null);
       } else if ((search_offset === 0 && searchterm !== "") || Object.values(filters).length > 0) {
-        shaders = result.hits;
+        updateShaders(result.hits);
       } else {
-        shaders = [...shaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))];
+        updateShaders([...shaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -218,30 +258,27 @@
     });
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
-      deleteShaderFile(shader?.file_name ?? shader, false);
-      shaders = shaders;
-      launcherProfiles.addons[currentBranch].shaders = launcherProfiles.addons[currentBranch].shaders;
+      deleteShaderFile(shader?.file_name ?? shader);
       launcherProfiles.store();
+
+      const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];
+      updateShaders([]);
+      updateProfileShaders([]);
+      await tick();
+      updateShaders(prev[0]);
+      updateProfileShaders(prev[1]);
     } else {
       deleteShaderFile(shader);
     }
   }
 
-  async function deleteShaderFile(filename, showError = true) {
-    await invoke("get_custom_shaders_folder", {
+  async function deleteShaderFile(filename) {
+    await invoke("delete_shader_file", {
+      fileName: filename,
       options: options,
       branch: launchManifest.build.branch,
-    }).then(async (folder) => {
-      await remove(folder + "/" + filename).then(() => {
-        getCustomShadersFilenames();
-      }).catch((error) => {
-        if (!showError) return;
-        addNotification(error);
-      });
-      // remove potential shader settings txt
-      await remove(folder + "/" + filename + ".txt").catch((error) => {
-        return;
-      });
+    }).then(async () => {
+      getCustomShadersFilenames();
     }).catch((error) => {
       addNotification(error);
     });
@@ -355,40 +392,49 @@
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Shaders on Modrinth..." />
     {#if shaders !== null && shaders.length > 0 }
-      <VirtualList height="30em" items={[...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null]} let:item>
-        {#if item == 'LOAD_MORE_SHADERS'}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
-        {:else if item != null}
-          <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
-                      on:delete={() => deleteInstalledShader(item)}
-                      on:install={() => installShader(item)}
-                      type="RESULT"
-                      shader={item} />
-        {/if}
-      </VirtualList>
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null] as item}
+          {#if item == 'LOAD_MORE_SHADERS'}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
+          {:else if item != null}
+            <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
+              on:delete={() => deleteInstalledShader(item)}
+              on:install={() => installShader(item)}
+              type="RESULT"
+              shader={item}
+            />
+          {/if}
+        {/each}
+      </div>
     {:else}
       <h1 class="loading-indicator">{shaders == null ? 'No Shaders found.' : 'Loading...'}</h1>
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Shaders..." />
     {#if launcherProfiles.addons[currentBranch].shaders.length > 0 || customShaders.length > 0}
-      <VirtualList height="30em" items={[...customShaders,...launcherProfiles.addons[currentBranch].shaders].filter((shader) => {
-                let name = (shader?.title ?? shader).toUpperCase()
-                return (shader?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase())
-            }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) } let:item>
-        {#if (typeof item === 'string' || item instanceof String)}
-          <ShaderItem text="INSTALLED"
-                      on:delete={() => deleteInstalledShader(item)}
-                      type="CUSTOM"
-                      shader={item} />
-        {:else}
-          <ShaderItem text="INSTALLED"
-                      on:delete={() => deleteInstalledShader(item)}
-                      type="INSTALLED"
-                      shader={item} />
-        {/if}
-      </VirtualList>
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...customShaders,...launcherProfiles.addons[currentBranch].shaders].filter((shader) => {
+          let name = (shader?.title ?? shader).toUpperCase()
+          return (shader?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase())
+      }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) as item}
+          {#if (typeof item === 'string' || item instanceof String)}
+            <ShaderItem text="INSTALLED"
+              on:delete={() => deleteInstalledShader(item)}
+              type="CUSTOM"
+              shader={item}
+            />
+          {:else}
+            <ShaderItem text="INSTALLED"
+              on:delete={() => deleteInstalledShader(item)}
+              type="INSTALLED" 
+              shader={item}
+            />
+          {/if}
+        {/each}
+      </div>
+      {:else}
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].shaders.length < 1 ? 'No shaders installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>
@@ -453,5 +499,14 @@
         display: flex;
         flex-direction: column;
         gap: 0.7em;
+    }
+
+    .scrollList {
+        height: 30em;
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling:touch;
+        display: block;
     }
 </style>

@@ -11,6 +11,19 @@ use crate::HTTP_CLIENT;
 pub struct ModrinthApiEndpoints;
 
 impl ModrinthApiEndpoints {
+    // PROJECTS
+    pub async fn get_project_members(slug: &str) -> Result<Vec<ModrinthTeamMember>, Box<dyn Error>> {
+        let url = format!("https://api.modrinth.com/v2/project/{}/members", slug);
+        let response = HTTP_CLIENT.get(url)
+            .send()
+            .await
+            .map_err(|e| format!("Modrinth Team Members Request error: {:?}", e))?;
+        match response.json::<Vec<ModrinthTeamMember>>().await {
+            Ok(json) => Ok(json),
+            Err(e) => Err(Box::new(e) as Box<dyn Error>),
+        }
+    }
+
     // MODS
     pub async fn search_mods(params: &ModrinthSearchRequestParams) -> Result<ModrinthModsSearchResponse, Box<dyn Error>> {
         let url = format!("https://api.modrinth.com/v2/search?facets={}&index={}&limit={}&offset={}&query={}", params.facets, params.index, params.limit, params.offset, params.query);
@@ -96,11 +109,14 @@ impl ModrinthApiEndpoints {
         Ok(result)
     }
 
-    pub async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: &Vec<LoaderMod>) -> Result<CustomMod, Box<dyn Error>> {
+    pub async fn install_mod_and_dependencies(slug: &str, version: Option<&str>, params: &str, required_mods: &Vec<LoaderMod>) -> Result<CustomMod, Box<dyn Error>> {
         let mod_project = ModrinthApiEndpoints::get_mod_info(slug).await?;
         let mod_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
-        let project = mod_versions.first().ok_or("Mod not found")?;
-
+        let project = if version.is_some() {
+            mod_versions.iter().find(|project| project.version_number == version.unwrap()).ok_or("Mod not found")?
+        } else {
+            mod_versions.first().ok_or("Mod not found")?
+        };
         let dependencies = ModrinthApiEndpoints::get_dependencies(&project.dependencies, params, required_mods).await?;
 
         Ok(CustomMod {
@@ -315,6 +331,17 @@ impl ModrinthApiEndpoints {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct ModrinthTeamMember {
+    pub user: ModrinthUser,
+    pub role: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModrinthUser {
+    pub username: String
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ModrinthModsSearchResponse {
     hits: Vec<ModInfo>,
     offset: u32,
@@ -362,6 +389,7 @@ pub struct ModInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -380,6 +408,7 @@ pub struct ShaderInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -400,6 +429,7 @@ pub struct ResourcePackInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 
@@ -420,6 +450,7 @@ pub struct DatapackInfo {
     pub title: String,
     pub description: String,
     pub icon_url: String,
+    pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
 

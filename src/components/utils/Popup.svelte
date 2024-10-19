@@ -89,7 +89,7 @@
     <hr>
     <div class="popup-content-wrapper">
         <div class="content-wrapper" style={`height: ${popupHeight - 11}em;`}>
-            <p class="content nes-font" style={`font-size: ${popupContentFontSize};`}>{popupContent}</p>
+            <p class="content nes-font" style={`font-size: ${popupContentFontSize};`}>{@html popupContent}</p>
             {#if popupType == "INPUT"}
                 {#if popupInputType == "TEXT"}
                     <ConfigTextInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} placeholder={popupInputPlaceholder} />

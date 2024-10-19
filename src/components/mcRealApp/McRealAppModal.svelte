@@ -8,16 +8,13 @@
   
     export let showModal;
   
-    function hideModal() {
-      showModal = false;
-    }
-  
     let dialog; // HTMLDialogElement
     let mobileAppToken;
     let codeContent;
     let showQrCode = false;
   
     $: if (dialog && showModal) dialog.showModal();
+    let animateOutNow = false;
   
     async function getToken() {
       const token = getNoRiskToken();
@@ -48,6 +45,14 @@
       });
     }
 
+    function animateOut() {
+      animateOutNow = true;
+      setTimeout(() => {
+        showModal = false;
+        dialog.close();
+      }, 100);
+    }
+
     function preventSelection(event) {
       event.preventDefault();
     }
@@ -58,14 +63,16 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <dialog
     bind:this={dialog}
-    on:close={hideModal}
+    class:animateOut={animateOutNow}
+    class:animateIn={!animateOutNow}
+    on:close={animateOut}
     on:click|self={() => dialog.close()}
   >
     <div on:click|stopPropagation class="divider">
       <div>
         <div class="header-wrapper">
           <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>MCREAL APP</h1>
-          <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
+          <h1 class="nes-font red-text-clickable close-button" on:click={animateOut}>X</h1>
         </div>
         <hr>
         <div class="settings-wrapper">
@@ -137,17 +144,47 @@
       }
   
       dialog[open]::backdrop {
-          animation: fade 0.2s ease-out;
-      }
-  
-      @keyframes fade {
-          from {
-              opacity: 0;
-          }
-          to {
-              opacity: 1;
-          }
-      }
+        animation: fade 0.2s ease-out;
+    }
+
+    dialog.animateIn {
+        animation: open 0.2s ease-out;
+    }
+
+    dialog.animateOut {
+        animation: close 0.2s ease-out;
+    }
+
+    @keyframes fade {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes open {
+        from {
+            transform: translate(-50%, 200%);
+            opacity: 0;
+        }
+        to {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+    }
+
+    @keyframes close {
+        from {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+        to {
+            transform: translate(-50%, 200%);
+            opacity: 0;
+        }
+    }
   
       .nes-font {
           font-family: 'Press Start 2P', serif;

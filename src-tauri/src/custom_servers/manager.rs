@@ -63,15 +63,15 @@ impl CustomServerManager {
             None => {
                 info!("Checking for JRE...");
                 let _ = Self::handle_progress(&window_mutex, &custom_server.id, ProgressUpdate::SetLabel("Checking for JRE...".to_owned()))?;
-                
-                match find_java_binary(&runtimes_folder, 17).await {
+
+                match find_java_binary(&runtimes_folder, 21).await {
                     Result::Ok(jre) => jre, // Fix: Wrap the value in a tuple variant
                     Err(e) => {
                         error!("Failed to find JRE: {}", e);
                         
                         info!("Download JRE...");
                         let _ = Self::handle_progress(&window_mutex, &custom_server.id, ProgressUpdate::SetLabel("Download JRE...".to_owned()))?;
-                        jre_downloader::jre_download(&runtimes_folder, 17, |a, b| {
+                        jre_downloader::jre_download(&runtimes_folder, 21, |a, b| {
                             let _ = Self::handle_progress(&window_mutex, &custom_server.id, ProgressUpdate::SetProgress((a / b) * 100));
                         }).await?
                     }

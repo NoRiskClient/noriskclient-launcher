@@ -7,10 +7,6 @@
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
-  function preventSelection(event) {
-    event.preventDefault();
-  }
-
   $: currentBranch = $branches[$currentBranchIndex];
 
   let world;
@@ -31,7 +27,7 @@
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 {#if world == null}
-  <div class="wrapper" on:selectstart={preventSelection}>
+  <div class="wrapper">
     <h1 class="title">Worlds</h1>
     <div style="height: 65px;"></div>
     {#if worlds.length > 0}

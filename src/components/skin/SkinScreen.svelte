@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
@@ -9,9 +9,8 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { preventSelection } from "../../utils/svelteUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
-  import { noriskLog } from "../../utils/noriskUtils.js";
-
-  const dispatch = createEventDispatcher();
+  import { noriskLog, getMcToken } from "../../utils/noriskUtils.js";
+  import { pop } from "svelte-spa-router";
 
   let isLoading = true;
 
@@ -126,11 +125,11 @@
       await invoke("save_player_skin", {
         location: location,
         slim: slim ?? false,
-        accessToken: $defaultUser.accessToken,
+        accessToken: getMcToken(),
       })
         .then(() => {
           isLoading = false;
-          dispatch("home");
+          pop();
           isLoading = true;
         })
         .catch(async (error) => {

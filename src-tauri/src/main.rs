@@ -64,7 +64,7 @@ pub fn main() -> anyhow::Result<()> {
 
     // Build a stdout logger.
     let stderr = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n")))
+        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n")))
         .target(Target::Stderr).build();
 
     // Create a policy to use with the file logging
@@ -78,7 +78,7 @@ pub fn main() -> anyhow::Result<()> {
     // Logging to log file. (with rolling)
     let logfile = log4rs::append::rolling_file::RollingFileAppender::builder()
         // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
-        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n")))
+        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n")))
         .build(latest_log.clone(), Box::new(policy))
         .unwrap();
 
@@ -106,6 +106,7 @@ pub fn main() -> anyhow::Result<()> {
     // once you are done.
     let _handle = log4rs::init_config(config)?;
 
+    info!("");
     info!("###############################");
     info!("");
     info!("");
@@ -113,6 +114,7 @@ pub fn main() -> anyhow::Result<()> {
     info!("");
     info!("");
     info!("###############################");
+    info!("");
 
 
     // application directory
