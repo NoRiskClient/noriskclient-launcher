@@ -1483,7 +1483,7 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 async fn check_if_custom_server_running(window: WebviewWindow) -> Result<(bool, String), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
-    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
+    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap_or_default();
     if latest_running_server.forwarder_process_id.is_none() && latest_running_server.process_id.is_none() {
         return Ok((false, String::new()));
     }

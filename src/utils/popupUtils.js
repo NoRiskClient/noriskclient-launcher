@@ -1,6 +1,6 @@
 import { get, writable } from "svelte/store";
 import { addNotification } from "../stores/notificationStore";
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { pop, push, replace } from "svelte-spa-router";
 import { noriskLog } from "./noriskUtils";
 
