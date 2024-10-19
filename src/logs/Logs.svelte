@@ -55,10 +55,13 @@
 <div class="black-bar" data-tauri-drag-region>
   <div class="logs-button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:auto-scroll-button-on={autoScroll} class:auto-scroll-button-off={!autoScroll}
-        on:click={toggleAutoScroll}>
-      [Auto Scroll]
-    </h1>
+    <h1
+      class:auto-scroll-button-on={autoScroll}
+      class:green-text={autoScroll}
+      class:auto-scroll-button-off={!autoScroll}
+      class:red-text={!autoScroll}
+      on:click={toggleAutoScroll}
+    >[Auto Scroll]</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="copy-button primary-text" on:click={uploadLogs}>
       [Copy]

@@ -8,6 +8,8 @@ use dirs::data_dir;
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
+use rand::Rng;
+use regex::Regex;
 use minecraft_client_rs::Client;
 use reqwest::multipart::{Form, Part};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};

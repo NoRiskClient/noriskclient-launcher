@@ -4,7 +4,7 @@
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus } from "./utils/noriskUtils.js";
+  import { isInMaintenanceMode, isClientRunning, noriskUser, checkApiStatus, noriskError, } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
@@ -32,6 +32,7 @@
   import ApiOfflineScreen from "./components/maintenance-mode/ApiOfflineScreen.svelte";
   import { listen } from "@tauri-apps/api/event";
   import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
+  import Popup from "./components/utils/Popup.svelte";
 
   const routes = {
     "/": Home,
@@ -61,12 +62,27 @@
   onMount(async () => {
     apiIsOnline = await checkApiStatus();
 
+    const clientLaunchError = await listen("client-error", async (event) => {
+      let reason = event.payload; // Extract the path from the event's payload
+      // Remove the prefix "Failed to launch client:" if it exists
+      if (reason.startsWith("Failed to launch client: ")) {
+        reason = reason.replace("Failed to launch client: ", "");
+      }
+      noriskError(reason);
+      showLaunchErrorModal = true;
+      launchErrorReason = reason
+    });
+
     invoke("check_if_custom_server_running").then((value) => {
       console.log(value);
       if (value[0] == true) {
         setStillRunningCustomServer(value[1]);
       }
     }).catch(error => addNotification("Failed to check if custom server is running: " + error));
+
+    return () => {
+      clientLaunchError();
+    };
   });
 
   // Event Handler
@@ -112,6 +128,9 @@
     <ApiOfflineScreen />
   {:else if apiIsOnline === true}
     <Notifications />
+    {#if $activePopup != null}
+      <Popup />
+    {/if}
     {#if $isInMaintenanceMode === true && !$noriskUser?.isDev}
       <MaintenanceMode />
     {:else if $isInMaintenanceMode === false || $noriskUser?.isDev}
