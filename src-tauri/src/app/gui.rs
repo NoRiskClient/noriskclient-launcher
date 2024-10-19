@@ -7,7 +7,6 @@ use dirs::data_dir;
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
-use log4rs::append::file;
 use rand::Rng;
 use regex::Regex;
 use minecraft_client_rs::Client;
