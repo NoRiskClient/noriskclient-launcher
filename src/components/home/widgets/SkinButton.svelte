@@ -22,7 +22,7 @@
     <div on:click={() => (showModal = true)} class="tag">*</div>
   {:else}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <img class="skin-kopf zoom"
+    <img class="skin-kopf zoom glow"
          src={SteveSkin}
          alt="Skin Kopf"
          on:click={startMicrosoftAuth}
@@ -92,5 +92,9 @@
     100% {
       transform: scale(1, 1);
     }
+  }
+  
+  .glow {
+    box-shadow: 0 0 15px var(--primary-color);
   }
 </style>
