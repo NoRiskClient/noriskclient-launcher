@@ -11,7 +11,7 @@
                 class="change"
                 class:ADDED={change.startsWith('+') || change.toUpperCase().startsWith('ADDED')}
                 class:REMOVED={change.startsWith('-') || change.toUpperCase().startsWith('REMOVED')}
-            >{change}</p>
+            >{@html change}</p>
         {/each}
     </div>
 </div>
