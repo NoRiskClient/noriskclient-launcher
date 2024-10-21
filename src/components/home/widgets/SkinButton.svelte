@@ -1,6 +1,7 @@
 <script>
   import Modal from "../../account/AccountModal.svelte";
   import SteveSkin from "../../../images/steve_head.png";
+  import FallbackSkin from "/src/images/fallback_skin_kopf.png";
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { startMicrosoftAuth } from "../../../utils/microsoftUtils.js";
   import { runClient } from "../../../utils/noriskUtils.js";
@@ -15,7 +16,8 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img class="skin-kopf"
          src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
-         alt="Skin Kopf"
+         alt=" " 
+         onerror="this.src='{FallbackSkin}'"
          on:click={() => { runClient($branches[$currentBranchIndex])}}
     >
     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -38,7 +40,6 @@
   }
 
   .skin-kopf {
-    cursor: pointer;
     -webkit-user-drag: none;
     box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
     border-radius: 0.45em;
@@ -67,7 +68,6 @@
     z-index: 1000;
     padding: 5px;
     font-weight: bold;
-    cursor: pointer;
     transition: transform 0.3s, color 0.25s;
   }
 
@@ -77,7 +77,6 @@
   }
 
   .zoom {
-    cursor: pointer;
     box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
     border-radius: 0.2em;
     animation: zoom 5s ease infinite;
@@ -93,8 +92,9 @@
       transform: scale(1, 1);
     }
   }
-  
+
   .glow {
     box-shadow: 0 0 15px var(--primary-color);
   }
+
 </style>
