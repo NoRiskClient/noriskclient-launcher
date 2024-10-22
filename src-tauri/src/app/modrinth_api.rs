@@ -389,7 +389,7 @@ pub struct ModInfo {
     pub author: Option<String>,
     pub title: String,
     pub description: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
