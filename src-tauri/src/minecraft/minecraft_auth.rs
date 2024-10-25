@@ -116,7 +116,7 @@ impl MinecraftAuthStore {
         if auth_path.exists() {
             let contents = fs::read_to_string(&auth_path)
                 .await
-                .map_err(|e| ErrorKind::FSError(format!("Failed to read accounts.json: {}", e)))?;
+                .map_err(|e| ErrorKind::FSError(format!("Failed to read accounts.json: {e}")))?;
 
             match serde_json::from_str::<MinecraftAuthStore>(&contents) {
                 Ok(store) => Ok(store),
@@ -137,7 +137,7 @@ impl MinecraftAuthStore {
             serde_json::to_string_pretty(&self)?,
         )
         .await
-        .map_err(|err| -> String { format!("Failed to write options.json: {}", err) });
+        .map_err(|err| -> String { format!("Failed to write options.json: {err}") });
         Ok(())
     }
 
@@ -222,7 +222,9 @@ impl MinecraftAuthStore {
                 redirect_uri: redirect_uri.value.msa_oauth_redirect,
             }),
             Err(err) => {
-                if !valid_date {
+                if valid_date {
+                    Err(crate::error::ErrorKind::from(err).into())
+                } else {
                     let (key, token, current_date, _) =
                         self.refresh_and_get_device_token(Utc::now(), false).await?;
 
@@ -241,8 +243,6 @@ impl MinecraftAuthStore {
                         session_id,
                         redirect_uri: redirect_uri.value.msa_oauth_redirect,
                     })
-                } else {
-                    Err(crate::error::ErrorKind::from(err).into())
                 }
             }
         }
@@ -316,7 +316,12 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: if !Self::init(None).await?.users.is_empty() {
+            norisk_credentials: if Self::init(None).await?.users.is_empty() {
+                NoRiskCredentials {
+                    production: None,
+                    experimental: None,
+                }
+            } else {
                 Self::init(None)
                     .await?
                     .users
@@ -324,11 +329,6 @@ impl MinecraftAuthStore {
                     .unwrap()
                     .norisk_credentials
                     .clone()
-            } else {
-                NoRiskCredentials {
-                    production: None,
-                    experimental: None,
-                }
             },
         };
 
@@ -500,7 +500,7 @@ impl MinecraftAuthStore {
             if self.users.is_empty() {
                 self.default_user = None;
             } else {
-                self.default_user = self.users.keys().next().cloned();
+                self.default_user = self.users.keys().next().copied();
             }
         }
         debug!("Removing {:?}", id);
@@ -1072,13 +1072,13 @@ async fn send_signed_request<T: DeserializeOwned>(
     step: MinecraftAuthStep,
     current_date: DateTime<Utc>,
 ) -> Result<SignedRequestResponse<T>, MinecraftAuthenticationError> {
+    use byteorder::WriteBytesExt;
     let auth = authorization.map_or(Vec::new(), |v| v.as_bytes().to_vec());
 
     let body = serde_json::to_vec(&raw_body)
         .map_err(|source| MinecraftAuthenticationError::SerializeBody { source, step })?;
-    let time: u128 = { ((current_date.timestamp() as u128) + 11644473600) * 10000000 };
+    let time: u128 = { ((current_date.timestamp() as u128) + 11_644_473_600) * 10_000_000 };
 
-    use byteorder::WriteBytesExt;
     let mut buffer = Vec::new();
     buffer.write_u32::<BigEndian>(1).map_err(|source| {
         MinecraftAuthenticationError::ConstructingSignedRequest { source, step }
@@ -1177,8 +1177,7 @@ fn get_date_header(headers: &HeaderMap) -> DateTime<Utc> {
         .get(reqwest::header::DATE)
         .and_then(|x| x.to_str().ok())
         .and_then(|x| DateTime::parse_from_rfc2822(x).ok())
-        .map(|x| x.with_timezone(&Utc))
-        .unwrap_or(Utc::now())
+        .map_or(Utc::now(), |x| x.with_timezone(&Utc))
 }
 
 fn generate_oauth_challenge() -> String {
@@ -1188,7 +1187,7 @@ fn generate_oauth_challenge() -> String {
     bytes
         .iter()
         .fold(String::with_capacity(64 * 2), |mut acc, byte| {
-            write!(&mut acc, "{:02x}", byte).unwrap();
+            write!(&mut acc, "{byte:02x}").unwrap();
             acc
         })
 }

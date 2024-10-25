@@ -17,8 +17,7 @@ fn default_concurrent_downloads() -> i32 {
     10
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Addons {
     pub shaders: Vec<Shader>,
     #[serde(rename = "resourcePacks")]
@@ -34,8 +33,7 @@ pub struct LauncherProfile {
     pub mods: Vec<CustomMod>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub(crate) struct LauncherProfiles {
     #[serde(rename = "mainProfiles")]
     pub main_profiles: Vec<LauncherProfile>,
@@ -81,9 +79,7 @@ impl LauncherOptions {
         let options = serde_json::from_slice::<LauncherOptions>(
             &fs::read(app_data.join("options.json")).await?,
         )
-        .map_err(|err| -> String {
-            format!("Failed to write options.json: {}", err)
-        })
+        .map_err(|err| -> String { format!("Failed to write options.json: {err}") })
         .unwrap_or_else(|_| LauncherOptions::default());
         Ok(options)
     }
@@ -94,7 +90,7 @@ impl LauncherOptions {
             serde_json::to_string_pretty(&self)?,
         )
         .await
-        .map_err(|err| -> String { format!("Failed to write options.json: {}", err) });
+        .map_err(|err| -> String { format!("Failed to write options.json: {err}") });
         Ok(())
     }
 
@@ -113,14 +109,17 @@ impl Default for LauncherOptions {
             // Dark mode
             dark_light::Mode::Dark => "DARK",
             // Light mode
-            dark_light::Mode::Light => "LIGHT",
             // Unspecified
-            dark_light::Mode::Default => "LIGHT",
+            dark_light::Mode::Light | dark_light::Mode::Default => "LIGHT",
         };
         Self {
             keep_launcher_open: true,
             experimental_mode: false,
-            data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
+            data_path: LAUNCHER_DIRECTORY
+                .data_dir()
+                .to_str()
+                .expect("Could not get Launcher Directory")
+                .to_string(),
             memory_percentage: 35, // 35% memory of computer allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
@@ -138,12 +137,7 @@ impl LauncherProfiles {
         let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(
             &fs::read(app_data.join("launcher_profiles.json")).await?,
         )
-        .map_err(|err| -> String {
-            format!(
-                "Failed to write launcher_profiles.json: {}",
-                err
-            )
-        })
+        .map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {err}") })
         .unwrap_or_else(|_| LauncherProfiles::default());
         Ok(launcher_profiles)
     }
@@ -155,11 +149,7 @@ impl LauncherProfiles {
             serde_json::to_string_pretty(&self)?,
         )
         .await
-        .map_err(|err| -> String {
-            format!("Failed to write launcher_profiles.json: {}", err)
-        });
+        .map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {err}") });
         Ok(())
     }
 }
-
-

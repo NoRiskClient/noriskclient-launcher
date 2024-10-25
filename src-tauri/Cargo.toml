@@ -97,3 +97,29 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+perf = { level = "deny", priority = 2 }
+style = { level = "deny", priority = 3 }
+
+# These should be enabled in the future:
+unwrap_used = { level = "allow", priority = 5 }         # very important
+missing_errors_doc = { level = "allow", priority = 20 }
+missing_panics_doc = { level = "allow", priority = 21 }
+too_many_lines = { level = "allow", priority = 22 }
+# expect_used = { level = "deny", priority = 6 }
+
+# These are okay to allow
+module_name_repetitions = { level = "allow", priority = 21 }
+cast_sign_loss = { level = "allow", priority = 32 }
+cast_possible_truncation = { level = "allow", priority = 33 }
+cast_possible_wrap = { level = "allow", priority = 34 }
+cast_precision_loss = { level = "allow", priority = 35 }
+# seems this a tauri thing
+used_underscore_binding = { level = "allow", priority = 40 }
+# Maybe interesting for the future
+# nursery = { level = "deny", priority = 0 }

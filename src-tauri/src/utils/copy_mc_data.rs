@@ -18,7 +18,7 @@ impl McDataHandler {
     ) -> Result<(), String> {
         let options = get_options()
             .await
-            .map_err(|e| format!("unable to load options: {:?}", e))?;
+            .map_err(|e| format!("unable to load options: {e:?}"))?;
         let mc_folder_path = PathBuf::from(path);
 
         if !mc_folder_path.exists() {
@@ -30,7 +30,7 @@ impl McDataHandler {
         if !&branch_dir_path.exists() {
             fs::create_dir_all(&branch_dir_path)
                 .await
-                .map_err(|e| format!("unable to create branch directory: {:?}", e))?;
+                .map_err(|e| format!("unable to create branch directory: {e:?}"))?;
         }
 
         let servers_path = mc_folder_path.join("servers.dat");
@@ -39,7 +39,7 @@ impl McDataHandler {
         if servers_path.exists() {
             fs::copy(&servers_path, &new_servers_path)
                 .await
-                .map_err(|e| format!("unable to copy servers.dat: {:?}", e))?;
+                .map_err(|e| format!("unable to copy servers.dat: {e:?}"))?;
         }
 
         let options_path = mc_folder_path.join("options.txt");
@@ -48,7 +48,7 @@ impl McDataHandler {
         if options_path.exists() {
             fs::copy(&options_path, &new_options_path)
                 .await
-                .map_err(|e| format!("unable to copy options.txt: {:?}", e))?;
+                .map_err(|e| format!("unable to copy options.txt: {e:?}"))?;
         }
 
         let resource_packs_path = mc_folder_path.join("resourcepacks");
@@ -57,7 +57,7 @@ impl McDataHandler {
         if resource_packs_path.exists() {
             Self::copy_mc_dir_all(&resource_packs_path, new_resource_packs_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy resource packs: {:?}", e))?;
+                .map_err(|e| format!("unable to copy resource packs: {e:?}"))?;
         }
 
         let shader_packs_path = mc_folder_path.join("shaderpacks");
@@ -66,7 +66,7 @@ impl McDataHandler {
         if shader_packs_path.exists() {
             Self::copy_mc_dir_all(&shader_packs_path, new_shader_packs_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy shader packs: {:?}", e))?;
+                .map_err(|e| format!("unable to copy shader packs: {e:?}"))?;
         }
 
         let saves_path = mc_folder_path.join("saves");
@@ -75,7 +75,7 @@ impl McDataHandler {
         if saves_path.exists() {
             Self::copy_mc_dir_all(&saves_path, new_saves_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy saves: {:?}", e))?;
+                .map_err(|e| format!("unable to copy saves: {e:?}"))?;
         }
 
         Ok(())
@@ -88,7 +88,7 @@ impl McDataHandler {
     ) -> Result<(), String> {
         let options = get_options()
             .await
-            .map_err(|e| format!("unable to load options: {:?}", e))?;
+            .map_err(|e| format!("unable to load options: {e:?}"))?;
         let old_branch_path = options.data_path_buf().join("gameDir").join(old_branch);
         let new_branch_path = options.data_path_buf().join("gameDir").join(new_branch);
 
@@ -97,7 +97,7 @@ impl McDataHandler {
         } else if !new_branch_path.exists() {
             fs::create_dir_all(&new_branch_path)
                 .await
-                .map_err(|e| format!("unable to create new branch directory: {:?}", e))?;
+                .map_err(|e| format!("unable to create new branch directory: {e:?}"))?;
         }
 
         let old_servers_path = old_branch_path.join("servers.dat");
@@ -106,7 +106,7 @@ impl McDataHandler {
         if old_servers_path.exists() {
             fs::copy(&old_servers_path, &new_servers_path)
                 .await
-                .map_err(|e| format!("unable to copy servers.dat: {:?}", e))?;
+                .map_err(|e| format!("unable to copy servers.dat: {e:?}"))?;
         }
 
         let old_options_path = old_branch_path.join("options.txt");
@@ -115,7 +115,7 @@ impl McDataHandler {
         if old_options_path.exists() {
             fs::copy(&old_options_path, &new_options_path)
                 .await
-                .map_err(|e| format!("unable to copy options.txt: {:?}", e))?;
+                .map_err(|e| format!("unable to copy options.txt: {e:?}"))?;
         }
 
         let old_resource_packs_path = old_branch_path.join("resourcepacks");
@@ -124,7 +124,7 @@ impl McDataHandler {
         if old_resource_packs_path.exists() {
             Self::copy_mc_dir_all(&old_resource_packs_path, &new_resource_packs_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy resource packs: {:?}", e))?;
+                .map_err(|e| format!("unable to copy resource packs: {e:?}"))?;
         }
 
         let old_shader_packs_path = old_branch_path.join("shaderpacks");
@@ -133,7 +133,7 @@ impl McDataHandler {
         if old_shader_packs_path.exists() {
             Self::copy_mc_dir_all(&old_shader_packs_path, &new_shader_packs_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy shader packs: {:?}", e))?;
+                .map_err(|e| format!("unable to copy shader packs: {e:?}"))?;
         }
 
         let old_saves_path = old_branch_path.join("saves");
@@ -142,7 +142,7 @@ impl McDataHandler {
         if old_saves_path.exists() {
             Self::copy_mc_dir_all(&old_saves_path, &new_saves_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy saves: {:?}", e))?;
+                .map_err(|e| format!("unable to copy saves: {e:?}"))?;
         }
 
         let old_nrc_data_path = old_branch_path.join("NoRiskClient");
@@ -151,7 +151,7 @@ impl McDataHandler {
         if old_nrc_data_path.exists() {
             Self::copy_mc_dir_all(&old_nrc_data_path, &new_nrc_data_path, &app)
                 .await
-                .map_err(|e| format!("unable to copy NoRiskClient data: {:?}", e))?;
+                .map_err(|e| format!("unable to copy NoRiskClient data: {e:?}"))?;
         }
 
         Ok(())
@@ -219,7 +219,7 @@ impl McDataHandler {
                                     .count()
                                     .await;
                                 current_type_entry_count = 0;
-                                let _ = &app_clone
+                                let () = &app_clone
                                     .get_window("main")
                                     .unwrap()
                                     .emit(
@@ -237,7 +237,7 @@ impl McDataHandler {
                             let _ = fs::create_dir_all(dst_path.parent().unwrap()).await;
                             let _ = fs::copy(path, dst_path).await;
                             current_type_entry_count += 1;
-                            let _ = &app_clone
+                            let () = &app_clone
                                 .get_window("main")
                                 .unwrap()
                                 .emit(
@@ -261,7 +261,7 @@ impl McDataHandler {
             }
         }))
         .await
-        .map_err(|e| format!("Error copying directory: {:?}", e))?;
+        .map_err(|e| format!("Error copying directory: {e:?}"))?;
 
         Ok(())
     }

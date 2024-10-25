@@ -23,7 +23,7 @@ impl VanillaProvider {
     pub async fn get_manifest(hash: &str, version: &str) -> Result<VanillaManifest> {
         Self::request_from_endpoint(
             VANILLA_LAUNCHER_API,
-            &format!("v1/packages/{}/{}.json", hash, version),
+            &format!("v1/packages/{hash}/{version}.json"),
         )
         .await
     }
@@ -45,7 +45,7 @@ impl VanillaProvider {
         base: &str,
         endpoint: &str,
     ) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

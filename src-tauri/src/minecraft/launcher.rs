@@ -13,7 +13,7 @@ use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info};
 
-use path_absolutize::*;
+use path_absolutize::Absolutize;
 use tokio::{fs, fs::OpenOptions};
 use walkdir::WalkDir;
 
@@ -131,11 +131,11 @@ pub async fn launch<D: Send + Sync>(
         )?;
 
         // Download client jar
-        let requires_download = if !client_jar.exists() {
-            true
-        } else {
+        let requires_download = if client_jar.exists() {
             let hash = sha1sum(&client_jar)?;
             hash != client_download.sha1
+        } else {
+            true
         };
 
         if requires_download {
@@ -177,7 +177,7 @@ pub async fn launch<D: Send + Sync>(
     let libraries_to_download = version_profile
         .libraries
         .iter()
-        .map(|x| x.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect::<Vec<_>>();
     // let libraries_downloaded = Arc::new(AtomicU64::new(0));
     let libraries_max = libraries_to_download.len() as u64;
@@ -193,7 +193,7 @@ pub async fn launch<D: Send + Sync>(
         stream::iter(libraries_to_download.into_iter().filter_map(|library| {
             // let download_count = libraries_downloaded.clone();
             let data_clone = launcher_data_arc.clone();
-            let folder_clone = libraries_folder.to_path_buf();
+            let folder_clone = libraries_folder.clone();
 
             if !rule_interpreter::check_condition(&library.rules, &features).unwrap_or(false) {
                 return None;
@@ -238,7 +238,10 @@ pub async fn launch<D: Send + Sync>(
 
                 // Natives are not included in the classpath
                 return if library.natives.is_none() {
-                    return Ok(path.absolutize()?.to_str().map(|x| x.to_string()));
+                    return Ok(path
+                        .absolutize()?
+                        .to_str()
+                        .map(std::string::ToString::to_string));
                 } else {
                     Ok(None)
                 };
@@ -279,7 +282,7 @@ pub async fn launch<D: Send + Sync>(
     let asset_objects_to_download = asset_index
         .objects
         .values()
-        .map(|x| x.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect::<Vec<_>>();
     let assets_downloaded = Arc::new(AtomicU64::new(0));
     let asset_max = asset_objects_to_download.len() as u64;
@@ -314,8 +317,7 @@ pub async fn launch<D: Send + Sync>(
                                 asset_max,
                             ));
                             data_clone.progress_update(ProgressUpdate::set_label(format!(
-                                "Downloaded Minecraft asset {}",
-                                hash
+                                "Downloaded Minecraft asset {hash}"
                             )));
                         }
                     }
@@ -356,7 +358,7 @@ pub async fn launch<D: Send + Sync>(
         let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
         let norisk_asset_max = norisk_asset_objects_to_download
             .values()
-            .map(|x| x.to_owned())
+            .map(std::borrow::ToOwned::to_owned)
             .collect::<Vec<_>>()
             .len() as u64;
 
@@ -400,13 +402,12 @@ pub async fn launch<D: Send + Sync>(
                                         norisk_asset_max,
                                     ));
                                     data_clone.progress_update(ProgressUpdate::set_label(format!(
-                                        "Downloaded Norisk asset {}",
-                                        hash
+                                        "Downloaded Norisk asset {hash}"
                                     )));
                                 }
                             }
                             Err(err) => {
-                                error!("Unable to download Norisk asset {}: {:?}", hash, err)
+                                error!("Unable to download Norisk asset {}: {:?}", hash, err);
                             }
                         }
 
@@ -465,16 +466,16 @@ pub async fn launch<D: Send + Sync>(
 
     let mut mapped: Vec<String> = Vec::with_capacity(command_arguments.len());
 
-    for x in command_arguments.iter() {
+    for x in &command_arguments {
         mapped.push(process_templates(x, |output, param| {
             match param {
                 "auth_player_name" => output.push_str(&launching_parameter.auth_player_name),
                 "version_name" => output.push_str(&version_profile.id),
                 "game_directory" => {
-                    output.push_str(game_dir.absolutize().unwrap().to_str().unwrap())
+                    output.push_str(game_dir.absolutize().unwrap().to_str().unwrap());
                 }
                 "assets_root" => {
-                    output.push_str(assets_folder.absolutize().unwrap().to_str().unwrap())
+                    output.push_str(assets_folder.absolutize().unwrap().to_str().unwrap());
                 }
                 "assets_index_name" => output.push_str(&asset_index_location.id),
                 "auth_uuid" => output.push_str(&launching_parameter.auth_uuid),
@@ -482,7 +483,7 @@ pub async fn launch<D: Send + Sync>(
                 "user_type" => output.push_str(&launching_parameter.user_type),
                 "version_type" => output.push_str(&version_profile.version_type),
                 "natives_directory" => {
-                    output.push_str(natives_folder.absolutize().unwrap().to_str().unwrap())
+                    output.push_str(natives_folder.absolutize().unwrap().to_str().unwrap());
                 }
                 "launcher_name" => output.push_str("NoRiskClient"),
                 "launcher_version" => output.push_str(LAUNCHER_VERSION),
@@ -536,7 +537,7 @@ async fn verify_norisk_assets<D: Send + Sync>(
 ) {
     let mut keys_vec: Vec<&str> = vec![];
     for location in asset_objetcs.keys() {
-        let parts: Vec<&str> = location.split("/").collect();
+        let parts: Vec<&str> = location.split('/').collect();
 
         if let Some(last_part) = parts.last() {
             keys_vec.push(last_part);
@@ -552,17 +553,14 @@ async fn verify_norisk_assets<D: Send + Sync>(
         verified,
         file_names.len() as u64,
     ));
-    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_map(std::result::Result::ok)
+    {
         let path = entry.path().to_owned();
         if path.is_file() {
             let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-            if !file_names.contains(&file_name.as_ref()) {
-                if let Err(err) = fs::remove_file(&path).await {
-                    info!("Failed to remove {}: {}", path.display(), err);
-                } else {
-                    info!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
-                }
-            } else {
+            if file_names.contains(&file_name.as_ref()) {
                 verified += 1;
                 launcher_data_arc.progress_update(ProgressUpdate::set_for_step(
                     ProgressUpdateSteps::VerifyNoRiskAssets,
@@ -570,9 +568,16 @@ async fn verify_norisk_assets<D: Send + Sync>(
                     file_names.len() as u64,
                 ));
                 launcher_data_arc.progress_update(ProgressUpdate::set_label(format!(
-                    "Verified Norisk asset {}",
-                    file_name
+                    "Verified Norisk asset {file_name}"
                 )));
+            } else {
+                #[warn(clippy::collapsible_else_if)]
+                // Wrong warning, this is not a collapsible else if
+                if let Err(err) = fs::remove_file(&path).await {
+                    info!("Failed to remove {}: {err}", path.display());
+                } else {
+                    info!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
+                }
             }
         }
     }
@@ -630,8 +635,7 @@ fn process_templates<F: Fn(&mut String, &str) -> Result<()>>(
                 }
                 if !matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9') {
                     return Err(LauncherError::InvalidVersionProfile(format!(
-                        "invalid character in template: '{}'",
-                        c
+                        "invalid character in template: '{c}'"
                     ))
                     .into());
                 }

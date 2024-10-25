@@ -21,7 +21,7 @@ impl FabricProvider {
 
     /// Request all available loader versions
     pub async fn get_all_loader_versions(mc_version: &str) -> Result<Vec<FabricLoaderVersion>> {
-        Self::request_from_endpoint(FABRIC_API_BASE, &format!("versions/loader/{}", mc_version))
+        Self::request_from_endpoint(FABRIC_API_BASE, &format!("versions/loader/{mc_version}"))
             .await
     }
 
@@ -63,7 +63,7 @@ impl FabricProvider {
         base: &str,
         endpoint: &str,
     ) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

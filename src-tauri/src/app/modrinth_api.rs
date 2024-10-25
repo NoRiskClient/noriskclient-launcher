@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs::metadata;
 use std::path::Path;
 
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::app::api::{LoaderMod, ModSource};
@@ -24,7 +25,7 @@ impl ModrinthApiEndpoints {
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<ModrinthModsSearchResponse>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -47,12 +48,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_mod_slug(slug_or_id: &str) -> Result<Mod, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<Mod>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -60,12 +61,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_mod_info(slug_or_id: &str) -> Result<ModInfo, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<ModInfo>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -76,15 +77,12 @@ impl ModrinthApiEndpoints {
         slug: &str,
         params: &str,
     ) -> Result<Vec<ModrinthProject>, Box<dyn Error>> {
-        let url = format!(
-            "https://api.modrinth.com/v2/project/{}/version{}",
-            slug, params
-        );
+        let url = format!("https://api.modrinth.com/v2/project/{slug}/version{params}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<Vec<ModrinthProject>>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -149,7 +147,7 @@ impl ModrinthApiEndpoints {
 
         Ok(CustomMod {
             title: mod_project.title.clone(),
-            image_url: "".to_string(), //Ich setze das einfach in Tauri kein bock
+            image_url: String::new(), //Ich setze das einfach in Tauri kein bock
             value: project.to_loader_mod(slug, false, true),
             dependencies,
         })
@@ -167,7 +165,7 @@ impl ModrinthApiEndpoints {
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<ModrinthShadersSearchResponse>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -184,7 +182,9 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = shaders_read.next_entry().await? {
             if entry.file_type().await?.is_file()
-                && entry.file_name().to_str().unwrap().ends_with(".zip")
+                && Path::new(entry.file_name().to_str().unwrap())
+                    .extension()
+                    .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
                 && !installed_shaders
                     .iter()
                     .any(|shader| shader.file_name == *entry.file_name().to_str().unwrap())
@@ -197,12 +197,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_shader_slug(slug_or_id: &str) -> Result<Shader, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Shader Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Shader Search Request error: {e:?}"))?;
         match response.json::<Shader>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -210,12 +210,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_shader_info(slug_or_id: &str) -> Result<ShaderInfo, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Shader Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Shader Search Request error: {e:?}"))?;
         match response.json::<ShaderInfo>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -248,7 +248,7 @@ impl ModrinthApiEndpoints {
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<ModrinthResourcePacksSearchResponse>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -265,7 +265,9 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = resourcepacks_read.next_entry().await? {
             if entry.file_type().await?.is_file()
-                && entry.file_name().to_str().unwrap().ends_with(".zip")
+                && Path::new(entry.file_name().to_str().unwrap())
+                    .extension()
+                    .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
                 && !installed_resourcepacks.iter().any(|resourcepack| {
                     resourcepack.file_name == *entry.file_name().to_str().unwrap()
                 })
@@ -278,12 +280,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_resourcepack_slug(slug_or_id: &str) -> Result<ResourcePack, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth ResourcePack Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth ResourcePack Search Request error: {e:?}"))?;
         match response.json::<ResourcePack>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -293,12 +295,12 @@ impl ModrinthApiEndpoints {
     pub async fn get_resourcepack_info(
         slug_or_id: &str,
     ) -> Result<ResourcePackInfo, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth ResourcePack Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth ResourcePack Search Request error: {e:?}"))?;
         match response.json::<ResourcePackInfo>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -333,7 +335,7 @@ impl ModrinthApiEndpoints {
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Search Request error: {e:?}"))?;
         match response.json::<ModrinthDatapacksSearchResponse>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -350,7 +352,14 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = datapacks_read.next_entry().await? {
             if entry.file_type().await?.is_file()
-                && entry.file_name().to_str().unwrap().ends_with(".zip")
+                && Path::new(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?,
+                )
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
                 && !installed_resourcepacks
                     .iter()
                     .any(|datapack| datapack.file_name == *entry.file_name().to_str().unwrap())
@@ -363,12 +372,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_datapack_slug(slug_or_id: &str) -> Result<ResourcePack, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Datapack Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Datapack Search Request error: {e:?}"))?;
         match response.json::<ResourcePack>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -376,12 +385,12 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn get_datapack_info(slug_or_id: &str) -> Result<DatapackInfo, Box<dyn Error>> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
         let response = HTTP_CLIENT
             .get(url)
             .send()
             .await
-            .map_err(|e| format!("Modrinth Datapack Search Request error: {:?}", e))?;
+            .map_err(|e| format!("Modrinth Datapack Search Request error: {e:?}"))?;
         match response.json::<DatapackInfo>().await {
             Ok(json) => Ok(json),
             Err(e) => Err(Box::new(e) as Box<dyn Error>),
@@ -551,6 +560,7 @@ pub struct ModrinthProject {
 }
 
 impl ModrinthProject {
+    #[must_use]
     pub fn to_custom_mod(
         &self,
         title: &str,
@@ -563,14 +573,12 @@ impl ModrinthProject {
         let file_name = self
             .files
             .first()
-            .map(|file| file.filename.clone())
-            .unwrap_or("MOD_FALL_BACK".to_string());
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.filename.clone());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
         let url = self
             .files
             .first()
-            .map(|file| file.url.clone())
-            .unwrap_or("MOD_FALL_BACK".to_string());
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.url.clone());
 
         CustomMod {
             title: title.to_string(),
@@ -589,18 +597,17 @@ impl ModrinthProject {
         }
     }
 
+    #[must_use]
     pub fn to_loader_mod(&self, slug: &str, required: bool, enabled: bool) -> LoaderMod {
         let file_name = self
             .files
             .first()
-            .map(|file| file.filename.clone())
-            .unwrap_or("MOD_FALL_BACK".to_string());
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.filename.clone());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
         let url = self
             .files
             .first()
-            .map(|file| file.url.clone())
-            .unwrap_or("MOD_FALL_BACK".to_string());
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.url.clone());
 
         LoaderMod {
             enabled,
@@ -614,18 +621,16 @@ impl ModrinthProject {
         }
     }
 
+    #[must_use]
     pub fn to_slug(&self) -> String {
-        return self
-            .files
-            .first()
-            .map(|file| {
-                return file
-                    .filename
-                    .replace(format!("-{}.jar", self.version_number).as_str(), "");
-            })
-            .unwrap_or("ERROR-MOD".to_string());
+        return self.files.first().map_or("ERROR-MOD".to_string(), |file| {
+            return file
+                .filename
+                .replace(format!("-{}.jar", self.version_number).as_str(), "");
+        });
     }
 
+    #[must_use]
     pub fn is_already_required_by_norisk_client(&self, mods: &[LoaderMod]) -> bool {
         let dependency_slug = self.to_slug();
         return mods.iter().any(|loader_mod| {

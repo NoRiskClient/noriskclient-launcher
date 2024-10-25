@@ -6,7 +6,7 @@ use tokio::fs;
 
 use crate::HTTP_CLIENT;
 
-/// Download file using HTTP_CLIENT without any progress tracking
+/// Download file using `HTTP_CLIENT` without any progress tracking
 pub async fn download_file_untracked(url: &str, path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref().to_owned();
     let response = HTTP_CLIENT.get(url).send().await?.error_for_status()?;
@@ -24,7 +24,7 @@ pub async fn download_private_file_untracked(
     let path = path.as_ref().to_owned();
     let response = HTTP_CLIENT
         .get(url)
-        .header("Authorization", format!("Bearer {}", norisk_token))
+        .header("Authorization", format!("Bearer {norisk_token}"))
         .send()
         .await?
         .error_for_status()?;

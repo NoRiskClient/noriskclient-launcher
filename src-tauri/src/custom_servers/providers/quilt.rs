@@ -55,12 +55,11 @@ impl QuiltProvider {
             .join("installers");
         fs::create_dir_all(&path).await?;
         let url = format!(
-            "{}/quilt-installer/{}/quilt-installer-{}.jar",
-            QUILT_MAVEN_REPO_BASE, installer_version, installer_version
+            "{QUILT_MAVEN_REPO_BASE}/quilt-installer/{installer_version}/quilt-installer-{installer_version}.jar"
         );
         let content = download_file(&url, on_progress).await?;
         let _ = fs::write(
-            path.join(format!("quilt-{}.jar", installer_version)),
+            path.join(format!("quilt-{installer_version}.jar")),
             content,
         )
         .await;
@@ -72,7 +71,7 @@ impl QuiltProvider {
         base: &str,
         endpoint: &str,
     ) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

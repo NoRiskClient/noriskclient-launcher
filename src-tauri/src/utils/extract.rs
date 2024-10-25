@@ -8,7 +8,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, BufReader};
 
 /// Extracts everything from the ZIP archive to the output directory
 ///
-/// Taken from https://github.com/Majored/rs-async-zip/blob/main/examples/file_extraction.rs
+/// Taken from <https://github.com/Majored/rs-async-zip/blob/main/examples/file_extraction.rs>
 pub async fn zip_extract<R>(archive: R, out_dir: &Path) -> Result<()>
 where
     R: AsyncRead + AsyncSeek + Unpin,

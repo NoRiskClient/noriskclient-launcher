@@ -89,10 +89,10 @@ impl CustomServerManager {
             fs::create_dir(&runtimes_folder).await?;
         }
 
-        let custom_java_path = if !options.custom_java_path.is_empty() {
-            Some(options.custom_java_path.clone())
-        } else {
+        let custom_java_path = if options.custom_java_path.is_empty() {
             None
+        } else {
+            Some(options.custom_java_path.clone())
         };
 
         let java_bin = match &custom_java_path {
@@ -159,7 +159,7 @@ impl CustomServerManager {
             &todo_credentials.id.to_string(),
         )
         .await
-        .map_err(|err| format!("Failed to get token: {}", err))
+        .map_err(|err| format!("Failed to get token: {err}"))
         .unwrap();
 
         let _ = java_runtime
@@ -173,7 +173,7 @@ impl CustomServerManager {
                 &window_mutex,
             )
             .await
-            .map_err(|e| format!("Failed to handle server IO: {}", e));
+            .map_err(|e| format!("Failed to handle server IO: {e}"));
 
         Ok(running_task)
     }
@@ -190,13 +190,13 @@ impl CustomServerManager {
             .join("latest.log");
         let content = fs::read_to_string(&path)
             .await
-            .map_err(|e| format!("Failed to read log file: {}", e))
+            .map_err(|e| format!("Failed to read log file: {e}"))
             .unwrap();
         let lines: Vec<String> = content
             .lines()
             .collect::<Vec<&str>>()
             .iter()
-            .map(|line| line.to_string())
+            .map(|line| (*line).to_string())
             .collect();
         if lines
             .last()
@@ -205,7 +205,7 @@ impl CustomServerManager {
         {
             Self::store_latest_running_server(None, None, None).await?;
         } else {
-            lines.iter().for_each(|line| {
+            for line in &lines {
                 window
                     .lock()
                     .unwrap()
@@ -216,9 +216,9 @@ impl CustomServerManager {
                             data: line.to_owned(),
                         },
                     )
-                    .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+                    .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
                     .unwrap();
-            });
+            }
         }
 
         Ok(())
@@ -236,7 +236,7 @@ impl CustomServerManager {
                 .lines()
                 .map(|line| {
                     if line.starts_with('#') {
-                        (line.to_owned(), "".to_owned())
+                        (line.to_owned(), String::new())
                     } else {
                         let mut parts = line.split('=');
                         let key = parts.next().unwrap().to_owned();
@@ -262,12 +262,12 @@ impl CustomServerManager {
         }
 
         for (key, value) in force_defauls {
-            if !properties.iter().any(|(k, _)| k == &key) {
-                properties.push((key, value));
-            } else {
+            if properties.iter().any(|(k, _)| k == &key) {
                 // replace the value without pushing a new set to the vector
                 let index = properties.iter().position(|(k, _)| k == &key).unwrap();
                 properties[index] = (key, value);
+            } else {
+                properties.push((key, value));
             }
         }
 
@@ -277,7 +277,7 @@ impl CustomServerManager {
                 format!(
                     "{}{}{}",
                     key,
-                    if key.starts_with("#") { "" } else { "=" },
+                    if key.starts_with('#') { "" } else { "=" },
                     value
                 )
             })
@@ -356,7 +356,7 @@ impl CustomServerManager {
         let latest_running_server = serde_json::from_slice::<LatestRunningServer>(
             &fs::read(path.join("latest.json")).await?,
         )
-        .map_err(|err| -> String { format!("Failed to write latest.json: {}", err) })
+        .map_err(|err| -> String { format!("Failed to write latest.json: {err}") })
         .unwrap_or_else(|_| LatestRunningServer::default());
         Ok(latest_running_server)
     }
@@ -384,7 +384,7 @@ impl CustomServerManager {
             serde_json::to_string_pretty(&latest_running_server)?,
         )
         .await
-        .map_err(|err| -> String { format!("Failed to write options.json: {}", err) });
+        .map_err(|err| -> String { format!("Failed to write options.json: {err}") });
         Ok(())
     }
 }

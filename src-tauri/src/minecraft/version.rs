@@ -168,7 +168,7 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:G1ReservePercent=20".to_string());
         command_arguments.push("-XX:MaxGCPauseMillis=50".to_string());
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
-        command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
+        command_arguments.push(format!("-Dnorisk.token={norisk_token}"));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         if parameter.force_server.is_some() {
             info!(
@@ -180,7 +180,7 @@ impl ArgumentDeclaration {
                 parameter.force_server.clone().unwrap()
             ));
         }
-        for arg in parameter.custom_java_args.split(" ") {
+        for arg in parameter.custom_java_args.split(' ') {
             if arg != " " && !arg.is_empty() {
                 info!("Added custom java arg: {:?}", arg);
                 command_arguments.push(arg.to_string());
@@ -219,7 +219,7 @@ impl ArgumentDeclaration {
                                 "no game arguments specified".to_string(),
                             )
                         })?
-                        .split(" ")
+                        .split(' ')
                         .map(ToOwned::to_owned),
                 );
             }
@@ -318,6 +318,7 @@ impl FromStr for Argument {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)] // Looks like we need to return a Result here
 fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
 where
     D: Deserializer<'de>,
@@ -415,7 +416,9 @@ impl AssetObject {
 
         let asset_path = asset_folder.join(&self.hash);
 
-        if !asset_path.exists() {
+        if asset_path.exists() {
+            Ok(false)
+        } else {
             progress.progress_update(ProgressUpdate::set_label(format!(
                 "Downloading asset object {}",
                 self.hash
@@ -434,8 +437,6 @@ impl AssetObject {
             info!("Downloaded {}", self.hash);
 
             Ok(true)
-        } else {
-            Ok(false)
         }
     }
 
@@ -452,7 +453,7 @@ impl AssetObject {
             .unwrap_or_default();
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
 
-        let mut path_parts: Vec<&str> = file_path.split("/").collect();
+        let mut path_parts: Vec<&str> = file_path.split('/').collect();
 
         let mut asset_file_path = assets_objects_folder.clone();
         for part in path_parts.clone() {
@@ -593,7 +594,7 @@ impl Library {
             .unwrap_or("https://libraries.minecraft.net/");
 
         Ok(LibraryDownloadInfo {
-            url: format!("{}{}", url, path),
+            url: format!("{url}{path}"),
             sha1: None,
             size: None,
             path,
@@ -648,10 +649,10 @@ pub struct LibraryDownloadInfo {
 impl From<&LibraryArtifact> for LibraryDownloadInfo {
     fn from(artifact: &LibraryArtifact) -> Self {
         LibraryDownloadInfo {
-            path: artifact.path.to_owned(),
-            sha1: Some(artifact.sha1.to_owned()),
+            path: artifact.path.clone(),
+            sha1: Some(artifact.sha1.clone()),
             size: Some(artifact.size),
-            url: artifact.url.to_owned(),
+            url: artifact.url.clone(),
         }
     }
 }
@@ -737,8 +738,7 @@ impl LibraryDownloadInfo {
 
         // Download library
         progress.progress_update(ProgressUpdate::set_label(format!(
-            "Downloading library {}",
-            name
+            "Downloading library {name}"
         )));
 
         download_file_untracked(&self.url, &library_path).await?;

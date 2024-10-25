@@ -20,7 +20,7 @@ pub const CONTENT_FOLDER: &str = "NoRiskClient";
 /// Placeholder struct for API endpoints implementation
 pub struct ApiEndpoints;
 
-pub fn get_api_base(is_experimental: bool) -> String {
+#[must_use] pub fn get_api_base(is_experimental: bool) -> String {
     if is_experimental {
         String::from("https://api-staging.norisk.gg/api/v1")
     } else {
@@ -86,7 +86,7 @@ impl ApiEndpoints {
         request_uuid: &str,
     ) -> Result<bool> {
         Self::request_from_norisk_endpoint(
-            format!("core/whitelist/feature/{}", feature).as_str(),
+            format!("core/whitelist/feature/{feature}").as_str(),
             norisk_token,
             request_uuid,
         )
@@ -102,7 +102,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -113,14 +113,14 @@ impl ApiEndpoints {
 
     /// Request featured mods
     pub async fn norisk_featured_mods(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&format!("launcher/featured/{}/mods", branch), "", "")
+        Self::request_from_norisk_endpoint(&format!("launcher/featured/{branch}/mods"), "", "")
             .await
     }
 
     /// Request featured resourcepacks
     pub async fn norisk_featured_resourcepacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(
-            &format!("launcher/featured/{}/resourcepacks", branch),
+            &format!("launcher/featured/{branch}/resourcepacks"),
             "",
             "",
         )
@@ -129,14 +129,14 @@ impl ApiEndpoints {
 
     /// Request featured shaders
     pub async fn norisk_featured_shaders(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(&format!("launcher/featured/{}/shaders", branch), "", "")
+        Self::request_from_norisk_endpoint(&format!("launcher/featured/{branch}/shaders"), "", "")
             .await
     }
 
     /// Request featured datapacks
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(
-            &format!("launcher/featured/{}/datapacks", branch),
+            &format!("launcher/featured/{branch}/datapacks"),
             "",
             "",
         )
@@ -145,7 +145,7 @@ impl ApiEndpoints {
 
     /// Request featured servers
     pub async fn norisk_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>> {
-        Self::request_from_norisk_endpoint(&format!("launcher/featured/{}/servers", branch), "", "")
+        Self::request_from_norisk_endpoint(&format!("launcher/featured/{branch}/servers"), "", "")
             .await
     }
 
@@ -183,7 +183,7 @@ impl ApiEndpoints {
     }
 
     /**
-    In diesem Fall ist es nicht der NoRiskToken sondern der Minecraft Token!!
+    In diesem Fall ist es nicht der `NoRiskToken` sondern der Minecraft Token!!
      */
     pub async fn refresh_norisk_token(token: &str) -> Result<NoRiskToken> {
         Self::post_from_norisk_endpoint("launcher/auth/validate", token, "").await
@@ -197,8 +197,7 @@ impl ApiEndpoints {
     ) -> Result<bool> {
         Self::request_from_norisk_endpoint(
             &format!(
-                "launcher/custom-servers/check-subdomain?subdomain={}",
-                subdomain
+                "launcher/custom-servers/check-subdomain?subdomain={subdomain}"
             ),
             token,
             request_uuid,
@@ -213,7 +212,7 @@ impl ApiEndpoints {
         request_uuid: &str,
     ) -> Result<String> {
         Self::request_from_norisk_endpoint(
-            &format!("launcher/custom-servers/{}/token", custom_server_id),
+            &format!("launcher/custom-servers/{custom_server_id}/token"),
             token,
             request_uuid,
         )
@@ -235,7 +234,7 @@ impl ApiEndpoints {
             CreateCustomServerRequest {
                 name: name.to_owned(),
                 mc_version: mc_version.to_owned(),
-                loader_version: loader_version.map(|s| s.to_owned()),
+                loader_version: loader_version.map(std::borrow::ToOwned::to_owned),
                 r#type: r#type.to_owned(),
                 subdomain: subdomain.to_owned(),
             },
@@ -262,7 +261,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         HTTP_CLIENT
             .delete(url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -293,7 +292,7 @@ impl ApiEndpoints {
     pub async fn launch_manifest(
         branch: &str,
     ) -> core::result::Result<NoRiskLaunchManifest, crate::error::Error> {
-        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{}", branch))
+        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{branch}"))
             .await
     }
 
@@ -301,8 +300,7 @@ impl ApiEndpoints {
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
         Self::request_from_norisk_endpoint(
             &format!(
-                "launcher/version/jre/{}/{}/{}",
-                os_name, os_arch, jre_version
+                "launcher/version/jre/{os_name}/{os_arch}/{jre_version}"
             ),
             "",
             "",
@@ -317,7 +315,7 @@ impl ApiEndpoints {
         request_uuid: &str,
     ) -> Result<NoriskAssets> {
         Self::request_from_norisk_endpoint(
-            &format!("launcher/assets/{}", branch),
+            &format!("launcher/assets/{branch}"),
             norisk_token,
             request_uuid,
         )
@@ -338,7 +336,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -361,7 +359,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -394,7 +392,7 @@ impl ApiEndpoints {
         request_uuid: &str,
     ) -> Result<bool> {
         Self::post_from_norisk_endpoint(
-            &format!("core/whitelist/invite/{}", uuid),
+            &format!("core/whitelist/invite/{uuid}"),
             norisk_token,
             request_uuid,
         )
@@ -414,7 +412,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -437,7 +435,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -491,7 +489,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -539,7 +537,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -562,7 +560,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .json(&body)
             .send()
@@ -585,7 +583,7 @@ impl ApiEndpoints {
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .query(&[("uuid", request_uuid)])
             .send()
             .await?
@@ -864,7 +862,7 @@ pub struct LoaderMod {
 }
 
 impl LoaderMod {
-    pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
+    #[must_use] pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
         self.source
             .get_slug()
             .eq_ignore_ascii_case(&other.source.get_slug())
@@ -872,7 +870,7 @@ impl LoaderMod {
 }
 
 ///
-/// JSON struct of ModSource (the method to be used for downloading the mod)
+/// JSON struct of `ModSource` (the method to be used for downloading the mod)
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
@@ -887,35 +885,35 @@ pub enum ModSource {
 }
 
 impl ModSource {
-    pub fn get_slug(&self) -> String {
+    #[must_use] pub fn get_slug(&self) -> String {
         match self {
             ModSource::Repository {
                 repository: _repository,
                 artifact,
                 url: _,
             } => {
-                let parts: Vec<&str> = artifact.split(":").collect();
+                let parts: Vec<&str> = artifact.split(':').collect();
                 if parts.len() > 1 {
                     parts[1].to_string()
                 } else {
-                    "".to_string()
+                    String::new()
                 }
             }
         }
     }
 
-    pub fn get_repository(&self) -> String {
+    #[must_use] pub fn get_repository(&self) -> String {
         match self {
             ModSource::Repository {
                 repository: _repository,
                 artifact,
                 url: _,
             } => {
-                let parts: Vec<&str> = artifact.split(":").collect();
+                let parts: Vec<&str> = artifact.split(':').collect();
                 if parts.len() > 1 {
                     parts[0].to_string()
                 } else {
-                    "".to_string()
+                    String::new()
                 }
             }
         }

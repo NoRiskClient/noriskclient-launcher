@@ -14,7 +14,7 @@ pub fn total_memory() -> i64 {
 pub fn percentage_of_total_memory(memory_percentage: i32) -> i64 {
     let sys = System::new_with_specifics(RefreshKind::new().with_memory());
 
-    ((sys.total_memory() / 1000000) as f64 * (memory_percentage as f64 / 100.0)) as i64
+    ((sys.total_memory() / 1_000_000) as f64 * (f64::from(memory_percentage) / 100.0)) as i64
 }
 
 pub const OS: OperatingSystem = if cfg!(target_os = "windows") {
@@ -73,7 +73,7 @@ impl OperatingSystem {
         Ok(match self {
             OperatingSystem::Windows => ";",
             OperatingSystem::Linux | OperatingSystem::Osx => ":",
-            _ => bail!("Invalid OS"),
+            OperatingSystem::Unknown => bail!("Invalid OS"),
         })
     }
 
@@ -82,7 +82,7 @@ impl OperatingSystem {
             OperatingSystem::Windows => "windows",
             OperatingSystem::Linux => "linux",
             OperatingSystem::Osx => "osx",
-            _ => bail!("Invalid OS"),
+            OperatingSystem::Unknown => bail!("Invalid OS"),
         })
     }
 
@@ -91,7 +91,7 @@ impl OperatingSystem {
             OperatingSystem::Windows => "windows",
             OperatingSystem::Linux => "linux",
             OperatingSystem::Osx => "mac",
-            _ => bail!("Invalid OS"),
+            OperatingSystem::Unknown => bail!("Invalid OS"),
         })
     }
 }
@@ -109,7 +109,7 @@ impl Architecture {
             Architecture::X64 => "x64",
             Architecture::ARM => "arm",
             Architecture::AARCH64 => "aarch64",
-            _ => bail!("Invalid architecture"),
+            Architecture::UNKNOWN => bail!("Invalid architecture"),
         })
     }
 }

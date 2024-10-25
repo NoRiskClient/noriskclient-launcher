@@ -1,3 +1,4 @@
+use anyhow::Context;
 use base64::engine::general_purpose;
 use base64::Engine;
 use dirs::data_dir;
@@ -99,6 +100,7 @@ struct MinecraftProfileProperty {
     value: String,
 }
 
+#[allow(dead_code)] // Seems like we might need this later
 #[derive(serde::Serialize)]
 struct NewMinecraftSkinBody {
     variant: String,
@@ -124,9 +126,10 @@ struct PlayerDBPlayer {
 async fn check_online_status() -> Result<bool, String> {
     ApiEndpoints::norisk_api_status()
         .await
-        .map_err(|e| format!("unable to check online status: {:?}", e))
+        .map_err(|e| format!("unable to check online status: {e:?}"))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
@@ -135,7 +138,9 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
         tauri::WindowUrl::External(url.parse().unwrap()),
     )
     .build()
-    .unwrap();
+    .map_err(|e| format!("Could not create window: {e:?}"))?;
+
+    // TODO: these errors are not being handled
     let _ = window.set_title("NoRiskClient");
     let _ = window.set_resizable(false);
     let _ = window.set_focus();
@@ -320,7 +325,7 @@ async fn get_blacklisted_mods() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Mods...");
     ApiEndpoints::norisk_blacklisted_mods()
         .await
-        .map_err(|e| format!("unable to get blacklisted mods: {:?}", e))
+        .map_err(|e| format!("unable to get blacklisted mods: {e:?}"))
 }
 
 #[tauri::command]
@@ -328,7 +333,7 @@ async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted ResourcePacks...");
     ApiEndpoints::norisk_blacklisted_resourcepacks()
         .await
-        .map_err(|e| format!("unable to get blacklisted resourcepacks: {:?}", e))
+        .map_err(|e| format!("unable to get blacklisted resourcepacks: {e:?}"))
 }
 
 #[tauri::command]
@@ -336,7 +341,7 @@ async fn get_blacklisted_shaders() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Shaders...");
     ApiEndpoints::norisk_blacklisted_shaders()
         .await
-        .map_err(|e| format!("unable to get blacklisted shaders: {:?}", e))
+        .map_err(|e| format!("unable to get blacklisted shaders: {e:?}"))
 }
 
 #[tauri::command]
@@ -344,7 +349,7 @@ async fn get_blacklisted_datapacks() -> Result<Vec<String>, String> {
     debug!("Getting Blacklisted Datapacks...");
     ApiEndpoints::norisk_blacklisted_datapacks()
         .await
-        .map_err(|e| format!("unable to get blacklisted datapacks: {:?}", e))
+        .map_err(|e| format!("unable to get blacklisted datapacks: {e:?}"))
 }
 
 #[tauri::command]
@@ -352,7 +357,7 @@ async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
     debug!("Getting Blacklisted Servers...");
     ApiEndpoints::norisk_blacklisted_servers()
         .await
-        .map_err(|e| format!("unable to get blacklisted servers: {:?}", e))
+        .map_err(|e| format!("unable to get blacklisted servers: {e:?}"))
 }
 
 #[tauri::command]
@@ -362,7 +367,7 @@ async fn search_mods(
     debug!("Searching Mods...");
     ModrinthApiEndpoints::search_mods(&params)
         .await
-        .map_err(|e| format!("unable to search mods: {:?}", e))
+        .map_err(|e| format!("unable to search mods: {e:?}"))
 }
 
 #[tauri::command]
@@ -385,7 +390,7 @@ async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
     debug!("Fetching mod info...");
     ModrinthApiEndpoints::get_mod_info(&slug)
         .await
-        .map_err(|e| format!("unable to get mod info: {:?}", e))
+        .map_err(|e| format!("unable to get mod info: {e:?}"))
 }
 
 #[tauri::command]
@@ -397,7 +402,7 @@ async fn install_mod_and_dependencies(
     info!("Installing Mod And Dependencies...");
     ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods)
         .await
-        .map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
+        .map_err(|e| format!("unable to install mod and dependencies: {e:?}"))
 }
 
 #[tauri::command]
@@ -405,7 +410,7 @@ async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthPro
     info!("Searching Project Version...");
     ModrinthApiEndpoints::get_project_version(slug, params)
         .await
-        .map_err(|e| format!("unable to search project version: {:?}", e))
+        .map_err(|e| format!("unable to search project version: {e:?}"))
 }
 
 #[tauri::command]
@@ -415,7 +420,7 @@ async fn search_shaders(
     debug!("Searching Shaders...");
     ModrinthApiEndpoints::search_shaders(&params)
         .await
-        .map_err(|e| format!("unable to search shaders: {:?}", e))
+        .map_err(|e| format!("unable to search shaders: {e:?}"))
 }
 
 #[tauri::command]
@@ -423,7 +428,7 @@ async fn get_shader_info(slug: String) -> Result<ShaderInfo, String> {
     debug!("Fetching shader info...");
     ModrinthApiEndpoints::get_shader_info(&slug)
         .await
-        .map_err(|e| format!("unable to get shader info: {:?}", e))
+        .map_err(|e| format!("unable to get shader info: {e:?}"))
 }
 
 #[tauri::command]
@@ -431,7 +436,7 @@ async fn install_shader(slug: &str, params: &str) -> Result<Shader, String> {
     info!("Installing Shader...");
     ModrinthApiEndpoints::install_shader(slug, params)
         .await
-        .map_err(|e| format!("unable to install shader: {:?}", e))
+        .map_err(|e| format!("unable to install shader: {e:?}"))
 }
 
 #[tauri::command]
@@ -441,7 +446,7 @@ async fn search_resourcepacks(
     debug!("Searching ResourcePacks...");
     ModrinthApiEndpoints::search_resourcepacks(&params)
         .await
-        .map_err(|e| format!("unable to search resourcepacks: {:?}", e))
+        .map_err(|e| format!("unable to search resourcepacks: {e:?}"))
 }
 
 #[tauri::command]
@@ -449,7 +454,7 @@ async fn get_resourcepack_info(slug: String) -> Result<ResourcePackInfo, String>
     debug!("Fetching ResourcePack info...");
     ModrinthApiEndpoints::get_resourcepack_info(&slug)
         .await
-        .map_err(|e| format!("unable to get resourcepack info: {:?}", e))
+        .map_err(|e| format!("unable to get resourcepack info: {e:?}"))
 }
 
 #[tauri::command]
@@ -457,7 +462,7 @@ async fn install_resourcepack(slug: &str, params: &str) -> Result<ResourcePack, 
     info!("Installing ResourcePack...");
     ModrinthApiEndpoints::install_resourcepack(slug, params)
         .await
-        .map_err(|e| format!("unable to install resourcepack: {:?}", e))
+        .map_err(|e| format!("unable to install resourcepack: {e:?}"))
 }
 
 #[tauri::command]
@@ -467,7 +472,7 @@ async fn search_datapacks(
     debug!("Searching Datapacks...");
     ModrinthApiEndpoints::search_datapacks(&params)
         .await
-        .map_err(|e| format!("unable to search datapacks: {:?}", e))
+        .map_err(|e| format!("unable to search datapacks: {e:?}"))
 }
 
 #[tauri::command]
@@ -475,7 +480,7 @@ async fn get_datapack_info(slug: String) -> Result<DatapackInfo, String> {
     debug!("Fetching Datapack info...");
     ModrinthApiEndpoints::get_datapack_info(&slug)
         .await
-        .map_err(|e| format!("unable to get datapack info: {:?}", e))
+        .map_err(|e| format!("unable to get datapack info: {e:?}"))
 }
 
 #[tauri::command]
@@ -483,7 +488,7 @@ async fn install_datapack(slug: &str, params: &str, world: &str) -> Result<Datap
     info!("Installing Datapack...");
     ModrinthApiEndpoints::install_datapack(slug, params, world)
         .await
-        .map_err(|e| format!("unable to install datapack: {:?}", e))
+        .map_err(|e| format!("unable to install datapack: {e:?}"))
 }
 
 #[tauri::command]
@@ -497,15 +502,21 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
     if world_folder.exists() {
         let mut entries = fs::read_dir(world_folder)
             .await
-            .map_err(|e| format!("unable to read world folders: {:?}", e))?;
+            .map_err(|e| format!("unable to read world folders: {e:?}"))?;
         while let Some(entry) = entries
             .next_entry()
             .await
-            .map_err(|e| format!("unable to read world folder: {:?}", e))?
+            .map_err(|e| format!("unable to read world folder: {e:?}"))?
         {
             let path = entry.path();
             if path.is_dir() {
-                world_folders.push(path.file_name().unwrap().to_str().unwrap().to_string());
+                world_folders.push(
+                    path.file_name()
+                        .expect("Could not get file name")
+                        .to_str()
+                        .expect("Could not convert file name to string")
+                        .to_string(),
+                );
             }
         }
     }
@@ -527,7 +538,7 @@ async fn request_trending_capes(
 ) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit)
         .await
-        .map_err(|e| format!("unable to request trending capes: {:?}", e))
+        .map_err(|e| format!("unable to request trending capes: {e:?}"))
 }
 
 #[tauri::command]
@@ -538,7 +549,7 @@ async fn request_owned_capes(
 ) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit)
         .await
-        .map_err(|e| format!("unable to request owned capes: {:?}", e))
+        .map_err(|e| format!("unable to request owned capes: {e:?}"))
 }
 
 #[tauri::command]
@@ -551,31 +562,38 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
     } else {
         "https://dl.norisk.gg/capes/prod/template.png"
     };
-    let user_dirs = UserDirs::new().unwrap();
-    let downloads_dir = user_dirs.download_dir().unwrap();
+    let user_dirs = UserDirs::new()
+        .context("Error getting user directories")
+        .map_err(|e| e.to_string())?;
+    let downloads_dir = user_dirs
+        .download_dir()
+        .context("Error getting download directory")
+        .map_err(|e| e.to_string())?;
     debug!("Downloads directory: {:?}", downloads_dir);
     let response = HTTP_CLIENT
         .get(template_url)
         .send()
         .await
-        .map_err(|e| format!("Error downloading template: {:?}", e))?;
+        .map_err(|e| format!("Error downloading template: {e:?}"))?;
     let template_bytes = response
         .bytes()
         .await
-        .map_err(|e| format!("Error reading template bytes: {:?}", e))?;
+        .map_err(|e| format!("Error reading template bytes: {e:?}"))?;
 
     let mut file = File::create(downloads_dir.join("nrc_cape_template.png"))
-        .map_err(|e| format!("Error creating file: {:?}", e))?;
+        .map_err(|e| format!("Error creating file: {e:?}"))?;
     file.write_all(&template_bytes)
-        .map_err(|e| format!("Error writing file: {:?}", e))?;
+        .map_err(|e| format!("Error writing file: {e:?}"))?;
 
     CapeApiEndpoints::show_in_folder(
         downloads_dir
             .join("nrc_cape_template.png")
             .into_os_string()
             .to_str()
-            .unwrap(),
-    );
+            .context("Error converting path to string")
+            .map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -584,14 +602,14 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
     ApiEndpoints::get_mcreal_app_token(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to get mcreal app token: {:?}", e))
+        .map_err(|e| format!("unable to get mcreal app token: {e:?}"))
 }
 
 #[tauri::command]
 async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
     ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to reset mcreal app token: {:?}", e))
+        .map_err(|e| format!("unable to reset mcreal app token: {e:?}"))
 }
 
 #[tauri::command]
@@ -599,9 +617,9 @@ pub async fn open_minecraft_logs_window(
     handle: tauri::AppHandle,
 ) -> Result<(), crate::error::Error> {
     // Generate a random number
-    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
+    let random_number: u64 = rand::thread_rng().gen_range(100_000..999_999);
     // Create a unique label using the random number
-    let unique_label = format!("logs-{}", random_number);
+    let unique_label = format!("logs-{random_number}");
     let window = tauri::WindowBuilder::new(
         &handle,
         unique_label,
@@ -620,9 +638,9 @@ pub async fn open_minecraft_crash_window(
     crash_report_path: String,
 ) -> Result<(), crate::error::Error> {
     // Generate a random number
-    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
+    let random_number: u64 = rand::thread_rng().gen_range(100_000..999_999);
     // Create a unique label using the random number
-    let unique_label = format!("crash-{}", random_number);
+    let unique_label = format!("crash-{random_number}");
     // Create the new window
     let window = tauri::WindowBuilder::new(
         &handle,
@@ -677,12 +695,12 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Er
 #[tauri::command]
 pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, crate::error::Error> {
     debug!("Incoming Path {:?}", file_path.clone());
-    let normalized_path = file_path.trim().replace("\\", "/");
+    let normalized_path = file_path.trim().replace('\\', "/");
     let path = std::path::Path::new(&normalized_path);
     debug!("Normalized Path {:?}", normalized_path.clone());
 
     if !path.exists() {
-        return Err(ErrorKind::OtherError(format!("File does not exist: {:?}", path)).as_error());
+        return Err(ErrorKind::OtherError(format!("File does not exist: {path:?}")).as_error());
     }
 
     let file = File::open(path)?;
@@ -773,10 +791,10 @@ async fn get_custom_mods_filenames(
     let custom_mod_folder = options
         .data_path_buf()
         .join("custom_mods")
-        .join(format!("{}-{}", branch, mc_version));
+        .join(format!("{branch}-{mc_version}"));
     let names = ModrinthApiEndpoints::get_custom_mod_names(&custom_mod_folder)
         .await
-        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+        .map_err(|e| format!("unable to load config filenames: {e:?}"))?;
     Ok(names)
 }
 
@@ -789,10 +807,10 @@ async fn get_custom_mods_folder(
     let custom_mod_folder = options
         .data_path_buf()
         .join("custom_mods")
-        .join(format!("{}-{}", branch, mc_version));
+        .join(format!("{branch}-{mc_version}"));
     return custom_mod_folder
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| "Error converting path to string".to_string());
 }
 
@@ -806,7 +824,7 @@ async fn save_custom_mods_to_folder(
     let file_path = options
         .data_path_buf()
         .join("custom_mods")
-        .join(format!("{}-{}", branch, mc_version))
+        .join(format!("{branch}-{mc_version}"))
         .join(file.name.clone());
 
     info!(
@@ -837,7 +855,7 @@ async fn get_custom_shaders_filenames(
     let names =
         ModrinthApiEndpoints::get_custom_shader_names(&custom_shader_folder, &installed_shaders)
             .await
-            .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+            .map_err(|e| format!("unable to load config filenames: {e:?}"))?;
     Ok(names)
 }
 
@@ -853,7 +871,7 @@ async fn get_custom_shaders_folder(
         .join("shaderpacks");
     return custom_shader_folder
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| "Error converting path to string".to_string());
 }
 
@@ -895,7 +913,7 @@ async fn get_custom_resourcepacks_filenames(
         &installed_resourcepacks,
     )
     .await
-    .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    .map_err(|e| format!("unable to load config filenames: {e:?}"))?;
     Ok(names)
 }
 
@@ -911,7 +929,7 @@ async fn get_custom_resourcepacks_folder(
         .join("resourcepacks");
     return custom_resourcepack_folder
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| "Error converting path to string".to_string());
 }
 
@@ -963,7 +981,7 @@ async fn get_custom_datapacks_filenames(
         &installed_datapacks,
     )
     .await
-    .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+    .map_err(|e| format!("unable to load config filenames: {e:?}"))?;
     Ok(names)
 }
 
@@ -982,7 +1000,7 @@ async fn get_custom_datapacks_folder(
         .join("datapacks");
     return custom_datapack_folder
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| "Error converting path to string".to_string());
 }
 
@@ -1022,23 +1040,22 @@ async fn save_custom_datapacks_to_folder(
 async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
     let minecraft_profile: Result<MinecraftProfile, reqwest::Error> = HTTP_CLIENT
         .get(format!(
-            "https://sessionserver.mojang.com/session/minecraft/profile/{}",
-            uuid
+            "https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
         ))
         .send()
         .await
-        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {e:}"))?
         .error_for_status()
-        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {e:}"))?
         .json()
         .await;
 
     match minecraft_profile {
         Ok(profile) => {
             let mut textures: Vec<String> = vec![];
-            for property in profile.properties.iter() {
+            for property in &profile.properties {
                 if property.name == "textures" {
-                    textures.push(property.value.clone())
+                    textures.push(property.value.clone());
                 }
             }
             Ok(textures)
@@ -1070,7 +1087,7 @@ async fn save_player_skin(
         )
         .send()
         .await
-        .map_err(|e| format!("Failed to send request: {}", e))?;
+        .map_err(|e| format!("Failed to send request: {e}"))?;
 
     if response.status().is_success() {
         info!("Skin {} saved successfully.", &location);
@@ -1089,11 +1106,11 @@ async fn read_local_skin_file(location: String) -> Result<String, String> {
         Ok(mut file) => {
             let mut buffer = Vec::new();
             if let Err(err) = file.read_to_end(&mut buffer).await {
-                return Err(format!("Failed to read the file: {}", err));
+                return Err(format!("Failed to read the file: {err}"));
             }
             Ok(general_purpose::STANDARD.encode(buffer))
         }
-        Err(err) => Err(format!("Failed to open the file: {}", err)),
+        Err(err) => Err(format!("Failed to open the file: {err}")),
     }
 }
 
@@ -1103,9 +1120,9 @@ async fn read_remote_image_file(location: String) -> Result<String, String> {
         .get(&location)
         .send()
         .await
-        .map_err(|e| format!("unable to connect to {}: {:}", e, location))?
+        .map_err(|e| format!("unable to connect to {e}: {location:}"))?
         .error_for_status()
-        .map_err(|e| format!("{} returned an error: {:}", location, e))?
+        .map_err(|e| format!("{location} returned an error: {e:}"))?
         .bytes()
         .await;
 
@@ -1121,7 +1138,7 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
     options
         .store(config_dir)
         .await
-        .map_err(|e| format!("unable to store config data: {:?}", e))?;
+        .map_err(|e| format!("unable to store config data: {e:?}"))?;
 
     Ok(())
 }
@@ -1132,7 +1149,7 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
     launcher_profiles
         .store(config_dir)
         .await
-        .map_err(|e| format!("unable to store launcher_profiles data: {:?}", e))?;
+        .map_err(|e| format!("unable to store launcher_profiles data: {e:?}"))?;
 
     Ok(())
 }
@@ -1150,7 +1167,7 @@ async fn get_norisk_user(
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+    .map_err(|e| format!("unable to request norisk user: {e:?}"))?;
     Ok(user)
 }
 
@@ -1158,7 +1175,7 @@ async fn get_norisk_user(
 async fn check_maintenance_mode() -> Result<bool, String> {
     let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
         .await
-        .map_err(|e| format!("unable to request maintenance mode: {:?}", e))?;
+        .map_err(|e| format!("unable to request maintenance mode: {e:?}"))?;
     Ok(maintenance_mode)
 }
 
@@ -1184,7 +1201,7 @@ async fn enable_experimental_mode(credentials: Credentials) -> Result<String, St
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to enable experimental mode: {:?}", e))
+    .map_err(|e| format!("unable to enable experimental mode: {e:?}"))
 }
 
 #[tauri::command]
@@ -1196,7 +1213,7 @@ async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, crate
 async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
     let log_response = McLogsApiEndpoints::upload_logs(log)
         .await
-        .map_err(|e| format!("unable to upload logs: {:?}", e))?;
+        .map_err(|e| format!("unable to upload logs: {e:?}"))?;
     Ok(log_response)
 }
 
@@ -1348,7 +1365,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
                         debug!(
                             "After Microsoft Auth: Error Fetching NoRiskClient Token {:?}",
                             err
-                        )
+                        );
                     }
                 }
 
@@ -1423,7 +1440,7 @@ fn handle_progress(
 async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
     let options = get_options()
         .await
-        .map_err(|e| format!("unable to load options: {:?}", e))?;
+        .map_err(|e| format!("unable to load options: {e:?}"))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
     if !game_dir_path.exists() {
         return Ok(None);
@@ -1431,7 +1448,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
 
     let all_branches = game_dir_path
         .read_dir()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?
+        .map_err(|e| format!("unable to read branches: {e:?}"))?
         .filter(|entry| {
             entry
                 .as_ref()
@@ -1440,7 +1457,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
         })
         .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
         .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?;
+        .map_err(|e| format!("unable to read branches: {e:?}"))?;
 
     if all_branches.is_empty() {
         return Ok(None);
@@ -1455,7 +1472,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
 async fn get_branches_from_folder() -> Result<Vec<String>, String> {
     let options = get_options()
         .await
-        .map_err(|e| format!("unable to load options: {:?}", e))?;
+        .map_err(|e| format!("unable to load options: {e:?}"))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
     if !game_dir_path.exists() {
         return Ok(Vec::new());
@@ -1463,7 +1480,7 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 
     let branches = game_dir_path
         .read_dir()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?
+        .map_err(|e| format!("unable to read branches: {e:?}"))?
         .filter(|entry| {
             entry
                 .as_ref()
@@ -1472,7 +1489,7 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
         })
         .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
         .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?;
+        .map_err(|e| format!("unable to read branches: {e:?}"))?;
 
     Ok(branches)
 }
@@ -1510,7 +1527,7 @@ async fn is_client_running(
     if runner_instance
         .lock()
         .map_err(|e| {
-            ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error()
+            ErrorKind::LauncherError(format!("unable to lock runner instance: {e:?}")).as_error()
         })?
         .is_some()
     {
@@ -1550,10 +1567,10 @@ async fn run_client(
         force_server,
         memory: percentage_of_total_memory(options.memory_percentage),
         data_path: options.data_path_buf(),
-        custom_java_path: if !options.custom_java_path.is_empty() {
-            Some(options.custom_java_path)
-        } else {
+        custom_java_path: if options.custom_java_path.is_empty() {
             None
+        } else {
+            Some(options.custom_java_path)
         },
         custom_java_args: options.custom_java_args,
         auth_player_name: credentials.username,
@@ -1587,7 +1604,7 @@ async fn run_client(
 
     let runner_instance = &app_state.runner_instance;
     *runner_instance.lock().map_err(|e| {
-        ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error()
+        ErrorKind::LauncherError(format!("unable to lock runner instance: {e:?}")).as_error()
     })? = Some(RunnerInstance {
         terminator: terminator_tx,
     });
@@ -1629,24 +1646,24 @@ async fn run_client(
                     window_mutex
                         .lock()
                         .unwrap()
-                        .emit("client-error", format!("Failed to launch client: {:?}", e))
+                        .emit("client-error", format!("Failed to launch client: {e:?}"))
                         .unwrap();
                     handle_stderr(
                         &window_mutex,
-                        format!("Failed to launch client: {:?}", e).as_bytes(),
+                        format!("Failed to launch client: {e:?}").as_bytes(),
                     )
                     .unwrap();
                 };
 
                 *copy_of_runner_instance
                     .lock()
-                    .map_err(|e| format!("unable to lock runner instance: {:?}", e))
+                    .map_err(|e| format!("unable to lock runner instance: {e:?}"))
                     .unwrap() = None;
                 window_mutex
                     .lock()
                     .unwrap()
                     .emit("client-exited", ())
-                    .unwrap()
+                    .unwrap();
             });
     });
 
@@ -1658,7 +1675,7 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
     let runner_instance = app_state.runner_instance.clone();
     let mut lck = runner_instance
         .lock()
-        .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
+        .map_err(|e| format!("unable to lock runner instance: {e:?}"))?;
 
     if let Some(inst) = lck.take() {
         info!("Sending sigterm");
@@ -1677,7 +1694,7 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
     let account = login_data
         .refresh_maybe_fixed()
         .await
-        .map_err(|e| format!("unable to refresh: {:?}", e))?;
+        .map_err(|e| format!("unable to refresh: {e:?}"))?;
     Ok(account)
 }
 
@@ -1685,21 +1702,21 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
 async fn mc_name_by_uuid(uuid: &str) -> Result<String, String> {
     CapeApiEndpoints::mc_name_by_uuid(uuid)
         .await
-        .map_err(|e| format!("unable get mc name by uuid: {:?}", e))
+        .map_err(|e| format!("unable get mc name by uuid: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, String> {
     CapeApiEndpoints::cape_hash_by_uuid(uuid)
         .await
-        .map_err(|e| format!("unable get cape hash by uuid: {:?}", e))
+        .map_err(|e| format!("unable get cape hash by uuid: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_whitelist_slots(norisk_token: &str, uuid: &str) -> Result<WhitelistSlots, String> {
     ApiEndpoints::whitelist_slots(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to get whitelist slots: {:?}", e))
+        .map_err(|e| format!("unable to get whitelist slots: {e:?}"))
 }
 
 #[tauri::command]
@@ -1710,18 +1727,17 @@ async fn add_player_to_whitelist(
 ) -> Result<bool, String> {
     let response = HTTP_CLIENT
         .get(format!(
-            "https://playerdb.co/api/player/minecraft/{}",
-            identifier
+            "https://playerdb.co/api/player/minecraft/{identifier}"
         ))
         .send()
         .await
-        .map_err(|e| format!("invalid username: {:}", e))
+        .map_err(|e| format!("invalid username: {e:}"))
         .unwrap();
     let response_text = response.json::<PlayerDBData>().await.unwrap();
     let uuid = response_text.data.player.unwrap().id;
     ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid)
         .await
-        .map_err(|e| format!("unable to add player to whitelist: {:?}", e))
+        .map_err(|e| format!("unable to add player to whitelist: {e:?}"))
 }
 
 #[tauri::command]
@@ -1757,7 +1773,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
     .filter(|dir| dir.exists())
     .map(std::fs::remove_dir_all)
     .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
+    .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {e:?}")))?;
     Ok(())
 }
 
@@ -1768,14 +1784,14 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
 async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, String> {
     ApiEndpoints::norisk_featured_servers(branch)
         .await
-        .map_err(|e| format!("unable to get featured servers {:?}", e))
+        .map_err(|e| format!("unable to get featured servers {e:?}"))
 }
 
 #[tauri::command]
 async fn get_custom_servers(token: &str, uuid: &str) -> Result<CustomServersResponse, String> {
     ApiEndpoints::norisk_custom_servers(token, uuid)
         .await
-        .map_err(|e| format!("unable to get custom servers {:?}", e))
+        .map_err(|e| format!("unable to get custom servers {e:?}"))
 }
 
 #[tauri::command]
@@ -1786,7 +1802,7 @@ async fn check_custom_server_subdomain(
 ) -> Result<bool, String> {
     ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token, uuid)
         .await
-        .map_err(|e| format!("unable to check custom server subdomain {:?}", e))
+        .map_err(|e| format!("unable to check custom server subdomain {e:?}"))
 }
 
 #[tauri::command]
@@ -1797,7 +1813,7 @@ async fn get_custom_server_jwt_token(
 ) -> Result<String, String> {
     ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token, uuid)
         .await
-        .map_err(|e| format!("unable to get custom server jwt token: {:?}", e))
+        .map_err(|e| format!("unable to get custom server jwt token: {e:?}"))
 }
 
 #[tauri::command]
@@ -1820,7 +1836,7 @@ async fn create_custom_server(
         uuid,
     )
     .await
-    .map_err(|e| format!("unable to create custom server: {:?}", e))
+    .map_err(|e| format!("unable to create custom server: {e:?}"))
 }
 
 #[tauri::command]
@@ -1832,7 +1848,7 @@ async fn initialize_custom_server(
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     CustomServerManager::initialize_server(&window_mutex, custom_server, additional_data)
         .await
-        .map_err(|e| format!("unable to initialize custom server: {:?}", e))
+        .map_err(|e| format!("unable to initialize custom server: {e:?}"))
 }
 
 #[tauri::command]
@@ -1888,30 +1904,27 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
     // check if process is still running
     let custom_server_process =
         system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
-    match custom_server_process.is_some() {
-        true => {
-            info!("Custom server is already / still running!");
-            CustomServerManager::read_and_process_server_log_file(
-                &window_mutex,
-                &latest_running_server.server_id.clone().unwrap(),
-            )
+    if custom_server_process.is_some() {
+        info!("Custom server is already / still running!");
+        CustomServerManager::read_and_process_server_log_file(
+            &window_mutex,
+            &latest_running_server.server_id.clone().unwrap(),
+        )
+        .await
+        .unwrap();
+        Ok((true, latest_running_server.server_id.unwrap()))
+    } else {
+        info!("No custom server is running!");
+        let custom_server_forwarder_process = system.process(Pid::from(
+            latest_running_server.forwarder_process_id.unwrap() as usize,
+        ));
+        if let Some(forwarder) = custom_server_forwarder_process {
+            forwarder.kill();
+        }
+        CustomServerManager::store_latest_running_server(None, None, None)
             .await
             .unwrap();
-            Ok((true, latest_running_server.server_id.unwrap()))
-        }
-        false => {
-            info!("No custom server is running!");
-            let custom_server_forwarder_process = system.process(Pid::from(
-                latest_running_server.forwarder_process_id.unwrap() as usize,
-            ));
-            if let Some(forwarder) = custom_server_forwarder_process {
-                forwarder.kill();
-            }
-            CustomServerManager::store_latest_running_server(None, None, None)
-                .await
-                .unwrap();
-            Ok((false, String::new()))
-        }
+        Ok((false, String::new()))
     }
 }
 
@@ -1954,7 +1967,7 @@ pub async fn terminate_custom_server(
                     data: String::from("Stopping server"),
                 },
             )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
             .unwrap();
         window
             .emit(
@@ -1964,7 +1977,7 @@ pub async fn terminate_custom_server(
                     data: String::from("Thread RCON Listener stopped"),
                 },
             )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
             .unwrap();
     }
 
@@ -1998,7 +2011,7 @@ async fn execute_rcon_command(
                 data: console_info_log.clone(),
             },
         )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
         .unwrap();
 
     let response = client.send_command(command).unwrap();
@@ -2012,7 +2025,7 @@ async fn execute_rcon_command(
                 data: response_log.clone(),
             },
         )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
         .unwrap();
 
     Ok(response.body)
@@ -2055,7 +2068,7 @@ async fn get_rcon_server_info() -> Result<HashMap<String, String>, String> {
 async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), String> {
     ApiEndpoints::norisk_delete_custom_server(id, token, uuid)
         .await
-        .map_err(|e| format!("unable to delete custom server: {:?}", e))?;
+        .map_err(|e| format!("unable to delete custom server: {e:?}"))?;
 
     let path = LAUNCHER_DIRECTORY
         .data_dir()
@@ -2065,7 +2078,7 @@ async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), S
     if path.exists() {
         fs::remove_dir_all(path)
             .await
-            .map_err(|e| format!("unable to delete custom server files: {:?}", e))?;
+            .map_err(|e| format!("unable to delete custom server files: {e:?}"))?;
     }
 
     Ok(())
@@ -2078,14 +2091,14 @@ async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), S
 async fn get_all_vanilla_versions() -> Result<VanillaVersions, String> {
     VanillaProvider::get_all_versions()
         .await
-        .map_err(|e| format!("unable to get all vanilla versions: {:?}", e))
+        .map_err(|e| format!("unable to get all vanilla versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManifest, String> {
     VanillaProvider::get_manifest(hash, version)
         .await
-        .map_err(|e| format!("unable to get vanilla manifest: {:?}", e))
+        .map_err(|e| format!("unable to get vanilla manifest: {e:?}"))
 }
 
 ///
@@ -2095,7 +2108,7 @@ async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManife
 async fn get_all_fabric_game_versions() -> Result<Vec<FabricVersion>, String> {
     FabricProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all fabric game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all fabric game versions: {e:?}"))
 }
 
 #[tauri::command]
@@ -2104,7 +2117,7 @@ async fn get_all_fabric_loader_versions(
 ) -> Result<Vec<FabricLoaderVersion>, String> {
     FabricProvider::get_all_loader_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all fabric loader versions: {:?}", e))
+        .map_err(|e| format!("unable to get all fabric loader versions: {e:?}"))
 }
 
 ///
@@ -2114,7 +2127,7 @@ async fn get_all_fabric_loader_versions(
 async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
     QuiltProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get quilt manifest: {:?}", e))
+        .map_err(|e| format!("unable to get quilt manifest: {e:?}"))
 }
 
 ///
@@ -2124,7 +2137,7 @@ async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
 async fn get_forge_manifest() -> Result<ForgeManifest, String> {
     ForgeProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get forge manifest: {:?}", e))
+        .map_err(|e| format!("unable to get forge manifest: {e:?}"))
 }
 
 ///
@@ -2134,7 +2147,7 @@ async fn get_forge_manifest() -> Result<ForgeManifest, String> {
 async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
     NeoForgeProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get neoforge manifest: {:?}", e))
+        .map_err(|e| format!("unable to get neoforge manifest: {e:?}"))
 }
 
 ///
@@ -2144,14 +2157,14 @@ async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
 async fn get_all_paper_game_versions() -> Result<PaperManifest, String> {
     PaperProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all paper game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all paper game versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, String> {
     PaperProvider::get_all_build_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all paper build versions: {:?}", e))
+        .map_err(|e| format!("unable to get all paper build versions: {e:?}"))
 }
 
 ///
@@ -2161,14 +2174,14 @@ async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, S
 async fn get_all_folia_game_versions() -> Result<FoliaManifest, String> {
     FoliaProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all folia game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all folia game versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, String> {
     FoliaProvider::get_all_build_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all folia build versions: {:?}", e))
+        .map_err(|e| format!("unable to get all folia build versions: {e:?}"))
 }
 
 ///
@@ -2178,7 +2191,7 @@ async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, S
 async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
     PurpurProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all purpur game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all purpur game versions: {e:?}"))
 }
 
 ///
@@ -2188,7 +2201,7 @@ async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
 async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
     SpigotProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all spigot game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all spigot game versions: {e:?}"))
 }
 
 ///
@@ -2198,7 +2211,7 @@ async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
 async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
     BukkitProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all bukkit game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all bukkit game versions: {e:?}"))
 }
 
 ///
@@ -2217,7 +2230,7 @@ async fn get_full_feature_whitelist(
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
+    .map_err(|e| format!("unable to get full feature whitelist: {e:?}"))
 }
 
 ///
@@ -2238,7 +2251,7 @@ async fn check_feature_whitelist(
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to check feature whitelist: {:?}", e))
+    .map_err(|e| format!("unable to check feature whitelist: {e:?}"))
 }
 
 /// Runs the GUI and returns when the window is closed.

@@ -58,7 +58,7 @@ impl SpigotProvider {
         base: &str,
         endpoint: &str,
     ) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

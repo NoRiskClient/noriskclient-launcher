@@ -14,6 +14,7 @@ use tokio::{
 pub struct JavaRuntime(PathBuf);
 
 impl JavaRuntime {
+    #[must_use]
     pub fn new(path: PathBuf) -> JavaRuntime {
         JavaRuntime(path)
     }
@@ -29,6 +30,7 @@ impl JavaRuntime {
         Ok(child)
     }
 
+    #[allow(clippy::unused_async)] // TODO: check if we really need async here
     pub async fn run_server(&self, max_ram: u64, min_ram: u64, server_dir: &Path) -> Result<Child> {
         let mut command = Command::new(&self.0);
         command.current_dir(server_dir);
@@ -75,7 +77,7 @@ impl JavaRuntime {
                     let code = exit_status?.code().unwrap_or(7900); // 7900 = unwrap failed error code
 
                     debug!("Process exited with code: {}", code);
-                    if code != 0 && code != -1073740791 { // -1073740791 = happens when the process is killed forcefully, we don't want to bail in this case
+                    if code != 0 && code != -1_073_740_791 { // -1073740791 = happens when the process is killed forcefully, we don't want to bail in this case
                         bail!("Process exited with non-zero code: {}", code);
                     }
                     break;
@@ -125,7 +127,7 @@ impl JavaRuntime {
                     let code = exit_status?.code().unwrap_or(7900); // 7900 = unwrap failed error code
 
                     debug!("Process exited with code: {}", code);
-                    if code != 0 && code != -1073740791 { // -1073740791 = happens when the process is killed forcefully, we don't want to bail in this case
+                    if code != 0 && code != -1_073_740_791 { // -1073740791 = happens when the process is killed forcefully, we don't want to bail in this case
                         bail!("Process exited with non-zero code: {}", code);
                     }
                     break;

@@ -84,8 +84,7 @@ pub(crate) async fn launch<D: Send + Sync>(
             .map(|x| &x.url)
             .ok_or_else(|| {
                 LauncherError::InvalidVersionProfile(format!(
-                    "unable to find inherited version manifest {}",
-                    inherited_version
+                    "unable to find inherited version manifest {inherited_version}"
                 ))
             })?;
 
@@ -207,12 +206,11 @@ pub async fn retrieve_and_copy_mods(
                         let repository_url =
                             manifest.repositories.get(repository).ok_or_else(|| {
                                 LauncherError::InvalidVersionProfile(format!(
-                                    "There is no repository specified with the name {}",
-                                    repository
+                                    "There is no repository specified with the name {repository}"
                                 ))
                             })?;
                         let maven_artifact_path = get_maven_artifact_path(artifact)?;
-                        format!("{}{}", repository_url, maven_artifact_path)
+                        format!("{repository_url}{maven_artifact_path}")
                     };
 
                     info!("downloading mod {} from {}", artifact, download_url);
@@ -239,7 +237,7 @@ pub async fn retrieve_and_copy_mods(
         .await?;
 
         info!("Installed Mod {:?}", current_mod);
-        installed_mods.push(current_mod.clone())
+        installed_mods.push(current_mod.clone());
     }
 
     Ok(())
@@ -287,7 +285,9 @@ pub async fn retrieve_shaders(
         let current_shader_path = shader_path.join(&current_shader.file_name);
 
         // Do we need to download the shader?
-        if !current_shader_path.exists() {
+        if current_shader_path.exists() {
+            info!("Shader {} is already downloaded", &current_shader.file_name);
+        } else {
             // Make sure that the parent directory exists
             fs::create_dir_all(&current_shader_path.parent().unwrap()).await?;
 
@@ -310,11 +310,9 @@ pub async fn retrieve_shaders(
                 fs::write(&current_shader_path, retrieved_bytes).await?;
                 info!("Installed Shader {}", &current_shader.file_name);
             }
-        } else {
-            info!("Shader {} is already downloaded", &current_shader.file_name);
         }
 
-        installed_shaders.push(current_shader.clone())
+        installed_shaders.push(current_shader.clone());
     }
 
     Ok(())
@@ -362,7 +360,12 @@ pub async fn retrieve_resourcepacks(
         let current_resourcepack_path = resourcepack_path.join(&current_resourcepack.file_name);
 
         // Do we need to download the ResourcePack?
-        if !current_resourcepack_path.exists() {
+        if current_resourcepack_path.exists() {
+            info!(
+                "ResourcePack {} is already downloaded",
+                &current_resourcepack.file_name
+            );
+        } else {
             // Make sure that the parent directory exists
             fs::create_dir_all(&current_resourcepack_path.parent().unwrap()).await?;
 
@@ -385,14 +388,9 @@ pub async fn retrieve_resourcepacks(
                 fs::write(&current_resourcepack_path, retrieved_bytes).await?;
                 info!("Installed ResourcePack {}", &current_resourcepack.file_name);
             }
-        } else {
-            info!(
-                "ResourcePack {} is already downloaded",
-                &current_resourcepack.file_name
-            );
         }
 
-        installed_resourcepacks.push(current_resourcepack.clone())
+        installed_resourcepacks.push(current_resourcepack.clone());
     }
 
     Ok(())
@@ -481,7 +479,7 @@ pub async fn retrieve_datapacks(
             );
         }
 
-        installed_datapacks.push(current_datapack.clone())
+        installed_datapacks.push(current_datapack.clone());
     }
 
     Ok(())

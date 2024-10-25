@@ -39,9 +39,9 @@ pub enum CustomServerType {
 }
 
 impl CustomServerType {
+    #[must_use]
     pub fn from_string(s: &str) -> Self {
         match s {
-            "VANILLA" => CustomServerType::VANILLA,
             "FORGE" => CustomServerType::FORGE,
             "FABRIC" => CustomServerType::FABRIC,
             "NEO_FORGE" => CustomServerType::NEO_FORGE,

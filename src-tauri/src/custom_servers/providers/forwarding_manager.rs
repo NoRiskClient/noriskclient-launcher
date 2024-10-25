@@ -63,24 +63,24 @@ impl ForwardingManagerProvider {
         let version_file_path = path.join(".version");
         let forwarding_manager_path = path.join("forwarding_manager.jar");
         let latest_version = Self::get_latest_version().await?;
-        if !forwarding_manager_path.exists() {
-            info!("Downloading forwarding manager for the first time...");
-            Self::download_forwarding_manager(&latest_version).await?;
-            fs::write(version_file_path, latest_version.as_bytes()).await?;
-        } else {
+        if forwarding_manager_path.exists() {
             let current_version = fs::read_to_string(&version_file_path)
                 .await
                 .unwrap_or_default();
-            if current_version != latest_version {
+            if current_version == latest_version {
+                info!("Forwarding manager is up to date!");
+            } else {
                 info!(
                     "Updating forwarding manager from {} to {}...",
                     current_version, latest_version
                 );
                 Self::download_forwarding_manager(&latest_version).await?;
                 fs::write(version_file_path, latest_version.as_bytes()).await?;
-            } else {
-                info!("Forwarding manager is up to date!");
             }
+        } else {
+            info!("Downloading forwarding manager for the first time...");
+            Self::download_forwarding_manager(&latest_version).await?;
+            fs::write(version_file_path, latest_version.as_bytes()).await?;
         }
         Ok(())
     }
@@ -121,7 +121,7 @@ impl ForwardingManagerProvider {
 
     /// Request JSON formatted data from launcher API
     async fn request_from_endpoint(base: &str, endpoint: &str) -> Result<String> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

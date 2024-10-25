@@ -10,7 +10,7 @@ use crate::utils::{download_file, tar_gz_extract, zip_extract, OperatingSystem, 
 
 /// Find java binary in JRE folder
 pub async fn find_java_binary(runtimes_folder: &Path, jre_version: u32) -> Result<PathBuf> {
-    let runtime_path = runtimes_folder.join(format!("{}", jre_version));
+    let runtime_path = runtimes_folder.join(format!("{jre_version}"));
 
     // Find JRE in runtime folder
     let mut files = fs::read_dir(&runtime_path).await?;
@@ -60,7 +60,7 @@ pub async fn jre_download<F>(
 where
     F: Fn(u64, u64),
 {
-    let runtime_path = runtimes_folder.join(format!("{}", jre_version));
+    let runtime_path = runtimes_folder.join(format!("{jre_version}"));
 
     if runtime_path.exists() {
         // Clear out folder
@@ -85,9 +85,9 @@ where
     match OS {
         OperatingSystem::Windows => zip_extract(cursor, runtime_path.as_path()).await?,
         OperatingSystem::Linux | OperatingSystem::Osx => {
-            tar_gz_extract(cursor, runtime_path.as_path()).await?
+            tar_gz_extract(cursor, runtime_path.as_path()).await?;
         }
-        _ => bail!("Unsupported OS"),
+        OperatingSystem::Unknown => bail!("Unsupported OS"),
     }
 
     // Find JRE afterwards

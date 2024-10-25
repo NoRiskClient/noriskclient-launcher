@@ -24,14 +24,17 @@ impl CapeApiEndpoints {
             .unwrap_or_default();
 
         let image_url = if options.experimental_mode {
-            format!("https://dl-staging.norisk.gg/capes/prod/{}.png", hash)
+            format!("https://dl-staging.norisk.gg/capes/prod/{hash}.png")
         } else {
-            format!("https://dl.norisk.gg/capes/prod/{}.png", hash)
+            format!("https://dl.norisk.gg/capes/prod/{hash}.png")
         };
 
         match reqwest::get(image_url).await {
             Ok(response) => {
-                let image_bytes = response.bytes().await;
+                let image_bytes = response
+                    .bytes()
+                    .await
+                    .map_err(|err| format!("Error reading Image: {err}"))?;
 
                 // Baue die URL mit dem Token als Query-Parameter
                 let url = format!(
@@ -43,11 +46,11 @@ impl CapeApiEndpoints {
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .body(image_bytes.unwrap())
+                    .header("Authorization", format!("Bearer {token}"))
+                    .body(image_bytes)
                     .send()
                     .await
-                    .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+                    .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
                 debug!("Cape equiped status {:?}", response.status());
 
@@ -57,14 +60,14 @@ impl CapeApiEndpoints {
                         let response_text = response
                             .text()
                             .await
-                            .map_err(|err| format!("Error reading the request: {}", err))?;
+                            .map_err(|err| format!("Error reading the request: {err}"))?;
                         Err(response_text)
                     }
                     _ => {
                         let response_text = response
                             .text()
                             .await
-                            .map_err(|err| format!("Error reading the request: {}", err))?;
+                            .map_err(|err| format!("Error reading the request: {err}"))?;
                         Err(response_text)
                     }
                 }
@@ -99,11 +102,11 @@ impl CapeApiEndpoints {
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)
-                    .header("Authorization", format!("Bearer {}", token))
+                    .header("Authorization", format!("Bearer {token}"))
                     .body(image_data)
                     .send()
                     .await
-                    .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+                    .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
                 debug!("Cape upload status {:?}", response.status());
 
@@ -116,14 +119,14 @@ impl CapeApiEndpoints {
                         let response_text = response
                             .text()
                             .await
-                            .map_err(|err| format!("Error reading the request: {}", err))?;
+                            .map_err(|err| format!("Error reading the request: {err}"))?;
                         Ok(response_text)
                     }
                     _ => {
                         let response_text = response
                             .text()
                             .await
-                            .map_err(|err| format!("Error reading the request: {}", err))?;
+                            .map_err(|err| format!("Error reading the request: {err}"))?;
                         Err(response_text)
                     }
                 }
@@ -134,10 +137,7 @@ impl CapeApiEndpoints {
 
     pub async fn mc_name_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
         debug!("Requesting Minecraft Username {}", uuid);
-        let url = format!(
-            "  https://sessionserver.mojang.com/session/minecraft/profile/{}",
-            uuid
-        );
+        let url = format!("  https://sessionserver.mojang.com/session/minecraft/profile/{uuid}");
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         Ok(response_text.name)
@@ -172,22 +172,21 @@ impl CapeApiEndpoints {
         // Sende den POST-Request
         let response = HTTP_CLIENT
             .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .send()
             .await
-            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+            .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
         debug!("Delete cape status {:?}", response.status());
 
-        match response.status() {
-            StatusCode::OK => Ok(()),
-            _ => {
-                let response_text = response
-                    .text()
-                    .await
-                    .map_err(|err| format!("Error reading the request: {}", err))?;
-                Err(response_text)
-            }
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            let response_text = response
+                .text()
+                .await
+                .map_err(|err| format!("Error reading the request: {err}"))?;
+            Err(response_text)
         }
     }
 
@@ -210,7 +209,7 @@ impl CapeApiEndpoints {
         );
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .send()
             .await?
             .error_for_status()?
@@ -235,7 +234,7 @@ impl CapeApiEndpoints {
         );
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .send()
             .await?
             .error_for_status()?
@@ -243,14 +242,13 @@ impl CapeApiEndpoints {
             .await?)
     }
 
-    pub fn show_in_folder(path: &str) {
+    pub fn show_in_folder(path: &str) -> anyhow::Result<()> {
         debug!("Spawning Path {}", path);
         #[cfg(target_os = "windows")]
         {
             Command::new("explorer")
                 .args(["/select,", path]) // The comma after select is not a typo
-                .spawn()
-                .unwrap();
+                .spawn()?;
         }
 
         /* TODO Später
@@ -285,8 +283,10 @@ impl CapeApiEndpoints {
 
         #[cfg(target_os = "macos")]
         {
-            Command::new("open").args(["-R", &path]).spawn().unwrap();
+            Command::new("open").args(["-R", &path]).spawn()?;
         }
+
+        Ok(())
     }
 }
 

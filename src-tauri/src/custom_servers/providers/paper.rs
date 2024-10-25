@@ -21,7 +21,7 @@ impl PaperProvider {
 
     /// Request all available loader versions
     pub async fn get_all_build_versions(mc_version: &str) -> Result<PaperBuilds> {
-        Self::request_from_endpoint(PAPER_API_BASE, &format!("versions/{}/builds", mc_version))
+        Self::request_from_endpoint(PAPER_API_BASE, &format!("versions/{mc_version}/builds"))
             .await
     }
 
@@ -61,7 +61,7 @@ impl PaperProvider {
         base: &str,
         endpoint: &str,
     ) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT
             .get(url)

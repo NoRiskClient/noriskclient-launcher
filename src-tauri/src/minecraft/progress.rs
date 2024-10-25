@@ -19,10 +19,12 @@ pub enum ProgressUpdateSteps {
     DownloadCustomServerInstallerJar,
 }
 
+#[must_use]
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
     idx as u64 * 100 + (curr * 100 / max.max(1))
 }
 
+#[must_use]
 pub fn get_max(len: usize) -> u64 {
     len as u64 * 100
 }
@@ -35,8 +37,9 @@ impl ProgressUpdateSteps {
     fn step_idx(&self) -> usize {
         match self {
             ProgressUpdateSteps::DownloadNoRiskClientMods => 0,
-            ProgressUpdateSteps::DownloadJRE => 1,
-            ProgressUpdateSteps::DownloadClientJar => 2,
+            ProgressUpdateSteps::DownloadJRE | ProgressUpdateSteps::DownloadCustomServerJar => 1,
+            ProgressUpdateSteps::DownloadClientJar
+            | ProgressUpdateSteps::DownloadCustomServerInstallerJar => 2,
             ProgressUpdateSteps::DownloadLibraries => 3,
             ProgressUpdateSteps::DownloadAssets => 4,
             ProgressUpdateSteps::DownloadNoRiskAssets => 5,
@@ -44,9 +47,6 @@ impl ProgressUpdateSteps {
             ProgressUpdateSteps::DownloadShader => 7,
             ProgressUpdateSteps::DownloadResourcePack => 8,
             ProgressUpdateSteps::DownloadDatapack => 9,
-
-            ProgressUpdateSteps::DownloadCustomServerJar => 1,
-            ProgressUpdateSteps::DownloadCustomServerInstallerJar => 2,
         }
     }
 }
@@ -65,12 +65,16 @@ pub enum ProgressUpdate {
 const PER_STEP: u64 = 1024;
 
 impl ProgressUpdate {
+    #[allow(clippy::needless_pass_by_value)] // TODO: check if we really need this
+    #[must_use]
     pub fn set_for_step(step: ProgressUpdateSteps, progress: u64, max: u64) -> Self {
         Self::SetProgress(step.step_idx() as u64 * PER_STEP + (progress * PER_STEP / max))
     }
+    #[must_use]
     pub fn set_to_max() -> Self {
         Self::SetProgress(ProgressUpdateSteps::len() as u64 * PER_STEP)
     }
+    #[must_use]
     pub fn set_max() -> Self {
         let max = ProgressUpdateSteps::len() as u64;
 
