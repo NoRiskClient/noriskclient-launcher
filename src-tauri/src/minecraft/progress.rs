@@ -16,7 +16,7 @@ pub enum ProgressUpdateSteps {
     VerifyNoRiskAssets,
 
     DownloadCustomServerJar,
-    DownloadCustomServerInstallerJar
+    DownloadCustomServerInstallerJar,
 }
 
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
@@ -54,11 +54,11 @@ impl ProgressUpdateSteps {
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", content = "value")]
 pub enum ProgressUpdate {
-    #[serde(rename = "max")] 
+    #[serde(rename = "max")]
     SetMax(u64),
-    #[serde(rename = "progress")] 
+    #[serde(rename = "progress")]
     SetProgress(u64),
-    #[serde(rename = "label")] 
+    #[serde(rename = "label")]
     SetLabel(String),
 }
 
@@ -84,4 +84,3 @@ impl ProgressUpdate {
 pub trait ProgressReceiver {
     fn progress_update(&self, update: ProgressUpdate);
 }
-

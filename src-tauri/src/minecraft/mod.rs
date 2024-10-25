@@ -1,8 +1,8 @@
-pub mod launcher;
-pub mod version;
-mod rule_interpreter;
 pub mod auth;
+pub mod java;
+pub mod launcher;
+pub mod minecraft_auth;
 pub mod prelauncher;
 pub mod progress;
-pub mod java;
-pub mod minecraft_auth;
+mod rule_interpreter;
+pub mod version;

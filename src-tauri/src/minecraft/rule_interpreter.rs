@@ -4,7 +4,7 @@ use anyhow::Result;
 use regex::Regex;
 
 use crate::minecraft::version::{Rule, RuleAction};
-use crate::utils::{OS, ARCHITECTURE, OS_VERSION};
+use crate::utils::{ARCHITECTURE, OS, OS_VERSION};
 
 pub fn check_condition(rules: &Vec<Rule>, features: &HashSet<String>) -> Result<bool> {
     if rules.is_empty() {
@@ -29,7 +29,7 @@ pub fn check_condition(rules: &Vec<Rule>, features: &HashSet<String>) -> Result<
                 }
             }
             if let Some(version_regex) = &os_requirement.version {
-                if !Regex::new(version_regex)?.is_match(&os_version) {
+                if !Regex::new(version_regex)?.is_match(os_version) {
                     rule_applies = false;
                 }
             }

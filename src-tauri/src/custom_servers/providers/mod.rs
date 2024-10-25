@@ -1,11 +1,11 @@
-pub mod vanilla;
-pub mod forge;
+pub mod bukkit;
 pub mod fabric;
 pub mod folia;
+pub mod forge;
+pub mod forwarding_manager;
+pub mod neoforge;
 pub mod paper;
 pub mod purpur;
 pub mod quilt;
-pub mod neoforge;
 pub mod spigot;
-pub mod bukkit;
-pub mod forwarding_manager;
+pub mod vanilla;

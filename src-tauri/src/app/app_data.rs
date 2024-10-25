@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::vec;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -19,6 +18,7 @@ fn default_concurrent_downloads() -> i32 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Addons {
     pub shaders: Vec<Shader>,
     #[serde(rename = "resourcePacks")]
@@ -35,6 +35,7 @@ pub struct LauncherProfile {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Default)]
 pub(crate) struct LauncherProfiles {
     #[serde(rename = "mainProfiles")]
     pub main_profiles: Vec<LauncherProfile>,
@@ -67,19 +68,33 @@ pub struct LauncherOptions {
     pub latest_branch: Option<String>,
     #[serde(rename = "latestDevBranch")]
     pub latest_dev_branch: Option<String>,
-    #[serde(rename = "concurrentDownloads", default = "default_concurrent_downloads")]
+    #[serde(
+        rename = "concurrentDownloads",
+        default = "default_concurrent_downloads"
+    )]
     pub concurrent_downloads: i32,
 }
 
 impl LauncherOptions {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the options from the file
-        let options = serde_json::from_slice::<LauncherOptions>(&fs::read(app_data.join("options.json")).await?).map_err(|err| -> String { format!("Failed to write options.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherOptions::default());
+        let options = serde_json::from_slice::<LauncherOptions>(
+            &fs::read(app_data.join("options.json")).await?,
+        )
+        .map_err(|err| -> String {
+            format!("Failed to write options.json: {}", err)
+        })
+        .unwrap_or_else(|_| LauncherOptions::default());
         Ok(options)
     }
 
     pub async fn store(&self, app_data: &Path) -> Result<()> {
-        let _ = fs::write(app_data.join("options.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write options.json: {}", err).into() });
+        let _ = fs::write(
+            app_data.join("options.json"),
+            serde_json::to_string_pretty(&self)?,
+        )
+        .await
+        .map_err(|err| -> String { format!("Failed to write options.json: {}", err) });
         Ok(())
     }
 
@@ -120,35 +135,31 @@ impl Default for LauncherOptions {
 impl LauncherProfiles {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the launcher_profiles from the file
-        let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(&fs::read(app_data.join("launcher_profiles.json")).await?).map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err.to_string()).into() }).unwrap_or_else(|_| LauncherProfiles::default());
+        let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(
+            &fs::read(app_data.join("launcher_profiles.json")).await?,
+        )
+        .map_err(|err| -> String {
+            format!(
+                "Failed to write launcher_profiles.json: {}",
+                err
+            )
+        })
+        .unwrap_or_else(|_| LauncherProfiles::default());
         Ok(launcher_profiles)
     }
 
     pub async fn store(&self, app_data: &Path) -> Result<()> {
         // save the launcher_profiles to the file
-        let _ = fs::write(app_data.join("launcher_profiles.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err).into() });
+        let _ = fs::write(
+            app_data.join("launcher_profiles.json"),
+            serde_json::to_string_pretty(&self)?,
+        )
+        .await
+        .map_err(|err| -> String {
+            format!("Failed to write launcher_profiles.json: {}", err)
+        });
         Ok(())
     }
 }
 
-impl Default for LauncherProfiles {
-    fn default() -> Self {
-        Self {
-            main_profiles: vec![],
-            selected_main_profiles: HashMap::new(),
-            experimental_profiles: vec![],
-            selected_experimental_profiles: HashMap::new(),
-            addons: HashMap::new(),
-        }
-    }
-}
 
-impl Default for Addons {
-    fn default() -> Self {
-        Self {
-            shaders: vec![],
-            resourcepacks: vec![],
-            datapacks: vec![],
-        }
-    }
-}
