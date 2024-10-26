@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::info;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,7 @@ impl FoliaProvider {
 
     /// Request all available loader versions
     pub async fn get_all_build_versions(mc_version: &str) -> Result<FoliaBuilds> {
-        Self::request_from_endpoint(FOLIA_API_BASE, &format!("versions/{mc_version}/builds"))
-            .await
+        Self::request_from_endpoint(FOLIA_API_BASE, &format!("versions/{mc_version}/builds")).await
     }
 
     pub async fn download_server_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()>
@@ -38,7 +37,7 @@ impl FoliaProvider {
             .await?
             .builds;
         build_version.reverse();
-        let latest_build = build_version.first().unwrap();
+        let latest_build = build_version.first().context("No builds found")?;
         let url = format!(
             "{}/versions/{}/builds/{}/downloads/{}",
             FOLIA_API_BASE,

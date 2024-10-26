@@ -107,7 +107,7 @@ perf = { level = "deny", priority = 2 }
 style = { level = "deny", priority = 3 }
 
 # These should be enabled in the future:
-unwrap_used = { level = "allow", priority = 5 }         # very important
+unwrap_used = { level = "warn", priority = 5 }          # very important
 missing_errors_doc = { level = "allow", priority = 20 }
 missing_panics_doc = { level = "allow", priority = 21 }
 too_many_lines = { level = "allow", priority = 22 }

@@ -15,7 +15,12 @@ where
 {
     let mut reader = ZipFileReader::new(archive).await?;
     for index in 0..reader.file().entries().len() {
-        let entry = &reader.file().entries().get(index).unwrap().entry();
+        let entry = &reader
+            .file()
+            .entries()
+            .get(index)
+            .context("Could not get entry")?
+            .entry();
         let file_name = entry.filename();
 
         let path = out_dir.join(sanitize_file_path(file_name));
@@ -35,7 +40,7 @@ where
         } else {
             // Creates parent directories. They may not exist if iteration is out of order
             // or the archive does not contain directory entries.
-            let parent = path.parent().unwrap();
+            let parent = path.parent().context("Could not get parent path")?;
             if !parent.is_dir() {
                 create_dir_all(parent).await?;
             }

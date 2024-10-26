@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use sysinfo::{RefreshKind, System, SystemExt};
 
 /// Get the total memory of the system in bytes
@@ -98,7 +98,10 @@ impl OperatingSystem {
 
 impl Display for OperatingSystem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.get_simple_name().unwrap())
+        match self.get_simple_name() {
+            Ok(name) => f.write_str(name),
+            Err(_) => Err(fmt::Error),
+        }
     }
 }
 
@@ -114,8 +117,11 @@ impl Architecture {
     }
 }
 
-impl Display for Architecture {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.get_simple_name().unwrap())
+impl fmt::Display for Architecture {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.get_simple_name() {
+            Ok(name) => f.write_str(name),
+            Err(_) => Err(fmt::Error),
+        }
     }
 }

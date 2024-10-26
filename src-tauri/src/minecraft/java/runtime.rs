@@ -1,7 +1,7 @@
 use crate::custom_servers::manager::CustomServerManager;
 use crate::custom_servers::models::{CustomServer, CustomServerTokenResponse};
 use crate::custom_servers::providers::forwarding_manager::ForwardingManagerProvider;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use log::debug;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -53,8 +53,8 @@ impl JavaRuntime {
         terminator: Receiver<()>,
         data: &D,
     ) -> Result<()> {
-        let mut stdout = running_task.stdout.take().unwrap();
-        let mut stderr = running_task.stderr.take().unwrap();
+        let mut stdout = running_task.stdout.take().context("stdout missing")?;
+        let mut stderr = running_task.stderr.take().context("stderr missing")?;
 
         let mut stdout_buf = vec![0; 1024];
         let mut stderr_buf = vec![0; 1024];
@@ -98,8 +98,8 @@ impl JavaRuntime {
         java_runtime: &JavaRuntime,
         data: &D,
     ) -> Result<()> {
-        let mut stdout = running_task.stdout.take().unwrap();
-        let mut stderr = running_task.stderr.take().unwrap();
+        let mut stdout = running_task.stdout.take().context("stdout missing")?;
+        let mut stderr = running_task.stderr.take().context("stderr missing")?;
 
         let mut stdout_buf = vec![0; 1024];
         let mut stderr_buf = vec![0; 1024];
@@ -113,9 +113,9 @@ impl JavaRuntime {
                     if String::from_utf8_lossy(content).contains("Done") && !startet_forwarding {
                         let server_clone = server.clone();
                         let tokens_clone = tokens.clone();
-                        let forwarder: Child = ForwardingManagerProvider::start_forwarding_manager(java_runtime, &server_clone.domain, &server_clone.subdomain, &tokens_clone.jwt, &tokens_clone.private_key).unwrap();
-                        let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
-                        CustomServerManager::store_latest_running_server(forwarder.id(), latest_running_server.process_id, latest_running_server.server_id).await.unwrap();
+                        let forwarder: Child = ForwardingManagerProvider::start_forwarding_manager(java_runtime, &server_clone.domain, &server_clone.subdomain, &tokens_clone.jwt, &tokens_clone.private_key)?;
+                        let latest_running_server = CustomServerManager::load_latest_running_server().await?;
+                        CustomServerManager::store_latest_running_server(forwarder.id(), latest_running_server.process_id, latest_running_server.server_id).await?;
                         startet_forwarding = true;
                     }
                     let _ = (on_stdout)(data, &server.id, content);

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use log::{debug, error, info};
 use tauri::Window;
 use tokio::{fs, process::Child};
@@ -128,7 +128,10 @@ impl CustomServerManager {
                 }
             }
         };
-        debug!("Java binary: {}", java_bin.to_str().unwrap());
+        debug!(
+            "Java binary: {}",
+            java_bin.to_str().expect("Failed to convert path to string")
+        );
         // Game
         let java_runtime = JavaRuntime::new(java_bin);
 
@@ -151,16 +154,16 @@ impl CustomServerManager {
         let custom_server_clone = custom_server.clone();
 
         //Das sollte anders gelöst werden
-        let todo_credentials = minecraft_auth_get_default_user().await?.unwrap();
+        let todo_credentials = minecraft_auth_get_default_user()
+            .await?
+            .context("Failed to get default user")?;
 
         let tokens: CustomServerTokenResponse = ApiEndpoints::request_from_norisk_endpoint(
             &format!("launcher/custom-servers/{}/token", &custom_server.id),
             &token,
             &todo_credentials.id.to_string(),
         )
-        .await
-        .map_err(|err| format!("Failed to get token: {err}"))
-        .unwrap();
+        .await?;
 
         let _ = java_runtime
             .handle_server_io(
@@ -188,10 +191,7 @@ impl CustomServerManager {
             .join(server_id)
             .join("logs")
             .join("latest.log");
-        let content = fs::read_to_string(&path)
-            .await
-            .map_err(|e| format!("Failed to read log file: {e}"))
-            .unwrap();
+        let content = fs::read_to_string(&path).await?;
         let lines: Vec<String> = content
             .lines()
             .collect::<Vec<&str>>()
@@ -200,24 +200,19 @@ impl CustomServerManager {
             .collect();
         if lines
             .last()
-            .unwrap()
+            .context("Failed to get last line of log file")?
             .contains("Thread RCON Listener stopped")
         {
             Self::store_latest_running_server(None, None, None).await?;
         } else {
             for line in &lines {
-                window
-                    .lock()
-                    .unwrap()
-                    .emit(
-                        "custom-server-process-output",
-                        CustomServerEventPayload {
-                            server_id: server_id.to_owned(),
-                            data: line.to_owned(),
-                        },
-                    )
-                    .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
-                    .unwrap();
+                window.lock().expect("Could not lock window").emit(
+                    "custom-server-process-output",
+                    CustomServerEventPayload {
+                        server_id: server_id.to_owned(),
+                        data: line.to_owned(),
+                    },
+                )?;
             }
         }
 
@@ -231,7 +226,9 @@ impl CustomServerManager {
             .join(server_id)
             .join("server.properties");
         let mut properties: Vec<(String, String)> = if path.exists() {
-            let content = fs::read_to_string(&path).await.unwrap();
+            let content = fs::read_to_string(&path)
+                .await
+                .expect("Failed to read properties file");
             content
                 .lines()
                 .map(|line| {
@@ -239,8 +236,8 @@ impl CustomServerManager {
                         (line.to_owned(), String::new())
                     } else {
                         let mut parts = line.split('=');
-                        let key = parts.next().unwrap().to_owned();
-                        let value = parts.next().unwrap().to_owned();
+                        let key = parts.next().expect("Could not get key").to_owned();
+                        let value = parts.next().expect("Could not get value").to_owned();
                         (key, value)
                     }
                 })
@@ -264,7 +261,10 @@ impl CustomServerManager {
         for (key, value) in force_defauls {
             if properties.iter().any(|(k, _)| k == &key) {
                 // replace the value without pushing a new set to the vector
-                let index = properties.iter().position(|(k, _)| k == &key).unwrap();
+                let index = properties
+                    .iter()
+                    .position(|(k, _)| k == &key)
+                    .expect("Could not find index");
                 properties[index] = (key, value);
             } else {
                 properties.push((key, value));
@@ -283,7 +283,9 @@ impl CustomServerManager {
             })
             .collect::<Vec<String>>()
             .join("\n");
-        fs::write(&path, content).await.unwrap();
+        fs::write(&path, content)
+            .await
+            .expect("Failed to write properties file");
     }
 
     fn handle_stdout(
@@ -297,7 +299,7 @@ impl CustomServerManager {
         }
 
         info!("{}", data);
-        window.lock().unwrap().emit(
+        window.lock().expect("Could not lock window").emit(
             "custom-server-process-output",
             CustomServerEventPayload {
                 server_id: server_id.to_owned(),
@@ -318,7 +320,7 @@ impl CustomServerManager {
         }
 
         error!("{}", data);
-        window.lock().unwrap().emit(
+        window.lock().expect("Could not lock window").emit(
             "custom-server-process-output",
             CustomServerEventPayload {
                 server_id: server_id.to_owned(),
@@ -333,7 +335,7 @@ impl CustomServerManager {
         server_id: &str,
         progress_update: ProgressUpdate,
     ) -> anyhow::Result<()> {
-        window.lock().unwrap().emit(
+        window.lock().expect("Could not lock window").emit(
             "custom-server-progress-update",
             CustomServerProgressEventPayload {
                 server_id: server_id.to_owned(),
@@ -345,11 +347,7 @@ impl CustomServerManager {
 
     pub async fn load_latest_running_server() -> Result<LatestRunningServer> {
         // load the options from the file
-        let path = get_options()
-            .await
-            .unwrap()
-            .data_path_buf()
-            .join("custom_servers");
+        let path = get_options().await?.data_path_buf().join("custom_servers");
         if !path.exists() {
             fs::create_dir_all(&path).await?;
         }
@@ -366,11 +364,7 @@ impl CustomServerManager {
         process_id: Option<u32>,
         server_id: Option<String>,
     ) -> Result<()> {
-        let path = get_options()
-            .await
-            .unwrap()
-            .data_path_buf()
-            .join("custom_servers");
+        let path = get_options().await?.data_path_buf().join("custom_servers");
         if !path.exists() {
             fs::create_dir_all(&path).await?;
         }

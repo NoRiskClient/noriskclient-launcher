@@ -16,7 +16,7 @@ use crate::{
     utils::{download_file_untracked, download_private_file_untracked, Architecture},
     HTTP_CLIENT, LAUNCHER_DIRECTORY,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{debug, info};
 use serde::{
     de::{self, MapAccess, Visitor},
@@ -173,11 +173,17 @@ impl ArgumentDeclaration {
         if parameter.force_server.is_some() {
             info!(
                 "\n\n\nAdded force server arg: {:?}\n\n\n.",
-                parameter.force_server.clone().unwrap()
+                parameter
+                    .force_server
+                    .clone()
+                    .context("force server not set")?
             );
             command_arguments.push(format!(
                 "-Dnorisk.forceServer={}",
-                parameter.force_server.clone().unwrap()
+                parameter
+                    .force_server
+                    .clone()
+                    .context("force server not set")?
             ));
         }
         for arg in parameter.custom_java_args.split(' ') {
@@ -326,7 +332,7 @@ where
     #[derive(Deserialize)]
     struct Wrapper(#[serde(deserialize_with = "string_or_struct")] Argument);
 
-    let v = Vec::deserialize(deserializer).unwrap();
+    let v = Vec::deserialize(deserializer)?;
     Ok(v.into_iter().map(|Wrapper(a)| a).collect())
 }
 
@@ -685,7 +691,7 @@ impl LibraryDownloadInfo {
         let library_path = path.join(&self.path);
 
         // Create parent directories
-        fs::create_dir_all(&library_path.parent().unwrap()).await?;
+        fs::create_dir_all(&library_path.parent().context("Could not get parent path")?).await?;
 
         // SHA1
         let sha1 = if let Some(sha1) = &self.sha1 {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::info;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ impl QuiltProvider {
         let installer_version = Self::get_all_installer_versions()
             .await?
             .first()
-            .unwrap()
+            .context("No installer versions found")?
             .clone();
         let path = LAUNCHER_DIRECTORY
             .data_dir()
@@ -58,11 +58,7 @@ impl QuiltProvider {
             "{QUILT_MAVEN_REPO_BASE}/quilt-installer/{installer_version}/quilt-installer-{installer_version}.jar"
         );
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(
-            path.join(format!("quilt-{installer_version}.jar")),
-            content,
-        )
-        .await;
+        fs::write(path.join(format!("quilt-{installer_version}.jar")), content).await?;
         Ok(())
     }
 

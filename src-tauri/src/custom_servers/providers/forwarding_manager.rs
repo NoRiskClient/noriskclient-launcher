@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::info;
 use tokio::fs;
 use tokio::process::Child;
@@ -101,7 +101,10 @@ impl ForwardingManagerProvider {
 
         let args = vec![
             "-jar".to_owned(),
-            forwarding_manager_path.to_str().unwrap().to_owned(),
+            forwarding_manager_path
+                .to_str()
+                .context("Could not convert path to string")?
+                .to_owned(),
             "--host".to_owned(),
             base_domain.to_owned(),
             "--domain".to_owned(),

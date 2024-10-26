@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use log::{debug, info};
 use tokio::fs;
 
@@ -174,7 +174,7 @@ pub async fn retrieve_and_copy_mods(
             let already_installed = installed_mods
                 .iter()
                 .find(|&loader_mod| loader_mod.is_same_slug(current_mod))
-                .unwrap();
+                .context("Could not find already installed mod")?;
             info!(
                 "Skipping Mod {:?} cuz {:?} is already installed",
                 current_mod, already_installed
@@ -192,7 +192,12 @@ pub async fn retrieve_and_copy_mods(
         // Do we need to download the mod?
         if !current_mod_path.exists() {
             // Make sure that the parent directory exists
-            fs::create_dir_all(&current_mod_path.parent().unwrap()).await?;
+            fs::create_dir_all(
+                &current_mod_path
+                    .parent()
+                    .context("Could not get parent of path")?,
+            )
+            .await?;
 
             match &current_mod.source {
                 ModSource::Repository {
@@ -269,7 +274,7 @@ pub async fn retrieve_shaders(
             let already_installed = installed_shaders
                 .iter()
                 .find(|&shader| shader.slug == current_shader.slug)
-                .unwrap();
+                .context("Could not find already installed shader")?;
             info!(
                 "Skipping Shader {:?} cuz {:?} is already installed",
                 &current_shader, already_installed
@@ -289,7 +294,12 @@ pub async fn retrieve_shaders(
             info!("Shader {} is already downloaded", &current_shader.file_name);
         } else {
             // Make sure that the parent directory exists
-            fs::create_dir_all(&current_shader_path.parent().unwrap()).await?;
+            fs::create_dir_all(
+                &current_shader_path
+                    .parent()
+                    .context("Could not get parent of path")?,
+            )
+            .await?;
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_shader.url {
@@ -344,7 +354,7 @@ pub async fn retrieve_resourcepacks(
             let already_installed = installed_resourcepacks
                 .iter()
                 .find(|&resourcepack| resourcepack.slug == current_resourcepack.slug)
-                .unwrap();
+                .context("Could not find already installed resourcepack")?;
             info!(
                 "Skipping ResoucePack {:?} cuz {:?} is already installed",
                 &current_resourcepack, already_installed
@@ -367,7 +377,12 @@ pub async fn retrieve_resourcepacks(
             );
         } else {
             // Make sure that the parent directory exists
-            fs::create_dir_all(&current_resourcepack_path.parent().unwrap()).await?;
+            fs::create_dir_all(
+                &current_resourcepack_path
+                    .parent()
+                    .context("Could not get parent of path")?,
+            )
+            .await?;
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_resourcepack.url {
@@ -430,7 +445,7 @@ pub async fn retrieve_datapacks(
                     datapack.slug == current_datapack.slug
                         && current_datapack.world_name == datapack.world_name
                 })
-                .unwrap();
+                .context("Could not find already installed datapack")?;
             info!(
                 "Skipping Datapack {:?} cuz {:?} is already installed",
                 &current_datapack, already_installed
@@ -448,7 +463,12 @@ pub async fn retrieve_datapacks(
         // Do we need to download the ResourcePack?
         if !current_datapack_path.exists() || current_datapack_path.is_dir() {
             // Make sure that the parent directory exists
-            fs::create_dir_all(&current_datapack_path.parent().unwrap()).await?;
+            fs::create_dir_all(
+                &current_datapack_path
+                    .parent()
+                    .context("Could not get parent path")?,
+            )
+            .await?;
 
             // ignore shaders that dont have a download url.
             if let Some(url) = &current_datapack.url {

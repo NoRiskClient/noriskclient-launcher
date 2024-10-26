@@ -32,6 +32,7 @@ use crate::app::modrinth_api::{
     CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
     ModrinthSearchRequestParams,
 };
+use crate::error::Error;
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
@@ -135,7 +136,7 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
     let window = tauri::WindowBuilder::new(
         &handle,
         "external", /* the unique window label */
-        tauri::WindowUrl::External(url.parse().unwrap()),
+        tauri::WindowUrl::External(url.parse().expect("Invalid URL")),
     )
     .build()
     .map_err(|e| format!("Could not create window: {e:?}"))?;
@@ -159,7 +160,12 @@ async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
         .add_filter("Pictures", &["png"])
         .pick_file();
 
-    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
+    CapeApiEndpoints::upload_cape(
+        norisk_token,
+        uuid,
+        dialog_result.expect("Invalid dialog result"),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -767,7 +773,7 @@ pub async fn minecraft_auth_update_mojang_and_norisk_token(
 }
 
 #[tauri::command]
-pub async fn get_options() -> Result<LauncherOptions, String> {
+pub async fn get_options() -> Result<LauncherOptions, Error> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
 
@@ -1144,12 +1150,9 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<(), String> {
+async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<(), Error> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
-    launcher_profiles
-        .store(config_dir)
-        .await
-        .map_err(|e| format!("unable to store launcher_profiles data: {e:?}"))?;
+    launcher_profiles.store(config_dir).await?;
 
     Ok(())
 }
@@ -1158,24 +1161,20 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 async fn get_norisk_user(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<NoRiskUserMinimal, String> {
+) -> Result<NoRiskUserMinimal, Error> {
     let user = ApiEndpoints::get_norisk_user(
         &credentials
             .norisk_credentials
-            .get_token(options.experimental_mode)
-            .unwrap(),
+            .get_token(options.experimental_mode)?,
         &credentials.id.to_string(),
     )
-    .await
-    .map_err(|e| format!("unable to request norisk user: {e:?}"))?;
+    .await?;
     Ok(user)
 }
 
 #[tauri::command]
-async fn check_maintenance_mode() -> Result<bool, String> {
-    let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
-        .await
-        .map_err(|e| format!("unable to request maintenance mode: {e:?}"))?;
+async fn check_maintenance_mode() -> Result<bool, Error> {
+    let maintenance_mode = ApiEndpoints::norisk_maintenance_mode().await?;
     Ok(maintenance_mode)
 }
 
@@ -1183,7 +1182,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<Vec<String>, crate::error::Error> {
+) -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_branches(
         &credentials
             .norisk_credentials
@@ -1194,14 +1193,18 @@ async fn request_norisk_branches(
 }
 
 #[tauri::command]
-async fn enable_experimental_mode(credentials: Credentials) -> Result<String, String> {
+async fn enable_experimental_mode(credentials: Credentials) -> Result<String, Error> {
     // This requires the production token to be present!!!
     ApiEndpoints::enable_experimental_mode(
-        &credentials.norisk_credentials.production.unwrap().value,
+        &credentials
+            .norisk_credentials
+            .production
+            .context("Could not get production credentials")?
+            .value,
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to enable experimental mode: {e:?}"))
+    .map_err(Error::from)
 }
 
 #[tauri::command]
@@ -1222,7 +1225,7 @@ async fn discord_auth_link(
     options: LauncherOptions,
     credentials: Credentials,
     app: tauri::AppHandle,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     let token = credentials
         .norisk_credentials
         .get_token(options.experimental_mode)?;
@@ -1242,10 +1245,12 @@ async fn discord_auth_link(
 
     let start = Utc::now();
 
+    let window_url = url.parse().expect("Error parsing discord auth URL");
+
     let window = tauri::WindowBuilder::new(
         &app,
         "discord-signin",
-        tauri::WindowUrl::External(url.parse().unwrap()),
+        tauri::WindowUrl::External(window_url),
     )
     .title("Discord X NoRiskClient")
     .always_on_top(true)
@@ -1346,12 +1351,13 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
         {
             if let Some((_, code)) = window.url().query_pairs().find(|x| x.0 == "code") {
                 window.close()?;
+                let main_window = app.get_window("main").expect("Could not get main window");
+
                 let credentials = accounts
-                    .login_finish(&code.clone(), flow, app.get_window("main").unwrap())
+                    .login_finish(&code.clone(), flow, main_window.clone())
                     .await?;
 
-                app.get_window("main")
-                    .unwrap()
+                main_window
                     .emit("microsoft-output", "NoRisk Token")
                     .unwrap_or_default();
 
@@ -1389,8 +1395,7 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()>
     info!("{}", data);
 
     // Regex to detect the crash message and extract the file path
-    let crash_regex =
-        Regex::new(r"#@!@# Game crashed! Crash report saved to: #@!@# (?P<path>.+)").unwrap();
+    let crash_regex = Regex::new(r"#@!@# Game crashed! Crash report saved to: #@!@# (?P<path>.+)")?;
 
     // Check if the data contains a crash report
     if let Some(captures) = crash_regex.captures(&data) {
@@ -1404,12 +1409,15 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()>
             // Emit an event with the crash path to the front-end
             window
                 .lock()
-                .unwrap()
+                .expect("Could not access window")
                 .emit("minecraft-crash", crash_path_str)?;
         }
     } else {
         // Emit the regular process output
-        window.lock().unwrap().emit("process-output", data)?;
+        window
+            .lock()
+            .expect("Could not access window")
+            .emit("process-output", data)?;
     }
     Ok(())
 }
@@ -1421,7 +1429,10 @@ fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow:
     }
 
     error!("{}", data);
-    window.lock().unwrap().emit("process-output", data)?;
+    window
+        .lock()
+        .expect("Could not access window")
+        .emit("process-output", data)?;
     Ok(())
 }
 
@@ -1431,33 +1442,35 @@ fn handle_progress(
 ) -> anyhow::Result<()> {
     window
         .lock()
-        .unwrap()
+        .expect("Could not access window")
         .emit("progress-update", progress_update)?;
     Ok(())
 }
 
 #[tauri::command]
-async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
-    let options = get_options()
-        .await
-        .map_err(|e| format!("unable to load options: {e:?}"))?;
+async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, Error> {
+    let options = get_options().await.expect("Could not get options");
     let game_dir_path = options.data_path_buf().join("gameDir");
     if !game_dir_path.exists() {
         return Ok(None);
     }
 
     let all_branches = game_dir_path
-        .read_dir()
-        .map_err(|e| format!("unable to read branches: {e:?}"))?
+        .read_dir()?
         .filter(|entry| {
             entry
                 .as_ref()
                 .map(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
                 .unwrap_or(false)
         })
-        .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
-        .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| format!("unable to read branches: {e:?}"))?;
+        .map(|entry| {
+            entry.map(|e| {
+                e.file_name()
+                    .into_string()
+                    .expect("Could not convert file name to string")
+            })
+        })
+        .collect::<Result<Vec<String>, _>>()?;
 
     if all_branches.is_empty() {
         return Ok(None);
@@ -1487,7 +1500,13 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
                 .map(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
                 .unwrap_or(false)
         })
-        .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
+        .map(|entry| {
+            entry.map(|e| {
+                e.file_name()
+                    .into_string()
+                    .expect("Could not convert file name to string")
+            })
+        })
         .collect::<Result<Vec<String>, _>>()
         .map_err(|e| format!("unable to read branches: {e:?}"))?;
 
@@ -1498,7 +1517,11 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 async fn get_default_mc_folder() -> Result<String, String> {
     if let Some(appdata_dir) = data_dir() {
         let minecraft_folder = appdata_dir.join(".minecraft");
-        Ok(minecraft_folder.as_os_str().to_str().unwrap().to_string())
+        Ok(minecraft_folder
+            .as_os_str()
+            .to_str()
+            .expect("Could not convert folder name to string")
+            .to_string())
     } else {
         Err("Unable to find default Minecraft folder".to_string())
     }
@@ -1615,7 +1638,7 @@ async fn run_client(
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap()
+            .expect("Could not build tokio runtime")
             .block_on(async {
                 let keep_launcher_open = parameters.keep_launcher_open;
 
@@ -1640,30 +1663,34 @@ async fn run_client(
                 .await
                 {
                     if !keep_launcher_open {
-                        window_mutex.lock().unwrap().show().unwrap();
+                        window_mutex
+                            .lock()
+                            .expect("Could not lock window mutex")
+                            .show()
+                            .expect("Could not show window");
                     }
 
                     window_mutex
                         .lock()
-                        .unwrap()
+                        .expect("Could not lock window mutex")
                         .emit("client-error", format!("Failed to launch client: {e:?}"))
-                        .unwrap();
+                        .expect("Could not emit client-error event");
                     handle_stderr(
                         &window_mutex,
                         format!("Failed to launch client: {e:?}").as_bytes(),
                     )
-                    .unwrap();
+                    .expect("Unable to handle stderr");
                 };
 
                 *copy_of_runner_instance
                     .lock()
                     .map_err(|e| format!("unable to lock runner instance: {e:?}"))
-                    .unwrap() = None;
+                    .expect("Could not handle error") = None;
                 window_mutex
                     .lock()
-                    .unwrap()
+                    .expect("Could not lock window mutex")
                     .emit("client-exited", ())
-                    .unwrap();
+                    .expect("Could not emit client-exited event");
             });
     });
 
@@ -1679,7 +1706,7 @@ async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> 
 
     if let Some(inst) = lck.take() {
         info!("Sending sigterm");
-        inst.terminator.send(()).unwrap();
+        inst.terminator.send(()).expect("Could not send sigterm");
     }
     Ok(())
 }
@@ -1724,20 +1751,18 @@ async fn add_player_to_whitelist(
     identifier: &str,
     norisk_token: &str,
     request_uuid: &str,
-) -> Result<bool, String> {
+) -> Result<bool, Error> {
     let response = HTTP_CLIENT
         .get(format!(
             "https://playerdb.co/api/player/minecraft/{identifier}"
         ))
         .send()
-        .await
-        .map_err(|e| format!("invalid username: {e:}"))
-        .unwrap();
-    let response_text = response.json::<PlayerDBData>().await.unwrap();
-    let uuid = response_text.data.player.unwrap().id;
+        .await?;
+    let response_text = response.json::<PlayerDBData>().await?;
+    let uuid = response_text.data.player.expect("Could not get player").id;
     ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid)
         .await
-        .map_err(|e| format!("unable to add player to whitelist: {e:?}"))
+        .map_err(Error::from)
 }
 
 #[tauri::command]
@@ -1774,6 +1799,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
     .map(std::fs::remove_dir_all)
     .collect::<Result<Vec<_>, _>>()
     .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {e:?}")))?;
+
     Ok(())
 }
 
@@ -1857,14 +1883,14 @@ async fn run_custom_server(
     options: LauncherOptions,
     token: String,
     window: Window,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window.clone()));
 
     thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap()
+            .expect("Unable to build tokio runtime")
             .block_on(async {
                 CustomServerManager::run_server(
                     custom_server,
@@ -1873,13 +1899,16 @@ async fn run_custom_server(
                     window_mutex.clone(),
                 )
                 .await
-                .unwrap();
+                .expect("Could not run custom server");
+
                 window_mutex
                     .lock()
-                    .unwrap()
+                    .expect("Could not lock window mutex")
                     .emit("server-exited", ())
-                    .unwrap();
-                terminate_custom_server(false, window).await.unwrap();
+                    .expect("Could not emit server-exited event");
+                terminate_custom_server(false, window)
+                    .await
+                    .expect("Could not terminate server");
                 info!("Server exited!");
             });
     });
@@ -1887,12 +1916,10 @@ async fn run_custom_server(
 }
 
 #[tauri::command]
-async fn check_if_custom_server_running(window: Window) -> Result<(bool, String), String> {
+async fn check_if_custom_server_running(window: Window) -> Result<(bool, String), Error> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
-    let latest_running_server = CustomServerManager::load_latest_running_server()
-        .await
-        .unwrap();
+    let latest_running_server = CustomServerManager::load_latest_running_server().await?;
     if latest_running_server.forwarder_process_id.is_none()
         && latest_running_server.process_id.is_none()
     {
@@ -1902,28 +1929,38 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
     let mut system = System::new_all();
     system.refresh_all();
     // check if process is still running
-    let custom_server_process =
-        system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
+    let custom_server_process = system.process(Pid::from(
+        latest_running_server
+            .process_id
+            .expect("Could not get process id") as usize,
+    ));
     if custom_server_process.is_some() {
         info!("Custom server is already / still running!");
         CustomServerManager::read_and_process_server_log_file(
             &window_mutex,
-            &latest_running_server.server_id.clone().unwrap(),
+            &latest_running_server
+                .server_id
+                .clone()
+                .expect("Could not get server id"),
         )
-        .await
-        .unwrap();
-        Ok((true, latest_running_server.server_id.unwrap()))
+        .await?;
+        Ok((
+            true,
+            latest_running_server
+                .server_id
+                .expect("Could not get server id"),
+        ))
     } else {
         info!("No custom server is running!");
         let custom_server_forwarder_process = system.process(Pid::from(
-            latest_running_server.forwarder_process_id.unwrap() as usize,
+            latest_running_server
+                .forwarder_process_id
+                .expect("Could not get process id") as usize,
         ));
         if let Some(forwarder) = custom_server_forwarder_process {
             forwarder.kill();
         }
-        CustomServerManager::store_latest_running_server(None, None, None)
-            .await
-            .unwrap();
+        CustomServerManager::store_latest_running_server(None, None, None).await?;
         Ok((false, String::new()))
     }
 }
@@ -1932,58 +1969,64 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
 pub async fn terminate_custom_server(
     launcher_was_closed: bool,
     window: Window,
-) -> Result<(), String> {
-    let latest_running_server = CustomServerManager::load_latest_running_server()
-        .await
-        .unwrap();
+) -> Result<(), Error> {
+    let latest_running_server = CustomServerManager::load_latest_running_server().await?;
 
     let mut system = System::new_all();
     system.refresh_all();
 
     info!("Killing Forwarding Manager");
     let custom_server_forwarder_process = system.process(Pid::from(
-        latest_running_server.forwarder_process_id.unwrap() as usize,
+        latest_running_server
+            .forwarder_process_id
+            .expect("Could not get server id") as usize,
     ));
     if let Some(forwarder) = custom_server_forwarder_process {
         forwarder.kill();
     }
 
     info!("Killing Custom Server");
-    let custom_server_process =
-        system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
+    let custom_server_process = system.process(Pid::from(
+        latest_running_server
+            .process_id
+            .expect("Could not get server id") as usize,
+    ));
     if custom_server_process.is_some() {
         // Create a new client and connect to the server.
-        let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
-        client.authenticate("minecraft".to_string()).unwrap();
-        client.send_command("stop".to_string()).unwrap();
+        let mut client =
+            Client::new("127.0.0.1:25594".to_string()).expect("Could not create Client");
+        client
+            .authenticate("minecraft".to_string())
+            .expect("Could not authenticate");
+        client
+            .send_command("stop".to_string())
+            .expect("Could not send command");
     }
 
     if launcher_was_closed {
-        window
-            .emit(
-                "custom-server-process-output",
-                CustomServerEventPayload {
-                    server_id: latest_running_server.server_id.clone().unwrap(),
-                    data: String::from("Stopping server"),
-                },
-            )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
-            .unwrap();
-        window
-            .emit(
-                "custom-server-process-output",
-                CustomServerEventPayload {
-                    server_id: latest_running_server.server_id.clone().unwrap(),
-                    data: String::from("Thread RCON Listener stopped"),
-                },
-            )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
-            .unwrap();
+        window.emit(
+            "custom-server-process-output",
+            CustomServerEventPayload {
+                server_id: latest_running_server
+                    .server_id
+                    .clone()
+                    .expect("Could not get server id"),
+                data: String::from("Stopping server"),
+            },
+        )?;
+        window.emit(
+            "custom-server-process-output",
+            CustomServerEventPayload {
+                server_id: latest_running_server
+                    .server_id
+                    .clone()
+                    .expect("Could not get server id"),
+                data: String::from("Thread RCON Listener stopped"),
+            },
+        )?;
     }
 
-    CustomServerManager::store_latest_running_server(None, None, None)
-        .await
-        .unwrap();
+    CustomServerManager::store_latest_running_server(None, None, None).await?;
 
     Ok(())
 }
@@ -1995,69 +2038,75 @@ async fn execute_rcon_command(
     log_type: String,
     command: String,
     window: Window,
-) -> Result<String, String> {
-    let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
-    client.authenticate("minecraft".to_string()).unwrap();
+) -> Result<String, Error> {
+    let mut client = Client::new("127.0.0.1:25594".to_string()).expect("Could not create Client");
+    client
+        .authenticate("minecraft".to_string())
+        .expect("Could not authenticate");
 
     let console_info_log = format!(
         "{} [/{}]: Executing \"{}\" from the console.\n\r",
         &timestamp, &log_type, &command
     );
-    window
-        .emit(
-            "custom-server-process-output",
-            CustomServerEventPayload {
-                server_id: server_id.clone(),
-                data: console_info_log.clone(),
-            },
-        )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
-        .unwrap();
+    window.emit(
+        "custom-server-process-output",
+        CustomServerEventPayload {
+            server_id: server_id.clone(),
+            data: console_info_log.clone(),
+        },
+    )?;
 
-    let response = client.send_command(command).unwrap();
+    let response = client
+        .send_command(command)
+        .expect("Could not send command");
 
     let response_log = format!("{} [/{}]: {}\n\r", &timestamp, &log_type, &response.body);
-    window
-        .emit(
-            "custom-server-process-output",
-            CustomServerEventPayload {
-                server_id,
-                data: response_log.clone(),
-            },
-        )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
-        .unwrap();
+    window.emit(
+        "custom-server-process-output",
+        CustomServerEventPayload {
+            server_id,
+            data: response_log.clone(),
+        },
+    )?;
 
     Ok(response.body)
 }
 
 #[tauri::command]
 async fn get_rcon_server_info() -> Result<HashMap<String, String>, String> {
-    let mut client = Client::new("127.0.0.1:25594".to_string()).unwrap();
-    client.authenticate("minecraft".to_string()).unwrap();
+    let mut client = Client::new("127.0.0.1:25594".to_string()).expect("Could not create Client");
+    client
+        .authenticate("minecraft".to_string())
+        .expect("Could not authenticate");
 
     let mut server_info: HashMap<String, String> = HashMap::new();
 
     server_info.insert(
         String::from("seed"),
-        client.send_command(String::from("seed")).unwrap().body,
+        client
+            .send_command(String::from("seed"))
+            .expect("Could not send command")
+            .body,
     );
     server_info.insert(
         String::from("difficulty"),
         client
             .send_command(String::from("difficulty"))
-            .unwrap()
+            .expect("Could not send command")
             .body,
     );
     server_info.insert(
         String::from("list"),
-        client.send_command(String::from("list")).unwrap().body,
+        client
+            .send_command(String::from("list"))
+            .expect("Could not send command")
+            .body,
     );
     server_info.insert(
         String::from("whitelist"),
         client
             .send_command(String::from("whitelist list"))
-            .unwrap()
+            .expect("Could not send command")
             .body,
     );
 
@@ -2221,16 +2270,15 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 async fn get_full_feature_whitelist(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_full_feature_whitelist(
         &credentials
             .norisk_credentials
-            .get_token(options.experimental_mode)
-            .unwrap(),
+            .get_token(options.experimental_mode)?,
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to get full feature whitelist: {e:?}"))
+    .map_err(Error::from)
 }
 
 ///
@@ -2241,17 +2289,16 @@ async fn check_feature_whitelist(
     feature: &str,
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<bool, String> {
+) -> Result<bool, Error> {
     ApiEndpoints::norisk_feature_whitelist(
         feature,
         &credentials
             .norisk_credentials
-            .get_token(options.experimental_mode)
-            .unwrap(),
+            .get_token(options.experimental_mode)?,
         &credentials.id.to_string(),
     )
     .await
-    .map_err(|e| format!("unable to check feature whitelist: {e:?}"))
+    .map_err(Error::from)
 }
 
 /// Runs the GUI and returns when the window is closed.

@@ -326,7 +326,7 @@ impl MinecraftAuthStore {
                     .await?
                     .users
                     .get(&profile_id.clone())
-                    .unwrap()
+                    .expect("User not found")
                     .norisk_credentials
                     .clone()
             },
@@ -439,10 +439,8 @@ impl MinecraftAuthStore {
 
             match res {
                 Ok(val) => {
-                    if val.is_some() {
-                        Ok(Some(
-                            self.refresh_norisk_token(&val.unwrap().clone()).await?,
-                        ))
+                    if let Some(val) = val {
+                        Ok(Some(self.refresh_norisk_token(&val.clone()).await?))
                     } else {
                         Err(ErrorKind::NoCredentialsError.as_error())
                     }
@@ -539,14 +537,14 @@ impl NoRiskCredentials {
                 .clone()
                 .experimental
                 .ok_or(ErrorKind::NoCredentialsError)
-                .unwrap()
+                .expect("Experimental Token not found")
                 .value)
         } else {
             Ok(self
                 .clone()
                 .production
                 .ok_or(ErrorKind::NoCredentialsError)
-                .unwrap()
+                .expect("Production Token not found")
                 .value)
         }
     }

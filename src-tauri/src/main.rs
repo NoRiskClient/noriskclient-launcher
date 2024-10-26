@@ -6,6 +6,7 @@
 
 use std::fs;
 
+use anyhow::Context;
 use directories::ProjectDirs;
 use log::{info, LevelFilter};
 use log4rs::{
@@ -39,8 +40,6 @@ static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 
 /// HTTP Client with launcher agent
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
-    
-
     reqwest::ClientBuilder::new()
         .user_agent(APP_USER_AGENT)
         .build()
@@ -72,8 +71,8 @@ pub fn main() -> anyhow::Result<()> {
     let trigger = SizeTrigger::new(TRIGGER_FILE_SIZE);
     let roller = FixedWindowRoller::builder()
         .base(0) // Default Value (line not needed unless you want to change from 0 (only here for demo purposes)
-        .build(archive_folder.to_str().unwrap(), LOG_FILE_COUNT) // Roll based on pattern and max 3 archive files
-        .unwrap();
+        .build(archive_folder.to_str().context("Could not convert to str")?, LOG_FILE_COUNT) // Roll based on pattern and max 3 archive files
+        ?;
     let policy = CompoundPolicy::new(Box::new(trigger), Box::new(roller));
 
     // Logging to log file. (with rolling)
@@ -82,8 +81,7 @@ pub fn main() -> anyhow::Result<()> {
         .encoder(Box::new(PatternEncoder::new(
             "[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n",
         )))
-        .build(latest_log.clone(), Box::new(policy))
-        .unwrap();
+        .build(latest_log.clone(), Box::new(policy))?;
 
     //TODO log also in console
     // Log Trace level output to file where trace is the default level
@@ -100,8 +98,7 @@ pub fn main() -> anyhow::Result<()> {
                 .appender("logfile")
                 .appender("stderr")
                 .build(LevelFilter::Debug),
-        )
-        .unwrap();
+        )?;
 
     // Use this to change log levels at runtime.
     // This means you can change the default log level to trace
