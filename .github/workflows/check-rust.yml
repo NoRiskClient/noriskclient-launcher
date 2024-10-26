@@ -17,6 +17,9 @@ jobs:
       - name: Set up cargo cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Create dist Directory
+        run: mkdir -p dist
+
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: |
