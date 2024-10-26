@@ -72,7 +72,7 @@ impl CapeApiEndpoints {
                     }
                 }
             }
-            Err(_err) => Err("Failed to equip cape.".parse().unwrap()),
+            Err(_err) => Err("Failed to equip cape.".parse().expect("Error parsing")),
         }
     }
 
@@ -131,7 +131,7 @@ impl CapeApiEndpoints {
                     }
                 }
             }
-            Err(_err) => Err("Error Selecting Cape".parse().unwrap()),
+            Err(_err) => Err("Error Selecting Cape".parse().expect("Error parsing")),
         }
     }
 

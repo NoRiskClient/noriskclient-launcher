@@ -40,7 +40,13 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = mods_read.next_entry().await? {
             if entry.file_type().await?.is_file() {
-                files.push(entry.file_name().to_str().unwrap().to_string());
+                files.push(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?
+                        .to_string(),
+                );
             }
         }
 
@@ -182,14 +188,25 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = shaders_read.next_entry().await? {
             if entry.file_type().await?.is_file()
-                && Path::new(entry.file_name().to_str().unwrap())
-                    .extension()
-                    .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
-                && !installed_shaders
-                    .iter()
-                    .any(|shader| shader.file_name == *entry.file_name().to_str().unwrap())
+                && Path::new(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?,
+                )
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
+                && !installed_shaders.iter().any(|shader| {
+                    shader.file_name == *entry.file_name().to_str().expect("Could not get filename")
+                })
             {
-                files.push(entry.file_name().to_str().unwrap().to_string());
+                files.push(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?
+                        .to_string(),
+                );
             }
         }
 
@@ -231,8 +248,20 @@ impl ModrinthApiEndpoints {
             slug: project.slug,
             title: project.title,
             icon_url: project.icon_url,
-            file_name: project_version.files.first().unwrap().filename.clone(),
-            url: Some(project_version.files.first().unwrap().url.clone()),
+            file_name: project_version
+                .files
+                .first()
+                .expect("No project version files")
+                .filename
+                .clone(),
+            url: Some(
+                project_version
+                    .files
+                    .first()
+                    .expect("No project version files")
+                    .url
+                    .clone(),
+            ),
         })
     }
 
@@ -265,14 +294,26 @@ impl ModrinthApiEndpoints {
         let mut files: Vec<String> = Vec::new();
         while let Some(entry) = resourcepacks_read.next_entry().await? {
             if entry.file_type().await?.is_file()
-                && Path::new(entry.file_name().to_str().unwrap())
-                    .extension()
-                    .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
+                && Path::new(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?,
+                )
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
                 && !installed_resourcepacks.iter().any(|resourcepack| {
-                    resourcepack.file_name == *entry.file_name().to_str().unwrap()
+                    resourcepack.file_name
+                        == *entry.file_name().to_str().expect("Could not get filename")
                 })
             {
-                files.push(entry.file_name().to_str().unwrap().to_string());
+                files.push(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?
+                        .to_string(),
+                );
             }
         }
 
@@ -321,8 +362,20 @@ impl ModrinthApiEndpoints {
             slug: project.slug,
             title: project.title,
             icon_url: project.icon_url,
-            file_name: project_version.files.first().unwrap().filename.clone(),
-            url: Some(project_version.files.first().unwrap().url.clone()),
+            file_name: project_version
+                .files
+                .first()
+                .expect("No project files")
+                .filename
+                .clone(),
+            url: Some(
+                project_version
+                    .files
+                    .first()
+                    .expect("No project files")
+                    .url
+                    .clone(),
+            ),
         })
     }
 
@@ -360,11 +413,18 @@ impl ModrinthApiEndpoints {
                 )
                 .extension()
                 .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
-                && !installed_resourcepacks
-                    .iter()
-                    .any(|datapack| datapack.file_name == *entry.file_name().to_str().unwrap())
+                && !installed_resourcepacks.iter().any(|datapack| {
+                    datapack.file_name
+                        == *entry.file_name().to_str().expect("Could not get filename")
+                })
             {
-                files.push(entry.file_name().to_str().unwrap().to_string());
+                files.push(
+                    entry
+                        .file_name()
+                        .to_str()
+                        .context("Could not get filename")?
+                        .to_string(),
+                );
             }
         }
 
@@ -411,8 +471,20 @@ impl ModrinthApiEndpoints {
             title: project.title,
             icon_url: project.icon_url,
             world_name: world.to_string(),
-            file_name: project_version.files.first().unwrap().filename.clone(),
-            url: Some(project_version.files.first().unwrap().url.clone()),
+            file_name: project_version
+                .files
+                .first()
+                .expect("No project version files")
+                .filename
+                .clone(),
+            url: Some(
+                project_version
+                    .files
+                    .first()
+                    .expect("No project version files")
+                    .url
+                    .clone(),
+            ),
         })
     }
 }

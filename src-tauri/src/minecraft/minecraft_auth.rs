@@ -1185,7 +1185,7 @@ fn generate_oauth_challenge() -> String {
     bytes
         .iter()
         .fold(String::with_capacity(64 * 2), |mut acc, byte| {
-            write!(&mut acc, "{byte:02x}").unwrap();
+            write!(&mut acc, "{byte:02x}").expect("Unable to write");
             acc
         })
 }

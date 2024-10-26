@@ -9,7 +9,7 @@ use std::process::exit;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info};
 
@@ -103,7 +103,10 @@ pub async fn launch<D: Send + Sync>(
             }
         }
     };
-    debug!("Java binary: {}", java_bin.to_str().unwrap());
+    debug!(
+        "Java binary: {}",
+        java_bin.to_str().context("Invalid path")?
+    );
 
     // Launch class path for JRE
     let mut class_path = String::new();
@@ -126,7 +129,11 @@ pub async fn launch<D: Send + Sync>(
         write!(
             class_path,
             "{}{}",
-            &client_jar.absolutize().unwrap().to_str().unwrap(),
+            &client_jar
+                .absolutize()
+                .context("Could not get absolute path")?
+                .to_str()
+                .context("Could not convert path to string")?,
             OS.get_path_separator()?
         )?;
 
@@ -472,10 +479,22 @@ pub async fn launch<D: Send + Sync>(
                 "auth_player_name" => output.push_str(&launching_parameter.auth_player_name),
                 "version_name" => output.push_str(&version_profile.id),
                 "game_directory" => {
-                    output.push_str(game_dir.absolutize().unwrap().to_str().unwrap());
+                    output.push_str(
+                        game_dir
+                            .absolutize()
+                            .context("Could not get path")?
+                            .to_str()
+                            .context("Could not convert path to string")?,
+                    );
                 }
                 "assets_root" => {
-                    output.push_str(assets_folder.absolutize().unwrap().to_str().unwrap());
+                    output.push_str(
+                        assets_folder
+                            .absolutize()
+                            .context("Could not get path")?
+                            .to_str()
+                            .context("Could not convert path to string")?,
+                    );
                 }
                 "assets_index_name" => output.push_str(&asset_index_location.id),
                 "auth_uuid" => output.push_str(&launching_parameter.auth_uuid),
@@ -483,7 +502,13 @@ pub async fn launch<D: Send + Sync>(
                 "user_type" => output.push_str(&launching_parameter.user_type),
                 "version_type" => output.push_str(&version_profile.version_type),
                 "natives_directory" => {
-                    output.push_str(natives_folder.absolutize().unwrap().to_str().unwrap());
+                    output.push_str(
+                        natives_folder
+                            .absolutize()
+                            .context("Could not get path")?
+                            .to_str()
+                            .context("Could not convert path to string")?,
+                    );
                 }
                 "launcher_name" => output.push_str("NoRiskClient"),
                 "launcher_version" => output.push_str(LAUNCHER_VERSION),
@@ -505,7 +530,7 @@ pub async fn launch<D: Send + Sync>(
 
     if !launching_parameter.keep_launcher_open {
         // Hide launcher window
-        window.lock().unwrap().hide().unwrap();
+        window.lock().expect("Could not lock windows").hide()?;
     }
 
     let launcher_data = Arc::try_unwrap(launcher_data_arc).unwrap_or_else(|_| panic!());

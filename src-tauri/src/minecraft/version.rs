@@ -357,7 +357,7 @@ where
         where
             E: serde::de::Error,
         {
-            Ok(FromStr::from_str(value).unwrap())
+            FromStr::from_str(value).map_err(serde::de::Error::custom)
         }
 
         fn visit_map<M>(self, map: M) -> Result<T, M::Error>

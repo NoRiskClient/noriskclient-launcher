@@ -173,44 +173,56 @@ impl McDataHandler {
                 match entries.next().await {
                     Some(Ok(entry)) => {
                         let path = entry.path();
-                        let relative_path = path.strip_prefix(&src_clone).unwrap();
+                        let relative_path = path
+                            .strip_prefix(&src_clone)
+                            .expect("Could not strip prefix");
                         let dst_path = &dst_clone.join(relative_path);
 
-                        if entry.file_type().await.unwrap().is_dir() {
+                        if entry
+                            .file_type()
+                            .await
+                            .expect("Could not get file_type")
+                            .is_dir()
+                        {
                             let _ = fs::create_dir(&dst_path).await;
                             if ["resourcepacks", "shaderpacks", "saves", "NoRiskClient"].contains(
                                 &entry
                                     .path()
                                     .parent()
-                                    .unwrap()
+                                    .expect("Could not get parent path")
                                     .file_name()
-                                    .unwrap()
+                                    .expect("Could not get filename")
                                     .to_str()
-                                    .unwrap(),
+                                    .expect("Could not convert to string"),
                             ) && current_type
                                 != *entry
                                     .clone()
                                     .path()
                                     .parent()
-                                    .unwrap()
+                                    .expect("Could not get parent path")
                                     .file_name()
-                                    .unwrap()
+                                    .expect("Could not get filename")
                                     .to_str()
-                                    .unwrap()
+                                    .expect("Could not convert to string")
                             {
-                                let children = WalkDir::new(path.parent().unwrap());
+                                let children =
+                                    WalkDir::new(path.parent().expect("Could not get parent path"));
                                 current_type = entry
                                     .path()
                                     .parent()
-                                    .unwrap()
+                                    .expect("Could not get parent path")
                                     .file_name()
-                                    .unwrap()
+                                    .expect("Could not get filename")
                                     .to_str()
-                                    .unwrap()
+                                    .expect("Could not convert to string")
                                     .to_string();
                                 total_type_entry_count = children
                                     .filter(|c| async move {
-                                        if c.file_type().await.unwrap().is_file() {
+                                        if c.file_type()
+                                            .await
+                                            .expect("Could not get file_type")
+                                            .is_file()
+                                        {
                                             Filtering::Continue
                                         } else {
                                             Filtering::Ignore
@@ -221,7 +233,7 @@ impl McDataHandler {
                                 current_type_entry_count = 0;
                                 let () = &app_clone
                                     .get_window("main")
-                                    .unwrap()
+                                    .expect("Could not get main window")
                                     .emit(
                                         "copy-mc-data",
                                         CopyMcDataEventPayload {
@@ -234,17 +246,24 @@ impl McDataHandler {
                                     .unwrap_or_default();
                             }
                         } else {
-                            let _ = fs::create_dir_all(dst_path.parent().unwrap()).await;
+                            let _ = fs::create_dir_all(
+                                dst_path.parent().expect("Could not get parent path"),
+                            )
+                            .await;
                             let _ = fs::copy(path, dst_path).await;
                             current_type_entry_count += 1;
                             let () = &app_clone
                                 .get_window("main")
-                                .unwrap()
+                                .expect("Could not get main window")
                                 .emit(
                                     "copy-mc-data",
                                     CopyMcDataEventPayload {
                                         r#type: current_type.clone(),
-                                        file: entry.file_name().to_str().unwrap().to_string(),
+                                        file: entry
+                                            .file_name()
+                                            .to_str()
+                                            .expect("Could not get filename")
+                                            .to_string(),
                                         total_type_entry_count,
                                         current_type_entry_count,
                                     },
