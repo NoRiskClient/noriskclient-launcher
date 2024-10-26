@@ -20,7 +20,8 @@ pub const CONTENT_FOLDER: &str = "NoRiskClient";
 /// Placeholder struct for API endpoints implementation
 pub struct ApiEndpoints;
 
-#[must_use] pub fn get_api_base(is_experimental: bool) -> String {
+#[must_use]
+pub fn get_api_base(is_experimental: bool) -> String {
     if is_experimental {
         String::from("https://api-staging.norisk.gg/api/v1")
     } else {
@@ -135,12 +136,8 @@ impl ApiEndpoints {
 
     /// Request featured datapacks
     pub async fn norisk_featured_datapacks(branch: &str) -> Result<Vec<String>> {
-        Self::request_from_norisk_endpoint(
-            &format!("launcher/featured/{branch}/datapacks"),
-            "",
-            "",
-        )
-        .await
+        Self::request_from_norisk_endpoint(&format!("launcher/featured/{branch}/datapacks"), "", "")
+            .await
     }
 
     /// Request featured servers
@@ -196,9 +193,7 @@ impl ApiEndpoints {
         request_uuid: &str,
     ) -> Result<bool> {
         Self::request_from_norisk_endpoint(
-            &format!(
-                "launcher/custom-servers/check-subdomain?subdomain={subdomain}"
-            ),
+            &format!("launcher/custom-servers/check-subdomain?subdomain={subdomain}"),
             token,
             request_uuid,
         )
@@ -292,16 +287,13 @@ impl ApiEndpoints {
     pub async fn launch_manifest(
         branch: &str,
     ) -> core::result::Result<NoRiskLaunchManifest, crate::error::Error> {
-        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{branch}"))
-            .await
+        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{branch}")).await
     }
 
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
         Self::request_from_norisk_endpoint(
-            &format!(
-                "launcher/version/jre/{os_name}/{os_arch}/{jre_version}"
-            ),
+            &format!("launcher/version/jre/{os_name}/{os_arch}/{jre_version}"),
             "",
             "",
         )
@@ -862,7 +854,8 @@ pub struct LoaderMod {
 }
 
 impl LoaderMod {
-    #[must_use] pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
+    #[must_use]
+    pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
         self.source
             .get_slug()
             .eq_ignore_ascii_case(&other.source.get_slug())
@@ -885,7 +878,8 @@ pub enum ModSource {
 }
 
 impl ModSource {
-    #[must_use] pub fn get_slug(&self) -> String {
+    #[must_use]
+    pub fn get_slug(&self) -> String {
         match self {
             ModSource::Repository {
                 repository: _repository,
@@ -902,7 +896,8 @@ impl ModSource {
         }
     }
 
-    #[must_use] pub fn get_repository(&self) -> String {
+    #[must_use]
+    pub fn get_repository(&self) -> String {
         match self {
             ModSource::Repository {
                 repository: _repository,

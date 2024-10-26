@@ -35,8 +35,7 @@ impl VanillaProvider {
             .join(&custom_server.id);
         fs::create_dir_all(&path).await?;
         let manifest = Self::get_manifest(hash, &custom_server.mc_version).await?;
-        download_file_untracked(&manifest.downloads.server.url, path.join("server.jar"))
-            .await?;
+        download_file_untracked(&manifest.downloads.server.url, path.join("server.jar")).await?;
         Ok(())
     }
 

@@ -48,8 +48,7 @@ impl SpigotProvider {
             GETBUKKIT_API_BASE, custom_server.mc_version
         );
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join("server.jar"), content)
-            .await;
+        let _ = fs::write(path.join("server.jar"), content).await;
         Ok(())
     }
 
