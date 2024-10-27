@@ -283,7 +283,7 @@ impl CapeApiEndpoints {
 
         #[cfg(target_os = "macos")]
         {
-            Command::new("open").args(["-R", &path]).spawn()?;
+            Command::new("open").args(["-R", path]).spawn()?;
         }
 
         Ok(())

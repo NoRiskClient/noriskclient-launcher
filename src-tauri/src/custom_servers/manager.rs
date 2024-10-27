@@ -95,36 +95,35 @@ impl CustomServerManager {
             Some(options.custom_java_path.clone())
         };
 
-        let java_bin = match &custom_java_path {
-            Some(path) => PathBuf::from(path),
-            None => {
-                info!("Checking for JRE...");
-                Self::handle_progress(
-                    &window_mutex,
-                    &custom_server.id,
-                    ProgressUpdate::SetLabel("Checking for JRE...".to_owned()),
-                )?;
+        let java_bin = if let Some(path) = &custom_java_path {
+            PathBuf::from(path)
+        } else {
+            info!("Checking for JRE...");
+            Self::handle_progress(
+                &window_mutex,
+                &custom_server.id,
+                ProgressUpdate::SetLabel("Checking for JRE...".to_owned()),
+            )?;
 
-                match find_java_binary(&runtimes_folder, 17).await {
-                    Result::Ok(jre) => jre, // Fix: Wrap the value in a tuple variant
-                    Err(e) => {
-                        error!("Failed to find JRE: {}", e);
+            match find_java_binary(&runtimes_folder, 17).await {
+                Result::Ok(jre) => jre, // Fix: Wrap the value in a tuple variant
+                Err(e) => {
+                    error!("Failed to find JRE: {}", e);
 
-                        info!("Download JRE...");
-                        Self::handle_progress(
+                    info!("Download JRE...");
+                    Self::handle_progress(
+                        &window_mutex,
+                        &custom_server.id,
+                        ProgressUpdate::SetLabel("Download JRE...".to_owned()),
+                    )?;
+                    jre_downloader::jre_download(&runtimes_folder, 17, |a, b| {
+                        let _ = Self::handle_progress(
                             &window_mutex,
                             &custom_server.id,
-                            ProgressUpdate::SetLabel("Download JRE...".to_owned()),
-                        )?;
-                        jre_downloader::jre_download(&runtimes_folder, 17, |a, b| {
-                            let _ = Self::handle_progress(
-                                &window_mutex,
-                                &custom_server.id,
-                                ProgressUpdate::SetProgress((a / b) * 100),
-                            );
-                        })
-                        .await?
-                    }
+                            ProgressUpdate::SetProgress((a / b) * 100),
+                        );
+                    })
+                    .await?
                 }
             }
         };

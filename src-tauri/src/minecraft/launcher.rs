@@ -74,32 +74,31 @@ pub async fn launch<D: Send + Sync>(
         fs::create_dir(&runtimes_folder).await?;
     }
 
-    let java_bin = match &launching_parameter.custom_java_path {
-        Some(path) => PathBuf::from(path),
-        None => {
-            info!("Checking for JRE...");
-            launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking for JRE..."));
+    let java_bin = if let Some(path) = &launching_parameter.custom_java_path {
+        PathBuf::from(path)
+    } else {
+        info!("Checking for JRE...");
+        launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking for JRE..."));
 
-            match find_java_binary(&runtimes_folder, manifest.build.jre_version).await {
-                Ok(jre) => jre,
-                Err(e) => {
-                    error!("Failed to find JRE: {}", e);
+        match find_java_binary(&runtimes_folder, manifest.build.jre_version).await {
+            Ok(jre) => jre,
+            Err(e) => {
+                error!("Failed to find JRE: {}", e);
 
-                    info!("Download JRE...");
-                    launcher_data_arc.progress_update(ProgressUpdate::set_label("Download JRE..."));
-                    jre_downloader::jre_download(
-                        &runtimes_folder,
-                        manifest.build.jre_version,
-                        |a, b| {
-                            launcher_data_arc.progress_update(ProgressUpdate::set_for_step(
-                                ProgressUpdateSteps::DownloadJRE,
-                                get_progress(0, a, b),
-                                get_max(1),
-                            ));
-                        },
-                    )
-                    .await?
-                }
+                info!("Download JRE...");
+                launcher_data_arc.progress_update(ProgressUpdate::set_label("Download JRE..."));
+                jre_downloader::jre_download(
+                    &runtimes_folder,
+                    manifest.build.jre_version,
+                    |a, b| {
+                        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(
+                            ProgressUpdateSteps::DownloadJRE,
+                            get_progress(0, a, b),
+                            get_max(1),
+                        ));
+                    },
+                )
+                .await?
             }
         }
     };
