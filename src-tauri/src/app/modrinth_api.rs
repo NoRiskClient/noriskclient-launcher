@@ -1,6 +1,4 @@
 use std::error::Error;
-#[cfg(target_os = "linux")]
-use std::fs::metadata;
 use std::path::Path;
 
 use anyhow::Context;

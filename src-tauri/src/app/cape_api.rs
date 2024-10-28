@@ -1,9 +1,8 @@
 use std::error::Error;
-#[cfg(target_os = "linux")]
-use std::fs::metadata;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+#[cfg(not(target_os = "linux"))]
 use std::process::Command;
 
 use log::debug;
