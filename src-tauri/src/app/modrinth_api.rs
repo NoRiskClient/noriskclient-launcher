@@ -103,11 +103,9 @@ impl ModrinthApiEndpoints {
         for dependency in dependencies {
             if dependency.dependency_type == "required" {
                 let dependency_mods =
-                    Self::get_project_version(&dependency.project_id, params)
-                        .await?;
+                    Self::get_project_version(&dependency.project_id, params).await?;
                 if let Some(dependency_mod) = dependency_mods.first() {
-                    let slug_holder =
-                        Self::get_mod_slug(&dependency.project_id).await?;
+                    let slug_holder = Self::get_mod_slug(&dependency.project_id).await?;
                     let required =
                         dependency_mod.is_already_required_by_norisk_client(required_mods);
                     if required {
@@ -146,8 +144,7 @@ impl ModrinthApiEndpoints {
         let project = mod_versions.first().ok_or("Mod not found")?;
 
         let dependencies =
-            Self::get_dependencies(&project.dependencies, params, required_mods)
-                .await?;
+            Self::get_dependencies(&project.dependencies, params, required_mods).await?;
 
         Ok(CustomMod {
             title: mod_project.title.clone(),

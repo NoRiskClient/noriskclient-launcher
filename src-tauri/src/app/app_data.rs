@@ -76,11 +76,10 @@ pub struct LauncherOptions {
 impl LauncherOptions {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the options from the file
-        let options = serde_json::from_slice::<Self>(
-            &fs::read(app_data.join("options.json")).await?,
-        )
-        .map_err(|err| -> String { format!("Failed to write options.json: {err}") })
-        .unwrap_or_else(|_| Self::default());
+        let options =
+            serde_json::from_slice::<Self>(&fs::read(app_data.join("options.json")).await?)
+                .map_err(|err| -> String { format!("Failed to write options.json: {err}") })
+                .unwrap_or_else(|_| Self::default());
         Ok(options)
     }
 

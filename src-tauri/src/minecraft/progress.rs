@@ -38,8 +38,7 @@ impl ProgressUpdateSteps {
         match self {
             Self::DownloadNoRiskClientMods => 0,
             Self::DownloadJRE | Self::DownloadCustomServerJar => 1,
-            Self::DownloadClientJar
-            | Self::DownloadCustomServerInstallerJar => 2,
+            Self::DownloadClientJar | Self::DownloadCustomServerInstallerJar => 2,
             Self::DownloadLibraries => 3,
             Self::DownloadAssets => 4,
             Self::DownloadNoRiskAssets => 5,

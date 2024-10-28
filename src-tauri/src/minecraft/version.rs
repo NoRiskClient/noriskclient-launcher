@@ -200,11 +200,7 @@ impl ArgumentDeclaration {
                 "${classpath}".to_string(),
             ]),
             Self::V21(decl) => {
-                Self::check_rules_and_add(
-                    command_arguments,
-                    &decl.arguments.jvm,
-                    features,
-                )?;
+                Self::check_rules_and_add(command_arguments, &decl.arguments.jvm, features)?;
             }
         }
 
@@ -230,11 +226,7 @@ impl ArgumentDeclaration {
                 );
             }
             Self::V21(decl) => {
-                Self::check_rules_and_add(
-                    command_arguments,
-                    &decl.arguments.game,
-                    features,
-                )?;
+                Self::check_rules_and_add(command_arguments, &decl.arguments.game, features)?;
             }
         }
 
