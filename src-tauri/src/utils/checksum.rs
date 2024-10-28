@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sha1::{Sha1, Digest};
+use sha1::{Digest, Sha1};
 use std::path::PathBuf;
 
 pub fn sha1sum(path: &PathBuf) -> Result<String> {

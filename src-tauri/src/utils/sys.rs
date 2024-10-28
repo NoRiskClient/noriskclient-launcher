@@ -1,7 +1,7 @@
-use std::fmt::Display;
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::fmt::{self, Display};
 use sysinfo::{RefreshKind, System, SystemExt};
 
 /// Get the total memory of the system in bytes
@@ -14,17 +14,17 @@ pub fn total_memory() -> i64 {
 pub fn percentage_of_total_memory(memory_percentage: i32) -> i64 {
     let sys = System::new_with_specifics(RefreshKind::new().with_memory());
 
-    ((sys.total_memory() / 1000000) as f64 * (memory_percentage as f64 / 100.0)) as i64
+    ((sys.total_memory() / 1_000_000) as f64 * (f64::from(memory_percentage) / 100.0)) as i64
 }
 
 pub const OS: OperatingSystem = if cfg!(target_os = "windows") {
-    OperatingSystem::WINDOWS
+    OperatingSystem::Windows
 } else if cfg!(target_os = "macos") {
-    OperatingSystem::OSX
+    OperatingSystem::Osx
 } else if cfg!(target_os = "linux") {
-    OperatingSystem::LINUX
+    OperatingSystem::Linux
 } else {
-    OperatingSystem::UNKNOWN
+    OperatingSystem::Unknown
 };
 
 pub const ARCHITECTURE: Architecture = if cfg!(target_arch = "x86") {
@@ -39,22 +39,21 @@ pub const ARCHITECTURE: Architecture = if cfg!(target_arch = "x86") {
     Architecture::UNKNOWN // Unsupported architecture
 };
 
-pub const OS_VERSION: Lazy<String> = Lazy::new(|| {
-    os_info::get().version().to_string()
-});
+pub static OS_VERSION: Lazy<String> = Lazy::new(|| os_info::get().version().to_string());
 
 #[derive(Deserialize, PartialEq, Eq, Hash, Debug)]
 pub enum OperatingSystem {
     #[serde(rename = "windows")]
-    WINDOWS,
+    Windows,
     #[serde(rename = "linux")]
-    LINUX,
+    Linux,
     #[serde(rename = "osx")]
-    OSX,
+    Osx,
     #[serde(rename = "unknown")]
-    UNKNOWN,
+    Unknown,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Architecture {
     #[serde(rename = "x86")]
@@ -72,51 +71,53 @@ pub enum Architecture {
 impl OperatingSystem {
     pub fn get_path_separator(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => ";",
-            OperatingSystem::LINUX | OperatingSystem::OSX => ":",
-            _ => bail!("Invalid OS")
+            Self::Windows => ";",
+            Self::Linux | Self::Osx => ":",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => "windows",
-            OperatingSystem::LINUX => "linux",
-            OperatingSystem::OSX => "osx",
-            _ => bail!("Invalid OS")
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+            Self::Osx => "osx",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_adoptium_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => "windows",
-            OperatingSystem::LINUX => "linux",
-            OperatingSystem::OSX => "mac",
-            _ => bail!("Invalid OS")
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+            Self::Osx => "mac",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 }
 
 impl Display for OperatingSystem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.get_simple_name().unwrap())
+        self.get_simple_name()
+            .map_or(Err(fmt::Error), |name| f.write_str(name))
     }
 }
 
 impl Architecture {
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
-            Architecture::X86 => "x86",
-            Architecture::X64 => "x64",
-            Architecture::ARM => "arm",
-            Architecture::AARCH64 => "aarch64",
-            _ => bail!("Invalid architecture")
+            Self::X86 => "x86",
+            Self::X64 => "x64",
+            Self::ARM => "arm",
+            Self::AARCH64 => "aarch64",
+            Self::UNKNOWN => bail!("Invalid architecture"),
         })
     }
 }
 
-impl Display for Architecture {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.get_simple_name().unwrap())
+impl fmt::Display for Architecture {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.get_simple_name()
+            .map_or(Err(fmt::Error), |name| f.write_str(name))
     }
 }

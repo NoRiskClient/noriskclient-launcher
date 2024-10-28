@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 use crate::minecraft::progress::ProgressUpdate;
@@ -18,7 +20,7 @@ pub struct CustomServer {
     #[serde(rename = "lastOnline")]
     pub last_online: u64,
     #[serde(rename = "createdAt")]
-    pub created_at: u64
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -26,44 +28,47 @@ pub enum CustomServerType {
     VANILLA,
     FORGE,
     FABRIC,
+    #[allow(non_camel_case_types)] // TODO: do we really need this?
     NEO_FORGE,
     QUILT,
     PAPER,
     SPIGOT,
     BUKKIT,
     FOLIA,
-    PURPUR
+    PURPUR,
 }
 
 impl CustomServerType {
+    #[must_use]
     pub fn from_string(s: &str) -> Self {
         match s {
-            "VANILLA" => CustomServerType::VANILLA,
-            "FORGE" => CustomServerType::FORGE,
-            "FABRIC" => CustomServerType::FABRIC,
-            "NEO_FORGE" => CustomServerType::NEO_FORGE,
-            "QUILT" => CustomServerType::QUILT,
-            "PAPER" => CustomServerType::PAPER,
-            "SPIGOT" => CustomServerType::SPIGOT,
-            "BUKKIT" => CustomServerType::BUKKIT,
-            "FOLIA" => CustomServerType::FOLIA,
-            "PURPUR" => CustomServerType::PURPUR,
-            _ => CustomServerType::VANILLA
+            "FORGE" => Self::FORGE,
+            "FABRIC" => Self::FABRIC,
+            "NEO_FORGE" => Self::NEO_FORGE,
+            "QUILT" => Self::QUILT,
+            "PAPER" => Self::PAPER,
+            "SPIGOT" => Self::SPIGOT,
+            "BUKKIT" => Self::BUKKIT,
+            "FOLIA" => Self::FOLIA,
+            "PURPUR" => Self::PURPUR,
+            _ => Self::VANILLA,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for CustomServerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CustomServerType::VANILLA => "VANILLA".to_string(),
-            CustomServerType::FORGE => "FORGE".to_string(),
-            CustomServerType::FABRIC => "FABRIC".to_string(),
-            CustomServerType::NEO_FORGE => "NEO_FORGE".to_string(),
-            CustomServerType::QUILT => "QUILT".to_string(),
-            CustomServerType::PAPER => "PAPER".to_string(),
-            CustomServerType::SPIGOT => "SPIGOT".to_string(),
-            CustomServerType::BUKKIT => "BUKKIT".to_string(),
-            CustomServerType::FOLIA => "FOLIA".to_string(),
-            CustomServerType::PURPUR => "PURPUR".to_string()
+            Self::VANILLA => write!(f, "VANILLA"),
+            Self::FORGE => write!(f, "FORGE"),
+            Self::FABRIC => write!(f, "FABRIC"),
+            Self::NEO_FORGE => write!(f, "NEO_FORGE"),
+            Self::QUILT => write!(f, "QUILT"),
+            Self::PAPER => write!(f, "PAPER"),
+            Self::SPIGOT => write!(f, "SPIGOT"),
+            Self::BUKKIT => write!(f, "BUKKIT"),
+            Self::FOLIA => write!(f, "FOLIA"),
+            Self::PURPUR => write!(f, "PURPUR"),
         }
     }
 }
@@ -84,23 +89,23 @@ impl<'de> Deserialize<'de> for CustomServerType {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Ok(CustomServerType::from_string(&s))
+        Ok(Self::from_string(&s))
     }
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct CustomServerEventPayload {
     pub server_id: String,
-    pub data: String
+    pub data: String,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct CustomServerProgressEventPayload {
     pub server_id: String,
-    pub data: ProgressUpdate
+    pub data: ProgressUpdate,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct LatestRunningServer {
     #[serde(rename = "forwarderProcessId")]
     pub forwarder_process_id: Option<u32>,
@@ -108,16 +113,6 @@ pub struct LatestRunningServer {
     pub process_id: Option<u32>,
     #[serde(rename = "serverId")]
     pub server_id: Option<String>,
-}
-
-impl Default for LatestRunningServer {
-    fn default() -> Self {
-        Self {
-            forwarder_process_id: None,
-            process_id: None,
-            server_id: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
