@@ -42,16 +42,16 @@ impl CustomServerType {
     #[must_use]
     pub fn from_string(s: &str) -> Self {
         match s {
-            "FORGE" => CustomServerType::FORGE,
-            "FABRIC" => CustomServerType::FABRIC,
-            "NEO_FORGE" => CustomServerType::NEO_FORGE,
-            "QUILT" => CustomServerType::QUILT,
-            "PAPER" => CustomServerType::PAPER,
-            "SPIGOT" => CustomServerType::SPIGOT,
-            "BUKKIT" => CustomServerType::BUKKIT,
-            "FOLIA" => CustomServerType::FOLIA,
-            "PURPUR" => CustomServerType::PURPUR,
-            _ => CustomServerType::VANILLA,
+            "FORGE" => Self::FORGE,
+            "FABRIC" => Self::FABRIC,
+            "NEO_FORGE" => Self::NEO_FORGE,
+            "QUILT" => Self::QUILT,
+            "PAPER" => Self::PAPER,
+            "SPIGOT" => Self::SPIGOT,
+            "BUKKIT" => Self::BUKKIT,
+            "FOLIA" => Self::FOLIA,
+            "PURPUR" => Self::PURPUR,
+            _ => Self::VANILLA,
         }
     }
 }
@@ -59,16 +59,16 @@ impl CustomServerType {
 impl Display for CustomServerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CustomServerType::VANILLA => write!(f, "VANILLA"),
-            CustomServerType::FORGE => write!(f, "FORGE"),
-            CustomServerType::FABRIC => write!(f, "FABRIC"),
-            CustomServerType::NEO_FORGE => write!(f, "NEO_FORGE"),
-            CustomServerType::QUILT => write!(f, "QUILT"),
-            CustomServerType::PAPER => write!(f, "PAPER"),
-            CustomServerType::SPIGOT => write!(f, "SPIGOT"),
-            CustomServerType::BUKKIT => write!(f, "BUKKIT"),
-            CustomServerType::FOLIA => write!(f, "FOLIA"),
-            CustomServerType::PURPUR => write!(f, "PURPUR"),
+            Self::VANILLA => write!(f, "VANILLA"),
+            Self::FORGE => write!(f, "FORGE"),
+            Self::FABRIC => write!(f, "FABRIC"),
+            Self::NEO_FORGE => write!(f, "NEO_FORGE"),
+            Self::QUILT => write!(f, "QUILT"),
+            Self::PAPER => write!(f, "PAPER"),
+            Self::SPIGOT => write!(f, "SPIGOT"),
+            Self::BUKKIT => write!(f, "BUKKIT"),
+            Self::FOLIA => write!(f, "FOLIA"),
+            Self::PURPUR => write!(f, "PURPUR"),
         }
     }
 }
@@ -89,7 +89,7 @@ impl<'de> Deserialize<'de> for CustomServerType {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Ok(CustomServerType::from_string(&s))
+        Ok(Self::from_string(&s))
     }
 }
 

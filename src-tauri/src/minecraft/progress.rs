@@ -25,28 +25,28 @@ pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
 }
 
 #[must_use]
-pub fn get_max(len: usize) -> u64 {
+pub const fn get_max(len: usize) -> u64 {
     len as u64 * 100
 }
 
 impl ProgressUpdateSteps {
-    fn len() -> usize {
+    const fn len() -> usize {
         12
     }
 
-    fn step_idx(&self) -> usize {
+    const fn step_idx(&self) -> usize {
         match self {
-            ProgressUpdateSteps::DownloadNoRiskClientMods => 0,
-            ProgressUpdateSteps::DownloadJRE | ProgressUpdateSteps::DownloadCustomServerJar => 1,
-            ProgressUpdateSteps::DownloadClientJar
-            | ProgressUpdateSteps::DownloadCustomServerInstallerJar => 2,
-            ProgressUpdateSteps::DownloadLibraries => 3,
-            ProgressUpdateSteps::DownloadAssets => 4,
-            ProgressUpdateSteps::DownloadNoRiskAssets => 5,
-            ProgressUpdateSteps::VerifyNoRiskAssets => 6,
-            ProgressUpdateSteps::DownloadShader => 7,
-            ProgressUpdateSteps::DownloadResourcePack => 8,
-            ProgressUpdateSteps::DownloadDatapack => 9,
+            Self::DownloadNoRiskClientMods => 0,
+            Self::DownloadJRE | Self::DownloadCustomServerJar => 1,
+            Self::DownloadClientJar
+            | Self::DownloadCustomServerInstallerJar => 2,
+            Self::DownloadLibraries => 3,
+            Self::DownloadAssets => 4,
+            Self::DownloadNoRiskAssets => 5,
+            Self::VerifyNoRiskAssets => 6,
+            Self::DownloadShader => 7,
+            Self::DownloadResourcePack => 8,
+            Self::DownloadDatapack => 9,
         }
     }
 }
@@ -67,15 +67,15 @@ const PER_STEP: u64 = 1024;
 impl ProgressUpdate {
     #[allow(clippy::needless_pass_by_value)] // TODO: check if we really need this
     #[must_use]
-    pub fn set_for_step(step: ProgressUpdateSteps, progress: u64, max: u64) -> Self {
+    pub const fn set_for_step(step: ProgressUpdateSteps, progress: u64, max: u64) -> Self {
         Self::SetProgress(step.step_idx() as u64 * PER_STEP + (progress * PER_STEP / max))
     }
     #[must_use]
-    pub fn set_to_max() -> Self {
+    pub const fn set_to_max() -> Self {
         Self::SetProgress(ProgressUpdateSteps::len() as u64 * PER_STEP)
     }
     #[must_use]
-    pub fn set_max() -> Self {
+    pub const fn set_max() -> Self {
         let max = ProgressUpdateSteps::len() as u64;
 
         Self::SetMax(max * PER_STEP)

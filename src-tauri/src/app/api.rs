@@ -728,7 +728,7 @@ pub struct MinecraftToken {
 impl LoginData {
     /// Refresh access token if necessary
 
-    pub async fn refresh_maybe_fixed(self) -> Result<LoginData> {
+    pub async fn refresh_maybe_fixed(self) -> Result<Self> {
         debug!("Refreshing auth via norisk maybe fixed...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
             .await
@@ -736,7 +736,7 @@ impl LoginData {
         match ApiEndpoints::refresh_token_maybe_fixed(&self.refresh_token).await {
             Ok(response) => {
                 debug!("Refreshed auth...");
-                Ok(LoginData {
+                Ok(Self {
                     uuid: self.uuid,
                     access_token: response.access_token,
                     refresh_token: response.refresh_token,
@@ -798,11 +798,9 @@ pub struct Build {
     pub subsystem_specific_data: SubsystemSpecificData,
 }
 
-///
 /// Subsystem specific data
 /// This can be used for any subsystem, but for now it is only implemented for Fabric.
 /// It has to be turned into a Enum to be able to decide on it's own for specific data, but for now this is not required.
-///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubsystemSpecificData {
     // Additional data
@@ -855,7 +853,7 @@ pub struct LoaderMod {
 
 impl LoaderMod {
     #[must_use]
-    pub fn is_same_slug(&self, other: &LoaderMod) -> bool {
+    pub fn is_same_slug(&self, other: &Self) -> bool {
         self.source
             .get_slug()
             .eq_ignore_ascii_case(&other.source.get_slug())
@@ -881,7 +879,7 @@ impl ModSource {
     #[must_use]
     pub fn get_slug(&self) -> String {
         match self {
-            ModSource::Repository {
+            Self::Repository {
                 repository: _repository,
                 artifact,
                 url: _,
@@ -899,7 +897,7 @@ impl ModSource {
     #[must_use]
     pub fn get_repository(&self) -> String {
         match self {
-            ModSource::Repository {
+            Self::Repository {
                 repository: _repository,
                 artifact,
                 url: _,
@@ -916,7 +914,7 @@ impl ModSource {
 
     pub fn get_path(&self) -> Result<String> {
         Ok(match self {
-            ModSource::Repository {
+            Self::Repository {
                 repository: _repository,
                 artifact,
                 url: _,

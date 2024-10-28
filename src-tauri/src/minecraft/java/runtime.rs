@@ -15,8 +15,8 @@ pub struct JavaRuntime(PathBuf);
 
 impl JavaRuntime {
     #[must_use]
-    pub fn new(path: PathBuf) -> JavaRuntime {
-        JavaRuntime(path)
+    pub const fn new(path: PathBuf) -> Self {
+        Self(path)
     }
 
     pub fn execute(&self, arguments: Vec<String>, game_dir: &Path) -> Result<Child> {
@@ -95,7 +95,7 @@ impl JavaRuntime {
         tokens: &CustomServerTokenResponse,
         on_stdout: fn(&D, &str, &[u8]) -> Result<()>,
         on_stderr: fn(&D, &str, &[u8]) -> Result<()>,
-        java_runtime: &JavaRuntime,
+        java_runtime: &Self,
         data: &D,
     ) -> Result<()> {
         let mut stdout = running_task.stdout.take().context("stdout missing")?;

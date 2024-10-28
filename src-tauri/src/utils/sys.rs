@@ -71,57 +71,53 @@ pub enum Architecture {
 impl OperatingSystem {
     pub fn get_path_separator(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::Windows => ";",
-            OperatingSystem::Linux | OperatingSystem::Osx => ":",
-            OperatingSystem::Unknown => bail!("Invalid OS"),
+            Self::Windows => ";",
+            Self::Linux | Self::Osx => ":",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::Windows => "windows",
-            OperatingSystem::Linux => "linux",
-            OperatingSystem::Osx => "osx",
-            OperatingSystem::Unknown => bail!("Invalid OS"),
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+            Self::Osx => "osx",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_adoptium_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::Windows => "windows",
-            OperatingSystem::Linux => "linux",
-            OperatingSystem::Osx => "mac",
-            OperatingSystem::Unknown => bail!("Invalid OS"),
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+            Self::Osx => "mac",
+            Self::Unknown => bail!("Invalid OS"),
         })
     }
 }
 
 impl Display for OperatingSystem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.get_simple_name() {
-            Ok(name) => f.write_str(name),
-            Err(_) => Err(fmt::Error),
-        }
+        self.get_simple_name()
+            .map_or(Err(fmt::Error), |name| f.write_str(name))
     }
 }
 
 impl Architecture {
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
-            Architecture::X86 => "x86",
-            Architecture::X64 => "x64",
-            Architecture::ARM => "arm",
-            Architecture::AARCH64 => "aarch64",
-            Architecture::UNKNOWN => bail!("Invalid architecture"),
+            Self::X86 => "x86",
+            Self::X64 => "x64",
+            Self::ARM => "arm",
+            Self::AARCH64 => "aarch64",
+            Self::UNKNOWN => bail!("Invalid architecture"),
         })
     }
 }
 
 impl fmt::Display for Architecture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.get_simple_name() {
-            Ok(name) => f.write_str(name),
-            Err(_) => Err(fmt::Error),
-        }
+        self.get_simple_name()
+            .map_or(Err(fmt::Error), |name| f.write_str(name))
     }
 }

@@ -700,7 +700,7 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Er
 
 #[tauri::command]
 pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, crate::error::Error> {
-    debug!("Incoming Path {:?}", file_path.clone());
+    debug!("Incoming Path {:?}", file_path);
     let normalized_path = file_path.trim().replace('\\', "/");
     let path = std::path::Path::new(&normalized_path);
     debug!("Normalized Path {:?}", normalized_path.clone());
@@ -1132,10 +1132,10 @@ async fn read_remote_image_file(location: String) -> Result<String, String> {
         .bytes()
         .await;
 
-    match response {
-        Ok(bytes) => Ok(general_purpose::STANDARD.encode(&bytes)),
-        Err(_) => Err("Failed to fetch cape from remote resource".to_string()),
-    }
+    response.map_or_else(
+        |_| Err("Failed to fetch cape from remote resource".to_string()),
+        |bytes| Ok(general_purpose::STANDARD.encode(&bytes)),
+    )
 }
 
 #[tauri::command]
@@ -1515,16 +1515,17 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn get_default_mc_folder() -> Result<String, String> {
-    if let Some(appdata_dir) = data_dir() {
-        let minecraft_folder = appdata_dir.join(".minecraft");
-        Ok(minecraft_folder
-            .as_os_str()
-            .to_str()
-            .expect("Could not convert folder name to string")
-            .to_string())
-    } else {
-        Err("Unable to find default Minecraft folder".to_string())
-    }
+    data_dir().map_or_else(
+        || Err("Unable to find default Minecraft folder".to_string()),
+        |appdata_dir| {
+            let minecraft_folder = appdata_dir.join(".minecraft");
+            Ok(minecraft_folder
+                .as_os_str()
+                .to_str()
+                .expect("Could not convert folder name to string")
+                .to_string())
+        },
+    )
 }
 
 #[tauri::command]
@@ -1769,10 +1770,10 @@ async fn add_player_to_whitelist(
 async fn default_data_folder_path() -> Result<String, String> {
     let data_directory = LAUNCHER_DIRECTORY.data_dir().to_str();
 
-    match data_directory {
-        Some(path) => Ok(path.to_string()),
-        None => Err("unable to get data folder path".to_string()),
-    }
+    data_directory.map_or_else(
+        || Err("unable to get data folder path".to_string()),
+        |path| Ok(path.to_string()),
+    )
 }
 
 #[tauri::command]
@@ -2052,7 +2053,7 @@ async fn execute_rcon_command(
         "custom-server-process-output",
         CustomServerEventPayload {
             server_id: server_id.clone(),
-            data: console_info_log.clone(),
+            data: console_info_log,
         },
     )?;
 
@@ -2065,7 +2066,7 @@ async fn execute_rcon_command(
         "custom-server-process-output",
         CustomServerEventPayload {
             server_id,
-            data: response_log.clone(),
+            data: response_log,
         },
     )?;
 
@@ -2305,7 +2306,7 @@ async fn check_feature_whitelist(
 pub fn gui_main() {
     tauri::Builder::default()
         .on_window_event(move |event| {
-            if let WindowEvent::Destroyed = event.event() {
+            if matches!(event.event(), WindowEvent::Destroyed) {
                 info!("Window destroyed, quitting application");
             }
         })

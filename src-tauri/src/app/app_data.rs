@@ -13,7 +13,7 @@ use super::modrinth_api::Datapack;
 use super::modrinth_api::ResourcePack;
 use super::modrinth_api::Shader;
 
-fn default_concurrent_downloads() -> i32 {
+const fn default_concurrent_downloads() -> i32 {
     10
 }
 
@@ -76,11 +76,11 @@ pub struct LauncherOptions {
 impl LauncherOptions {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the options from the file
-        let options = serde_json::from_slice::<LauncherOptions>(
+        let options = serde_json::from_slice::<Self>(
             &fs::read(app_data.join("options.json")).await?,
         )
         .map_err(|err| -> String { format!("Failed to write options.json: {err}") })
-        .unwrap_or_else(|_| LauncherOptions::default());
+        .unwrap_or_else(|_| Self::default());
         Ok(options)
     }
 
@@ -134,11 +134,11 @@ impl Default for LauncherOptions {
 impl LauncherProfiles {
     pub async fn load(app_data: &Path) -> Result<Self> {
         // load the launcher_profiles from the file
-        let launcher_profiles = serde_json::from_slice::<LauncherProfiles>(
+        let launcher_profiles = serde_json::from_slice::<Self>(
             &fs::read(app_data.join("launcher_profiles.json")).await?,
         )
         .map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {err}") })
-        .unwrap_or_else(|_| LauncherProfiles::default());
+        .unwrap_or_else(|_| Self::default());
         Ok(launcher_profiles)
     }
 

@@ -30,11 +30,10 @@ mod error;
 mod utils;
 
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
-static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
-    Lazy::new(|| match ProjectDirs::from("gg", "norisk", "NoRiskClient") {
-        Some(proj_dirs) => proj_dirs,
-        None => panic!("no application directory"),
-    });
+static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
+    ProjectDirs::from("gg", "norisk", "NoRiskClient")
+        .map_or_else(|| panic!("no application directory"), |proj_dirs| proj_dirs)
+});
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -81,7 +80,7 @@ pub fn main() -> anyhow::Result<()> {
         .encoder(Box::new(PatternEncoder::new(
             "[{d(%d-%m-%Y %H:%M:%S)}] {l} - {m}\n",
         )))
-        .build(latest_log.clone(), Box::new(policy))?;
+        .build(latest_log, Box::new(policy))?;
 
     //TODO log also in console
     // Log Trace level output to file where trace is the default level

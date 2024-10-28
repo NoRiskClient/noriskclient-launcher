@@ -293,7 +293,7 @@ impl CustomServerManager {
         data: &[u8],
     ) -> anyhow::Result<()> {
         let data = String::from_utf8(data.to_vec())?;
-        if data.is_empty() || data.to_string().contains("RCON Client /127.0.0.1") {
+        if data.is_empty() || data.contains("RCON Client /127.0.0.1") {
             return Ok(()); // ignore empty lines
         }
 

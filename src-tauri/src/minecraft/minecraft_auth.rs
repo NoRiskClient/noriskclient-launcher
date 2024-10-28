@@ -110,7 +110,7 @@ impl MinecraftAuthStore {
         let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
 
         if create_new.unwrap_or(false) {
-            return Ok(MinecraftAuthStore::default());
+            return Ok(Self::default());
         }
 
         if auth_path.exists() {
@@ -118,15 +118,15 @@ impl MinecraftAuthStore {
                 .await
                 .map_err(|e| ErrorKind::FSError(format!("Failed to read accounts.json: {e}")))?;
 
-            match serde_json::from_str::<MinecraftAuthStore>(&contents) {
+            match serde_json::from_str::<Self>(&contents) {
                 Ok(store) => Ok(store),
                 Err(e) => {
                     error!("JSON Error reading accounts.json: {:?}", e);
-                    Ok(MinecraftAuthStore::default())
+                    Ok(Self::default())
                 }
             }
         } else {
-            Ok(MinecraftAuthStore::default())
+            Ok(Self::default())
         }
     }
 
@@ -1092,7 +1092,7 @@ async fn send_signed_request<T: DeserializeOwned>(
     buffer.write_u8(0).map_err(|source| {
         MinecraftAuthenticationError::ConstructingSignedRequest { source, step }
     })?;
-    buffer.extend_from_slice("POST".as_bytes());
+    buffer.extend_from_slice(b"POST");
     buffer.write_u8(0).map_err(|source| {
         MinecraftAuthenticationError::ConstructingSignedRequest { source, step }
     })?;
@@ -1175,7 +1175,7 @@ fn get_date_header(headers: &HeaderMap) -> DateTime<Utc> {
         .get(reqwest::header::DATE)
         .and_then(|x| x.to_str().ok())
         .and_then(|x| DateTime::parse_from_rfc2822(x).ok())
-        .map_or(Utc::now(), |x| x.with_timezone(&Utc))
+        .map_or_else(Utc::now, |x| x.with_timezone(&Utc))
 }
 
 fn generate_oauth_challenge() -> String {

@@ -365,8 +365,7 @@ pub async fn launch<D: Send + Sync>(
         let norisk_asset_max = norisk_asset_objects_to_download
             .values()
             .map(std::borrow::ToOwned::to_owned)
-            .collect::<Vec<_>>()
-            .len() as u64;
+            .count() as u64;
 
         launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
         launcher_data_arc.progress_update(ProgressUpdate::set_for_step(

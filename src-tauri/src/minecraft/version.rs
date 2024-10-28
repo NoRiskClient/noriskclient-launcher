@@ -41,7 +41,7 @@ impl VersionManifest {
             .send()
             .await?
             .error_for_status()?;
-        let manifest = response.json::<VersionManifest>().await?;
+        let manifest = response.json::<Self>().await?;
 
         Ok(manifest)
     }
@@ -82,7 +82,7 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub(crate) fn merge(&mut self, mut parent: VersionProfile) -> Result<()> {
+    pub(crate) fn merge(&mut self, mut parent: Self) -> Result<()> {
         Self::merge_options(&mut self.asset_index_location, parent.asset_index_location);
         Self::merge_options(&mut self.assets, parent.assets);
 
@@ -194,13 +194,13 @@ impl ArgumentDeclaration {
         }
 
         match self {
-            ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec![
+            Self::V14(_) => command_arguments.append(&mut vec![
                 "-Djava.library.path=${natives_directory}".to_string(),
                 "-cp".to_string(),
                 "${classpath}".to_string(),
             ]),
-            ArgumentDeclaration::V21(decl) => {
-                ArgumentDeclaration::check_rules_and_add(
+            Self::V21(decl) => {
+                Self::check_rules_and_add(
                     command_arguments,
                     &decl.arguments.jvm,
                     features,
@@ -216,7 +216,7 @@ impl ArgumentDeclaration {
         features: &HashSet<String>,
     ) -> Result<()> {
         match self {
-            ArgumentDeclaration::V14(decl) => {
+            Self::V14(decl) => {
                 command_arguments.extend(
                     decl.minecraft_arguments
                         .as_ref()
@@ -229,8 +229,8 @@ impl ArgumentDeclaration {
                         .map(ToOwned::to_owned),
                 );
             }
-            ArgumentDeclaration::V21(decl) => {
-                ArgumentDeclaration::check_rules_and_add(
+            Self::V21(decl) => {
+                Self::check_rules_and_add(
                     command_arguments,
                     &decl.arguments.game,
                     features,
@@ -282,7 +282,7 @@ impl VersionProfile {
             .send()
             .await?
             .error_for_status()?
-            .json::<VersionProfile>()
+            .json::<Self>()
             .await?)
     }
 }
@@ -317,7 +317,7 @@ impl FromStr for Argument {
     type Err = Void;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Argument {
+        Ok(Self {
             value: ArgumentValue::SINGLE(s.to_string()),
             rules: None,
         })
@@ -654,7 +654,7 @@ pub struct LibraryDownloadInfo {
 
 impl From<&LibraryArtifact> for LibraryDownloadInfo {
     fn from(artifact: &LibraryArtifact) -> Self {
-        LibraryDownloadInfo {
+        Self {
             path: artifact.path.clone(),
             sha1: Some(artifact.sha1.clone()),
             size: Some(artifact.size),

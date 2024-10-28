@@ -103,11 +103,11 @@ impl ModrinthApiEndpoints {
         for dependency in dependencies {
             if dependency.dependency_type == "required" {
                 let dependency_mods =
-                    ModrinthApiEndpoints::get_project_version(&dependency.project_id, params)
+                    Self::get_project_version(&dependency.project_id, params)
                         .await?;
                 if let Some(dependency_mod) = dependency_mods.first() {
                     let slug_holder =
-                        ModrinthApiEndpoints::get_mod_slug(&dependency.project_id).await?;
+                        Self::get_mod_slug(&dependency.project_id).await?;
                     let required =
                         dependency_mod.is_already_required_by_norisk_client(required_mods);
                     if required {
@@ -141,12 +141,12 @@ impl ModrinthApiEndpoints {
         params: &str,
         required_mods: &[LoaderMod],
     ) -> Result<CustomMod, Box<dyn Error>> {
-        let mod_project = ModrinthApiEndpoints::get_mod_info(slug).await?;
-        let mod_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
+        let mod_project = Self::get_mod_info(slug).await?;
+        let mod_versions = Self::get_project_version(slug, params).await?;
         let project = mod_versions.first().ok_or("Mod not found")?;
 
         let dependencies =
-            ModrinthApiEndpoints::get_dependencies(&project.dependencies, params, required_mods)
+            Self::get_dependencies(&project.dependencies, params, required_mods)
                 .await?;
 
         Ok(CustomMod {
@@ -238,9 +238,9 @@ impl ModrinthApiEndpoints {
     }
 
     pub async fn install_shader(slug: &str, params: &str) -> Result<Shader, Box<dyn Error>> {
-        let shader_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
+        let shader_versions = Self::get_project_version(slug, params).await?;
         let project_version = shader_versions.first().ok_or("Shader not found")?;
-        let project = ModrinthApiEndpoints::get_shader_info(slug).await?;
+        let project = Self::get_shader_info(slug).await?;
 
         Ok(Shader {
             slug: project.slug,
@@ -350,11 +350,11 @@ impl ModrinthApiEndpoints {
         slug: &str,
         params: &str,
     ) -> Result<ResourcePack, Box<dyn Error>> {
-        let resourcepack_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
+        let resourcepack_versions = Self::get_project_version(slug, params).await?;
         let project_version = resourcepack_versions
             .first()
             .ok_or("ResourcePack not found")?;
-        let project = ModrinthApiEndpoints::get_resourcepack_info(slug).await?;
+        let project = Self::get_resourcepack_info(slug).await?;
 
         Ok(ResourcePack {
             slug: project.slug,
@@ -460,9 +460,9 @@ impl ModrinthApiEndpoints {
         params: &str,
         world: &str,
     ) -> Result<Datapack, Box<dyn Error>> {
-        let datapack_versions = ModrinthApiEndpoints::get_project_version(slug, params).await?;
+        let datapack_versions = Self::get_project_version(slug, params).await?;
         let project_version = datapack_versions.first().ok_or("Datapack not found")?;
-        let project = ModrinthApiEndpoints::get_datapack_info(slug).await?;
+        let project = Self::get_datapack_info(slug).await?;
 
         Ok(Datapack {
             slug: project.slug,
