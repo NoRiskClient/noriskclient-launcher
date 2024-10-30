@@ -915,7 +915,7 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 
 #[tauri::command]
 async fn get_norisk_user(options: LauncherOptions, credentials: Credentials) -> Result<NoRiskUserMinimal, String> {
-    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
+    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string())
         .await
         .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
 
@@ -937,7 +937,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 
 #[tauri::command]
 async fn request_norisk_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, crate::error::Error> {
-    Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
+    Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
@@ -961,7 +961,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 
 #[tauri::command]
 async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, app: tauri::AppHandle) -> Result<(), crate::error::Error> {
-    let token = credentials.norisk_credentials.get_token(options.experimental_mode)?;
+    let token = credentials.norisk_credentials.get_token(options.experimental_mode).await?;
     let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, token);
 
     if let Some(window) = app.get_window("discord-signin") {
@@ -1004,12 +1004,12 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
 
 #[tauri::command]
 async fn discord_auth_status(options: LauncherOptions, credentials: Credentials) -> Result<bool, crate::error::Error> {
-    Ok(ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
+    Ok(ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
 async fn discord_auth_unlink(credentials: Credentials, options: LauncherOptions) -> Result<(), crate::error::Error> {
-    ApiEndpoints::unlink_discord(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?;
+    ApiEndpoints::unlink_discord(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?;
     Ok(())
 }
 
@@ -1688,7 +1688,7 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 ///
 #[tauri::command]
 async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, String> {
-    ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
+    ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
 }
 
 ///
@@ -1696,7 +1696,7 @@ async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Crede
 ///
 #[tauri::command]
 async fn check_feature_whitelist(feature: &str, options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
-    ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to check feature whitelist: {:?}", e))
+    ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to check feature whitelist: {:?}", e))
 }
 
 /// Runs the GUI and returns when the window is closed.

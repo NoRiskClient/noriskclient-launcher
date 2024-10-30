@@ -29,7 +29,7 @@
       {/if}
     </div>
     <!-- svelte-ignore a11y-autofocus -->
-    <!-- <div class="add-account-button primary-text" on:click={startMicrosoftAuth}>ADD ACCOUNT</div> -->
+    <div class="add-account-button primary-text" on:click={startMicrosoftAuth}>ADD ACCOUNT</div>
   </div>
 </dialog>
 
