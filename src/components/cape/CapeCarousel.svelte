@@ -205,7 +205,7 @@
     }
 
     .crop img {
-        position: absolute;
+        position: relative;
         width: 512px;
         height: 256px;
         left: -8px;
@@ -222,13 +222,13 @@
         text-shadow: 2px 2px #57cc00;
         cursor: pointer;
         position: absolute;
-        bottom: 0.3em;
+        bottom: 0.15em;
         left: 50%;
         outline: 2px solid black;
         background: #7cff00;
         transform: translateX(-50%);
         color: #0a7000;
-        padding: 4px 8px;
+        padding: 4px 3px;
         opacity: 0;
         transition: opacity 0.3s;
     }
