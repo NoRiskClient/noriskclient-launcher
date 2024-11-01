@@ -1,7 +1,7 @@
 // #![feature(exit_status_error)] - wait for feature to be stable
 #![cfg_attr(
-all(not(debug_assertions), target_os = "windows"),
-windows_subsystem = "windows"
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
 )]
 
 use std::fs;
@@ -20,6 +20,8 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
+use tauri::utils::Error::Architecture;
+use crate::utils::{get_architecture};
 
 pub mod app;
 pub mod minecraft;
@@ -37,9 +39,9 @@ static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
 });
 
 static APP_USER_AGENT: &str = concat!(
-    env!("CARGO_PKG_NAME"),
-    "/",
-    env!("CARGO_PKG_VERSION"),
+env!("CARGO_PKG_NAME"),
+"/",
+env!("CARGO_PKG_VERSION"),
 );
 
 /// HTTP Client with launcher agent
@@ -116,6 +118,8 @@ pub fn main() -> anyhow::Result<()> {
     info!("");
     info!("");
     info!("###############################");
+
+    info!("Architecture: {}", get_architecture().get_simple_name()?.to_string());
 
 
     // application directory

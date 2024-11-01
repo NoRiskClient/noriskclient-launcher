@@ -4,7 +4,7 @@ use anyhow::Result;
 use regex::Regex;
 
 use crate::minecraft::version::{Rule, RuleAction};
-use crate::utils::{OS, ARCHITECTURE, OS_VERSION};
+use crate::utils::{get_architecture, OS, OS_VERSION};
 
 pub fn check_condition(rules: &Vec<Rule>, features: &HashSet<String>) -> Result<bool> {
     if rules.is_empty() {
@@ -24,7 +24,7 @@ pub fn check_condition(rules: &Vec<Rule>, features: &HashSet<String>) -> Result<
                 rule_applies = false;
             }
             if let Some(arch) = &os_requirement.arch {
-                if *arch != ARCHITECTURE {
+                if *arch != get_architecture() {
                     rule_applies = false;
                 }
             }

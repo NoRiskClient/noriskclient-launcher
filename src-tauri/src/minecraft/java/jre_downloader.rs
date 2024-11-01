@@ -6,7 +6,7 @@ use path_absolutize::Absolutize;
 use tokio::fs;
 use crate::app::api::ApiEndpoints;
 
-use crate::utils::{download_file, tar_gz_extract, zip_extract, ARCHITECTURE, OperatingSystem, OS};
+use crate::utils::{download_file, get_architecture, tar_gz_extract, zip_extract, OperatingSystem, OS};
 
 /// Find java binary in JRE folder
 pub async fn find_java_binary(runtimes_folder: &Path, jre_version: u32) -> Result<PathBuf> {
@@ -60,7 +60,7 @@ pub async fn jre_download<F>(runtimes_folder: &Path, jre_version: u32, on_progre
 
     // OS details
     let os_name = OS.get_adoptium_name()?.to_string();
-    let os_arch = ARCHITECTURE.get_simple_name()?.to_string();
+    let os_arch = get_architecture().get_simple_name()?.to_string();
 
     // Request JRE source
     let jre_source = ApiEndpoints::jre(&os_name, &os_arch, jre_version).await?;
