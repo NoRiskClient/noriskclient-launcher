@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::process::Command;
 use anyhow::{bail, Result};
+use log::debug;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use sysinfo::{RefreshKind, System, SystemExt};
@@ -28,13 +29,14 @@ pub const OS: OperatingSystem = if cfg!(target_os = "windows") {
     OperatingSystem::UNKNOWN
 };
 
-fn is_rosetta() -> bool {
+pub fn is_rosetta() -> bool {
     #[cfg(target_os = "macos")]
     {
         if let Ok(output) = Command::new("sysctl")
             .arg("sysctl.proc_translated")
             .output()
         {
+            debug!("Rosetta Output: {:?}", String::from_utf8_lossy(&output.stdout));
             return String::from_utf8_lossy(&output.stdout).contains("1");
         }
     }

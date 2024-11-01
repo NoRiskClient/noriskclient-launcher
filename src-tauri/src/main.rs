@@ -21,7 +21,7 @@ use log4rs::{
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use tauri::utils::Error::Architecture;
-use crate::utils::{get_architecture};
+use crate::utils::{get_architecture, is_rosetta};
 
 pub mod app;
 pub mod minecraft;
@@ -121,6 +121,7 @@ pub fn main() -> anyhow::Result<()> {
     info!("###############################");
     info!("");
 
+    info!("Rosetta: {}", is_rosetta());
     info!("Architecture: {}", get_architecture().get_simple_name()?.to_string());
 
 
