@@ -1,5 +1,7 @@
 <script>
-    import {createEventDispatcher} from "svelte";
+    import { createEventDispatcher } from "svelte";
+    import { onMount, tick } from "svelte";
+    import { openInfoPopup } from "../../../utils/popupUtils.js";
 
     const dispatch = createEventDispatcher()
 
@@ -7,6 +9,38 @@
     export let enabled = mod?.value?.enabled ?? null;
     export let text;
     export let type;
+    export let modVersions;
+
+    const slug = mod?.slug ?? mod?.value?.source?.artifact?.split(":")[1];
+    const name = mod?.title ?? mod?.value?.name;
+
+    let versionDropdownOpen = false;
+    let isChangingVersion = false;
+
+    onMount(() => {
+        isChangingVersion = false;
+        if (slug && text != "DEPENDENCY" && modVersions != null && modVersions[slug] == null) {
+            console.log("Fetching versions for " + name);
+            dispatch("getVersions");
+        }
+    })
+
+    async function changeVersion(version) {
+        console.log("Changing version of " + slug + " to " + version);
+        isChangingVersion = true;
+        versionDropdownOpen = false;
+        await dispatch("changeVersion", { version: version });
+    }
+
+    function getMinimalisticDownloadCount() {
+        if (mod?.downloads < 1000) {
+            return mod?.downloads;
+        } else if (mod?.downloads < 1000000) {
+            return (mod?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (mod?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="mod-item-wrapper" class:blacklisted={mod?.blacklisted}>
@@ -22,22 +56,72 @@
         <div class="text-item-wrapper" style={type != "INSTALLED" && type != "CUSTOM" ? 'height: 95px;' : ''}>
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
-                    <a class="mod-title" href={"https://modrinth.com/mod/"+mod.slug ?? mod.value.source.artifact.split(":")[1]} target="_blank" title="Modrinth Page">
-                        {typeof mod == 'string' ? mod : mod?.title ?? mod?.value?.name}
-                    </a>
-                    {#if mod?.featured}
-                        <p title="Featured">⭐️</p>
-                    {/if}
+                    <div class="name-div">
+                        <a class="mod-title" href={`https://modrinth.com/mod/${slug}`} target="_blank" title={name}>
+                            {name.length > 20 && (text == 'INSTALL' || text == 'REQUIRED' || text == 'DEPENDENCY') ? name.substring(0, 19) + '...' : name}
+                        </a>
+                        {#if mod?.featured}
+                            <p title="Featured">⭐️</p>
+                        {/if}
+                    </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
-                    <a class="mod-title">{mod.replace('.jar', '').replace('.disabled', '')}</a>
+                    <a class="mod-title">{mod.title.replace('.jar', '')}</a>
                 {/if}
                 {#if mod?.author != undefined && mod?.author != null}
-                    <div>by {mod.author ?? mod.value.author}</div>
+                    <div class="author-container">
+                        <p class="author">by {mod.author ?? mod.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
-            {#if mod?.description != undefined && mod?.description != null}
-                <p class="description">{mod.description}</p>
+            {#if mod.isMissing}
+                <p class="description isMissing red-text"><span style="text-shadow: none; font-size: 20px;">⚠️</span> File does not exist!</p>
+            {:else if type == "CUSTOM"}
+                <p class="description custom-mod-label">Custom Mod</p>
+            {:else if mod.parents != undefined && mod.parents.length > 0}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <p
+                    class="description"
+                    style="margin-top: 1em; opacity: 0.65;"
+                    on:click={
+                        mod.parents.join(", ").length > 180 ? () => openInfoPopup({
+                            title: "Used by:",
+                            content: mod.parents.join(", "),
+                            contentFontSize: "14px"
+                        }) : () => {}
+                    }
+                >
+                    Used by: {mod.parents.join(", ").length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", ")}
+                </p>
+            {:else if mod.description != undefined && mod.description != null}
+                <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
+            {:else if modVersions != null && modVersions[slug]?.length > 1}
+                <div class="versionSelect">
+                    <p>Version:</p>
+                    <section class="dropdown">
+                        <button
+                            on:click={async () => {
+                                if (isChangingVersion) return;
+                                versionDropdownOpen = !versionDropdownOpen;
+                                await tick();
+                            }}
+                        >
+                            {#if isChangingVersion}
+                                <span>⏳</span> Changing version...
+                            {:else}
+                                <span>{versionDropdownOpen ? '⮟' : '⮞'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
+                            {/if}
+                        </button>
+                        <div class="versions" class:show={versionDropdownOpen}>
+                            {#each modVersions[slug].filter(v => v != mod?.value?.source?.artifact?.split(':')[2]) as version}
+                                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                <p class="version" on:click={() => changeVersion(version)}>{version}</p>
+                            {/each}
+                        </div>
+                    </section>
+                </div>
             {/if}
         </div>
     </div>
@@ -58,10 +142,10 @@
                     </h1>
                 </div>
             {:else}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                INSTALL
-            </h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    INSTALL
+                </h1>
             {/if}
         {:else if text === "RECOMENDED"}
             <div style="display: flex; flex-direction: column; align-items: center;">
@@ -113,6 +197,10 @@
         {:else if text === "REQUIRED"}
             <h1 class="required-button primary-text">
                 REQUIRED
+            </h1>
+        {:else if text === "DEPENDENCY"}
+            <h1 class="required-button primary-text">
+                DEPENDENCY
             </h1>
         {:else if type == "CUSTOM"}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -185,20 +273,18 @@
 
     .href-wrapper {
         display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
+    }
+    
+    .href-wrapper .name-div {
+        display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 0.7em;
-    }
-
-    .href-wrapper div {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 0.7em;
-    }
-
-    .href-wrapper p {
-        font-size: 20px;
+        gap: 0.3em;
     }
 
     .text-item-wrapper {
@@ -212,15 +298,16 @@
         object-fit: contain;
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
+        -webkit-user-drag: none;
     }
 
     .icon-fallback {
-    background-image: url("https://docs.modrinth.com/img/logo.svg");
-    min-width: 90px; 
-    min-height: 90px;
-    background-position: center center;
-    background-size: 90%;
-    background-repeat: no-repeat;
+        background-image: url("https://docs.modrinth.com/img/logo.svg");
+        min-width: 90px; 
+        min-height: 90px;
+        background-position: center center;
+        background-size: 90%;
+        background-repeat: no-repeat;
     }
 
     .mod-title {
@@ -228,17 +315,121 @@
         text-decoration: underline;
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
-        font-size: 18px;
+        font-size: 16px;
         cursor: pointer;
+        -webkit-user-drag: none;
+    }
+
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .custom-mod-label {
+        font-size: 14px !important;
+        font-style: italic;
+        opacity: 0.5;
     }
 
     .description {
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
+        font-size: 9px;
         line-height: 1.2em;
         padding-top: 2em;
         cursor: default;
-        overflow-y: scroll;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .versionSelect {
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+        justify-content: center;
+        margin-top: 1.5em;
+        gap: 0.5em;
+    }
+
+    .versionSelect p {
+        font-family: 'Press Start 2P', serif;
+        font-size: 10px;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .versionSelect button {
+        display: flex;
+        font-family: 'Press Start 2P', serif;
+        font-size: 11px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+        cursor: pointer;
+        background: var(--background-color);
+        border: none;
+        border-radius: 5px;
+        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1em;
+    }
+
+    .versionSelect button span {
+        font-size: 12px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .versionSelect .dropdown {
+        display: inline-block;
+    }
+
+    .versionSelect .dropdown .versions {
+      display: none;
+      flex-direction: column;
+      gap: 1.5em;
+      position: absolute;
+      background-color: var(--background-color);
+      padding: 15px 15px 15px 1.5em;
+      margin-top: 5px;
+      border: none;
+      border-radius: 5px;
+      z-index: 100;
+    }
+
+    .versionSelect .dropdown .versions.show {
+        display: flex;
+    }
+
+    .versionSelect .dropdown .versions .version {
+        font-family: 'Press Start 2P', serif;
+        font-size: 12px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+        cursor: pointer;
+    }
+
+    .versionSelect .dropdown .versions .version:hover {
+        text-decoration: underline;
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+    }
+
+    .isMissing {
+        font-size: 14px;
+        font-style: italic;
     }
 
     .install-button {

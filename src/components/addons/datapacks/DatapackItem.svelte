@@ -6,6 +6,16 @@
     export let datapack;
     export let text;
     export let type;
+
+    function getMinimalisticDownloadCount() {
+        if (datapack?.downloads < 1000) {
+            return datapack?.downloads;
+        } else if (datapack?.downloads < 1000000) {
+            return (datapack?.downloads / 1000).toFixed(1) + "K";
+        } else {
+            return (datapack?.downloads / 1000000).toFixed(1) + "M";
+        }
+    }
 </script>
 
 <div class="datapack-item-wrapper" class:blacklisted={datapack?.blacklisted}>
@@ -21,22 +31,28 @@
         <div class="text-item-wrapper">
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
-                    <a class="datapack-title" href={"https://modrinth.com/datapack/"+datapack.slug} target="_blank" title="Modrinth Page">
-                        {datapack.title}
-                    </a>
-                    {#if datapack?.featured}
-                        <p title="Featured" style="font-size: 20px;">⭐️</p>
-                    {/if}
+                    <div class="name-div">
+                        <a class="datapack-title" href={`https://modrinth.com/mod/${datapack.slug}`} target="_blank" title={datapack.title}>
+                            {datapack.title.length > 20 ? datapack.title.substring(0, datapack?.featured ? 17 : 20) + '...' : datapack.title}
+                        </a>
+                        {#if datapack?.featured}
+                            <p title="Featured">⭐️</p>
+                        {/if}
+                    </div>
                 {:else}
                     <!-- svelte-ignore a11y-missing-attribute -->
-                    <a class="datapack-title">{datapack.replace('.zip', '')}</a>
+                    <a class="datapack-title">{datapack.replace('.jar', '').replace('.disabled', '')}</a>
                 {/if}
                 {#if datapack?.author != undefined && datapack?.author != null}
-                    <div>by {datapack.author}</div>
+                    <div class="author-container">
+                        <p class="author">by {datapack.author ?? datapack.value.author}</p>
+                        <b>•</b>
+                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                    </div>
                 {/if}
             </div>
             {#if datapack?.description != undefined && datapack?.description != null}
-                <p>{datapack.description}</p>
+                <p class="description">{datapack.description.length > 85 ? datapack.description.substring(0, 85) + '...' : datapack.description}</p>
             {/if}
         </div>
     </div>
@@ -132,20 +148,26 @@
 
     .href-wrapper {
         display: flex;
-        align-items: center;
-        gap: 0.7em;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        color: var(--font-color);
+        gap: 0.3em;
     }
 
-    .href-wrapper div {
-        white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
-        font-size: 9px;
-        margin-top: 0.7em;
+    .href-wrapper .name-div {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.3em;
     }
 
     .text-item-wrapper {
         height: 100%;
         max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .icon {
@@ -154,15 +176,16 @@
         object-fit: contain;
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
+        -webkit-user-drag: none;
     }
 
     .icon-fallback {
-    background-image: url("https://docs.modrinth.com/img/logo.svg");
-    min-width: 90px; 
-    min-height: 90px;
-    background-position: center center;
-    background-size: 90%;
-    background-repeat: no-repeat;
+        background-image: url("https://docs.modrinth.com/img/logo.svg");
+        min-width: 90px; 
+        min-height: 90px;
+        background-position: center center;
+        background-size: 90%;
+        background-repeat: no-repeat;
     }
 
     .datapack-title {
@@ -170,17 +193,40 @@
         text-decoration: underline;
         font-family: 'Press Start 2P', serif;
         line-break: anywhere;
-        font-size: auto;
+        font-size: 16px;
         cursor: pointer;
+        -webkit-user-drag: none;
     }
 
-    .datapack-item-wrapper p {
-        width: 350px;
+    .author-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65em;
+        margin-top: 0.3em;
+    }
+
+    .author-container .author {
+        white-space: nowrap;
         font-family: 'Press Start 2P', serif;
-        font-size: 10px;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .author-container .download-count {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
+        text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
+    }
+
+    .description {
+        font-family: 'Press Start 2P', serif;
+        font-size: 9px;
         line-height: 1.2em;
-        cursor: default;
         padding-top: 2em;
+        cursor: default;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
     .install-button {

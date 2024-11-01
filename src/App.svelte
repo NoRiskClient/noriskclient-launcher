@@ -5,8 +5,9 @@
   import { fetchOptions } from "./stores/optionsStore.js";
   import { fetchBranches } from "./stores/branchesStore.js";
   import { fetchProfiles } from "./stores/profilesStore.js";
+  import { startMicrosoftAuth } from "./utils/microsoftUtils.js";
   import { listen } from "@tauri-apps/api/event";
-  import { location, push } from "svelte-spa-router";
+  import { push } from "svelte-spa-router";
   import {
     isClientRunning,
     startProgress,
@@ -14,8 +15,13 @@
     getMaintenanceMode,
     noriskError,
     noriskLog,
-    checkIfClientIsRunning,
+    checkIfClientIsRunning
   } from "./utils/noriskUtils.js";
+  import { 
+    getChangeLogs,
+    getAnnouncements,
+    getLastViewedPopups
+  } from "./utils/popupUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
@@ -24,16 +30,23 @@
     setTimeout(async () => {
       await appWindow.show();
     }, 300);
-    await checkIfClientIsRunning()
+    await checkIfClientIsRunning();
     await fetchOptions();
     await fetchDefaultUserOrError(false);
-    await getNoRiskUser();
-    await fetchBranches();
-    await fetchProfiles();
-    await getMaintenanceMode();
+    const isTokenValid = await getNoRiskUser();
+    if (isTokenValid) {
+      await fetchBranches();
+      await fetchProfiles();
+      await getMaintenanceMode();
+      await getChangeLogs();
+      await getAnnouncements();
+      await getLastViewedPopups();
+    } else {
+      await startMicrosoftAuth();
+    }
 
     let unlisten = await listen("client-exited", () => {
-      isClientRunning.set(false);
+      isClientRunning.set([false, false]);
       startProgress.set({
         progressBarMax: 0,
         progressBarProgress: 0,
@@ -56,6 +69,12 @@
       noriskLog("Default User Was Updated.");
       await fetchBranches();
       await fetchProfiles();
+      if (!isTokenValid) {
+        await getMaintenanceMode();
+        await getChangeLogs();
+        await getAnnouncements();
+        await getLastViewedPopups();
+      }
     });
 
     return () => {

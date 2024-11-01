@@ -1,12 +1,6 @@
-## Todos
-- [x] Drag and Drop Custom Mod files
-- [x] mc.logs api integration
-- [x] Featured Mods
-- [x] Set Custom Javapath and Mod Folder
-- [x] Save Light/Darkmode - Use Default OS Setting
-
 ## Issues
-If you notice any bugs or missing features, you can let us know by opening an issue [here](https://github.com/NoRiskClient/noriskclient-launcher/issues).
+
+If you notice any bugs or missing features, you can let us know by opening an issue [here](https://github.com/NoRiskClient/issues/issues/new/choose).
 
 ## License
 This code is originally forked from [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher).

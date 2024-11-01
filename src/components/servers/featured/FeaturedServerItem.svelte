@@ -17,7 +17,7 @@
             <div class="name-wrapper">
                 <h4 class="server-name">{server.name}</h4>
                 {#if server.supportsNoRiskClientFeatures}
-                    <img src={NRCLogo} alt="NRC Logo" title="Supports special NoRiskClient features">
+                    <img src={NRCLogo} alt="NRC Logo" title="Supports special NoRiskClient features" style="-webkit-user-drag: none;">
                 {/if}
             </div>
             <p>{server.description}</p>
@@ -90,6 +90,7 @@
         height: 90px;
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
+        -webkit-user-drag: none;
     }
 
     .server-name {

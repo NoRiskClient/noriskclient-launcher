@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
-use crate::app::app_data::LauncherOptions;
 use crate::app::gui::minecraft_auth_get_default_user;
+use super::app_data::{Announcement, ChangeLog, LauncherOptions};
 use crate::custom_servers::models::CustomServer;
 use crate::error::ErrorKind;
 use crate::minecraft::minecraft_auth::NoRiskToken;
@@ -200,6 +200,16 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token, request_uuid).await
     }
 
+    /// Request changelogs
+    pub async fn changelogs() -> Result<Vec<ChangeLog>> {
+        Self::request_from_download_norisk_endpoint("launcher_popups/changelogs.json").await
+    }
+
+    /// Request announcements
+    pub async fn announcements() -> Result<Vec<Announcement>> {
+        Self::request_from_download_norisk_endpoint("launcher_popups/announcements.json").await
+    }
+
     /// Request mcreal app token
     pub async fn get_mcreal_app_token(norisk_token: &str, request_uuid: &str) -> Result<String> {
         // BRUDER WIESO GEHT DAS HIER NT MIT DEM JSON PARSEN ABER OEBN SCHON!?!?!? Aber egal, brauchen eh nur String also von mir aus dann halt so :(
@@ -239,7 +249,7 @@ impl ApiEndpoints {
 
     /// Request discord link status
     pub async fn unlink_discord(norisk_token: &str, request_uuid: &str) -> Result<String> {
-        Self::delete_from_norisk_endpoint("core/oauth/discord/unlink", norisk_token, request_uuid).await
+        Self::delete_from_norisk_endpoint_text("core/oauth/discord/unlink", norisk_token, request_uuid).await
     }
 
     /// Request whitelist slots
@@ -378,6 +388,21 @@ impl ApiEndpoints {
         )
     }
 
+    /// Request **TEXT** formatted data from launcher API
+    pub async fn delete_from_norisk_endpoint_text(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url); // Den formatierten String ausgeben
+        Ok(HTTP_CLIENT.delete(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send().await?
+            .error_for_status()?
+            .text()
+            .await?
+        )
+    }
+
     /// Request JSON formatted data from launcher API
     pub async fn post_from_await_endpoint<T: DeserializeOwned>(endpoint: &str, id: u32) -> Result<T> {
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
@@ -397,12 +422,6 @@ pub struct Branches {
     #[serde(rename = "defaultBranch")]
     pub default_branch: String,
     pub branches: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Changelog {
-    pub build: Build,
-    pub changelog: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -650,7 +669,9 @@ impl ModSource {
         match self {
             ModSource::Repository { repository: _repository, artifact, url: _ } => {
                 let parts: Vec<&str> = artifact.split(":").collect();
-                if parts.len() > 1 {
+                if parts[0] == "CUSTOM" {
+                    parts[2].to_string()
+                } else if parts.len() > 1 {
                     parts[1].to_string()
                 } else {
                     "".to_string()

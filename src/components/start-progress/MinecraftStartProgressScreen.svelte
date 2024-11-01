@@ -1,4 +1,5 @@
 <script>
+	import { pop, location } from 'svelte-spa-router';
   import { listen } from "@tauri-apps/api/event";
   import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../../utils/svelteUtils.js";
@@ -7,7 +8,7 @@
   $: progressBarMax = $startProgress.progressBarMax;
   $: progressBarProgress = $startProgress.progressBarProgress;
   $: progressBarLabel = $startProgress.progressBarLabel;
-  $: isFinished = $isClientRunning;
+  $: isFinished = $isClientRunning[0];
 
   $: progress = progressBarProgress / progressBarMax;
 
@@ -46,8 +47,22 @@
   afterUpdate(() => {
     if (progressBarLabel === "Launching...") {
       isFinished = true;
+
+      setTimeout(() => {
+        if ($location == "/start-progress") {
+          pop();
+        }
+      }, 30 * 1000);
     }
   });
+
+  onMount(() => {
+    if ($isClientRunning[0]) {
+      progressBarLabel = "Running...";
+      progress = 1;
+    }
+  });
+
 
   function convertToPercentage(value) {
     return Math.round(value * 100);

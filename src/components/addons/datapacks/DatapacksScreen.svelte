@@ -2,10 +2,9 @@
   import { invoke } from "@tauri-apps/api";
   import { removeFile } from "@tauri-apps/api/fs";
   import { open } from "@tauri-apps/api/dialog";
-  import VirtualList from "../../utils/VirtualList.svelte";
   import ModrinthSearchBar from "../widgets/ModrinthSearchBar.svelte";
   import DatapackItem from "./DatapackItem.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { tick, onDestroy, onMount } from "svelte";
   import { watch } from "tauri-plugin-fs-watch-api";
   import { listen } from "@tauri-apps/api/event";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
@@ -21,7 +20,7 @@
   export let world;
   let launcherProfile = null;
   let customDatapacks = [];
-  let featuredDatapacks = [];
+  let featuredDatapacks = null;
   let blacklistedDatapacks = [];
   let datapacks = [];
   let launchManifest = null;
@@ -29,6 +28,7 @@
   let filterterm = "";
   let currentTabIndex = 0;
   let fileWatcher;
+  let listScroll = 0;
 
   let search_offset = 0;
   let search_limit = 30;
@@ -62,11 +62,17 @@
   ];
   let filters = {};
 
+  let lastFileDrop = -1;
   listen("tauri://file-drop", files => {
     if (currentTabIndex != 1) {
       return;
     }
-    installCustomDatapacks(files.payload);
+    const time = Date.now();
+    if (time - lastFileDrop < 1000) return;
+    lastFileDrop = time;
+    let todo = new Set();
+    files.payload.forEach(l => todo.add(l));
+    installCustomDatapacks(todo);
   });
 
   // check if an element exists in array using a comparer function
@@ -85,6 +91,25 @@
       this.push(element);
     }
   };
+
+  async function updateDatapacks(newDatapacks) {
+    datapacks = newDatapacks;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
+  async function updateProfileDatapacks(newDatapacks) {
+    launcherProfiles.addons[currentBranch].datapacks = newDatapacks;
+    
+    // Try to scroll to the previous position
+    try {
+      await tick();
+      document.getElementById('scrollList').scrollTop = listScroll ?? 0;
+    } catch(_) {}
+  }
 
   async function getLaunchManifest() {
     await invoke("get_launch_manifest", {
@@ -116,9 +141,9 @@
       branch: launchManifest.build.branch,
       installedDatapacks: launcherProfiles.addons[currentBranch].datapacks,
       world: world,
-    }).then((datapacks) => {
-      console.debug("Custom Datapacks", datapacks);
-      customDatapacks = datapacks;
+    }).then((fileNames) => {
+      console.debug("Custom Datapacks", fileNames);
+      customDatapacks = fileNames;
     }).catch((error) => {
       addNotification(error);
     });
@@ -126,7 +151,7 @@
 
   async function installDatapack(datapack) {
     datapack.loading = true;
-    datapacks = datapacks;
+    updateDatapacks(datapacks);
     await invoke("install_datapack", {
       slug: datapack.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["datapack"]`,
@@ -136,8 +161,8 @@
         return e.slug === result.slug && e.world_name === world;
       });
       datapack.loading = false;
-      datapacks = datapacks;
-      launcherProfiles.addons[currentBranch].datapacks = launcherProfiles.addons[currentBranch].datapacks;
+      updateDatapacks(datapacks);
+      updateProfileDatapacks(launcherProfiles.addons[currentBranch].datapacks);
       launcherProfiles.store();
     }).catch((error) => {
       addNotification(error);
@@ -153,19 +178,33 @@
     return "INSTALL";
   }
 
+  async function getFeaturedDatapacks() {
+    await invoke("get_featured_datapacks", {
+      branch: currentBranch,
+      mcVersion: launchManifest.build.mcVersion,
+    }).then((result) => {
+      console.debug("Featured Datapacks", result);
+      result.forEach(datapack => datapack.featured = true);
+      featuredDatapacks = result;
+    }).catch((error) => {
+      addNotification(error);
+      featuredDatapacks = [];
+    });
+  }
+
   async function searchDatapacks() {
-    if (searchterm === "" && search_offset === 0) {
-      await invoke("get_featured_datapacks", {
-        branch: currentBranch,
-        mcVersion: launchManifest.build.mcVersion,
-      }).then((result) => {
-        console.debug("Featured Datapacks", result);
-        result.forEach(datapack => datapack.featured = true);
-        datapacks = result;
-        featuredDatapacks = result;
-      }).catch((error) => {
-        addNotification(error);
-      });
+    if (searchterm == "" && search_offset === 0) {
+      if (featuredDatapacks == null) {
+        await getFeaturedDatapacks();
+      }
+      updateDatapacks([]);
+      // Wait for the UI to update
+      await tick();
+      updateDatapacks(featuredDatapacks);
+    } else {
+      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+      // Update: Ich habe ne eigene Virtual List gemacht 📉
+      updateDatapacks([]);
     }
 
     await invoke("search_datapacks", {
@@ -190,11 +229,11 @@
         datapack.blacklisted = blacklistedDatapacks.includes(datapack.slug);
       });
       if (result.hits.length === 0) {
-        datapacks = null;
+        updateDatapacks(null);
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
-        datapacks = result.hits;
+        updateDatapacks(result.hits);
       } else {
-        datapacks = [...datapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))];
+        updateDatapacks([...datapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -213,27 +252,28 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].datapacks.splice(index, 1);
-      deleteDatapackFile(datapack?.file_name ?? datapack, false);
-      datapacks = datapacks;
-      launcherProfiles.addons[currentBranch].datapacks = launcherProfiles.addons[currentBranch].datapacks;
+      deleteDatapackFile(datapack?.file_name ?? datapack);
       launcherProfiles.store();
+
+      const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
+      updateDatapacks([]);
+      updateProfileDatapacks([]);
+      await tick();
+      updateDatapacks(prev[0]);
+      updateProfileDatapacks(prev[1]);
     } else {
       deleteDatapackFile(datapack);
     }
   }
 
-  async function deleteDatapackFile(filename, showError = true) {
-    await invoke("get_custom_datapacks_folder", {
+  async function deleteDatapackFile(filename) {
+    await invoke("delete_datapack_file", {
+      fileName: filename,
       options: options,
       branch: launchManifest.build.branch,
       world: world,
-    }).then(async (folder) => {
-      await removeFile(folder + "/" + filename).then(() => {
-        getCustomDatapacksFilenames();
-      }).catch((error) => {
-        if (!showError) return;
-        addNotification(error);
-      });
+    }).then(async () => {
+      getCustomDatapacksFilenames();
     }).catch((error) => {
       addNotification(error);
     });
@@ -349,40 +389,49 @@
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Datapacks on Modrinth..." />
     {#if datapacks !== null && datapacks.length > 0 }
-      <VirtualList height="30em" items={[...datapacks, datapacks.length >= 30 ? 'LOAD_MORE_DATAPACKS' : null]} let:item>
-        {#if item === 'LOAD_MORE_DATAPACKS'}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="load-more-button primary-text" on:click={loadMore}><p>LOAD MORE</p></div>
-        {:else if item != null}
-          <DatapackItem text={checkIfRequiredOrInstalled(item.slug)}
-                        on:delete={() => deleteInstalledDatapack(item)}
-                        on:install={() => installDatapack(item)}
-                        type="RESULT"
-                        datapack={item} />
-        {/if}
-      </VirtualList>
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...datapacks, datapacks.length >= 30 ? 'LOAD_MORE_DATAPACKS' : null] as item}
+          {#if item === 'LOAD_MORE_DATAPACKS'}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
+          {:else if item != null}
+            <DatapackItem text={checkIfRequiredOrInstalled(item.slug)}
+                on:delete={() => deleteInstalledDatapack(item)}
+                on:install={() => installDatapack(item)}
+                type="RESULT"
+                datapack={item}
+              />
+          {/if}
+        {/each}
+      </div>
     {:else}
       <h1 class="loading-indicator">{datapacks == null ? 'No Datapacks found.' : 'Loading...'}</h1>
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Datapacks..." />
-    {#if launcherProfiles.addons[currentBranch].datapacks.length > 0 || datapacks.length > 0}
-      <VirtualList height="30em" items={[...customDatapacks,...launcherProfiles.addons[currentBranch].datapacks].filter((datapack) => {
-                let name = (datapack?.title ?? datapack).toUpperCase()
-                return (datapack?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase()) && (datapack?.world_name == undefined || datapack.world_name === world)
-            }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) } let:item>
-        {#if (typeof item === 'string' || item instanceof String)}
-          <DatapackItem text="INSTALLED"
-                        on:delete={() => deleteInstalledDatapack(item)}
-                        type="CUSTOM"
-                        datapack={item} />
-        {:else}
-          <DatapackItem text="INSTALLED"
-                        on:delete={() => deleteInstalledDatapack(item)}
-                        type="INSTALLED"
-                        datapack={item} />
-        {/if}
-      </VirtualList>
+    {#if launcherProfiles.addons[currentBranch].datapacks.length > 0 || customDatapacks.length > 0}
+      <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
+        {#each [...customDatapacks,...launcherProfiles.addons[currentBranch].datapacks].filter((datapack) => {
+            let name = (datapack?.title ?? datapack).toUpperCase()
+            return (datapack?.title != null || name.endsWith(".ZIP")) && name.includes(filterterm.toUpperCase()) && (datapack?.world_name == undefined || datapack.world_name === world)
+          }).sort((a, b) => (a?.title ?? a).localeCompare(b?.title ?? b)) as item}
+          {#if (typeof item === 'string' || item instanceof String)}
+            <DatapackItem text="INSTALLED"
+              on:delete={() => deleteInstalledDatapack(item)}
+              type="CUSTOM"
+              datapack={item}
+            />
+          {:else}
+            <DatapackItem text="INSTALLED"
+              on:delete={() => deleteInstalledDatapack(item)}
+              type="INSTALLED"
+              datapack={item}
+            />
+          {/if}
+        {/each}
+      </div>
+      {:else}
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].datapacks.length < 1 ? 'No datapacks installed.' : 'Loading...'}</h1>
     {/if}
   {/if}
 </div>
@@ -447,5 +496,14 @@
         display: flex;
         flex-direction: column;
         gap: 0.7em;
+    }
+
+    .scrollList {
+        height: 30em;
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling:touch;
+        display: block;
     }
 </style>

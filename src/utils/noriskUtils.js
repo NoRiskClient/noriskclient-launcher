@@ -8,7 +8,7 @@ import { profiles } from "../stores/profilesStore.js";
 
 export const noriskUser = writable(null);
 export const isInMaintenanceMode = writable(null);
-export const isClientRunning = writable(false);
+export const isClientRunning = writable([false, false]);
 export const isCheckingForUpdates = writable(true);
 export const startProgress = writable({
   progressBarMax: 0,
@@ -33,17 +33,18 @@ export async function checkApiStatus() {
 
 export async function checkIfClientIsRunning() {
   await invoke("is_client_running").then((isRunning) => {
-    noriskLog(`IsClientRunning is ${isRunning}`);
-    isClientRunning.set(isRunning)
+    noriskLog(`IsClientRunning is ${isRunning[0]} (Was launcher closed? -> ${isRunning[1]})`);
+    isClientRunning.set(isRunning);
   }).catch((reason) => {
     noriskError(reason);
+    isClientRunning.set([false, false]);
   });
 }
 
 
 export async function runClient(branch, checkedForNewBranch = false) {
-  if (get(isClientRunning)) {
-    addNotification("Client is already running");
+  if (get(isClientRunning)[0]) {
+    push('/start-progress');
     return;
   }
 
@@ -104,6 +105,9 @@ export async function runClient(branch, checkedForNewBranch = false) {
     });
   });
 
+  // Ensure keep local assets only exists if permission is granted
+  getNoRiskUser();
+
   await invoke("run_client", {
     branch: branch,
     options: options,
@@ -113,12 +117,12 @@ export async function runClient(branch, checkedForNewBranch = false) {
     resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
     datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).then(() => {
-    isClientRunning.set(true);
+    isClientRunning.set([true, false]);
     if (get(forceServer).length > 0) {
       forceServer.set(get(forceServer) + ":RUNNING");
     }
   }).catch(error => {
-    isClientRunning.set(false);
+    isClientRunning.set([false, false]);
     forceServer.set("");
     pop();
     addNotification("Failed to run client: " + error);
@@ -130,12 +134,18 @@ export async function runClient(branch, checkedForNewBranch = false) {
 
 export async function stopClient() {
   push("/");
-  await invoke("terminate").catch(reason => {
+  await invoke("terminate").then(() => {
+    isClientRunning.set([false, false]);
+  }).catch(reason => {
     addNotification(reason);
   });
 }
 
 export async function openMinecraftLogsWindow() {
+  if (get(isClientRunning)[1]) {
+    addNotification("Logs are unavailable because your launcher was closed since you started the game.", "INFO", "Logs unavailable!");
+  }
+
   await invoke("open_minecraft_logs_window").catch(reason => {
     addNotification(reason);
   });
@@ -147,20 +157,31 @@ export function getNoRiskToken() {
   return options.experimentalMode ? user.norisk_credentials.experimental?.value ?? null : user.norisk_credentials.production?.value ?? null;
 }
 
-export function getNoRiskUser() {
-  const user = get(defaultUser);
-  if (!user) return;
+export function getMcToken() {
+  let user = get(defaultUser);
+  return user.access_token ?? null;
+}
 
-  invoke("get_norisk_user", {
+export async function getNoRiskUser() {
+  const user = get(defaultUser);
+  if (!user) return false;
+
+  let isTokenValid = false;
+  await invoke("get_norisk_user", {
     options: get(launcherOptions),
     credentials: get(defaultUser),
   }).then(result => {
     result.isDev = result?.rank == "DEVELOPER" || result?.rank == "ADMIN";
     noriskUser.set(result);
     noriskLog("NoRisk User: " + JSON.stringify(result));
+    isTokenValid = true;
   }).catch(reason => {
-    addNotification(`Failed to fetch NoRisk User: ${reason}`);
+    if (!reason.includes("401")) {
+      addNotification(`Failed to fetch NoRisk User: ${reason}`);
+    }
   });
+
+  return isTokenValid;
 }
 
 export function noriskLog(message) {

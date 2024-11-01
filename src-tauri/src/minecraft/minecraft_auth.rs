@@ -316,13 +316,15 @@ impl MinecraftAuthStore {
 
         let profile_id = profile.id.unwrap_or_default();
 
+        let existing_accounts = Self::init(None).await?;
+
         let credentials = Credentials {
             id: profile_id,
             username: profile.name,
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: if Self::init(None).await?.users.len() > 0 { Self::init(None).await?.users.get(&profile_id.clone()).unwrap().norisk_credentials.clone() } else { NoRiskCredentials { production: None, experimental: None } },
+            norisk_credentials: if existing_accounts.users.get(&profile_id.clone()).is_some() { existing_accounts.users.get(&profile_id.clone()).unwrap().norisk_credentials.clone() } else { NoRiskCredentials { production: None, experimental: None } },
         };
 
         self.users.insert(profile_id, credentials.clone());
@@ -515,10 +517,15 @@ pub struct NoRiskToken {
 }
 
 impl NoRiskCredentials {
-    pub fn get_token(&self, experimental_mode: bool) -> Result<String, crate::error::Error> {
-        return if experimental_mode {
+    pub async fn get_token(&self, experimental_mode: bool) -> Result<String, crate::error::Error> {
+        return if experimental_mode && self.experimental.is_some() {
             Ok(self.clone().experimental.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
         } else {
+            if experimental_mode && self.experimental.is_none() {
+                let mut options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await?;
+                options.experimental_mode = false;
+                options.store(LAUNCHER_DIRECTORY.config_dir()).await?;
+            }
             Ok(self.clone().production.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
         };
     }

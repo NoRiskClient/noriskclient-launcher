@@ -54,7 +54,7 @@
       {
         name: "SKIN",
         onClick: () => push("/skin"),
-        condition: () => get(defaultUser) != null,
+        condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
         name: "QUIT",
@@ -113,6 +113,8 @@
       content: `You have ${friendInviteSlots.text} invites left.\nYou can use them to invite a friend to the NRC closed beta.`,
       inputPlaceholder: "Username / UUID",
       confirmButton: "Invite",
+      height: 22,
+      contentFontSize: 14,
       validateInput: (input) => input.length > 2 && input.length <= 16,
       onConfirm: async (identifier) => {        
         await invoke("add_player_to_whitelist", {

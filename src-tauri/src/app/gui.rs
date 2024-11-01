@@ -2,7 +2,6 @@ use std::{collections::HashMap, io, path::PathBuf, sync::{Arc, Mutex}, thread};
 use std::fs::File;
 use std::io::Write;
 use std::io::BufRead;
-use std::thread::sleep;
 use dirs::data_dir;
 
 use chrono::Utc;
@@ -27,7 +26,7 @@ use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
 
-use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
+use super::{api::{ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal, WhitelistSlots}, app_data::{Announcement, ChangeLog, LastViewedPopups, LatestRunningGame, LauncherOptions, LauncherProfiles}, modrinth_api::{Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo}};
 
 struct RunnerInstance {
     terminator: tokio::sync::oneshot::Sender<()>,
@@ -53,12 +52,6 @@ struct MinecraftProfile {
 struct MinecraftProfileProperty {
     name: String,
     value: String,
-}
-
-#[derive(serde::Serialize)]
-struct NewMinecraftSkinBody {
-    variant: String,
-    file: Vec<u8>,
 }
 
 #[derive(serde::Deserialize)]
@@ -124,12 +117,19 @@ async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo
             // fetch mod info for each mod
             let mut mod_infos: Vec<ModInfo> = Vec::new();
             for mod_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&mod_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
-                    Ok(mod_info) => {
+                    Ok(mut mod_info) => {
                         // Filter featured mods based on mc version
                         match &mod_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            mod_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
+
                                     mod_infos.push(mod_info);
                                 } else {
                                     debug!("Featured mod {} does not support version {}", mod_info.title, mc_version);
@@ -160,12 +160,18 @@ async fn get_featured_resourcepacks(branch: &str, mc_version: &str) -> Result<Ve
             // fetch resourcepack info for each resourcepack
             let mut resourcepack_infos: Vec<ResourcePackInfo> = Vec::new();
             for resourcepack_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&resourcepack_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_resourcepack_info(&*resourcepack_id).await {
-                    Ok(resourcepack_info) => {
+                    Ok(mut resourcepack_info) => {
                         // Filter featured resourcepacks based on mc version
                         match &resourcepack_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            resourcepack_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     resourcepack_infos.push(resourcepack_info);
                                 } else {
                                     debug!("Featured resourcepack {} does not support version {}", resourcepack_info.title, mc_version);
@@ -196,12 +202,18 @@ async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<Shad
             // fetch shader info for each resourcepack
             let mut shader_infos: Vec<ShaderInfo> = Vec::new();
             for shader_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&shader_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_shader_info(&*shader_id).await {
-                    Ok(shader_info) => {
+                    Ok(mut shader_info) => {
                         // Filter featured shaders based on mc version
                         match &shader_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            shader_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     shader_infos.push(shader_info);
                                 } else {
                                     debug!("Featured shader {} does not support version {}", shader_info.title, mc_version);
@@ -232,12 +244,18 @@ async fn get_featured_datapacks(branch: &str, mc_version: &str) -> Result<Vec<Da
             // fetch datapack info for each resourcepack
             let mut datapack_infos: Vec<DatapackInfo> = Vec::new();
             for datapack_id in result {
+                let project_members = ModrinthApiEndpoints::get_project_members(&datapack_id).await.map_err(|e| format!("unable to get team members: {:?}", e))?;
                 match ModrinthApiEndpoints::get_datapack_info(&*datapack_id).await {
-                    Ok(datapack_info) => {
+                    Ok(mut datapack_info) => {
                         // Filter featured datapacks based on mc version
                         match &datapack_info.game_versions {
                             Some(versions) => {
                                 if versions.contains(&mc_version.to_string()) {
+                                    project_members.iter().for_each(|member| {
+                                        if member.role.to_uppercase() == "OWNER" {
+                                            datapack_info.author = Some(member.user.username.clone());
+                                        }
+                                    });
                                     datapack_infos.push(datapack_info);
                                 } else {
                                     debug!("Featured datapack {} does not support version {}", datapack_info.title, mc_version);
@@ -317,9 +335,9 @@ async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
 }
 
 #[tauri::command]
-async fn install_mod_and_dependencies(slug: &str, params: &str, required_mods: Vec<LoaderMod>) -> Result<CustomMod, String> {
+async fn install_mod_and_dependencies(slug: &str, version: Option<&str>, params: &str, required_mods: Vec<LoaderMod>) -> Result<CustomMod, String> {
     info!("Installing Mod And Dependencies...");
-    ModrinthApiEndpoints::install_mod_and_dependencies(slug, params, &required_mods).await.map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
+    ModrinthApiEndpoints::install_mod_and_dependencies(slug, version, params, &required_mods).await.map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
 }
 
 #[tauri::command]
@@ -456,7 +474,9 @@ pub async fn open_minecraft_logs_window(handle: tauri::AppHandle) -> Result<(), 
         &handle,
         unique_label,
         tauri::WindowUrl::App("logs.html".into()),
-    ).build()?;
+    )
+        .inner_size(1000.0, 800.0)
+        .build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
     let _ = window.set_focus();
@@ -593,26 +613,39 @@ async fn get_launcher_profiles() -> Result<LauncherProfiles, String> {
 }
 
 #[tauri::command]
-async fn get_custom_mods_filenames(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<Vec<String>, String> {
-    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
+async fn get_custom_mods_filenames(options: LauncherOptions, profile_name: &str) -> Result<Vec<String>, String> {
+    let custom_mod_folder = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name);
     let names = ModrinthApiEndpoints::get_custom_mod_names(&custom_mod_folder).await.map_err(|e| format!("unable to load config filenames: {:?}", e))?;
     Ok(names)
 }
 
 #[tauri::command]
-async fn get_custom_mods_folder(options: LauncherOptions, branch: &str, mc_version: &str) -> Result<String, String> {
-    let custom_mod_folder = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version));
-    return custom_mod_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+async fn save_custom_mods_to_folder(options: LauncherOptions, profile_name: &str, file: FileData) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name).join(&file.name);
+
+    info!("Saving {} to {} custom mods folder.", &file.name, &profile_name);
+
+    fs::create_dir_all(&file_path.parent().unwrap()).await.map_err(|e| format!("unable to create custom mod folder: {:?}", e))?;
+
+    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
+        return Err(format!("Error saving custom mod {}: {}", &file.name, err));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
-async fn save_custom_mods_to_folder(options: LauncherOptions, branch: &str, mc_version: &str, file: FileData) -> Result<(), String> {
-    let file_path = options.data_path_buf().join("custom_mods").join(format!("{}-{}", branch, mc_version)).join(file.name.clone());
+async fn delete_custom_mod_file(options: LauncherOptions, profile_name: &str, file: &str) -> Result<(), String> {
+    let file_path = options.data_path_buf().join("mod_cache").join("CUSTOM").join(&profile_name).join(&file);
 
-    info!("Saving {} to {}-{} custom mods folder.", file.name.clone(), branch, mc_version);
+    if !file_path.exists() {
+        return Ok(());
+    }
 
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!("Error saving custom mod {}: {}", file.name, err));
+    info!("Deleting {} from {} custom mods folder.", &file, &profile_name);
+
+    if let Err(err) = fs::remove_file(&file_path).await {
+        return Err(format!("Error deleting custom mod {}: {}", &file, err));
     }
 
     Ok(())
@@ -629,6 +662,23 @@ async fn get_custom_shaders_filenames(options: LauncherOptions, installed_shader
 async fn get_custom_shaders_folder(options: LauncherOptions, branch: &str) -> Result<String, String> {
     let custom_shader_folder = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks");
     return custom_shader_folder.to_str().map(|s| s.to_string()).ok_or_else(|| "Error converting path to string".to_string());
+}
+
+#[tauri::command]
+async fn delete_shader_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(file_name);
+    let settings_file = options.data_path_buf().join("gameDir").join(branch).join("shaderpacks").join(format!("{}.txt", file_name));
+    
+    if file.exists() {
+        info!("Deleting {} from {} shaders folder.", file_name, branch);
+        fs::remove_file(&file).await.map_err(|e| format!("unable to delete shader file: {:?}", e))?;
+    }
+    if settings_file.exists() {
+        info!("Deleting {}.txt from {} shaders folder.", file_name, branch);
+        fs::remove_file(&settings_file).await.map_err(|e| format!("unable to delete shader settings file: {:?}", e))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -658,6 +708,19 @@ async fn get_custom_resourcepacks_folder(options: LauncherOptions, branch: &str)
 }
 
 #[tauri::command]
+async fn delete_resourcepack_file(file_name: &str, options: LauncherOptions, branch: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file_name);
+    if !file.exists() {
+        return Ok(());
+    }
+
+    info!("Deleting {} from {} resourcepacks folder.", file_name, branch);
+    fs::remove_file(&file).await.map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn save_custom_resourcepacks_to_folder(options: LauncherOptions, branch: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("resourcepacks").join(file.name.clone());
 
@@ -684,6 +747,19 @@ async fn get_custom_datapacks_folder(options: LauncherOptions, branch: &str, wor
 }
 
 #[tauri::command]
+async fn delete_datapack_file(file_name: &str, options: LauncherOptions, branch: &str, world: &str) -> Result<(), String> {
+    let file = options.data_path_buf().join("gameDir").join(branch).join("saves").join(&world).join("datapacks").join(file_name);
+    if !file.exists() {
+        return Ok(());
+    }
+
+    info!("Deleting {} from {} ({}) datapacks folder.", file_name, branch, world);
+    fs::remove_file(&file).await.map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn save_custom_datapacks_to_folder(options: LauncherOptions, branch: &str, world: &str, file: FileData) -> Result<(), String> {
     let file_path = options.data_path_buf().join("gameDir").join(branch).join("saves").join(world).join("datapacks").join(file.name.clone());
 
@@ -694,6 +770,44 @@ async fn save_custom_datapacks_to_folder(options: LauncherOptions, branch: &str,
     }
 
     Ok(())
+}
+
+#[tauri::command]
+async fn enable_keep_local_assets() -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+    
+    if !file.exists() {
+        info!("Creating keepLocalAssets file: {:?}", file);
+        let content = "Hi, what are you doing here?\nMsg me on discord (aim_shock) for a free cookie!\n\nBye <3";
+        fs::write(&file, Vec::from(content)).await.map_err(|e| format!("unable to create keepLocalAssets file: {:?}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_keep_local_assets() -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+
+    if file.exists() {
+        info!("Removing keepLocalAssets file: {:?}", file);
+        fs::remove_file(&file).await.map_err(|e| format!("unable to remove keepLocalAssets file: {:?}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_keep_local_assets() -> Result<bool, String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+
+    let file = config_dir.join("keepLocalAssets");
+
+    Ok(file.exists())
 }
 
 #[tauri::command]
@@ -801,9 +915,15 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 
 #[tauri::command]
 async fn get_norisk_user(options: LauncherOptions, credentials: Credentials) -> Result<NoRiskUserMinimal, String> {
-    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string())
+    let user = ApiEndpoints::get_norisk_user(&credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string())
         .await
         .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+
+    // ensure user does not have keepLocalAssets enabled depending on rank
+    let allowed_ranks = vec!["ADMIN".to_string(), "DEVELOPER".to_string(), "DESIGNER".to_string()];
+    if !allowed_ranks.contains(&user.rank) {
+        disable_keep_local_assets().await?;
+    }
     Ok(user)
 }
 
@@ -817,7 +937,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 
 #[tauri::command]
 async fn request_norisk_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, crate::error::Error> {
-    Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
+    Ok(ApiEndpoints::norisk_branches(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
@@ -841,7 +961,7 @@ async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
 
 #[tauri::command]
 async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, app: tauri::AppHandle) -> Result<(), crate::error::Error> {
-    let token = credentials.norisk_credentials.get_token(options.experimental_mode)?;
+    let token = credentials.norisk_credentials.get_token(options.experimental_mode).await?;
     let url = format!("https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}", if options.experimental_mode.clone() { "-staging" } else { "" }, token);
 
     if let Some(window) = app.get_window("discord-signin") {
@@ -858,6 +978,7 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
         .title("Discord X NoRiskClient")
         .always_on_top(true)
         .center()
+        .max_inner_size(1250.0, 1000.0)
         .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
@@ -883,12 +1004,12 @@ async fn discord_auth_link(options: LauncherOptions, credentials: Credentials, a
 
 #[tauri::command]
 async fn discord_auth_status(options: LauncherOptions, credentials: Credentials) -> Result<bool, crate::error::Error> {
-    Ok(ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?)
+    Ok(ApiEndpoints::discord_link_status(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?)
 }
 
 #[tauri::command]
 async fn discord_auth_unlink(credentials: Credentials, options: LauncherOptions) -> Result<(), crate::error::Error> {
-    ApiEndpoints::unlink_discord(&credentials.norisk_credentials.get_token(options.experimental_mode)?, &credentials.id.to_string()).await?;
+    ApiEndpoints::unlink_discord(&credentials.norisk_credentials.get_token(options.experimental_mode).await?, &credentials.id.to_string()).await?;
     Ok(())
 }
 
@@ -1011,6 +1132,33 @@ fn handle_progress(window: &Arc<std::sync::Mutex<Window>>, progress_update: Prog
 }
 
 #[tauri::command]
+async fn get_last_viewed_popups() -> Result<LastViewedPopups, String> {
+    let last_viewed_popups = LastViewedPopups::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+    Ok(last_viewed_popups)
+}
+
+
+#[tauri::command]
+async fn store_last_viewed_popups(last_viewed_popups: LastViewedPopups) -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    last_viewed_popups.store(config_dir)
+        .await
+        .map_err(|e| format!("unable to store last viewed popups data: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_changelogs() -> Result<Vec<ChangeLog>, String> {
+    ApiEndpoints::changelogs().await.map_err(|e| format!("unable to get changelogs: {:?}", e))
+}
+
+#[tauri::command]
+async fn get_announcements() -> Result<Vec<Announcement>, String> {
+    ApiEndpoints::announcements().await.map_err(|e| format!("unable to get announcements: {:?}", e))
+}
+
+#[tauri::command]
 async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
     let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
@@ -1061,21 +1209,38 @@ async fn copy_branch_data(old_branch: &str, new_branch: &str, app: tauri::AppHan
     McDataHandler::copy_branch_data(old_branch, new_branch, app).await
 }
 
+// The return type is 1. is the client running 2. is the client running without the launcher being closed after launch -> important info for the frontend
 #[tauri::command]
-async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<bool, crate::error::Error> {
+async fn is_client_running(app_state: tauri::State<'_, AppState>) -> Result<(bool, bool), crate::error::Error> {
     let runner_instance = &app_state.runner_instance;
 
     if runner_instance.lock().map_err(|e| ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error())?.is_some() {
-        return Ok(true);
+        return Ok((true, false));
     }
 
-    return Ok(false);
+    let options = get_options().await.map_err(|e| ErrorKind::LauncherError(format!("unable to load options: {:?}", e)).as_error())?;
+    let mut latest_running_game = LatestRunningGame::load(&options.data_path_buf()).await.unwrap_or_default();
+
+    if latest_running_game.id.is_some() {
+        let mut system = System::new_all();
+        system.refresh_all();
+        // check if process is still running
+        let game_process = system.process(Pid::from(latest_running_game.id.unwrap() as usize));
+        if game_process.is_some() {
+            return Ok((true, true));
+        } else {
+            latest_running_game.id = None;
+            latest_running_game.store(&options.data_path_buf()).await?;
+        }
+    }
+
+    return Ok((false, false));
 }
 
 #[tauri::command]
 async fn run_client(branch: String, options: LauncherOptions, force_server: Option<String>, mods: Vec<LoaderMod>, shaders: Vec<Shader>, resourcepacks: Vec<ResourcePack>, datapacks: Vec<Datapack>, window: Window, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
     debug!("Starting Client with branch {}",branch);
-    if is_client_running(app_state.clone()).await? {
+    if is_client_running(app_state.clone()).await?.0 {
         return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
     }
 
@@ -1164,13 +1329,30 @@ async fn run_client(branch: String, options: LauncherOptions, force_server: Opti
 
 #[tauri::command]
 async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let options = get_options().await.map_err(|e| format!("unable to load options: {:?}", e))?;
+    let latest_running_game = LatestRunningGame::load(&options.data_path_buf()).await.unwrap_or_default();
     let runner_instance = app_state.runner_instance.clone();
     let mut lck = runner_instance.lock()
         .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
 
     if let Some(inst) = lck.take() {
-        info!("Sending sigterm");
+        info!("Sending sigterm - soft game kill");
         inst.terminator.send(()).unwrap();
+        info!("Sigterm sent - game killed softly");
+    } else {
+        let mut system = System::new_all();
+        system.refresh_all();
+
+        if let Some(pid) = latest_running_game.id {
+            let game_process = system.process(Pid::from(pid as usize));
+            if let Some(game_process) = game_process {
+                if game_process.name().contains("java") {
+                    info!("Killing game process with pid: {} and name: {}", pid, game_process.name());
+                    let _ = game_process.kill();
+                    info!("Game process killed");
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -1295,7 +1477,7 @@ async fn run_custom_server(custom_server: CustomServer, options: LauncherOptions
 async fn check_if_custom_server_running(window: Window) -> Result<(bool, String), String> {
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
-    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap();
+    let latest_running_server = CustomServerManager::load_latest_running_server().await.unwrap_or_default();
     if latest_running_server.forwarder_process_id.is_none() && latest_running_server.process_id.is_none() {
         return Ok((false, String::new()));
     }
@@ -1313,9 +1495,11 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
         }
         false => {
             info!("No custom server is running!");
-            let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
-            if custom_server_forwarder_process.is_some() {
-                custom_server_forwarder_process.unwrap().kill();
+            if latest_running_server.forwarder_process_id.is_some() {
+                let custom_server_forwarder_process = system.process(Pid::from(latest_running_server.forwarder_process_id.unwrap() as usize));
+                if custom_server_forwarder_process.is_some() {
+                    custom_server_forwarder_process.unwrap().kill();
+                }
             }
             CustomServerManager::store_latest_running_server(None, None, None).await.unwrap();
             Ok((false, String::new()))
@@ -1504,7 +1688,7 @@ async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
 ///
 #[tauri::command]
 async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, String> {
-    ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
+    ApiEndpoints::norisk_full_feature_whitelist(&credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
 }
 
 ///
@@ -1512,7 +1696,7 @@ async fn get_full_feature_whitelist(options: LauncherOptions, credentials: Crede
 ///
 #[tauri::command]
 async fn check_feature_whitelist(feature: &str, options: LauncherOptions, credentials: Credentials) -> Result<bool, String> {
-    ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to check feature whitelist: {:?}", e))
+    ApiEndpoints::norisk_feature_whitelist(feature, &credentials.norisk_credentials.get_token(options.experimental_mode).await.unwrap(), &credentials.id.to_string()).await.map_err(|e| format!("unable to check feature whitelist: {:?}", e))
 }
 
 /// Runs the GUI and returns when the window is closed.
@@ -1590,6 +1774,10 @@ pub fn gui_main() {
             get_mobile_app_token,
             reset_mobile_app_token,
             clear_data,
+            get_changelogs,
+            get_announcements,
+            get_last_viewed_popups,
+            store_last_viewed_popups,
             get_mod_info,
             console_log_info,
             console_log_warning,
@@ -1597,29 +1785,35 @@ pub fn gui_main() {
             get_launcher_profiles,
             store_launcher_profiles,
             get_project_version,
-            get_custom_mods_folder,
-            save_custom_mods_to_folder,
-            install_mod_and_dependencies,
             get_custom_mods_filenames,
+            save_custom_mods_to_folder,
+            delete_custom_mod_file,
+            install_mod_and_dependencies,
             get_custom_shaders_folder,
+            delete_shader_file,
             save_custom_shaders_to_folder,
             get_custom_shaders_filenames,
             search_shaders,
             get_shader_info,
             install_shader,
             get_custom_resourcepacks_folder,
+            delete_resourcepack_file,
             save_custom_resourcepacks_to_folder,
             get_custom_resourcepacks_filenames,
             search_resourcepacks,
             get_resourcepack_info,
             install_resourcepack,
             get_custom_datapacks_folder,
+            delete_datapack_file,
             save_custom_datapacks_to_folder,
             get_custom_datapacks_filenames,
             search_datapacks,
             get_datapack_info,
             install_datapack,
             get_world_folders,
+            enable_keep_local_assets,
+            disable_keep_local_assets,
+            get_keep_local_assets,
             upload_logs,
             get_launch_manifest,
             default_data_folder_path,
