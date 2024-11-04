@@ -20,7 +20,6 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use tauri::utils::Error::Architecture;
 use crate::utils::{get_architecture, is_rosetta};
 
 pub mod app;
