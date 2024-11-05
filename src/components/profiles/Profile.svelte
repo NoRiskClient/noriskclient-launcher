@@ -14,6 +14,7 @@
         <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.length} Mods)</h2>
     </div>
     <div class="button-wrapper">
+        <h1 class="export-button" on:click={() => dispatch('export')}>📤</h1>
         {#if profile.name != `${profile.branch} - Default`}
             <h1 class="settings-button" title="Edit Profile" on:click={() => dispatch('settings')}>
                 ⚙️
@@ -55,6 +56,24 @@
 
     .enabled {
         border-color: rgba(0, 255, 0, 0.5);
+    }
+
+    .button-wrapper {
+        display: flex;
+        flex-direction: row;
+        gap: 2.5em;
+        justify-content: space-between;
+    }
+
+    .export-button {
+        cursor: pointer;
+        margin-bottom: 3px;
+        transition-duration: 100ms;
+    }
+
+    .export-button:hover {
+        transform: scale(1.2);
+        transition-duration: 100ms;
     }
 
     .settings-button {

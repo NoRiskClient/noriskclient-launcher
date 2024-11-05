@@ -48,6 +48,15 @@ pub(crate) struct LauncherProfiles {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct ExportProfile {
+    pub id: String,
+    pub branch: String,
+    pub name: String,
+    pub mods: Vec<CustomMod>,
+    pub addons: Addons,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChangeLog {
     pub version: String,
     pub date: String,
