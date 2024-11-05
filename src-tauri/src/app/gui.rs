@@ -1740,7 +1740,7 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()>
         return Ok(()); // ignore empty lines
     }
 
-    info!("{}", data);
+    info!("{}", data.trim());
 
     // Regex to detect the crash message and extract the file path
     let crash_regex =
@@ -1774,7 +1774,7 @@ fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow:
         return Ok(()); // ignore empty lines
     }
 
-    error!("{}", data);
+    error!("{}", data.trim());
     window.lock().unwrap().emit("process-output", data)?;
     Ok(())
 }

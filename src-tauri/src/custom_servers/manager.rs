@@ -169,7 +169,7 @@ impl CustomServerManager {
             return Ok(()); // ignore empty lines
         }
     
-        info!("{}", data);
+        info!("{}", data.trim());
         window.lock().unwrap().emit("custom-server-process-output", CustomServerEventPayload { server_id: server_id.to_owned(), data: data })?;
         Ok(())
     }
@@ -180,7 +180,7 @@ impl CustomServerManager {
             return Ok(()); // ignore empty lines
         }
     
-        error!("{}", data);
+        error!("{}", data.trim());
         window.lock().unwrap().emit("custom-server-process-output", CustomServerEventPayload { server_id: server_id.to_owned(), data: data })?;
         Ok(())
     }
