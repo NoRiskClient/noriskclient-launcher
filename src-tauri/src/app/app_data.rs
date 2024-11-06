@@ -230,6 +230,7 @@ impl LauncherProfiles {
                 .map_err(|e| format!("Error converting content to string: {:?}", e))?,
         )
         .map_err(|e| format!("Error deserializing profile: {:?}", e))?;
+    
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
             .await
             .unwrap_or_default();
@@ -245,10 +246,12 @@ impl LauncherProfiles {
         };
     
         if options.experimental_mode {
+            // Check for branch missmatch -> this is done because branches can be fundementally incompatible
             if options.latest_dev_branch.is_some() && &options.latest_dev_branch.unwrap() != &import_profile.branch {
                 return Err("The profile you are trying to import is not compatible with your selected branch.".to_string())
             }
 
+            // Check for duplicate names -> append (imported) if necessary
             if launcher_profiles
                 .experimental_profiles
                 .iter()
@@ -257,6 +260,7 @@ impl LauncherProfiles {
                 new_profile.name = format!("{} (imported)", new_profile.name);
             }
     
+            // Check if profile already exists -> replace if id is matching
             if launcher_profiles
                 .experimental_profiles
                 .iter()
@@ -266,11 +270,16 @@ impl LauncherProfiles {
             } else {
                 launcher_profiles.experimental_profiles.push(new_profile);
             }
+
+            // Auto select new profile
+            launcher_profiles.selected_experimental_profiles.get_mut(&import_profile.branch).map(|selected_profile| *selected_profile = import_profile.id.clone());
         } else {
+            // Check for branch missmatch -> this is done because branches can be fundementally incompatible
             if options.latest_branch.is_some() && &options.latest_branch.unwrap() != &import_profile.branch {
                 return Err("The profile you are trying to import is not compatible with your selected branch.".to_string())
             }
 
+            // Check for duplicate names -> append (imported) if necessary
             if launcher_profiles
                 .main_profiles
                 .iter()
@@ -279,6 +288,7 @@ impl LauncherProfiles {
                 new_profile.name = format!("{} (imported)", new_profile.name);
             }
     
+            // Check if profile already exists -> replace if id is matching
             if launcher_profiles
                 .main_profiles
                 .iter()
@@ -288,6 +298,9 @@ impl LauncherProfiles {
             } else {
                 launcher_profiles.main_profiles.push(new_profile);
             }
+
+            // Auto select new profile
+            launcher_profiles.selected_main_profiles.get_mut(&import_profile.branch).map(|selected_profile| *selected_profile = import_profile.id.clone());
         }
     
         let resourcepacks_to_add: Vec<_> = import_profile
