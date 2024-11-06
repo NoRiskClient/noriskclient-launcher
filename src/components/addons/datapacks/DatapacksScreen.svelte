@@ -252,7 +252,7 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].datapacks.splice(index, 1);
-      deleteDatapackFile(datapack?.file_name ?? datapack);
+      deleteDatapackFile(datapack?.file_name ?? (datapack?.title ? datapack.title + '.zip' : null) ?? datapack);
       launcherProfiles.store();
 
       const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
