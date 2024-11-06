@@ -11,10 +11,7 @@
   import { open } from "@tauri-apps/api/dialog";
   import { addNotification } from "../../stores/notificationStore.js";
   import { noriskLog } from "../../utils/noriskUtils.js";
-
-  currentBranchIndex.subscribe(async _ => {
-    await fetchProfiles();
-  });
+  import { openConfirmPopup } from "../../utils/popupUtils.js";
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: launcherProfiles = $launcherOptions.experimentalMode ? $profiles.experimentalProfiles : $profiles.mainProfiles;
@@ -54,14 +51,22 @@
   }
 
   async function exportProfile(profileId) {
-    await invoke("export_profile_and_open_explorer", { profileId }).then(() => {
-      noriskLog("Exported profile: " + profileId);
-      addNotification("Profile exported successfully!", "INFO");
-    }).catch(err => {
-      noriskLog("Failed to export profile: " + profileId);
-      noriskLog(err);
-      addNotification("Failed to export profile: " + err);
-    });
+    openConfirmPopup({
+      title: "Export Profile",
+      content: `Do you want to export the profile \"${profileById(profileId).name}\"?`,
+      confirmButton: "Export",
+      closeButton: "Nevermind",
+      onConfirm: async () => {
+        await invoke("export_profile_and_open_explorer", { profileId }).then(() => {
+          noriskLog("Exported profile: " + profileId);
+          addNotification("Profile exported successfully!", "INFO");
+        }).catch(err => {
+          noriskLog("Failed to export profile: " + profileId);
+          noriskLog(err);
+          addNotification("Failed to export profile: " + err);
+        });
+      }
+    })
   }
 
   async function importProfile() {
