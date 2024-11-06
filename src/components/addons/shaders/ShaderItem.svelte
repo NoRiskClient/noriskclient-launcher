@@ -240,7 +240,7 @@
         font-family: 'Press Start 2P', serif;
         font-size: 17px;
         color: #f0c91a;
-        text-shadow: 1.5px 1.5px var(--hover-color-text-shadow);
+        text-shadow: 1.5px 1.5px #9e8704;
         cursor: default;
     }
 

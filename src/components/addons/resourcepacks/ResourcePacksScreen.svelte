@@ -270,7 +270,7 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].resourcePacks.splice(index, 1);
-      deleteResourcePackFile(resourcePack?.file_name ?? resourcePack);
+      deleteResourcePackFile(resourcePack?.file_name ?? (resourcePack?.title ? resourcePack.title + '.zip' : null) ?? resourcePack);
       launcherProfiles.store();
 
       const prev = [resourcePacks, launcherProfiles.addons[currentBranch].resourcePacks]

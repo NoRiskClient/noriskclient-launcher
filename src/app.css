@@ -39,7 +39,6 @@ body {
     --green-text: #00cc00;
     --green-text-shadow: #086b08;
     transition: background-color 0.2s;
-    /* border-radius: 14px; */
 }
 
 body.dark-mode {

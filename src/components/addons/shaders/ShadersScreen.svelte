@@ -259,7 +259,7 @@
     });
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
-      deleteShaderFile(shader?.file_name ?? shader);
+      deleteShaderFile(shader?.file_name ?? (shader?.title ? shader.title + '.zip' : null) ?? shader);
       launcherProfiles.store();
 
       const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];

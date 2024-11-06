@@ -55,10 +55,10 @@
     noriskLog(`DELETING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);
     if (experimentalMode) {
         launcherProfiles.experimentalProfiles.splice(launcherProfiles.experimentalProfiles.indexOf(settingsProfile), 1);
-        launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = launcherProfiles.experimentalProfiles[0].id;
+        launcherProfiles.selectedExperimentalProfiles[settingsProfile.branch] = launcherProfiles.experimentalProfiles.filter(p => p.branch == settingsProfile.branch)[0].id;
     } else {
         launcherProfiles.mainProfiles.splice(launcherProfiles.mainProfiles.indexOf(settingsProfile), 1);
-        launcherProfiles.selectedMainProfiles[settingsProfile.branch] = launcherProfiles.mainProfiles[0].id;
+        launcherProfiles.selectedMainProfiles[settingsProfile.branch] = launcherProfiles.mainProfiles.filter(p => p.branch == settingsProfile.branch)[0].id;
     }
     closeSettings();
     addNotification(`Profile "${settingsProfile.name}" has been deleted.`, "INFO");
