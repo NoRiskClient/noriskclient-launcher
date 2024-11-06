@@ -96,7 +96,7 @@
 
       noriskLog(`Importing profile ${fileName}`);
       await invoke("import_launcher_profile", { fileLocation: location }).then(() => {
-        addNotification(`Successfully imported profile ${fileName}`, "INFO");
+        addNotification(`Successfully imported profile "${fileName.replace('.noriskprofile', '')}"!`, "INFO");
         fetchProfiles();
       }).catch((error) => {
         addNotification(`Failed to import profile ${fileName}: ${error}`);
