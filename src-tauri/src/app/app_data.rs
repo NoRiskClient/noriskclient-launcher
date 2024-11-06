@@ -298,7 +298,7 @@ impl LauncherProfiles {
                 !launcher_profiles.addons[&import_profile.branch]
                     .resourcepacks
                     .iter()
-                    .any(|pack| pack.slug != resourcepack.slug)
+                    .any(|pack| pack.slug == resourcepack.slug)
             })
             .cloned()
             .collect();
@@ -315,7 +315,7 @@ impl LauncherProfiles {
                 !launcher_profiles.addons[&import_profile.branch]
                     .shaders
                     .iter()
-                    .any(|shad| shad.slug != shader.slug)
+                    .any(|shad| shad.slug == shader.slug)
             })
             .cloned()
             .collect();
