@@ -59,14 +59,13 @@ use crate::{
     HTTP_CLIENT, LAUNCHER_DIRECTORY,
 };
 
-use super::app_data::LauncherProfile;
 use super::{
     api::{
         ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
         WhitelistSlots,
     },
     app_data::{
-        Announcement, ChangeLog, ExportProfile, LastViewedPopups, LatestRunningGame,
+        Announcement, ChangeLog, LastViewedPopups, LatestRunningGame,
         LauncherOptions, LauncherProfiles,
     },
     modrinth_api::{
@@ -625,164 +624,12 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 
 #[tauri::command]
 async fn export_profile_and_open_explorer(profile_id: String) -> Result<(), String> {
-    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
-        .await
-        .unwrap_or_default();
-    let user_dirs = UserDirs::new().unwrap();
-    let downloads_dir = user_dirs.download_dir().unwrap();
-    debug!("Downloads directory: {:?}", downloads_dir);
-    let launcher_profiles = LauncherProfiles::load(LAUNCHER_DIRECTORY.config_dir())
-        .await
-        .unwrap_or_default();
-    let profile = if options.experimental_mode {
-        launcher_profiles
-            .experimental_profiles
-            .iter()
-            .find(|profile| profile.id == profile_id)
-            .ok_or_else(|| format!("Profile with id {} not found", profile_id))?
-    } else {
-        launcher_profiles
-            .main_profiles
-            .iter()
-            .find(|profile| profile.id == profile_id)
-            .ok_or_else(|| format!("Profile with id {} not found", profile_id))?
-    };
-    let pexport_profile = ExportProfile {
-        id: profile.id.clone(),
-        branch: profile.branch.clone(),
-        name: profile.name.clone(),
-        mods: profile.mods.clone(),
-        addons: launcher_profiles
-            .addons
-            .iter()
-            .find(|addons| addons.0 == &profile.branch)
-            .map(|(_, addons)| addons.clone())
-            .unwrap(),
-    };
-
-    let export_profile_json = serde_json::to_vec_pretty(&pexport_profile)
-        .map_err(|e| format!("Error serializing profile: {:?}", e))?;
-    let mut file = File::create(downloads_dir.join(format!("{}.noriskprofile", &profile.name.replace(" ", "_"))))
-        .map_err(|e| format!("Error creating file: {:?}", e))?;
-    file.write_all(&export_profile_json)
-        .map_err(|e| format!("Error writing file: {:?}", e))?;
-
-    Ok(())
+    LauncherProfiles::export(profile_id).await
 }
 
 #[tauri::command]
 async fn import_launcher_profile(file_location: &str) -> Result<(), String> {
-    let content = fs::read(file_location)
-        .await
-        .map_err(|e| format!("Error reading file: {:?}", e))?;
-    let import_profile: ExportProfile = serde_json::from_str(
-        &String::from_utf8(content)
-            .map_err(|e| format!("Error converting content to string: {:?}", e))?,
-    )
-    .map_err(|e| format!("Error deserializing profile: {:?}", e))?;
-    let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
-        .await
-        .unwrap_or_default();
-    let mut launcher_profiles = LauncherProfiles::load(LAUNCHER_DIRECTORY.config_dir())
-        .await
-        .unwrap_or_default();
-
-    let new_profile = LauncherProfile {
-        id: import_profile.id.clone(),
-        branch: import_profile.branch.clone(),
-        name: import_profile.name.clone(),
-        mods: import_profile.mods.clone(),
-    };
-
-    if options.experimental_mode {
-        if launcher_profiles
-            .experimental_profiles
-            .iter()
-            .any(|profile| profile.id == import_profile.id)
-        {
-            return Err("Profile with the same id already exists".to_string());
-        } else if launcher_profiles
-            .experimental_profiles
-            .iter()
-            .any(|profile| profile.name == import_profile.name)
-        {
-            return Err("Profile with the same name already exists".to_string());
-        }
-
-        launcher_profiles.experimental_profiles.push(new_profile);
-    } else {
-        if launcher_profiles
-            .main_profiles
-            .iter()
-            .any(|profile| profile.id == import_profile.id)
-        {
-            return Err("Profile with the same id already exists".to_string());
-        } else if launcher_profiles
-            .main_profiles
-            .iter()
-            .any(|profile| profile.name == import_profile.name)
-        {
-            return Err("Profile with the same name already exists".to_string());
-        }
-        launcher_profiles.main_profiles.push(new_profile);
-    }
-
-    let resourcepacks_to_add: Vec<_> = import_profile
-        .addons
-        .resourcepacks
-        .iter()
-        .filter(|resourcepack| {
-            !launcher_profiles.addons[&import_profile.branch]
-                .resourcepacks
-                .iter()
-                .any(|pack| pack.slug != resourcepack.slug)
-        })
-        .cloned()
-        .collect();
-
-    if let Some(addons) = launcher_profiles.addons.get_mut(&import_profile.branch) {
-        addons.resourcepacks.extend(resourcepacks_to_add);
-    }
-
-    let shaders_to_add: Vec<_> = import_profile
-        .addons
-        .shaders
-        .iter()
-        .filter(|shader| {
-            !launcher_profiles.addons[&import_profile.branch]
-                .shaders
-                .iter()
-                .any(|shad| shad.slug != shader.slug)
-        })
-        .cloned()
-        .collect();
-
-    if let Some(addons) = launcher_profiles.addons.get_mut(&import_profile.branch) {
-        addons.shaders.extend(shaders_to_add);
-    }
-
-    let datapacks_to_add: Vec<_> = import_profile
-        .addons
-        .datapacks
-        .iter()
-        .filter(|datapack| {
-            !launcher_profiles.addons[&import_profile.branch]
-                .datapacks
-                .iter()
-                .any(|pack| pack.slug != datapack.slug)
-        })
-        .cloned()
-        .collect();
-
-    if let Some(addons) = launcher_profiles.addons.get_mut(&import_profile.branch) {
-        addons.datapacks.extend(datapacks_to_add);
-    }
-
-    launcher_profiles
-        .store(LAUNCHER_DIRECTORY.config_dir())
-        .await
-        .map_err(|e| format!("Error storing profiles: {:?}", e))?;
-    Ok(())
+    LauncherProfiles::import(file_location).await
 }
 
 #[tauri::command]

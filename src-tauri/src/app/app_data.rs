@@ -4,8 +4,13 @@ use std::path::PathBuf;
 use std::vec;
 
 use anyhow::Result;
+use directories::UserDirs;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
 
 use crate::LAUNCHER_DIRECTORY;
 
@@ -163,6 +168,194 @@ impl LauncherProfiles {
         // save the launcher_profiles to the file
         let _ = fs::write(app_data.join("launcher_profiles.json"), serde_json::to_string_pretty(&self)?).await.map_err(|err| -> String { format!("Failed to write launcher_profiles.json: {}", err).into() });
         Ok(())
+    }
+
+    pub async fn export(profile_id: String) -> Result<(), String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let user_dirs = UserDirs::new().unwrap();
+        let downloads_dir = user_dirs.download_dir().unwrap();
+        debug!("Downloads directory: {:?}", downloads_dir);
+        let launcher_profiles = Self::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let profile = if options.experimental_mode {
+            launcher_profiles
+                .experimental_profiles
+                .iter()
+                .find(|profile| profile.id == profile_id)
+                .ok_or_else(|| format!("Profile with id {} not found", profile_id))?
+        } else {
+            launcher_profiles
+                .main_profiles
+                .iter()
+                .find(|profile| profile.id == profile_id)
+                .ok_or_else(|| format!("Profile with id {} not found", profile_id))?
+        };
+        let mut export_profile = ExportProfile {
+            id: profile.id.clone(),
+            branch: profile.branch.clone(),
+            name: profile.name.clone(),
+            mods: profile.mods.clone(),
+            addons: launcher_profiles
+                .addons
+                .iter()
+                .find(|addons| addons.0 == &profile.branch)
+                .map(|(_, addons)| addons.clone())
+                .unwrap(),
+        };
+    
+        // datapacks dont make sese since they are world specific
+        export_profile.addons.datapacks.clear();
+    
+        let export_profile_json = serde_json::to_vec_pretty(&export_profile)
+            .map_err(|e| format!("Error serializing profile: {:?}", e))?;
+        let mut file = File::create(downloads_dir.join(format!("{}.noriskprofile", &profile.name.replace(" ", "_")))).await
+            .map_err(|e| format!("Error creating file: {:?}", e))?;
+        file.write_all(&export_profile_json).await
+            .map_err(|e| format!("Error writing file: {:?}", e))?;
+
+        Self::show_in_folder(downloads_dir.join(format!("{}.noriskprofile", &profile.name.replace(" ", "_"))).to_str().unwrap());
+    
+        Ok(())
+    }
+
+    pub async fn import(file_location: &str) -> Result<(), String> {
+        let content = fs::read(file_location)
+            .await
+            .map_err(|e| format!("Error reading file: {:?}", e))?;
+        let import_profile: ExportProfile = serde_json::from_str(
+            &String::from_utf8(content)
+                .map_err(|e| format!("Error converting content to string: {:?}", e))?,
+        )
+        .map_err(|e| format!("Error deserializing profile: {:?}", e))?;
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let mut launcher_profiles = Self::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+    
+        let mut new_profile = LauncherProfile {
+            id: import_profile.id.clone(),
+            branch: import_profile.branch.clone(),
+            name: import_profile.name.clone(),
+            mods: import_profile.mods.clone(),
+        };
+    
+        if options.experimental_mode {
+            if options.latest_dev_branch.is_some() && &options.latest_dev_branch.unwrap() != &import_profile.branch {
+                return Err("The profile you are trying to import is not compatible with your selected branch.".to_string())
+            }
+
+            if launcher_profiles
+                .experimental_profiles
+                .iter()
+                .any(|profile| profile.name == import_profile.name)
+            {
+                new_profile.name = format!("{} (imported)", new_profile.name);
+            }
+    
+            if launcher_profiles
+                .experimental_profiles
+                .iter()
+                .any(|profile| &profile.id == &import_profile.id)
+            {
+                launcher_profiles.experimental_profiles.iter_mut().find(|p| p.id == import_profile.id).unwrap().mods = import_profile.mods;
+            } else {
+                launcher_profiles.experimental_profiles.push(new_profile);
+            }
+        } else {
+            if options.latest_branch.is_some() && &options.latest_branch.unwrap() != &import_profile.branch {
+                return Err("The profile you are trying to import is not compatible with your selected branch.".to_string())
+            }
+
+            if launcher_profiles
+                .main_profiles
+                .iter()
+                .any(|profile| profile.name == import_profile.name)
+            {
+                new_profile.name = format!("{} (imported)", new_profile.name);
+            }
+    
+            if launcher_profiles
+                .main_profiles
+                .iter()
+                .any(|profile| &profile.id == &import_profile.id)
+            {
+                launcher_profiles.main_profiles.iter_mut().find(|p| p.id == import_profile.id).unwrap().mods = import_profile.mods;
+            } else {
+                launcher_profiles.main_profiles.push(new_profile);
+            }
+        }
+    
+        let resourcepacks_to_add: Vec<_> = import_profile
+            .addons
+            .resourcepacks
+            .iter()
+            .filter(|resourcepack| {
+                !launcher_profiles.addons[&import_profile.branch]
+                    .resourcepacks
+                    .iter()
+                    .any(|pack| pack.slug != resourcepack.slug)
+            })
+            .cloned()
+            .collect();
+    
+        if let Some(addons) = launcher_profiles.addons.get_mut(&import_profile.branch) {
+            addons.resourcepacks.extend(resourcepacks_to_add);
+        }
+    
+        let shaders_to_add: Vec<_> = import_profile
+            .addons
+            .shaders
+            .iter()
+            .filter(|shader| {
+                !launcher_profiles.addons[&import_profile.branch]
+                    .shaders
+                    .iter()
+                    .any(|shad| shad.slug != shader.slug)
+            })
+            .cloned()
+            .collect();
+    
+        if let Some(addons) = launcher_profiles.addons.get_mut(&import_profile.branch) {
+            addons.shaders.extend(shaders_to_add);
+        }
+    
+        launcher_profiles
+            .store(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .map_err(|e| format!("Error storing profiles: {:?}", e))?;
+
+        Ok(())
+    }
+
+    pub fn show_in_folder(path: &str) {
+        debug!("Spawning Path {}",path);
+        #[cfg(target_os = "windows")]
+        {
+            Command::new("explorer")
+                .args(["/select,", &path]) // The comma after select is not a typo
+                .spawn()
+                .unwrap();
+        }
+
+        /* TODO Später
+        #[cfg(target_os = "linux")]
+        {
+            
+        }
+        */
+
+        #[cfg(target_os = "macos")]
+        {
+            Command::new("open")
+                .args(["-R", &path])
+                .spawn()
+                .unwrap();
+        }
     }
 }
 
