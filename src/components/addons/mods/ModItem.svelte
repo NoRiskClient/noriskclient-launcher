@@ -47,9 +47,7 @@
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
         {#if type != 'CUSTOM'}
-            <div class="icon-fallback">
-                <img class="icon" src={mod.icon_url ?? mod.image_url} alt=" " onerror="this.style.display='none'">
-            </div>
+            <img class="icon" src={mod.icon_url ?? mod.image_url} alt=" " onerror="this.src='https://avatars.githubusercontent.com/u/67560307'">
         {:else}
             <div class="custom-mod-icon">📦</div>
         {/if}
@@ -299,15 +297,6 @@
         background: var(--background-contrast-color);
         box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.5);
         -webkit-user-drag: none;
-    }
-
-    .icon-fallback {
-        background-image: url("https://docs.modrinth.com/img/logo.svg");
-        min-width: 90px; 
-        min-height: 90px;
-        background-position: center center;
-        background-size: 90%;
-        background-repeat: no-repeat;
     }
 
     .mod-title {
