@@ -41,7 +41,8 @@
           profileTexture = JSON.parse(atob(profileTexture));
           await getNoRiskUserByUUID(profileTexture);
         }
-        currentSkinLocation = profileTexture != null ? profileTexture.textures.SKIN.url : "";
+        currentSkinLocation = profileTexture != null ? profileTexture.textures.SKIN.url.replace('http', 'https') : "";
+        noriskLog(`Loading player skin: ${currentSkinLocation}`);
         const canvas = document.createElement("canvas");
         skinViewer = new SkinViewer({
           canvas: canvas,
