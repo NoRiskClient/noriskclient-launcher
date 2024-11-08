@@ -27,6 +27,7 @@
   let launchManifest = null;
   let searchterm = "";
   let filterterm = "";
+  let showMoreButton = false;
   let currentTabIndex = 0;
   let listScroll = 0;
 
@@ -322,19 +323,18 @@
   }
 
   async function searchMods() {
+    let oldMods = mods;
+
     if (searchterm == "" && search_offset === 0) {
       if (baseMods == null) {
         await getBaseMods();
       }
-      updateMods([]);
-      // Wait for the UI to update
-      await tick();
-      updateMods(baseMods);
-    } else {
-      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
-      // Update: Ich habe ne eigene Virtual List gemacht 📉
-      updateMods([]);
+      oldMods = baseMods;
     }
+
+    // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+    // Update: Ich habe ne eigene Virtual List gemacht 📉
+    updateMods([]);
 
     let client_server_side_filters = "";
     const client_side = Object.values(filters).find(filter => filter.id === "client_side");
@@ -351,16 +351,19 @@
 
     const notEnvironmentFilter = (filter) => filter.id !== "client_side" && filter.id !== "server_side";
 
+    noriskLog(`Searching for mods with searchterm: ${searchterm} | Limit: ${search_limit} | Offset: ${search_offset} | Filters: ${Object.values(filters).filter(f => f.enabled).map(f => f.id).join(", ")}`);
     await invoke("search_mods", {
       params: {
         facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(", ")}${client_server_side_filters}]`,
         index: search_index,
-        limit: search_limit + (searchterm === "" ? launchManifest.mods.length : 0),
+        limit: search_limit,
         offset: search_offset,
         query: searchterm,
       },
     }).then((result) => {
       console.debug("Search Mod Result", result);
+
+      showMoreButton = result.hits.length >= search_limit;
       
       if (!$noriskUser?.isDev) {
         console.debug("Filtering blacklisted mods...");
@@ -375,9 +378,9 @@
       if (result.hits.length === 0) {
         updateMods(null);
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
-        updateMods(result.hits);;
+        updateMods(result.hits);
       } else {
-        updateMods([...mods, ...result.hits.filter(mod => searchterm != "" || (!launchManifest.mods.some((launchManifestMod) => {
+        updateMods([...oldMods, ...result.hits.filter(mod => searchterm != "" || (!launchManifest.mods.some((launchManifestMod) => {
           return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase();
         }) && !featuredMods.some((featuredMod) => {
           return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase();
@@ -389,7 +392,7 @@
   }
 
   function loadMore() {
-    search_offset += search_limit + (searchterm === "" ? launchManifest.mods.length : 0);
+    search_offset += search_limit;
     searchMods();
   }
 
@@ -591,7 +594,7 @@
                        bind:options={options} placeHolder="Search for Mods on Modrinth..." />
     {#if mods !== null && mods.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
-        {#each [...mods, mods.length >= 30 ? 'LOAD_MORE_MODS' : null] as item}
+        {#each [...mods, showMoreButton ? 'LOAD_MORE_MODS' : null] as item}
           {#if item === 'LOAD_MORE_MODS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
