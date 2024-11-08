@@ -589,6 +589,7 @@
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
             search_offset = 0;
+            listScroll = 0;
             searchMods();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Mods on Modrinth..." />
