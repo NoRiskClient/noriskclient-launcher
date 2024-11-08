@@ -205,6 +205,8 @@
   }
 
   .home-navbar-wrapper h1.invite-button p {
+    color: var(--hover-text-shadow);
+    text-shadow: 1px 1px var(--secondary-color-text-shadow);
     margin-bottom: 5px;
     padding-right: 5px;
     font-size: 15px;

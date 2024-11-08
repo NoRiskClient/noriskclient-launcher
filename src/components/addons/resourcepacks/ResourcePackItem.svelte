@@ -1,5 +1,6 @@
 <script>
     import {createEventDispatcher} from "svelte";
+    import FallbackIcon from "/src/images/modrinth.png";
 
     const dispatch = createEventDispatcher()
 
@@ -22,7 +23,7 @@
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
         {#if type != 'CUSTOM'}
-            <img class="icon" src={resourcePack.icon_url} alt=" " onerror="this.src='https://avatars.githubusercontent.com/u/67560307'">
+            <img class="icon" src={resourcePack.icon_url} alt=" " onerror="this.src='{FallbackIcon}'">
         {:else}
             <div class="custom-resourcepack-icon">🎨</div>
         {/if}
