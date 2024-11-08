@@ -26,6 +26,7 @@
   let searchterm = "";
   let filterterm = "";
   let currentTabIndex = 0;
+  let loadMoreButton = false;
   let fileWatcher;
   let listScroll = 0;
 
@@ -211,19 +212,18 @@
   }
 
   async function searchResourcePacks() {
+    let oldResourcePacks = resourcePacks;
+
     if (searchterm == "" && search_offset === 0) {
       if (featuredResourcePacks == null) {
         await getFeaturedResourcePacks();
       }
-      updateResourcePacks([]);
-      // Wait for the UI to update
-      await tick();
-      updateResourcePacks(featuredResourcePacks);
-    } else {
-      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
-      // Update: Ich habe ne eigene Virtual List gemacht 📉
-      updateResourcePacks([]);
+      oldResourcePacks = featuredResourcePacks;
     }
+    
+    // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+    // Update: Ich habe ne eigene Virtual List gemacht 📉
+    updateResourcePacks([]);
 
     await invoke("search_resourcepacks", {
       params: {
@@ -235,6 +235,8 @@
       },
     }).then((result) => {
       console.debug("Search ResourcePack Result", result);
+
+      loadMoreButton = result.hits.length === search_limit;
 
       if (!$noriskUser?.isDev) {
         console.debug("Filtering blacklisted ResourcePacks");
@@ -251,7 +253,7 @@
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
         updateResourcePacks(result.hits);
       } else {
-        updateResourcePacks([...resourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))]);
+        updateResourcePacks([...oldResourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -399,12 +401,13 @@
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
             search_offset = 0;
+            listScroll = 0;
             searchResourcePacks();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Resource Packs on Modrinth..." />
     {#if resourcePacks !== null && resourcePacks.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
-        {#each [...resourcePacks, resourcePacks.length >= 30 ? 'LOAD_MORE_RESOURCEPACKS' : null] as item}
+        {#each [...resourcePacks, loadMoreButton ? 'LOAD_MORE_RESOURCEPACKS' : null] as item}
           {#if item == 'LOAD_MORE_RESOURCEPACKS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>

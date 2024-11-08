@@ -27,6 +27,7 @@
   let searchterm = "";
   let filterterm = "";
   let currentTabIndex = 0;
+  let loadMoreButton = false;
   let fileWatcher;
   let listScroll = 0;
 
@@ -193,19 +194,18 @@
   }
 
   async function searchDatapacks() {
+    let oldDatapacks = datapacks;
+    
     if (searchterm == "" && search_offset === 0) {
       if (featuredDatapacks == null) {
         await getFeaturedDatapacks();
       }
-      updateDatapacks([]);
-      // Wait for the UI to update
-      await tick();
-      updateDatapacks(featuredDatapacks);
-    } else {
-      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
-      // Update: Ich habe ne eigene Virtual List gemacht 📉
-      updateDatapacks([]);
+      oldDatapacks = featuredDatapacks;
     }
+      
+    // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+    // Update: Ich habe ne eigene Virtual List gemacht 📉
+    updateDatapacks([]);
 
     await invoke("search_datapacks", {
       params: {
@@ -217,6 +217,8 @@
       },
     }).then((result) => {
       console.debug("Search Datapack Result", result);
+
+      loadMoreButton = result.hits.length >= search_limit;
 
       if (!$noriskUser?.isDev) {
         console.debug("Filtering Blacklisted Datapacks", blacklistedDatapacks);
@@ -233,7 +235,7 @@
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
         updateDatapacks(result.hits);
       } else {
-        updateDatapacks([...datapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))]);
+        updateDatapacks([...oldDatapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -385,12 +387,13 @@
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
             search_offset = 0;
+            listScroll = 0;
             searchDatapacks();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Datapacks on Modrinth..." />
     {#if datapacks !== null && datapacks.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
-        {#each [...datapacks, datapacks.length >= 30 ? 'LOAD_MORE_DATAPACKS' : null] as item}
+        {#each [...datapacks, loadMoreButton ? 'LOAD_MORE_DATAPACKS' : null] as item}
           {#if item === 'LOAD_MORE_DATAPACKS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>

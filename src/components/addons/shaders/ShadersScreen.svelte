@@ -26,6 +26,7 @@
   let searchterm = "";
   let filterterm = "";
   let currentTabIndex = 0;
+  let loadMoreButton = false;
   let fileWatcher;
   let listScroll = 0;
 
@@ -151,6 +152,8 @@
       branch: launchManifest.build.branch,
       installedShaders: launcherProfiles.addons[currentBranch].shaders,
     }).then((fileNames) => {
+      fileNames = fileNames.filter(f => f != "subwaysurfers_shader.zip");
+
       console.debug("Custom Shaders", fileNames);
       customShaders = fileNames;
     }).catch((error) => {
@@ -201,19 +204,18 @@
   }
 
   async function searchShaders() {
+    let oldShaders = shaders;
+    
     if (searchterm == "" && search_offset === 0) {
       if (featuredShaders == null) {
         await getFeaturedShaders();
       }
-      updateShaders([]);
-      // Wait for the UI to update
-      await tick();
-      updateShaders(featuredShaders);
-    } else {
-      // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
-      // Update: Ich habe ne eigene Virtual List gemacht 📉
-      updateShaders([]);
+      oldShaders = featuredShaders;
     }
+      
+    // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
+    // Update: Ich habe ne eigene Virtual List gemacht 📉
+    updateShaders([]);
 
     await invoke("search_shaders", {
       params: {
@@ -225,6 +227,8 @@
       },
     }).then((result) => {
       console.debug("Search Shader Result", result);
+
+      loadMoreButton = result.hits.length === search_limit;
 
       if (!$noriskUser?.isDev) {
         console.debug("Filtering Blacklisted Shaders", blacklistedShaders);
@@ -241,7 +245,7 @@
       } else if ((search_offset === 0 && searchterm !== "") || Object.values(filters).length > 0) {
         updateShaders(result.hits);
       } else {
-        updateShaders([...shaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))]);
+        updateShaders([...oldShaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))]);
       }
     }).catch((error) => {
       addNotification(error);
@@ -389,12 +393,13 @@
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
             search_offset = 0;
+            listScroll = 0;
             searchShaders();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
                        bind:options={options} placeHolder="Search for Shaders on Modrinth..." />
     {#if shaders !== null && shaders.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
-        {#each [...shaders, shaders.length >= 30 ? 'LOAD_MORE_SHADERS' : null] as item}
+        {#each [...shaders, loadMoreButton ? 'LOAD_MORE_SHADERS' : null] as item}
           {#if item == 'LOAD_MORE_SHADERS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
