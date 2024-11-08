@@ -2,6 +2,7 @@
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
     import { openInfoPopup } from "../../../utils/popupUtils.js";
+    import FallbackIcon from "/src/images/modrinth.png";
 
     const dispatch = createEventDispatcher()
 
@@ -47,7 +48,7 @@
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
         {#if type != 'CUSTOM'}
-            <img class="icon" src={mod.icon_url ?? mod.image_url} alt=" " onerror="this.src='https://avatars.githubusercontent.com/u/67560307'">
+            <img class="icon" src={mod.icon_url ?? mod.image_url} alt=" " onerror="this.src='{FallbackIcon}'">
         {:else}
             <div class="custom-mod-icon">📦</div>
         {/if}
