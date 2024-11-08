@@ -49,6 +49,7 @@
   .skin-kopf-container:hover {
     position: relative;
     transform: scale(1.2);
+    cursor: pointer;
   }
   
   .skin-kopf-container:hover .skin-kopf {
