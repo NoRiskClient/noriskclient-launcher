@@ -129,9 +129,9 @@ impl CapeApiEndpoints {
             .header("Authorization", format!("Bearer {}", norisk_token))
             .send()
             .await
-            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+            .map_err(|err| format!("Error while sending the request: {}", err))?;
 
-        debug!("Delete cape status {:?}",response.status());
+        debug!("Unequip cape status {:?}",response.status());
 
         return match response.status() {
             StatusCode::OK => {

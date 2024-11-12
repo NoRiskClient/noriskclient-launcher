@@ -556,7 +556,7 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn unequip_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
-    debug!("Deleting Cape...");
+    debug!("Unequiping Cape...");
     CapeApiEndpoints::unequip_cape(norisk_token, uuid).await
 }
 
