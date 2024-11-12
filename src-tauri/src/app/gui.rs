@@ -555,9 +555,9 @@ async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn delete_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
+async fn unequip_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
     debug!("Deleting Cape...");
-    CapeApiEndpoints::delete_cape(norisk_token, uuid).await
+    CapeApiEndpoints::unequip_cape(norisk_token, uuid).await
 }
 
 #[tauri::command]
@@ -573,12 +573,22 @@ async fn request_trending_capes(
 }
 
 #[tauri::command]
-async fn request_owned_capes(
+async fn request_user_capes(
     norisk_token: &str,
     uuid: &str,
-    limit: u32,
+    username: &str,
 ) -> Result<Vec<Cape>, String> {
-    CapeApiEndpoints::request_owned_capes(norisk_token, uuid, limit)
+    CapeApiEndpoints::request_user_capes(norisk_token, uuid, username)
+        .await
+        .map_err(|e| format!("unable to request user capes: {:?}", e))
+}
+
+#[tauri::command]
+async fn request_owned_capes(
+    norisk_token: &str,
+    uuid: &str
+) -> Result<Vec<Cape>, String> {
+    CapeApiEndpoints::request_owned_capes(norisk_token, uuid)
         .await
         .map_err(|e| format!("unable to request owned capes: {:?}", e))
 }
@@ -2585,7 +2595,7 @@ pub fn gui_main() {
             get_cape_hash_by_uuid,
             mc_name_by_uuid,
             microsoft_auth,
-            delete_cape,
+            unequip_cape,
             search_mods,
             get_featured_mods,
             get_featured_resourcepacks,
@@ -2608,6 +2618,7 @@ pub fn gui_main() {
             enable_experimental_mode,
             download_template_and_open_explorer,
             request_trending_capes,
+            request_user_capes,
             request_owned_capes,
             refresh_via_norisk,
             get_mobile_app_token,

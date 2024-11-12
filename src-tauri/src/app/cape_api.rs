@@ -94,10 +94,19 @@ impl CapeApiEndpoints {
 
     pub async fn mc_name_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
         debug!("Requesting Minecraft Username {}",uuid);
-        let url = format!("  https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid);
+        let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid);
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         Ok(response_text.name)
+    }
+
+    pub async fn mc_uuid_by_name(username: &str) -> Result<String, Box<dyn Error>> {
+        debug!("Requesting Minecraft UUID {}",username);
+        let url = format!("https://api.mojang.com/users/profiles/minecraft/{}", username);
+        let response = HTTP_CLIENT.get(url).send().await?;
+        let response_text = response.json::<McProfile>().await?;
+        let uuid = uuid::Uuid::parse_str(&response_text.id)?;
+        Ok(uuid.to_string())
     }
 
     pub async fn cape_hash_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
@@ -109,10 +118,10 @@ impl CapeApiEndpoints {
         Ok(response_text)
     }
 
-    pub async fn delete_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
+    pub async fn unequip_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
         // Baue die URL mit dem Token als Query-Parameter
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape?uuid={}", get_api_base(options.experimental_mode), uuid);
+        let url = format!("{}/cosmetics/cape/unequip?uuid={}", get_api_base(options.experimental_mode), uuid);
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
@@ -149,10 +158,23 @@ impl CapeApiEndpoints {
             .json::<Vec<Cape>>().await?)
     }
 
-    pub async fn request_owned_capes(norisk_token: &str, uuid: &str, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_user_capes(norisk_token: &str, uuid: &str, username: &str) -> Result<Vec<Cape>, Box<dyn Error>> {
+        debug!("Requesting User Capes of {}...", username);
+        let target_uuid = Self::mc_uuid_by_name(username).await?;
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let url = format!("{}/cosmetics/cape/user/{}?uuid={}", get_api_base(options.experimental_mode), target_uuid, uuid);
+        Ok(HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send().await?
+            .error_for_status()?
+            .json::<Vec<Cape>>().await?)
+    }
+
+    pub async fn request_owned_capes(norisk_token: &str, uuid: &str) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/owned?uuid={}&limit={}", get_api_base(options.experimental_mode), uuid, limit);
+        let url = format!("{}/cosmetics/cape/owned?uuid={}&limit=250", get_api_base(options.experimental_mode), uuid);
         Ok(HTTP_CLIENT
             .get(url)
             .header("Authorization", format!("Bearer {}", norisk_token))
@@ -213,6 +235,7 @@ impl CapeApiEndpoints {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct McProfile {
+    pub id: String,
     pub name: String,
 }
 

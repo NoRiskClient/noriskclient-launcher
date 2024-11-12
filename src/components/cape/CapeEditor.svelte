@@ -30,9 +30,9 @@
     }
   }
 
-  async function deleteCape() {
+  async function unequipCape() {
     if ($defaultUser) {
-      await invoke("delete_cape", {
+      await invoke("unequip_cape", {
         noriskToken: getNoRiskToken(),
         uuid: $defaultUser.id,
       }).then(() => {
@@ -69,7 +69,7 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={downloadTemplate}>TEMPLATE</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class="red-text-clickable" on:click={deleteCape}>DELETE</h1>
+    <h1 class="red-text-clickable" on:click={unequipCape}>UNEQUIP</h1>
   </div>
 </div>
 

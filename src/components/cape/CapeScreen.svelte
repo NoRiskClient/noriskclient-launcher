@@ -5,9 +5,11 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { openInputPopup } from "../../utils/popupUtils.js";
   import { noriskLog } from "../../utils/noriskUtils.js";
 
   let capes = null;
+  let userCapes = null;
   let capeHash = null;
   let isLoading = true;
   let currentRequest = 0;
@@ -28,12 +30,27 @@
     }
   }
 
+  async function requestUserCapes(username) {
+    if ($defaultUser) {
+      await invoke("request_user_capes", {
+        noriskToken: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
+        uuid: $defaultUser.id,
+        username: username,
+        limit: 30,
+      }).then((result) => {
+        noriskLog("Requesting User capes: " + JSON.stringify(result));
+        capes = result;
+      }).catch(error => {
+        addNotification(error);
+      });
+    }
+  }
+
   async function requestOwnedCapes() {
     if ($defaultUser) {
       await invoke("request_owned_capes", {
         noriskToken: $launcherOptions.experimentalMode ? $defaultUser.norisk_credentials.experimental.value : $defaultUser.norisk_credentials.production.value,
-        uuid: $defaultUser.id,
-        limit: 30,
+        uuid: $defaultUser.id
       }).then((result) => {
         noriskLog("Requesting Owned capes: " + JSON.stringify(result));
         capes = result;
@@ -44,13 +61,27 @@
   }
 
   async function switchTab(tab) {
+    const oldRequest = currentRequest;
     currentRequest = tab;
     capes = null;
+    if (currentRequest != 3) {
+      userCapes = null;
+    }
     if (currentRequest === 1) {
       await requestTrendingCapes(1);
     } else if (currentRequest === 2) {
       await requestTrendingCapes(0);
     } else if (currentRequest === 3) {
+      openInputPopup({
+        title: 'Search Capes',
+        content: 'Enter a username, you want to see the capes of.',
+        inputPlaceholder: 'Username',
+        confirmButton: 'Search',
+        validateInput: (value) => value.length >= 3 && value.length <= 16,
+        onConfirm: requestUserCapes,
+        onCancel: () => { switchTab(oldRequest) }
+      });
+    } else if (currentRequest === 4) {
       await requestOwnedCapes();
     }
   }
@@ -84,7 +115,8 @@
     <div class="button-wrapper">
       <h2 on:click={() => switchTab(1)} class:primary-text={currentRequest === 1}>ALL TIME</h2>
       <h2 on:click={() => switchTab(2)} class:primary-text={currentRequest === 2}>WEEKLY</h2>
-      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>OWNED</h2>
+      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>SEARCH</h2>
+      <h2 on:click={() => switchTab(4)} class:primary-text={currentRequest === 4}>OWNED</h2>
     </div>
   </div>
   <div class="cape-wrapper">
@@ -92,7 +124,7 @@
       {#if !isLoading}
         <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
       {/if}
-    {:else}
+    {:else if currentRequest === 1 || currentRequest === 2 || currentRequest === 3 || currentRequest === 4}
       {#if capes != null}
         <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
       {/if}
