@@ -60,8 +60,9 @@
     <h1 class="header-text">Your Cape</h1>
     <CapePlayer cape={capeHash} />
   {:else}
-    <h1 class="red-text empty-text">[No Cape Uploaded]</h1>
-    <div class="empty-cape-wrapper"></div>
+    <div class="empty-text-wrapper">
+      <h1 class="red-text empty-text">[No Cape Uploaded]</h1>
+    </div>
   {/if}
   <div class="button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -91,6 +92,13 @@
         cursor: default;
     }
 
+    .empty-text-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 300px;
+    }
+
     .empty-text {
         font-family: 'Press Start 2P', serif;
         font-size: 20px;
@@ -116,13 +124,5 @@
 
     .button-wrapper h1:hover {
         transform: scale(1.5);
-    }
-
-    .empty-cape-wrapper {
-        transform: scale(0.8);
-        padding: 10px;
-        width: 512px;
-        height: 280px;
-        box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.75);
     }
 </style>
