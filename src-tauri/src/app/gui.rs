@@ -2023,7 +2023,10 @@ async fn add_player_to_whitelist(
         .map_err(|e| format!("invalid username: {:}", e))
         .unwrap();
     let response_text = response.json::<PlayerDBData>().await.unwrap();
-    let uuid = response_text.data.player.unwrap().id;
+    let uuid = match response_text.data.player {
+        Some(player) => player.id,
+        None => return Err("invalid username / uuid".to_string()),
+    };
     ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid)
         .await
         .map_err(|e| format!("unable to add player to whitelist: {:?}", e))
