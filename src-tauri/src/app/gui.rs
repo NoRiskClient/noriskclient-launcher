@@ -165,6 +165,22 @@ async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), St
 }
 
 #[tauri::command]
+async fn get_mod_author(slug: &str) -> Result<Option<String>, String> {
+    debug!("Getting Mod Author...");
+    let project_members = ModrinthApiEndpoints::get_project_members(&slug)
+                    .await
+                    .map_err(|e| format!("unable to get team members: {:?}", e))?;
+    let mut author = None;
+    project_members.iter().for_each(|member| {
+        if member.role.to_uppercase() == "OWNER" {
+            author = Some(member.user.username.clone());
+        }
+    });
+
+    Ok(author)
+}
+
+#[tauri::command]
 async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo>, String> {
     debug!("Getting Featured Mods...");
 
@@ -2607,6 +2623,7 @@ pub fn gui_main() {
             microsoft_auth,
             unequip_cape,
             search_mods,
+            get_mod_author,
             get_featured_mods,
             get_featured_resourcepacks,
             get_featured_shaders,

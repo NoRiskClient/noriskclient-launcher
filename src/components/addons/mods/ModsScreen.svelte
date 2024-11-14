@@ -44,6 +44,12 @@
       ],
     },
     {
+      type: "NoRiskClient",
+      entries: [
+        { id: "norisk", name: "NoRiskClient Mods" },
+      ]
+    },
+    {
       type: "Categories",
       entries: [
         { id: "adventure", name: "Adventure" },
@@ -72,6 +78,8 @@
 
   if (!isServersideInstallation) {
     filterCategories.shift();
+  } else {
+    filterCategories = filterCategories.filter(category => category.type !== "NoRiskClient");
   }
 
   $: loginData = $defaultUser;
@@ -263,7 +271,7 @@
       ).required) {
         return "REQUIRED";
       } else {
-        return "RECOMENDED";
+        return "RECOMMENDED";
       }
     }
     
@@ -291,12 +299,12 @@
       baseMods = result;
       featuredMods = result;
       launchManifest.mods.forEach(async mod => {
-        if (!mod.required) {
+        if (!mod.required && mod.source.repository == "modrinth") {
           const slug = mod.source.artifact.split(":")[1];
           let author;
-          let iconUrl = "src/images/norisk_logo.png";
-          let description = "A custom NoRiskClient Mod.";
-          if (mod.source.repository !== "norisk" && mod.source.repository !== "CUSTOM") {
+          let iconUrl = "";
+          let description = "A mod recomended by NoRiskClient.";
+          if (mod.source.repository == "modrinth") {
             await invoke("get_mod_info", { slug }).then(info => {
               author = info.author ?? null;
               iconUrl = info.icon_url;
@@ -335,6 +343,53 @@
     // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
     // Update: Ich habe ne eigene Virtual List gemacht 📉
     updateMods([]);
+    
+    if (filters['norisk']?.enabled) {
+      await tick();
+      let newMods = [];
+      await Promise.all(launchManifest.mods.filter(m => m.name.toLowerCase().includes(searchterm.toLowerCase())).map(async mod => {
+        const slug = mod.source.artifact.split(":")[1];
+        const domain = mod.source.artifact.split(":")[0];
+        let modData = {
+          title: mod.name,
+          slug: slug,
+          author: domain,   
+          blacklisted: false,
+          description: "",
+          downloads: null,
+          featured: false,
+          icon_url: "",
+          source: mod.source,
+        };
+        if (mod.source.artifact.split(':')[0].includes("norisk")) {
+          modData.author = "NoRiskClient";
+          modData.icon_url = "src/images/norisk_logo.png";
+        } else {
+          try {
+            await invoke("get_mod_info", { slug }).then(async info => {
+              if (info.author == null) {
+                await invoke("get_mod_author", { slug }).then(author => {
+                  modData.author = author ?? "Unknown";
+                })
+              } else {
+                modData.author = info.author;
+              }
+              
+              modData.title = info.title;
+              modData.icon_url = info.icon_url;
+              modData.description = info.description;
+              modData.downloads = info.downloads;
+            });
+          } catch (e) {
+            // ignore in this case
+          }
+        }
+        newMods.push(modData);
+      }));
+      
+      console.log(newMods);
+      return updateMods(newMods);
+    }
 
     let client_server_side_filters = "";
     const client_side = Object.values(filters).find(filter => filter.id === "client_side");
@@ -380,8 +435,8 @@
       } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
         updateMods(result.hits);
       } else {
-        updateMods([...oldMods, ...result.hits.filter(mod => searchterm != "" || (!launchManifest.mods.some((launchManifestMod) => {
-          return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase();
+        updateMods([...(oldMods ?? []), ...result.hits.filter(mod => searchterm != "" || (!launchManifest.mods.some((launchManifestMod) => {
+          return launchManifestMod.source.artifact.split(":")[1].toUpperCase() === mod.slug.toUpperCase() && !launchManifestMod.source.repository.includes('norisk');
         }) && !featuredMods.some((featuredMod) => {
           return featuredMod.slug.toUpperCase() === mod.slug.toUpperCase();
         })))]);
@@ -595,7 +650,7 @@
                        bind:options={options} placeHolder="Search for Mods on Modrinth..." />
     {#if mods !== null && mods.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
-        {#each [...mods, showMoreButton ? 'LOAD_MORE_MODS' : null] as item}
+        {#each [...mods, showMoreButton && !filters['norisk']?.enabled ? 'LOAD_MORE_MODS' : null] as item}
           {#if item === 'LOAD_MORE_MODS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>

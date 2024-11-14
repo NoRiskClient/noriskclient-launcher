@@ -56,7 +56,7 @@
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
                     <div class="name-div">
-                        <a class="mod-title" href={`https://modrinth.com/mod/${slug}`} target="_blank" title={name}>
+                        <a class="mod-title" href={mod.downloads != null ? `https://modrinth.com/mod/${slug}` : undefined} target="_blank" title={name}>
                             {name.length > 20 && (text == 'INSTALL' || text == 'REQUIRED' || text == 'DEPENDENCY') ? name.substring(0, 19) + '...' : name}
                         </a>
                         {#if mod?.featured}
@@ -70,8 +70,10 @@
                 {#if mod?.author != undefined && mod?.author != null}
                     <div class="author-container">
                         <p class="author">by {mod.author ?? mod.value.author}</p>
-                        <b>•</b>
-                        <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                        {#if mod?.downloads != null}
+                            <b>•</b>
+                            <p class="download-count">{getMinimalisticDownloadCount()}</p>
+                        {/if}
                     </div>
                 {/if}
             </div>
@@ -146,10 +148,10 @@
                     INSTALL
                 </h1>
             {/if}
-        {:else if text === "RECOMENDED"}
+        {:else if text === "RECOMMENDED"}
             <div style="display: flex; flex-direction: column; align-items: center;">
                 <h1 class="required-button primary-text" style="margin-bottom: 15px;">
-                    RECOMENDED
+                    RECOMMENDED
                 </h1>
                 {#if enabled}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
