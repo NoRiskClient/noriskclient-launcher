@@ -1,4 +1,5 @@
 <script>
+	import { writable } from 'svelte/store';
   import Router from "./Router.svelte";
   import { onMount } from "svelte";
   import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
@@ -9,6 +10,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { push } from "svelte-spa-router";
   import {
+    getVersion,
     isClientRunning,
     startProgress,
     getNoRiskUser,
@@ -30,6 +32,7 @@
     setTimeout(async () => {
       await appWindow.show();
     }, 300);
+    await getVersion();
     await checkIfClientIsRunning();
     await fetchOptions();
     await fetchDefaultUserOrError(false);

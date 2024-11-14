@@ -33,6 +33,7 @@ use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
+use crate::LAUNCHER_VERSION;
 use crate::{
     custom_servers::{
         manager::CustomServerManager,
@@ -120,6 +121,11 @@ async fn check_online_status() -> Result<bool, String> {
     ApiEndpoints::norisk_api_status()
         .await
         .map_err(|e| format!("unable to check online status: {:?}", e))
+}
+
+#[tauri::command]
+fn get_launcher_version() -> String {
+    LAUNCHER_VERSION.to_string()
 }
 
 #[tauri::command]
@@ -2568,8 +2574,9 @@ pub fn gui_main() {
             runner_instance: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
-            open_url,
             check_online_status,
+            get_launcher_version,
+            open_url,
             get_options,
             open_minecraft_logs_window,
             open_minecraft_crash_window,

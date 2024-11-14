@@ -6,6 +6,7 @@ import { pop, push } from "svelte-spa-router";
 import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
 
+export const version = writable("");
 export const noriskUser = writable(null);
 export const isInMaintenanceMode = writable(null);
 export const isClientRunning = writable([false, false]);
@@ -18,6 +19,16 @@ export const startProgress = writable({
 export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
+
+export async function getVersion() {
+  await invoke("get_launcher_version").then((v) => {
+    version.set(v);
+    noriskLog("Launcher Version: " + v);
+  }).catch(reason => {
+    addNotification(reason);
+    noriskError(reason);
+  });
+}
 
 export async function checkApiStatus() {
   let apiIsOnline = null;
