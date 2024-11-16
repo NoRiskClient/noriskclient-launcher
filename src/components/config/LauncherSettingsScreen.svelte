@@ -5,6 +5,7 @@
     import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
     import ConfigFileInput from "./inputs/ConfigFileInput.svelte";
     import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
+    import ManageAccountsModal from "../account/AccountModal.svelte";
     import { fetchOptions, launcherOptions, saveOptions } from "../../stores/optionsStore.js";
     import { preventSelection } from "../../utils/svelteUtils.js";
     import { invoke } from "@tauri-apps/api";
@@ -24,6 +25,7 @@
 
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
+    let showManageAccountsModal = false;
     let totalSystemMemory = 0;
     let selectedMemory = 0;
 
@@ -132,9 +134,8 @@
     });
 </script>
 
-{#if showMcRealAppModal}
-    <McRealAppModal bind:showModal={showMcRealAppModal} />
-{/if}
+<McRealAppModal bind:showModal={showMcRealAppModal} />
+<ManageAccountsModal bind:showModal={showManageAccountsModal} />
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div on:click|stopPropagation class="settings-container">
     <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.settings.title}</h1>
@@ -154,6 +155,10 @@
             <h1 class="button primary-text" on:click={() => { showMcRealAppModal = true; }}>{lang.settings.mcRealApp.button.details}</h1>
         </div>
     {/if}
+    <div class="horizontal-wrapper">
+        <h1 class="title">{lang.settings.accounts.title}</h1>
+        <h1 class="button primary-text" on:click={() => { showManageAccountsModal = true; }}>{lang.settings.accounts.button.manage}</h1>
+    </div>
     <div class="sliders">
         <ConfigSlider title={lang.settings.ram} suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
         <ConfigSlider title={lang.settings.maxDownloads} suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />

@@ -11,19 +11,31 @@
 
   let dialog; // HTMLDialogElement
   $: if (dialog && showModal) dialog.showModal();
+  let animateOutNow = false;
+
+  function animateOut() {
+    animateOutNow = true;
+    setTimeout(() => {
+      showModal = false;
+      dialog.close();
+      animateOutNow = false;
+    }, 100);
+  }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <dialog
   bind:this={dialog}
-  on:close={() => (showModal = false)}
+  class:animateOut={animateOutNow}
+  class:animateIn={!animateOutNow}
+  on:close={animateOut}
   on:click|self={() => dialog.close()}
 >
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
         <h1 class="nes-font">{lang.accountModal.title}</h1>
-        <h1 class="nes-font red-text-clickable" on:click={() => dialog.close()}>X</h1>
+        <h1 class="nes-font red-text-clickable" on:click={animateOut}>X</h1>
       </div>
       <hr>
       {#if $defaultUser}
@@ -79,12 +91,42 @@
         animation: fade 0.2s ease-out;
     }
 
+    dialog.animateIn {
+        animation: open 0.2s ease-out;
+    }
+
+    dialog.animateOut {
+        animation: close 0.2s ease-out;
+    }
+
     @keyframes fade {
         from {
             opacity: 0;
         }
         to {
             opacity: 1;
+        }
+    }
+
+    @keyframes open {
+        from {
+            transform: translate(-50%, 200%);
+            opacity: 0;
+        }
+        to {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+    }
+
+    @keyframes close {
+        from {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+        to {
+            transform: translate(-50%, 200%);
+            opacity: 0;
         }
     }
 

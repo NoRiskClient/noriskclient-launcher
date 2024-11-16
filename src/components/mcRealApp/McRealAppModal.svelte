@@ -54,6 +54,7 @@
       setTimeout(() => {
         showModal = false;
         dialog.close();
+        animateOutNow = false;
       }, 100);
     }
 
