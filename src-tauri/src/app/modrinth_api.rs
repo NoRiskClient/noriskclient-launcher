@@ -95,14 +95,10 @@ impl ModrinthApiEndpoints {
         for dependency in dependencies {
             if dependency.dependency_type == "required" {
                 let dependency_mods = ModrinthApiEndpoints::get_project_version(&dependency.project_id, params).await?;
-                if let Some(dependency_mod) = dependency_mods.first() {
-                    let slug_holder = ModrinthApiEndpoints::get_mod_slug(&dependency.project_id).await?;
-                    let required = dependency_mod.is_already_required_by_norisk_client(required_mods);
-                    if required {
-                        result.push(dependency_mod.to_custom_mod(&dependency_mod.name, &slug_holder.slug, &slug_holder.icon_url, Vec::new(), false, false));
-                    } else {
-                        result.push(dependency_mod.to_custom_mod(&dependency_mod.name, &slug_holder.slug, &slug_holder.icon_url, Vec::new(), false, true));
-                    };
+                if let Some(dependency) = dependency_mods.first() {
+                    let dependency_mod = ModrinthApiEndpoints::get_mod_slug(&dependency.project_id).await?;
+                    let already_required_by_nrc = dependency.is_already_required_by_norisk_client(required_mods);
+                    result.push(dependency.to_custom_mod(&dependency_mod.title, &dependency_mod.slug, &dependency_mod.icon_url, Vec::new(), false, if already_required_by_nrc { false } else { true }));
                 }
             }
         }
