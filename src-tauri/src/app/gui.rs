@@ -780,7 +780,21 @@ pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>
         let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
         match token_result {
             //TODO checken ob token valid ist (api mässig)
-            Ok(token) => credentials,
+            Ok(token) => {
+                let result = ApiEndpoints::get_norisk_user(&token, &credentials.unwrap().id.to_string()).await;
+                match result {
+                    Ok(_) => {}
+                    Err(error) => {
+                        // Überprüfen, ob der Fehler ein HTTP-Fehler ist
+                        debug!("Error Fetching NoRiskUser: {:?}",error);
+                        //ich weiß ich weiß...
+                        if error.to_string().contains("(401 Unauthorized)") {
+                            info!("Refreshing NoRisk Token because: {}", error.to_string());
+                            return Ok(Option::from(minecraft_auth_update_norisk_token(credentials.unwrap().clone()).await?));
+                        }
+                    }
+                }
+            }
             Err(error) => {
                 // Versuche den NoRisk-Token zu aktualisieren
                 info!("Refreshing NoRisk Token because: {}", error.to_string());
@@ -2537,8 +2551,8 @@ async fn get_full_feature_whitelist(
             .unwrap(),
         &credentials.id.to_string(),
     )
-    .await
-    .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
+        .await
+        .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
 }
 
 
