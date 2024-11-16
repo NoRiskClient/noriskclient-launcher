@@ -129,8 +129,8 @@ fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
         "external", /* the unique window label */
         tauri::WindowUrl::External(url.parse().unwrap()),
     )
-    .build()
-    .unwrap();
+        .build()
+        .unwrap();
     let _ = window.set_title("NoRiskClient");
     let _ = window.set_resizable(false);
     let _ = window.set_focus();
@@ -586,7 +586,7 @@ async fn request_user_capes(
 #[tauri::command]
 async fn request_owned_capes(
     norisk_token: &str,
-    uuid: &str
+    uuid: &str,
 ) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_owned_capes(norisk_token, uuid)
         .await
@@ -669,8 +669,8 @@ pub async fn open_minecraft_logs_window(
         unique_label,
         tauri::WindowUrl::App("logs.html".into()),
     )
-    .inner_size(1000.0, 800.0)
-    .build()?;
+        .inner_size(1000.0, 800.0)
+        .build()?;
     let _ = window.set_title("Minecraft Logs");
     let _ = window.set_resizable(true);
     let _ = window.set_focus();
@@ -692,7 +692,7 @@ pub async fn open_minecraft_crash_window(
         unique_label,
         tauri::WindowUrl::App("crash.html".into()),
     )
-    .build()?;
+        .build()?;
 
     // Set window properties
     let _ = window.set_title("Crash Report");
@@ -717,7 +717,7 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Er
     } else {
         options.latest_branch
     }
-    .ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
+        .ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
 
     let log_path: PathBuf = LAUNCHER_DIRECTORY
         .data_dir()
@@ -770,10 +770,26 @@ pub async fn minecraft_auth_remove_user(
 #[tauri::command]
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, crate::error::Error> {
     let accounts = minecraft_auth_get_store().await?;
-    Ok(accounts
-        .users
-        .get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?)
-        .cloned())
+    let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?);
+    Ok(refresh_norisk_token_if_necessary(account).await?)
+}
+
+pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
+    let experimental_mode = get_options().await.unwrap().experimental_mode;
+    if (credentials.is_some()) {
+        let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
+        match token_result {
+            //TODO checken ob token valid ist (api mässig)
+            Ok(token) => credentials,
+            Err(error) => {
+                // Versuche den NoRisk-Token zu aktualisieren
+                info!("Refreshing NoRisk Token because: {}", error.to_string());
+                return Ok(Option::from(minecraft_auth_update_norisk_token(credentials.unwrap().clone()).await?));
+            }
+        };
+    }
+
+    Ok(credentials.cloned())
 }
 
 #[tauri::command]
@@ -1007,8 +1023,8 @@ async fn get_custom_resourcepacks_filenames(
         &custom_resourcepack_folder,
         &installed_resourcepacks,
     )
-    .await
-    .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+        .await
+        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
     Ok(names)
 }
 
@@ -1102,8 +1118,8 @@ async fn get_custom_datapacks_filenames(
         &custom_datapack_folder,
         &installed_datapacks,
     )
-    .await
-    .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
+        .await
+        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
     Ok(names)
 }
 
@@ -1353,17 +1369,14 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
 async fn get_norisk_user(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<NoRiskUserMinimal, String> {
+) -> Result<NoRiskUserMinimal, crate::error::Error> {
     let user = ApiEndpoints::get_norisk_user(
         &credentials
             .norisk_credentials
             .get_token(options.experimental_mode)
-            .await
-            .unwrap(),
+            .await?,
         &credentials.id.to_string(),
-    )
-    .await
-    .map_err(|e| format!("unable to request norisk user: {:?}", e))?;
+    ).await?;
 
     // ensure user does not have keepLocalAssets enabled depending on rank
     let allowed_ranks = vec![
@@ -1372,7 +1385,7 @@ async fn get_norisk_user(
         "DESIGNER".to_string(),
     ];
     if !allowed_ranks.contains(&user.rank) {
-        disable_keep_local_assets().await?;
+        disable_keep_local_assets().await.map_err(|e| ErrorKind::LauncherError(format!("Disable Keep Local Assets: {:?}", e)).as_error())?;
     }
     Ok(user)
 }
@@ -1397,7 +1410,7 @@ async fn request_norisk_branches(
             .await?,
         &credentials.id.to_string(),
     )
-    .await?)
+        .await?)
 }
 
 #[tauri::command]
@@ -1407,8 +1420,8 @@ async fn enable_experimental_mode(credentials: Credentials) -> Result<String, St
         &credentials.norisk_credentials.production.unwrap().value,
         &credentials.id.to_string(),
     )
-    .await
-    .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
+        .await
+        .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
 }
 
 #[tauri::command]
@@ -1455,11 +1468,11 @@ async fn discord_auth_link(
         "discord-signin",
         tauri::WindowUrl::External(url.parse().unwrap()),
     )
-    .title("Discord X NoRiskClient")
-    .always_on_top(true)
-    .center()
-    .max_inner_size(1250.0, 1000.0)
-    .build()?;
+        .title("Discord X NoRiskClient")
+        .always_on_top(true)
+        .center()
+        .max_inner_size(1250.0, 1000.0)
+        .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
 
@@ -1498,7 +1511,7 @@ async fn discord_auth_status(
             .await?,
         &credentials.id.to_string(),
     )
-    .await?)
+        .await?)
 }
 
 #[tauri::command]
@@ -1513,7 +1526,7 @@ async fn discord_auth_unlink(
             .await?,
         &credentials.id.to_string(),
     )
-    .await?;
+        .await?;
     Ok(())
 }
 
@@ -1537,10 +1550,10 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
                 .as_error()
         })?),
     )
-    .title("Sign into NoRiskClient")
-    .always_on_top(true)
-    .center()
-    .build()?;
+        .title("Sign into NoRiskClient")
+        .always_on_top(true)
+        .center()
+        .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
 
@@ -1900,7 +1913,7 @@ async fn run_client(
                     },
                     window_mutex.clone(),
                 )
-                .await
+                    .await
                 {
                     if !keep_launcher_open {
                         window_mutex.lock().unwrap().show().unwrap();
@@ -1915,7 +1928,7 @@ async fn run_client(
                         &window_mutex,
                         format!("Failed to launch client: {:?}", e).as_bytes(),
                     )
-                    .unwrap();
+                        .unwrap();
                 };
 
                 *copy_of_runner_instance
@@ -2057,12 +2070,12 @@ async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error>
         "runtimes",
         "versions",
     ]
-    .iter()
-    .map(|dir| options.data_path_buf().join(dir))
-    .filter(|dir| dir.exists())
-    .map(std::fs::remove_dir_all)
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
+        .iter()
+        .map(|dir| options.data_path_buf().join(dir))
+        .filter(|dir| dir.exists())
+        .map(std::fs::remove_dir_all)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
     Ok(())
 }
 
@@ -2124,8 +2137,8 @@ async fn create_custom_server(
         token,
         uuid,
     )
-    .await
-    .map_err(|e| format!("unable to create custom server: {:?}", e))
+        .await
+        .map_err(|e| format!("unable to create custom server: {:?}", e))
 }
 
 #[tauri::command]
@@ -2161,8 +2174,8 @@ async fn run_custom_server(
                     token,
                     window_mutex.clone(),
                 )
-                .await
-                .unwrap();
+                    .await
+                    .unwrap();
                 window_mutex
                     .lock()
                     .unwrap()
@@ -2200,8 +2213,8 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
                 &window_mutex,
                 &latest_running_server.server_id.clone().unwrap(),
             )
-            .await
-            .unwrap();
+                .await
+                .unwrap();
             Ok((true, latest_running_server.server_id.unwrap()))
         }
         false => {
@@ -2528,6 +2541,7 @@ async fn get_full_feature_whitelist(
     .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
 }
 
+
 ///
 /// Get Launcher feature toggles
 ///
@@ -2546,8 +2560,8 @@ async fn check_feature_whitelist(
             .unwrap(),
         &credentials.id.to_string(),
     )
-    .await
-    .map_err(|e| format!("unable to check feature whitelist: {:?}", e))
+        .await
+        .map_err(|e| format!("unable to check feature whitelist: {:?}", e))
 }
 
 /// Runs the GUI and returns when the window is closed.

@@ -518,16 +518,16 @@ pub struct NoRiskToken {
 
 impl NoRiskCredentials {
     pub async fn get_token(&self, experimental_mode: bool) -> Result<String, crate::error::Error> {
-        return if experimental_mode && self.experimental.is_some() {
-            Ok(self.clone().experimental.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
+        if experimental_mode && self.experimental.is_some() {
+            Ok(self.experimental.as_ref().ok_or(ErrorKind::NoCredentialsError)?.value.clone())
         } else {
             if experimental_mode && self.experimental.is_none() {
                 let mut options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await?;
                 options.experimental_mode = false;
                 options.store(LAUNCHER_DIRECTORY.config_dir()).await?;
             }
-            Ok(self.clone().production.ok_or(ErrorKind::NoCredentialsError).unwrap().value)
-        };
+            Ok(self.production.as_ref().ok_or(ErrorKind::NoCredentialsError)?.value.clone())
+        }
     }
 }
 
