@@ -187,7 +187,7 @@
     "servers.button.createCustomServer": "Create",
     "servers.tooltip.customServerLimit": "You can only create a limited amount of servers.",
     "servers.custom.limitReached": "Limit reached",
-    "servers.custom.empty": "You don\\'t have any custom servers.",
+    "servers.custom.empty": "You don't have any custom servers.",
     "servers.featured.tooltip.supportsSpecialNoRiskClientFeatures": "Supports special NoRiskClient features",
     "servers.featured.launching": "LAUNCHING...",
     "servers.featured.playing": "PLAYING...",
