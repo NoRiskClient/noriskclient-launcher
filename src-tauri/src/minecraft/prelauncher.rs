@@ -112,7 +112,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
             continue;
         }
 
-        progress.progress_update(ProgressUpdate::set_label(format!("Downloading recommended mod {}", current_mod.name)));
+        progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingRecommendedMod&mod%{}", current_mod.name)));
 
         let current_mod_path = mod_cache_path.join(current_mod.source.get_path()?);
 

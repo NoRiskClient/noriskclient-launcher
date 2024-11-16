@@ -5,6 +5,10 @@
     import { launcherOptions } from "../../../../stores/optionsStore.js";
     import { defaultUser } from "../../../../stores/credentialsStore.js";
     import { addNotification } from "../../../../stores/notificationStore.js";
+    import { translations } from '../../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -21,17 +25,17 @@
         }).then(() => {
             dispatch('next');
         }).catch((error) => {
-            addNotification("Failed to check subdomain: " + error);
+            addNotification(lang.servers.custom.create.nameAndSubdomain.notification.failedToCheckSubdomain.replace("{error}", error));
         });
     }
 </script>
 
 <div class="tab-wrapper">
-    <h1 class="title">Server Setup</h1>
+    <h1 class="title">{lang.servers.custom.create.nameAndSubdomain.title}</h1>
     <div class="row">
         <div class="column" style="width: 65%;">
-            <TextInput bind:value={name} title="Server Name" placeholder="Your server name..." autofocus={true} />
-            <TextInput bind:value={subdomain} title="Domain" placeholder="Your custom subdomain..." suffix={`.${baseDomain}`} />
+            <TextInput bind:value={name} title={lang.servers.custom.create.nameAndSubdomain.tooltip.name} placeholder={lang.servers.custom.create.nameAndSubdomain.placeholder.name} autofocus={true} />
+            <TextInput bind:value={subdomain} title={lang.servers.custom.create.nameAndSubdomain.tooltip.domain} placeholder={lang.servers.custom.create.nameAndSubdomain.placeholder.subdomain} suffix={`.${baseDomain}`} />
         </div>
         <div class="column" style="gap: 0em;">
             <h1>Icon</h1>

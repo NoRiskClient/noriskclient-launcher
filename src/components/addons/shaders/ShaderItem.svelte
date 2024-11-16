@@ -1,6 +1,10 @@
 <script>
     import {createEventDispatcher} from "svelte";
     import FallbackIcon from "/src/images/modrinth.png";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
     
     const dispatch = createEventDispatcher()
 
@@ -12,9 +16,9 @@
         if (shader?.downloads < 1000) {
             return shader?.downloads;
         } else if (shader?.downloads < 1000000) {
-            return (shader?.downloads / 1000).toFixed(1) + "K";
+            return lang.addons.global.item.downloadCount.thousand.replace("{count}", (shader?.downloads / 1000).toFixed(1));
         } else {
-            return (shader?.downloads / 1000000).toFixed(1) + "M";
+            return lang.addons.global.item.downloadCount.million.replace("{count}", (shader?.downloads / 1000000).toFixed(1));
         }
     }
 </script>
@@ -44,7 +48,7 @@
                 {/if}
                 {#if shader?.author != undefined && shader?.author != null}
                     <div class="author-container">
-                        <p class="author">by {shader.author ?? shader.value.author}</p>
+                        <p class="author">{lang.addons.global.item.madeBy.replace("{author}", shader.author ?? shader.value.author)}</p>
                         <b>•</b>
                         <p class="download-count">{getMinimalisticDownloadCount()}</p>
                     </div>
@@ -58,23 +62,23 @@
     <div class="buttons">
         {#if shader?.loading ?? false}
             <h1 class="required-button primary-text">
-                LOADING
+                {lang.addons.global.item.loading}
             </h1>
         {:else if text === "INSTALL"}
             {#if shader?.featured}
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <h1 class="featured-label" style="margin-bottom: 15px;">
-                        FEATURED
+                        {lang.addons.global.item.featured}
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                        INSTALL
+                        {lang.addons.global.item.button.install}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                    INSTALL
+                    {lang.addons.global.item.button.install}
                 </h1>
             {/if}
         {:else if text === "INSTALLED"}
@@ -82,18 +86,18 @@
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     {#if shader?.featured}
                         <h1 class="featured-label" style="margin-bottom: 15px;">
-                            FEATURED
+                            {lang.addons.global.item.featured}
                         </h1>
                     {/if}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
-                        DELETE
+                        {lang.addons.global.item.button.delete}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
-                    DELETE
+                    {lang.addons.global.item.button.delete}
                 </h1>
             {/if}
         {/if}

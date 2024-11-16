@@ -10,7 +10,7 @@
   let showModal = false;
 </script>
 
-<Modal bind:showModal></Modal>
+<Modal bind:showModal />
 <div class="skin-kopf-container">
   {#if $defaultUser}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -26,7 +26,7 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img class="skin-kopf zoom glow"
          src={SteveSkin}
-         alt="Skin Kopf"
+         alt="Skin Head"
          on:click={startMicrosoftAuth}
     >
   {/if}

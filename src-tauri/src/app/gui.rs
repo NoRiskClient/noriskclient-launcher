@@ -1585,7 +1585,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
 
                 app.get_window("main")
                     .unwrap()
-                    .emit("microsoft-output", "NoRisk Token")
+                    .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
 
                 match accounts.refresh_norisk_token(&credentials.clone()).await {

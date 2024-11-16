@@ -5,6 +5,7 @@ import { launcherOptions, saveOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
 import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { profiles } from "../stores/profilesStore.js";
+import { translations } from "./translationUtils";
 
 export const version = writable("");
 export const noriskUser = writable(null);
@@ -136,7 +137,7 @@ export async function runClient(branch, checkedForNewBranch = false) {
     isClientRunning.set([false, false]);
     forceServer.set("");
     pop();
-    addNotification("Failed to run client: " + error);
+    addNotification(get(translations).app.notification.failedToRunClient.replace("{error}", error));
   });
 
   // NoRisk Token Changed So Update
@@ -154,7 +155,7 @@ export async function stopClient() {
 
 export async function openMinecraftLogsWindow() {
   if (get(isClientRunning)[1]) {
-    addNotification("Logs are unavailable because your launcher was closed since you started the game.", "INFO", "Logs unavailable!");
+    addNotification(get(translations).logs.notification.liveLogsUnavailable.info, "INFO", get(translations).logs.notification.liveLogsUnavailable.details);
   }
 
   await invoke("open_minecraft_logs_window").catch(reason => {

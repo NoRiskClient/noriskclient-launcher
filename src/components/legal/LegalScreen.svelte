@@ -1,30 +1,33 @@
 <script>
     import { preventSelection } from "../../utils/svelteUtils.js";
-    import { push } from "svelte-spa-router";
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="container" on:selectstart={preventSelection}>
-    <h1 class="title">Legal Information</h1>
+    <h1 class="title">{lang.legal.title}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="card" style="margin-top: 60px;" on:click={() => window.open("https://norisk.gg/privacy-policy", "_blanc")}> <!-- push('/legal/privacy-policy') -->
-        <h2>🔐 Privacy Policy</h2>
+        <h2>🔐 {lang.legal.button.privacyPolicy}</h2>
         <p>&gt;</p>
     </div>
     <div class="card" on:click={() => window.open("https://norisk.gg/terms-of-service", "_blanc")}> <!-- push('/legal/terms-of-service') -->
-        <h2>📝 Terms of Service</h2>
+        <h2>📝 {lang.legal.button.termsOfService}</h2>
         <p>&gt;</p>
     </div>
     <div class="card" on:click={() => window.open("https://norisk.gg/open-source-licences", "_blanc")}> <!-- push('/legal/open-source-licences') -->
-        <h2>📜 Open Source Licences</h2>
+        <h2>📜 {lang.legal.button.openSourceLicenses}</h2>
         <p>&gt;</p>
     </div>
     <div class="card" on:click={() => window.open("https://norisk.gg/used-libraries", "_blanc")}> <!-- push('/legal/used-libraries') -->
-        <h2>📦 Used Libraries</h2>
+        <h2>📦 {lang.legal.button.usedLibraries}</h2>
         <p>&gt;</p>
     </div>
     <div class="card" on:click={() => window.open("https://norisk.gg/imprint", "_blanc")}> <!-- push('/legal/imprint') -->
-        <h2>📨 Imprint</h2>
+        <h2>📨 {lang.legal.button.imprint}</h2>
         <p>&gt;</p>
     </div>
 </div>

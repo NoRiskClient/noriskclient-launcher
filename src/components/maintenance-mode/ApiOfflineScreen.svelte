@@ -1,15 +1,21 @@
 <script>
     import { appWindow } from "@tauri-apps/api/window";
+	import { translations } from './../../utils/translationUtils.js';
+
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 </script>
 
 <div class="container">
     <div class="api-offline">
-        <h1 class="title text primary-text">API Offline!</h1>
-        <p class="text">Our API is currently offline.<br>Please try again later or check or Discord for more information.</p>
+        <h1 class="title text primary-text">{lang.apiOffline.title}</h1>
+        <p class="text">{@html lang.apiOffline.text}</p>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <p class="status" on:click={() => window.open("https://status.norisk.gg", "_blanc")}>-&gt; Status</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>Exit</h1>
+        <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>{lang.apiOffline.button.exit}</h1>
     </div>
 </div>
 
@@ -38,6 +44,20 @@
     .api-offline p {
         font-size: 15px;
         padding: 0px 35px;
+    }
+
+    .api-offline .status {
+        cursor: pointer;
+        color: #167e23;
+        text-shadow: 2px 2px #1a5922;
+        font-family: 'Press Start 2P', serif;
+        font-size: 23px;
+        margin-top: 20px;
+        transition-duration: 200ms;
+    }
+
+    .api-offline .status:hover {
+        transform: scale(1.2);
     }
 
     .api-offline .discord {

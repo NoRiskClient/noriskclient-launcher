@@ -13,6 +13,10 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -34,52 +38,7 @@
   let search_limit = 30;
   let search_index = "relevance";
 
-  let filterCategories = [
-    {
-      type: "Categories",
-      entries: [
-        { id: "combat", name: "Combat" },
-        { id: "cursed", name: "Cursed" },
-        { id: "decoration", name: "Decoration" },
-        { id: "modded", name: "Modded" },
-        { id: "realistic", name: "Realistic" },
-        { id: "simplistic", name: "Simplistic" },
-        { id: "themed", name: "Themed" },
-        { id: "tweaks", name: "Tweaks" },
-        { id: "utility", name: "Utility" },
-        { id: "vanilla-like", name: "Vanilla Like" },
-      ],
-    },
-    {
-      type: "Features",
-      entries: [
-        { id: "audio", name: "Audio" },
-        { id: "blocks", name: "Blocks" },
-        { id: "core-shaders", name: "Core Shaders" },
-        { id: "entities", name: "Entities" },
-        { id: "environment", name: "Environment" },
-        { id: "equipment", name: "Equipment" },
-        { id: "fonts", name: "Fonts" },
-        { id: "gui", name: "GUI" },
-        { id: "items", name: "Items" },
-        { id: "locale", name: "Locale" },
-        { id: "models", name: "Models" },
-      ],
-    },
-    {
-      type: "Performance",
-      entries: [
-        { id: "8x-", name: "8x or lower" },
-        { id: "16x", name: "16x" },
-        { id: "32x", name: "32x" },
-        { id: "48x", name: "48x" },
-        { id: "64x", name: "64x" },
-        { id: "128x", name: "128x" },
-        { id: "256x", name: "256x" },
-        { id: "512x+", name: "512x or higher" },
-      ],
-    },
-  ];
+  let filterCategories = [];
   let filters = {};
   
   let lastFileDrop = -1;
@@ -319,13 +278,13 @@
       const locations = await open({
         defaultPath: "/",
         multiple: true,
-        filters: [{ name: "Resource Packs", extensions: ["zip"] }],
+        filters: [{ name: lang.addons.mods.selectCustomResourcePackFileExtentionFilterName, extensions: ["zip"] }],
       });
       if (locations instanceof Array) {
         installCustomResourcePacks(locations);
       }
     } catch (error) {
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.addons.mods.notification.failedToSelectCustomResourcePacks.replace("{error}", error));
     }
   }
 
@@ -379,6 +338,52 @@
   }
 
   onMount(() => {
+    [
+      {
+        type: lang.addons.resourcePacks.filters.categories.title,
+        entries: [
+          { id: "combat", name: lang.addons.resourcePacks.filters.categories.combat },
+          { id: "cursed", name: lang.addons.resourcePacks.filters.categories.cursed },
+          { id: "decoration", name: lang.addons.resourcePacks.filters.categories.decoration },
+          { id: "modded", name: lang.addons.resourcePacks.filters.categories.modded },
+          { id: "realistic", name: lang.addons.resourcePacks.filters.categories.realistic },
+          { id: "simplistic", name: lang.addons.resourcePacks.filters.categories.simplistic },
+          { id: "themed", name: lang.addons.resourcePacks.filters.categories.themed },
+          { id: "tweaks", name: lang.addons.resourcePacks.filters.categories.tweaks },
+          { id: "utility", name: lang.addons.resourcePacks.filters.categories.utility },
+          { id: "vanilla-like", name: lang.addons.resourcePacks.filters.categories.vanillaLike },
+        ],
+      },
+      {
+        type: lang.addons.resourcePacks.filters.features.title,
+        entries: [
+          { id: "audio", name: lang.addons.resourcePacks.filters.features.audio },
+          { id: "blocks", name: lang.addons.resourcePacks.filters.features.blocks },
+          { id: "core-shaders", name: lang.addons.resourcePacks.filters.features.coreShaders },
+          { id: "entities", name: lang.addons.resourcePacks.filters.features.entities },
+          { id: "environment", name: lang.addons.resourcePacks.filters.features.environment },
+          { id: "equipment", name: lang.addons.resourcePacks.filters.features.equipment },
+          { id: "fonts", name: lang.addons.resourcePacks.filters.features.fonts },
+          { id: "gui", name: lang.addons.resourcePacks.filters.features.gui },
+          { id: "items", name: lang.addons.resourcePacks.filters.features.items },
+          { id: "locale", name: lang.addons.resourcePacks.filters.features.locale },
+          { id: "models", name: lang.addons.resourcePacks.filters.features.models },
+        ],
+      },
+      {
+        type: lang.addons.resourcePacks.filters.performance.title,
+        entries: [
+          { id: "8x-", name: lang.addons.resourcePacks.filters.performance.x8orLower},
+          { id: "16x", name: lang.addons.resourcePacks.filters.performance.x16 },
+          { id: "32x", name: lang.addons.resourcePacks.filters.performance.x32 },
+          { id: "48x", name: lang.addons.resourcePacks.filters.performance.x48 },
+          { id: "64x", name: lang.addons.resourcePacks.filters.performance.x64 },
+          { id: "128x", name: lang.addons.resourcePacks.filters.performance.x128 },
+          { id: "256x", name: lang.addons.resourcePacks.filters.performance.x256 },
+          { id: "512x+", name: lang.addons.resourcePacks.filters.performance.x512orHigher},
+        ],
+      },
+    ]
     load();
   });
 
@@ -390,13 +395,13 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>{lang.addons.global.navbar.discover}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>{lang.addons.global.navbar.installed}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={handleSelectCustomResourcePacks}>Custom</h1>
+    <h1 on:click={handleSelectCustomResourcePacks}>{lang.addons.global.navbar.button.custom}</h1>
   </div>
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
@@ -404,7 +409,7 @@
             listScroll = 0;
             searchResourcePacks();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
-                       bind:options={options} placeHolder="Search for Resource Packs on Modrinth..." />
+                       bind:options={options} placeHolder={lang.addons.resourcePacks.searchbar.modrinth.placeholder} />
     {#if resourcePacks !== null && resourcePacks.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...resourcePacks, loadMoreButton ? 'LOAD_MORE_RESOURCEPACKS' : null] as item}
@@ -422,11 +427,11 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{resourcePacks == null ? 'No Resource Packs found.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{resourcePacks == null ? lang.addons.resourcePacks.noResourcePacksFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
-                       placeHolder="Filter installed Resource Packs..." />
+                       placeHolder={lang.addons.resourcePacks.searchbar.installed.placeholder} />
     {#if launcherProfiles.addons[currentBranch].resourcePacks.length > 0 || customResourcePacks.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...customResourcePacks,...launcherProfiles.addons[currentBranch].resourcePacks].filter((resourcePack) => {
@@ -449,7 +454,7 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].resourcePacks.length < 1 ? 'No resourcepacks installed.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].resourcePacks.length < 1 ? lang.addons.resourcePacks.noResourcePacksInstalled : lang.addons.global.loading}</h1>
     {/if}
   {/if}
 </div>

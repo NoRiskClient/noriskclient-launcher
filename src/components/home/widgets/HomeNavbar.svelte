@@ -9,6 +9,10 @@
   import { getNoRiskToken, noriskLog, getFeatureWhitelist, featureWhitelist, getNoRiskUser } from "../../../utils/noriskUtils.js";
   import { openInputPopup } from "../../../utils/popupUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
+  import { translations } from '../../../utils/translationUtils.js';
+
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   let friendInviteSlots = {};
 
@@ -17,47 +21,47 @@
   function updateNavItems() {
     navItems = [
       {
-        name: "LEGAL-INFO",
+        name: lang.home.navbar.button.legalInfo,
         onClick: () => push("/legal"),
         condition: () => true,
       },
       {
-        name: "SETTINGS",
+        name: lang.home.navbar.button.settings,
         onClick: () => push("/launcher-settings"),
         condition: true
       },
       {
-        name: "PROFILES",
+        name: lang.home.navbar.button.profiles,
         onClick: () => push("/profiles"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
-        name: "SERVERS",
+        name: lang.home.navbar.button.servers,
         onClick: () => push("/servers"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
-        name: "ADDONS",
+        name: lang.home.navbar.button.addons,
         onClick: () => push("/addons"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
-        name: "INVITE",
+        name: lang.home.navbar.button.invite,
         onClick: openInviteFriendsPopup,
         condition: () => get(branches).length > 0 && get(defaultUser) != null && $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1,
       },
       {
-        name: "CAPES",
+        name: lang.home.navbar.button.capes,
         onClick: () => push("/capes"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
-        name: "SKIN",
+        name: lang.home.navbar.button.skin,
         onClick: () => push("/skin"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
       },
       {
-        name: "QUIT",
+        name: lang.home.navbar.button.quit,
         onClick: () => appWindow.close(),
         condition: true,
         className: "quit",
@@ -68,7 +72,7 @@
 
   onMount(async () => {
     const branchesUnlisten = branches.subscribe(async value => {
-      updateNavItems();
+      updateNavItems();      
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
@@ -109,22 +113,23 @@
 
   function openInviteFriendsPopup() {
     openInputPopup({
-      title: "Invite Friends",
-      content: `You have ${friendInviteSlots.text} invites left.\nYou can use them to invite a friend to the NRC closed beta.`,
-      inputPlaceholder: "Username / UUID",
-      confirmButton: "Invite",
+      title: lang.home.navbar.popup.inviteFriends.title,
+      content: lang.home.navbar.popup.inviteFriends.content.replace("{slots}", friendInviteSlots.text),
+      inputPlaceholder: lang.home.navbar.popup.inviteFriends.inputPlaceholder,
+      confirmButton: lang.home.navbar.popup.inviteFriends.confirmButton,
       height: 22,
       contentFontSize: 14,
-      validateInput: (input) => input.length > 2 && input.length <= 16,
+      validateInput: (input) => input.length > 2 && (input.length <= 16 || input.length == 36),
       onConfirm: async (identifier) => {        
         await invoke("add_player_to_whitelist", {
           identifier: identifier,
           noriskToken: getNoRiskToken(),
           requestUuid: $defaultUser.id,
         }).then(() => {
-          addNotification("Successfully invited " + identifier + " to the NRC closed beta!", "INFO");
+          addNotification(lang.home.navbar.natification.invite.success.replace("{user}", identifier), "INFO");
+          loadFriendInvites();
         }).catch((error) => {
-          addNotification("An error occurred while inviting " + identifier + " to the NRC closed beta: " + error);
+          addNotification(lang.home.navbar.natification.invite.error.replace("{user}", identifier).replace("{error}", error));
         });
       }
     })
@@ -136,7 +141,7 @@
     {#if $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots - friendInviteSlots.previousInvites > 0}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="invite-button" on:click={openInviteFriendsPopup}>
-        <p>✨ INVITE ✨</p>
+        <p>{lang.home.navbar.button.inviteFeature}</p>
       </h1>
     {/if}
     {#each navItems as item (item.name)}

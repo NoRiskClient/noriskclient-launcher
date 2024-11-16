@@ -2,6 +2,10 @@
   import AccountListItem from "./AccountListItem.svelte";
   import { defaultUser, users } from "../../stores/credentialsStore.js";
   import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let showModal;
 
@@ -18,7 +22,7 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="nes-font">ACCOUNTS</h1>
+        <h1 class="nes-font">{lang.accountModal.title}</h1>
         <h1 class="nes-font red-text-clickable" on:click={() => dialog.close()}>X</h1>
       </div>
       <hr>
@@ -29,7 +33,7 @@
       {/if}
     </div>
     <!-- svelte-ignore a11y-autofocus -->
-    <div class="add-account-button primary-text" on:click={startMicrosoftAuth}>ADD ACCOUNT</div>
+    <div class="add-account-button primary-text" on:click={startMicrosoftAuth}>{lang.accountModal.addAccountButton}</div>
   </div>
 </dialog>
 

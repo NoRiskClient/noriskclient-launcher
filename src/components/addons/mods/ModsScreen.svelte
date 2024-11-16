@@ -11,6 +11,10 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { addNotification } from "../../../stores/notificationStore.js";
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let isServersideInstallation = false;
 
@@ -35,52 +39,8 @@
   let search_limit = 30;
   let search_index = "relevance";
 
-  let filterCategories = [
-    {
-      type: "Environments",
-      entries: [
-        { id: "client_side", name: "Client" },
-        { id: "server_side", name: "Server" },
-      ],
-    },
-    {
-      type: "NoRiskClient",
-      entries: [
-        { id: "norisk", name: "NoRiskClient Mods" },
-      ]
-    },
-    {
-      type: "Categories",
-      entries: [
-        { id: "adventure", name: "Adventure" },
-        { id: "cursed", name: "Cursed" },
-        { id: "decoration", name: "Decoration" },
-        { id: "economy", name: "Economy" },
-        { id: "equipment", name: "Equipment" },
-        { id: "food", name: "Food" },
-        { id: "game-mechanics", name: "Game Mechanics" },
-        { id: "library", name: "Library" },
-        { id: "magic", name: "Magic" },
-        { id: "management", name: "Management" },
-        { id: "minigame", name: "Minigame" },
-        { id: "mobs", name: "Mobs" },
-        { id: "optimization", name: "Optimization" },
-        { id: "social", name: "Social" },
-        { id: "storage", name: "Storage" },
-        { id: "technology", name: "Technology" },
-        { id: "transportation", name: "Transportation" },
-        { id: "utility", name: "Utility" },
-        { id: "worldgen", name: "Worldgen" },
-      ],
-    },
-  ];
+  let filterCategories = [];
   let filters = {};
-
-  if (!isServersideInstallation) {
-    filterCategories.shift();
-  } else {
-    filterCategories = filterCategories.filter(category => category.type !== "NoRiskClient");
-  }
 
   $: loginData = $defaultUser;
 
@@ -208,7 +168,7 @@
     }).then((result) => {
       const blockedDependencies = result.dependencies.filter(d => blacklistedMods.some(slug => slug == d.value.source.artifact.split(":")[1]))
       if (blockedDependencies.length > 0) {
-        addNotification(`Failed to install mod because of incompatible dependencies:<br><br>${blockedDependencies.map(d => d.value.name).join(', ')}`, "ERROR", null, 5000);
+        addNotification(lang.addons.mods.notification.failedToInstallDueToDependencies.replace("{dependencies}", blockedDependencies.map(d => d.value.name).join(', ')), "ERROR", null, 5000);
         return;
       }
 
@@ -228,7 +188,7 @@
   async function changeModVersion(slug, version) {
     let mod = launcherProfile.mods.find(mod => mod.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase());
     if (!mod) {
-      addNotification(`Failed to change version of ${slug} because it is not installed.`);
+      addNotification(lang.addons.mods.notification.failedToChangeVersion.notInstalled.replace("{slug}", slug));
       return;
     }
 
@@ -240,7 +200,7 @@
     }).then(async (result) => {
       const blockedDependencies = result.dependencies.filter(d => blacklistedMods.some(slug => slug == d.value.source.artifact.split(":")[1]))
       if (blockedDependencies.length > 0) {
-        addNotification(`Failed to install mod because of incompatible dependencies:<br><br>${blockedDependencies.map(d => d.value.name).join(', ')}`, "ERROR", null, 5000);
+        addNotification(lang.addons.mods.notification.failedToChangeVersion.incompatibleDependencies.replace("{dependencies}", blockedDependencies.map(d => d.value.name).join(', ')), "ERROR", null, 5000);
         return;
       }
 
@@ -303,7 +263,7 @@
           const slug = mod.source.artifact.split(":")[1];
           let author;
           let iconUrl = "";
-          let description = "A mod recomended by NoRiskClient.";
+          let description = "";
           if (mod.source.repository == "modrinth") {
             await invoke("get_mod_info", { slug }).then(info => {
               author = info.author ?? null;
@@ -369,7 +329,7 @@
             await invoke("get_mod_info", { slug }).then(async info => {
               if (info.author == null) {
                 await invoke("get_mod_author", { slug }).then(author => {
-                  modData.author = author ?? "Unknown";
+                  modData.author = author ?? lang.addons.mods.unknownAuthor;
                 })
               } else {
                 modData.author = info.author;
@@ -536,13 +496,13 @@
       const locations = await open({
         defaultPath: "/",
         multiple: true,
-        filters: [{ name: "Custom Mods", extensions: ["jar"] }],
+        filters: [{ name: lang.addons.mods.selectCustomModFileExtentionFilterName, extensions: ["jar"] }],
       });
       if (locations instanceof Array) {
         installCustomMods(locations);
       }
     } catch (error) {
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.addons.mods.notification.failedToSelectCustomMods.replace("{error}", error));
     }
   }
 
@@ -557,12 +517,12 @@
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
 
       if (!fileName.endsWith(".jar")) {
-        addNotification(`Cannot install ${fileName}!<br><br>Only .jar files are supported.`);
+        addNotification(lang.addons.mods.notification.invalidCustomModFileExtention.replace("{fileName}", fileName));
         return;
       }
 
       if (customModFiles.includes(fileName)) {
-        addNotification(`Cannot install ${fileName}!<br><br>Mod already exists.`);
+        addNotification(lang.addons.mods.notification.customModFileAlreadyExists.replace("{fileName}", fileName));
         return;
       }
 
@@ -626,6 +586,51 @@
   }
 
   onMount(() => {
+    filterCategories = [
+      {
+        type: lang.addons.mods.filters.environments.title,
+        entries: [
+          { id: "client_side", name: lang.addons.mods.filters.environments.client },
+          { id: "server_side", name: lang.addons.mods.filters.environments.server },
+        ],
+      },
+      {
+        type: lang.addons.mods.filters.noriskclient.title,
+        entries: [
+          { id: "norisk", name: lang.addons.mods.filters.noriskclient.mods },
+        ]
+      },
+      {
+        type: lang.addons.mods.filters.categories.title,
+        entries: [
+          { id: "adventure", name: lang.addons.mods.filters.categories.adventure },
+          { id: "cursed", name: lang.addons.mods.filters.categories.cursed },
+          { id: "decoration", name: lang.addons.mods.filters.categories.decoration },
+          { id: "economy", name: lang.addons.mods.filters.categories.economy },
+          { id: "equipment", name: lang.addons.mods.filters.categories.equipment },
+          { id: "food", name: lang.addons.mods.filters.categories.food },
+          { id: "game-mechanics", name: lang.addons.mods.filters.categories.gameMechanics },
+          { id: "library", name: lang.addons.mods.filters.categories.library },
+          { id: "magic", name: lang.addons.mods.filters.categories.magic },
+          { id: "management", name: lang.addons.mods.filters.categories.management },
+          { id: "minigame", name: lang.addons.mods.filters.categories.minigame },
+          { id: "mobs", name: lang.addons.mods.filters.categories.mobs },
+          { id: "optimization", name: lang.addons.mods.filters.categories.optimization },
+          { id: "social", name: lang.addons.mods.filters.categories.social },
+          { id: "storage", name: lang.addons.mods.filters.categories.storage },
+          { id: "technology", name: lang.addons.mods.filters.categories.technology },
+          { id: "transportation", name: lang.addons.mods.filters.categories.transportation },
+          { id: "utility", name: lang.addons.mods.filters.categories.utility },
+          { id: "worldgen", name: lang.addons.mods.filters.categories.worldgen },
+        ],
+      },
+    ];
+    if (!isServersideInstallation) {
+      filterCategories.shift();
+    } else {
+      filterCategories = filterCategories.filter(category => category.type !== lang.addons.mods.filters.noriskclient.title);
+    }
+   
     load();
   });
 </script>
@@ -633,13 +638,13 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 0} on:click={() => {currentTabIndex = 0, listScroll = 0}}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => {currentTabIndex = 0, listScroll = 0}}>{lang.addons.global.navbar.discover}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 1} on:click={() => {currentTabIndex = 1, listScroll = 0}}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => {currentTabIndex = 1, listScroll = 0}}>{lang.addons.global.navbar.installed}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={handleSelectCustomMods}>Custom</h1>
+    <h1 on:click={handleSelectCustomMods}>{lang.addons.global.navbar.button.custom}</h1>
   </div>
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
@@ -647,13 +652,13 @@
             listScroll = 0;
             searchMods();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
-                       bind:options={options} placeHolder="Search for Mods on Modrinth..." />
+                       bind:options={options} placeHolder={lang.addons.mods.searchbar.modrinth.placeholder} />
     {#if mods !== null && mods.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...mods, showMoreButton && !filters['norisk']?.enabled ? 'LOAD_MORE_MODS' : null] as item}
           {#if item === 'LOAD_MORE_MODS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
+            <div class="load-more-button" on:click={loadMore}><p class="primary-text">{lang.addons.global.button.loadMore}</p></div>
           {:else if item != null}
             <ModItem
               text={checkIfRequiredOrInstalled(item)}
@@ -669,10 +674,10 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{mods == null ? 'No Mods found.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{mods == null ? lang.addons.mods.noModsFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Mods..." />
+    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.mods.searchbar.installed.placeholder} />
     {#if launcherProfile.mods.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop}>
         {#each (() => {
@@ -724,7 +729,7 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{launcherProfile.mods.length < 1 ? 'No mods installed.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{launcherProfile.mods.length < 1 ? lang.addons.mods.noModsInstalled : lang.addons.global.loading}</h1>
     {/if}
   {/if}
 </div>

@@ -3,6 +3,10 @@
     import VirtualList from "../../../utils/VirtualList.svelte";
     import { createEventDispatcher } from "svelte";
     import { addNotification } from "../../../../stores/notificationStore.js";
+    import { translations } from '../../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -48,7 +52,7 @@
 </script>
 
 <div class="tab-wrapper">
-    <h1 class="title">Loader Version</h1>
+    <h1 class="title">{lang.servers.custom.create.loaderVersion.title}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="before-button" on:click={() => dispatch('back')}>&lt;-</h1>
     <VirtualList height="28em" items={

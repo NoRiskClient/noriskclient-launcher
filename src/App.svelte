@@ -27,6 +27,10 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
+  import { setLanguage, language, translations } from "./utils/translationUtils.js";
+
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   onMount(async () => {
     setTimeout(async () => {
@@ -35,6 +39,8 @@
     await getVersion();
     await checkIfClientIsRunning();
     await fetchOptions();
+    setLanguage($language);
+
     await fetchDefaultUserOrError(false);
     const isTokenValid = await getNoRiskUser();
     if (isTokenValid) {
@@ -89,7 +95,10 @@
 </script>
 
 <main>
-  <Router />
+  <!-- Ensure translations are loaded before showing UI -->
+  {#if lang?.dummy}
+    <Router />
+  {/if}
 </main>
 
 <style>

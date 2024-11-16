@@ -13,6 +13,10 @@
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: options = $launcherOptions;
@@ -34,42 +38,7 @@
   let search_limit = 30;
   let search_index = "relevance";
 
-  let filterCategories = [
-    {
-      type: "Categories",
-      entries: [
-        { id: "cartoon", name: "Cartoon" },
-        { id: "cursed", name: "Cursed" },
-        { id: "fantasy", name: "Fantasy" },
-        { id: "realistic", name: "Realistic" },
-        { id: "semi-realistic", name: "Semi Realistic" },
-        { id: "vanilla-like", name: "Vanilla Like" },
-      ],
-    },
-    {
-      type: "Features",
-      entries: [
-        { id: "atmosphere", name: "Atmosphere" },
-        { id: "bloom", name: "Bloom" },
-        { id: "colored-lighting", name: "Colored Lighting" },
-        { id: "foliage", name: "Foliage" },
-        { id: "path-tracing", name: "Path Tracing" },
-        { id: "pbr", name: "PBR" },
-        { id: "reflections", name: "Reflections" },
-        { id: "shadows", name: "Shadows" },
-      ],
-    },
-    {
-      type: "Performance Impact",
-      entries: [
-        { id: "potato", name: "Potato" },
-        { id: "low", name: "Low" },
-        { id: "medium", name: "Medium" },
-        { id: "high", name: "High" },
-        { id: "screenshot", name: "Screenshot" },
-      ],
-    },
-  ];
+  let filterCategories = [];
   let filters = {};
 
   let lastFileDrop = -1;
@@ -317,7 +286,7 @@
         installCustomShaders(locations);
       }
     } catch (error) {
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.addons.shaders.notification.failedToSelectCustomShaders.replace("{error}", error));
     }
   }
 
@@ -371,6 +340,42 @@
   }
 
   onMount(() => {
+    filterCategories = [
+      {
+        type: lang.addons.shaders.filter.categories.title,
+        entries: [
+          { id: "cartoon", name: lang.addons.shaders.filter.categories.cartoon },
+          { id: "cursed", name: lang.addons.shaders.filter.categories.cursed },
+          { id: "fantasy", name: lang.addons.shaders.filter.categories.fantasy },
+          { id: "realistic", name: lang.addons.shaders.filter.categories.realistic },
+          { id: "semi-realistic", name: lang.addons.shaders.filter.categories.semiRealistic },
+          { id: "vanilla-like", name: lang.addons.shaders.filter.categories.vanillaLike },
+        ],
+      },
+      {
+        type: lang.addons.shaders.filter.features.title,
+        entries: [
+          { id: "atmosphere", name: lang.addons.shaders.filter.features.atmosohere },
+          { id: "bloom", name: lang.addons.shaders.filter.features.bloom },
+          { id: "colored-lighting", name: lang.addons.shaders.filter.features.coloredLighting },
+          { id: "foliage", name: lang.addons.shaders.filter.features.foliage },
+          { id: "path-tracing", name: lang.addons.shaders.filter.features.pathTracing },
+          { id: "pbr", name: lang.addons.shaders.filter.features.pbr },
+          { id: "reflections", name: lang.addons.shaders.filter.features.reflections },
+          { id: "shadows", name: lang.addons.shaders.filter.features.shadows },
+        ],
+      },
+      {
+        type: lang.addons.shaders.filter.performanceImpact.title,
+        entries: [
+          { id: "potato", name: lang.addons.shaders.filter.performanceImpact.potato },
+          { id: "low", name: lang.addons.shaders.filter.performanceImpact.low },
+          { id: "medium", name: lang.addons.shaders.filter.performanceImpact.medium },
+          { id: "high", name: lang.addons.shaders.filter.performanceImpact.high },
+          { id: "screenshot", name: lang.addons.shaders.filter.performanceImpact.screenshot },
+        ],
+      },
+    ];
     load();
   });
 
@@ -382,13 +387,13 @@
 <div class="modrinth-wrapper">
   <div class="navbar">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Discover</h1>
+    <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>{lang.addons.global.navbar.discover}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Installed</h1>
+    <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>{lang.addons.global.navbar.installed}</h1>
     <h2>|</h2>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={handleSelectCustomShaders}>Custom</h1>
+    <h1 on:click={handleSelectCustomShaders}>{lang.addons.global.navbar.button.custom}</h1>
   </div>
   {#if currentTabIndex === 0}
     <ModrinthSearchBar on:search={() => {
@@ -396,13 +401,13 @@
             listScroll = 0;
             searchShaders();
         }} bind:searchTerm={searchterm} bind:filterCategories={filterCategories} bind:filters={filters}
-                       bind:options={options} placeHolder="Search for Shaders on Modrinth..." />
+                       bind:options={options} placeHolder={lang.addons.shaders.searchbar.modrinth.placeholder} />
     {#if shaders !== null && shaders.length > 0 }
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...shaders, loadMoreButton ? 'LOAD_MORE_SHADERS' : null] as item}
           {#if item == 'LOAD_MORE_SHADERS'}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <div class="load-more-button" on:click={loadMore}><p class="primary-text">LOAD MORE</p></div>
+            <div class="load-more-button" on:click={loadMore}><p class="primary-text">{lang.addons.global.button.loadMore}</p></div>
           {:else if item != null}
             <ShaderItem text={checkIfRequiredOrInstalled(item.slug)}
               on:delete={() => deleteInstalledShader(item)}
@@ -414,10 +419,10 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{shaders == null ? 'No Shaders found.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{shaders == null ? lang.addons.shaders.noShadersFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder="Filter installed Shaders..." />
+    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.shaders.searchbar.installed.placeholder} />
     {#if launcherProfiles.addons[currentBranch].shaders.length > 0 || customShaders.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...customShaders,...launcherProfiles.addons[currentBranch].shaders].filter((shader) => {
@@ -440,7 +445,7 @@
         {/each}
       </div>
       {:else}
-      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].shaders.length < 1 ? 'No shaders installed.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{launcherProfiles.addons[currentBranch].shaders.length < 1 ? lang.addons.shaders.noShadersInstalled : lang.addons.global.loading}</h1>
     {/if}
   {/if}
 </div>

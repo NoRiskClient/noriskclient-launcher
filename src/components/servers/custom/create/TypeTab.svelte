@@ -1,5 +1,9 @@
 <script>
     import {createEventDispatcher} from "svelte";
+    import { translations } from '../../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -11,7 +15,7 @@
 </script>
 
 <div class="tab-wrapper">
-    <h1 class="title">Server Type</h1>
+    <h1 class="title">{lang.servers.custom.create.type.title}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="before-button" on:click={() => dispatch('back')}>&lt;-</h1>
     <div class="types row">

@@ -4,6 +4,10 @@
   import { openConfirmPopup } from "../../utils/popupUtils.js";
   import { noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   const dispatch = createEventDispatcher()
 
@@ -31,7 +35,7 @@
     if (settingsProfile.name == '') {
         settingsProfile.name = "Empty Name?";
     } else if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
-        addNotification("Profile name contains illegal characters.", "ERROR");
+        addNotification(lang.profiles.notification.illigalCharacterError, "ERROR");
         return;
     }
     if (experimentalMode) {
@@ -45,8 +49,8 @@
 
   function confirmDelete() {
     openConfirmPopup({
-      title: "Delete Profile",
-      content: "Are you sure you want to delete this profile?",
+      title: lang.profiles.modal.delete.title,
+      content: lang.profiles.modal.delete.content,
       onConfirm: deleteProfile
     });
   }
@@ -61,14 +65,14 @@
         launcherProfiles.selectedMainProfiles[settingsProfile.branch] = launcherProfiles.mainProfiles.filter(p => p.branch == settingsProfile.branch)[0].id;
     }
     closeSettings();
-    addNotification(`Profile "${settingsProfile.name}" has been deleted.`, "INFO");
+    addNotification(lang.profiles.notification.delete.success.replace("{profile}", settingsProfile.name), "INFO");
     dispatch('update');
   }
 
   async function createProfile() {
     if (settingsProfile.name == '' || settingsProfile.name.toLowerCase() == `${settingsProfile.branch} - Default`.toLowerCase()) return;
     if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
-        addNotification("Profile name contains illegal characters.", "ERROR");
+        addNotification(lang.profiles.notification.illigalCharacterError, "ERROR");
         return;
     }
     noriskLog(`CREATING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);
@@ -81,7 +85,7 @@
     }
     launcherProfiles.store();
     closeSettings();
-    addNotification(`Profile "${settingsProfile.name}" has been created.`, "INFO");
+    addNotification(lang.profiles.notification.create.success.replace("{profile}", settingsProfile.name), "INFO");
     dispatch('update');
   }
 
@@ -110,26 +114,26 @@
     <div>
       <div class="header-wrapper">
         {#if createMode}
-          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>CREATE PROFILE</h1>
+          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.create.title}</h1>
         {:else}
-          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>PROFILE SETTINGS</h1>
+          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.edit.title}</h1>
         {/if}
         <h1 class="nes-font red-text-clickable close-button" on:click={closeSettings}>X</h1>
       </div>
       <hr>
       <div class="settings-wrapper">
-        <ConfigTextInput title="Name" bind:value={settingsProfile.name} />
-        <ConfigTextInput title="Branch" bind:value={settingsProfile.branch} disabled={true} />
+        <ConfigTextInput title={lang.profiles.modal.name} bind:value={settingsProfile.name} />
+        <ConfigTextInput title={lang.profiles.modal.branch} bind:value={settingsProfile.branch} disabled={true} />
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
     {#if createMode}
       <div class="create-profile-button-wrapper">
-        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={createProfile}>CREATE</p>
+        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={createProfile}>{lang.profiles.modal.button.create}</p>
       </div>
     {:else}
       <div class="delete-profile-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>DELETE PROFILE</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>{lang.profiles.modal.button.delete}</p>
       </div>
     {/if}
   </div>

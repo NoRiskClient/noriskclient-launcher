@@ -1,25 +1,29 @@
 <script>
   import { preventSelection } from "../../utils/svelteUtils.js";
   import { push } from "svelte-spa-router";
+  import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="addons-wrapper" on:selectstart={preventSelection}>
-  <h1 class="title">Addons</h1>
+  <h1 class="title">{lang.addons.title}</h1>
   <div class="card" style="margin-top: 60px;" on:click={() => push('/addons/mods')}>
-    <h2>📦 Mods</h2>
+    <h2>📦 {lang.addons.button.mods}</h2>
     <p>&gt;</p>
   </div>
   <div class="card" on:click={() => push('/addons/resourcepacks')}>
-    <h2>🎨 Resource Packs</h2>
+    <h2>🎨 {lang.addons.button.resourcePacks}</h2>
     <p>&gt;</p>
   </div>
   <div class="card" on:click={() => push('/addons/shaders')}>
-    <h2>🔮 Shaders</h2>
+    <h2>🔮 {lang.addons.button.shaders}</h2>
     <p>&gt;</p>
   </div>
   <div class="card" on:click={() => push('/addons/datapacks')}>
-    <h2>🛠️ Datapacks</h2>
+    <h2>🛠️ {lang.addons.button.dataPacks}</h2>
     <p>&gt;</p>
   </div>
 </div>
