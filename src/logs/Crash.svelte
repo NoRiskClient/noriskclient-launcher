@@ -8,9 +8,15 @@
   import { addNotification } from "../stores/notificationStore.js";
   import { noriskError } from "../utils/noriskUtils.js";
   import { launcherOptions, fetchOptions } from "../stores/optionsStore.js";
+  import { translations, setLanguage, language } from '../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   onMount(async () => {
     fetchOptions();
+
+    setLanguage($language);
 
     const crashReportUnlisten = await listen("crash-report", async (event) => {
       const crashReportPath = event.payload;
@@ -39,27 +45,28 @@
   }
 </script>
 
-
-<body class:dark-mode={$launcherOptions?.theme == "DARK"}>
-  <div class="black-bar" data-tauri-drag-region>
-    <h1 class="back-button">CRASHED :(</h1>
-  </div>
-  <main class="content">
-    <div class="logs-wrapper">
-      <VirtualList items={$minecraftLogs} let:item>
-        <LogMessage item={item} />
-      </VirtualList>
+{#if lang?.dummy}
+  <body class:dark-mode={$launcherOptions?.theme == "DARK"}>
+    <div class="black-bar" data-tauri-drag-region>
+      <h1 class="back-button">{lang.crash.title}</h1>
     </div>
-  </main>
-  <div class="black-bar" data-tauri-drag-region>
-    <div class="logs-button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="copy-button" on:click={uploadLogs}>
-        [Copy]
-      </h1>
+    <main class="content">
+      <div class="logs-wrapper">
+        <VirtualList items={$minecraftLogs} let:item>
+          <LogMessage item={item} />
+        </VirtualList>
+      </div>
+    </main>
+    <div class="black-bar" data-tauri-drag-region>
+      <div class="logs-button-wrapper">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="copy-button" on:click={uploadLogs}>
+          [{lang.crash.button.copy}]
+        </h1>
+      </div>
     </div>
-  </div>
-</body>
+  </body>
+{/if}
 
 <style>
     .black-bar {

@@ -105,6 +105,8 @@
     "logs.noLogsFound": "No logs found.",
     "logs.button.autoScroll": "Auto Scroll",
     "logs.button.copy": "Copy",
+    "crash.title": "Crashed :(",
+    "crash.button.copy": "Copy",
     "legal.title": "Legal Information",
     "legal.button.privacyPolicy": "Privacy Policy",
     "legal.button.termsOfService": "Terms of Service",
