@@ -92,13 +92,13 @@
                     style="margin-top: 1em; opacity: 0.65;"
                     on:click={
                         mod.parents.join(", ").length > 180 ? () => openInfoPopup({
-                            title: lang.addons.mods.item.dependency.popup.title,
+                            title: lang.addons.mods.item.dependencyText.popup.title,
                             content: mod.parents.join(", "),
                             contentFontSize: "14px"
                         }) : () => {}
                     }>
                 
-                    {lang.addons.mods.item.dependency.usedBy.replace("{parents}", mod.parents.join(", ").length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", "))}
+                    {lang.addons.mods.item.dependencyText.usedBy.replace("{parents}", mod.parents.length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", "))}
                 </p>
             {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
