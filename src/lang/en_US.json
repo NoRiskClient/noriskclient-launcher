@@ -408,7 +408,7 @@
     "capes.notification.failedToLoadPlayerSkin": "Failed to load player skin: {error}",
     "capes.notification.failedToLoadCape": "Failed to load cape: {error}",
     "capes.notification.failedToUploadCape": "Failed to upload cape!",
-    "capes.notification.unequip.success": "Cape deleted successfully.",
+    "capes.notification.unequip.success": "Cape unequipped successfully.",
     "capes.notification.unequip.error": "Failed to unequip cape: {error}",
     "capes.notification.downloadTemplate.success.info": "Template Cape Downloaded!",
     "capes.notification.downloadTemplate.success.details": "Template Cape Downloaded!<br><br>Check your downloads folder.",
