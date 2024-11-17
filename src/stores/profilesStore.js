@@ -60,7 +60,7 @@ export async function fetchProfiles() {
   });
 
   // Custom mods bug migration
-  if (parseInt(get(version).split(".")[2] ?? "-1") > 12) {
+  if (parseInt(get(version).split(".")[2] ?? "-1") >= 12) {
     const launcherProfiles = get(profiles);
     const todo = [launcherProfiles.mainProfiles, launcherProfiles.experimentalProfiles];
     await Promise.all(
