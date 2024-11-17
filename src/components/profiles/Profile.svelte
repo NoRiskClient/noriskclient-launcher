@@ -15,7 +15,7 @@
 <div class="profile-item-wrapper" class:enabled={active}>
     <div class="text-wrapper" on:click={() => dispatch('select')}>
         <h2>{profile.name.length > 20 && profile.name != `${profile.branch} - Default` ? profile.name.substring(0, 18) + '...' : profile.name}</h2>
-        <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.length} Mods)</h2>
+        <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length} Mods)</h2>
     </div>
     <div class="button-wrapper">
         <h1 class="export-button" title="Export" on:click={() => dispatch('export')}>📤</h1>
