@@ -129,7 +129,7 @@
   async function getCustomModsFilenames() {
     await invoke("get_custom_mods_filenames", {
       options: options,
-      profileName: launcherProfile.name
+      profileId: launcherProfile.id
     }).then((fileNames) => {
       console.debug("Custom Mods", fileNames);
       customModFiles = fileNames;
@@ -481,7 +481,7 @@
   async function deleteCustomModFile(fileName) {
     await invoke("delete_custom_mod_file", {
       options: options,
-      profileName: launcherProfile.name,
+      profileId: launcherProfile.id,
       file: fileName,
     }).then(() => {
       customModFiles.splice(customModFiles.indexOf(fileName), 1);
@@ -527,9 +527,9 @@
       }
 
       noriskLog(`Installing custom Mod ${fileName}`);
-      await invoke("save_custom_mods_to_folder", {
+      await invoke("save_custom_mod_to_folder", {
         options: options,
-        profileName: launcherProfile.name,
+        profileId: launcherProfile.id,
         file: { name: fileName, location: location },
       }).then(() => {
         launcherProfile.mods.push({

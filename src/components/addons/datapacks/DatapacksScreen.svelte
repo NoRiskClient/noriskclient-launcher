@@ -132,18 +132,29 @@
   async function installDatapack(datapack) {
     datapack.loading = true;
     updateDatapacks(datapacks);
-    await invoke("install_datapack", {
+    await invoke("get_datapack", {
       slug: datapack.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["datapack"]`,
       world: world,
-    }).then((result) => {
+    }).then(async (result) => {
       launcherProfiles.addons[currentBranch].datapacks.pushIfNotExist(result, function(e) {
         return e.slug === result.slug && e.world_name === world;
       });
-      datapack.loading = false;
       updateDatapacks(datapacks);
       updateProfileDatapacks(launcherProfiles.addons[currentBranch].datapacks);
       launcherProfiles.store();
+
+      await invoke("download_datapack", {
+        options: $launcherOptions,
+        branch: launchManifest.build.branch,
+        world: world,
+        datapack: result,
+      }).then(() => {
+        datapack.loading = false;
+        updateDatapacks(datapacks);
+      }).catch((error) => {
+        addNotification(error);
+      });
     }).catch((error) => {
       addNotification(error);
     });
@@ -233,15 +244,25 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].datapacks.splice(index, 1);
-      deleteDatapackFile(datapack?.file_name ?? (datapack?.title ? datapack.title + '.zip' : null) ?? datapack);
-      launcherProfiles.store();
+      updateDatapacks(datapacks);
 
-      const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
-      updateDatapacks([]);
-      updateProfileDatapacks([]);
-      await tick();
-      updateDatapacks(prev[0]);
-      updateProfileDatapacks(prev[1]);
+      await invoke("get_datapack", {
+        slug: datapack.slug,
+        params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["datapack"]`,
+        world: world,
+      }).then(async datapackVersion => {
+        deleteDatapackFile(datapackVersion.file_name);
+        
+        launcherProfiles.store();
+        const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
+        updateDatapacks([]);
+        updateProfileDatapacks([]);
+        await tick();
+        updateDatapacks(prev[0]);
+        updateProfileDatapacks(prev[1]);
+      }).catch((error) => {
+        addNotification(error);
+      });
     } else {
       deleteDatapackFile(datapack);
     }
@@ -306,7 +327,7 @@
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
       noriskLog(`Installing custom Datapack ${fileName}`);
-      await invoke("save_custom_datapacks_to_folder", {
+      await invoke("save_custom_datapack_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },

@@ -1,4 +1,5 @@
 <script>
+	import { listen } from '@tauri-apps/api/event';
     import {createEventDispatcher} from "svelte";
     import FallbackIcon from "/src/images/modrinth.png";
     import { translations } from '../../../utils/translationUtils.js';
@@ -11,6 +12,18 @@
     export let resourcePack;
     export let text;
     export let type;
+
+    let downloadProgress = null;
+
+    listen('addons-progress', event => {
+        if (event.payload.identifier == resourcePack.slug) {
+            downloadProgress = {
+                current: event.payload.current,
+                max: event.payload.max
+            };
+            
+        }
+    });
 
     function getMinimalisticDownloadCount() {
         if (resourcePack?.downloads < 1000) {
@@ -61,8 +74,9 @@
     </div>
     <div class="buttons">
         {#if resourcePack?.loading ?? false}
-            <h1 class="required-button primary-text">
-                {lang.addons.global.item.loading}
+            <h1 class="progress-text primary-text">
+                <p class="label primary-text">{lang.addons.global.item.downloading}</p>
+                {downloadProgress == null ? '0' : ((downloadProgress.current / downloadProgress.max) * 100).toFixed(0)}%
             </h1>
         {:else if text === "INSTALL"}
         {#if resourcePack?.featured}
@@ -235,10 +249,18 @@
         transition: transform 0.3s;
     }
 
-    .required-button {
+    .progress-text {
+        display: flex;
+        flex-direction: column;
         font-family: 'Press Start 2P', serif;
-        font-size: 17px;
+        font-size: 16px;
+        gap: 1em;
+        text-align: center;
         cursor: default;
+    }
+
+    .progress-text .label {
+        font-size: 12px;
     }
 
     .featured-label {

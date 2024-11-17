@@ -294,6 +294,7 @@
     "addons.mods.item.dependencyText.usedBy": "Used by: {parents}",
     "addons.mods.item.changingVersion": "Changing version...",
     "addons.global.item.loading": "LOADING",
+    "addons.global.item.downloading": "DOWNLOADING",
     "addons.global.item.featured": "FEATURED",
     "addons.global.item.button.install": "INSTALL",
     "addons.mods.item.recommended": "RECOMMENDED",

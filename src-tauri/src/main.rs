@@ -24,6 +24,7 @@ use crate::utils::{get_architecture, is_rosetta};
 
 pub mod app;
 pub mod minecraft;
+pub mod addons;
 pub mod custom_servers;
 
 mod error;

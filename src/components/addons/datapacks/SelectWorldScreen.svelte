@@ -1,4 +1,5 @@
 <script>
+	import { launcherOptions } from './../../../stores/optionsStore.js';
   import { invoke } from "@tauri-apps/api";
   import { onMount } from "svelte";
   import WorldItem from "./WorldItem.svelte";
@@ -17,7 +18,10 @@
   let worlds = [];
 
   async function loadWorlds() {
-    await invoke("get_world_folders", { branch: currentBranch }).then((result) => {
+    await invoke("get_world_folders", {
+      options: $launcherOptions,
+      branch: currentBranch
+    }).then((result) => {
       worlds = result;
     }).catch((error) => {
       addNotification(error);

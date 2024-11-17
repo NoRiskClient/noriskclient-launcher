@@ -132,17 +132,26 @@
   async function installResourcePack(resourcePack) {
     resourcePack.loading = true;
     updateResourcePacks(resourcePacks);
-    await invoke("install_resourcepack", {
+    await invoke("get_resourcepack", {
       slug: resourcePack.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
-    }).then((result) => {
+    }).then(async (result) => {
       launcherProfiles.addons[currentBranch].resourcePacks.pushIfNotExist(result, function(e) {
         return e.slug === result.slug;
       });
-      resourcePack.loading = false;
-      updateResourcePacks(resourcePacks);
       updateProfileResourcePacks(launcherProfiles.addons[currentBranch].resourcePacks);
       launcherProfiles.store();
+
+      await invoke("download_resourcepack", {
+        options: options,
+        branch: launchManifest.build.branch,
+        resourcepack: result,
+      }).then(async () => {
+        resourcePack.loading = false;
+        updateResourcePacks(resourcePacks);
+      }).catch((error) => {
+        addNotification(error);
+      });
     }).catch((error) => {
       addNotification(error);
     });
@@ -231,15 +240,24 @@
 
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].resourcePacks.splice(index, 1);
-      deleteResourcePackFile(resourcePack?.file_name ?? (resourcePack?.title ? resourcePack.title + '.zip' : null) ?? resourcePack);
-      launcherProfiles.store();
+      updateResourcePacks(resourcePacks);
 
-      const prev = [resourcePacks, launcherProfiles.addons[currentBranch].resourcePacks]
-      updateResourcePacks([]);
-      updateProfileResourcePacks([]);
-      await tick();
-      updateResourcePacks(prev[0]);
-      updateProfileResourcePacks(prev[1]);
+      await invoke("get_resourcepack", {
+        slug: resourcePack.slug,
+        params: `?game_versions=["${launchManifest.build.mcVersion}"]`,
+      }).then(async resourcePackVersion => {
+        deleteResourcePackFile(resourcePackVersion.file_name);
+        
+        launcherProfiles.store();
+        const prev = [resourcePacks, launcherProfiles.addons[currentBranch].resourcePacks]
+        updateResourcePacks([]);
+        updateProfileResourcePacks([]);
+        await tick();
+        updateResourcePacks(prev[0]);
+        updateProfileResourcePacks(prev[1]);
+      }).catch((error) => {
+        addNotification(error);
+      });
     } else {
       deleteResourcePackFile(resourcePack);
     }
@@ -301,7 +319,7 @@
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
       noriskLog(`Installing custom ResourcePack ${fileName}`);
-      await invoke("save_custom_resourcepacks_to_folder", {
+      await invoke("save_custom_resourcepack_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },

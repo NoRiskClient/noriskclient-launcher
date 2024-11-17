@@ -52,6 +52,9 @@ pub async fn download_file<F>(url: &str, on_progress: F) -> Result<Vec<u8>> wher
         on_progress(curr_len as u64, max_len);
     }
 
+    // Send 100% completion to ensure the progress ends on 100%
+    on_progress(max_len, max_len);
+
     debug!("Downloaded file");
     Ok(output)
 }

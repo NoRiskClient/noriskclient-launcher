@@ -125,9 +125,6 @@ export async function runClient(branch, checkedForNewBranch = false) {
     options: options,
     forceServer: get(forceServer).length > 0 ? get(forceServer) : null,
     mods: installedMods,
-    shaders: get(profiles)?.addons[branch]?.shaders ?? [],
-    resourcepacks: get(profiles)?.addons[branch]?.resourcePacks ?? [],
-    datapacks: get(profiles)?.addons[branch]?.datapacks ?? [],
   }).then(() => {
     isClientRunning.set([true, false]);
     if (get(forceServer).length > 0) {

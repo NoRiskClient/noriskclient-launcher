@@ -5,16 +5,12 @@ use serde::Serialize;
 #[derive(Debug)]
 pub enum ProgressUpdateSteps {
     DownloadNoRiskClientMods,
-    DownloadShader,
-    DownloadResourcePack,
-    DownloadDatapack,
     DownloadJRE,
     DownloadClientJar,
     DownloadLibraries,
     DownloadAssets,
     DownloadNoRiskAssets,
     VerifyNoRiskAssets,
-
     DownloadCustomServerJar,
     DownloadCustomServerInstallerJar
 }
@@ -41,10 +37,6 @@ impl ProgressUpdateSteps {
             ProgressUpdateSteps::DownloadAssets => 4,
             ProgressUpdateSteps::DownloadNoRiskAssets => 5,
             ProgressUpdateSteps::VerifyNoRiskAssets => 6,
-            ProgressUpdateSteps::DownloadShader => 7,
-            ProgressUpdateSteps::DownloadResourcePack => 8,
-            ProgressUpdateSteps::DownloadDatapack => 9,
-
             ProgressUpdateSteps::DownloadCustomServerJar => 1,
             ProgressUpdateSteps::DownloadCustomServerInstallerJar => 2,
         }

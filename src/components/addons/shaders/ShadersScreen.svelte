@@ -133,17 +133,28 @@
   async function installShader(shader) {
     shader.loading = true;
     updateShaders(shaders);
-    await invoke("install_shader", {
+
+    await invoke("get_shader", {
       slug: shader.slug,
       params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`,
-    }).then((result) => {
+    }).then(async (result) => {
       launcherProfiles.addons[currentBranch].shaders.pushIfNotExist(result, function(e) {
         return e.slug === result.slug;
       });
-      shader.loading = false;
       updateShaders(shaders);
       updateProfileShaders(launcherProfiles.addons[currentBranch].shaders);
       launcherProfiles.store();
+
+      await invoke("download_shader", {
+        options: $launcherOptions,
+        branch: launchManifest.build.branch,
+        shader: result,
+      }).then(() => {
+        shader.loading = false;
+        updateShaders(shaders);
+      }).catch((error) => {
+        addNotification(error);
+      });
     }).catch((error) => {
       addNotification(error);
     });
@@ -232,15 +243,24 @@
     });
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
-      deleteShaderFile(shader?.file_name ?? (shader?.title ? shader.title + '.zip' : null) ?? shader);
-      launcherProfiles.store();
-
-      const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];
-      updateShaders([]);
-      updateProfileShaders([]);
-      await tick();
-      updateShaders(prev[0]);
-      updateProfileShaders(prev[1]);
+      updateShaders(shaders);
+      
+      await invoke("get_shader", {
+        slug: shader.slug,
+        params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`,
+      }).then(async shaderVersion => {
+        deleteShaderFile(shaderVersion.file_name);
+        
+        launcherProfiles.store();
+        const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];
+        updateShaders([]);
+        updateProfileShaders([]);
+        await tick();
+        updateShaders(prev[0]);
+        updateProfileShaders(prev[1]);
+      }).catch((error) => {
+        addNotification(error);
+      });
     } else {
       deleteShaderFile(shader);
     }
@@ -303,7 +323,7 @@
       }
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
       noriskLog(`Installing custom Shader ${fileName}`);
-      await invoke("save_custom_shaders_to_folder", {
+      await invoke("save_custom_shader_to_folder", {
         options: options,
         branch: launchManifest.build.branch,
         file: { name: fileName, location: location },
