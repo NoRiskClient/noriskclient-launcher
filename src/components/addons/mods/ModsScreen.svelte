@@ -542,7 +542,7 @@
             source: {
               type: "repository",
               repository: "CUSTOM",
-              artifact: `CUSTOM:${launcherProfile.name}:${fileName}`,
+              artifact: `CUSTOM:${launcherProfile.id}:${fileName}`,
               url: "",
             },
           },
