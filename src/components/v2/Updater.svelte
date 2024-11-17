@@ -67,10 +67,9 @@
   }
 </script>
 
-
-<h1 class="branch-font primary-text" style="position:absolute"
-    transition:scale={{ x: 15, duration: 300, easing: quintOut }}>{lang.updater.searching}{dots}</h1>
-
+{#if lang?.dummy}
+  <h1 class="branch-font primary-text" style="position:absolute" transition:scale={{ x: 15, duration: 300, easing: quintOut }}>{lang.updater.searching}{dots}</h1>
+{/if}
 <style>
     .branch-font {
         font-family: 'Press Start 2P', serif;

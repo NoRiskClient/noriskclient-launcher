@@ -678,7 +678,7 @@
     {/if}
   {:else if currentTabIndex === 1}
     <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.mods.searchbar.installed.placeholder} />
-    {#if launcherProfile.mods.length > 0}
+    {#if launcherProfile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop}>
         {#each (() => {
           let dependencies = new Set();
@@ -729,7 +729,7 @@
         {/each}
       </div>
     {:else}
-      <h1 class="loading-indicator">{launcherProfile.mods.length < 1 ? lang.addons.mods.noModsInstalled : lang.addons.global.loading}</h1>
+      <h1 class="loading-indicator">{launcherProfile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length < 1 ? lang.addons.mods.noModsInstalled : lang.addons.global.loading}</h1>
     {/if}
   {/if}
 </div>
