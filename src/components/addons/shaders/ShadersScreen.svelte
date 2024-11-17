@@ -442,7 +442,12 @@
       <h1 class="loading-indicator">{shaders == null ? lang.addons.shaders.noShadersFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.shaders.searchbar.installed.placeholder} />
+    <ModrinthSearchBar on:search={async () => {
+      const prev = launcherProfiles.addons[currentBranch].resourcePacks;
+      launcherProfiles.addons[currentBranch].resourcePacks = [];
+      await tick();
+      launcherProfiles.addons[currentBranch].resourcePacks = prev;
+    }} bind:searchTerm={filterterm} placeHolder={lang.addons.shaders.searchbar.installed.placeholder} />
     {#if launcherProfiles.addons[currentBranch].shaders.length > 0 || customShaders.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...customShaders,...launcherProfiles.addons[currentBranch].shaders].filter((shader) => {

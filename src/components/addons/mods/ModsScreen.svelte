@@ -677,7 +677,12 @@
       <h1 class="loading-indicator">{mods == null ? lang.addons.mods.noModsFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.mods.searchbar.installed.placeholder} />
+    <ModrinthSearchBar on:search={async () => {
+      const prev = launcherProfile.mods;
+      launcherProfile.mods = [];
+      await tick();
+      launcherProfile.mods = prev;
+    }} bind:searchTerm={filterterm} placeHolder={lang.addons.mods.searchbar.installed.placeholder} />
     {#if launcherProfile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop}>
         {#each (() => {

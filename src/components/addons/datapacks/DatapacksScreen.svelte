@@ -437,7 +437,12 @@
       <h1 class="loading-indicator">{datapacks == null ? lang.addons.datapacks.noDatapacksFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm} placeHolder={lang.addons.datapacks.searchbar.installed.placeholder} />
+    <ModrinthSearchBar on:search={async () => {
+      const prev = launcherProfiles.addons[currentBranch].datapacks;
+      launcherProfiles.addons[currentBranch].datapacks = [];
+      await tick();
+      launcherProfiles.addons[currentBranch].datapacks = prev;
+    }} bind:searchTerm={filterterm} placeHolder={lang.addons.datapacks.searchbar.installed.placeholder} />
     {#if launcherProfiles.addons[currentBranch].datapacks.length > 0 || customDatapacks.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
         {#each [...customDatapacks,...launcherProfiles.addons[currentBranch].datapacks].filter((datapack) => {

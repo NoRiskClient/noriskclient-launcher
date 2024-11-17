@@ -448,7 +448,12 @@
       <h1 class="loading-indicator">{resourcePacks == null ? lang.addons.resourcePacks.noResourcePacksFound : lang.addons.global.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
-    <ModrinthSearchBar on:search={() => {}} bind:searchTerm={filterterm}
+    <ModrinthSearchBar on:search={async () => {
+      const prev = launcherProfiles.addons[currentBranch].resourcePacks;
+      launcherProfiles.addons[currentBranch].resourcePacks = [];
+      await tick();
+      launcherProfiles.addons[currentBranch].resourcePacks = prev;
+    }} bind:searchTerm={filterterm}
                        placeHolder={lang.addons.resourcePacks.searchbar.installed.placeholder} />
     {#if launcherProfiles.addons[currentBranch].resourcePacks.length > 0 || customResourcePacks.length > 0}
       <div id="scrollList" class="scrollList" on:scroll={() => listScroll = document.getElementById('scrollList').scrollTop ?? 0}>
