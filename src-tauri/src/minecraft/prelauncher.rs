@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::{Mutex, Arc};
 
 use anyhow::{Ok, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
@@ -113,7 +113,7 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
         let current_mod_path = mod_cache_path.join(current_mod.source.get_path()?);
 
         // Do we need to download the mod?
-        if !current_mod_path.exists() {
+        if !current_mod_path.exists() && current_mod.source.get_repository() != "CUSTOM".to_string() {
             // Make sure that the parent directory exists
             fs::create_dir_all(&current_mod_path.parent().unwrap()).await?;
 
@@ -136,6 +136,11 @@ pub async fn retrieve_and_copy_mods(data: &Path, manifest: &NoRiskLaunchManifest
                     fs::write(&current_mod_path, retrieved_bytes).await?;
                 }
             }
+        } else if !current_mod_path.exists() && current_mod.source.get_repository() == "CUSTOM".to_string() {
+            // Broken custom mod path -> ignore
+            installed_mods.push(current_mod.clone());
+            warn!("Skipping Mod {:?} cuz it's a custom mod with a broken / non existing path!",current_mod);
+            continue;
         }
 
         // Copy the mod.
