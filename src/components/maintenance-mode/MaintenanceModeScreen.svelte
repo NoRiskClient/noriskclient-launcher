@@ -2,12 +2,16 @@
     import { appWindow } from "@tauri-apps/api/window";
     import { openInputPopup } from "../../utils/popupUtils.js";
     import { setMaintenanceMode } from "../../utils/noriskUtils.js";
+    import { translations } from './../../utils/translationUtils.js';
+
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     function openMaintenanceModeTokenPopup() {
         openInputPopup({
-            title: "Maintenance Mode",
-            content: "Please enter the maintenance mode token.",
-            inputPlaceholder: "Your Token...",
+            title: lang.maintenanceMode.popup.title,
+            content: lang.maintenanceMode.popup.content,
+            inputPlaceholder: lang.maintenanceMode.popup.inputPlaceholder,
             validateInput: (input) => input == "bro_wieso_suchst_du_dannach_?_warte_halt_noch_bissl",
             liveValidation: false,
             onConfirm: () => setMaintenanceMode(false),
@@ -19,12 +23,12 @@
 <div class="container">
     <div class="maintenance-mode">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="title text primary-text" on:click={openMaintenanceModeTokenPopup}>Maintenance Mode</h1>
-        <p class="text">We are currently in maintenance mode.<br>Please try again later or check or Discord for more information.</p>
+        <h1 class="title text primary-text" on:click={openMaintenanceModeTokenPopup}>{lang.maintenanceMode.title}</h1>
+        <p class="text">{@html lang.maintenanceMode.text}</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>Exit</h1>
+        <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>{lang.maintenanceMode.button.exit}</h1>
     </div>
 </div>
 

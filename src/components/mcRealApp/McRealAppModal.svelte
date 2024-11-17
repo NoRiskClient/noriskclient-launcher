@@ -5,6 +5,10 @@
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
     import { addNotification } from "../../stores/notificationStore.js";
     // import qrcode from "qrcode-generator";
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
   
     export let showModal;
   
@@ -26,7 +30,7 @@
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
       }).catch(error => {
-        addNotification("An error occurred while getting the mobile app token: " + error);
+        addNotification(lang.settings.popup.mcRealApp.notification.errorWhileGettingMobileAppToken.replace("{error}", error));
         dialog.close();
       });
     }
@@ -41,7 +45,7 @@
         // qr.make();
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
       }).catch(error => {
-        addNotification("An error occurred while resetting the mobile app token: " + error);
+        addNotification(lang.settings.popup.mcRealApp.notification.errorWhileResettingMobileAppToken.replace("{error}", error));
       });
     }
 
@@ -50,6 +54,7 @@
       setTimeout(() => {
         showModal = false;
         dialog.close();
+        animateOutNow = false;
       }, 100);
     }
 
@@ -71,18 +76,18 @@
     <div on:click|stopPropagation class="divider">
       <div>
         <div class="header-wrapper">
-          <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>MCREAL APP</h1>
+          <h1 class="nes-font" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.settings.popup.mcRealApp.title}</h1>
           <h1 class="nes-font red-text-clickable close-button" on:click={animateOut}>X</h1>
         </div>
         <hr>
         <div class="settings-wrapper">
-          <h4 class="nes-font red-text-clickable warning">Do not share this QR Code with anyone and only scan it with the official McReal App!</h4>
+          <h4 class="nes-font red-text-clickable warning">{lang.settings.popup.mcRealApp.content}</h4>
           <div class="qrCode" id="qrCode"></div>
           {#if codeContent && showQrCode}
             <img class="qrCode" src={`https://qr-generator-putuwaw.vercel.app/api?data=${codeContent}&fill_color=%2300afe8`} alt="">
-            <h4 class="nes-font red-text-clickable warning reset" on:click={() => resetToken()}>Reset QR Code</h4>
+            <h4 class="nes-font red-text-clickable warning reset" on:click={() => resetToken()}>{lang.settings.popup.mcRealApp.button.reset}</h4>
           {:else}
-            <h1 class="nes-font showButton primary-text" on:click={() => showQrCode = true}>Show QR Code</h1>
+            <h1 class="nes-font showButton primary-text" on:click={() => showQrCode = true}>{lang.settings.popup.mcRealApp.button.showQrCode}</h1>
           {/if}
         </div>
       </div>

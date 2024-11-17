@@ -2,6 +2,10 @@
   import AdminIcon from "../../../images/ranks/admin.png";
   import DeveloperIcon from "../../../images/ranks/developer.png";
   import BugBountyIcon from "../../../images/ranks/bug_bounty.png";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let showModal;
 
@@ -23,7 +27,7 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="nes-font title">LAUNCHER CREDITS</h1>
+        <h1 class="nes-font title">{lang.creditsModal.title}</h1>
         <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
       </div>
       <hr>
@@ -42,7 +46,7 @@
         </div>
         <div class="credit">
           <p title="We love you!" class="all-contributers-icon">❤️</p>
-          <p class="nes-font all-contributers">All contributers and bug reporters</p>
+          <p class="nes-font all-contributers">{lang.creditsModal.contributersText}</p>
         </div>
       </div>
     </div>

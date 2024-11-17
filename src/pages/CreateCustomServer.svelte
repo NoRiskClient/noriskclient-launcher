@@ -4,7 +4,5 @@
 </script>
 
 <TransitionWrapper>
-  <div>
     <CreateCustomServerScreen />
-  </div>
 </TransitionWrapper>

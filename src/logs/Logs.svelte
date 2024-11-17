@@ -8,6 +8,10 @@
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
   import { launcherOptions, fetchOptions } from "../stores/optionsStore.js";
+  import { translations, setLanguage, language } from '../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   let autoScroll = true;
   let reloadLogs = false;
@@ -16,6 +20,8 @@
     fetchOptions();
     checkIfClientIsRunning();
     
+    setLanguage($language);
+
     invoke("get_latest_minecraft_logs").then(value => {
       minecraftLogs.set(value.map(string => string + "\n"));
     }).catch(reason => {
@@ -36,7 +42,7 @@
     await invoke("upload_logs", {
       log: $minecraftLogs.join(""),
     }).then((result) => {
-      addNotification("Logs uploaded successfully. URL copied to clipboard.", "INFO");
+      addNotification(lang.logs.notification.upload.success, "INFO");
       navigator.clipboard.writeText(result.url);
     }).catch((error) => {
       addNotification(error);
@@ -68,59 +74,62 @@
   $: logItems = search != null && Object.values(logLevels).every(level => level != null) ? $minecraftLogs.filter(filterLogs) : [];
 </script>
 
-<body class:dark-mode={$launcherOptions?.theme == "DARK"}>
-  <div class="black-bar" data-tauri-drag-region>
-    <div class="header">
-      <input bind:value={search} placeholder="Search logs" />
-      <div class="filter">
-        {#each Object.keys(logLevels) as level (level)}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <p class={"logLevelFilter red-text"} class:active={logLevels[level] == true} on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}({logItems.filter(l => l.split('/')[1]?.split(']: ')[0] == level).length ?? 0})</p>
-        {/each}
+<!-- Ensure translations are loaded before showing UI -->
+{#if lang?.dummy}
+  <body class:dark-mode={$launcherOptions?.theme == "DARK"}>
+    <div class="black-bar" data-tauri-drag-region>
+      <div class="header">
+        <input bind:value={search} placeholder={lang.logs.searchbar.placeholder} />
+        <div class="filter">
+          {#each Object.keys(logLevels) as level (level)}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <p class={"logLevelFilter red-text"} class:active={logLevels[level] == true} on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}({logItems.filter(l => l.split('/')[1]?.split(']: ')[0] == level).length ?? 0})</p>
+          {/each}
+        </div>
       </div>
     </div>
-  </div>
-  <main class="content">
-    {#if $isClientRunning[1] && !hideNoLiveLogs}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <div class="noLiveLogs" on:click={() => hideNoLiveLogs = !hideNoLiveLogs}>
-        <h1 class="noLiveLogsText">Live logs are unavailable because your launcher was closed since your last game start.</h1>
+    <main class="content">
+      {#if $isClientRunning[1] && !hideNoLiveLogs}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div class="noLiveLogs" on:click={() => hideNoLiveLogs = !hideNoLiveLogs}>
+          <h1 class="noLiveLogsText">{lang.logs.liveLogsUnavailable}</h1>
+        </div>
+      {/if}
+      {#if logItems.length == 0}
+        <div class="center">
+          {#if !reloadLogs}
+            <h1 class="noLogs">{lang.logs.noLogsFound}</h1>
+          {/if}
+        </div>
+      {:else if !reloadLogs}
+        <div class="logs-wrapper">
+          <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
+            <LogMessage
+              {item}
+              log={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : null}
+            />
+          </VirtualList>
+        </div>
+      {/if}
+    </main>
+    <div class="black-bar" data-tauri-drag-region>
+      <div class="logs-button-wrapper">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1
+          class:auto-scroll-button-on={autoScroll}
+          class:green-text={autoScroll}
+          class:auto-scroll-button-off={!autoScroll}
+          class:red-text={!autoScroll}
+          on:click={toggleAutoScroll}
+        >[{lang.logs.button.autoScroll}]</h1>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="copy-button primary-text" on:click={uploadLogs}>
+          [{lang.logs.button.copy}]
+        </h1>
       </div>
-    {/if}
-    {#if logItems.length == 0}
-      <div class="center">
-        {#if !reloadLogs}
-          <h1 class="noLogs">No logs found!</h1>
-        {/if}
-      </div>
-    {:else if !reloadLogs}
-      <div class="logs-wrapper">
-        <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
-          <LogMessage
-            {item}
-            log={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : null}
-          />
-        </VirtualList>
-      </div>
-    {/if}
-  </main>
-  <div class="black-bar" data-tauri-drag-region>
-    <div class="logs-button-wrapper">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1
-        class:auto-scroll-button-on={autoScroll}
-        class:green-text={autoScroll}
-        class:auto-scroll-button-off={!autoScroll}
-        class:red-text={!autoScroll}
-        on:click={toggleAutoScroll}
-      >[Auto Scroll]</h1>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="copy-button primary-text" on:click={uploadLogs}>
-        [Copy]
-      </h1>
     </div>
-  </div>
-</body>
+  </body>
+{/if}
 
 <style>
     .black-bar {

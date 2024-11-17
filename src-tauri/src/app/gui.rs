@@ -1,3 +1,4 @@
+use anyhow::Result;
 use dirs::data_dir;
 use std::fs::File;
 use std::io::BufRead;
@@ -22,6 +23,10 @@ use tauri::api::dialog::blocking::FileDialogBuilder;
 use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tokio::{fs, io::AsyncReadExt};
 
+use crate::addons::datapack_manager::DataPackManager;
+use crate::addons::mod_manager::ModManager;
+use crate::addons::resourcepack_manager::ResourcePackManager;
+use crate::addons::shader_manager::ShaderManager;
 use crate::app::api::{LoginData, NoRiskLaunchManifest};
 use crate::app::cape_api::{Cape, CapeApiEndpoints};
 use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
@@ -29,10 +34,12 @@ use crate::app::modrinth_api::{
     CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
     ModrinthSearchRequestParams,
 };
+use crate::error::Error;
 use crate::error::ErrorKind;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::utils::percentage_of_total_memory;
+use crate::LAUNCHER_VERSION;
 use crate::{
     custom_servers::{
         manager::CustomServerManager,
@@ -84,9 +91,9 @@ struct AppState {
 }
 
 #[derive(serde::Deserialize)]
-struct FileData {
-    name: String,
-    location: String,
+pub struct FileData {
+    pub name: String,
+    pub location: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -120,6 +127,11 @@ async fn check_online_status() -> Result<bool, String> {
     ApiEndpoints::norisk_api_status()
         .await
         .map_err(|e| format!("unable to check online status: {:?}", e))
+}
+
+#[tauri::command]
+fn get_launcher_version() -> String {
+    LAUNCHER_VERSION.to_string()
 }
 
 #[tauri::command]
@@ -159,251 +171,74 @@ async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), St
 }
 
 #[tauri::command]
-async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo>, String> {
-    debug!("Getting Featured Mods...");
+async fn get_mod_author(slug: &str) -> Result<String, Error> {
+    ModManager::get_mod_author(slug).await
+}
 
-    match ApiEndpoints::norisk_featured_mods(&branch).await {
-        Ok(result) => {
-            // fetch mod info for each mod
-            let mut mod_infos: Vec<ModInfo> = Vec::new();
-            for mod_id in result {
-                let project_members = ModrinthApiEndpoints::get_project_members(&mod_id)
-                    .await
-                    .map_err(|e| format!("unable to get team members: {:?}", e))?;
-                match ModrinthApiEndpoints::get_mod_info(&*mod_id).await {
-                    Ok(mut mod_info) => {
-                        // Filter featured mods based on mc version
-                        match &mod_info.game_versions {
-                            Some(versions) => {
-                                if versions.contains(&mc_version.to_string()) {
-                                    project_members.iter().for_each(|member| {
-                                        if member.role.to_uppercase() == "OWNER" {
-                                            mod_info.author = Some(member.user.username.clone());
-                                        }
-                                    });
-
-                                    mod_infos.push(mod_info);
-                                } else {
-                                    debug!(
-                                        "Featured mod {} does not support version {}",
-                                        mod_info.title, mc_version
-                                    );
-                                }
-                            }
-                            _ => {
-                                error!("Featured mod {} has no game versions", mod_info.title);
-                            }
-                        }
-                    }
-                    Err(_) => (),
-                }
-            }
-            Ok(mod_infos)
-        }
-        Err(err) => Err(err.to_string()),
-    }
+#[tauri::command]
+async fn get_featured_mods(branch: &str, mc_version: &str) -> Result<Vec<ModInfo>, Error> {
+    ModManager::get_featured_mods(branch, mc_version).await
 }
 
 #[tauri::command]
 async fn get_featured_resourcepacks(
     branch: &str,
     mc_version: &str,
-) -> Result<Vec<ResourcePackInfo>, String> {
-    debug!("Getting Featured ResourcePacks...");
-
-    match ApiEndpoints::norisk_featured_resourcepacks(&branch).await {
-        Ok(result) => {
-            // fetch resourcepack info for each resourcepack
-            let mut resourcepack_infos: Vec<ResourcePackInfo> = Vec::new();
-            for resourcepack_id in result {
-                let project_members = ModrinthApiEndpoints::get_project_members(&resourcepack_id)
-                    .await
-                    .map_err(|e| format!("unable to get team members: {:?}", e))?;
-                match ModrinthApiEndpoints::get_resourcepack_info(&*resourcepack_id).await {
-                    Ok(mut resourcepack_info) => {
-                        // Filter featured resourcepacks based on mc version
-                        match &resourcepack_info.game_versions {
-                            Some(versions) => {
-                                if versions.contains(&mc_version.to_string()) {
-                                    project_members.iter().for_each(|member| {
-                                        if member.role.to_uppercase() == "OWNER" {
-                                            resourcepack_info.author =
-                                                Some(member.user.username.clone());
-                                        }
-                                    });
-                                    resourcepack_infos.push(resourcepack_info);
-                                } else {
-                                    debug!(
-                                        "Featured resourcepack {} does not support version {}",
-                                        resourcepack_info.title, mc_version
-                                    );
-                                }
-                            }
-                            _ => {
-                                error!(
-                                    "Featured resourcepack {} has no game versions",
-                                    resourcepack_info.title
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => (),
-                }
-            }
-            Ok(resourcepack_infos)
-        }
-        Err(err) => Err(err.to_string()),
-    }
+) -> Result<Vec<ResourcePackInfo>, Error> {
+    ResourcePackManager::get_featured_resourcepacks(branch, mc_version).await
 }
 
 #[tauri::command]
-async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<ShaderInfo>, String> {
-    debug!("Getting Featured Shaders...");
-
-    match ApiEndpoints::norisk_featured_shaders(&branch).await {
-        Ok(result) => {
-            // fetch shader info for each resourcepack
-            let mut shader_infos: Vec<ShaderInfo> = Vec::new();
-            for shader_id in result {
-                let project_members = ModrinthApiEndpoints::get_project_members(&shader_id)
-                    .await
-                    .map_err(|e| format!("unable to get team members: {:?}", e))?;
-                match ModrinthApiEndpoints::get_shader_info(&*shader_id).await {
-                    Ok(mut shader_info) => {
-                        // Filter featured shaders based on mc version
-                        match &shader_info.game_versions {
-                            Some(versions) => {
-                                if versions.contains(&mc_version.to_string()) {
-                                    project_members.iter().for_each(|member| {
-                                        if member.role.to_uppercase() == "OWNER" {
-                                            shader_info.author = Some(member.user.username.clone());
-                                        }
-                                    });
-                                    shader_infos.push(shader_info);
-                                } else {
-                                    debug!(
-                                        "Featured shader {} does not support version {}",
-                                        shader_info.title, mc_version
-                                    );
-                                }
-                            }
-                            _ => {
-                                error!(
-                                    "Featured shader {} has no game versions",
-                                    shader_info.title
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => (),
-                }
-            }
-            Ok(shader_infos)
-        }
-        Err(err) => Err(err.to_string()),
-    }
+async fn get_featured_shaders(branch: &str, mc_version: &str) -> Result<Vec<ShaderInfo>, Error> {
+    ShaderManager::get_featured_shaders(branch, mc_version).await
 }
 
 #[tauri::command]
 async fn get_featured_datapacks(
     branch: &str,
     mc_version: &str,
-) -> Result<Vec<DatapackInfo>, String> {
-    debug!("Getting Featured Datapacks...");
-
-    match ApiEndpoints::norisk_featured_datapacks(&branch).await {
-        Ok(result) => {
-            // fetch datapack info for each resourcepack
-            let mut datapack_infos: Vec<DatapackInfo> = Vec::new();
-            for datapack_id in result {
-                let project_members = ModrinthApiEndpoints::get_project_members(&datapack_id)
-                    .await
-                    .map_err(|e| format!("unable to get team members: {:?}", e))?;
-                match ModrinthApiEndpoints::get_datapack_info(&*datapack_id).await {
-                    Ok(mut datapack_info) => {
-                        // Filter featured datapacks based on mc version
-                        match &datapack_info.game_versions {
-                            Some(versions) => {
-                                if versions.contains(&mc_version.to_string()) {
-                                    project_members.iter().for_each(|member| {
-                                        if member.role.to_uppercase() == "OWNER" {
-                                            datapack_info.author =
-                                                Some(member.user.username.clone());
-                                        }
-                                    });
-                                    datapack_infos.push(datapack_info);
-                                } else {
-                                    debug!(
-                                        "Featured datapack {} does not support version {}",
-                                        datapack_info.title, mc_version
-                                    );
-                                }
-                            }
-                            _ => {
-                                error!(
-                                    "Featured datapack {} has no game versions",
-                                    datapack_info.title
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => (),
-                }
-            }
-            Ok(datapack_infos)
-        }
-        Err(err) => Err(err.to_string()),
-    }
+) -> Result<Vec<DatapackInfo>, Error> {
+    DataPackManager::get_featured_datapacks(branch, mc_version).await
 }
 
 #[tauri::command]
-async fn get_blacklisted_mods() -> Result<Vec<String>, String> {
-    debug!("Getting Blacklisted Mods...");
+async fn get_blacklisted_mods() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_mods()
         .await
-        .map_err(|e| format!("unable to get blacklisted mods: {:?}", e))
+        .map_err(|e| e.into())
 }
 
 #[tauri::command]
-async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, String> {
-    debug!("Getting Blacklisted ResourcePacks...");
+async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_resourcepacks()
         .await
-        .map_err(|e| format!("unable to get blacklisted resourcepacks: {:?}", e))
+        .map_err(|e| e.into())
 }
 
 #[tauri::command]
-async fn get_blacklisted_shaders() -> Result<Vec<String>, String> {
-    debug!("Getting Blacklisted Shaders...");
-    ApiEndpoints::norisk_blacklisted_shaders()
-        .await
-        .map_err(|e| format!("unable to get blacklisted shaders: {:?}", e))
+async fn get_blacklisted_shaders() -> Result<Vec<String>, Error> {
+    ApiEndpoints::norisk_blacklisted_shaders().await.map_err(|e| e.into())
 }
 
 #[tauri::command]
-async fn get_blacklisted_datapacks() -> Result<Vec<String>, String> {
-    debug!("Getting Blacklisted Datapacks...");
+async fn get_blacklisted_datapacks() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_datapacks()
         .await
-        .map_err(|e| format!("unable to get blacklisted datapacks: {:?}", e))
+        .map_err(|e| e.into())
 }
 
 #[tauri::command]
-async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, String> {
-    debug!("Getting Blacklisted Servers...");
+async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, Error> {
     ApiEndpoints::norisk_blacklisted_servers()
         .await
-        .map_err(|e| format!("unable to get blacklisted servers: {:?}", e))
+        .map_err(|e| e.into())
 }
 
 #[tauri::command]
 async fn search_mods(
     params: ModrinthSearchRequestParams,
-) -> Result<ModrinthModsSearchResponse, String> {
-    debug!("Searching Mods...");
-    ModrinthApiEndpoints::search_mods(&params)
-        .await
-        .map_err(|e| format!("unable to search mods: {:?}", e))
+) -> Result<ModrinthModsSearchResponse, Error> {
+    ModrinthApiEndpoints::search_projects(&params, None).await
 }
 
 #[tauri::command]
@@ -422,11 +257,8 @@ async fn console_log_error(message: String) {
 }
 
 #[tauri::command]
-async fn get_mod_info(slug: String) -> Result<ModInfo, String> {
-    debug!("Fetching mod info...");
-    ModrinthApiEndpoints::get_mod_info(&slug)
-        .await
-        .map_err(|e| format!("unable to get mod info: {:?}", e))
+async fn get_mod_info(slug: String) -> Result<ModInfo, Error> {
+    ModrinthApiEndpoints::get_project::<ModInfo>(&slug).await
 }
 
 #[tauri::command]
@@ -435,128 +267,88 @@ async fn install_mod_and_dependencies(
     version: Option<&str>,
     params: &str,
     required_mods: Vec<LoaderMod>,
-) -> Result<CustomMod, String> {
-    info!("Installing Mod And Dependencies...");
-    ModrinthApiEndpoints::install_mod_and_dependencies(slug, version, params, &required_mods)
-        .await
-        .map_err(|e| format!("unable to install mod and dependencies: {:?}", e))
+) -> Result<CustomMod, Error> {
+    ModManager::install_mod_and_dependencies(slug, version, params, &required_mods).await
 }
 
 #[tauri::command]
-async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthProject>, String> {
-    info!("Searching Project Version...");
-    ModrinthApiEndpoints::get_project_version(slug, params)
-        .await
-        .map_err(|e| format!("unable to search project version: {:?}", e))
+async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthProject>, Error> {
+    ModrinthApiEndpoints::get_project_version(slug, params).await
 }
 
 #[tauri::command]
 async fn search_shaders(
     params: ModrinthSearchRequestParams,
-) -> Result<ModrinthShadersSearchResponse, String> {
-    debug!("Searching Shaders...");
-    ModrinthApiEndpoints::search_shaders(&params)
-        .await
-        .map_err(|e| format!("unable to search shaders: {:?}", e))
+) -> Result<ModrinthShadersSearchResponse, Error> {
+    ModrinthApiEndpoints::search_projects(&params, None).await
 }
 
 #[tauri::command]
-async fn get_shader_info(slug: String) -> Result<ShaderInfo, String> {
-    debug!("Fetching shader info...");
-    ModrinthApiEndpoints::get_shader_info(&slug)
-        .await
-        .map_err(|e| format!("unable to get shader info: {:?}", e))
+async fn get_shader_info(slug: String) -> Result<ShaderInfo, Error> {
+    ModrinthApiEndpoints::get_project::<ShaderInfo>(&slug).await
 }
 
 #[tauri::command]
-async fn install_shader(slug: &str, params: &str) -> Result<Shader, String> {
-    info!("Installing Shader...");
-    ModrinthApiEndpoints::install_shader(slug, params)
-        .await
-        .map_err(|e| format!("unable to install shader: {:?}", e))
+async fn get_shader(slug: &str, params: &str) -> Result<Shader, Error> {
+    ShaderManager::get_shader(slug, params).await
+}
+
+#[tauri::command]
+async fn download_shader(options: LauncherOptions, branch: &str, shader: Shader, window: Window) -> Result<(), Error> {
+    ShaderManager::download_shader(options, branch, &shader, window).await
 }
 
 #[tauri::command]
 async fn search_resourcepacks(
     params: ModrinthSearchRequestParams,
-) -> Result<ModrinthResourcePacksSearchResponse, String> {
-    debug!("Searching ResourcePacks...");
-    ModrinthApiEndpoints::search_resourcepacks(&params)
-        .await
-        .map_err(|e| format!("unable to search resourcepacks: {:?}", e))
+) -> Result<ModrinthResourcePacksSearchResponse, Error> {
+    ModrinthApiEndpoints::search_projects(&params, None).await
 }
 
 #[tauri::command]
-async fn get_resourcepack_info(slug: String) -> Result<ResourcePackInfo, String> {
-    debug!("Fetching ResourcePack info...");
-    ModrinthApiEndpoints::get_resourcepack_info(&slug)
-        .await
-        .map_err(|e| format!("unable to get resourcepack info: {:?}", e))
+async fn get_resourcepack_info(slug: String) -> Result<ResourcePackInfo, Error> {
+    ModrinthApiEndpoints::get_project::<ResourcePackInfo>(&slug).await
 }
 
 #[tauri::command]
-async fn install_resourcepack(slug: &str, params: &str) -> Result<ResourcePack, String> {
-    info!("Installing ResourcePack...");
-    ModrinthApiEndpoints::install_resourcepack(slug, params)
-        .await
-        .map_err(|e| format!("unable to install resourcepack: {:?}", e))
+async fn get_resourcepack(slug: &str, params: &str) -> Result<ResourcePack, Error> {
+    ResourcePackManager::get_resourcepack(slug, params).await
+}
+
+#[tauri::command]
+async fn download_resourcepack(options: LauncherOptions, branch: &str, resourcepack: ResourcePack, window: Window) -> Result<(), Error> {
+    ResourcePackManager::download_resourcepack(options, branch, &resourcepack, window).await
 }
 
 #[tauri::command]
 async fn search_datapacks(
     params: ModrinthSearchRequestParams,
-) -> Result<ModrinthDatapacksSearchResponse, String> {
-    debug!("Searching Datapacks...");
-    ModrinthApiEndpoints::search_datapacks(&params)
-        .await
-        .map_err(|e| format!("unable to search datapacks: {:?}", e))
+) -> Result<ModrinthDatapacksSearchResponse, Error> {
+    ModrinthApiEndpoints::search_projects(&params, Some(HashMap::from([("l".to_string(), "datapacks".to_string())]))).await
 }
 
 #[tauri::command]
-async fn get_datapack_info(slug: String) -> Result<DatapackInfo, String> {
-    debug!("Fetching Datapack info...");
-    ModrinthApiEndpoints::get_datapack_info(&slug)
-        .await
-        .map_err(|e| format!("unable to get datapack info: {:?}", e))
+async fn get_datapack_info(slug: String) -> Result<DatapackInfo, Error> {
+    ModrinthApiEndpoints::get_project::<DatapackInfo>(&slug).await
 }
 
 #[tauri::command]
-async fn install_datapack(slug: &str, params: &str, world: &str) -> Result<Datapack, String> {
-    info!("Installing Datapack...");
-    ModrinthApiEndpoints::install_datapack(slug, params, world)
-        .await
-        .map_err(|e| format!("unable to install datapack: {:?}", e))
+async fn get_datapack(slug: &str, params: &str, world: &str) -> Result<Datapack, Error> {
+    DataPackManager::get_datapack(slug, params, world).await
 }
 
 #[tauri::command]
-async fn get_world_folders(branch: String) -> Result<Vec<String>, String> {
-    let mut world_folders: Vec<String> = Vec::new();
-    let world_folder = LAUNCHER_DIRECTORY
-        .data_dir()
-        .join("gameDir")
-        .join(&branch)
-        .join("saves");
-    if world_folder.exists() {
-        let mut entries = fs::read_dir(world_folder)
-            .await
-            .map_err(|e| format!("unable to read world folders: {:?}", e))?;
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| format!("unable to read world folder: {:?}", e))?
-        {
-            let path = entry.path();
-            if path.is_dir() {
-                world_folders.push(path.file_name().unwrap().to_str().unwrap().to_string());
-            }
-        }
-    }
-    Ok(world_folders)
+async fn download_datapack(options: LauncherOptions, branch: &str, world: &str, datapack: Datapack, window: Window) -> Result<(), Error> {
+    DataPackManager::download_datapack(options, branch, world, &datapack, window).await
+}
+
+#[tauri::command]
+async fn get_world_folders(options: LauncherOptions, branch: &str) -> Result<Vec<String>, Error> {
+    DataPackManager::get_worlds(options, branch).await
 }
 
 #[tauri::command]
 async fn unequip_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
-    debug!("Unequiping Cape...");
     CapeApiEndpoints::unequip_cape(norisk_token, uuid).await
 }
 
@@ -659,7 +451,7 @@ async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String
 #[tauri::command]
 pub async fn open_minecraft_logs_window(
     handle: tauri::AppHandle,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     // Generate a random number
     let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
     // Create a unique label using the random number
@@ -681,7 +473,7 @@ pub async fn open_minecraft_logs_window(
 pub async fn open_minecraft_crash_window(
     handle: tauri::AppHandle,
     crash_report_path: String,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     // Generate a random number
     let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
     // Create a unique label using the random number
@@ -708,7 +500,7 @@ pub async fn open_minecraft_crash_window(
 }
 
 #[tauri::command]
-pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Error> {
+pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, Error> {
     let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
         .await
         .unwrap_or_default();
@@ -738,7 +530,7 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, crate::error::Er
 }
 
 #[tauri::command]
-pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, crate::error::Error> {
+pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, Error> {
     debug!("Incoming Path {:?}", file_path.clone());
     let normalized_path = file_path.trim().replace("\\", "/");
     let path = std::path::Path::new(&normalized_path);
@@ -756,19 +548,19 @@ pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, crate::erro
 }
 
 #[tauri::command]
-async fn minecraft_auth_get_store() -> Result<MinecraftAuthStore, crate::error::Error> {
+async fn minecraft_auth_get_store() -> Result<MinecraftAuthStore, Error> {
     Ok(MinecraftAuthStore::init(None).await?)
 }
 
 #[tauri::command]
 pub async fn minecraft_auth_remove_user(
     uuid: uuid::Uuid,
-) -> Result<Option<Credentials>, crate::error::Error> {
+) -> Result<Option<Credentials>, Error> {
     Ok(minecraft_auth_get_store().await?.remove(uuid).await?)
 }
 
 #[tauri::command]
-pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, crate::error::Error> {
+pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Error> {
     let accounts = minecraft_auth_get_store().await?;
     let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?);
     Ok(refresh_norisk_token_if_necessary(account).await?)
@@ -807,7 +599,7 @@ pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>
 }
 
 #[tauri::command]
-pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), crate::error::Error> {
+pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), Error> {
     let mut accounts = minecraft_auth_get_store().await?;
     accounts.default_user = Some(uuid);
     accounts.save().await?;
@@ -817,7 +609,7 @@ pub async fn minecraft_auth_set_default_user(uuid: uuid::Uuid) -> Result<(), cra
 /// Get a copy of the list of all user credentials
 // invoke('plugin:auth|auth_users',user)
 #[tauri::command]
-pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Error> {
+pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, Error> {
     let accounts = minecraft_auth_get_store().await?;
     Ok(accounts.users.values().cloned().collect())
 }
@@ -825,7 +617,7 @@ pub async fn minecraft_auth_users() -> Result<Vec<Credentials>, crate::error::Er
 #[tauri::command]
 pub async fn minecraft_auth_update_norisk_token(
     credentials: Credentials,
-) -> Result<Credentials, crate::error::Error> {
+) -> Result<Credentials, Error> {
     let mut accounts = minecraft_auth_get_store().await?;
     Ok(accounts.refresh_norisk_token(&credentials).await?)
 }
@@ -833,7 +625,7 @@ pub async fn minecraft_auth_update_norisk_token(
 #[tauri::command]
 pub async fn minecraft_auth_update_mojang_and_norisk_token(
     credentials: Credentials,
-) -> Result<Credentials, crate::error::Error> {
+) -> Result<Credentials, Error> {
     return Ok(minecraft_auth_get_store()
         .await?
         .update_norisk_and_microsoft_token(&credentials)
@@ -844,125 +636,56 @@ pub async fn minecraft_auth_update_mojang_and_norisk_token(
 #[tauri::command]
 pub async fn get_options() -> Result<LauncherOptions, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
-    let options = LauncherOptions::load(config_dir).await.unwrap_or_default(); // default to basic options if unable to load
-
-    Ok(options)
+    Ok(LauncherOptions::load(config_dir).await.unwrap_or_default()) // default to basic options if unable to load
 }
 
 #[tauri::command]
 async fn get_launcher_profiles() -> Result<LauncherProfiles, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
-    let launcher_profiles = LauncherProfiles::load(config_dir).await.unwrap_or_default(); // default to basic launcher_profiles defaults if unable to load
-
-    Ok(launcher_profiles)
+    Ok(LauncherProfiles::load(config_dir).await.unwrap_or_default()) // default to basic launcher_profiles defaults if unable to load
 }
 
 #[tauri::command]
 async fn get_custom_mods_filenames(
     options: LauncherOptions,
-    profile_name: &str,
-) -> Result<Vec<String>, String> {
-    let custom_mod_folder = options
-        .data_path_buf()
-        .join("mod_cache")
-        .join("CUSTOM")
-        .join(&profile_name);
-    let names = ModrinthApiEndpoints::get_custom_mod_names(&custom_mod_folder)
-        .await
-        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
-    Ok(names)
+    profile_id: &str,
+) -> Result<Vec<String>, Error> {
+    ModManager::get_custom_mods_filenames(options, profile_id).await
 }
 
 #[tauri::command]
-async fn save_custom_mods_to_folder(
+async fn save_custom_mod_to_folder(
     options: LauncherOptions,
-    profile_name: &str,
+    profile_id: &str,
     file: FileData,
-) -> Result<(), String> {
-    let file_path = options
-        .data_path_buf()
-        .join("mod_cache")
-        .join("CUSTOM")
-        .join(&profile_name)
-        .join(&file.name);
-
-    info!(
-        "Saving {} to {} custom mods folder.",
-        &file.name, &profile_name
-    );
-
-    fs::create_dir_all(&file_path.parent().unwrap())
-        .await
-        .map_err(|e| format!("unable to create custom mod folder: {:?}", e))?;
-
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!("Error saving custom mod {}: {}", &file.name, err));
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    ModManager::save_custom_mod_to_folder(options, profile_id, file).await
 }
 
 #[tauri::command]
 async fn delete_custom_mod_file(
     options: LauncherOptions,
-    profile_name: &str,
+    profile_id: &str,
     file: &str,
-) -> Result<(), String> {
-    let file_path = options
-        .data_path_buf()
-        .join("mod_cache")
-        .join("CUSTOM")
-        .join(&profile_name)
-        .join(&file);
-
-    if !file_path.exists() {
-        return Ok(());
-    }
-
-    info!(
-        "Deleting {} from {} custom mods folder.",
-        &file, &profile_name
-    );
-
-    if let Err(err) = fs::remove_file(&file_path).await {
-        return Err(format!("Error deleting custom mod {}: {}", &file, err));
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    ModManager::delete_custom_mod_file(options, profile_id, file).await
 }
 
 #[tauri::command]
 async fn get_custom_shaders_filenames(
     options: LauncherOptions,
-    installed_shaders: Vec<Shader>,
     branch: &str,
-) -> Result<Vec<String>, String> {
-    let custom_shader_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("shaderpacks");
-    let names =
-        ModrinthApiEndpoints::get_custom_shader_names(&custom_shader_folder, &installed_shaders)
-            .await
-            .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
-    Ok(names)
+    installed_shaders: Vec<Shader>,
+) -> Result<Vec<String>, Error> {
+    ShaderManager::get_custom_shaders_filenames(options, branch, installed_shaders).await
 }
 
 #[tauri::command]
 async fn get_custom_shaders_folder(
     options: LauncherOptions,
     branch: &str,
-) -> Result<String, String> {
-    let custom_shader_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("shaderpacks");
-    return custom_shader_folder
-        .to_str()
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Error converting path to string".to_string());
+) -> Result<String, Error> {
+    Ok(ShaderManager::get_shaders_folder(options, branch).to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -970,171 +693,62 @@ async fn delete_shader_file(
     file_name: &str,
     options: LauncherOptions,
     branch: &str,
-) -> Result<(), String> {
-    let file = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("shaderpacks")
-        .join(file_name);
-    let settings_file = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("shaderpacks")
-        .join(format!("{}.txt", file_name));
-
-    if file.exists() {
-        info!("Deleting {} from {} shaders folder.", file_name, branch);
-        fs::remove_file(&file)
-            .await
-            .map_err(|e| format!("unable to delete shader file: {:?}", e))?;
-    }
-    if settings_file.exists() {
-        info!("Deleting {}.txt from {} shaders folder.", file_name, branch);
-        fs::remove_file(&settings_file)
-            .await
-            .map_err(|e| format!("unable to delete shader settings file: {:?}", e))?;
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    ShaderManager::delete_shader_file(options, branch, file_name).await
 }
 
 #[tauri::command]
-async fn save_custom_shaders_to_folder(
+async fn save_custom_shader_to_folder(
     options: LauncherOptions,
     branch: &str,
     file: FileData,
-) -> Result<(), String> {
-    let file_path = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("shaderpacks")
-        .join(file.name.clone());
-
-    info!("Saving {} to {} shaders folder.", file.name.clone(), branch);
-
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!("Error saving custom shader {}: {}", file.name, err));
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    ShaderManager::save_custom_shader_to_folder(options, branch, file).await
 }
 
 #[tauri::command]
 async fn get_custom_resourcepacks_filenames(
     options: LauncherOptions,
-    installed_resourcepacks: Vec<ResourcePack>,
     branch: &str,
-) -> Result<Vec<String>, String> {
-    let custom_resourcepack_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("resourcepacks");
-    let names = ModrinthApiEndpoints::get_custom_resourcepack_names(
-        &custom_resourcepack_folder,
-        &installed_resourcepacks,
-    )
-        .await
-        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
-    Ok(names)
+    installed_resourcepacks: Vec<ResourcePack>,
+) -> Result<Vec<String>, Error> {
+    ResourcePackManager::get_custom_resourcepack_filenames(options, branch, installed_resourcepacks).await
 }
 
 #[tauri::command]
 async fn get_custom_resourcepacks_folder(
     options: LauncherOptions,
     branch: &str,
-) -> Result<String, String> {
-    let custom_resourcepack_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("resourcepacks");
-    return custom_resourcepack_folder
-        .to_str()
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Error converting path to string".to_string());
+) -> Result<String, Error> {
+    Ok(ResourcePackManager::get_resourcepack_folder(options, branch).to_string_lossy().to_string())
 }
 
 #[tauri::command]
 async fn delete_resourcepack_file(
-    file_name: &str,
     options: LauncherOptions,
     branch: &str,
-) -> Result<(), String> {
-    let file = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("resourcepacks")
-        .join(file_name);
-    if !file.exists() {
-        return Ok(());
-    }
-
-    info!(
-        "Deleting {} from {} resourcepacks folder.",
-        file_name, branch
-    );
-    fs::remove_file(&file)
-        .await
-        .map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
-
-    Ok(())
+    file_name: &str,
+) -> Result<(), Error> {
+    ResourcePackManager::delete_resourcepack_file(options, branch, file_name).await
 }
 
 #[tauri::command]
-async fn save_custom_resourcepacks_to_folder(
+async fn save_custom_resourcepack_to_folder(
     options: LauncherOptions,
     branch: &str,
     file: FileData,
-) -> Result<(), String> {
-    let file_path = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("resourcepacks")
-        .join(file.name.clone());
-
-    info!(
-        "Saving {} to {} resourcepacks folder.",
-        file.name.clone(),
-        branch
-    );
-
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!(
-            "Error saving custom resourcepack {}: {}",
-            file.name, err
-        ));
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    ResourcePackManager::save_custom_resourcepack_to_folder(options, branch, file).await
 }
 
 #[tauri::command]
 async fn get_custom_datapacks_filenames(
     options: LauncherOptions,
-    installed_datapacks: Vec<Datapack>,
     branch: &str,
     world: &str,
-) -> Result<Vec<String>, String> {
-    let custom_datapack_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("saves")
-        .join(world)
-        .join("datapacks");
-    let names = ModrinthApiEndpoints::get_custom_datapack_names(
-        &custom_datapack_folder,
-        &installed_datapacks,
-    )
-        .await
-        .map_err(|e| format!("unable to load config filenames: {:?}", e))?;
-    Ok(names)
+    installed_datapacks: Vec<Datapack>,
+) -> Result<Vec<String>, Error> {
+    DataPackManager::get_custom_datapack_filenames(options, branch, world, installed_datapacks).await
 }
 
 #[tauri::command]
@@ -1142,80 +756,28 @@ async fn get_custom_datapacks_folder(
     options: LauncherOptions,
     branch: &str,
     world: &str,
-) -> Result<String, String> {
-    let custom_datapack_folder = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("saves")
-        .join(world)
-        .join("datapacks");
-    return custom_datapack_folder
-        .to_str()
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Error converting path to string".to_string());
+) -> Result<String, Error> {
+    Ok(DataPackManager::get_datapack_folder(options, branch, world).to_string_lossy().to_string())
 }
 
 #[tauri::command]
 async fn delete_datapack_file(
-    file_name: &str,
     options: LauncherOptions,
     branch: &str,
     world: &str,
-) -> Result<(), String> {
-    let file = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("saves")
-        .join(&world)
-        .join("datapacks")
-        .join(file_name);
-    if !file.exists() {
-        return Ok(());
-    }
-
-    info!(
-        "Deleting {} from {} ({}) datapacks folder.",
-        file_name, branch, world
-    );
-    fs::remove_file(&file)
-        .await
-        .map_err(|e| format!("unable to delete resourcepack file: {:?}", e))?;
-
-    Ok(())
+    file_name: &str,
+) -> Result<(), Error> {
+    DataPackManager::delete_datapack_file(options, branch, world, file_name).await
 }
 
 #[tauri::command]
-async fn save_custom_datapacks_to_folder(
+async fn save_custom_datapack_to_folder(
     options: LauncherOptions,
     branch: &str,
     world: &str,
     file: FileData,
-) -> Result<(), String> {
-    let file_path = options
-        .data_path_buf()
-        .join("gameDir")
-        .join(branch)
-        .join("saves")
-        .join(world)
-        .join("datapacks")
-        .join(file.name.clone());
-
-    info!(
-        "Saving {} to {} datapacks folder.",
-        file.name.clone(),
-        branch
-    );
-
-    if let Err(err) = fs::copy(PathBuf::from(file.location), &file_path).await {
-        return Err(format!(
-            "Error saving custom datapack {}: {}",
-            file.name, err
-        ));
-    }
-
-    Ok(())
+) -> Result<(), Error> {
+    DataPackManager::save_custom_datapack_to_folder(options, branch, world, file).await
 }
 
 #[tauri::command]
@@ -1416,7 +978,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<Vec<String>, crate::error::Error> {
+) -> Result<Vec<String>, Error> {
     Ok(ApiEndpoints::norisk_branches(
         &credentials
             .norisk_credentials
@@ -1439,7 +1001,7 @@ async fn enable_experimental_mode(credentials: Credentials) -> Result<String, St
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, crate::error::Error> {
+async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, Error> {
     Ok(ApiEndpoints::launch_manifest(branch).await?)
 }
 
@@ -1456,7 +1018,7 @@ async fn discord_auth_link(
     options: LauncherOptions,
     credentials: Credentials,
     app: tauri::AppHandle,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     let token = credentials
         .norisk_credentials
         .get_token(options.experimental_mode)
@@ -1517,7 +1079,7 @@ async fn discord_auth_link(
 async fn discord_auth_status(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<bool, crate::error::Error> {
+) -> Result<bool, Error> {
     Ok(ApiEndpoints::discord_link_status(
         &credentials
             .norisk_credentials
@@ -1532,7 +1094,7 @@ async fn discord_auth_status(
 async fn discord_auth_unlink(
     credentials: Credentials,
     options: LauncherOptions,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     ApiEndpoints::unlink_discord(
         &credentials
             .norisk_credentials
@@ -1545,7 +1107,7 @@ async fn discord_auth_unlink(
 }
 
 #[tauri::command]
-async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, crate::error::Error> {
+async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Error> {
     let mut accounts = MinecraftAuthStore::init(None).await?;
 
     let flow = accounts.login_begin().await?;
@@ -1560,7 +1122,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
         &app,
         "signin",
         tauri::WindowUrl::External(flow.redirect_uri.parse().map_err(|_| {
-            crate::error::ErrorKind::OtherError("Error parsing auth redirect URL".to_string())
+            ErrorKind::OtherError("Error parsing auth redirect URL".to_string())
                 .as_error()
         })?),
     )
@@ -1590,7 +1152,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, cr
 
                 app.get_window("main")
                     .unwrap()
-                    .emit("microsoft-output", "NoRisk Token")
+                    .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
 
                 match accounts.refresh_norisk_token(&credentials.clone()).await {
@@ -1792,7 +1354,7 @@ async fn copy_branch_data(
 #[tauri::command]
 async fn is_client_running(
     app_state: tauri::State<'_, AppState>,
-) -> Result<(bool, bool), crate::error::Error> {
+) -> Result<(bool, bool), Error> {
     let runner_instance = &app_state.runner_instance;
 
     if runner_instance
@@ -1834,12 +1396,9 @@ async fn run_client(
     options: LauncherOptions,
     force_server: Option<String>,
     mods: Vec<LoaderMod>,
-    shaders: Vec<Shader>,
-    resourcepacks: Vec<ResourcePack>,
-    datapacks: Vec<Datapack>,
     window: Window,
     app_state: tauri::State<'_, AppState>,
-) -> Result<(), crate::error::Error> {
+) -> Result<(), Error> {
     debug!("Starting Client with branch {}", branch);
     if is_client_running(app_state.clone()).await?.0 {
         return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
@@ -1915,9 +1474,6 @@ async fn run_client(
                     launch_manifest,
                     parameters,
                     mods,
-                    shaders,
-                    resourcepacks,
-                    datapacks,
                     LauncherData {
                         on_stdout: handle_stdout,
                         on_stderr: handle_stderr,
@@ -2050,7 +1606,10 @@ async fn add_player_to_whitelist(
         .map_err(|e| format!("invalid username: {:}", e))
         .unwrap();
     let response_text = response.json::<PlayerDBData>().await.unwrap();
-    let uuid = response_text.data.player.unwrap().id;
+    let uuid = match response_text.data.player {
+        Some(player) => player.id,
+        None => return Err("invalid username / uuid".to_string()),
+    };
     ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid)
         .await
         .map_err(|e| format!("unable to add player to whitelist: {:?}", e))
@@ -2067,7 +1626,7 @@ async fn default_data_folder_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn clear_data(options: LauncherOptions) -> Result<(), crate::error::Error> {
+async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
     let auth_store = MinecraftAuthStore::init(Some(true)).await?;
     auth_store.save().await?;
 
@@ -2593,8 +2152,9 @@ pub fn gui_main() {
             runner_instance: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
-            open_url,
             check_online_status,
+            get_launcher_version,
+            open_url,
             get_options,
             open_minecraft_logs_window,
             open_minecraft_crash_window,
@@ -2625,6 +2185,7 @@ pub fn gui_main() {
             microsoft_auth,
             unequip_cape,
             search_mods,
+            get_mod_author,
             get_featured_mods,
             get_featured_resourcepacks,
             get_featured_shaders,
@@ -2664,30 +2225,33 @@ pub fn gui_main() {
             store_launcher_profiles,
             get_project_version,
             get_custom_mods_filenames,
-            save_custom_mods_to_folder,
+            save_custom_mod_to_folder,
             delete_custom_mod_file,
             install_mod_and_dependencies,
             get_custom_shaders_folder,
             delete_shader_file,
-            save_custom_shaders_to_folder,
+            save_custom_shader_to_folder,
             get_custom_shaders_filenames,
             search_shaders,
             get_shader_info,
-            install_shader,
+            get_shader,
+            download_shader,
             get_custom_resourcepacks_folder,
             delete_resourcepack_file,
-            save_custom_resourcepacks_to_folder,
+            save_custom_resourcepack_to_folder,
             get_custom_resourcepacks_filenames,
             search_resourcepacks,
             get_resourcepack_info,
-            install_resourcepack,
+            get_resourcepack,
+            download_resourcepack,
             get_custom_datapacks_folder,
             delete_datapack_file,
-            save_custom_datapacks_to_folder,
+            save_custom_datapack_to_folder,
             get_custom_datapacks_filenames,
             search_datapacks,
             get_datapack_info,
-            install_datapack,
+            get_datapack,
+            download_datapack,
             get_world_folders,
             enable_keep_local_assets,
             disable_keep_local_assets,

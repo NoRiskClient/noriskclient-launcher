@@ -1,8 +1,12 @@
 <script>
+	import { translations } from './../../../utils/translationUtils.js';
   import { preventSelection } from "../../../utils/svelteUtils.js";
 
   export let showModal;
   export let reason;
+
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   function hideModal() {
     showModal = false;
@@ -22,7 +26,7 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>START ERROR</h1>
+        <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.launchErrorModal.title}</h1>
         <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
       </div>
       <hr>

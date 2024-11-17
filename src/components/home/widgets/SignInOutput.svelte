@@ -3,8 +3,12 @@
   import { listen } from "@tauri-apps/api/event";
   import { quintOut } from "svelte/easing";
   import { scale } from "svelte/transition";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
-  let microsoftOutput = "PRESS START";
+  $: microsoftOutput = lang.signIn.signInText;
   let dots = "";
   let microsoftFlag = false;
 
@@ -16,7 +20,16 @@
         interval = animateLoadingText();
         microsoftFlag = true;
       }
-      microsoftOutput = event.payload;
+
+      if (event.payload.includes('signIn.')) {
+        let translatedStep = lang;
+        event.payload.split('.').forEach(step => {
+          translatedStep = translatedStep[step];
+        });
+        microsoftOutput = translatedStep;
+      } else {
+        microsoftOutput = event.payload;
+      }
     });
 
     return () => {

@@ -2,6 +2,10 @@
 <script>
   import { open } from '@tauri-apps/api/dialog';
   import { addNotification } from '../../../stores/notificationStore.js';
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let title;
   export let value;
@@ -18,7 +22,7 @@
         value = result
       }
     } catch (error) {
-      addNotification("Failed to select folder using dialog: " + error);
+      addNotification(lang.folderInput.notification.failedToSelect.replace("{error}", error));
     }
   }
 </script>
@@ -27,8 +31,8 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input id={id} placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
-    <button on:click={selectFolderPath} aria-label="Select Folder" title="Select Folder">📂</button>
+    <input id={id} placeholder={lang.folderInput.placeholder} autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <button on:click={selectFolderPath} title={lang.folderInput.selectFolderTooltip}>📂</button>
   </div>
 </div>
 

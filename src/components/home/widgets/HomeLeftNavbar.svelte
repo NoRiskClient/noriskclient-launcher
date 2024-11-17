@@ -1,4 +1,5 @@
 <script>
+	import { translations } from './../../../utils/translationUtils.js';
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { onMount } from "svelte";
   import { openDiscordIntegration } from "../../../utils/discordUtils.js";
@@ -12,10 +13,13 @@
   let discordLinked = false;
   let navItems = [];
 
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
+
   function updateNavItems() {
     navItems = [
       {
-        name: discordLinked ? "UNLINK DISCORD" : "LINK DISCORD",
+        name: discordLinked ? lang.home.leftNavbar.button.unlinkDiscord : lang.home.leftNavbar.button.linkDiscord,
         onClick: async () => {
           if (discordLinked) {
             await unlinkDiscord();
@@ -74,7 +78,7 @@
     return await invoke("discord_auth_unlink", { options, credentials })
       .then((value) => {
         discordLinked = false;
-        addNotification("Discord unlinked successfully!", "INFO");
+        addNotification(lang.home.notification.discordUnlinkSuccess, "INFO");
         noriskLog("Unlinked Discord" + discordLinked);
       })
       .catch((error) => {

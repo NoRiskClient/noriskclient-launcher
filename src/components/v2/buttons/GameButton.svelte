@@ -1,9 +1,13 @@
 <script>
-  import { push } from "svelte-spa-router";
+    import { push } from "svelte-spa-router";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<h1 class="back-button" on:click={() => push("/start-progress")}>[GAME]</h1>
+<h1 class="back-button" on:click={() => push("/start-progress")}>[{lang.main.buttons.game}]</h1>
 
 <style>
     .back-button {

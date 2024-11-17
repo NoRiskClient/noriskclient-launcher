@@ -3,6 +3,10 @@
     import NRCLogo from "../../../images/norisk_logo.png";
     import { forceServer, setForceServer, runClient } from "../../../utils/noriskUtils.js";
     import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -12,12 +16,12 @@
 <div class="server-item-wrapper">
     <div class="image-text-wrapper">
         <!-- svelte-ignore a11y-img-redundant-alt -->
-        <img class="icon" src={server.iconUrl != "" ? server.iconUrl : ''} alt="Shader Icon">
+        <img class="icon" src={server.iconUrl != "" ? server.iconUrl : ''} alt="Server Icon">
         <div class="text-item-wrapper">
             <div class="name-wrapper">
                 <h4 class="server-name">{server.name}</h4>
                 {#if server.supportsNoRiskClientFeatures}
-                    <img src={NRCLogo} alt="NRC Logo" title="Supports special NoRiskClient features" style="-webkit-user-drag: none;">
+                    <img src={NRCLogo} alt="NRC Logo" title={lang.servers.featured.tooltip.supportsSpecialNoRiskClientFeatures} style="-webkit-user-drag: none;">
                 {/if}
             </div>
             <p>{server.description}</p>
@@ -25,16 +29,16 @@
     </div>
     <div class="buttons">
         {#if $forceServer === `${server.name}:${server.ip}:${server.port}`}
-            <h1 class="launching-button primary-text">LAUNCHING...</h1>
+            <h1 class="launching-button primary-text">{lang.servers.featured.launching}</h1>
         {:else if $forceServer === `${server.name}:${server.ip}:${server.port}:LAUNCHED`}
-            <h1 class="launching-button primary-text">PLAYING...</h1>
+            <h1 class="launching-button primary-text">{lang.servers.featured.playing}</h1>
         {:else}
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <h1 class="play-button  green-text" on:click={() => {
                     setForceServer(`${server.name}:${server.ip}:${server.port}`);
                     runClient($branches[$currentBranchIndex]);
                 }}>
-                PLAY
+                {lang.servers.featured.button.play}
             </h1>
         {/if}
     </div>

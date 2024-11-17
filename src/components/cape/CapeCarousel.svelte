@@ -6,6 +6,10 @@
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { getNoRiskToken } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   const dispatch = createEventDispatcher();
 
@@ -46,16 +50,16 @@
     return capes.findIndex(value => value._id === hash);
   }
 
-  let responseData = "";
+  let ownerName = "";
 
   async function getNameByUUID(uuid) {
     await invoke("mc_name_by_uuid", {
       uuid: uuid,
     }).then((user) => {
-      responseData = user ?? "Unknown";
+      ownerName = user ?? "Unknown";
     }).catch(error => {
-      responseData = "Unknown";
-      addNotification("Failed to get name by UUID: " + error);
+      ownerName = "Unknown";
+      addNotification(lang.capes.notification.failedToRequestNameByUUID.replace("{error}", error));
     });
   }
 
@@ -66,10 +70,10 @@
         uuid: $defaultUser.id,
         hash: hash,
       }).then(() => {
-        addNotification("Cape equipped!", "INFO");
+        addNotification(lang.capes.notification.equip.success, "INFO");
         dispatch("fetchNoRiskUser");
       }).catch((error) => {
-        addNotification("Failed to equip cape: " + error);
+        addNotification(lang.capes.notification.equip.error.replace("{error}", error));
       });
     }
   }
@@ -93,7 +97,7 @@
 
     <div class="cape-slider-wrapper">
       {#if capes.length === 0}
-        <p class="fall-back-text">No capes here D:</p>
+        <p class="fall-back-text">{lang.capes.noCapesHere}</p>
       {/if}
 
       {#each visibleCapes as cape, index (cape._id)}
@@ -113,15 +117,15 @@
             {/if}
             {#if !cape._id.includes("NO_COPY") || cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
-              <div on:click={() => handleEquipCape(cape._id)} class="equip-text">EQUIP</div>
+              <div on:click={() => handleEquipCape(cape._id)} class="equip-text">{lang.capes.button.equip}</div>
             {/if}
           </div>
           {#if cape.hovered}
             <div in:fade={{ duration: 300 }} out:fade={{ duration: 300 }} class="info-text">
-              by {responseData}
+              {lang.capes.uploadedBy.replace("{name}", ownerName)}
             </div>
             <div in:fade={{ duration: 300 }} out:fade={{ duration: 300 }} class="info-text-bottom">
-              Used by {cape.uses} players
+              {lang.capes.usedBy.replace("{count}", cape.uses)}
             </div>
           {/if}
         </div>

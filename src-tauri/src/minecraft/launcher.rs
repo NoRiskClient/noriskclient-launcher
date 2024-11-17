@@ -59,7 +59,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
         Some(path) => PathBuf::from(path),
         None => {
             info!("Checking for JRE...");
-            launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking for JRE..."));
+            launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingJRE"));
 
             match find_java_binary(&runtimes_folder, manifest.build.jre_version).await {
                 Ok(jre) => jre,
@@ -67,7 +67,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
                     error!("Failed to find JRE: {}", e);
 
                     info!("Download JRE...");
-                    launcher_data_arc.progress_update(ProgressUpdate::set_label("Download JRE..."));
+                    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadJRE"));
                     jre_downloader::jre_download(&runtimes_folder, manifest.build.jre_version, |a, b| {
                         launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadJRE, get_progress(0, a, b), get_max(1)));
                     }).await?
@@ -102,7 +102,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
         };
 
         if requires_download {
-            launcher_data_arc.progress_update(ProgressUpdate::set_label("Downloading client..."));
+            launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadingClient"));
 
             let retrieved_bytes = download_file(&client_download.url, |a, b| {
                 launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadClientJar, get_progress(0, a, b), get_max(1)));
@@ -133,7 +133,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     // let libraries_downloaded = Arc::new(AtomicU64::new(0));
     let libraries_max = libraries_to_download.len() as u64;
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking libraries..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingLibraries"));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadLibraries, 0, libraries_max));
 
     let class_paths: Vec<Result<Option<String>>> = stream::iter(
@@ -200,7 +200,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     let assets_downloaded = Arc::new(AtomicU64::new(0));
     let asset_max = asset_objects_to_download.len() as u64;
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Minecraft assets..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingMinecraftAssets"));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, 0, asset_max));
 
     let _: Vec<Result<()>> = stream::iter(
@@ -218,7 +218,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
                         if downloaded {
                             // the progress bar is only being updated when a asset has been downloaded to improve speeds
                             data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, asset_max));
-                            data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Minecraft asset {}", hash)));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedMinecraftAsset&hash%{}", hash)));
                         }
                     }
                     Err(err) => error!("Unable to download asset {}: {:?}", hash, err)
@@ -260,7 +260,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
             let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
             let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
     
-            launcher_data_arc.progress_update(ProgressUpdate::set_label("Checking Norisk assets..."));
+            launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingNoriskAssets"));
             launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
     
             let _: Vec<Result<()>> = stream::iter(
@@ -280,7 +280,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
                                 if downloaded {
                                     // the progress bar is only being updated when a asset has been downloaded to improve speeds
                                     data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
-                                    data_clone.progress_update(ProgressUpdate::set_label(format!("Downloaded Norisk asset {}", hash)));
+                                    data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", hash)));
                                 }
                             }
                             Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
@@ -345,7 +345,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
         );
     }
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Launching..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.launching"));
     launcher_data_arc.progress_update(ProgressUpdate::set_to_max());
 
     let mut running_task = java_runtime.execute(mapped, &game_dir)?;
@@ -389,7 +389,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
     let file_names: &[&str] = &keys_vec;
     let mut verified: u64 = 0;
 
-    launcher_data_arc.progress_update(ProgressUpdate::set_label("Verifying Norisk assets..."));
+    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.verifyingNoriskAssets"));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
@@ -404,7 +404,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
             } else {
                 verified += 1;
                 launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
-                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("Verified Norisk asset {}", file_name)));
+                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("translation.verifiedNoriskAsset&fileName%{}", file_name)));
             }
         }
     }

@@ -1,6 +1,11 @@
 <script>
+	import { listen } from '@tauri-apps/api/event';
     import {createEventDispatcher} from "svelte";
     import FallbackIcon from "/src/images/modrinth.png";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -8,13 +13,26 @@
     export let text;
     export let type;
 
+    let downloadProgress = null;
+
+    listen('addons-progress', event => {
+        if (event.payload.identifier == datapack.slug) {
+            console.log(event.payload);
+            
+            downloadProgress = {
+                current: event.payload.current,
+                max: event.payload.max
+            };
+        }
+    });
+
     function getMinimalisticDownloadCount() {
         if (datapack?.downloads < 1000) {
             return datapack?.downloads;
         } else if (datapack?.downloads < 1000000) {
-            return (datapack?.downloads / 1000).toFixed(1) + "K";
+            return lang.addons.global.item.downloadCount.thousand.replace("{count}", (datapack?.downloads / 1000).toFixed(1));
         } else {
-            return (datapack?.downloads / 1000000).toFixed(1) + "M";
+            return lang.addons.global.item.downloadCount.million.replace("{count}", (datapack?.downloads / 1000000).toFixed(1));
         }
     }
 </script>
@@ -44,7 +62,7 @@
                 {/if}
                 {#if datapack?.author != undefined && datapack?.author != null}
                     <div class="author-container">
-                        <p class="author">by {datapack.author ?? datapack.value.author}</p>
+                        <p class="author">{lang.addons.global.item.madeBy.replace("{author}", datapack.author ?? datapack.value.author)}</p>
                         <b>•</b>
                         <p class="download-count">{getMinimalisticDownloadCount()}</p>
                     </div>
@@ -57,24 +75,25 @@
     </div>
     <div class="buttons">
         {#if datapack?.loading ?? false}
-            <h1 class="required-button primary-text">
-                LOADING
+            <h1 class="progress-text primary-text">
+                <p class="label primary-text">{lang.addons.global.item.downloading}</p>
+                {downloadProgress == null ? '0' : ((downloadProgress.current / downloadProgress.max) * 100).toFixed(0)}%
             </h1>
         {:else if text === "INSTALL"}
             {#if datapack?.featured}
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <h1 class="featured-label" style="margin-bottom: 15px;">
-                        FEATURED
+                        {lang.addons.global.item.featured}
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                        INSTALL
+                        {lang.addons.global.item.button.install}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="install-button green-text" on:click={() => dispatch("install")}>
-                    INSTALL
+                    {lang.addons.global.item.button.install}
                 </h1>
             {/if}
         {:else if text === "INSTALLED"}
@@ -82,18 +101,18 @@
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     {#if datapack?.featured}
                         <h1 class="featured-label" style="margin-bottom: 15px;">
-                            FEATURED
+                            {lang.addons.global.item.featured}
                         </h1>
                     {/if}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
-                        DELETE
+                        {lang.addons.global.item.button.delete}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <h1 class="red-text-clickable delete-button" style={type != "RESULT" ? "margin-top: 15px;" : ""} on:click={() => dispatch("delete")}>
-                    DELETE
+                    {lang.addons.global.item.button.delete}
                 </h1>
             {/if}
         {/if}
@@ -234,10 +253,18 @@
         cursor: default;
     }
 
-    .required-button {
+    .progress-text {
+        display: flex;
+        flex-direction: column;
         font-family: 'Press Start 2P', serif;
-        font-size: 17px;
+        font-size: 16px;
+        gap: 1em;
+        text-align: center;
         cursor: default;
+    }
+
+    .progress-text .label {
+        font-size: 12px;
     }
 
     .delete-button {

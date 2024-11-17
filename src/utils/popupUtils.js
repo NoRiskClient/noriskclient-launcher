@@ -3,6 +3,7 @@ import { addNotification } from "../stores/notificationStore";
 import { invoke } from "@tauri-apps/api";
 import { pop, push, replace } from "svelte-spa-router";
 import { noriskLog } from "./noriskUtils";
+import { translations } from "./translationUtils";
 
 export const activePopup = writable(null);
 export const changeLogs = writable(null);
@@ -18,7 +19,7 @@ export function closePopup() {
 
 export function openInfoPopup({
     title = null,
-    content = "Empty!",
+    content = get(translations).popup.defaultContent,
     closeButton = null,
     onClose = () => { },
     height = null,
@@ -41,7 +42,7 @@ export function openInfoPopup({
 
 export function openConfirmPopup({
     title = null,
-    content = "Empty!",
+    content = get(translations).popup.defaultContent,
     confirmButton = null,
     closeButton = null,
     onConfirm = () => { },
@@ -68,7 +69,7 @@ export function openConfirmPopup({
 
 export function openInputPopup({
     title = null,
-    content = "Empty!",
+    content = get(translations).popup.defaultContent,
     inputType = "TEXT",
     inputName = null,
     inputValue = "",
@@ -107,7 +108,7 @@ export function openInputPopup({
 
 export function openErrorPopup({
     title = null,
-    content = "Empty!",
+    content = get(translations).popup.defaultContent,
     closeButton = null,
     onClose = () => { },
     height = null,

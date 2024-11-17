@@ -1,7 +1,10 @@
-
 <script>
   import { open } from '@tauri-apps/api/dialog';
   import { addNotification } from '../../../stores/notificationStore.js';
+  import { translations } from '../../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let title;
   export let value;
@@ -14,21 +17,21 @@
   async function selectFolderPath() {
     try {
       const result = await open({
-        title: `Select File ${requiredFileName.length > 0 ? `(${requiredFileName})` : ''}`,
+        title: lang.fileInput.windowTitle.replace("{file}", requiredFileName.length > 0 ? `(${requiredFileName})` : ''),
         defaultPath: value,
         directory: false,
-        filters: [{ name: 'Extentions Filter', extensions: extentions }]
+        filters: [{ name: lang.fileInput.filterName, extensions: extentions }]
       })
       if (typeof result == 'string' && result.length > 0) {
         const splitter = result.includes('\\') ? '\\' : '/';
         if (!requiredFileName.includes("*") && !requiredFileName.includes(result.split(splitter).pop().split('.')[result.split(splitter).pop().split('.').length - 2])) {
-          addNotification(`Please select a file with the name ${requiredFileName.map(f => `"${f}"`).join(" or ")}, depending on your OS!`);
+          addNotification(lang.fileInput.notification.invalidFileName.replace("{fileNames}", requiredFileName.map(f => `"${f}"`).join(" or ")));
           return;
         }
         value = result
       }
     } catch (error) {
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.fileInput.notification.failedToSelect.replace("{error}", error));
     }
   }
 
@@ -41,10 +44,10 @@
   <h1>{title}</h1>
   <div class="input-button-wrapper">
     <!-- svelte-ignore a11y-autofocus -->
-    <input id={id} placeholder="Detect Automatically" autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
-    <button on:click={selectFolderPath} aria-label="Select File" title="Select File">📂</button>
+    <input id={id} placeholder={lang.fileInput.placeholder} autofocus={false} bind:value={value} type="text" class="nes-input" disabled>
+    <button on:click={selectFolderPath} title={lang.fileInput.tooltip.selectFile}>📂</button>
     {#if defaultValue != undefined}
-      <button on:click={resetFilePathToDefault} aria-label="Reset" title="Reset">🗑️</button>
+      <button on:click={resetFilePathToDefault} title={lang.fileInput.tooltip.reset}>🗑️</button>
     {/if}
   </div>
 </div>

@@ -1,9 +1,13 @@
 <script>
 	import { activeChangeLog } from './../../utils/popupUtils.js';
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 </script>
 
 <div class="container">
-    <h1 class="title">Change Log</h1>
+    <h1 class="title">{lang.changeLog.title}</h1>
     <h2 class="version">Version {$activeChangeLog?.version ?? ''}</h2>
     <div class="content">
         {#each $activeChangeLog?.changes ?? [] as change}

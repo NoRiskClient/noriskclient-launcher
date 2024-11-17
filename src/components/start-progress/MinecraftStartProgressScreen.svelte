@@ -4,6 +4,10 @@
   import { afterUpdate, onMount } from "svelte";
   import { preventSelection } from "../../utils/svelteUtils.js";
   import { isClientRunning, startProgress, stopClient, openMinecraftLogsWindow } from "../../utils/noriskUtils.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   $: progressBarMax = $startProgress.progressBarMax;
   $: progressBarProgress = $startProgress.progressBarProgress;
@@ -31,7 +35,7 @@
         }
         case "label": {
           startProgress.update(value => {
-            return { ...value, progressBarLabel: progressUpdate.value };
+            return { ...value, progressBarLabel: lang.startProgress.step[progressUpdate.value.replace("translation.", "").split("&")[0]]?.replace(`{${progressUpdate.value.split("&")[1]?.split("%")[0]}}`, progressUpdate.value.split("&")[1]?.split("%")[1]) ?? progressUpdate.value };
           });
           break;
         }
@@ -45,7 +49,7 @@
   });
 
   afterUpdate(() => {
-    if (progressBarLabel === "Launching...") {
+    if (progressBarLabel === lang.startProgress.step.launching) {
       isFinished = true;
 
       setTimeout(() => {
@@ -58,7 +62,7 @@
 
   onMount(() => {
     if ($isClientRunning[0]) {
-      progressBarLabel = "Running...";
+      progressBarLabel = lang.startProgress.step.running;
       progress = 1;
     }
   });
@@ -79,15 +83,15 @@
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
         class="nes-font-big">{convertToPercentage(0)}%</h1>
     <h1 on:selectstart={preventSelection} on:mousedown={preventSelection}
-        class="nes-font-small progress-label-text">Waiting...</h1>
+        class="nes-font-small progress-label-text">{lang.startProgress.step.waiting}</h1>
   {/if}
   {#if isFinished}
     <div class="button-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="nes-font-big logs" on:click={openMinecraftLogsWindow}>LOGS</h1>
+      <h1 class="nes-font-big logs" on:click={openMinecraftLogsWindow}>{lang.startProgress.button.logs}</h1>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <h1 class="nes-font-big close red-text-clickable" on:click={stopClient}>
-        CLOSE
+        {lang.startProgress.button.close}
       </h1>
     </div>
   {/if}

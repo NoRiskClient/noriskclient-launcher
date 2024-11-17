@@ -11,6 +11,10 @@
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { customServers, clearCustomServers, addCustomServer, setCustomServerBaseDomain, setActiveCustomServerId } from "../../stores/customServerStore.js";
   import { addNotification } from "../../stores/notificationStore.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   const dispatch = createEventDispatcher();
 
@@ -53,15 +57,15 @@
   {#if $featureWhitelist.includes("CUSTOM_SERVERS")}
     <div class="navbar">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>Featured</h1>
+      <h1 class:primary-text={currentTabIndex === 0} on:click={() => currentTabIndex = 0}>{lang.servers.button.featured}</h1>
       <h2>|</h2>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>Custom</h1>
+      <h1 class:primary-text={currentTabIndex === 1} on:click={() => currentTabIndex = 1}>{lang.servers.button.custom}</h1>
     </div>
   {:else}
     <div class="navbar">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1>Featured Servers</h1>
+      <h1>{lang.servers.navbar.featuredServers}</h1>
     </div>
   {/if}
   {#if currentTabIndex === 0}
@@ -72,17 +76,16 @@
         </VirtualList>
       </div>
     {:else}
-      <h1 class="loading-indicator">{featuredServers != null ? 'No featured servers found.' : 'Loading...'}</h1>
+      <h1 class="loading-indicator">{featuredServers != null ? lang.servers.featured.empty : lang.servers.loading}</h1>
     {/if}
   {:else if currentTabIndex === 1}
     <div class="customServerToolbar">
       <h4>Servers: {$customServers?.length ?? 0} / {customServerLimit == -1 ? '∞' : customServerLimit ?? 0}</h4>
       {#if customServerLimit == -1 || $customServers?.length < customServerLimit}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h4 class="create-server-button green-text" on:click={() => push("/servers/custom/create")}>Create</h4>
+        <h4 class="create-server-button green-text" on:click={() => push("/servers/custom/create")}>{lang.servers.button.createCustomServer}</h4>
       {:else}
-        <h4 class="create-server-button-limit" title="You can only create a limited ammout of servers.">Limit
-          reached</h4>
+        <h4 class="create-server-button-limit" title={lang.servers.tooltip.customServerLimit}>{lang.servers.custom.limitReached}</h4>
       {/if}
     </div>
     {#if customServers !== null && $customServers.length > 0}
@@ -93,7 +96,7 @@
       </div>
     {:else}
       <h1
-        class="loading-indicator">{$customServers.length == 0 ? 'You don\'t have any custom servers.' : 'Loading...'}</h1>
+        class="loading-indicator">{$customServers.length == 0 ? lang.servers.custom.empty : lang.servers.loading}</h1>
     {/if}
   {/if}
 </div>

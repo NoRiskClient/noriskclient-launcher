@@ -1,10 +1,11 @@
 <script>
+	import { version } from './../../../utils/noriskUtils.js';
 	import { push } from 'svelte-spa-router';
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="copyright" on:click={() => push("/legal")}>
-  © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v0.5.11
+  © 2000-{new Date().getFullYear()} HGLabor/Friends Inc. v{$version}
 </div>
 
 <style>

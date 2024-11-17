@@ -8,20 +8,22 @@
     import { runClient, noriskLog } from "../../utils/noriskUtils.js";
     import { addNotification } from "../../stores/notificationStore.js";
     import { openInputPopup } from "../../utils/popupUtils.js";
-
-    const dontCloneDataText = "Don't clone any data";
-    const cloneMinecraftDataText = "Clone Minecraft Data";
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     let availableBranches = [];
     let path = '';
 
     onMount(() => {
         invoke("get_branches_from_folder").then(branches_from_folder => {
-            availableBranches = branches_from_folder.filter(b => b != $branches[$currentBranchIndex]).map(b => b == ($launcherOptions.experimentalMode ? $launcherOptions.latestDevBranch : $launcherOptions.latestBranch) ? `${b} (last played)` : b)
-            availableBranches.push(cloneMinecraftDataText);
-            availableBranches.push(dontCloneDataText);
+            availableBranches = [];
+            availableBranches.push(lang.copyMcData.button.cloneMinecraftData);
+            branches_from_folder.filter(b => b != $branches[$currentBranchIndex]).map(b => b == ($launcherOptions.experimentalMode ? $launcherOptions.latestDevBranch : $launcherOptions.latestBranch) ? `${b} (last played)` : b).forEach(b => availableBranches.push(b));
+            availableBranches.push(lang.copyMcData.button.dontClone);
         }).catch(error => {
-            addNotification("An error occurred while getting the branches: " + error);
+            addNotification(lang.copyMcData.notification.errorWhileCopyingData.replace("{error}", error));
         });
     });
 
@@ -38,8 +40,8 @@
             noriskLog("Data copied successfully!");
             pop();
             runClient($branches[$currentBranchIndex], true);
-        }).catch(err => {
-            addNotification("An error occurred while copying the data: " + err);
+        }).catch(error => {
+            addNotification(lang.copyMcData.notification.errorWhileCopyingData.replace("{error}", error));
         });
     }
 
@@ -47,21 +49,21 @@
         invoke("get_default_mc_folder").then(res => {
             path = res;
             openInputPopup({
-                title: "Select Minecraft Path",
-                content: "Please select the minecraft data path you want to clone the data from.\nThe default value is your normal \".minecraft\" folder.",
+                title: lang.copyMcData.newBranch.popup.title,
+                content: lang.copyMcData.newBranch.popup.content,
                 inputType: "FOLDER",
                 inputName: "",
                 inputValue: path,
-                confirmButton: "Clone",
+                confirmButton: lang.copyMcData.newBranch.popup.confirmButton,
                 titleFontSize: "15px",
                 width: 35,
                 height: 25,
                 validateInput: (path) => path != '',
                 onConfirm: (path) => cloneMinecraftData(path)
             })
-        }).catch(err => {
+        }).catch(error => {
             path = null;
-            addNotification("An error occurred while getting the default minecraft folder: " + err);
+            addNotification(lang.copyMcData.newBranch.notification.errorWhileGettingDefaultMcFolder.replace("{error}", error));
         });
     }
 
@@ -72,35 +74,35 @@
             noriskLog("Minecraft data copied successfully!");
             pop();
             runClient($branches[$currentBranchIndex], true);
-        }).catch(err => {
-            addNotification("An error occurred while copying the minecraft data: " + err);
+        }).catch(error => {
+            addNotification(lang.copyMcData.notification.errorWhileCopyingData.replace("{error}", error));
         });
     }
 </script>
 
 <div class="container">
     <div class="header">
-        <h1>New Branch Detected</h1>
-        <p>You have just started "{$branches[$currentBranchIndex]}" for the first time.<br>To make the transition cleaner and faster you can copy your settings and servers from other branches below.</p>
+        <h1>{lang.copyMcData.newBranch.title}</h1>
+        <p>{@html lang.copyMcData.newBranch.infoText.replace("{branch}", $branches[$currentBranchIndex])}</p>
     </div>
     <div class="branches">
         <VirtualList height="20em" items={availableBranches} let:item>
             <div class="branch">
-                <p class="branchName" class:red-text={item == dontCloneDataText} class:green-text={item == cloneMinecraftDataText}>{item}</p>
-                {#if item == cloneMinecraftDataText}
+                <p class="branchName" class:red-text={item == lang.copyMcData.button.dontClone} class:green-text={item == lang.copyMcData.button.cloneMinecraftData}>{item}</p>
+                {#if item == lang.copyMcData.button.cloneMinecraftData}
                     <div class="buttons">
                         <p class="arrow cloneMinecraft">&gt;</p>
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <p class="cloneButton cloneMinecraft primary-text" on:click={openCloneMinecraftDataPopup}>Select Path</p>
+                        <p class="cloneButton cloneMinecraft primary-text" on:click={openCloneMinecraftDataPopup}>{lang.copyMcData.newBranch.button.selectPath}</p>
                     </div>
-                {:else if item == dontCloneDataText}
+                {:else if item == lang.copyMcData.button.dontClone}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <p class="staticArrow" on:click={() => cloneBranchData(null)}>-&gt;</p>
                 {:else}
                     <div class="buttons">
                         <p class="arrow">&gt;</p>
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
-                        <p class="cloneButton primary-text" on:click={() => cloneBranchData(item.replace(' (last played)', ''))}>Clone</p>
+                        <p class="cloneButton primary-text" on:click={() => cloneBranchData(item.replace(' (last played)', ''))}>{lang.copyMcData.button.clone}</p>
                     </div>
                 {/if}
             </div>

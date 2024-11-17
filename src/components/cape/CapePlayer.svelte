@@ -5,6 +5,10 @@
     import { launcherOptions } from "../../stores/optionsStore.js";
     import { addNotification } from "../../stores/notificationStore.js";
     import Elytra from "../../images/elytra.webp";
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     export let cape;
     export let height = 275;
@@ -26,7 +30,7 @@
             }
             skinData = profileTexture != null ? profileTexture.textures.SKIN.url : "";
         }).catch((error) => {
-            addNotification("Failed to load player skin: " + error);
+            addNotification(lang.capes.notification.failedToLoadPlayerSkin.replace("{error}", error));
         });
 
         // Load current cape
@@ -35,7 +39,7 @@
         }).then((data) => {
             capeData = `data:image/png;base64,${data}`;
         }).catch((error) => {
-            addNotification("Failed to load cape: " + error);
+            addNotification(lang.capes.notification.failedToLoadCape.replace("{error}", error));
         });
 
         const canvas = document.createElement("canvas");
