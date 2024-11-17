@@ -60,7 +60,7 @@
             <div class="href-wrapper">
                 {#if type != 'CUSTOM'}
                     <div class="name-div">
-                        <a class="mod-title" href={mod.downloads != null ? `https://modrinth.com/mod/${slug}` : undefined} target="_blank" title={name}>
+                        <a class="mod-title" href={(mod?.value?.source?.artifact?.includes("modrinth") || mod?.downloads) ? `https://modrinth.com/mod/${slug}` : undefined} target="_blank" title={name}>
                             {name.length > 20 && (text == 'INSTALL' || text == 'REQUIRED' || text == 'DEPENDENCY') ? name.substring(0, 19) + '...' : name}
                         </a>
                         {#if mod?.featured}
