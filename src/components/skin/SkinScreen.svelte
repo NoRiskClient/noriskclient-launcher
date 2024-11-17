@@ -11,6 +11,10 @@
   import { addNotification } from "../../stores/notificationStore.js";
   import { noriskLog, getMcToken } from "../../utils/noriskUtils.js";
   import { pop } from "svelte-spa-router";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   let isLoading = true;
 
@@ -60,7 +64,7 @@
         document.getElementById("skin").appendChild(canvas);
       })
       .catch((error) => {
-        addNotification("Failed to load player skins: " + error);
+        addNotification(lang.skin.notification.failedToLoadPlayerSkins.replace("{error}", error));
       });
     isLoading = false;
   }
@@ -76,7 +80,7 @@
             .then((capeData) => {
               capeLocation = `data:image/png;base64,${capeData}`;
             }).catch((error) => {
-              addNotification("Failed to load player capes: " + error);
+              addNotification(lang.skin.notification.failedToLoadPlayerCapes.replace("{error}", error));
             });
         } else {
           capeLocation = profileTexture.textures.CAPE?.url ?? "";
@@ -84,7 +88,7 @@
         }
         isLoading = false;
       }).catch(error => {
-        addNotification("Failed to load player cape hash by uuid: " + error);
+        addNotification(lang.skin.notification.failedToLoadPlayerCapeHashByUUID.replace("{error}", error));
         isLoading = false;
       });
     }
@@ -99,7 +103,7 @@
         settings.lockControlls = false;
         skinViewer.zoom = 0.7;
       }).catch((error) => {
-        addNotification("Failed to load skin: " + error);
+        addNotification(lang.skin.notification.failedToLoadSkin.replace("{error}", error));
       });
   }
 
@@ -140,7 +144,7 @@
             await fetchOptions.bind(async () => await trySave());
             return;
           }
-          addNotification("Failed to save skin: " + error);
+          addNotification(lang.skin.notification.failedToSaveSkin.replace("{error}", error));
         });
     };
     if (!failed) {
@@ -170,7 +174,7 @@
     } catch (error) {
       skinViewer.controls.enabled = true;
       settings.lockControls = false;
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.skin.notification.failedToSelectSkinFile.replace("{error}", error));
     }
   }
 
@@ -264,9 +268,9 @@
   {/if}
   <div class="wrapper" on:selectstart={preventSelection}>
     <div class="slider slide"></div>
-    <h1 class="title slider">Skin</h1>
+    <h1 class="title slider">{lang.skin.title}</h1>
     {#if isLoading}
-      <h2 class="loading">Loading...</h2>
+      <h2 class="loading">{lang.skin.loading}</h2>
     {/if}
     <div
       id="skin"
@@ -286,29 +290,29 @@
             d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
         </svg>
         <div class="setting setting-slider no-slide" style="margin-top: 70px">
-          <ConfigRadioButton bind:value={settings.rotatePlayer} text="Rotate Player" reversed></ConfigRadioButton>
+          <ConfigRadioButton bind:value={settings.rotatePlayer} text={lang.skin.settings.rotatePlayer} reversed></ConfigRadioButton>
         </div>
         <div class="setting setting-slider no-slide">
-          <ConfigRadioButton bind:value={settings.enableZoom} text="Zoom" reversed></ConfigRadioButton>
+          <ConfigRadioButton bind:value={settings.enableZoom} text={lang.skin.settings.zoom} reversed></ConfigRadioButton>
         </div>
         {#if capeLocation}
           <div class="setting setting-slider no-slide">
-            <ConfigRadioButton bind:value={settings.showCape} text="Show Cape" reversed></ConfigRadioButton>
+            <ConfigRadioButton bind:value={settings.showCape} text={lang.skin.settings.showCape} reversed></ConfigRadioButton>
           </div>
           <div id="showCapeAsElytraSetting" class="setting setting-slider no-slide">
-            <ConfigRadioButton bind:value={settings.showCapeAsElytra} text="Elytra" reversed></ConfigRadioButton>
+            <ConfigRadioButton bind:value={settings.showCapeAsElytra} text={lang.skin.settings.elytra} reversed></ConfigRadioButton>
           </div>
         {/if}
       </div>
       {#if !unsavedSkin}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="change-button slider no-slide primary-text" on:click={selectSkin}>Change</h1>
+        <h1 class="change-button slider no-slide primary-text" on:click={selectSkin}>{lang.skin.button.change}</h1>
       {:else}
         <div class="unsavedSkinActionWrapper slider no-slide">
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h1 class="red-text-clickable" on:click={cancelSkinPreview}>Cancel</h1>
+          <h1 class="red-text-clickable" on:click={cancelSkinPreview}>{lang.skin.button.cancel}</h1>
           <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>Save</h1>
+          <h1 class="save-button" on:click={async () => saveSkin(unsavedSkin)}>{lang.skin.button.save}</h1>
         </div>
       {/if}
     {/if}

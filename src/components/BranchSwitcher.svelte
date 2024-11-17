@@ -6,7 +6,11 @@
   import { scale } from "svelte/transition";
   import { isCheckingForUpdates } from "../utils/noriskUtils.js";
   import Updater from "./v2/Updater.svelte";
-  import SignInOutput from "./home/widgets/SignInOutput.svelte";  
+  import SignInOutput from "./home/widgets/SignInOutput.svelte";
+  import { translations } from '../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   export let allowBranchSwitching = true;
 </script>
@@ -36,7 +40,7 @@
                 style="position:absolute"
                 on:selectstart={preventSelection}
                 on:mousedown={preventSelection}
-            > {branch.toUpperCase()} VERSION</h1>
+            > {lang.branchSwitcher.branch.replace("{branch}", branch.toUpperCase())}</h1>
           {/if}
         {/each}
       {:else}
@@ -45,7 +49,7 @@
             style="position:absolute"
             on:selectstart={preventSelection}
             on:mousedown={preventSelection}
-        > NOT WHITELISTED</h1>
+        > {lang.branchSwitcher.notWhitelisted}</h1>
       {/if}
     {/if}
   </section>

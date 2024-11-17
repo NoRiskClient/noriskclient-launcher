@@ -1,14 +1,18 @@
 <script>
+	import { translations } from './../../utils/translationUtils.js';
     import { onMount } from 'svelte';
     import { activePopup, closePopup as killPopup } from '../../utils/popupUtils.js';
     import ConfigTextInput from '../config/inputs/ConfigTextInput.svelte';
     import ConfigFolderInput from '../config/inputs/ConfigFolderInput.svelte';
     import ConfigFileInput from '../config/inputs/ConfigFileInput.svelte';
-  
-    let dialog; // HTMLDialogElement
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
+    let dialog; // HTMLDialogElement
+    
     let popupTitle = $activePopup?.title ?? null;
-    let popupContent = $activePopup?.content ?? 'Empty!';
+    let popupContent = $activePopup?.content ?? lang.popup.defaultContent;
     let popupType = $activePopup?.type ?? 'INFO';
     let popupInputName = $activePopup?.inputName ?? '';
     let popupInputType = $activePopup?.inputType ?? 'TEXT';
@@ -19,14 +23,15 @@
     let onConfirm = $activePopup?.onConfirm ?? (() => closePopup());
     let validateInput = $activePopup?.validateInput ?? (() => true);
     let liveValidation = $activePopup?.liveValidation ?? true;
-    let popupConfirmButton = $activePopup?.confirmButton ?? 'Confirm';
-    let popupCloseButton = $activePopup?.cancelButton ?? popupType == "INFO" ? "OK" : popupType == "CONFIRM" || popupType == "INPUT" ? "Cancel" : "Close";
+    // Darf nicht let sein, translation stuff !!?!?!?!
+    $: popupConfirmButton = $activePopup?.confirmButton ?? lang.popup.defaultButtons.confirm;
+    $: popupCloseButton = $activePopup?.cancelButton ?? popupType == "INFO" ? "OK" : popupType == "CONFIRM" || popupType == "INPUT" ? lang.popup.defaultButtons.cancel : lang.popup.defaultButtons.close;
     
     let popupHeight = $activePopup?.height ?? 22.5;
     let popupWidth = $activePopup?.width ?? 30;
     let popupTitleFontSize = $activePopup?.titleFontSize ?? '22.5px';
     let popupContentFontSize = $activePopup?.contentFontSize ?? '16.5px';
-  
+
     $: if (dialog) dialog.showModal();
     let animateOutNow = false;
     let isInputValid = (popupType != "INPUT" || popupInputType != "TEXT") || !liveValidation;
@@ -83,7 +88,7 @@
 >
 <div on:click|stopPropagation class="divider">
     <div class="header-wrapper">
-        <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? popupType}</h1>
+        <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? lang.popup.title[popupType.toLowerCase()]}</h1>
         <h1 class="nes-font red-text-clickable close-button" on:click={closePopup}>X</h1>
     </div>
     <hr>
@@ -108,7 +113,7 @@
                 on:click={closePopup}
             >{popupCloseButton}</p>
             {#if popupType == "CONFIRM" || popupType == "INPUT"}
-                <p class="button nes-font green-text" class:disabled={!isInputValid} class:enabled={isInputValid} on:click={() => isInputValid ? confirmPopup() : {}} title={!isInputValid ? "Invalid Input!" : ""}>{popupConfirmButton}</p>
+                <p class="button nes-font green-text" class:disabled={!isInputValid} class:enabled={isInputValid} on:click={() => isInputValid ? confirmPopup() : {}} title={!isInputValid ? lang.popup.invalidInput : ""}>{popupConfirmButton}</p>
             {/if}
         </div>
     </div>

@@ -7,6 +7,10 @@
   import { addNotification } from "../../stores/notificationStore.js";
   import { openInputPopup } from "../../utils/popupUtils.js";
   import { noriskLog } from "../../utils/noriskUtils.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   let capes = null;
   let userCapes = null;
@@ -73,10 +77,10 @@
       await requestTrendingCapes(0);
     } else if (currentRequest === 3) {
       openInputPopup({
-        title: 'Search Capes',
-        content: 'Enter a username, you want to see the capes of.',
-        inputPlaceholder: 'Username',
-        confirmButton: 'Search',
+        title: lang.capes.popup.search.title,
+        content: lang.capes.popup.search.content,
+        inputPlaceholder: lang.capes.popup.search.inputPlaceholder,
+        confirmButton: lang.capes.popup.search.confirmButton,
         validateInput: (value) => value.length >= 3 && value.length <= 16,
         onConfirm: requestUserCapes,
         onCancel: () => { switchTab(oldRequest) }
@@ -98,7 +102,7 @@
         }
         isLoading = false;
       }).catch(error => {
-        addNotification("Failed to Request User by UUID: " + error);
+        addNotification(lang.capes.notification.failedToRequestUserByUUID.replace("{error}", error));
         isLoading = false;
       });
     }
@@ -110,13 +114,13 @@
 <div class="wrapper">
   <div class="tab-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={() => switchTab(0)} class:primary-text={currentRequest === 0}>EDITOR</h1>
+    <h1 on:click={() => switchTab(0)} class:primary-text={currentRequest === 0}>{lang.capes.navbar.editor}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="button-wrapper">
-      <h2 on:click={() => switchTab(1)} class:primary-text={currentRequest === 1}>ALL TIME</h2>
-      <h2 on:click={() => switchTab(2)} class:primary-text={currentRequest === 2}>WEEKLY</h2>
-      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>SEARCH</h2>
-      <h2 on:click={() => switchTab(4)} class:primary-text={currentRequest === 4}>OWNED</h2>
+      <h2 on:click={() => switchTab(1)} class:primary-text={currentRequest === 1}>{lang.capes.navbar.alltime}</h2>
+      <h2 on:click={() => switchTab(2)} class:primary-text={currentRequest === 2}>{lang.capes.navbar.weekly}</h2>
+      <h2 on:click={() => switchTab(3)} class:primary-text={currentRequest === 3}>{lang.capes.navbar.search}</h2>
+      <h2 on:click={() => switchTab(4)} class:primary-text={currentRequest === 4}>{lang.capes.navbar.owned}</h2>
     </div>
   </div>
   <div class="cape-wrapper">

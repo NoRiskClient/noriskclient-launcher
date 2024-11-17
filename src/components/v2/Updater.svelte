@@ -7,7 +7,11 @@
   import { isCheckingForUpdates, noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { delay } from "../../utils/svelteUtils.js";
-
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
+  
   let dots = "";
 
   onMount(async () => {
@@ -65,7 +69,7 @@
 
 
 <h1 class="branch-font primary-text" style="position:absolute"
-    transition:scale={{ x: 15, duration: 300, easing: quintOut }}>Searching Updates{dots}</h1>
+    transition:scale={{ x: 15, duration: 300, easing: quintOut }}>{lang.updater.searching}{dots}</h1>
 
 <style>
     .branch-font {

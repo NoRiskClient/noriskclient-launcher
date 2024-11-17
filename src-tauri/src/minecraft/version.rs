@@ -341,7 +341,7 @@ impl AssetObject {
         let asset_path = asset_folder.join(&self.hash);
 
         return if !asset_path.exists() {
-            progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
+            progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingAssetObject&hash%{}", self.hash)));
 
             info!("Downloading {}", self.hash);
             download_file_untracked(&*format!("https://resources.download.minecraft.net/{}/{}", &self.hash[0..2], &self.hash), asset_path).await?;
@@ -392,7 +392,7 @@ impl AssetObject {
         }
 
         return if download {
-            progress.progress_update(ProgressUpdate::set_label(format!("Downloading asset object {}", self.hash)));
+            progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingNoriskAssetObject&hash%{}", self.hash)));
 
             info!("Downloading {}", self.hash);
             download_private_file_untracked(&*format!("{}/launcher/assets/{}/{}/{}", get_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), norisk_token, asset_file_path).await?;
@@ -592,7 +592,7 @@ impl LibraryDownloadInfo {
         }
 
         // Download library
-        progress.progress_update(ProgressUpdate::set_label(format!("Downloading library {}", name)));
+        progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingLibrary&library%{}", name)));
 
         download_file_untracked(&self.url, &library_path).await?;
         info!("Downloaded {}", self.url);

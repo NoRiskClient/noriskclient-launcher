@@ -68,23 +68,10 @@ impl CapeApiEndpoints {
 
                 debug!("Cape upload status {:?}",response.status());
 
-                return match response.status() {
-                    StatusCode::CREATED => {
-                        Ok("Your cape was applied instantly because it was already accepted before.".to_string())
-                    }
-                    StatusCode::OK => {
-                        let response_text = response.text().await.map_err(|err| {
-                            format!("Error reading the request: {}", err)
-                        })?;
-                        Ok(response_text)
-                    }
-                    _ => {
-                        let response_text = response.text().await.map_err(|err| {
-                            format!("Error reading the request: {}", err)
-                        })?;
-                        Err(response_text)
-                    }
-                };
+                let response_text = response.text().await.map_err(|err| {
+                    format!("Error reading cape upload response text: {}", err)
+                })?;
+                Ok(response_text)
             }
             Err(_err) => {
                 Err("Error Selecting Cape".parse().unwrap())

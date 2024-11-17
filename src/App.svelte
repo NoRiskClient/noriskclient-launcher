@@ -1,4 +1,5 @@
 <script>
+	import { writable } from 'svelte/store';
   import Router from "./Router.svelte";
   import { onMount } from "svelte";
   import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
@@ -9,6 +10,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { push } from "svelte-spa-router";
   import {
+    getVersion,
     isClientRunning,
     startProgress,
     getNoRiskUser,
@@ -25,13 +27,20 @@
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
+  import { setLanguage, language, translations } from "./utils/translationUtils.js";
+
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   onMount(async () => {
     setTimeout(async () => {
       await appWindow.show();
     }, 300);
+    await getVersion();
     await checkIfClientIsRunning();
     await fetchOptions();
+    setLanguage($language);
+
     await fetchDefaultUserOrError(false);
     const isTokenValid = await getNoRiskUser();
     if (isTokenValid) {
@@ -86,7 +95,10 @@
 </script>
 
 <main>
-  <Router />
+  <!-- Ensure translations are loaded before showing UI -->
+  {#if lang?.dummy}
+    <Router />
+  {/if}
 </main>
 
 <style>

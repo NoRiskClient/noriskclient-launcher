@@ -3,7 +3,6 @@
     import { invoke } from "@tauri-apps/api";
     import { pop } from "svelte-spa-router";
     import VirtualList from "../../utils/VirtualList.svelte";
-    import CustomServerInfoPopup from "./CustomServerInfoPopup.svelte";
     import { customServerLogs, clearCustomServerLogs } from "../../../stores/customServerLogsStore.js";
     import { launcherOptions } from "../../../stores/optionsStore.js";
     import { customServers, activeCustomServerId } from "../../../stores/customServerStore.js";
@@ -11,13 +10,17 @@
     import { getNoRiskToken } from "../../../utils/noriskUtils.js";
     import { defaultUser } from "../../../stores/credentialsStore.js";
     import { addNotification } from "../../../stores/notificationStore.js";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     let customServer = $customServers.find(s => s._id == $activeCustomServerId) ?? {};
 
     if (customServer._id == undefined) {
         pop();
         pop();
-        addNotification("Failed to load custom server details.");
+        addNotification(lang.servers.custom.details.notification.failedToLoad);
     }
 
     let logs = $customServerLogs[customServer._id] ?? [];
@@ -61,7 +64,7 @@
                 logType: "CONSOLE",
                 command: command,
             }).catch((error) => {
-                addNotification("Failed to send command: " + error);
+                addNotification(lang.servers.custom.details.notification.failedToSendCommand.replace("{error}", error));
             });
         });
     }
@@ -88,8 +91,6 @@
         return `[${date.getHours() < 10 ? "0" + date.getHours() : date.getHours()}:${date.getMinutes() < 9 ? "0" + date.getMinutes() : date.getMinutes()}:${date.getSeconds() < 9 ? "0" + date.getSeconds() : date.getSeconds()}]`;
     }
 
-    let showInfoPopup = false;
-
     async function runServer() {
         consoleListenerActive = false;
         await invoke("run_custom_server", {
@@ -98,7 +99,7 @@
             token: getNoRiskToken(),
             uuid: $defaultUser.id
         }).catch((error) => {
-            addNotification("Failed to start server: " + error);
+            addNotification(lang.servers.custom.details.notification.failedToStartServer.replace("{error}", error));
         });
     }
 
@@ -106,7 +107,7 @@
         await invoke("terminate_custom_server", {
             launcherWasClosed: $stillRunningCustomServer == customServer._id,
         }).catch((error) => {
-            addNotification("Failed to stop server: " + error);
+            addNotification(lang.servers.custom.details.notification.failedToStopServer.replace("{error}", error));
         });
     }
 
@@ -122,44 +123,41 @@
         }, 10 * 1000);
 
         if ($stillRunningCustomServer == customServer._id) {
-            addNotification("Live logs unavailable. | Click for more info!", "INFO", "Live logs are currently unavailable because you closed the launcher while your server was still running.", 5000);
+            addNotification(lang.servers.custom.details.notification.liveLogsUnavailable.info, "INFO", lang.servers.custom.details.notification.liveLogsUnavailable.details, 5000);
         }
     });
 </script>
 
-{#if showInfoPopup}
-    <CustomServerInfoPopup bind:customServer={customServer} bind:showModal={showInfoPopup} />
-{/if}
 <div class="server-details-wrapper">
     <div class="row" style="margin-top: 0.5em;">
         <div class="row" style="margin-left: 0.5em;">
             <h1>Status:</h1>
             {#if logs.length < 1}
-                <h1 class="offline">Offline</h1>
+                <h1 class="offline">{lang.servers.custom.details.offline}</h1>
             {:else if logs.join(' ').includes('Done')}
-                <h1 class="online green-text">Running</h1>
+                <h1 class="online green-text">{lang.servers.custom.details.running}</h1>
             {:else if logs.join(' ').includes('Stopping server')}
-                <h1 class="stopping">Stopping...</h1>
+                <h1 class="stopping">{lang.servers.custom.details.stopping}</h1>
             {:else}
-                <h1 class="starting">Starting...</h1>
+                <h1 class="starting">{lang.servers.custom.details.starting}</h1>
             {/if}
         </div>
         <div class="start-stop-button-wrapper">
             {#if logs.length < 1}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="startServer-button green-text" on:click={runServer}>Start</h1>
+                <h1 class="startServer-button green-text" on:click={runServer}>{lang.servers.custom.details.button.start}</h1>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="stopServer-button red-text" on:click={stopServer}>Stop</h1>
+                <h1 class="stopServer-button red-text" on:click={stopServer}>{lang.servers.custom.details.button.stop}</h1>
             {/if}
         </div>
     </div>
     <hr>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="navbar">
-        <p class="navItem" class:active={currentTab == 0} on:click={() => currentTab = 0}>Logs</p>
-        <p class="navItem" class:active={currentTab == 1} on:click={() => currentTab = 1}>Overview</p>
-        <p class="navItem" class:active={currentTab == 2} on:click={() => currentTab = 2}>Addons</p>
+        <p class="navItem" class:active={currentTab == 0} on:click={() => currentTab = 0}>{lang.servers.custom.details.navbar.logs}</p>
+        <p class="navItem" class:active={currentTab == 1} on:click={() => currentTab = 1}>{lang.servers.custom.details.navbar.overview}</p>
+        <p class="navItem" class:active={currentTab == 2} on:click={() => currentTab = 2}>{lang.servers.custom.details.navbar.addons}</p>
     </div>
     <div class="content">
         {#if currentTab == 0}
@@ -180,48 +178,48 @@
                     {/if}
                 </VirtualList>
             {:else}
-                <h1 class="center">No logs available...<br>Server is offline.</h1>
+                <h1 class="center">{@html lang.servers.custom.details.noLogsServerOffline}</h1>
             {/if}
         {:else if currentTab == 1}
             <div class="row overview">
                 <div class="infos">
                     <div class="item">
-                        <p>Name:</p>
+                        <p>{lang.servers.custom.details.overview.name}:</p>
                         <p>{customServer.name}</p>
                     </div>
                     <div class="item">
-                        <p>Subdomain:</p>
+                        <p>{lang.servers.custom.details.overview.subdomain}:</p>
                         <p class="small" title={`${customServer.subdomain}.${customServer.domain}`}>{customServer.subdomain}</p>
                     </div>
                     <div class="item">
-                        <p>Version:</p>
+                        <p>{lang.servers.custom.details.overview.version}:</p>
                         <p>{customServer.mcVersion}</p>
                     </div>
                     <div class="item">
-                        <p>Type:</p>
+                        <p>{lang.servers.custom.details.overview.type}:</p>
                         <p>{customServer.type}</p>
                     </div>
                     {#if liveServerInfo}
                         <div class="item">
-                            <p>Seed:</p>
+                            <p>{lang.servers.custom.details.overview.seed}:</p>
                             <p class="small">{liveServerInfo['seed']}</p>
                         </div>
                         <div class="item">
-                            <p>Difficulty:</p>
+                            <p>{lang.servers.custom.details.overview.difficulty}:</p>
                             <p>{liveServerInfo['difficulty']}</p>
                         </div>
                         <div class="item">
-                            <p>Max Players:</p>
+                            <p>{lang.servers.custom.details.overview.maxPlayers}:</p>
                             <p>{liveServerInfo['maxPlayers']}</p>
                         </div>
                         {#if serverRunning}
                             <div class="item">
-                                <p>Online Players:</p>
+                                <p>{lang.servers.custom.details.overview.onlinePlayers}:</p>
                                 <p>{liveServerInfo['onlinePlayers'].length ?? 0}</p>
                             </div>
                         {/if}
                         <div class="item">
-                            <p>Whitelisted Players:</p>
+                            <p>{lang.servers.custom.details.overview.whitelistedPlayers}:</p>
                             <p>{liveServerInfo['whitelistedPlayers'].length ?? 0}</p>
                         </div>
                     {/if}
@@ -234,7 +232,7 @@
     <!-- Keep this here so the eventlistener doesnt die on tab switch -->
     {#if serverRunning}
         <form id="console-form">
-            <input class="console" type="text" placeholder="Enter a command and press enter to execute..." hidden={!serverRunning || currentTab != 0}>
+            <input class="console" type="text" placeholder={lang.servers.custom.details.logs.console.placeholder} hidden={!serverRunning || currentTab != 0}>
         </form>
     {/if}
 </div>

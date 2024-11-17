@@ -12,6 +12,10 @@
   import { addNotification } from "../../stores/notificationStore.js";
   import { noriskLog } from "../../utils/noriskUtils.js";
   import { openConfirmPopup } from "../../utils/popupUtils.js";
+  import { translations } from '../../utils/translationUtils.js';
+    
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
 
   $: currentBranch = $branches[$currentBranchIndex];
   $: launcherProfiles = $launcherOptions.experimentalMode ? $profiles.experimentalProfiles : $profiles.mainProfiles;
@@ -52,18 +56,18 @@
 
   async function exportProfile(profileId) {
     openConfirmPopup({
-      title: "Export Profile",
-      content: `Do you want to export the profile \"${profileById(profileId).name}\"?`,
-      confirmButton: "Export",
-      closeButton: "Nevermind",
+      title: lang.profiles.popup.export.title,
+      content: lang.profiles.popup.export.content.replace("{profile}", profileById(profileId).name),
+      confirmButton: lang.profiles.popups.export.buttons.confirm,
+      closeButton: lang.profiles.popups.export.buttons.close,
       onConfirm: async () => {
         await invoke("export_profile_and_open_explorer", { profileId }).then(() => {
           noriskLog("Exported profile: " + profileId);
-          addNotification("Profile exported successfully!", "INFO");
+          addNotification(lang.profiles.notification.export.success, "INFO");
         }).catch(err => {
           noriskLog("Failed to export profile: " + profileId);
           noriskLog(err);
-          addNotification("Failed to export profile: " + err);
+          addNotification(lang.profiles.notification.export.error.replace("{error}", err));
         });
       }
     })
@@ -74,7 +78,7 @@
       const location = await open({
         defaultPath: "/",
         multiple: false,
-        filters: [{ name: "Import Progile", extensions: ["noriskprofile"] }],
+        filters: [{ name: lang.profiles.import.filterName, extensions: ["noriskprofile"] }],
       });
 
       if (!location) {
@@ -90,19 +94,19 @@
       const fileName = location.split(splitter)[location.split(splitter).length - 1];
 
       if (!fileName.endsWith(".noriskprofile")) {
-        addNotification(`Cannot install ${fileName}!<br><br>Only .noriskprofile files are supported.`);
+        addNotification(lang.profiles.notification.import.invalidFileExtentionError.replace("{fileName}", fileName));
         return;
       }
 
       noriskLog(`Importing profile ${fileName}`);
       await invoke("import_launcher_profile", { fileLocation: location }).then(() => {
-        addNotification(`Successfully imported profile "${fileName.replace('.noriskprofile', '')}"!`, "INFO");
+        addNotification(lang.profiles.notification.import.success.replace("{profile}", fileName.replace('.noriskprofile', '')), "INFO");
         fetchProfiles();
       }).catch((error) => {
-        addNotification(`Failed to import profile ${fileName}: ${error}`);
+        addNotification(lang.profiles.notification.import.failedToImportError.replace("{profile}", fileName).replace("{error}", error));
       });
     } catch (error) {
-      addNotification("Failed to select file using dialog: " + error);
+      addNotification(lang.profiles.notification.import.failedToSelectFile.replace("{error}", error));
     }
   }
 </script>
@@ -127,13 +131,9 @@
     </VirtualList>
     <div class="create-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="create-button green-text" on:click={openSettings}>
-        CREATE PROFILE
-      </h1>
+      <h1 class="create-button green-text" on:click={openSettings}>{lang.profiles.buttons.createProfile}</h1>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <h1 class="create-button green-text" on:click={importProfile}>
-        IMPORT PROFILE
-      </h1>
+      <h1 class="create-button green-text" on:click={importProfile}>{lang.profiles.buttons.importProfile}</h1>
     </div>
   {/if}
 </div>

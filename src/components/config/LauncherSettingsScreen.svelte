@@ -5,6 +5,7 @@
     import ConfigFolderInput from "./inputs/ConfigFolderInput.svelte";
     import ConfigFileInput from "./inputs/ConfigFileInput.svelte";
     import McRealAppModal from "../mcRealApp/McRealAppModal.svelte";
+    import ManageAccountsModal from "../account/AccountModal.svelte";
     import { fetchOptions, launcherOptions, saveOptions } from "../../stores/optionsStore.js";
     import { preventSelection } from "../../utils/svelteUtils.js";
     import { invoke } from "@tauri-apps/api";
@@ -17,9 +18,14 @@
     import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
     import { openConfirmPopup } from "../../utils/popupUtils.js";
+    import { translations } from '../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     $: lightTheme = $launcherOptions?.theme === "LIGHT";
     let showMcRealAppModal = false;
+    let showManageAccountsModal = false;
     let totalSystemMemory = 0;
     let selectedMemory = 0;
 
@@ -34,8 +40,8 @@
 
     async function confirmClearData() {
         openConfirmPopup({
-            title: "Are you sure?",
-            content: "Are you sure you want to erase all saved data?\nThis will delete all your worlds, mods and settings within the client.",
+            title: lang.settings.popup.clearData.title,
+            content: lang.settings.popup.clearData.content,
             onConfirm: clearData
         });
     }
@@ -43,7 +49,7 @@
     async function clearData() {
         invoke("clear_data", { options: $launcherOptions })
             .then(async () => {
-                addNotification("Data cleared successfully!", "INFO");
+                addNotification(lang.settings.notification.clearData.success, "INFO");
                 await fetchOptions();
                 await fetchDefaultUserOrError(false);
                 await fetchBranches();
@@ -76,9 +82,9 @@
                     await updateNoRiskToken($defaultUser);
                     await fetchDefaultUserOrError(true);
                 }
-            }).catch(async (e) => {
+            }).catch(async (err) => {
                 $launcherOptions.experimentalMode = false;
-                addNotification(`Failed to enable experimental mode: ${e}`);
+                addNotification(lang.settings.notification.experimentalMode.error.replace("{error}", err));
             });
         }
     }
@@ -87,16 +93,18 @@
         if (keepLocalAssets) {
             invoke("enable_keep_local_assets").then(() => {
                 keepLocalAssets = true;
-            }).catch((e) => {
+                addNotification(lang.settings.notification.enableKeepLocalAssets.success, "INFO");
+            }).catch((err) => {
                 keepLocalAssets = false;
-                addNotification(`Failed to enable keep local assets: ${e}`);
+                addNotification(lang.settings.notification.enableKeepLocalAssets.error.replace("{error}", err));
             });
         } else {
             invoke("disable_keep_local_assets").then(() => {
                 keepLocalAssets = false;
-            }).catch((e) => {
+                addNotification(lang.settings.notification.disableKeepLocalAssets.success, "INFO");
+            }).catch((err) => {
                 keepLocalAssets = true;
-                addNotification(`Failed to disable keep local assets: ${e}`);
+                addNotification(lang.settings.notification.disableKeepLocalAssets.error.replace("{error}", err));
             });
         }
     }
@@ -126,37 +134,40 @@
     });
 </script>
 
-{#if showMcRealAppModal}
-    <McRealAppModal bind:showModal={showMcRealAppModal} />
-{/if}
+<McRealAppModal bind:showModal={showMcRealAppModal} />
+<ManageAccountsModal bind:showModal={showManageAccountsModal} />
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div on:click|stopPropagation class="settings-container">
-    <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>SETTINGS</h1>
+    <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.settings.title}</h1>
     <hr>
     <div class="settings-wrapper">
-    <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text="Keep Launcher Open" />
+    <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text={lang.settings.keepLauncherOpen} />
     {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
-        <ConfigRadioButton text="Experimental Mode" bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
+        <ConfigRadioButton text={lang.settings.experimentalMode} bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
     {/if}
     {#if keepLocalAssetsPernmission}
-        <ConfigRadioButton text="Keep Local Assets" bind:value={keepLocalAssets} isExclusive={true} isExclusiveLabel={"Designer"} on:toggle={toggleKeepLocalAssets}/>
+        <ConfigRadioButton text={lang.settings.keepLocalAssets} bind:value={keepLocalAssets} isExclusive={true} isExclusiveLabel={"Designer"} on:toggle={toggleKeepLocalAssets}/>
     {/if}
-    <ConfigRadioButton text={`Theme: ${$launcherOptions.theme}`} bind:value={lightTheme} on:toggle={toggleTheme} />
+    <ConfigRadioButton text={lang.settings.theme.replace("{theme}", $launcherOptions.theme)} bind:value={lightTheme} on:toggle={toggleTheme} />
     {#if $featureWhitelist.includes("MCREAL_APP")}
-        <div class="mcreal-app-wrapper">
-            <h1 class="title">MCReal App<p class="devOnly">(Alpha)</p></h1>
-            <h1 class="button primary-text" on:click={() => { showMcRealAppModal = true; }}>Details</h1>
+        <div class="horizontal-wrapper">
+            <h1 class="title">{lang.settings.mcRealApp.title}<p class="devOnly">(Alpha)</p></h1>
+            <h1 class="button primary-text" on:click={() => { showMcRealAppModal = true; }}>{lang.settings.mcRealApp.button.details}</h1>
         </div>
     {/if}
-    <div class="sliders">
-        <ConfigSlider title="RAM" suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
-        <ConfigSlider title="Max Downloads" suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
+    <div class="horizontal-wrapper">
+        <h1 class="title">{lang.settings.accounts.title}</h1>
+        <h1 class="button primary-text" on:click={() => { showManageAccountsModal = true; }}>{lang.settings.accounts.button.manage}</h1>
     </div>
-    <ConfigFileInput title="Custom Java Path" bind:value={$launcherOptions.customJavaPath} requiredFileName={["javaw", "java"]} defaultValue={""} />
-    <ConfigTextInput title="Custom JVM args" bind:value={$launcherOptions.customJavaArgs} placeholder={"None"} />
-    <ConfigFolderInput title="Data Folder" bind:value={$launcherOptions.dataPath} />
+    <div class="sliders">
+        <ConfigSlider title={lang.settings.ram} suffix="GB" min={2} max={totalSystemMemory} bind:value={selectedMemory} step={1} />
+        <ConfigSlider title={lang.settings.maxDownloads} suffix="" min={1} max={50} bind:value={$launcherOptions.concurrentDownloads} step={1} />
+    </div>
+    <ConfigFileInput title={lang.settings.customJavaPath} bind:value={$launcherOptions.customJavaPath} requiredFileName={["javaw", "java"]} defaultValue={""} />
+    <ConfigTextInput title={lang.settings.customJavaArgs} bind:value={$launcherOptions.customJavaArgs} placeholder={lang.settings.placeholder.customJavaArgs} />
+    <ConfigFolderInput title={lang.settings.dataFolder} bind:value={$launcherOptions.dataPath} />
     <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[CLEAR DATA]</p>
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[{lang.settings.clearDataButton}]</p>
     </div>
     </div>
 </div>
@@ -209,7 +220,7 @@
         cursor: default;
     }
 
-    .mcreal-app-wrapper {
+    .horizontal-wrapper {
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -217,7 +228,7 @@
         margin-top: 10px;
     }
 
-    .mcreal-app-wrapper > .title {
+    .horizontal-wrapper > .title {
         display: flex;
         flex-direction: row;
         gap: 1em;
@@ -227,14 +238,14 @@
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }
 
-    .mcreal-app-wrapper > .button {
+    .horizontal-wrapper > .button {
         font-family: 'Press Start 2P', serif;
         font-size: 14px;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
-    .mcreal-app-wrapper > .button:hover {
+    .horizontal-wrapper > .button:hover {
         transform: scale(1.15);
     }
 

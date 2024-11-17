@@ -24,6 +24,10 @@
     import { customServerProgress, setCustomServerProgress, noriskLog } from "../../../utils/noriskUtils.js";
     import { addCustomServer, setActiveCustomServerId } from "../../../stores/customServerStore.js";
     import { addNotification } from "../../../stores/notificationStore.js";
+    import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
     const dispatch = createEventDispatcher()
 
@@ -142,7 +146,7 @@
             noriskLog("Created Server: " + JSON.stringify(newServer));
             createdServer = newServer;
             addCustomServer(newServer);
-            setCustomServerProgress(newServer._id, { label: "Initializing...", progress: 0, max: 0 });
+            setCustomServerProgress(newServer._id, { label: lang.servers.custom.create.initializing, progress: 0, max: 0 });
             
             let additionalData = null;
             if (newServer.type == "VANILLA") {
@@ -160,11 +164,11 @@
                 setActiveCustomServerId(newServer._id, true);
             }).catch((error) => {
                 dispatch("back");
-                addNotification("Failed to initialize server: " + error);
+                addNotification(lang.servers.custom.create.notification.failedToInitialize.replace("{error}", error));
             });
         }).catch((error) => {
             dispatch("back");
-            addNotification("Failed to create server: " + error);
+            addNotification(lang.servers.custom.create.notification.failedToCreate.replace("{error}", error));
         });
     }
 </script>
@@ -182,7 +186,7 @@
         <EulaTab bind:eula={eula} on:back={() => currentTab = availableTypes[type].requiresLoader ? "LOADER_VERSIONS" : "VERSIONS"} on:next={createServer} />
     {:else if currentTab === "INITIALIZING"}
         <div class="center">
-            <h1>{$customServerProgress[createdServer._id] ? $customServerProgress[createdServer._id].label : 'Initializing...'}</h1>
+            <h1>{$customServerProgress[createdServer._id] ? $customServerProgress[createdServer._id].label : lang.servers.custom.create.initializing}</h1>
         </div>
     {/if}
 </div>
@@ -203,8 +207,10 @@
     }
 
     .center {
-        display: grid;
-        place-items: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         height: 100%;
+        width: 100%;
     }
 </style>

@@ -2,6 +2,10 @@
   import { createEventDispatcher } from "svelte";
   import VirtualList from "../../utils/VirtualList.svelte";
   import ConfigRadioButton from "../../config/inputs/ConfigRadioButton.svelte";
+  import { translations } from '../../../utils/translationUtils.js';
+    
+    /** @type {{ [key: string]: any }} */
+    $: lang = $translations;
 
   const dispatch = createEventDispatcher();
 
@@ -63,13 +67,13 @@
   <div on:click|stopPropagation class="divider">
     <div>
       <div class="header-wrapper">
-        <h1 class="nes-font">FILTERS</h1>
+        <h1 class="nes-font">{lang.addons.filters.title}</h1>
         <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
       </div>
       <hr>
       <div class="settings-wrapper">
         {#if !reload}
-        <VirtualList height="27.5em" items={list} let:item>
+          <VirtualList height="27.5em" items={list} let:item>
             {#if item?.id == undefined || item?.id == null}
               <p class="filter-type primary-text" class:first={list.indexOf(item) == 0}>{item}</p>
             {:else}
@@ -77,14 +81,12 @@
               <div style="height: 7.5px;"></div>
             {/if}
           </VirtualList>
-        {:else}
-          <p>LOADING</p>
         {/if}
       </div>
     </div>
     <!-- svelte-ignore a11y-autofocus -->
     <div class="clear-data-button-wrapper">
-      <p class="red-text" on:click={resetFilters}>RESET FILTERS</p>
+      <p class="red-text" on:click={resetFilters}>{lang.addons.filters.button.resetFilters}</p>
     </div>
   </div>
 </dialog>
