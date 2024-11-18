@@ -134,8 +134,12 @@
     });
 </script>
 
-<McRealAppModal bind:showModal={showMcRealAppModal} />
-<ManageAccountsModal bind:showModal={showManageAccountsModal} />
+{#if showMcRealAppModal}
+    <McRealAppModal bind:showModal={showMcRealAppModal} />
+{/if}
+{#if showManageAccountsModal}
+    <ManageAccountsModal bind:showModal={showManageAccountsModal} />
+{/if}
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div on:click|stopPropagation class="settings-container">
     <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.settings.title}</h1>
