@@ -41,7 +41,7 @@ impl ApiEndpoints {
     pub async fn get_norisk_user(norisk_token: &str, request_uuid: &str) -> Result<NoRiskUserMinimal> {
         Self::request_from_norisk_endpoint("core/user", norisk_token, request_uuid).await
     }
-    
+
     /// Request maintenance mode
     pub async fn norisk_maintenance_mode() -> Result<bool> {
         Self::request_from_norisk_endpoint("launcher/maintenance-mode", "", "").await
@@ -56,7 +56,7 @@ impl ApiEndpoints {
     pub async fn norisk_full_feature_whitelist(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint("core/whitelist/features", norisk_token, request_uuid).await
     }
-    
+
     /// Request all available branches
     pub async fn norisk_feature_whitelist(feature: &str, norisk_token: &str, request_uuid: &str) -> Result<bool> {
         Self::request_from_norisk_endpoint(format!("core/whitelist/feature/{}", feature).as_str(), norisk_token, request_uuid).await
@@ -134,8 +134,12 @@ impl ApiEndpoints {
     /**
     In diesem Fall ist es nicht der NoRiskToken sondern der Minecraft Token!!
      */
-    pub async fn refresh_norisk_token(token: &str) -> Result<NoRiskToken> {
-        Self::post_from_norisk_endpoint("launcher/auth/validate", token, "").await
+    pub async fn refresh_norisk_token(token: &str, hwid: &str, force: bool) -> Result<NoRiskToken> {
+        let force_str = force.to_string(); // Erstelle einen String für `force`
+        let mut extra_params = HashMap::new();
+        extra_params.insert("force", force_str.as_str()); // Füge Referenz hinzu
+        extra_params.insert("hwid", hwid);
+        Self::post_from_norisk_endpoint_with_parameters("launcher/auth/validate", token, "", Some(extra_params)).await
     }
 
     /// Check subdomain
@@ -341,6 +345,37 @@ impl ApiEndpoints {
             .await?
         )
     }
+    pub async fn post_from_norisk_endpoint_with_parameters<T: DeserializeOwned>(
+        endpoint: &str,
+        norisk_token: &str,
+        request_uuid: &str,
+        additional_query_params: Option<HashMap<&str, &str>>,
+    ) -> Result<T> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!("{}/{}", get_api_base(options.experimental_mode), endpoint);
+        info!("URL: {}", url);
+
+        // Standard-Query-Parameter einfügen
+        let mut query_params = vec![("uuid", request_uuid)];
+
+        // Zusätzliche Query-Parameter hinzufügen
+        if let Some(params) = additional_query_params {
+            query_params.extend(params.iter().map(|(k, v)| (*k, *v)));
+        }
+
+        Ok(HTTP_CLIENT
+            .post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&query_params)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<T>()
+            .await?)
+    }
+
 
     /// Request JSON formatted data from launcher API
     pub async fn post_from_norisk_endpoint<T: DeserializeOwned>(endpoint: &str, norisk_token: &str, request_uuid: &str) -> Result<T> {

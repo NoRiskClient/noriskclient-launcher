@@ -562,12 +562,12 @@ pub async fn minecraft_auth_remove_user(
 #[tauri::command]
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Error> {
     let accounts = minecraft_auth_get_store().await?;
-    let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?);
-    Ok(refresh_norisk_token_if_necessary(account).await?)
+    let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).ok_or(ErrorKind::NoCredentialsError)?;
+    Ok(Option::from(minecraft_auth_update_mojang_and_norisk_token(account.clone()).await?))
 }
 
 pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
-    let experimental_mode = get_options().await.unwrap().experimental_mode;
+    let experimental_mode = get_options().await?.experimental_mode;
     if (credentials.is_some()) {
         let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
         match token_result {
@@ -575,7 +575,9 @@ pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>
             Ok(token) => {
                 let result = ApiEndpoints::get_norisk_user(&token, &credentials.unwrap().id.to_string()).await;
                 match result {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        debug!("NoRisk Token is valid");
+                    }
                     Err(error) => {
                         // Überprüfen, ob der Fehler ein HTTP-Fehler ist
                         debug!("Error Fetching NoRiskUser: {:?}",error);
@@ -619,7 +621,7 @@ pub async fn minecraft_auth_update_norisk_token(
     credentials: Credentials,
 ) -> Result<Credentials, Error> {
     let mut accounts = minecraft_auth_get_store().await?;
-    Ok(accounts.refresh_norisk_token(&credentials).await?)
+    Ok(accounts.refresh_norisk_token_if_necessary(&credentials, false).await?)
 }
 
 #[tauri::command]
@@ -634,7 +636,7 @@ pub async fn minecraft_auth_update_mojang_and_norisk_token(
 }
 
 #[tauri::command]
-pub async fn get_options() -> Result<LauncherOptions, String> {
+pub async fn get_options() -> Result<LauncherOptions, crate::error::Error> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     Ok(LauncherOptions::load(config_dir).await.unwrap_or_default()) // default to basic options if unable to load
 }
@@ -1155,7 +1157,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                     .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
 
-                match accounts.refresh_norisk_token(&credentials.clone()).await {
+                match accounts.refresh_norisk_token_if_necessary(&credentials.clone(), true).await {
                     Ok(credentials_with_norisk) => {
                         debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
                         return Ok(Some(credentials_with_norisk));
