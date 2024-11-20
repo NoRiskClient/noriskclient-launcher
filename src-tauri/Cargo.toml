@@ -89,9 +89,6 @@ tracing = "0.1.40"
 # Minecraft RCON
 minecraft-client-rs = "0.1.3"
 
-# HWID
-machineid-rs = "1.2.4"
-
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
