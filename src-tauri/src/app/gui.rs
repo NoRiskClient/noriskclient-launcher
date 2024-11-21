@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-
+use std::convert::From;
 use chrono::Utc;
 use directories::UserDirs;
 use log::{debug, error, info};
@@ -22,7 +22,8 @@ use sysinfo::{Pid, ProcessExt, System, SystemExt};
 use tauri::api::dialog::blocking::FileDialogBuilder;
 use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tokio::{fs, io::AsyncReadExt};
-
+use uuid::Uuid;
+use crate::app::nrc_cache::NRCCache;
 use crate::addons::datapack_manager::DataPackManager;
 use crate::addons::mod_manager::ModManager;
 use crate::addons::resourcepack_manager::ResourcePackManager;
@@ -563,7 +564,16 @@ pub async fn minecraft_auth_remove_user(
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Error> {
     let accounts = minecraft_auth_get_store().await?;
     let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).ok_or(ErrorKind::NoCredentialsError)?;
-    Ok(Option::from(minecraft_auth_update_mojang_and_norisk_token(account.clone()).await?))
+    debug!("Found Default User {:?} {:?}", account.username, account.id);
+    match minecraft_auth_update_mojang_and_norisk_token(account.clone()).await {
+        Ok(creds) => {
+            Ok(Option::from(creds))
+        }
+        Err(error) => {
+            error!("Error Fetching Default User {:?}", error);
+            Ok(Option::from(account.clone()))
+        }
+    }
 }
 
 pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
@@ -1003,8 +1013,8 @@ async fn enable_experimental_mode(credentials: Credentials) -> Result<String, St
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str) -> Result<NoRiskLaunchManifest, Error> {
-    Ok(ApiEndpoints::launch_manifest(branch).await?)
+async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> Result<NoRiskLaunchManifest, Error> {
+    Ok(NRCCache::get_launch_manifest(branch, norisk_token, uuid).await?)
 }
 
 #[tauri::command]
@@ -1406,11 +1416,19 @@ async fn run_client(
         return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
     }
 
-    let credentials = minecraft_auth_get_store()
-        .await?
+    let mut accounts = minecraft_auth_get_store().await?;
+
+    let credentials = match accounts
         .get_default_credential()
-        .await?
-        .ok_or(ErrorKind::NoCredentialsError)?;
+        .await {
+        Ok(creds) => { creds }
+        Err(_) => {
+            Option::from(accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).ok_or(ErrorKind::NoCredentialsError)?.clone())
+        }
+    }.ok_or(ErrorKind::NoCredentialsError)?;
+
+    debug!("Starting Minecraft with Account {:?}",credentials.username);
+
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
     let parameters = LaunchingParameter {
@@ -1449,7 +1467,7 @@ async fn run_client(
     };
 
     info!("Loading launch manifest...");
-    let launch_manifest = get_launch_manifest(&branch).await?;
+    let launch_manifest = get_launch_manifest(&branch, &token, credentials.id).await?;
 
     let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
 
@@ -1640,6 +1658,7 @@ async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
         "gameDir",
         "libraries",
         "mod_cache",
+        "nrc_cache",
         "custom_mods",
         "natives",
         "runtimes",

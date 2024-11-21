@@ -9,7 +9,8 @@ import { translations } from "./translationUtils";
 
 export const version = writable("");
 export const noriskUser = writable(null);
-export const isInMaintenanceMode = writable(null);
+export const isInMaintenanceMode = writable(false);
+export const isApiOnline = writable(true);
 export const isClientRunning = writable([false, false]);
 export const isCheckingForUpdates = writable(true);
 export const startProgress = writable({
@@ -35,9 +36,11 @@ export async function checkApiStatus() {
   let apiIsOnline = null;
   await invoke("check_online_status").then((apiOnlineState) => {
     apiIsOnline = apiOnlineState;
+    isApiOnline.set(apiOnlineState);
     noriskLog(`API is ${apiIsOnline ? 'online' : 'offline'}!`);
   }).catch(() => {
     apiIsOnline = false;
+    isApiOnline.set(false);
     noriskError("API is offline!");
   });
   return apiIsOnline;
@@ -174,6 +177,7 @@ export function getMcToken() {
 export async function getNoRiskUser() {
   const user = get(defaultUser);
   if (!user) return false;
+  if (!get(isApiOnline)) return false;
 
   let isTokenValid = false;
   await invoke("get_norisk_user", {
@@ -222,6 +226,7 @@ export async function getFeatureWhitelist() {
   featureWhitelist.set([]);
   const user = get(defaultUser);
   if (!user) return;
+  if (!get(isApiOnline)) return false;
 
   await invoke("get_full_feature_whitelist", {
     options: get(launcherOptions),
@@ -236,8 +241,9 @@ export async function getFeatureWhitelist() {
 }
 
 export async function getMaintenanceMode() {
+  if (!get(isApiOnline)) return;
   invoke("check_maintenance_mode").then(result => {
-    if (result == true && get(noriskUser)?.isDev && get(isInMaintenanceMode) == null) {
+    if (result === true && get(noriskUser)?.isDev && get(isInMaintenanceMode) == null) {
       addNotification(`Skipped maintenance mode screen because you are a ${get(noriskUser).rank.toLowerCase()}.`, "INFO");
     }
     isInMaintenanceMode.set(result);

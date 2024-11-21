@@ -7,6 +7,7 @@ use tokio::fs;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
 use crate::error::LauncherError;
+use crate::LAUNCHER_DIRECTORY;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
@@ -18,7 +19,8 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     info!("Loading minecraft version manifest...");
-    let mc_version_manifest = VersionManifest::download().await?;
+    let data_path = LAUNCHER_DIRECTORY.data_dir().join("nrc_cache");
+    let mc_version_manifest = VersionManifest::download(&data_path).await?;
 
     let build = &launch_manifest.build;
     let subsystem = &launch_manifest.subsystem;
@@ -40,7 +42,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
             .replace("{FABRIC_LOADER_VERSION}", &build.fabric_loader_version),
         LoaderSubsystem::Forge { manifest, .. } => manifest.clone()
     };
-    let mut version = VersionProfile::load(&manifest_url).await?;
+    let mut version = VersionProfile::download(&data_path, &manifest_url).await?;
 
     if let Some(inherited_version) = &version.inherits_from {
         let url = mc_version_manifest.versions
@@ -52,9 +54,10 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
         debug!("Determined {}'s download url to be {}", inherited_version, url);
         info!("Downloading inherited version {}...", inherited_version);
 
-        let parent_version = VersionProfile::load(url).await?;
+        let parent_version = VersionProfile::download(&data_path, url).await?;
 
         version.merge(parent_version)?;
+        version.store(&data_path).await?;
     }
 
     info!("Launching {}...", launch_manifest.build.branch);

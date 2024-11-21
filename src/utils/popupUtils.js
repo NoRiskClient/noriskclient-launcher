@@ -2,7 +2,7 @@ import { get, writable } from "svelte/store";
 import { addNotification } from "../stores/notificationStore";
 import { invoke } from "@tauri-apps/api";
 import { pop, push, replace } from "svelte-spa-router";
-import { noriskLog } from "./noriskUtils";
+import {isApiOnline, noriskLog} from "./noriskUtils";
 import { translations } from "./translationUtils";
 
 export const activePopup = writable(null);
@@ -132,6 +132,7 @@ export function openErrorPopup({
 // ChangeLog and Announcements
 
 export async function getChangeLogs() {
+    if (!get(isApiOnline)) return;
     await invoke("get_changelogs").then(result => {
         changeLogs.set(result);
         noriskLog("Change Logs: " + JSON.stringify(result));
@@ -141,6 +142,7 @@ export async function getChangeLogs() {
 }
 
 export async function getAnnouncements() {
+    if (!get(isApiOnline)) return;
     await invoke("get_announcements").then(result => {
         announcements.set(result);
         noriskLog("Announcements: " + JSON.stringify(result));

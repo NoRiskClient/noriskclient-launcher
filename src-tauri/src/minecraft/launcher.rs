@@ -95,11 +95,15 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
 
         // Download client jar
         let requires_download = if !client_jar.exists() {
+            debug!("Client Jar doesn't exists");
             true
         } else {
             let hash = sha1sum(&client_jar)?;
+            debug!("Client Jar Hash {:?} {:?}",hash,client_download.sha1);
             hash != client_download.sha1
         };
+
+        debug!("Downloading Client jar {:?}", requires_download);
 
         if requires_download {
             launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadingClient"));
@@ -245,9 +249,9 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     if !keep_local_assets {
         let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
         fs::create_dir_all(&norisk_asset_dir).await?;
-    
+
         let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token, uuid).await;
-    
+
         let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
             Ok(norisk_assets) => norisk_assets.objects,
             Err(err) => {
@@ -255,28 +259,28 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
                 HashMap::new()
             }
         };
-    
+
         if norisk_asset_objects_to_download.len() > 0 {
             let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
             let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
-    
+
             launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingNoriskAssets"));
             launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
-    
+
             let _: Vec<Result<()>> = stream::iter(
                 norisk_asset_objects_to_download.clone().into_iter().map(|asset_object| {
                     let download_count = norisk_assets_downloaded.clone();
                     let data_clone = launcher_data_arc.clone();
                     let folder_clone = norisk_asset_dir.clone();
                     let branch_clone = manifest.build.branch.clone();
-    
+
                     async move {
                         let hash = asset_object.1.hash.clone();
-    
+
                         match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), folder_clone, data_clone.clone()).await {
                             Ok(downloaded) => {
                                 let curr = download_count.fetch_add(1, Ordering::Relaxed);
-    
+
                                 if downloaded {
                                     // the progress bar is only being updated when a asset has been downloaded to improve speeds
                                     data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
@@ -285,16 +289,16 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
                             }
                             Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                         }
-    
+
                         Ok(())
                     }
                 })
             ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
-    
+
             launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, norisk_asset_max, norisk_asset_max));
-    
+
             // Delete usused norisk assets
-    
+
             verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
         }
     } else {
@@ -351,7 +355,7 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     let mut running_task = java_runtime.execute(mapped, &game_dir)?;
 
     if running_task.id().clone().is_some() {
-        let latest_running_game = LatestRunningGame { id: Some(running_task.id().clone().unwrap())  };
+        let latest_running_game = LatestRunningGame { id: Some(running_task.id().clone().unwrap()) };
         latest_running_game.store(data).await?;
     }
 
@@ -408,7 +412,7 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
             }
         }
     }
-    
+
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, file_names.len() as u64, file_names.len() as u64));
 }
 

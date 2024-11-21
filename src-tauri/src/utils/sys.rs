@@ -3,7 +3,7 @@ use std::process::Command;
 use anyhow::{bail, Result};
 use log::debug;
 use once_cell::sync::Lazy;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sysinfo::{RefreshKind, System, SystemExt};
 
 /// Get the total memory of the system in bytes
@@ -75,7 +75,7 @@ pub enum OperatingSystem {
     UNKNOWN,
 }
 
-#[derive(Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Architecture {
     #[serde(rename = "x86")]
     X86,

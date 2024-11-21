@@ -7,7 +7,7 @@
   import { branches } from "../../../stores/branchesStore.js";
   import { launcherOptions } from "../../../stores/optionsStore.js";
   import { invoke } from "@tauri-apps/api";
-  import { noriskLog } from "../../../utils/noriskUtils.js";
+    import {isApiOnline, noriskLog} from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
 
   let discordLinked = false;
@@ -57,6 +57,7 @@
     let options = get(launcherOptions);
     if (!credentials) return false;
     if (!options) return false;
+    if (!get(isApiOnline)) return false;
     return await invoke("discord_auth_status", { options, credentials })
       .then((value) => {
         discordLinked = value;
