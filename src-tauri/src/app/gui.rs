@@ -1416,6 +1416,8 @@ async fn run_client(
         return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
     }
 
+    fs::create_dir_all(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache")).await?;
+
     let mut accounts = minecraft_auth_get_store().await?;
 
     let credentials = match accounts

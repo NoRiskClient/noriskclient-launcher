@@ -587,11 +587,8 @@ impl LoginData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NoRiskBuild {
     pub branch: String,
-    #[serde(rename(serialize = "mcVersion", deserialize = "mcVersion"))]
     pub mc_version: String,
-    #[serde(rename(serialize = "jreVersion", deserialize = "jreVersion"))]
     pub jre_version: u32,
-    #[serde(rename(serialize = "fabricLoaderVersion", deserialize = "fabricLoaderVersion"))]
     pub fabric_loader_version: String,
 }
 
