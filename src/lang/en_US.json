@@ -173,6 +173,7 @@
     "profiles.modal.delete.content": "Are you sure you want to delete this profile?",
     "profiles.notification.delete.success": "Profile \"{profile}\" has been deleted.",
     "profiles.notification.create.success": "Profile \"{profile}\" has been created.",
+    "profiles.notification.clone.success": "Profile \"{profile}\" has been cloned.",
     "profiles.modal.create.title": "CREATE PROFILE",
     "profiles.modal.edit.title": "PROFILE SETTINGS",
     "profiles.modal.name": "Name",
