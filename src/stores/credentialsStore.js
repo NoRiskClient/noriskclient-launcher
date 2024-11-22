@@ -24,13 +24,9 @@ export async function fetchDefaultUserOrError(printError = false) {
 
 export async function fetchUsers() {
   return await invoke("minecraft_auth_users").then(value => {
-    console.log("Received Auth Users",value);
     value.sort((a, b) => a.id.localeCompare(b.id)); // Sortiere die Benutzer nach ihrer ID
-    console.log("Settings Auth Users",value );
     users.set(value);
-    console.log("Finished Settings Auth Users",value );
   }).catch((reason) => {
-    console.log("Error setting users",reason);
     addNotification(reason);
   });
 }
