@@ -56,7 +56,7 @@ pub enum MinecraftAuthenticationError {
         source: serde_json::Error,
     },
     #[error(
-    "Failed to deserialize response to JSON during step {step:?}: {source}. Status Code: {status_code} Body: {raw}"
+        "Failed to deserialize response to JSON during step {step:?}: {source}. Status Code: {status_code} Body: {raw}"
     )]
     DeserializeResponse {
         step: MinecraftAuthStep,
@@ -121,6 +121,7 @@ impl Default for MinecraftAuthStore {
 impl MinecraftAuthStore {
     //TODO
     pub async fn init(create_new: Option<bool>) -> Result<Self, crate::error::Error> {
+        
         let auth_path = LAUNCHER_DIRECTORY.config_dir().join("accounts.json");
 
         if create_new.unwrap_or(false) {
@@ -146,9 +147,7 @@ impl MinecraftAuthStore {
 
     //TODO
     pub async fn save(&self) -> Result<(), crate::error::Error> {
-        let _ = fs::write(LAUNCHER_DIRECTORY.config_dir().join("accounts.json"), serde_json::to_string_pretty(&self)?)
-            .await
-            .map_err(|err| -> String { format!("Failed to write options.json: {}", err).into() });
+        let _ = fs::write(LAUNCHER_DIRECTORY.config_dir().join("accounts.json"), serde_json::to_string_pretty(&self)?).await?;
         Ok(())
     }
 
@@ -514,14 +513,17 @@ impl MinecraftAuthStore {
         id: Uuid,
     ) -> Result<Option<Credentials>, crate::error::Error> {
         let val = self.users.remove(&id);
+        debug!("Removing {:?}",id);
         if self.default_user.filter(|user| user == &id).is_some() {
             if self.users.is_empty() {
+                debug!("Next User is None");
                 self.default_user = None;
             } else {
-                self.default_user = self.users.keys().next().cloned();
+                let next_user = self.users.keys().next().cloned();
+                debug!("Next User is {:?}",next_user);
+                self.default_user = next_user;
             }
         }
-        debug!("Removing {:?}",id);
         self.save().await?;
         Ok(val)
     }

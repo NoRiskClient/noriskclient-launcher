@@ -44,7 +44,7 @@ impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
 
 pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
     let launcher_data_arc = Arc::new(launcher_data);
-
+    
     let features: HashSet<String> = HashSet::new();
 
     info!("Determined OS to be {} {}", OS, OS_VERSION.clone());

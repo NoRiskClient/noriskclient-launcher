@@ -42,7 +42,7 @@ impl VersionManifest {
                        error!("Error Downloading Mojang Version Manifest {:?}", error);
                        Ok(Self::load(app_data).await?)
                    }
-               } 
+               }
             }
         }
     }

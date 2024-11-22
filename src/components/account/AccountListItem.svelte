@@ -1,27 +1,35 @@
 <script>
-  import { removeUser, setDefaultUser, users, fetchDefaultUserOrError } from "../../stores/credentialsStore.js";
+    import {
+        removeUser,
+        setDefaultUser,
+        users,
+        fetchDefaultUserOrError,
+        fetchUsers
+    } from "../../stores/credentialsStore.js";
+    import {addNotification} from "../../stores/notificationStore.js";
 
-  export let account;
-  export let isActive;
-  export let dialog;
+    export let account;
+    export let isActive;
+    export let dialog;
 
-  async function handleRemoveAccount() {
-    await removeUser(account).then(async value => {
-      await fetchDefaultUserOrError();
-      if ($users.length === 0) {
-        dialog.close();
-      }
-    });
-  }
+    function handleRemoveAccount() {
+        removeUser(account).then(async value => {
+            /*fetchUsers().catch((reason) => {
+                addNotification(reason);
+            });*/
+        }).catch((reason) => {
+            addNotification(reason);
+        });
+    }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="flex-wrapper" on:click={() => setDefaultUser(account)} class:active={isActive}>
-  <div class="skin-text-wrapper">
-    <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
-    <h1 class:green-text={isActive}>{account.username}</h1>
-  </div>
-  <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
+    <div class="skin-text-wrapper">
+        <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
+        <h1 class:green-text={isActive}>{account.username}</h1>
+    </div>
+    <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
 </div>
 <hr>
 
