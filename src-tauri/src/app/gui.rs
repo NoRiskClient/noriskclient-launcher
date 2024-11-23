@@ -994,14 +994,7 @@ async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
 ) -> Result<Vec<String>, Error> {
-    Ok(ApiEndpoints::norisk_branches(
-        &credentials
-            .norisk_credentials
-            .get_token(options.experimental_mode)
-            .await?,
-        &credentials.id.to_string(),
-    )
-        .await?)
+    Ok(NRCCache::get_branches(options, credentials).await?)
 }
 
 #[tauri::command]

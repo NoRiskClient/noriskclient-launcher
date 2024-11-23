@@ -18,11 +18,6 @@ export async function fetchBranches() {
     branches.set([])
     return
   }
-  if (!get(isApiOnline)) {
-    const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
-    branches.set([latestBranch])
-    return;
-  }
   await invoke("request_norisk_branches", { options, credentials }).then(result => {
     const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
     result.sort(function(a, b) {

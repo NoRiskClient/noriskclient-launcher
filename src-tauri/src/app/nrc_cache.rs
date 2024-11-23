@@ -1,17 +1,21 @@
+use std::future::Future;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use log::{debug, info};
 use log::error;
 use serde::Deserialize;
+use sha1::digest::typenum::op;
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
 use tauri::{Manager, State};
 use tokio::fs;
 use uuid::Uuid;
 
 use crate::app::api::{ApiEndpoints, LaunchManifest, NoRiskLaunchManifest};
+use crate::app::app_data::LauncherOptions;
 use crate::error::{Error, ErrorKind};
 use crate::LAUNCHER_DIRECTORY;
+use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::progress::ProgressUpdate;
 
 pub struct NRCCache {}
@@ -19,7 +23,7 @@ pub struct NRCCache {}
 #[derive(serde::Serialize, Deserialize, Debug, Clone)] // Damit diese Struktur serialisierbar ist
 pub struct OutputData {
     pub id: Uuid,
-    pub text: String
+    pub text: String,
 }
 
 #[derive(serde::Serialize, Deserialize, Debug)] // Damit diese Struktur serialisierbar ist
@@ -68,7 +72,7 @@ impl NoRiskLaunchManifest {
 
 impl NRCCache {
     pub async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> Result<NoRiskLaunchManifest, Error> {
-        let nrc_cache = LAUNCHER_DIRECTORY.data_dir().join("nrc_cache");
+        let nrc_cache = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(branch).join("nrc_cache");
         match ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await {
             Ok(manifest) => {
                 fs::create_dir_all(&nrc_cache).await?;
@@ -82,6 +86,51 @@ impl NRCCache {
             }
         }
     }
+
+    pub async fn get_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, Error> {
+        let path = LAUNCHER_DIRECTORY
+            .data_dir()
+            .join("nrc_cache")
+            .join(if !options.experimental_mode { "branches.json" } else { "exp_branches.json" });
+
+        match credentials.norisk_credentials.get_token(options.experimental_mode).await {
+            Ok(token) => {
+                match ApiEndpoints::norisk_branches(&token, &credentials.id.to_string()).await {
+                    Ok(response) => {
+                        if let Err(err) = fs::write(&path, serde_json::to_string_pretty(&response)?).await {
+                            error!("Failed to store branches: {:?}", err);
+                        }
+                        debug!("Branches were stored...");
+                        return Ok(response);
+                    }
+                    Err(error) => {
+                        error!("Error Loading Branches from API: {:?}", error);
+                    }
+                }
+            }
+            Err(error) => {
+                error!("Error Getting Token: {:?}", error);
+            }
+        }
+
+        // Try reading from the cache file if API call or token retrieval fails
+        match fs::read(&path).await {
+            Ok(data) => {
+                if let Ok(options) = serde_json::from_slice::<Vec<String>>(&data) {
+                    return Ok(options);
+                } else {
+                    error!("Error deserializing branches from cache.");
+                }
+            }
+            Err(err) => {
+                error!("Error Reading Branches Cache: {:?}", err);
+            }
+        }
+
+        // Return an empty vector as a fallback
+        Ok(Vec::new())
+    }
+
 
     pub async fn get_running_instances(app_state: tauri::State<'_, AppState>) -> Result<Vec<RunnerInstance>, Error> {
         let runner_instances = app_state.runner_instances.lock().unwrap();
