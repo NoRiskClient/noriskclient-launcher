@@ -1247,6 +1247,10 @@ fn handle_progress(
 ) -> anyhow::Result<()> {
     if let Some(instance) = instances.lock().unwrap().iter_mut().find(|r| r.id == instance_id) {
         instance.progress_updates.push(progress_update.clone());
+        // Ensure the list does not exceed 10 entries
+        if instance.progress_updates.len() > 10 {
+            instance.progress_updates.remove(0);
+        }
     }
     window
         .lock()
@@ -1450,6 +1454,7 @@ async fn run_client(
         progress_updates: Vec::new(),
         p_id: None,
         is_attached: true,
+        branch: branch.clone(),
     });
 
     thread::spawn(move || {

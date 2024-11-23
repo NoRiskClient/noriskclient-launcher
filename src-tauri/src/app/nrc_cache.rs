@@ -32,7 +32,8 @@ pub struct RunnerInstance {
     pub progress_updates: Vec<ProgressUpdate>, // Die Liste der Fortschritts-Updates
     pub p_id: Option<u32>,
     #[serde(rename = "isAttached")]
-    pub is_attached: bool //Für LiveLogs
+    pub is_attached: bool, //Für LiveLogs
+    pub branch: String,
 }
 
 impl Default for RunnerInstance {
@@ -42,7 +43,8 @@ impl Default for RunnerInstance {
             id: Uuid::new_v4(), // Oder ein Standardwert, den du verwenden möchtest
             progress_updates: Vec::new(),
             p_id: None,
-            is_attached: false
+            is_attached: false,
+            branch: "".to_string(),
         }
     }
 }
@@ -100,7 +102,8 @@ impl NRCCache {
                 id: instance.id.clone(), // Die ID wird serialisiert
                 progress_updates: instance.progress_updates.clone(),
                 p_id: instance.p_id.clone(),
-                is_attached: instance.terminator.is_some() //Für LiveLogs
+                is_attached: instance.terminator.is_some(), //Für LiveLogs
+                branch: instance.branch.clone(),
             })
             .collect();
 
@@ -149,7 +152,8 @@ impl NRCCache {
 
     pub fn store_running_instances(instances: &Arc<Mutex<Vec<RunnerInstance>>>) -> Result<(), crate::error::Error> {
         let instances_guard = instances.lock().unwrap();
-        let serialized = serde_json::to_string_pretty(&*instances_guard)?;
+        //nicht pretty speichern für maximale performance und größe
+        let serialized = serde_json::to_string(&*instances_guard)?;
         std::fs::write(LAUNCHER_DIRECTORY.data_dir().join("running_instances.json"), serialized)?;
         Ok(())
     }

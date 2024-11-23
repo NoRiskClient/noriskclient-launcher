@@ -21,7 +21,7 @@
   {#each instances as instance, index}
     <h1 class="instance-button" on:click={() => push("/start-progress/"+instance.id)}
         style="font-size: {buttonSize}em;">
-      [Game {index + 1}]
+      [{instance.branch}]
     </h1>
   {/each}
 </div>

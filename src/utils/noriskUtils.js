@@ -55,7 +55,7 @@ export async function runClient(branch, checkedForNewBranch = false) {
   let options = get(launcherOptions);
 
   if (!options.multipleInstances) {
-    let instance = get(clientInstances).find(value => true);
+    let instance = get(clientInstances).find(value => value.branch === branch);
     if (instance) {
       await push(`/start-progress/` + instance.id);
       return;
