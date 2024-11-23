@@ -447,8 +447,14 @@ pub async fn open_minecraft_logs_window(
     uuid: Uuid,
     is_live: bool,
     handle: tauri::AppHandle,
+    app_state: tauri::State<'_, AppState>,
 ) -> Result<(), Error> {
     // Generate a random number
+    let runner_instances = app_state.runner_instances.lock().unwrap();
+    let branch = runner_instances
+        .iter()
+        .find(|instance| instance.id == uuid)
+        .map(|instance| instance.branch.clone());
     let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
     // Create a unique label using the random number
     //hacky aber weiß sonst nicht wie lol
@@ -460,7 +466,8 @@ pub async fn open_minecraft_logs_window(
     )
         .inner_size(1000.0, 800.0)
         .build()?;
-    let _ = window.set_title("Minecraft Logs");
+
+    let _ = window.set_title(&format!("Minecraft Logs [{}]", &branch.unwrap_or_default()));
     let _ = window.set_resizable(true);
     let _ = window.set_focus();
     Ok(())
