@@ -260,11 +260,11 @@ impl VersionProfile {
     }
     pub async fn load(app_data: &Path) -> Result<Self, Error> {
         // load the options from the file
-        let options = serde_json::from_slice::<VersionProfile>(&fs::read(app_data.join("sub_system.json")).await?)?;
+        let options = serde_json::from_slice::<VersionProfile>(&fs::read(app_data).await?)?;
         Ok(options)
     }
     pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
-        let _ = fs::write(app_data.join("sub_system.json"), serde_json::to_string_pretty(&self)?).await?;
+        let _ = fs::write(app_data, serde_json::to_string_pretty(&self)?).await?;
         debug!("Sub System was stored...");
         Ok(())
     }

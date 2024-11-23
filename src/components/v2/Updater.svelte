@@ -4,14 +4,14 @@
   import { onMount } from "svelte";
   import { checkUpdate, installUpdate, onUpdaterEvent } from "@tauri-apps/api/updater";
   import { relaunch } from "@tauri-apps/api/process";
-  import { isCheckingForUpdates, noriskLog } from "../../utils/noriskUtils.js";
+  import { isApiOnline, isCheckingForUpdates, noriskLog } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { delay } from "../../utils/svelteUtils.js";
   import { translations } from '../../utils/translationUtils.js';
-    
+
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
-  
+
   let dots = "";
 
   onMount(async () => {
@@ -48,7 +48,9 @@
       }
     } catch (error) {
       isCheckingForUpdates.set(false);
-      addNotification(error);
+      if ($isApiOnline) {
+        addNotification(error);
+      }
     }
 
     return () => {

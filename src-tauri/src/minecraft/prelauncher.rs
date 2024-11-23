@@ -43,7 +43,7 @@ pub(crate) async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_toke
             .replace("{FABRIC_LOADER_VERSION}", &build.fabric_loader_version),
         LoaderSubsystem::Forge { manifest, .. } => manifest.clone()
     };
-    let mut version = VersionProfile::download(&data_path, &manifest_url).await?;
+    let mut version = VersionProfile::download(&data_path.join("child_sub_system.json"), &manifest_url).await?;
 
     if let Some(inherited_version) = &version.inherits_from {
         let url = mc_version_manifest.versions
@@ -55,10 +55,9 @@ pub(crate) async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_toke
         debug!("Determined {}'s download url to be {}", inherited_version, url);
         info!("Downloading inherited version {}...", inherited_version);
 
-        let parent_version = VersionProfile::download(&data_path, url).await?;
+        let parent_version = VersionProfile::download(&data_path.join("parent_sub_system.json"), url).await?;
 
         version.merge(parent_version)?;
-        version.store(&data_path).await?;
     }
 
     info!("Launching {}...", launch_manifest.build.branch);
