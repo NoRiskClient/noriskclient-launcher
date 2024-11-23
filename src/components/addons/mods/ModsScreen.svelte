@@ -12,7 +12,7 @@
   import { addNotification } from "../../../stores/notificationStore.js";
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
   import { translations } from '../../../utils/translationUtils.js';
-    
+
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
 
@@ -56,7 +56,7 @@
 
     let todo = new Set();
     files.payload.forEach(l => todo.add(l));
-    
+
     installCustomMods(todo);
   });
 
@@ -79,7 +79,7 @@
 
   async function updateMods(newMods) {
     mods = newMods;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -89,7 +89,7 @@
 
   async function updateProfileMods(newMods) {
     launcherProfile.mods = newMods;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -145,7 +145,7 @@
 
     await invoke("get_project_version", {
       slug: slug,
-      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
+      params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
     }).then(async (result) => {
       modVersions[slug] = result.map(v => v.version_number);
       console.debug(`Project Versions of ${slug}`, modVersions[slug]);
@@ -163,7 +163,7 @@
     await invoke("install_mod_and_dependencies", {
       slug: mod.slug,
       version: null,
-      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
+      params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
       requiredMods: launchManifest.mods,
     }).then((result) => {
       const blockedDependencies = result.dependencies.filter(d => blacklistedMods.some(slug => slug == d.value.source.artifact.split(":")[1]))
@@ -195,7 +195,7 @@
     await invoke("install_mod_and_dependencies", {
       slug: slug,
       version: version,
-      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["fabric"]`,
+      params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
       requiredMods: launchManifest.mods,
     }).then(async (result) => {
       const blockedDependencies = result.dependencies.filter(d => blacklistedMods.some(slug => slug == d.value.source.artifact.split(":")[1]))
@@ -205,11 +205,11 @@
       }
 
       const original = mod;
-      // Replace with new version info 
+      // Replace with new version info
       mod.value = result.value;
       mod.dependencies = result.dependencies;
       launcherProfile.mods.splice(launcherProfile.mods.indexOf(original), 1, mod);
-     
+
       const before = launcherProfile.mods;
       updateProfileMods([]);
       await tick();
@@ -234,7 +234,7 @@
         return "RECOMMENDED";
       }
     }
-    
+
     if (!launcherProfile.mods.some((mod) => {
       return mod.value.source.artifact.split(":")[1].toUpperCase() === slug.toUpperCase();
     }) && launcherProfile.mods.some((mod) => mod.dependencies.some((dependency) => dependency.value.source.artifact.split(':')[1].toUpperCase() == slug.toUpperCase()))) {
@@ -252,7 +252,7 @@
   async function getBaseMods() {
     await invoke("get_featured_mods", {
       branch: currentBranch,
-      mcVersion: launchManifest.build.mcVersion,
+      mcVersion: launchManifest.build.mc_version,
     }).then((result) => {
       console.debug("Featured Mods", result);
       result.forEach(mod => mod.featured = true);
@@ -284,7 +284,7 @@
         }
       });
       console.log("Base Mods", baseMods);
-      
+
     }).catch((error) => {
       addNotification(error);
     });
@@ -303,7 +303,7 @@
     // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
     // Update: Ich habe ne eigene Virtual List gemacht 📉
     updateMods([]);
-    
+
     if (filters['norisk']?.enabled) {
       await tick();
       let newMods = [];
@@ -313,7 +313,7 @@
         let modData = {
           title: mod.name,
           slug: slug,
-          author: domain,   
+          author: domain,
           blacklisted: false,
           description: "",
           downloads: null,
@@ -334,7 +334,7 @@
               } else {
                 modData.author = info.author;
               }
-              
+
               modData.title = info.title;
               modData.icon_url = info.icon_url;
               modData.description = info.description;
@@ -346,7 +346,7 @@
         }
         newMods.push(modData);
       }));
-      
+
       console.log(newMods);
       return updateMods(newMods);
     }
@@ -369,7 +369,7 @@
     noriskLog(`Searching for mods with searchterm: ${searchterm} | Limit: ${search_limit} | Offset: ${search_offset} | Filters: ${Object.values(filters).filter(f => f.enabled).map(f => f.id).join(", ")}`);
     await invoke("search_mods", {
       params: {
-        facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:mod"], ["categories:fabric"]${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(", ")}${client_server_side_filters}]`,
+        facets: `[["versions:${launchManifest.build.mc_version}"], ["project_type:mod"], ["categories:fabric"]${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled && notEnvironmentFilter(filter)).map(filter => `["categories:'${filter.id}'"]`).join(", ")}${client_server_side_filters}]`,
         index: search_index,
         limit: search_limit,
         offset: search_offset,
@@ -379,7 +379,7 @@
       console.debug("Search Mod Result", result);
 
       showMoreButton = result.hits.length >= search_limit;
-      
+
       if (!$noriskUser?.isDev) {
         console.debug("Filtering blacklisted mods...");
         const length = result.hits.length;
@@ -426,7 +426,7 @@
     let index = launcherProfile.mods.findIndex((element) => {
       return element.value.source.artifact.split(":")[isCustom ? 2 : 1].toUpperCase() === slug.toUpperCase();
     });
-    
+
     if (index !== -1) {
       launcherProfile.mods.splice(index, 1);
       launcherProfiles.store();
@@ -630,7 +630,7 @@
     } else {
       filterCategories = filterCategories.filter(category => category.type !== lang.addons.mods.filters.noriskclient.title);
     }
-   
+
     load();
   });
 </script>
@@ -697,7 +697,7 @@
                 dependencies.add(d);
               }
             });
-  
+
           return [...launcherProfile.mods, ...dependencies].filter((mod) => {
             let name = mod.value.name.toUpperCase()
             return name.includes(filterterm.toUpperCase()) && !mod.value.source.artifact.includes("PLACEHOLDER")

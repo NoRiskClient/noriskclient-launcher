@@ -14,7 +14,7 @@
   import { addNotification } from "../../../stores/notificationStore.js";
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
   import { translations } from '../../../utils/translationUtils.js';
-    
+
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
 
@@ -74,7 +74,7 @@
 
   async function updateDatapacks(newDatapacks) {
     datapacks = newDatapacks;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -83,7 +83,7 @@
   }
   async function updateProfileDatapacks(newDatapacks) {
     launcherProfiles.addons[currentBranch].datapacks = newDatapacks;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -134,7 +134,7 @@
     updateDatapacks(datapacks);
     await invoke("get_datapack", {
       slug: datapack.slug,
-      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["datapack"]`,
+      params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["datapack"]`,
       world: world,
     }).then(async (result) => {
       launcherProfiles.addons[currentBranch].datapacks.pushIfNotExist(result, function(e) {
@@ -172,7 +172,7 @@
   async function getFeaturedDatapacks() {
     await invoke("get_featured_datapacks", {
       branch: currentBranch,
-      mcVersion: launchManifest.build.mcVersion,
+      mcVersion: launchManifest.build.mc_version,
     }).then((result) => {
       console.debug("Featured Datapacks", result);
       result.forEach(datapack => datapack.featured = true);
@@ -185,21 +185,21 @@
 
   async function searchDatapacks() {
     let oldDatapacks = datapacks;
-    
+
     if (searchterm == "" && search_offset === 0) {
       if (featuredDatapacks == null) {
         await getFeaturedDatapacks();
       }
       oldDatapacks = featuredDatapacks;
     }
-      
+
     // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
     // Update: Ich habe ne eigene Virtual List gemacht 📉
     updateDatapacks([]);
 
     await invoke("search_datapacks", {
       params: {
-        facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:datapack"], ["categories:'datapack'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(", ")}]`,
+        facets: `[["versions:${launchManifest.build.mc_version}"], ["project_type:datapack"], ["categories:'datapack'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(", ")}]`,
         index: search_index,
         limit: search_limit,
         offset: search_offset,
@@ -248,11 +248,11 @@
 
       await invoke("get_datapack", {
         slug: datapack.slug,
-        params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["datapack"]`,
+        params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["datapack"]`,
         world: world,
       }).then(async datapackVersion => {
         deleteDatapackFile(datapackVersion.file_name);
-        
+
         launcherProfiles.store();
         const prev = [datapacks, launcherProfiles.addons[currentBranch].datapacks];
         updateDatapacks([]);
