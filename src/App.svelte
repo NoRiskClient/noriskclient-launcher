@@ -1,5 +1,4 @@
 <script>
-	import { writable } from 'svelte/store';
   import Router from "./Router.svelte";
   import { onMount } from "svelte";
   import { defaultUser, fetchDefaultUserOrError } from "./stores/credentialsStore.js";
@@ -10,24 +9,18 @@
   import { listen } from "@tauri-apps/api/event";
   import { push } from "svelte-spa-router";
   import {
-    getVersion,
-    isClientRunning,
-    startProgress,
-    getNoRiskUser,
+    getClientInstances,
     getMaintenanceMode,
+    getNoRiskUser,
+    getVersion,
     noriskError,
     noriskLog,
-    checkIfClientIsRunning
   } from "./utils/noriskUtils.js";
-  import { 
-    getChangeLogs,
-    getAnnouncements,
-    getLastViewedPopups
-  } from "./utils/popupUtils.js";
+  import { getAnnouncements, getChangeLogs, getLastViewedPopups } from "./utils/popupUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "./stores/notificationStore.js";
-  import { setLanguage, language, translations } from "./utils/translationUtils.js";
+  import { language, setLanguage, translations } from "./utils/translationUtils.js";
 
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
@@ -37,7 +30,6 @@
       await appWindow.show();
     }, 300);
     await getVersion();
-    await checkIfClientIsRunning();
     await fetchOptions();
     setLanguage($language);
 
@@ -54,13 +46,13 @@
       await startMicrosoftAuth();
     }
 
+    const clientInstancesInterval = setInterval(async () => {
+      //Hoffe das passt lol
+      await getClientInstances();
+    }, 2500);
+
     let unlisten = await listen("client-exited", () => {
-      isClientRunning.set([false, false]);
-      startProgress.set({
-        progressBarMax: 0,
-        progressBarProgress: 0,
-        progressBarLabel: "",
-      });
+      getClientInstances();
       push("/");
     });
 
@@ -90,6 +82,7 @@
       unlisten();
       minecraftCrashUnlisten();
       userUnlisten();
+      clearInterval(clientInstancesInterval);
     };
   });
 </script>

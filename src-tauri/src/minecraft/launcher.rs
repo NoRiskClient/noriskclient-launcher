@@ -1,7 +1,6 @@
-use std::{path::{Path, PathBuf}, collections::HashMap};
+use std::{collections::HashMap, path::{Path, PathBuf}};
 use std::collections::HashSet;
 use std::fmt::Write;
-
 use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -9,42 +8,57 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info};
-
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
+use tokio::runtime::Runtime;
+use uuid::Uuid;
 use walkdir::WalkDir;
 
-use crate::app::gui::get_keep_local_assets;
-use crate::{app::{api::ApiEndpoints, app_data::LatestRunningGame}, minecraft::version::AssetObject, utils::{OS, OS_VERSION}, LAUNCHER_VERSION};
+use crate::{app::{api::ApiEndpoints, app_data::LatestRunningGame}, LAUNCHER_DIRECTORY, LAUNCHER_VERSION, minecraft::version::AssetObject, utils::{OS, OS_VERSION}};
 use crate::app::api::NoRiskLaunchManifest;
+use crate::app::gui::get_keep_local_assets;
+use crate::app::nrc_cache::{AppState, NRCCache, RunnerInstance};
 use crate::error::LauncherError;
+use crate::minecraft::java::{find_java_binary, JavaRuntime, jre_downloader};
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
 use crate::minecraft::rule_interpreter;
-use crate::minecraft::java::{find_java_binary, JavaRuntime, jre_downloader};
 use crate::minecraft::version::LibraryDownloadInfo;
 use crate::utils::{download_file, sha1sum, zip_extract};
 
 use super::version::VersionProfile;
 
 pub struct LauncherData<D: Send + Sync> {
-    pub(crate) on_stdout: fn(&D, &[u8]) -> Result<()>,
-    pub(crate) on_stderr: fn(&D, &[u8]) -> Result<()>,
-    pub(crate) on_progress: fn(&D, ProgressUpdate) -> Result<()>,
+    pub instance_id: Uuid,
+    pub instances: Arc<Mutex<Vec<RunnerInstance>>>,
+    pub(crate) on_stdout: fn(&D, &[u8], Uuid) -> Result<()>,
+    pub(crate) on_stderr: fn(&D, &[u8], Uuid) -> Result<()>,
+    pub(crate) on_progress: fn(&D, ProgressUpdate, Uuid, Arc<Mutex<Vec<RunnerInstance>>>) -> Result<()>,
     pub(crate) data: Box<D>,
     pub(crate) terminator: tokio::sync::oneshot::Receiver<()>,
 }
 
-impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
-    fn progress_update(&self, progress_update: ProgressUpdate) {
-        let _ = (self.on_progress)(&self.data, progress_update);
-        //ui update
-        let _ = (self.on_progress)(&self.data, ProgressUpdate::set_max());
+impl<D: Send + Sync> LauncherData<D> {
+    /// Speichert die aktuelle Liste der RunnerInstances als JSON-Datei im angegebenen Pfad.
+    pub fn store(&self) -> Result<(), crate::error::Error> {
+        NRCCache::store_running_instances(&self.instances)?;
+        Ok(())
     }
 }
 
-pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+
+impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
+    fn progress_update(&self, progress_update: ProgressUpdate) {
+        let _ = (self.on_progress)(&self.data, progress_update, self.instance_id, self.instances.clone());
+        //ui update
+        let _ = (self.on_progress)(&self.data, ProgressUpdate::set_max(), self.instance_id, self.instances.clone());
+
+        self.store().unwrap()
+    }
+}
+
+pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>, instance_id: Uuid) -> Result<()> {
     let launcher_data_arc = Arc::new(launcher_data);
-    
+
     let features: HashSet<String> = HashSet::new();
 
     info!("Determined OS to be {} {}", OS, OS_VERSION.clone());
@@ -129,7 +143,8 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
     let natives_folder = data.join("natives");
     let natives_path = natives_folder.as_path();
     if natives_folder.exists() {
-        fs::remove_dir_all(&natives_folder).await?;
+        debug!("Deleting Natives folder...");
+        fs::remove_dir_all(&natives_folder).await.or_else(|e| if multiple_instances { Ok(()) } else { Err(e) })?;
     }
     fs::create_dir_all(&natives_folder).await?;
 
@@ -354,9 +369,12 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
 
     let mut running_task = java_runtime.execute(mapped, &game_dir)?;
 
-    if running_task.id().clone().is_some() {
-        let latest_running_game = LatestRunningGame { id: Some(running_task.id().clone().unwrap()) };
-        latest_running_game.store(data).await?;
+    if let Some(id) = running_task.id() {
+        let mut runner_instances = launcher_data_arc.instances.lock().unwrap();
+        if let Some(instance) = runner_instances.iter_mut().find(|r| r.id == instance_id) {
+            debug!("Found Process Id {:?}",id);
+            instance.p_id = Some(id);
+        }
     }
 
     if !launching_parameter.keep_launcher_open {
@@ -366,10 +384,11 @@ pub async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, data: &Path,
 
     let launcher_data = Arc::try_unwrap(launcher_data_arc)
         .unwrap_or_else(|_| panic!());
+    launcher_data.store().unwrap();
     let terminator = launcher_data.terminator;
     let data = launcher_data.data;
 
-    java_runtime.handle_io(&mut running_task, launcher_data.on_stdout, launcher_data.on_stderr, terminator, &data)
+    java_runtime.handle_io(&mut running_task, launcher_data.on_stdout, launcher_data.on_stderr, terminator, &data, instance_id)
         .await?;
 
     if !launching_parameter.keep_launcher_open {

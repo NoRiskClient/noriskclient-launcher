@@ -123,6 +123,7 @@
     "settings.notification.disableKeepLocalAssets.error": "Failed to disable keep local assets: {error}",
     "settings.title": "SETTINGS",
     "settings.keepLauncherOpen": "Keep Launcher Open",
+    "settings.multipleInstances": "Allow Multiple Instances",
     "settings.experimentalMode": "Experimental Mode",
     "settings.keepLocalAssets": "Keep Local Assets",
     "settings.theme": "Theme: {theme}",

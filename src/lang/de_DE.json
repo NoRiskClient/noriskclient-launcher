@@ -123,6 +123,7 @@
     "settings.notification.disableKeepLocalAssets.error": "Gescheitert erhalten lokaler assets zu deaktivieren: {error}",
     "settings.title": "EINSTELLUNGEN",
     "settings.keepLauncherOpen": "Launcher offen lassen",
+    "settings.multipleInstances": "Erlaube mehrere Instanzen",
     "settings.experimentalMode": "Experimenteller Modus",
     "settings.keepLocalAssets": "Assets behalten",
     "settings.theme": "Erscheinungsbild: {theme}",

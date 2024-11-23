@@ -1,37 +1,58 @@
 <script>
-	import { isClientRunning, checkIfClientIsRunning } from './../utils/noriskUtils.js';
   import { listen } from "@tauri-apps/api/event";
   import VirtualList from "../components/utils/VirtualList.svelte";
   import LogMessage from "./LogMessage.svelte";
   import { onMount } from "svelte";
-  import { minecraftLogs } from "../stores/logsStore.js";
+  import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../stores/notificationStore.js";
-  import { launcherOptions, fetchOptions } from "../stores/optionsStore.js";
-  import { translations, setLanguage, language } from '../utils/translationUtils.js';
-    
+  import { fetchOptions, launcherOptions } from "../stores/optionsStore.js";
+  import { language, setLanguage, translations } from "../utils/translationUtils.js";
+  import { location } from "svelte-spa-router";
+
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
 
+  let search = "";
+  let logLevels = {
+    DEBUG: false,
+    INFO: false,
+    WARN: false,
+    ERROR: false,
+    FATAL: false,
+  };
+  let hideNoLiveLogs = false;
   let autoScroll = true;
   let reloadLogs = false;
+  let isLive = true;
+  let id;
+  let minecraftLogs = [];
 
   onMount(async () => {
-    fetchOptions();
-    checkIfClientIsRunning();
-    
+    const splitted = appWindow.label.split(":")
+    id = splitted[1];
+    isLive = splitted[2] === "true"; //nojoke anders hat es nicht geupdated
+    console.log("###",splitted[2])
+    console.log("###",splitted[2])
+    console.log("###",splitted[2])
+    await fetchOptions();
+    console.log(isLive);
+    console.log(id);
+    console.log("####Location", $location);
+
     setLanguage($language);
 
     invoke("get_latest_minecraft_logs").then(value => {
-      minecraftLogs.set(value.map(string => string + "\n"));
+      minecraftLogs = value.map(string => string + "\n");
     }).catch(reason => {
       addNotification(reason);
     });
 
     const logsUnlisten = await listen("process-output", event => {
-      minecraftLogs.update(value => {
-        return [...value, event.payload];
-      });
+      let payload = event.payload;
+      if (payload?.id !== id) return;
+      console.log("Das Kommt Rein", payload);
+      minecraftLogs = [...minecraftLogs, event.payload.text];
     });
     return () => {
       logsUnlisten();
@@ -40,7 +61,7 @@
 
   async function uploadLogs() {
     await invoke("upload_logs", {
-      log: $minecraftLogs.join(""),
+      log: minecraftLogs.join(""),
     }).then((result) => {
       addNotification(lang.logs.notification.upload.success, "INFO");
       navigator.clipboard.writeText(result.url);
@@ -53,81 +74,77 @@
     autoScroll = !autoScroll;
   }
 
-  let search = '';
-  let logLevels = {
-    DEBUG: false,
-    INFO: false,
-    WARN: false,
-    ERROR: false,
-    FATAL: false,
-  };
-  let hideNoLiveLogs = false;
 
   function filterLogs(log) {
-    const level = log.split('/')[1]?.split(']: ')[0];
+    if (!log) return false;
+    const level = log.split("/")[1]?.split("]: ")[0];
 
     if (level == null) return false;
 
-    return (log.includes(search) || search.trim() === '') && (logLevels[level] || Object.values(logLevels).every(value => value == false));
+    return (log.includes(search) || search.trim() === "") && (logLevels[level] || Object.values(logLevels).every(value => value === false));
   }
 
-  $: logItems = search != null && Object.values(logLevels).every(level => level != null) ? $minecraftLogs.filter(filterLogs) : [];
+  $: logItems = search != null && Object.values(logLevels).every(level => level != null) ? minecraftLogs?.filter(filterLogs) : [];
 </script>
 
 <!-- Ensure translations are loaded before showing UI -->
 {#if lang?.dummy}
-  <body class:dark-mode={$launcherOptions?.theme == "DARK"}>
-    <div class="black-bar" data-tauri-drag-region>
-      <div class="header">
-        <input bind:value={search} placeholder={lang.logs.searchbar.placeholder} />
-        <div class="filter">
-          {#each Object.keys(logLevels) as level (level)}
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <p class={"logLevelFilter red-text"} class:active={logLevels[level] == true} on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}({logItems.filter(l => l.split('/')[1]?.split(']: ')[0] == level).length ?? 0})</p>
-          {/each}
-        </div>
+  <body class:dark-mode={$launcherOptions?.theme === "DARK"}>
+  <div class="black-bar" data-tauri-drag-region>
+    <div class="header">
+      <input bind:value={search} placeholder={lang.logs.searchbar.placeholder} />
+      <div class="filter">
+        {#each Object.keys(logLevels) as level (level)}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <p class={"logLevelFilter red-text"} class:active={logLevels[level] === true}
+             on:click={() => {logLevels[level] = !logLevels[level]; console.log(logLevels)}}>{level}
+            ({logItems.filter(l => l.split('/')[1]?.split(']: ')[0] === level).length ?? 0})</p>
+        {/each}
       </div>
     </div>
-    <main class="content">
-      {#if $isClientRunning[1] && !hideNoLiveLogs}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
+  </div>
+  <main class="content">
+    {#if !isLive}
+      {#if !hideNoLiveLogs}
         <div class="noLiveLogs" on:click={() => hideNoLiveLogs = !hideNoLiveLogs}>
           <h1 class="noLiveLogsText">{lang.logs.liveLogsUnavailable}</h1>
         </div>
       {/if}
-      {#if logItems.length == 0}
-        <div class="center">
-          {#if !reloadLogs}
-            <h1 class="noLogs">{lang.logs.noLogsFound}</h1>
-          {/if}
-        </div>
-      {:else if !reloadLogs}
-        <div class="logs-wrapper">
-          <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
-            <LogMessage
-              {item}
-              log={search.trim() != '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : null}
-            />
-          </VirtualList>
-        </div>
-      {/if}
-    </main>
-    <div class="black-bar" data-tauri-drag-region>
-      <div class="logs-button-wrapper">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1
-          class:auto-scroll-button-on={autoScroll}
-          class:green-text={autoScroll}
-          class:auto-scroll-button-off={!autoScroll}
-          class:red-text={!autoScroll}
-          on:click={toggleAutoScroll}
-        >[{lang.logs.button.autoScroll}]</h1>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class="copy-button primary-text" on:click={uploadLogs}>
-          [{lang.logs.button.copy}]
-        </h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+    {/if}
+    {#if logItems.length === 0}
+      <div class="center">
+        {#if !reloadLogs}
+          <h1 class="noLogs">{lang.logs.noLogsFound}</h1>
+        {/if}
       </div>
+    {:else if !reloadLogs}
+      <div class="logs-wrapper">
+        <VirtualList items={logItems} let:item {autoScroll} disableCustomScrollLogic={true}>
+          <LogMessage
+            {item}
+            log={search.trim() !== '' && item.split(']: ').slice(1).join(']: ').includes(search) ? item.split(']: ').slice(1).join(']: ').replaceAll(search, `<span style="background-color: #ff9100;">${search}</span>`) : null}
+          />
+        </VirtualList>
+      </div>
+    {/if}
+  </main>
+  <div class="black-bar" data-tauri-drag-region>
+    <div class="logs-button-wrapper">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1
+        class:auto-scroll-button-on={autoScroll}
+        class:green-text={autoScroll}
+        class:auto-scroll-button-off={!autoScroll}
+        class:red-text={!autoScroll}
+        on:click={toggleAutoScroll}
+      >[{lang.logs.button.autoScroll}]</h1>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <h1 class="copy-button primary-text" on:click={uploadLogs}>
+        [{lang.logs.button.copy}]
+      </h1>
     </div>
+  </div>
   </body>
 {/if}
 
@@ -143,20 +160,20 @@
     }
 
     .noLiveLogs {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 60px;
-      padding: 10px;
-      background-color: #ff5252;
-      position: absolute;
-      z-index: 100;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 60px;
+        padding: 10px;
+        background-color: #ff5252;
+        position: absolute;
+        z-index: 100;
     }
 
     .noLiveLogsText {
-      font-family: 'Press Start 2P', serif;
-      font-size: 14px;
-      color: var(--background-contrast-color);
+        font-family: 'Press Start 2P', serif;
+        font-size: 14px;
+        color: var(--background-contrast-color);
     }
 
     .header {
@@ -170,19 +187,19 @@
     }
 
     .header input {
-      width: 250px;
-      height: 30px;
-      border: none;
-      padding: 0.5em;
-      border-radius: 5px;
-      color: var(--primary-text);
-      background-color: var(--background-color);
+        width: 250px;
+        height: 30px;
+        border: none;
+        padding: 0.5em;
+        border-radius: 5px;
+        color: var(--primary-text);
+        background-color: var(--background-color);
     }
 
     .header input::placeholder {
-      color: var(--primary-text);
-      opacity: 0.5;
-      text-shadow: none;
+        color: var(--primary-text);
+        opacity: 0.5;
+        text-shadow: none;
     }
 
     .header .filter {
@@ -193,14 +210,14 @@
     }
 
     .header .filter .logLevelFilter {
-      font-family: 'Press Start 2P', serif;
-      font-size: 13px;
-      cursor: pointer;
+        font-family: 'Press Start 2P', serif;
+        font-size: 13px;
+        cursor: pointer;
     }
 
     .header .filter .logLevelFilter.active {
-      color: var(--green-text);
-      text-shadow: 2px 2px var(--green-text-shadow);
+        color: var(--green-text);
+        text-shadow: 2px 2px var(--green-text-shadow);
     }
 
     .content {

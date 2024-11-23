@@ -4,6 +4,7 @@ use std::sync::{Mutex, Arc};
 use anyhow::{Ok, Result};
 use log::{debug, info, warn};
 use tokio::fs;
+use uuid::Uuid;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
 use crate::error::LauncherError;
@@ -17,7 +18,7 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>, instance_id: Uuid) -> Result<()> {
     info!("Loading minecraft version manifest...");
     let data_path = LAUNCHER_DIRECTORY.data_dir().join("nrc_cache");
     let mc_version_manifest = VersionManifest::download(&data_path).await?;
@@ -31,7 +32,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
     let data_directory = launching_parameter.data_path.clone();
 
     // Copy retrieve and copy mods from manifest
-    clear_mods(&data_directory, &launch_manifest).await?;
+    clear_mods(&data_directory, &launch_manifest).await.or_else(|e| if multiple_instances { Ok(()) } else { Err(e) })?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &additional_mods, &progress).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &additional_mods, &progress).await?;
 
@@ -62,7 +63,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
 
     info!("Launching {}...", launch_manifest.build.branch);
 
-    launcher::launch(norisk_token, uuid, &data_directory, launch_manifest, version, launching_parameter, progress, window).await?;
+    launcher::launch(multiple_instances, norisk_token, uuid, &data_directory, launch_manifest, version, launching_parameter, progress, window, instance_id).await?;
     Ok(())
 }
 

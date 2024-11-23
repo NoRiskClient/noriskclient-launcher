@@ -13,11 +13,7 @@ export const isInMaintenanceMode = writable(false);
 export const isApiOnline = writable(true);
 export const isClientRunning = writable([false, false]);
 export const isCheckingForUpdates = writable(true);
-export const startProgress = writable({
-  progressBarMax: 0,
-  progressBarProgress: 0,
-  progressBarLabel: "",
-});
+export const clientInstances = writable([]);
 export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
@@ -37,7 +33,7 @@ export async function checkApiStatus() {
   await invoke("check_online_status").then((apiOnlineState) => {
     apiIsOnline = apiOnlineState;
     isApiOnline.set(apiOnlineState);
-    noriskLog(`API is ${apiIsOnline ? 'online' : 'offline'}!`);
+    noriskLog(`API is ${apiIsOnline ? "online" : "offline"}!`);
   }).catch(() => {
     apiIsOnline = false;
     isApiOnline.set(false);
@@ -46,21 +42,24 @@ export async function checkApiStatus() {
   return apiIsOnline;
 }
 
-export async function checkIfClientIsRunning() {
-  await invoke("is_client_running").then((isRunning) => {
-    noriskLog(`IsClientRunning is ${isRunning[0]} (Was launcher closed? -> ${isRunning[1]})`);
-    isClientRunning.set(isRunning);
+export async function getClientInstances() {
+  return await invoke("get_running_instances").then(value => {
+    clientInstances.set(value);
+    //noriskLog(`Received Running Instances: ${JSON.stringify(value)}`);
   }).catch((reason) => {
     noriskError(reason);
-    isClientRunning.set([false, false]);
   });
 }
 
-
 export async function runClient(branch, checkedForNewBranch = false) {
-  if (get(isClientRunning)[0]) {
-    push('/start-progress');
-    return;
+  let options = get(launcherOptions);
+
+  if (!options.multipleInstances) {
+    let instance = get(clientInstances).find(value => true);
+    if (instance) {
+      await push(`/start-progress/` + instance.id);
+      return;
+    }
   }
 
   if (!checkedForNewBranch) {
@@ -88,7 +87,6 @@ export async function runClient(branch, checkedForNewBranch = false) {
 
   noriskLog("Client started");
 
-  let options = get(launcherOptions);
   let launcherProfiles = get(profiles);
   let installedMods = [];
 
@@ -99,8 +97,6 @@ export async function runClient(branch, checkedForNewBranch = false) {
   }
 
   await saveOptions();
-
-  await push("/start-progress");
 
   let launcherProfile;
   if (options.experimentalMode) {
@@ -128,37 +124,40 @@ export async function runClient(branch, checkedForNewBranch = false) {
     options: options,
     forceServer: get(forceServer).length > 0 ? get(forceServer) : null,
     mods: installedMods,
-  }).then(() => {
-    isClientRunning.set([true, false]);
+  }).then((uuid) => {
+    noriskLog(`Started Instance ${uuid}`);
+    push("/start-progress/" + uuid);
     if (get(forceServer).length > 0) {
       forceServer.set(get(forceServer) + ":RUNNING");
     }
   }).catch(error => {
-    isClientRunning.set([false, false]);
     forceServer.set("");
     pop();
     addNotification(get(translations).app.notification.failedToRunClient.replace("{error}", error));
   });
 
   // NoRisk Token Changed So Update
-  await fetchDefaultUserOrError(false)
+  await fetchDefaultUserOrError(false);
 }
 
-export async function stopClient() {
+export async function stopClient(instanceId) {
   push("/");
-  await invoke("terminate").then(() => {
-    isClientRunning.set([false, false]);
+  await invoke("terminate", {
+    instanceId,
+  }).then(() => {
   }).catch(reason => {
     addNotification(reason);
   });
 }
 
-export async function openMinecraftLogsWindow() {
-  if (get(isClientRunning)[1]) {
+export async function openMinecraftLogsWindow(uuid) {
+  let isLive = get(clientInstances).find(value => value.id === uuid)?.isAttached ?? false
+
+  if (!isLive) {
     addNotification(get(translations).logs.notification.liveLogsUnavailable.info, "INFO", get(translations).logs.notification.liveLogsUnavailable.details);
   }
 
-  await invoke("open_minecraft_logs_window").catch(reason => {
+  return await invoke("open_minecraft_logs_window", { uuid, isLive }).catch(reason => {
     addNotification(reason);
   });
 }

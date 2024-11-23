@@ -1,8 +1,3 @@
-use anyhow::Result;
-use dirs::data_dir;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::Write;
 use std::{
     collections::HashMap,
     io,
@@ -11,36 +6,26 @@ use std::{
     thread,
 };
 use std::convert::From;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::Write;
+
+use anyhow::Result;
 use chrono::Utc;
 use directories::UserDirs;
+use dirs::data_dir;
 use log::{debug, error, info};
 use minecraft_client_rs::Client;
 use rand::Rng;
 use regex::Regex;
 use reqwest::multipart::{Form, Part};
+use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use tauri::api::dialog::blocking::FileDialogBuilder;
 use tauri::{Manager, UserAttentionType, Window, WindowEvent};
+use tauri::api::dialog::blocking::FileDialogBuilder;
 use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
-use crate::app::nrc_cache::NRCCache;
-use crate::addons::datapack_manager::DataPackManager;
-use crate::addons::mod_manager::ModManager;
-use crate::addons::resourcepack_manager::ResourcePackManager;
-use crate::addons::shader_manager::ShaderManager;
-use crate::app::api::{LoginData, NoRiskLaunchManifest};
-use crate::app::cape_api::{Cape, CapeApiEndpoints};
-use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{
-    CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
-    ModrinthSearchRequestParams,
-};
-use crate::error::Error;
-use crate::error::ErrorKind;
-use crate::minecraft::auth;
-use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
-use crate::utils::percentage_of_total_memory;
-use crate::LAUNCHER_VERSION;
+
 use crate::{
     custom_servers::{
         manager::CustomServerManager,
@@ -58,38 +43,46 @@ use crate::{
             vanilla::{VanillaManifest, VanillaProvider, VanillaVersions},
         },
     },
+    HTTP_CLIENT,
+    LAUNCHER_DIRECTORY,
     minecraft::{
         launcher::{LauncherData, LaunchingParameter},
         prelauncher,
         progress::ProgressUpdate,
-    },
-    utils::{total_memory, McDataHandler},
-    HTTP_CLIENT, LAUNCHER_DIRECTORY,
+    }, utils::{McDataHandler, total_memory},
 };
-
-use super::{
-    api::{
-        ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
-        WhitelistSlots,
-    },
-    app_data::{
-        Announcement, ChangeLog, LastViewedPopups, LatestRunningGame,
-        LauncherOptions, LauncherProfiles,
-    },
-    modrinth_api::{
-        Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
-        ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
-        ResourcePackInfo, Shader, ShaderInfo,
-    },
+use crate::addons::datapack_manager::DataPackManager;
+use crate::addons::mod_manager::ModManager;
+use crate::addons::resourcepack_manager::ResourcePackManager;
+use crate::addons::shader_manager::ShaderManager;
+use crate::app::api::{LoginData, NoRiskLaunchManifest};
+use crate::app::cape_api::{Cape, CapeApiEndpoints};
+use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
+use crate::app::modrinth_api::{
+    CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
+    ModrinthSearchRequestParams,
 };
+use crate::app::nrc_cache::{AppState, NRCCache, OutputData, RunnerInstance};
+use crate::error::Error;
+use crate::error::ErrorKind;
+use crate::error::ErrorKind::OtherError;
+use crate::LAUNCHER_VERSION;
+use crate::minecraft::auth;
+use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
+use crate::minecraft::progress::ClientProgressUpdate;
+use crate::utils::percentage_of_total_memory;
 
-struct RunnerInstance {
-    terminator: tokio::sync::oneshot::Sender<()>,
-}
-
-struct AppState {
-    runner_instance: Arc<Mutex<Option<RunnerInstance>>>,
-}
+use super::{api::{
+    ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
+    WhitelistSlots,
+}, app_data::{
+    Announcement, ChangeLog, LastViewedPopups, LatestRunningGame,
+    LauncherOptions, LauncherProfiles,
+}, modrinth_api::{
+    Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
+    ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
+    ResourcePackInfo, Shader, ShaderInfo,
+}, nrc_cache};
 
 #[derive(serde::Deserialize)]
 pub struct FileData {
@@ -451,12 +444,15 @@ async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String
 
 #[tauri::command]
 pub async fn open_minecraft_logs_window(
+    uuid: Uuid,
+    is_live: bool,
     handle: tauri::AppHandle,
 ) -> Result<(), Error> {
     // Generate a random number
     let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
     // Create a unique label using the random number
-    let unique_label = format!("logs-{}", random_number);
+    //hacky aber weiß sonst nicht wie lol
+    let unique_label = format!("logs-{}:{}:{}", random_number, uuid, is_live);
     let window = tauri::WindowBuilder::new(
         &handle,
         unique_label,
@@ -1192,7 +1188,7 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
     Ok(None)
 }
 
-fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8], uuid: Uuid) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
@@ -1221,30 +1217,41 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8]) -> anyhow::Result<()>
         }
     } else {
         // Emit the regular process output
-        window.lock().unwrap().emit("process-output", data)?;
+        window.lock().unwrap().emit("process-output", OutputData {
+            id: uuid,
+            text: data,
+        })?;
     }
     Ok(())
 }
 
-fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8]) -> anyhow::Result<()> {
+fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8], uuid: Uuid) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
     }
 
     error!("{}", data.trim());
-    window.lock().unwrap().emit("process-output", data)?;
+    window.lock().unwrap().emit("process-output", OutputData {
+        id: uuid,
+        text: data,
+    })?;
     Ok(())
 }
 
 fn handle_progress(
     window: &Arc<std::sync::Mutex<Window>>,
     progress_update: ProgressUpdate,
+    instance_id: Uuid,
+    instances: Arc<Mutex<Vec<RunnerInstance>>>,
 ) -> anyhow::Result<()> {
+    if let Some(instance) = instances.lock().unwrap().iter_mut().find(|r| r.id == instance_id) {
+        instance.progress_updates.push(progress_update.clone());
+    }
     window
         .lock()
         .unwrap()
-        .emit("progress-update", progress_update)?;
+        .emit("progress-update", ClientProgressUpdate { instance_id: instance_id.clone(), data: progress_update })?;
     Ok(())
 }
 
@@ -1354,52 +1361,17 @@ async fn copy_mc_data(path: &str, branch: &str, app: tauri::AppHandle) -> Result
 }
 
 #[tauri::command]
+async fn get_running_instances(app_state: tauri::State<'_, AppState>) -> Result<Vec<RunnerInstance>, crate::error::Error> {
+    Ok(NRCCache::get_running_instances(app_state).await?)
+}
+
+#[tauri::command]
 async fn copy_branch_data(
     old_branch: &str,
     new_branch: &str,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     McDataHandler::copy_branch_data(old_branch, new_branch, app).await
-}
-
-// The return type is 1. is the client running 2. is the client running without the launcher being closed after launch -> important info for the frontend
-#[tauri::command]
-async fn is_client_running(
-    app_state: tauri::State<'_, AppState>,
-) -> Result<(bool, bool), Error> {
-    let runner_instance = &app_state.runner_instance;
-
-    if runner_instance
-        .lock()
-        .map_err(|e| {
-            ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error()
-        })?
-        .is_some()
-    {
-        return Ok((true, false));
-    }
-
-    let options = get_options().await.map_err(|e| {
-        ErrorKind::LauncherError(format!("unable to load options: {:?}", e)).as_error()
-    })?;
-    let mut latest_running_game = LatestRunningGame::load(&options.data_path_buf())
-        .await
-        .unwrap_or_default();
-
-    if latest_running_game.id.is_some() {
-        let mut system = System::new_all();
-        system.refresh_all();
-        // check if process is still running
-        let game_process = system.process(Pid::from(latest_running_game.id.unwrap() as usize));
-        if game_process.is_some() {
-            return Ok((true, true));
-        } else {
-            latest_running_game.id = None;
-            latest_running_game.store(&options.data_path_buf()).await?;
-        }
-    }
-
-    return Ok((false, false));
 }
 
 #[tauri::command]
@@ -1410,12 +1382,9 @@ async fn run_client(
     mods: Vec<LoaderMod>,
     window: Window,
     app_state: tauri::State<'_, AppState>,
-) -> Result<(), Error> {
+    app: tauri::AppHandle,
+) -> Result<Uuid, Error> {
     debug!("Starting Client with branch {}", branch);
-    if is_client_running(app_state.clone()).await?.0 {
-        return Err(ErrorKind::LauncherError("client is already running".to_string()).into());
-    }
-
     fs::create_dir_all(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache")).await?;
 
     let mut accounts = minecraft_auth_get_store().await?;
@@ -1429,7 +1398,7 @@ async fn run_client(
         }
     }.ok_or(ErrorKind::NoCredentialsError)?;
 
-    debug!("Starting Minecraft with Account {:?}",credentials.username);
+    debug!("Starting Minecraft with Account {:?}", credentials.username);
 
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
 
@@ -1472,17 +1441,20 @@ async fn run_client(
     let launch_manifest = get_launch_manifest(&branch, &token, credentials.id).await?;
 
     let (terminator_tx, terminator_rx) = tokio::sync::oneshot::channel();
+    let runner_id = Uuid::new_v4(); // Erzeuge eine neue UUID für die Instanz
 
-    let runner_instance = &app_state.runner_instance;
-    *runner_instance.lock().map_err(|e| {
-        ErrorKind::LauncherError(format!("unable to lock runner instance: {:?}", e)).as_error()
-    })? = Some(RunnerInstance {
-        terminator: terminator_tx,
+    let runner_instances = Arc::clone(&app_state.runner_instances); // Verwende Arc für die Zustandsverwaltung
+    runner_instances.lock().unwrap().push(RunnerInstance {
+        terminator: Some(terminator_tx),
+        id: runner_id.clone(), // Speichern der ID
+        progress_updates: Vec::new(),
+        p_id: None,
+        is_attached: true,
     });
 
-    let copy_of_runner_instance = runner_instance.clone();
-
     thread::spawn(move || {
+        let runner_instances = runner_instances.clone(); // Der Zustand ist jetzt für den Thread verfügbar
+
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1491,12 +1463,15 @@ async fn run_client(
                 let keep_launcher_open = parameters.keep_launcher_open;
 
                 if let Err(e) = prelauncher::launch(
+                    options.multiple_instances,
                     &token,
                     &credentials.id.to_string(),
                     launch_manifest,
                     parameters,
                     mods,
                     LauncherData {
+                        instance_id: runner_id,
+                        instances: runner_instances.clone(),
                         on_stdout: handle_stdout,
                         on_stderr: handle_stderr,
                         on_progress: handle_progress,
@@ -1504,6 +1479,7 @@ async fn run_client(
                         terminator: terminator_rx,
                     },
                     window_mutex.clone(),
+                    runner_id.clone(),
                 )
                     .await
                 {
@@ -1519,61 +1495,72 @@ async fn run_client(
                     handle_stderr(
                         &window_mutex,
                         format!("Failed to launch client: {:?}", e).as_bytes(),
+                        runner_id,
                     )
                         .unwrap();
-                };
+                }
 
-                *copy_of_runner_instance
-                    .lock()
-                    .map_err(|e| format!("unable to lock runner instance: {:?}", e))
-                    .unwrap() = None;
+                // Entferne die Instanz aus der Liste, wenn der Client geschlossen wurde
+                let mut mut_runner_instances = runner_instances.lock().unwrap();
+
+                // Suchen der Instanz anhand der ID
+                if let Some(pos) = mut_runner_instances.iter().position(|r| r.id == runner_id) {
+                    mut_runner_instances.remove(pos); // Entfernen der Instanz
+                    debug!("Removed runner instance with id: {}", runner_id);
+                }
+
                 window_mutex
                     .lock()
                     .unwrap()
                     .emit("client-exited", ())
-                    .unwrap()
+                    .unwrap();
             });
     });
 
-    Ok(())
+    Ok(runner_id)
 }
 
+
 #[tauri::command]
-async fn terminate(app_state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let options = get_options()
-        .await
-        .map_err(|e| format!("unable to load options: {:?}", e))?;
-    let latest_running_game = LatestRunningGame::load(&options.data_path_buf())
-        .await
-        .unwrap_or_default();
-    let runner_instance = app_state.runner_instance.clone();
-    let mut lck = runner_instance
-        .lock()
-        .map_err(|e| format!("unable to lock runner instance: {:?}", e))?;
+async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
+    let mut runner_instances = app_state.runner_instances.lock().unwrap();
 
-    if let Some(inst) = lck.take() {
-        info!("Sending sigterm - soft game kill");
-        inst.terminator.send(()).unwrap();
-        info!("Sigterm sent - game killed softly");
-    } else {
-        let mut system = System::new_all();
-        system.refresh_all();
+    // Suchen nach der Instanz mit der gegebenen ID
+    if let Some(instance_position) = runner_instances.iter_mut().position(|r| r.id == instance_id) {
+        let instance = &mut runner_instances[instance_position];
 
-        if let Some(pid) = latest_running_game.id {
-            let game_process = system.process(Pid::from(pid as usize));
-            if let Some(game_process) = game_process {
+        // Falls ein Terminator existiert, schließen wir das Spiel damit
+        if let Some(terminator) = instance.terminator.take() {
+            info!("Closing Game {:?}...", instance_id);
+            terminator.send(()).map_err(|e| {
+                OtherError(format!("Couldn't close Game {:?}", e).to_string()).as_error()
+            })?;
+            info!("Closed Game {:?}!", instance_id);
+            return Ok(());
+        }
+
+        // Falls eine PID existiert, suchen wir den zugehörigen Prozess und beenden ihn
+        if let Some(pid) = instance.p_id {
+            let mut system = System::new_all();
+            system.refresh_all(); // Alle Prozesse aktualisieren
+
+            if let Some(game_process) = system.process(Pid::from(pid as usize)) {
+                // Überprüfen, ob der Prozess "java" im Namen enthält
                 if game_process.name().contains("java") {
-                    info!(
-                        "Killing game process with pid: {} and name: {}",
-                        pid,
-                        game_process.name()
-                    );
+                    info!("Killing game process with pid: {} and name: {}",pid,game_process.name());
                     let _ = game_process.kill();
                     info!("Game process killed");
+                    runner_instances.remove(instance_position);
+                    return Ok(());
+                } else {
+                    info!("Game process with pid: {} is not a Java process.", pid);
                 }
+            } else {
+                info!("No running process found with pid: {}", pid);
             }
         }
     }
+
     Ok(())
 }
 
@@ -1687,9 +1674,7 @@ async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, Strin
 
 #[tauri::command]
 async fn get_custom_servers(token: &str, uuid: &str) -> Result<CustomServersResponse, String> {
-    ApiEndpoints::norisk_custom_servers(token, uuid)
-        .await
-        .map_err(|e| format!("unable to get custom servers {:?}", e))
+    ApiEndpoints::norisk_custom_servers(token, uuid).await.map_err(|e| format!("unable to get custom servers {:?}", e))
 }
 
 #[tauri::command]
@@ -2170,9 +2155,9 @@ pub fn gui_main() {
             _ => {}
         })
         .plugin(tauri_plugin_fs_watch::init())
-        .setup(|_| Ok(()))
-        .manage(AppState {
-            runner_instance: Arc::new(Mutex::new(None)),
+        .setup(|app| {
+            NRCCache::initialize_app_state(app);
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             check_online_status,
@@ -2225,7 +2210,6 @@ pub fn gui_main() {
             get_default_mc_folder,
             copy_mc_data,
             copy_branch_data,
-            is_client_running,
             run_client,
             enable_experimental_mode,
             download_template_and_open_explorer,
@@ -2271,6 +2255,7 @@ pub fn gui_main() {
             delete_datapack_file,
             save_custom_datapack_to_folder,
             get_custom_datapacks_filenames,
+            get_running_instances,
             search_datapacks,
             get_datapack_info,
             get_datapack,
