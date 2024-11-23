@@ -215,6 +215,6 @@ impl NRCCache {
             runner_instances: instances.clone(),
         });
         // Store the instances immediately after loading
-        NRCCache::store_running_instances(&instances).unwrap();
+        NRCCache::store_running_instances(&instances).ok();
     }
 }
