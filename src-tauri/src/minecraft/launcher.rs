@@ -197,9 +197,14 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
             })
         })
     ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
+
+    let mut seen_paths: HashSet<String> = HashSet::new(); //offline windows support ansonsten zu groß... hab problem nicht an wurzel angegriffen sorry
     for x in class_paths {
         if let Some(library_path) = x? {
-            write!(class_path, "{}{}", &library_path, OS.get_path_separator()?)?;
+            // Überprüfen, ob der Pfad schon hinzugefügt wurde
+            if seen_paths.insert(library_path.clone()) {
+                write!(class_path, "{}{}", &library_path, OS.get_path_separator()?)?;
+            }
         }
     }
 
@@ -335,7 +340,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
     version_profile.arguments.add_game_args_to_vec(&mut command_arguments, &features)?;
 
     let mut mapped: Vec<String> = Vec::with_capacity(command_arguments.len());
-
+    
     for x in command_arguments.iter() {
         mapped.push(
             process_templates(x, |output, param| {
