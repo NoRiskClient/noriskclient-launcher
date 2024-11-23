@@ -1488,6 +1488,12 @@ async fn run_client(
     thread::spawn(move || {
         let runner_instances = runner_instances.clone(); // Der Zustand ist jetzt für den Thread verfügbar
 
+        let is_first_instance_of_branch = !runner_instances.lock().unwrap().iter().filter(|instance| {
+            return instance.id != runner_id;
+        }).any(|instance| {
+            return instance.branch == branch;
+        });
+
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1496,7 +1502,7 @@ async fn run_client(
                 let keep_launcher_open = parameters.keep_launcher_open;
 
                 if let Err(e) = prelauncher::launch(
-                    options.multiple_instances,
+                    options.multiple_instances || is_first_instance_of_branch,
                     &token,
                     &credentials.id.to_string(),
                     launch_manifest,
