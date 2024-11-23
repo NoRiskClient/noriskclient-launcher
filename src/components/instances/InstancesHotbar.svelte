@@ -13,6 +13,12 @@
     await getClientInstances();
   });
 
+  function getName(instance) {
+    const filtered = instances.filter(value => value.branch === instance.branch);
+    const index = filtered.indexOf(instance);
+    return instance.branch + ((index > 0) ? ` (${index + 1})` : "");
+  }
+
   // Berechnung der Button-Größe basierend auf der Anzahl der Instanzen
   $: buttonSize = ((1 / instances.length) * instances.length);  // Maximal 10 Instanzen, Button-Größe wird kleiner
 </script>
@@ -21,7 +27,7 @@
   {#each instances as instance, index}
     <h1 class="instance-button" on:click={() => push("/start-progress/"+instance.id)}
         style="font-size: {buttonSize}em;">
-      [{instance.branch}]
+      [{getName(instance)}]
     </h1>
   {/each}
 </div>
