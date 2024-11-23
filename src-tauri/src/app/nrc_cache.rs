@@ -203,12 +203,12 @@ impl NRCCache {
         let instances_guard = instances.lock().unwrap();
         //nicht pretty speichern für maximale performance und größe
         let serialized = serde_json::to_string(&*instances_guard)?;
-        std::fs::write(LAUNCHER_DIRECTORY.data_dir().join("running_instances.json"), serialized)?;
+        std::fs::write(LAUNCHER_DIRECTORY.data_dir().join("nrc_cache").join("running_instances.json"), serialized)?;
         Ok(())
     }
 
     pub fn initialize_app_state(app: &tauri::App) {
-        let runner_instances = Self::load_running_instances(&LAUNCHER_DIRECTORY.data_dir().join("running_instances.json"));
+        let runner_instances = Self::load_running_instances(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache").join("running_instances.json"));
         debug!("Found {:?} Last Instances",runner_instances.len());
         let instances = Arc::new(Mutex::new(runner_instances));
         app.manage(AppState {
