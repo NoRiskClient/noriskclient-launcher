@@ -6,7 +6,7 @@
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { checkApiStatus, isInMaintenanceMode, noriskError, noriskUser } from "./utils/noriskUtils.js";
+  import { checkApiStatus, isInMaintenanceMode, noriskError, noriskUser, isApiOnline } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
@@ -59,13 +59,10 @@
     "/addons/shaders": Shaders,
   };
 
-  let apiIsOnline = null;
   let showLaunchErrorModal = false;
   let launchErrorReason;
 
   onMount(async () => {
-    apiIsOnline = await checkApiStatus();
-
     const clientLaunchError = await listen("client-error", async (event) => {
       let reason = event.payload; // Extract the path from the event's payload
       // Remove the prefix "Failed to launch client:" if it exists
@@ -124,7 +121,7 @@
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
-  {#if apiIsOnline === false}
+  {#if $isApiOnline === false}
     <ApiOfflineScreenV2 />
   {/if}
 </div>

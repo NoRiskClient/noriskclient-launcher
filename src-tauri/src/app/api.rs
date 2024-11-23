@@ -32,9 +32,7 @@ impl ApiEndpoints {
     /// Check API status
     pub async fn norisk_api_status() -> Result<bool> {
         let core = Self::request_from_norisk_endpoint("core/online", "", "").await.unwrap_or(false);
-        let launcher = Self::request_from_norisk_endpoint("launcher/online", "", "").await.unwrap_or(false);
-        info!("Core API online state: {}, Launcher API online state: {}", core, launcher);
-        Ok(core && launcher)
+        Ok(core)
     }
 
     /// Request maintenance mode
