@@ -129,6 +129,7 @@ pub fn main() -> anyhow::Result<()> {
     info!("Creating launcher directories...");
     fs::create_dir_all(LAUNCHER_DIRECTORY.data_dir())?;
     fs::create_dir_all(LAUNCHER_DIRECTORY.config_dir())?;
+    fs::create_dir_all(LAUNCHER_DIRECTORY.data_dir().join("nrc_cache"))?;
     info!("Finish launcher directories...");
 
     // app

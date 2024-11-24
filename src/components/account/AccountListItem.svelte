@@ -1,16 +1,16 @@
 <script>
-  import { removeUser, setDefaultUser, users, fetchDefaultUserOrError } from "../../stores/credentialsStore.js";
+  import { fetchUsers, removeUser, setDefaultUser } from "../../stores/credentialsStore.js";
+  import { addNotification } from "../../stores/notificationStore.js";
 
   export let account;
   export let isActive;
   export let dialog;
 
-  async function handleRemoveAccount() {
-    await removeUser(account).then(async value => {
-      await fetchDefaultUserOrError();
-      if ($users.length === 0) {
-        dialog.close();
-      }
+  function handleRemoveAccount() {
+    removeUser(account).then(async value => {
+      await fetchUsers();
+    }).catch((reason) => {
+      addNotification(reason);
     });
   }
 </script>

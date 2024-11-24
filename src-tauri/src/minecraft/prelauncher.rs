@@ -4,9 +4,11 @@ use std::sync::{Mutex, Arc};
 use anyhow::{Ok, Result};
 use log::{debug, info, warn};
 use tokio::fs;
+use uuid::Uuid;
 
 use crate::app::api::{LoaderSubsystem, ModSource, LoaderMod, NoRiskLaunchManifest};
 use crate::error::LauncherError;
+use crate::LAUNCHER_DIRECTORY;
 use crate::minecraft::launcher;
 use crate::minecraft::launcher::{LauncherData, LaunchingParameter};
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
@@ -16,9 +18,10 @@ use crate::utils::{download_file, get_maven_artifact_path};
 ///
 /// Prelaunching client
 ///
-pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>) -> Result<()> {
+pub(crate) async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str, uuid: &str, launch_manifest: NoRiskLaunchManifest, launching_parameter: LaunchingParameter, additional_mods: Vec<LoaderMod>, progress: LauncherData<D>, window: Arc<Mutex<tauri::Window>>, instance_id: Uuid) -> Result<()> {
     info!("Loading minecraft version manifest...");
-    let mc_version_manifest = VersionManifest::download().await?;
+    let data_path = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(&launch_manifest.build.branch).join("nrc_cache");
+    let mc_version_manifest = VersionManifest::download(&data_path).await?;
 
     let build = &launch_manifest.build;
     let subsystem = &launch_manifest.subsystem;
@@ -29,7 +32,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
     let data_directory = launching_parameter.data_path.clone();
 
     // Copy retrieve and copy mods from manifest
-    clear_mods(&data_directory, &launch_manifest).await?;
+    clear_mods(&data_directory, &launch_manifest).await.or_else(|e| if multiple_instances { Ok(()) } else { Err(e) })?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &launch_manifest.mods, &additional_mods, &progress).await?;
     retrieve_and_copy_mods(&data_directory, &launch_manifest, &additional_mods, &additional_mods, &progress).await?;
 
@@ -40,7 +43,7 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
             .replace("{FABRIC_LOADER_VERSION}", &build.fabric_loader_version),
         LoaderSubsystem::Forge { manifest, .. } => manifest.clone()
     };
-    let mut version = VersionProfile::load(&manifest_url).await?;
+    let mut version = VersionProfile::download(&data_path.join("child_sub_system.json"), &manifest_url).await?;
 
     if let Some(inherited_version) = &version.inherits_from {
         let url = mc_version_manifest.versions
@@ -52,14 +55,14 @@ pub(crate) async fn launch<D: Send + Sync>(norisk_token: &str, uuid: &str, launc
         debug!("Determined {}'s download url to be {}", inherited_version, url);
         info!("Downloading inherited version {}...", inherited_version);
 
-        let parent_version = VersionProfile::load(url).await?;
+        let parent_version = VersionProfile::download(&data_path.join("parent_sub_system.json"), url).await?;
 
         version.merge(parent_version)?;
     }
 
     info!("Launching {}...", launch_manifest.build.branch);
 
-    launcher::launch(norisk_token, uuid, &data_directory, launch_manifest, version, launching_parameter, progress, window).await?;
+    launcher::launch(multiple_instances, norisk_token, uuid, &data_directory, launch_manifest, version, launching_parameter, progress, window, instance_id).await?;
     Ok(())
 }
 

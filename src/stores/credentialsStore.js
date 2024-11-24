@@ -3,11 +3,13 @@ import { addNotification } from "./notificationStore.js";
 import { writable } from "svelte/store";
 import { noriskError, noriskLog } from "../utils/noriskUtils.js";
 
-export const defaultUser = writable();
+export const defaultUser = writable(null);
 export const users = writable([]);
 
 export async function fetchDefaultUserOrError(printError = false) {
-  await fetchUsers();
+  /*await fetchUsers().catch((reason) => {
+    addNotification(reason);
+  });*/
   return await invoke("minecraft_auth_get_default_user").then(async value => {
     defaultUser.set(value);
   }).catch((error) => {
@@ -39,9 +41,7 @@ export async function setDefaultUser(account) {
 
 export async function removeUser(account) {
   noriskLog("Removing User: " + account.id);
-  return await invoke("minecraft_auth_remove_user", { uuid: account.id }).catch((reason) => {
-    addNotification(reason);
-  });
+  return await invoke("minecraft_auth_remove_user", { uuid: account.id });
 }
 
 export async function updateMojangAndNoRiskToken(credentials) {

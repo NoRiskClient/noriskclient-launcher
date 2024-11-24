@@ -19,7 +19,7 @@
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
     import { openConfirmPopup } from "../../utils/popupUtils.js";
     import { translations } from '../../utils/translationUtils.js';
-    
+
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
 
@@ -116,7 +116,7 @@
         selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
         noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
         noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
-        
+
         if (keepLocalAssetsPernmission) {
             await invoke("get_keep_local_assets").then((value) => {
               keepLocalAssets = value;
@@ -146,6 +146,7 @@
     <hr>
     <div class="settings-wrapper">
     <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text={lang.settings.keepLauncherOpen} />
+    <ConfigRadioButton bind:value={$launcherOptions.multipleInstances} text={lang.settings.multipleInstances} />
     {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
         <ConfigRadioButton text={lang.settings.experimentalMode} bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
     {/if}

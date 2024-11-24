@@ -14,7 +14,7 @@
   import { getNoRiskToken, noriskUser, noriskLog } from "../../../utils/noriskUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
   import { translations } from '../../../utils/translationUtils.js';
-    
+
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
 
@@ -74,7 +74,7 @@
 
   async function updateShaders(newShaders) {
     shaders = newShaders;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -83,7 +83,7 @@
   }
   async function updateProfileShaders(newShaders) {
     launcherProfiles.addons[currentBranch].shaders = newShaders;
-    
+
     // Try to scroll to the previous position
     try {
       await tick();
@@ -136,7 +136,7 @@
 
     await invoke("get_shader", {
       slug: shader.slug,
-      params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`,
+      params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["iris"]`,
     }).then(async (result) => {
       launcherProfiles.addons[currentBranch].shaders.pushIfNotExist(result, function(e) {
         return e.slug === result.slug;
@@ -172,7 +172,7 @@
   async function getFeaturedShaders() {
     await invoke("get_featured_shaders", {
         branch: currentBranch,
-        mcVersion: launchManifest.build.mcVersion,
+        mcVersion: launchManifest.build.mc_version,
       }).then((result) => {
         console.debug("Featured Shaders", result);
         result.forEach(shader => shader.featured = true);
@@ -185,21 +185,21 @@
 
   async function searchShaders() {
     let oldShaders = shaders;
-    
+
     if (searchterm == "" && search_offset === 0) {
       if (featuredShaders == null) {
         await getFeaturedShaders();
       }
       oldShaders = featuredShaders;
     }
-      
+
     // WENN WIR DAS NICHT MACHEN BUGGEN LIST ENTRIES INEINANDER, ICH SCHLAGE IRGENDWANN DEN TYP DER DIESE VIRTUAL LIST GEMACHT HAT
     // Update: Ich habe ne eigene Virtual List gemacht 📉
     updateShaders([]);
 
     await invoke("search_shaders", {
       params: {
-        facets: `[["versions:${launchManifest.build.mcVersion}"], ["project_type:shader"], ["categories:'iris'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(", ")}]`,
+        facets: `[["versions:${launchManifest.build.mc_version}"], ["project_type:shader"], ["categories:'iris'"]${Object.values(filters).filter(filter => filter.enabled).length > 0 ? ", " : ""}${Object.values(filters).filter(filter => filter.enabled).map(filter => `["categories:'${filter.id}'"]`).join(", ")}]`,
         index: search_index,
         limit: search_limit,
         offset: search_offset,
@@ -244,13 +244,13 @@
     if (index !== -1) {
       launcherProfiles.addons[currentBranch].shaders.splice(index, 1);
       updateShaders(shaders);
-      
+
       await invoke("get_shader", {
         slug: shader.slug,
-        params: `?game_versions=["${launchManifest.build.mcVersion}"]&loaders=["iris"]`,
+        params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["iris"]`,
       }).then(async shaderVersion => {
         deleteShaderFile(shaderVersion.file_name);
-        
+
         launcherProfiles.store();
         const prev = [shaders, launcherProfiles.addons[currentBranch].shaders];
         updateShaders([]);
@@ -463,7 +463,7 @@
           {:else}
             <ShaderItem text="INSTALLED"
               on:delete={() => deleteInstalledShader(item)}
-              type="INSTALLED" 
+              type="INSTALLED"
               shader={item}
             />
           {/if}

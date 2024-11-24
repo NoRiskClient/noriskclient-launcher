@@ -1,6 +1,7 @@
 use core::convert::AsRef;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum ProgressUpdateSteps {
@@ -12,7 +13,7 @@ pub enum ProgressUpdateSteps {
     DownloadNoRiskAssets,
     VerifyNoRiskAssets,
     DownloadCustomServerJar,
-    DownloadCustomServerInstallerJar
+    DownloadCustomServerInstallerJar,
 }
 
 pub fn get_progress(idx: usize, curr: u64, max: u64) -> u64 {
@@ -43,14 +44,21 @@ impl ProgressUpdateSteps {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClientProgressUpdate {
+    #[serde(rename = "instanceId")]
+    pub instance_id: Uuid,
+    pub data: ProgressUpdate,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "value")]
 pub enum ProgressUpdate {
-    #[serde(rename = "max")] 
+    #[serde(rename = "max")]
     SetMax(u64),
-    #[serde(rename = "progress")] 
+    #[serde(rename = "progress")]
     SetProgress(u64),
-    #[serde(rename = "label")] 
+    #[serde(rename = "label")]
     SetLabel(String),
 }
 

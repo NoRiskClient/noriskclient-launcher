@@ -2,13 +2,16 @@ use std::{collections::HashMap, fmt, marker::PhantomData, path::{Path, PathBuf},
 
 use anyhow::Result;
 use tokio::fs;
-use serde::{Deserialize, Deserializer, de::{self, MapAccess, Visitor}};
+use serde::{Deserialize, Deserializer, de::{self, MapAccess, Visitor}, Serialize};
 use void::Void;
 use std::collections::HashSet;
-use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, download_private_file_untracked, Architecture}};
+use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, download_private_file_untracked, Architecture}, error};
 use crate::utils::{get_maven_artifact_path, sha1sum};
 use std::sync::Arc;
-use log::{debug, info};
+use log::{debug, error, info};
+use reqwest::Response;
+use uuid::Uuid;
+use error::Error;
 use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::launcher::LaunchingParameter;
@@ -16,23 +19,47 @@ use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
 
 // https://launchermeta.mojang.com/mc/game/version_manifest.json
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct VersionManifest {
     pub versions: Vec<ManifestVersion>,
 }
 
 impl VersionManifest {
-    pub async fn download() -> Result<Self> {
-        let response = HTTP_CLIENT.get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
-            .send().await?
-            .error_for_status()?;
-        let manifest = response.json::<VersionManifest>().await?;
-
-        Ok(manifest)
+    pub async fn download(app_data: &Path) -> Result<Self, Error> {
+        match HTTP_CLIENT.get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
+            .send()
+            .await {
+            Err(error) => {
+                error!("Error Downloading Mojang Version Manifest {:?}", error);
+                Ok(Self::load(app_data).await?)
+            }
+            Ok(response) => {
+               match response.json::<VersionManifest>().await {
+                   Ok(manifest) => {
+                       manifest.store(app_data).await?;
+                       Ok(manifest)
+                   }
+                   Err(error) => {
+                       error!("Error Downloading Mojang Version Manifest {:?}", error);
+                       Ok(Self::load(app_data).await?)
+                   }
+               }
+            }
+        }
+    }
+    pub async fn load(app_data: &Path) -> Result<Self, Error> {
+        // load the options from the file
+        let options = serde_json::from_slice::<VersionManifest>(&fs::read(app_data.join("version_manifest.json")).await?)?;
+        Ok(options)
+    }
+    pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
+        let _ = fs::write(app_data.join("version_manifest.json"), serde_json::to_string_pretty(&self)?).await?;
+        debug!("Version manifest was stored...");
+        Ok(())
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ManifestVersion {
     pub id: String,
     #[serde(rename = "type")]
@@ -43,7 +70,7 @@ pub struct ManifestVersion {
     pub release_time: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct VersionProfile {
     pub id: String,
     #[serde(rename = "assetIndex")]
@@ -106,7 +133,10 @@ impl VersionProfile {
         }
     }
 
-    fn merge_larger<T>(a: &mut Option<T>, b: Option<T>) where T: Ord {
+    fn merge_larger<T>(a: &mut Option<T>, b: Option<T>)
+    where
+        T: Ord,
+    {
         if let Some((val_a, val_b)) = a.as_ref().zip(b.as_ref()) {
             if val_a < val_b {
                 *a = b;
@@ -117,7 +147,7 @@ impl VersionProfile {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)] // TODO: Might guess from minimum_launcher_version just to be sure.
 pub enum ArgumentDeclaration {
     /// V21 describes the new version json used by versions above 1.13.
@@ -194,28 +224,56 @@ impl ArgumentDeclaration {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct V14ArgumentDeclaration {
     #[serde(rename = "minecraftArguments")]
     pub minecraft_arguments: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct V21ArgumentDeclaration {
     pub arguments: Arguments,
 }
 
 impl VersionProfile {
-    pub async fn load(url: &String) -> Result<Self> {
-        dbg!(url);
-        Ok(HTTP_CLIENT.get(url).send().await?.error_for_status()?.json::<VersionProfile>().await?)
+    pub async fn download(app_data: &Path, url: &String) -> Result<Self, Error> {
+        match HTTP_CLIENT.get(url)
+            .send()
+            .await {
+            Err(error) => {
+                error!("Error Downloading Sub System {:?}", error);
+                Ok(Self::load(app_data).await?)
+            }
+            Ok(response) => {
+                match response.json::<VersionProfile>().await {
+                    Ok(manifest) => {
+                        manifest.store(app_data).await?;
+                        Ok(manifest)
+                    }
+                    Err(error) => {
+                        error!("Error Downloading Sub System {:?}", error);
+                        Ok(Self::load(app_data).await?)
+                    }
+                }
+            }
+        }
+    }
+    pub async fn load(app_data: &Path) -> Result<Self, Error> {
+        // load the options from the file
+        let options = serde_json::from_slice::<VersionProfile>(&fs::read(app_data).await?)?;
+        Ok(options)
+    }
+    pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
+        let _ = fs::write(app_data, serde_json::to_string_pretty(&self)?).await?;
+        debug!("Sub System was stored...");
+        Ok(())
     }
 }
 
 // Parsing the arguments was pain, please mojang. What in the hell did you do?
 // https://github.com/serde-rs/serde/issues/723 That's why I've done a workaround using vec_argument
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Arguments {
     #[serde(default)]
     #[serde(deserialize_with = "vec_argument")]
@@ -225,13 +283,13 @@ pub struct Arguments {
     pub jvm: Vec<Argument>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Argument {
     pub rules: Option<Vec<Rule>>,
     pub value: ArgumentValue,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ArgumentValue {
     SINGLE(String),
@@ -248,8 +306,8 @@ impl FromStr for Argument {
 
 
 fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
     struct Wrapper(#[serde(deserialize_with = "string_or_struct")] Argument);
@@ -259,15 +317,15 @@ fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
 }
 
 fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-    where
-        T: Deserialize<'de> + FromStr<Err=Void>,
-        D: Deserializer<'de>,
+where
+    T: Deserialize<'de> + FromStr<Err=Void>,
+    D: Deserializer<'de>,
 {
     struct StringOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> Visitor<'de> for StringOrStruct<T>
-        where
-            T: Deserialize<'de> + FromStr<Err=Void>,
+    where
+        T: Deserialize<'de> + FromStr<Err=Void>,
     {
         type Value = T;
 
@@ -276,15 +334,15 @@ fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
         }
 
         fn visit_str<E>(self, value: &str) -> Result<T, E>
-            where
-                E: serde::de::Error,
+        where
+            E: serde::de::Error,
         {
             Ok(FromStr::from_str(value).unwrap())
         }
 
         fn visit_map<M>(self, map: M) -> Result<T, M::Error>
-            where
-                M: MapAccess<'de>,
+        where
+            M: MapAccess<'de>,
         {
             Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
         }
@@ -293,7 +351,7 @@ fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     deserializer.deserialize_any(StringOrStruct(PhantomData))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct AssetIndexLocation {
     pub id: String,
     pub sha1: String,
@@ -318,12 +376,12 @@ impl AssetIndexLocation {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct AssetIndex {
     pub objects: HashMap<String, AssetObject>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct AssetObject {
     pub hash: String,
     pub size: i64,
@@ -413,7 +471,7 @@ impl AssetObject {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Downloads {
     pub client: Option<Download>,
     pub client_mappings: Option<Download>,
@@ -423,7 +481,7 @@ pub struct Downloads {
 }
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Download {
     pub sha1: String,
     pub size: i64,
@@ -438,7 +496,7 @@ impl Download {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Library {
     pub name: String,
     pub downloads: Option<LibraryDownloads>,
@@ -468,21 +526,21 @@ impl Library {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Rule {
     pub action: RuleAction,
     pub os: Option<OsRule>,
     pub features: Option<HashMap<String, bool>>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct OsRule {
     pub name: Option<String>,
     pub version: Option<String>,
     pub arch: Option<Architecture>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub enum RuleAction {
     #[serde(rename = "allow")]
     Allow,
@@ -490,13 +548,13 @@ pub enum RuleAction {
     Disallow,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct LibraryDownloads {
     pub artifact: Option<LibraryArtifact>,
     pub classifiers: Option<HashMap<String, LibraryArtifact>>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct LibraryArtifact {
     pub path: String,
     pub sha1: String,
@@ -504,7 +562,7 @@ pub struct LibraryArtifact {
     pub url: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct LibraryDownloadInfo {
     pub path: String,
     pub sha1: Option<String>,
@@ -609,7 +667,7 @@ impl LibraryDownloadInfo {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Logging {
     // TODO: Add logging configuration
 }
