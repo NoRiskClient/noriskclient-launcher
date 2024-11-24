@@ -1,14 +1,11 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::future::Future;
 
 use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
 use byteorder::BigEndian;
 use chrono::{DateTime, Duration, Utc};
-use jsonwebtoken::{Algorithm, decode, DecodingKey, TokenData, Validation};
 use log::{debug, error};
-use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::ecdsa::signature::Signer;
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
@@ -28,7 +25,6 @@ use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::ApiEndpoints;
 use crate::app::app_data::LauncherOptions;
 use crate::error::ErrorKind;
-use crate::error::ErrorKind::OtherError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum MinecraftAuthStep {
@@ -343,58 +339,28 @@ impl MinecraftAuthStore {
         Ok(credentials)
     }
 
-    pub(crate) async fn refresh_norisk_token_if_necessary(
+    pub(crate) async fn refresh_norisk_token(
         &mut self,
         creds: &Credentials,
-        force_update: bool,
     ) -> Result<Credentials, crate::error::Error> {
-        debug!("Refreshing NoRisk Token... {:?}",creds.username);
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        debug!("Refreshing NoRisk Token");
         let cred_id = creds.id;
-        let mut maybe_update = false;
 
-        if !force_update {
-            let token = creds.norisk_credentials.get_token(options.experimental_mode).await?;
-            let key = DecodingKey::from_secret(&[]);
-            let mut validation = Validation::new(Algorithm::HS256);
-            validation.insecure_disable_signature_validation();
-            match decode::<NoRiskTokenClaims>(&token, &key, &validation) {
-                Ok(data) => {
-                    debug!("NoRisk Token Expire Check {:?}",data.claims.exp);
-                    if (data.claims.username != creds.username) {
-                        error!("New Username {:?} to {:?}",data.claims.username,creds.username);
-                        maybe_update = true;
-                    }
-                }
-                Err(error) => {
-                    maybe_update = true;
-                    error!("Error Decoding NoRisk Token {:?}",error);
-                }
-            };
-        }
+        let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str()).await?;
 
-        if force_update || maybe_update {
-            let hwid = IdBuilder::new(Encryption::SHA256).add_component(HWIDComponent::SystemID).build("NRC").map_err(|e| {
-                OtherError(format!("HWID Error {:?}", e))
-            })?;
-            debug!("Refreshing NoRisk Token Force[{:?}] Maybe[{:?}] HWID[{:?}]",force_update,maybe_update, hwid);
-            let norisk_token = ApiEndpoints::refresh_norisk_token(creds.access_token.as_str(), &hwid, true).await?;
 
-            let mut copied_credentials = creds.clone();
-            if options.experimental_mode {
-                copied_credentials.norisk_credentials.experimental = Some(norisk_token);
-            } else {
-                copied_credentials.norisk_credentials.production = Some(norisk_token);
-            }
-
-            self.default_user = Some(cred_id); //das könnte backfiren
-            self.users.insert(cred_id, copied_credentials.clone());
-            self.save().await?;
-            Ok(copied_credentials)
+        let mut copied_credentials = creds.clone();
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        if options.experimental_mode {
+            copied_credentials.norisk_credentials.experimental = Some(norisk_token);
         } else {
-            debug!("NoRisk Token is still fresh 8)");
-            Ok(creds.clone())
+            copied_credentials.norisk_credentials.production = Some(norisk_token);
         }
+
+        self.users.insert(cred_id, copied_credentials.clone());
+        self.save().await?;
+
+        Ok(copied_credentials)
     }
 
     async fn refresh_token(
@@ -443,8 +409,8 @@ impl MinecraftAuthStore {
         Ok(Some(val))
     }
 
+    //TODO norisktoken zu jwt token mit expire datum ändern damit wir es nicht jedes mal updaten?
     pub async fn update_norisk_and_microsoft_token(&mut self, creds: &Credentials) -> Result<Option<Credentials>, crate::error::Error> {
-        debug!("Checking Microsoft and NoRisk Token...");
         debug!("Mojang Creds Expire Check {:?} {:?}", creds.expires, Utc::now());
         if creds.expires < Utc::now() {
             debug!("Refreshing expired Token {:?} {:?}", creds.expires, creds.id);
@@ -455,7 +421,7 @@ impl MinecraftAuthStore {
             match res {
                 Ok(val) => {
                     return if val.is_some() {
-                        Ok(Some(self.refresh_norisk_token_if_necessary(&val.unwrap().clone(), false).await?))
+                        Ok(Some(self.refresh_norisk_token(&val.unwrap().clone()).await?))
                     } else {
                         Err(ErrorKind::NoCredentialsError.as_error())
                     };
@@ -477,9 +443,9 @@ impl MinecraftAuthStore {
                 }
             }
         } else {
-            debug!("Microsoft Token is still valid {:?} {:?}", creds.expires, creds.id);
+            debug!("Token is still valid {:?} {:?}", creds.expires, creds.id);
             //Refresh NoRisk Token
-            Ok(Some(self.refresh_norisk_token_if_necessary(&creds.clone(), false).await?))
+            Ok(Some(self.refresh_norisk_token(&creds.clone()).await?))
         }
     }
 
@@ -527,12 +493,6 @@ impl MinecraftAuthStore {
         self.save().await?;
         Ok(val)
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NoRiskTokenClaims {
-    exp: usize,
-    username: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
