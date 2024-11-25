@@ -77,8 +77,8 @@
 
     const userUnlisten = defaultUser.subscribe(async value => {
       updateNavItems();
-      await fetchFeatures();
       await getNoRiskUser();
+      await fetchFeatures();
       updateNavItems();
     });
 
