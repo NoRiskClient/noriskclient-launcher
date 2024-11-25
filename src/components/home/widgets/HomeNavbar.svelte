@@ -72,14 +72,14 @@
 
   onMount(async () => {
     const branchesUnlisten = branches.subscribe(async value => {
-      updateNavItems();      
+      updateNavItems();
     });
 
     const userUnlisten = defaultUser.subscribe(async value => {
       updateNavItems();
       await getNoRiskUser();
-      await fetchFeatures();
-      updateNavItems();
+        await fetchFeatures();
+        updateNavItems();
     });
 
     return () => {
@@ -89,14 +89,16 @@
   });
 
   async function fetchFeatures() {
+    friendInviteSlots = {};
     await getFeatureWhitelist();
 
-    if ($featureWhitelist.includes("INVITE_FRIENDS")) {
+    if ($featureWhitelist.includes("INVITE_FRIENDS") === true) {
       await loadFriendInvites();
     }
   }
 
   async function loadFriendInvites() {
+    friendInviteSlots = {};
     if (!$defaultUser) return;
     await invoke("get_whitelist_slots", {
       noriskToken: getNoRiskToken(),
@@ -120,17 +122,17 @@
       height: 22,
       contentFontSize: 14,
       validateInput: (input) => input.length > 2 && (input.length <= 16 || input.length == 36),
-      onConfirm: async (identifier) => {        
-        await invoke("add_player_to_whitelist", {
-          identifier: identifier,
-          noriskToken: getNoRiskToken(),
-          requestUuid: $defaultUser.id,
-        }).then(() => {
-          addNotification(lang.home.navbar.natification.invite.success.replace("{user}", identifier), "INFO");
-          loadFriendInvites();
-        }).catch((error) => {
-          addNotification(lang.home.navbar.natification.invite.error.replace("{user}", identifier).replace("{error}", error));
-        });
+      onConfirm: async (identifier) => {
+          await invoke("add_player_to_whitelist", {
+              identifier: identifier,
+              noriskToken: getNoRiskToken(),
+              requestUuid: $defaultUser.id,
+          }).then(async () => {
+              addNotification(lang.home.navbar.natification.invite.success.replace("{user}", identifier), "INFO");
+              await loadFriendInvites();
+          }).catch((error) => {
+              addNotification(lang.home.navbar.natification.invite.error.replace("{user}", identifier).replace("{error}", error));
+          });
       }
     })
   }
