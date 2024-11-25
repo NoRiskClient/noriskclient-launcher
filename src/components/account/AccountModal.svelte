@@ -16,8 +16,8 @@
   let animateOutNow = false;
   let isLoading = false;
 
-  function openModal() {
-    fetchUsers();
+  async function openModal() {
+    await fetchUsers();
     dialog.showModal();
   }
 
