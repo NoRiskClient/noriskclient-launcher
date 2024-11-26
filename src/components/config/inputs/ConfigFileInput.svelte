@@ -17,7 +17,7 @@
   async function selectFolderPath() {
     try {
       const result = await open({
-        title: lang.fileInput.windowTitle.replace("{file}", requiredFileName.length > 0 ? `(${requiredFileName})` : ''),
+        title: lang.fileInput.WindowTitle.replace("{file}", requiredFileName.length > 0 ? `(${requiredFileName})` : ''),
         defaultPath: value,
         directory: false,
         filters: [{ name: lang.fileInput.filterName, extensions: extentions }]
