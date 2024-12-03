@@ -50,7 +50,7 @@
 
         const isOnlineInterval = setInterval(async () => {
             await checkApiStatus();
-        }, 5000) //des bedarfs anpassen?
+        }, 30 * 1000) //des bedarfs anpassen? -> Tim: 30 sek is fair oder? :)
 
         const clientInstancesInterval = setInterval(async () => {
             //Hoffe das passt lol

@@ -76,48 +76,55 @@ use super::{api::{
     ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
     WhitelistSlots,
 }, app_data::{
-    Announcement, ChangeLog, LastViewedPopups, LatestRunningGame,
+    Announcement, ChangeLog, LastViewedPopups,
     LauncherOptions, LauncherProfiles,
 }, modrinth_api::{
     Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
     ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
     ResourcePackInfo, Shader, ShaderInfo,
-}, nrc_cache};
+}};
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OnlineStatusInfo {
+    pub online: bool,
+    #[serde(rename = "onlinePlayers")]
+    pub online_players: u32,
+}
+
+#[derive(Deserialize)]
 pub struct FileData {
     pub name: String,
     pub location: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct MinecraftProfile {
     properties: Vec<MinecraftProfileProperty>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct MinecraftProfileProperty {
     name: String,
     value: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBData {
     data: PlayerDBEntry,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBEntry {
     player: Option<PlayerDBPlayer>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBPlayer {
     id: String,
 }
 
 #[tauri::command]
-async fn check_online_status() -> Result<bool, String> {
+async fn check_online_status() -> Result<OnlineStatusInfo, String> {
     ApiEndpoints::norisk_api_status()
         .await
         .map_err(|e| format!("unable to check online status: {:?}", e))
@@ -600,7 +607,7 @@ pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Er
 
 pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
     let experimental_mode = get_options().await?.experimental_mode;
-    if (credentials.is_some()) {
+    if credentials.is_some() {
         let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
         match token_result {
             //TODO checken ob token valid ist (api mässig)
@@ -1404,8 +1411,7 @@ async fn run_client(
     force_server: Option<String>,
     mods: Vec<LoaderMod>,
     window: Window,
-    app_state: tauri::State<'_, AppState>,
-    app: tauri::AppHandle,
+    app_state: tauri::State<'_, AppState>
 ) -> Result<Uuid, Error> {
     debug!("Starting Client with branch {}", branch);
     fs::create_dir_all(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache")).await?;

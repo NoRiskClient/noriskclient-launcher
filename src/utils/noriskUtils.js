@@ -10,6 +10,7 @@ import { translations } from "./translationUtils";
 export const version = writable("");
 export const noriskUser = writable(null);
 export const isInMaintenanceMode = writable(false);
+export const onlinePlayers = writable(null);
 export const isApiOnline = writable(true);
 export const isClientRunning = writable([false, false]);
 export const isCheckingForUpdates = writable(true);
@@ -29,8 +30,9 @@ export async function getVersion() {
 }
 
 export async function checkApiStatus() {
-    return await invoke("check_online_status").then((apiOnlineState) => {
-        isApiOnline.set(apiOnlineState);
+  return await invoke("check_online_status").then((apiOnlineInfo) => {
+    isApiOnline.set(apiOnlineInfo.online);
+    onlinePlayers.set(apiOnlineInfo.playerCount);
         //noriskLog(`API is ${apiIsOnline ? "online" : "offline"}!`);
     }).catch(() => {
         isApiOnline.set(false);

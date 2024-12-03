@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::gui::minecraft_auth_get_default_user;
 use super::app_data::{Announcement, ChangeLog, LauncherOptions};
+use super::gui::OnlineStatusInfo;
 use crate::custom_servers::models::CustomServer;
 use crate::error::ErrorKind;
 use crate::minecraft::minecraft_auth::NoRiskToken;
@@ -30,8 +31,11 @@ pub fn get_api_base(is_experimental: bool) -> String {
 
 impl ApiEndpoints {
     /// Check API status
-    pub async fn norisk_api_status() -> Result<bool> {
-        let core = Self::request_from_norisk_endpoint("core/online", "", "").await.unwrap_or(false);
+    pub async fn norisk_api_status() -> Result<OnlineStatusInfo> {
+        let core = Self::request_from_norisk_endpoint("core/online", "", "").await.unwrap_or(OnlineStatusInfo {
+            online: false,
+            online_players: 0
+        });
         Ok(core)
     }
 
