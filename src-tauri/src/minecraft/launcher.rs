@@ -10,14 +10,13 @@ use futures::stream::{self, StreamExt};
 use log::{debug, error, info};
 use path_absolutize::*;
 use tokio::{fs, fs::OpenOptions};
-use tokio::runtime::Runtime;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
-use crate::{app::{api::ApiEndpoints, app_data::LatestRunningGame}, LAUNCHER_DIRECTORY, LAUNCHER_VERSION, minecraft::version::AssetObject, utils::{OS, OS_VERSION}};
+use crate::{app::api::ApiEndpoints, LAUNCHER_VERSION, minecraft::version::AssetObject, utils::{OS, OS_VERSION}};
 use crate::app::api::NoRiskLaunchManifest;
 use crate::app::gui::get_keep_local_assets;
-use crate::app::nrc_cache::{AppState, NRCCache, RunnerInstance};
+use crate::app::nrc_cache::{NRCCache, RunnerInstance};
 use crate::error::LauncherError;
 use crate::minecraft::java::{find_java_binary, JavaRuntime, jre_downloader};
 use crate::minecraft::progress::{get_max, get_progress, ProgressReceiver, ProgressUpdate, ProgressUpdateSteps};
