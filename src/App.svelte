@@ -9,6 +9,7 @@
     import {listen} from "@tauri-apps/api/event";
     import {push} from "svelte-spa-router";
     import {
+        isApiOnline,
         checkApiStatus,
         getClientInstances,
         getMaintenanceMode,
@@ -37,15 +38,17 @@
 
         await fetchDefaultUserOrError(false);
         const isTokenValid = await getNoRiskUser();
-        if (isTokenValid) {
-            await fetchBranches();
-            await fetchProfiles();
-            await getMaintenanceMode();
-            await getChangeLogs();
-            await getAnnouncements();
-            await getLastViewedPopups();
-        } else {
-            await startMicrosoftAuth();
+        if ($isApiOnline) {
+            if (isTokenValid) {
+                await fetchBranches();
+                await fetchProfiles();
+                await getMaintenanceMode();
+                await getChangeLogs();
+                await getAnnouncements();
+                await getLastViewedPopups();
+            } else {
+                await startMicrosoftAuth();
+            }
         }
 
         const isOnlineInterval = setInterval(async () => {
