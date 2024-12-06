@@ -392,9 +392,9 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
         .await
         .unwrap_or_default();
     let template_url = if options.experimental_mode {
-        "https://dl-staging.norisk.gg/capes/prod/template.png"
+        "https://cdn.norisk.gg/capes-staging/template.png"
     } else {
-        "https://dl.norisk.gg/capes/prod/template.png"
+        "https://cdn.norisk.gg/capes/template.png"
     };
     let user_dirs = UserDirs::new().unwrap();
     let downloads_dir = user_dirs.download_dir().unwrap();

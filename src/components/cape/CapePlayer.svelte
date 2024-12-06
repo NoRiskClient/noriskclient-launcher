@@ -33,9 +33,9 @@
             addNotification(lang.capes.notification.failedToLoadPlayerSkin.replace("{error}", error));
         });
 
-        // Load current cape
+        // Load current cape        
         await invoke("read_remote_image_file", {
-            location: $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${cape}.png` : `https://dl.norisk.gg/capes/prod/${cape}.png`
+            location: `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape}.png`
         }).then((data) => {
             capeData = `data:image/png;base64,${data}`;
         }).catch((error) => {

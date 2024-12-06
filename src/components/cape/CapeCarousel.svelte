@@ -108,13 +108,8 @@
             on:mouseenter={() => { cape.hovered = true; return getNameByUUID(cape.firstSeen); }}
             on:mouseleave={() => cape.hovered = false}
           >
-            {#if $launcherOptions.experimentalMode}
-              <!-- svelte-ignore a11y-img-redundant-alt -->
-              <img src={`https://dl-staging.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
-            {:else}
-              <!-- svelte-ignore a11y-img-redundant-alt -->
-              <img src={`https://dl.norisk.gg/capes/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
-            {/if}
+            <!-- svelte-ignore a11y-img-redundant-alt -->
+            <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
             {#if !cape._id.includes("NO_COPY") || cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div on:click={() => handleEquipCape(cape._id)} class="equip-text">{lang.capes.button.equip}</div>
