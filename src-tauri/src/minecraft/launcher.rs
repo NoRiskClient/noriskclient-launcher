@@ -364,8 +364,6 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         );
     }
 
-    debug!("###Maped {:?}",mapped);
-
     launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.launching"));
     launcher_data_arc.progress_update(ProgressUpdate::set_to_max());
 
