@@ -80,7 +80,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                     error!("Failed to find JRE: {}", e);
 
                     info!("Download JRE...");
-                    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadJRE"));
+                    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadingJRE"));
                     jre_downloader::jre_download(&runtimes_folder, manifest.build.jre_version, |a, b| {
                         launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadJRE, get_progress(0, a, b), get_max(1)));
                     }).await?
