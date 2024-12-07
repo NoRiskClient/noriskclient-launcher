@@ -1671,7 +1671,7 @@ async fn default_data_folder_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
+async fn clear_cache(options: LauncherOptions) -> Result<(), Error> {
     let auth_store = MinecraftAuthStore::init(Some(true)).await?;
     auth_store.save().await?;
 
@@ -1680,7 +1680,6 @@ async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
 
     [
         "assets",
-        "gameDir",
         "libraries",
         "mod_cache",
         "nrc_cache",
@@ -1694,7 +1693,8 @@ async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
         .filter(|dir| dir.exists())
         .map(std::fs::remove_dir_all)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
+        .map_err(|e| ErrorKind::OtherError(format!("unable to clear cache: {:?}", e)))?;
+
     Ok(())
 }
 
@@ -2255,7 +2255,7 @@ pub fn gui_main() {
             refresh_via_norisk,
             get_mobile_app_token,
             reset_mobile_app_token,
-            clear_data,
+            clear_cache,
             get_changelogs,
             get_announcements,
             get_last_viewed_popups,

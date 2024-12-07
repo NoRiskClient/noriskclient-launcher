@@ -37,23 +37,23 @@
       lightTheme = $launcherOptions.theme === "LIGHT";
     }
 
-
-    async function confirmClearData() {
+    async function confirmClearCache() {
         openConfirmPopup({
-            title: lang.settings.popup.clearData.title,
-            content: lang.settings.popup.clearData.content,
-            onConfirm: clearData
+            title: lang.settings.popup.clearCache.title,
+            content: lang.settings.popup.clearCache.content,
+            onConfirm: clearCache
         });
     }
 
-    async function clearData() {
-        invoke("clear_data", { options: $launcherOptions })
+    async function clearCache() {
+        invoke("clear_cache", { options: $launcherOptions })
             .then(async () => {
-                addNotification(lang.settings.notification.clearData.success, "INFO");
+                addNotification(lang.settings.notification.clearCache.success, "INFO");
                 await fetchOptions();
                 await fetchDefaultUserOrError(false);
                 await fetchBranches();
                 await fetchProfiles();
+                await startMicrosoftAuth();
             })
             .catch((error) => {
                 addNotification(error);
@@ -171,8 +171,8 @@
     <ConfigFileInput title={lang.settings.customJavaPath} bind:value={$launcherOptions.customJavaPath} requiredFileName={["javaw", "java"]} defaultValue={""} />
     <ConfigTextInput title={lang.settings.customJavaArgs} bind:value={$launcherOptions.customJavaArgs} placeholder={lang.settings.placeholder.customJavaArgs} />
     <ConfigFolderInput title={lang.settings.dataFolder} bind:value={$launcherOptions.dataPath} />
-    <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[{lang.settings.clearDataButton}]</p>
+    <div class="clear-cache-button-wrapper">
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearCache}>[{lang.settings.clearCacheButton}]</p>
     </div>
     </div>
 </div>
@@ -267,7 +267,7 @@
         gap: 2em;
     }
 
-    .clear-data-button-wrapper {
+    .clear-cache-button-wrapper {
         display: flex;
         align-content: center;
         align-items: center;
@@ -279,13 +279,13 @@
         text-shadow: 2px 2px #6e0000;
     }
 
-    .clear-data-button-wrapper p {
+    .clear-cache-button-wrapper p {
         color: #ff0000;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
-    .clear-data-button-wrapper p:hover {
+    .clear-cache-button-wrapper p:hover {
         transform: scale(1.2);
     }
   </style>
