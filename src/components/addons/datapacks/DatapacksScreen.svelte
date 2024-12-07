@@ -222,7 +222,7 @@
       });
       if (result.hits.length === 0) {
         updateDatapacks(null);
-      } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
+      } else if ((search_offset == 0 && searchterm != "") || (Object.values(filters).length > 0 && search_offset == 0)) {
         updateDatapacks(result.hits);
       } else {
         updateDatapacks([...oldDatapacks, ...result.hits.filter(datapack => searchterm != "" || !featuredDatapacks.some((element) => element.slug === datapack.slug))]);

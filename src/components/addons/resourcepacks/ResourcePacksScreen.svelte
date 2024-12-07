@@ -218,7 +218,7 @@
       });
       if (result.hits.length === 0) {
         updateResourcePacks(null);
-      } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
+      } else if ((search_offset == 0 && searchterm != "") || (Object.values(filters).length > 0 && search_offset == 0)) {
         updateResourcePacks(result.hits);
       } else {
         updateResourcePacks([...oldResourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))]);

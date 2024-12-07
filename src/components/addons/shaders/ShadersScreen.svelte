@@ -222,7 +222,7 @@
       });
       if (result.hits.length === 0) {
         updateShaders(null);
-      } else if ((search_offset === 0 && searchterm !== "") || Object.values(filters).length > 0) {
+      } else if ((search_offset === 0 && searchterm !== "") || (Object.values(filters).length > 0 && search_offset == 0)) {
         updateShaders(result.hits);
       } else {
         updateShaders([...oldShaders, ...result.hits.filter(shader => searchterm !== "" || !featuredShaders.some((element) => element.slug === shader.slug))]);
