@@ -1,4 +1,6 @@
 <script>
+	import { defaultUser } from './../../stores/credentialsStore.js';
+	import { createEventDispatcher } from 'svelte';
     import {fetchUsers, removeUser, setDefaultUser, fetchDefaultUserOrError} from "../../stores/credentialsStore.js";
     import {addNotification} from "../../stores/notificationStore.js";
     import {preventSelection} from "../../utils/svelteUtils.js";
@@ -6,10 +8,15 @@
     export let account;
     export let isActive;
 
+    const dispatch = createEventDispatcher();
+
     function handleRemoveAccount() {
         removeUser(account).then(async value => {
             await fetchUsers();
             await fetchDefaultUserOrError();
+            if (!$defaultUser) {
+                dispatch('close');
+            }
         }).catch((reason) => {
             addNotification(reason);
         });

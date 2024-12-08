@@ -56,7 +56,7 @@
           </div>
           <hr>
           {#each $users as account}
-            <AccountListItem isActive={$defaultUser?.id === account.id} account={account} />
+            <AccountListItem isActive={$defaultUser?.id === account.id} account={account} on:close={animateOut} />
           {/each}
           {#if isLoading}
             <AccountListLoading />
