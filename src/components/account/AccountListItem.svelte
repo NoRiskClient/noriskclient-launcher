@@ -1,5 +1,5 @@
 <script>
-    import {fetchUsers, removeUser, setDefaultUser} from "../../stores/credentialsStore.js";
+    import {fetchUsers, removeUser, setDefaultUser, fetchDefaultUserOrError} from "../../stores/credentialsStore.js";
     import {addNotification} from "../../stores/notificationStore.js";
     import {preventSelection} from "../../utils/svelteUtils.js";
 
@@ -10,6 +10,7 @@
     function handleRemoveAccount() {
         removeUser(account).then(async value => {
             await fetchUsers();
+            await fetchDefaultUserOrError();
         }).catch((reason) => {
             addNotification(reason);
         });

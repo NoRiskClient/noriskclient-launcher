@@ -41,6 +41,7 @@
     "signIn.step.mcEntitlements": "Mc Berechtigungen",
     "signIn.step.recivingProfile": "Empfange Profil",
     "signIn.step.mcDone": "Mc Fertig",
+    "signIn.step.notWhitelisted": "NICHT GEWHITELISTED",
     "accountModal.title": "ACCOUNTS",
     "accountModal.addAccountButton": "ACCOUNT HINZUFÜGEN",
     "creditsModal.title": "LAUNCHER CREDITS",

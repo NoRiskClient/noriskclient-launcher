@@ -1193,7 +1193,6 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                     .unwrap()
                     .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
-
                 match accounts.refresh_norisk_token_if_necessary(&credentials.clone(), true).await {
                     Ok(credentials_with_norisk) => {
                         debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
@@ -1204,7 +1203,11 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                         debug!(
                             "After Microsoft Auth: Error Fetching NoRiskClient Token {:?}",
                             err
-                        )
+                        );
+                        app.get_window("main")
+                            .unwrap()
+                            .emit("microsoft-output", "signIn.step.notWhitelisted")
+                            .unwrap_or_default();
                     }
                 }
 

@@ -22,6 +22,12 @@
       }
 
       if (event.payload.includes('signIn.')) {
+        if (event.payload.includes('notWhitelisted')) {
+          clearInterval(interval);
+          microsoftFlag = false;
+          dots = "";
+        }
+
         let translatedStep = lang;
         event.payload.split('.').forEach(step => {
           translatedStep = translatedStep[step];
