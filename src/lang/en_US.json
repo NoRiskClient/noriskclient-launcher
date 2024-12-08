@@ -114,7 +114,7 @@
     "legal.button.openSourceLicenses": "Open Source Licenses",
     "legal.button.usedLibraries": "Used Libraries",
     "legal.button.imprint": "Imprint",
-    "settings.popup.clearCache.title": "Bist du sicher?",
+    "settings.popup.clearCache.title": "Are you sure?",
     "settings.popup.clearCache.content": "Are you sure you want to clear all cached data & configurations?<br>This will delete everything except your worlds, including mods and client settings.",
     "settings.notification.clearCache.success": "Cache cleared successfully!",
     "settings.notification.experimentalMode.error": "Failed to enable experimental mode: {error}",
