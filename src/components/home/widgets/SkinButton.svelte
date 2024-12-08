@@ -65,7 +65,6 @@
     }
 
     .tag {
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin: 0;
         color: #b7b7b7;

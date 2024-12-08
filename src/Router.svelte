@@ -163,6 +163,6 @@
     }
 
     .content {
-        height: 80vh;
+      height: 80vh;
     }
 </style>

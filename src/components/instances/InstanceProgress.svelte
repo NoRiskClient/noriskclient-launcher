@@ -132,7 +132,6 @@
     }
 
     .nes-font-big {
-        font-family: 'Press Start 2P', serif;
         font-size: 34px;
         margin: 0;
     }
@@ -155,7 +154,6 @@
     }
 
     .nes-font-small {
-        font-family: 'Press Start 2P', serif;
         font-size: 8px;
         margin: 0;
         cursor: default;

@@ -117,7 +117,7 @@ pub struct ModInfo {
 pub struct Mod {
     pub slug: String,
     pub title: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -126,7 +126,7 @@ pub struct ShaderInfo {
     pub author: Option<String>,
     pub title: String,
     pub description: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
@@ -137,7 +137,7 @@ pub struct Shader {
     pub slug: String,
     pub title: String,
     pub file_name: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub url: Option<String>,
 }
 
@@ -147,7 +147,7 @@ pub struct ResourcePackInfo {
     pub author: Option<String>,
     pub title: String,
     pub description: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
@@ -158,7 +158,7 @@ pub struct ResourcePack {
     pub slug: String,
     pub title: String,
     pub file_name: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub url: Option<String>,
 }
 
@@ -168,7 +168,7 @@ pub struct DatapackInfo {
     pub author: Option<String>,
     pub title: String,
     pub description: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub downloads: u32,
     pub game_versions: Option<Vec<String>>,
 }
@@ -180,7 +180,7 @@ pub struct Datapack {
     pub title: String,
     pub world_name: String,
     pub file_name: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub url: Option<String>,
 }
 
@@ -207,7 +207,7 @@ pub struct ModrinthProject {
 }
 
 impl ModrinthProject {
-    pub fn to_custom_mod(&self, title: &str, slug: &str, image_url: &str, dependencies: Vec<CustomMod>, required: bool, enabled: bool) -> CustomMod {
+    pub fn to_custom_mod(&self, title: &str, slug: &str, image_url: Option<String>, dependencies: Vec<CustomMod>, required: bool, enabled: bool) -> CustomMod {
         let file_name = self.files.first().map(|file| {
             file.filename.clone()
         }).unwrap_or("MOD_FALL_BACK".to_string());
@@ -218,7 +218,7 @@ impl ModrinthProject {
 
         return CustomMod {
             title: title.to_string(),
-            image_url: image_url.to_string(),
+            image_url: image_url,
             value: LoaderMod {
                 enabled,
                 required,
@@ -297,7 +297,7 @@ pub struct Dependency {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CustomMod {
     pub title: String,
-    pub image_url: String,
+    pub image_url: Option<String>,
     pub value: LoaderMod,
     pub dependencies: Vec<CustomMod>,
 }

@@ -74,8 +74,7 @@
         align-items: center;
         height: 80vh;
         width: 100vw;
-        font-family: 'Press Start 2P', serif;
-        color: var(--font-color);
+            color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }
     

@@ -4,12 +4,16 @@ import { get, writable } from "svelte/store";
 import { launcherOptions, saveOptions } from "../stores/optionsStore.js";
 import { pop, push } from "svelte-spa-router";
 import { defaultUser, fetchDefaultUserOrError } from "../stores/credentialsStore.js";
-import { profiles } from "../stores/profilesStore.js";
+import { fetchProfiles, profiles } from "../stores/profilesStore.js";
 import { translations } from "./translationUtils";
+import { fetchBranches } from "../stores/branchesStore.js";
+import { getAnnouncements, getChangeLogs, getLastViewedPopups } from "./popupUtils.js";
+import { startMicrosoftAuth } from "./microsoftUtils.js";
 
 export const version = writable("");
 export const noriskUser = writable(null);
 export const isInMaintenanceMode = writable(false);
+export const onlinePlayers = writable(null);
 export const isApiOnline = writable(true);
 export const isClientRunning = writable([false, false]);
 export const isCheckingForUpdates = writable(true);
@@ -29,8 +33,23 @@ export async function getVersion() {
 }
 
 export async function checkApiStatus() {
-    return await invoke("check_online_status").then((apiOnlineState) => {
-        isApiOnline.set(apiOnlineState);
+  return await invoke("check_online_status").then(async (apiOnlineInfo) => {
+    const oldOnlineStatus = get(isApiOnline);
+    isApiOnline.set(apiOnlineInfo.online);
+    onlinePlayers.set(apiOnlineInfo.playerCount);
+    if (oldOnlineStatus !== apiOnlineInfo.online && apiOnlineInfo.online && oldOnlineStatus === false) {
+      const isTokenValid = await getNoRiskUser();
+      if (isTokenValid) {
+        await fetchBranches();
+        await fetchProfiles();
+        await getMaintenanceMode();
+        await getChangeLogs();
+        await getAnnouncements();
+        await getLastViewedPopups();
+      } else {
+        await startMicrosoftAuth();
+      }
+    }
         //noriskLog(`API is ${apiIsOnline ? "online" : "offline"}!`);
     }).catch(() => {
         isApiOnline.set(false);

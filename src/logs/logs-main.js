@@ -1,4 +1,5 @@
-import "../app.css";
+import "./big-scrollbar.css";
+import "../global.css";
 import Logs from "./Logs.svelte";
 
 const logs = new Logs({

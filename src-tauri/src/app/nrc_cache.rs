@@ -1,19 +1,17 @@
-use std::future::Future;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use log::{debug, info};
+use log::debug;
 use log::error;
 use serde::Deserialize;
-use sha1::digest::typenum::op;
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use tauri::{Manager, State};
+use tauri::Manager;
 use tokio::fs;
 use uuid::Uuid;
 
-use crate::app::api::{ApiEndpoints, LaunchManifest, NoRiskLaunchManifest};
+use crate::app::api::{ApiEndpoints, NoRiskLaunchManifest};
 use crate::app::app_data::LauncherOptions;
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::LAUNCHER_DIRECTORY;
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::progress::ProgressUpdate;

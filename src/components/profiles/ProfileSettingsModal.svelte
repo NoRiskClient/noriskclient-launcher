@@ -147,7 +147,6 @@
     }
 
     .header-wrapper .title {
-        font-family: 'Press Start 2P', serif;
         font-size: 22.5px;
         user-select: none;
         cursor: default;
@@ -243,7 +242,6 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
@@ -258,7 +256,6 @@
       }
       
       .create-profile-button-wrapper p {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 0.3em;
         cursor: pointer;
@@ -274,7 +271,6 @@
         align-content: center;
         align-items: center;
         justify-content: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 1em;
         text-shadow: 2px 2px #6e0000;

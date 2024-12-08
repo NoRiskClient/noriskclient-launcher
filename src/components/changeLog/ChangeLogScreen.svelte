@@ -28,8 +28,7 @@
         justify-content: center;
         margin-top: 20px;
         overflow-y: hidden;
-        font-family: 'Press Start 2P', serif;
-    }
+        }
 
     .title {
         font-size: 2em;
