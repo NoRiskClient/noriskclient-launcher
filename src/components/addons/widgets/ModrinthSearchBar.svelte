@@ -26,11 +26,7 @@
     };
 </script>
 
-<div class="content">
-    {#if showFilterModal}
-        <FilterModal categories={filterCategories} bind:activeFilters={filters} bind:showModal={showFilterModal} on:search={onChange} />
-    {/if}
-</div>
+<FilterModal categories={filterCategories} bind:activeFilters={filters} bind:showModal={showFilterModal} on:search={onChange} />
 <div class="input-container">
     {#if title !== undefined}
         <h1>{title}</h1>

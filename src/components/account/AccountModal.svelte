@@ -11,21 +11,18 @@
 
   export let showModal;
 
-  let dialog; // HTMLDialogElement
-  $: if (dialog && showModal) openModal();
   let animateOutNow = false;
   let isLoading = false;
 
   async function openModal() {
     await fetchUsers();
-    dialog.showModal();
+    showModal = true;
   }
 
   function animateOut() {
     animateOutNow = true;
     setTimeout(() => {
       showModal = false;
-      dialog.close();
       animateOutNow = false;
     }, 100);
   }
@@ -44,32 +41,34 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<dialog
-  bind:this={dialog}
-  class:animateOut={animateOutNow}
-  class:animateIn={!animateOutNow}
-  on:close={animateOut}
-  on:click|self={() => dialog.close()}
->
-  <div on:click|stopPropagation class="divider">
-    <div>
-      <div class="header-wrapper">
-        <h1 class="nes-font">{lang.accountModal.title}</h1>
-        <h1 class="nes-font red-text-clickable" on:click={animateOut}>X</h1>
+{#if showModal}
+  <div class="overlay" on:click={animateOut}>
+    <div
+      class:animateOut={animateOutNow}
+      class:animateIn={!animateOutNow}
+      class="dialog"
+    >
+      <div on:click|stopPropagation class="divider">
+        <div>
+          <div class="header-wrapper">
+            <h1 class="nes-font">{lang.accountModal.title}</h1>
+            <h1 class="nes-font red-text-clickable" on:click={animateOut}>X</h1>
+          </div>
+          <hr>
+          {#each $users as account}
+            <AccountListItem isActive={$defaultUser?.id === account.id} account={account} />
+          {/each}
+          {#if isLoading}
+            <AccountListLoading />
+          {/if}
+        </div>
+        <!-- svelte-ignore a11y-autofocus -->
+        <div class="add-account-button primary-text"
+             on:click={handleAddAccount}>{lang.accountModal.addAccountButton}</div>
       </div>
-      <hr>
-      {#each $users as account}
-        <AccountListItem bind:dialog isActive={$defaultUser?.id === account.id} account={account} />
-      {/each}
-      {#if isLoading}
-        <AccountListLoading />
-      {/if}
     </div>
-    <!-- svelte-ignore a11y-autofocus -->
-    <div class="add-account-button primary-text"
-         on:click={handleAddAccount}>{lang.accountModal.addAccountButton}</div>
   </div>
-</dialog>
+{/if}
 
 <style>
     .header-wrapper {
@@ -87,7 +86,15 @@
         padding: 1em;
     }
 
-    dialog {
+    .overlay {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.2);
+        z-index: 999998;
+    }
+
+    .dialog {
         width: 30em;
         height: 30em;
         border-radius: 0.2em;
@@ -99,35 +106,19 @@
         overflow: hidden;
         transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
         background-color: var(--background-color);
+        z-index: 999999;
     }
 
-    dialog::backdrop {
-        background: rgba(0, 0, 0, 0.3);
-    }
-
-    dialog > div {
+    .dialog > div {
         padding: 1em;
     }
 
-    dialog[open]::backdrop {
-        animation: fade 0.2s ease-out;
-    }
-
-    dialog.animateIn {
+    .dialog.animateIn {
         animation: open 0.2s ease-out;
     }
 
-    dialog.animateOut {
+    .dialog.animateOut {
         animation: close 0.2s ease-out;
-    }
-
-    @keyframes fade {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
     }
 
     @keyframes open {
