@@ -22,6 +22,12 @@
       }
 
       if (event.payload.includes('signIn.')) {
+        if (event.payload.includes('notWhitelisted')) {
+          clearInterval(interval);
+          microsoftFlag = false;
+          dots = "";
+        }
+
         let translatedStep = lang;
         event.payload.split('.').forEach(step => {
           translatedStep = translatedStep[step];
@@ -54,7 +60,6 @@
 
 <style>
     .branch-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0;
         cursor: default;

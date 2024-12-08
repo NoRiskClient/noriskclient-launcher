@@ -10,7 +10,6 @@
 
 <style>
     .copyright {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         margin-top: 0.3em;
         text-shadow: 1px 1px var(--hover-color-text-shadow);

@@ -10,12 +10,17 @@
     margin: 0;
     padding: 0;
     -webkit-appearance: none;
+    font-family: 'Press Start 2P', serif;
     color: var(--font-color);
     text-shadow: 2px 2px var(--font-color-text-shadow);
 }
 
 *:focus {
     outline: none;
+}
+
+img {
+    pointer-events: none !important;
 }
 
 body {
@@ -89,13 +94,4 @@ body.dark-mode {
 .green-text {
     color: var(--green-text);
     text-shadow: 2px 2px var(--green-text-shadow) !important;
-}
-
-::-webkit-scrollbar {
-    width: 3px;
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: #4677FF;
-    border-radius: 5px;
 }

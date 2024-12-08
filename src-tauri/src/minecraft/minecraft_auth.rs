@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::future::Future;
 
 use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
 use byteorder::BigEndian;
 use chrono::{DateTime, Duration, Utc};
-use jsonwebtoken::{Algorithm, decode, DecodingKey, TokenData, Validation};
+use jsonwebtoken::{Algorithm, decode, DecodingKey, Validation};
 use log::{debug, error};
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
@@ -361,7 +360,7 @@ impl MinecraftAuthStore {
             match decode::<NoRiskTokenClaims>(&token, &key, &validation) {
                 Ok(data) => {
                     debug!("NoRisk Token Expire Check {:?}",data.claims.exp);
-                    if (data.claims.username != creds.username) {
+                    if data.claims.username != creds.username {
                         error!("New Username {:?} to {:?}",data.claims.username,creds.username);
                         maybe_update = true;
                     }

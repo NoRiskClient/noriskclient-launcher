@@ -172,19 +172,19 @@
   }
 
   .home-navbar-wrapper {
-    width: 50%;
     position: absolute;
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: end;
+    align-items: flex-end;
+    width: 50%;
+    text-align: right;
     pointer-events: all;
     overflow: hidden;
   }
 
   .home-navbar-wrapper h1 {
     font-size: 11px;
-    font-family: 'Press Start 2P', serif;
     margin-bottom: 1em;
     cursor: pointer;
     color: var(--secondary-color);

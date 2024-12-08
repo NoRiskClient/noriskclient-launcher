@@ -1,4 +1,5 @@
 <script>
+	import { open } from '@tauri-apps/api/dialog';
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
   import { createEventDispatcher, onMount } from "svelte";
@@ -34,6 +35,21 @@
     }
   }
 
+  async function handlePreviewCape() {
+    const location = await open({
+        defaultPath: "/",
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Cape", extensions: ["png"] }],
+      });
+      await invoke("read_local_skin_file", { location })
+      .then((content) => {
+        dispatch("preview", `data:image/png;base64,${content}`)
+      }).catch((error) => {
+        addNotification(lang.cape.notification.failedToLoadCapeFile.replace("{error}", error));
+      });
+  }
+
   async function unequipCape() {
     if ($defaultUser) {
       await invoke("unequip_cape", {
@@ -62,7 +78,7 @@
 <div in:fade={{ duration: 400 }} class="wrapper">
   {#if capeHash !== null}
     <h1 class="header-text">{lang.capes.yourCape}</h1>
-    <CapePlayer cape={capeHash} />
+    <CapePlayer cape={capeHash} data={null} />
   {:else}
     <div class="empty-text-wrapper">
       <h1 class="red-text empty-text">[{lang.capes.noCapeUploaded}]</h1>
@@ -71,6 +87,8 @@
   <div class="button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={handleUploadCape}>{lang.capes.button.upload}</h1>
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 on:click={handlePreviewCape}>{lang.capes.button.preview}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={downloadTemplate}>{lang.capes.button.template}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -90,7 +108,6 @@
     }
 
     .header-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 12.5px;
         margin-bottom: 3em;
         cursor: default;
@@ -104,7 +121,6 @@
     }
 
     .empty-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         cursor: default;
     }
@@ -115,8 +131,7 @@
     }
 
     .button-wrapper h1 {
-        font-family: 'Press Start 2P', serif;
-        font-size: 25px;
+        font-size: 17.5px;
         cursor: pointer;
         transition: transform 0.2s;
     }
@@ -124,6 +139,11 @@
     .button-wrapper h1:first-child {
         color: #1cc009;
         text-shadow: 2px 2px #114609;
+    }
+
+    .button-wrapper h1:nth-child(2) {
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .button-wrapper h1:hover {

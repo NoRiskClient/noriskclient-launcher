@@ -12,12 +12,10 @@
   
     export let showModal;
   
-    let dialog; // HTMLDialogElement
     let mobileAppToken;
     let codeContent;
     let showQrCode = false;
   
-    $: if (dialog && showModal) dialog.showModal();
     let animateOutNow = false;
   
     async function getToken() {
@@ -31,7 +29,7 @@
         // document.getElementById('qrCode').innerHTML = qr.createImgTag();
       }).catch(error => {
         addNotification(lang.settings.popup.mcRealApp.notification.errorWhileGettingMobileAppToken.replace("{error}", error));
-        dialog.close();
+        animateOut();
       });
     }
     
@@ -53,7 +51,6 @@
       animateOutNow = true;
       setTimeout(() => {
         showModal = false;
-        dialog.close();
         animateOutNow = false;
       }, 100);
     }
@@ -65,13 +62,13 @@
     getToken();
   </script>
   
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <dialog
-    bind:this={dialog}
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+{#if showModal}
+<div class="overlay" on:click={animateOut}>
+  <div
     class:animateOut={animateOutNow}
     class:animateIn={!animateOutNow}
-    on:close={animateOut}
-    on:click|self={() => dialog.close()}
+    class="dialog"
   >
     <div on:click|stopPropagation class="divider">
       <div>
@@ -92,7 +89,9 @@
         </div>
       </div>
     </div>
-  </dialog>
+  </div>
+</div>
+{/if}
   
   <style>
       .header-wrapper {
@@ -125,8 +124,16 @@
           height: 100%;
           padding: 1em;
         }
+
+        .overlay {
+          position: fixed;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.2);
+          z-index: 999998;
+        }
         
-        dialog {
+        .dialog {
           background-color: var(--background-color);
           border: 5px solid black;
           width: 30em;
@@ -138,25 +145,18 @@
           top: 50%; /* 50% von oben */
           left: 50%; /* 50% von links */
           transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
+          z-index: 999999;
       }
   
-      dialog::backdrop {
-          background: rgba(0, 0, 0, 0.3);
-      }
-  
-      dialog > div {
+      .dialog > div {
           padding: 1em;
       }
-  
-      dialog[open]::backdrop {
-        animation: fade 0.2s ease-out;
-    }
 
-    dialog.animateIn {
+    .dialog.animateIn {
         animation: open 0.2s ease-out;
     }
 
-    dialog.animateOut {
+    .dialog.animateOut {
         animation: close 0.2s ease-out;
     }
 
@@ -192,8 +192,7 @@
     }
   
       .nes-font {
-          font-family: 'Press Start 2P', serif;
-          font-size: 30px;
+            font-size: 30px;
           user-select: none;
           cursor: default;
       }

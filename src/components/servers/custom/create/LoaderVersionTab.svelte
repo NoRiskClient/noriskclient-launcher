@@ -82,7 +82,6 @@
     }
 
     .title {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         text-align: center;
         margin-bottom: 1em;
@@ -96,7 +95,6 @@
     }
 
     h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
@@ -110,8 +108,7 @@
     }
 
     .version {
-        font-family: 'Press Start 2P', serif;
-        gap: 1em;
+            gap: 1em;
         background-color: var(--background-contrast-color);
         padding: 20px;
         border-radius: 10px;
@@ -150,7 +147,6 @@
 
     .before-button {
         position: absolute;
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         text-align: center;
         cursor: pointer;
@@ -159,7 +155,6 @@
 
     .next-button {
         position: absolute;
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         margin-top: 60%;
         margin-left: 82.5%;

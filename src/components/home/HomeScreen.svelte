@@ -15,14 +15,14 @@
   }
 </script>
 
-{#if showCreditsModal}
-  <CreditModal bind:showModal={showCreditsModal} />
-{/if}
+<CreditModal bind:showModal={showCreditsModal} />
 <div class="home-wrapper">
   <HomeLeftNavbar />
   <HomeNavbar />
   <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title" on:click={showCredits}>
+  <!-- DO NOT REMOVE THIS! Contact Tim if you have any questions! -->
+  <div class="credits-click-field" on:click={showCredits}></div>
+  <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title">
   <BranchSwitcher />
   <SkinButton />
   <CopyrightLabel />
@@ -40,11 +40,19 @@
     gap: 1.2em;
   }
 
+  .credits-click-field {
+    position: absolute;
+    width: 360px;
+    height: 125px;
+    top: 135px;
+    cursor: pointer;
+    z-index: 10;
+  }
+
   .pokemon-title {
     width: 80%;
     max-width: 400px;
     image-rendering: pixelated;
-    cursor: pointer;
     -webkit-user-drag: none;
   }
   
