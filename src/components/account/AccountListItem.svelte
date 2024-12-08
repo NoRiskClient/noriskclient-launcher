@@ -5,7 +5,6 @@
 
     export let account;
     export let isActive;
-    export let dialog;
 
     function handleRemoveAccount() {
         removeUser(account).then(async value => {

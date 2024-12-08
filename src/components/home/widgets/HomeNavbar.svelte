@@ -172,12 +172,13 @@
   }
 
   .home-navbar-wrapper {
-    width: 50%;
     position: absolute;
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: end;
+    align-items: flex-end;
+    width: 50%;
+    text-align: right;
     pointer-events: all;
     overflow: hidden;
   }
