@@ -216,7 +216,7 @@
 
     .header .filter .logLevelFilter.active {
         color: var(--green-text);
-        text-shadow: 2px 2px var(--green-text-shadow);
+        text-shadow: 2px 2px var(--green-text-shadow) !important;
     }
 
     .content {
