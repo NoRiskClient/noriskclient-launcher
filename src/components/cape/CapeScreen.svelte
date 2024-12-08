@@ -112,9 +112,15 @@
   }
 
   function previewCape(hash, data) {
-    currentRequest = -1;
     previewHash = hash;
     previewData = data;
+    isLoading = true;
+
+    // ja das braucht man. nicht hinterfragen. :)
+    setTimeout(() => {
+      currentRequest = -1;
+      isLoading = false;
+    }, 0);
   }
 
   getNoRiskUserByUUID();
@@ -133,16 +139,16 @@
     </div>
   </div>
   <div class="cape-wrapper">
-    {#if (previewHash != null || previewData != null) && currentRequest === -1}
+    {#if currentRequest === -1}
       <div class="preview-player">
-        <CapePlayer cape={previewHash} data={previewData} height={350} width={350} />
+        <CapePlayer bind:cape={previewHash} bind:data={previewData} height={350} width={350} />
       </div>
     {:else if currentRequest === 0}
       {#if !isLoading}
         <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(null, data.detail)} bind:capeHash />
       {/if}
     {:else if currentRequest === 1 || currentRequest === 2 || currentRequest === 3 || currentRequest === 4}
-      {#if capes != null}
+      {#if capes != null && !isLoading}
         <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(data.detail)} bind:capes allowDelete={currentRequest === 4} />
       {/if}
     {/if}
