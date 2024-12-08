@@ -24,6 +24,12 @@
           "$APPDATA"
         ]
       },
+      "shell": {
+        "all": true,
+        "execute": true,
+        "sidecar": true,
+        "open": true
+      },
       "window": {
         "show": true
       }
