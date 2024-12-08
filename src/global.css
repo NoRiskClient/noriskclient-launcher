@@ -19,6 +19,10 @@
     outline: none;
 }
 
+img {
+    pointer-events: none !important;
+}
+
 body {
     background-color: var(--background-color);
     font-weight: 400;
