@@ -138,14 +138,15 @@
             on:mouseleave={() => cape.hovered = false}
           >
             <!-- svelte-ignore a11y-img-redundant-alt -->
-            <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")} on:click={() => dispatch("preview", cape._id)}>
             {#if allowDelete && cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
-              <div on:click={() => handleDeleteCape(cape._id)} class="delete-text">{lang.capes.button.delete}</div>
+              <div on:click={() => handleDeleteCape(cape._id)} class="delete-text">{lang.capes.cape.button.delete}</div>
             {/if}
             {#if !cape._id.includes("NO_COPY") || cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
-              <div on:click={() => handleEquipCape(cape._id)} class="equip-text">{lang.capes.button.equip}</div>
+              <div on:click={() => handleEquipCape(cape._id)} class="equip-text">{lang.capes.cape.button.equip}</div>
             {/if}
           </div>
           {#if cape.hovered}
@@ -239,6 +240,7 @@
         height: 256px;
         left: -8px;
         top: -8px;
+        cursor: pointer;
     }
 
     .crop img.custom {
@@ -272,7 +274,7 @@
         position: absolute;
         top: 0.15em;
         right: 0px;
-        outline: 2px solid black;
+        outline: 1.5px solid black;
         background: #460000;
         padding: 2px;
         opacity: 0;
