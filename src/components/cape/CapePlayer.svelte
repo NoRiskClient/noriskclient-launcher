@@ -11,6 +11,7 @@
     $: lang = $translations;
 
     export let cape;
+    export let data;
     export let height = 275;
     export let width = 275;
 
@@ -34,13 +35,17 @@
         });
 
         // Load current cape
-        await invoke("read_remote_image_file", {
-            location: $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${cape}.png` : `https://dl.norisk.gg/capes/prod/${cape}.png`
-        }).then((data) => {
-            capeData = `data:image/png;base64,${data}`;
-        }).catch((error) => {
-            addNotification(lang.capes.notification.failedToLoadCape.replace("{error}", error));
-        });
+        if (!data) {
+            await invoke("read_remote_image_file", {
+                location: `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape}.png`
+            }).then((data) => {
+                capeData = `data:image/png;base64,${data}`;
+            }).catch((error) => {
+                addNotification(lang.capes.notification.failedToLoadCape.replace("{error}", error));
+            });
+        } else {
+            capeData = data;
+        }
 
         const canvas = document.createElement("canvas");
         skinViewer = new SkinViewer({

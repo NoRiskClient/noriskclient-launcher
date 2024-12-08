@@ -58,7 +58,6 @@
 
 <style>
     h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 0.8em;
         margin-left: 10px;
     }

@@ -70,54 +70,60 @@ use crate::LAUNCHER_VERSION;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::minecraft::progress::ClientProgressUpdate;
-use crate::utils::percentage_of_total_memory;
 
 use super::{api::{
     ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
     WhitelistSlots,
 }, app_data::{
-    Announcement, ChangeLog, LastViewedPopups, LatestRunningGame,
+    Announcement, ChangeLog, LastViewedPopups,
     LauncherOptions, LauncherProfiles,
 }, modrinth_api::{
     Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
     ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
     ResourcePackInfo, Shader, ShaderInfo,
-}, nrc_cache};
+}};
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OnlineStatusInfo {
+    pub online: bool,
+    #[serde(rename = "onlinePlayers")]
+    pub online_players: u32,
+}
+
+#[derive(Deserialize)]
 pub struct FileData {
     pub name: String,
     pub location: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct MinecraftProfile {
     properties: Vec<MinecraftProfileProperty>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct MinecraftProfileProperty {
     name: String,
     value: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBData {
     data: PlayerDBEntry,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBEntry {
     player: Option<PlayerDBPlayer>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct PlayerDBPlayer {
     id: String,
 }
 
 #[tauri::command]
-async fn check_online_status() -> Result<bool, String> {
+async fn check_online_status() -> Result<OnlineStatusInfo, String> {
     ApiEndpoints::norisk_api_status()
         .await
         .map_err(|e| format!("unable to check online status: {:?}", e))
@@ -162,6 +168,12 @@ async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
 async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), String> {
     debug!("Equiping Cape...");
     CapeApiEndpoints::equip_cape(norisk_token, uuid, hash).await
+}
+
+#[tauri::command]
+async fn delete_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), String> {
+    debug!("Deleting Cape...");
+    CapeApiEndpoints::delete_cape(norisk_token, uuid, hash).await
 }
 
 #[tauri::command]
@@ -385,9 +397,9 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
         .await
         .unwrap_or_default();
     let template_url = if options.experimental_mode {
-        "https://dl-staging.norisk.gg/capes/prod/template.png"
+        "https://cdn.norisk.gg/capes-staging/template.png"
     } else {
-        "https://dl.norisk.gg/capes/prod/template.png"
+        "https://cdn.norisk.gg/capes/template.png"
     };
     let user_dirs = UserDirs::new().unwrap();
     let downloads_dir = user_dirs.download_dir().unwrap();
@@ -600,7 +612,7 @@ pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Er
 
 pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
     let experimental_mode = get_options().await?.experimental_mode;
-    if (credentials.is_some()) {
+    if credentials.is_some() {
         let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
         match token_result {
             //TODO checken ob token valid ist (api mässig)
@@ -1181,7 +1193,6 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                     .unwrap()
                     .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
-
                 match accounts.refresh_norisk_token_if_necessary(&credentials.clone(), true).await {
                     Ok(credentials_with_norisk) => {
                         debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
@@ -1192,7 +1203,11 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                         debug!(
                             "After Microsoft Auth: Error Fetching NoRiskClient Token {:?}",
                             err
-                        )
+                        );
+                        app.get_window("main")
+                            .unwrap()
+                            .emit("microsoft-output", "signIn.step.notWhitelisted")
+                            .unwrap_or_default();
                     }
                 }
 
@@ -1404,8 +1419,7 @@ async fn run_client(
     force_server: Option<String>,
     mods: Vec<LoaderMod>,
     window: Window,
-    app_state: tauri::State<'_, AppState>,
-    app: tauri::AppHandle,
+    app_state: tauri::State<'_, AppState>
 ) -> Result<Uuid, Error> {
     debug!("Starting Client with branch {}", branch);
     fs::create_dir_all(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache")).await?;
@@ -1428,7 +1442,7 @@ async fn run_client(
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
         force_server: force_server,
-        memory: percentage_of_total_memory(options.memory_percentage),
+        memory: options.memory_limit,
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() {
             Some(options.custom_java_path)
@@ -1595,7 +1609,7 @@ async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> 
 }
 
 #[tauri::command]
-async fn get_total_memory() -> Result<i64, String> {
+async fn get_total_memory() -> Result<u64, String> {
     Ok(total_memory())
 }
 
@@ -1665,7 +1679,8 @@ async fn default_data_folder_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
+async fn clear_cache() -> Result<(), Error> {
+    let options = get_options().await?;
     let auth_store = MinecraftAuthStore::init(Some(true)).await?;
     auth_store.save().await?;
 
@@ -1674,7 +1689,6 @@ async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
 
     [
         "assets",
-        "gameDir",
         "libraries",
         "mod_cache",
         "nrc_cache",
@@ -1688,7 +1702,8 @@ async fn clear_data(options: LauncherOptions) -> Result<(), Error> {
         .filter(|dir| dir.exists())
         .map(std::fs::remove_dir_all)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ErrorKind::OtherError(format!("unable to clear data: {:?}", e)))?;
+        .map_err(|e| ErrorKind::OtherError(format!("unable to clear cache: {:?}", e)))?;
+
     Ok(())
 }
 
@@ -2214,6 +2229,7 @@ pub fn gui_main() {
             discord_auth_unlink,
             upload_cape,
             equip_cape,
+            delete_cape,
             get_player_skins,
             save_player_skin,
             read_local_skin_file,
@@ -2249,7 +2265,7 @@ pub fn gui_main() {
             refresh_via_norisk,
             get_mobile_app_token,
             reset_mobile_app_token,
-            clear_data,
+            clear_cache,
             get_changelogs,
             get_announcements,
             get_last_viewed_popups,

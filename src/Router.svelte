@@ -126,9 +126,7 @@
   {/if}
 </div>
 <div class="content">
-  {#if showLaunchErrorModal}
-    <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason} />
-  {/if}
+  <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason} />
   <Notifications />
   {#if $activePopup != null}
     <Popup />
@@ -165,6 +163,6 @@
     }
 
     .content {
-        height: 80vh;
+      height: 80vh;
     }
 </style>

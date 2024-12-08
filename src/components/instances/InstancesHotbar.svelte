@@ -44,8 +44,7 @@
         transition: transform 0.3s, font-size 0.3s;
         color: #e8e8e8;
         text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
+            cursor: pointer;
     }
 
     .instance-button:hover {
