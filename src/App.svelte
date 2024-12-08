@@ -31,13 +31,13 @@
     $: lang = $translations;
 
     onMount(async () => {
-        setLanguage($language);
         setTimeout(async () => {
             await appWindow.show();
         }, 300);
         await getVersion();
         await fetchOptions();
         await checkApiStatus();
+        setLanguage($language);
 
         await fetchDefaultUserOrError(false);
         const isTokenValid = await getNoRiskUser();
