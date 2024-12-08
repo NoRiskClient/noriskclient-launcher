@@ -135,24 +135,6 @@ fn get_launcher_version() -> String {
 }
 
 #[tauri::command]
-fn open_url(url: &str, handle: tauri::AppHandle) -> Result<(), String> {
-    let window = tauri::WindowBuilder::new(
-        &handle,
-        "external", /* the unique window label */
-        tauri::WindowUrl::External(url.parse().unwrap()),
-    )
-        .build()
-        .unwrap();
-    let _ = window.set_title("NoRiskClient");
-    let _ = window.set_resizable(false);
-    let _ = window.set_focus();
-    let _ = window.set_minimizable(false);
-    let _ = window.set_maximizable(false);
-    let _ = window.set_always_on_top(true);
-    Ok(())
-}
-
-#[tauri::command]
 async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
     debug!("Uploading Cape...");
 
@@ -2207,7 +2189,6 @@ pub fn gui_main() {
         .invoke_handler(tauri::generate_handler![
             check_online_status,
             get_launcher_version,
-            open_url,
             get_options,
             open_minecraft_logs_window,
             open_minecraft_crash_window,
