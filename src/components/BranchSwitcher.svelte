@@ -1,4 +1,5 @@
 <script>
+	import { users } from './../stores/credentialsStore.js';
   import { preventSelection } from "../utils/svelteUtils.js";
   import { defaultUser } from "../stores/credentialsStore.js";
   import { quintOut } from "svelte/easing";
@@ -29,7 +30,7 @@
 
     {#if $isCheckingForUpdates}
       <Updater />
-    {:else if !$defaultUser}
+    {:else if $users.length < 1}
       <SignInOutput />
     {:else}
       {#if $branches.length > 0}
