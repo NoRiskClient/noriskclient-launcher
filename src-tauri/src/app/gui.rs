@@ -1671,7 +1671,8 @@ async fn default_data_folder_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn clear_cache(options: LauncherOptions) -> Result<(), Error> {
+async fn clear_cache() -> Result<(), Error> {
+    let options = get_options().await?;
     let auth_store = MinecraftAuthStore::init(Some(true)).await?;
     auth_store.save().await?;
 

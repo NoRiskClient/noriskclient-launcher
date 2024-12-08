@@ -1,4 +1,5 @@
 <script>
+	import { relaunch } from '@tauri-apps/api/process';
     import Router from "./Router.svelte";
     import {onMount} from "svelte";
     import {defaultUser, fetchDefaultUserOrError} from "./stores/credentialsStore.js";
@@ -16,8 +17,10 @@
         getNoRiskUser,
         getVersion,
         noriskError,
-        noriskLog,
+        noriskLog
     } from "./utils/noriskUtils.js";
+    import {launcherOptions} from "./stores/optionsStore.js";
+    import {profiles} from "./stores/profilesStore.js";
     import {getAnnouncements, getChangeLogs, getLastViewedPopups} from "./utils/popupUtils.js";
     import {appWindow} from "@tauri-apps/api/window";
     import {invoke} from "@tauri-apps/api";
@@ -28,13 +31,13 @@
     $: lang = $translations;
 
     onMount(async () => {
+        setLanguage($language);
         setTimeout(async () => {
             await appWindow.show();
         }, 300);
         await getVersion();
         await fetchOptions();
         await checkApiStatus();
-        setLanguage($language);
 
         await fetchDefaultUserOrError(false);
         const isTokenValid = await getNoRiskUser();
@@ -79,6 +82,7 @@
             noriskLog("Default User Was Updated.");
             await fetchBranches();
             await fetchProfiles();
+            const isTokenValid = await getNoRiskUser();
             if (!isTokenValid) {
                 await getMaintenanceMode();
                 await getChangeLogs();
@@ -95,6 +99,19 @@
             clearInterval(isOnlineInterval);
         };
     });
+
+    let isFixing = false;
+    async function fixAndRestart() {
+        if (isFixing) return;
+        isFixing = true;
+        await invoke("clear_cache").then(() => {
+            noriskLog("Launcher fixed successfully. -> Restarting...");
+            relaunch();
+        }).catch(reason => {
+            addNotification(reason);
+            noriskError(reason);
+        });
+    }
 </script>
 
 <main>
@@ -102,7 +119,50 @@
     {#if lang?.dummy}
         <Router/>
     {/if}
+
+    {#if !($launcherOptions || $profiles || $defaultUser)}
+        <!-- Hier extra keine translations, falls das language loaden iwie auch bruch ist. -->
+        <div class="fix-blackscreen" data-tauri-drag-region>
+            <p class="info">Something went wrong setting up your launcher! :/</p>
+            {#if isFixing}
+                <p class="info">Fixing...<br>The launcher will automatically restart soon!</p>
+            {:else}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="button red-text" on:click={fixAndRestart}>Fix & Restart</h1>
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <h1 class="button exit-button red-text" on:click={appWindow.close}>Exit</h1>
+            {/if}
+        </div>
+    {/if}
 </main>
 
 <style>
+    .fix-blackscreen {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+        z-index: 1;
+    }
+
+    .fix-blackscreen .info {
+        font-size: 0.85em;
+        margin-bottom: 3em;
+    }
+
+    .fix-blackscreen .button {
+        cursor: pointer;
+        transition-duration: 300ms;
+    }
+
+    .fix-blackscreen .button:hover {
+        transform: scale(1.1);
+    }
+
+    .exit-button {
+        margin-top: 3em;
+    }
 </style>

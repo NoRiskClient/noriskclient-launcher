@@ -46,8 +46,7 @@
     }
 
     async function clearCache() {
-        invoke("clear_cache", { options: $launcherOptions })
-            .then(async () => {
+        invoke("clear_cache").then(async () => {
                 addNotification(lang.settings.notification.clearCache.success, "INFO");
                 await fetchOptions();
                 await fetchDefaultUserOrError(false);
