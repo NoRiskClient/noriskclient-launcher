@@ -145,7 +145,18 @@
         align-items: center;
         height: 100vh;
         width: 100vw;
+        opacity: 0;
+        animation: fadeIn 1s forwards;
         z-index: 1;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
     }
 
     .fix-blackscreen .info {
