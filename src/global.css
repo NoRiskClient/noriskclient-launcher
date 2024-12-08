@@ -91,12 +91,3 @@ body.dark-mode {
     color: var(--green-text);
     text-shadow: 2px 2px var(--green-text-shadow) !important;
 }
-
-::-webkit-scrollbar {
-    width: 3px;
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: #4677FF;
-    border-radius: 5px;
-}
