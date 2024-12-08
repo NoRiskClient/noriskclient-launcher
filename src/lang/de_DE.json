@@ -294,6 +294,7 @@
     "addons.mods.item.customModDescription": "Eigene Mod",
     "addons.mods.item.dependencyText.popup.title": "Benutzt von:",
     "addons.mods.item.dependencyText.usedBy": "Benutzt von: {parents}",
+    "addons.mods.item.button.update": "Aktualisieren!",
     "addons.mods.item.changingVersion": "Version ändern...",
     "addons.global.item.loading": "LOADING",
     "addons.global.item.downloading": "DOWNLOADING",

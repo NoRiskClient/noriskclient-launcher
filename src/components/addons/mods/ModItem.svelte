@@ -1,4 +1,5 @@
 <script>
+	import { scale } from 'svelte/transition';
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
     import { openInfoPopup } from "../../../utils/popupUtils.js";
@@ -103,29 +104,40 @@
             {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
             {:else if modVersions != null && modVersions[slug]?.length > 1}
-                <div class="versionSelect">
-                    <p>Version:</p>
-                    <section class="dropdown">
-                        <button
-                            on:click={async () => {
-                                if (isChangingVersion) return;
-                                versionDropdownOpen = !versionDropdownOpen;
-                                await tick();
-                            }}
-                        >
-                            {#if isChangingVersion}
-                                <span>⏳</span> {lang.addons.mods.item.changingVersion}
-                            {:else}
-                                <span>{versionDropdownOpen ? '⮟' : '⮞'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
-                            {/if}
-                        </button>
-                        <div class="versions" class:show={versionDropdownOpen}>
-                            {#each modVersions[slug].filter(v => v != mod?.value?.source?.artifact?.split(':')[2]) as version}
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <p class="version" on:click={() => changeVersion(version)}>{version}</p>
-                            {/each}
-                        </div>
-                    </section>
+                <div class="versions-wrapper">
+                    <div class="versionSelect">
+                        <p>Version:</p>
+                        <section class="dropdown">
+                            <button
+                                on:click={async () => {
+                                    if (isChangingVersion) return;
+                                    versionDropdownOpen = !versionDropdownOpen;
+                                    await tick();
+                                }}
+                            >
+                                {#if isChangingVersion}
+                                    <span>⏳</span> {lang.addons.mods.item.changingVersion}
+                                {:else}
+                                    <span>{versionDropdownOpen ? '*' : '>'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
+                                {/if}
+                            </button>
+                            <div class="versions" class:show={versionDropdownOpen}>
+                                {#each modVersions[slug] as version}
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <p
+                                        class="version"
+                                        class:current={version == mod?.value?.source?.artifact?.split(':')[2]}
+                                        class:latest={modVersions[slug][0] == version}
+                                        on:click={version != mod?.value?.source?.artifact?.split(':')[2] ? () => changeVersion(version) : () => versionDropdownOpen = false}
+                                    >{version}</p>
+                                {/each}
+                            </div>
+                        </section>
+                    </div>
+                    {#if !isChangingVersion && modVersions[slug][0] != mod?.value?.source?.artifact?.split(':')[2]}
+                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                        <p class="update-button" on:click={() => changeVersion(modVersions[slug][0])}>{lang.addons.mods.item.button.update}</p>
+                    {/if}
                 </div>
             {/if}
         </div>
@@ -349,6 +361,13 @@
         text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
+    .versions-wrapper {
+        display: flex;
+        flex-direction: row;
+        align-items: end;
+        gap: 1em;
+    }
+
     .versionSelect {
         display: flex;
         flex-direction: column;
@@ -410,10 +429,33 @@
         cursor: pointer;
     }
 
+    .versionSelect .dropdown .versions .version.current {
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+    }
+
+    .versionSelect .dropdown .versions .version.latest {
+        color: var(--green-text);
+        text-shadow: 1.5px 1.5px var(--green-text-shadow);
+    }
+
     .versionSelect .dropdown .versions .version:hover {
         text-decoration: underline;
         color: var(--primary-color);
         text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+    }
+
+    .update-button {
+        font-size: 14px;
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+        cursor: pointer;
+        margin-bottom: 0.5em;
+        transition-duration: 300ms;
+    }
+
+    .update-button:hover {
+        transform: scale(1.1);
     }
 
     .isMissing {
