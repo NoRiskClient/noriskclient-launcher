@@ -20,22 +20,20 @@
 
 <Modal bind:showModal />
 <div class="skin-kopf-container">
-  {#if $defaultUser}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <div class="skin-click" on:click={$defaultUser ? handleStart : startMicrosoftAuth}></div>
+  {#if $defaultUser}
     <img class="skin-kopf"
          src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
          alt=" "
          onerror="this.src='{FallbackSkin}'"
-         on:click={handleStart}
     >
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div on:click={() => (showModal = true)} class="tag">*</div>
   {:else}
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <img class="skin-kopf zoom glow"
          src={SteveSkin}
          alt="Skin Head"
-         on:click={startMicrosoftAuth}
     >
   {/if}
 </div>
@@ -52,6 +50,14 @@
         box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
         border-radius: 0.45em;
         transition-duration: 200ms;
+    }
+
+    .skin-click {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
     }
 
     .skin-kopf-container:hover {

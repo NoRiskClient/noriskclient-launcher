@@ -137,9 +137,10 @@
             on:mouseenter={() => { cape.hovered = true; return getNameByUUID(cape.firstSeen); }}
             on:mouseleave={() => cape.hovered = false}
           >
-            <!-- svelte-ignore a11y-img-redundant-alt -->
             <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")} on:click={() => dispatch("preview", cape._id)}>
+            <div class="image-click" on:click={() => dispatch("preview", cape._id)}></div>
+            <!-- svelte-ignore a11y-img-redundant-alt -->
+            <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
             {#if allowDelete && cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div on:click={() => handleDeleteCape(cape._id)} class="delete-text">{lang.capes.cape.button.delete}</div>
@@ -234,13 +235,19 @@
         transform: scale(1.5);
     }
 
+    .image-click {
+        position: absolute;
+        width: 512px;
+        height: 256px;
+        cursor: pointer;
+    }
+
     .crop img {
         position: relative;
         width: 512px;
         height: 256px;
         left: -8px;
         top: -8px;
-        cursor: pointer;
     }
 
     .crop img.custom {
