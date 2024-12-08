@@ -106,6 +106,7 @@
   <main class="content">
     {#if !isLive}
       {#if !hideNoLiveLogs}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div class="noLiveLogs" on:click={() => hideNoLiveLogs = !hideNoLiveLogs}>
           <h1 class="noLiveLogsText">{lang.logs.liveLogsUnavailable}</h1>
         </div>
