@@ -172,6 +172,12 @@ async fn equip_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), St
 }
 
 #[tauri::command]
+async fn delete_cape(norisk_token: &str, uuid: &str, hash: &str) -> Result<(), String> {
+    debug!("Deleting Cape...");
+    CapeApiEndpoints::delete_cape(norisk_token, uuid, hash).await
+}
+
+#[tauri::command]
 async fn get_mod_author(slug: &str) -> Result<String, Error> {
     ModManager::get_mod_author(slug).await
 }
@@ -2221,6 +2227,7 @@ pub fn gui_main() {
             discord_auth_unlink,
             upload_cape,
             equip_cape,
+            delete_cape,
             get_player_skins,
             save_player_skin,
             read_local_skin_file,

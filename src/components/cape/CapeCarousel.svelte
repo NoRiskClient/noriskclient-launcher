@@ -7,6 +7,7 @@
   import { getNoRiskToken } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { translations } from '../../utils/translationUtils.js';
+  import { openConfirmPopup } from "../../utils/popupUtils.js";
     
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
@@ -14,6 +15,7 @@
   const dispatch = createEventDispatcher();
 
   export let capes = [];
+  export let allowDelete = false;
   let visibleCapes = [];
 
   // Der aktuelle Index der Seite für die Iteration
@@ -78,6 +80,33 @@
     }
   }
 
+  async function handleDeleteCape(hash) {
+    if ($defaultUser) {
+      openConfirmPopup({
+        title: lang.capes.popup.delete.title,
+        content: lang.capes.popup.delete.content,
+        confirmButton: lang.capes.popup.delete.button.confirm,
+        onConfirm: async () => {
+          await invoke("delete_cape", {
+            noriskToken: getNoRiskToken(),
+            uuid: $defaultUser.id,
+            hash: hash,
+          }).then(() => {
+            addNotification(lang.capes.notification.delete.success, "INFO");
+            dispatch("fetchNoRiskUser");
+            const keepCapes = capes;
+            capes = null;
+            capes = keepCapes.filter(cape => cape._id !== hash);
+            currentPage = 0;
+            updateVisibleCapes();
+          }).catch((error) => {
+            addNotification(lang.capes.notification.delete.error.replace("{error}", error));
+          });
+        },
+      });
+    }
+  }
+
   function preventSelection(event) {
     event.preventDefault();
   }
@@ -110,6 +139,10 @@
           >
             <!-- svelte-ignore a11y-img-redundant-alt -->
             <img src={`https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${cape._id}.png`} alt="Cape Image" class:custom={cape._id.includes("NO_COPY")}>
+            {#if allowDelete && cape.firstSeen === $defaultUser.id}
+              <!-- svelte-ignore a11y-click-events-have-key-events -->
+              <div on:click={() => handleDeleteCape(cape._id)} class="delete-text">{lang.capes.button.delete}</div>
+            {/if}
             {#if !cape._id.includes("NO_COPY") || cape.firstSeen === $defaultUser.id}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <div on:click={() => handleEquipCape(cape._id)} class="equip-text">{lang.capes.button.equip}</div>
@@ -229,6 +262,24 @@
     }
 
     .crop:hover .equip-text {
+        opacity: 1;
+    }
+
+    .delete-text {
+        font-size: 11px;
+        text-shadow: none;
+        cursor: pointer;
+        position: absolute;
+        top: 0.15em;
+        right: 0px;
+        outline: 2px solid black;
+        background: #460000;
+        padding: 2px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .crop:hover .delete-text {
         opacity: 1;
     }
 
