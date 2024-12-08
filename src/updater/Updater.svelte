@@ -152,7 +152,6 @@
   }
 
   .branch-font {
-    font-family: 'Press Start 2P', serif;
     font-size: 14px;
     margin-top: 2em;
   }
@@ -163,7 +162,6 @@
   }
 
   .copy-error {
-    font-family: 'Press Start 2P', serif;
     font-size: 16px;
     text-shadow: none;
     margin-top: 1em;

@@ -483,7 +483,6 @@
     }
 
     .navbar h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: pointer;
@@ -497,7 +496,6 @@
     }
 
     .navbar h2 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
@@ -507,7 +505,6 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 200px;
     }
@@ -517,7 +514,6 @@
         flex-direction: row;
         justify-content: center;
         margin-top: 20px;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: pointer;

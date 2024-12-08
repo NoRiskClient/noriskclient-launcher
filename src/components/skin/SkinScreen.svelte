@@ -332,8 +332,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
-    }
+        }
 
     .title {
         font-size: 35px;

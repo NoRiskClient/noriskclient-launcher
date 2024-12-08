@@ -118,8 +118,7 @@
     }
 
     .filter-type {
-      font-family: 'Press Start 2P', serif;
-      font-size: 20px;
+        font-size: 20px;
       margin-top: 30px;
       margin-bottom: 15px;
       user-select: none;
@@ -173,7 +172,6 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
@@ -184,7 +182,6 @@
         align-content: center;
         align-items: center;
         justify-content: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 1em;
         text-shadow: 2px 2px #6e0000;

@@ -151,8 +151,7 @@
 
     .tab-wrapper h1,
     .tab-wrapper h2 {
-        font-family: 'Press Start 2P', serif;
-        padding: 1em;
+            padding: 1em;
         font-size: 1em;
         transition: transform 0.3s, color 0.3s;
     }

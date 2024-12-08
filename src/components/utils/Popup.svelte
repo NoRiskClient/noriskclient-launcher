@@ -237,8 +237,7 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
-        user-select: none;
+            user-select: none;
         cursor: default;
     }
 

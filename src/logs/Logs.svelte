@@ -171,7 +171,6 @@
     }
 
     .noLiveLogsText {
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         color: var(--background-contrast-color);
     }
@@ -210,7 +209,6 @@
     }
 
     .header .filter .logLevelFilter {
-        font-family: 'Press Start 2P', serif;
         font-size: 13px;
         cursor: pointer;
     }
@@ -232,7 +230,6 @@
     }
 
     .content .center .noLogs {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
@@ -254,21 +251,18 @@
 
     .copy-button {
         transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
     }
 
     .auto-scroll-button-on {
         transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
     }
 
     .auto-scroll-button-off {
         transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
     }

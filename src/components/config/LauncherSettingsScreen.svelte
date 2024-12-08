@@ -219,7 +219,6 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
@@ -237,14 +236,12 @@
         display: flex;
         flex-direction: row;
         gap: 1em;
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }
 
     .horizontal-wrapper > .button {
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         cursor: pointer;
         transition: transform 0.3s;
@@ -274,7 +271,6 @@
         justify-content: center;
         height: 3em;
         margin-top: 1.5em;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;
     }

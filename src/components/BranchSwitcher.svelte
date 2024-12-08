@@ -73,7 +73,6 @@
     }
 
     .branch-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0;
         cursor: default;

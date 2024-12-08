@@ -37,17 +37,14 @@
     }
 
     .percentage {
-        font-family: 'Press Start 2P', serif;
         font-size: 35px;
     }
 
     .info {
-        font-family: 'Press Start 2P', serif;
         font-size: 15px;
     }
 
     .currentFile {
-        font-family: 'Press Start 2P', serif;
         font-size: 12px;
     }
 </style>

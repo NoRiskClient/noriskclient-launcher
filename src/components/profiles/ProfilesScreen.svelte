@@ -185,7 +185,6 @@
 
     .create-button {
         transition-duration: 100ms;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         cursor: pointer;
     }

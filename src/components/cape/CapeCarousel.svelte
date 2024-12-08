@@ -136,7 +136,6 @@
 
 <style>
     .button {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         margin-top: 1.5em;
         cursor: pointer;
@@ -175,7 +174,6 @@
     }
 
     .fall-back-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-top: 2em;
         cursor: default;
@@ -184,7 +182,6 @@
     }
 
     .image-wrapper h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         cursor: default;
     }
@@ -216,7 +213,6 @@
     }
 
     .equip-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         text-shadow: 2px 2px #57cc00;
         cursor: pointer;
@@ -244,7 +240,6 @@
         padding: 4px 8px;
         opacity: 0;
         transition: opacity 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #d0d0d0;
         cursor: default;
@@ -256,7 +251,6 @@
         transform: translateX(-50%);
         position: absolute;
         transition: opacity 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 11px;
         color: white;
         text-shadow: 1.25px 1.25px #d0d0d0;

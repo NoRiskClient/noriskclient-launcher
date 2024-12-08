@@ -90,7 +90,6 @@
     }
 
     .header-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 12.5px;
         margin-bottom: 3em;
         cursor: default;
@@ -104,7 +103,6 @@
     }
 
     .empty-text {
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         cursor: default;
     }
@@ -115,7 +113,6 @@
     }
 
     .button-wrapper h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 25px;
         cursor: pointer;
         transition: transform 0.2s;

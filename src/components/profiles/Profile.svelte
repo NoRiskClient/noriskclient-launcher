@@ -39,7 +39,6 @@
     .profile-item-wrapper {
         display: flex;
         width: 60em;
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         font-weight: 300;
         border-radius: 7.5px;
