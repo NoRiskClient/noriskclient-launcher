@@ -97,8 +97,8 @@ pub struct LauncherOptions {
     pub multiple_instances: bool,
     #[serde(rename = "dataPath")]
     pub data_path: String,
-    #[serde(rename = "memoryPercentage")]
-    pub memory_percentage: i32,
+    #[serde(rename = "memoryLimit")]
+    pub memory_limit: u64,
     #[serde(rename = "customJavaPath", default)]
     pub custom_java_path: String,
     #[serde(rename = "customJavaArgs", default)]
@@ -149,7 +149,7 @@ impl Default for LauncherOptions {
             experimental_mode: false,
             multiple_instances: false,
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
-            memory_percentage: 35, // 35% memory of computer allocated to game
+            memory_limit: 4 * 1024, // 4GB memory allocated to game
             custom_java_path: String::new(),
             custom_java_args: String::new(),
             theme: theme.to_string(),

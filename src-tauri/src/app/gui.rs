@@ -70,7 +70,6 @@ use crate::LAUNCHER_VERSION;
 use crate::minecraft::auth;
 use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
 use crate::minecraft::progress::ClientProgressUpdate;
-use crate::utils::percentage_of_total_memory;
 
 use super::{api::{
     ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
@@ -1440,7 +1439,7 @@ async fn run_client(
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
         force_server: force_server,
-        memory: percentage_of_total_memory(options.memory_percentage),
+        memory: options.memory_limit,
         data_path: options.data_path_buf(),
         custom_java_path: if !options.custom_java_path.is_empty() {
             Some(options.custom_java_path)
@@ -1607,7 +1606,7 @@ async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> 
 }
 
 #[tauri::command]
-async fn get_total_memory() -> Result<i64, String> {
+async fn get_total_memory() -> Result<u64, String> {
     Ok(total_memory())
 }
 

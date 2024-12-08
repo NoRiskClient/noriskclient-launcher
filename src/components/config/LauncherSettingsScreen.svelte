@@ -111,10 +111,9 @@
     onMount(async () => {
         const totalBytes = await invoke("get_total_memory");
         totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
-        const memoryPercentage = $launcherOptions.memoryPercentage; // Verwende den Wert aus $launcherOptions
-        selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
+        selectedMemory = Math.round($launcherOptions.memoryLimit / 1024); // Berechne den Speicher in GB
         noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
-        noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
+        noriskLog(`Selected memory: ${selectedMemory} GB.`);
 
         if (keepLocalAssetsPernmission) {
             await invoke("get_keep_local_assets").then((value) => {
@@ -127,8 +126,8 @@
 
     onDestroy(async () => {
         //wir runden es weil wir es in der config als int speichern
-        $launcherOptions.memoryPercentage = Math.round((selectedMemory / totalSystemMemory) * 100);
-        noriskLog(`Selected memory: ${selectedMemory} GB (${$launcherOptions.memoryPercentage}%).`);
+        $launcherOptions.memoryLimit = selectedMemory * 1024;
+        noriskLog(`Selected memory: ${selectedMemory} GB.`);
         await saveOptions();
     });
 </script>
