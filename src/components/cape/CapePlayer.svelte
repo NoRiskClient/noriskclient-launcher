@@ -71,7 +71,8 @@
 
 <div class="capePlayer" style={"height: " + height + "px; width: " + width + "px;"}>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <img src={Elytra} alt={"Elytra toggle"} style={"margin-left: " + (width - 25) + "px;"} class="setting" on:click={() => toggleElytra()} />
+    <div class="elytra-click" style={"margin-left: " + (width - 25) + "px;"} on:click={() => toggleElytra()}></div>
+    <img src={Elytra} alt={"Elytra toggle"} style={"margin-left: " + (width - 25) + "px;"} class="setting" />
     <div id={"player-" + cape} class="player" style={"height: " + height + "px; width: " + width + "px;"} />
 </div>
 
@@ -109,5 +110,17 @@
     .capePlayer:hover .setting {
         opacity: 100%;
         transition-duration: 200ms;
+    }
+
+    .elytra-click {
+        position: absolute;
+        display: flex;
+        height: 25px;
+        width: 25px;
+        justify-self: flex-start;
+        align-self: flex-start;
+        margin-top: 0.5em;
+        cursor: pointer;
+        z-index: 20;
     }
 </style>

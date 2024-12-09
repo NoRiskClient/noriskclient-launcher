@@ -21,7 +21,8 @@
         <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length} Mods)</h2>
     </div>
     <div class="button-wrapper">
-        <img class="clone-button" src={$launcherOptions.theme == "DARK" ? CloneIconWhite : CloneIconDark} height=20 width=20 alt="Clone" on:click={() => dispatch('clone')}>
+        <div class="clone-click" on:click={() => dispatch('clone')}></div>
+        <img class="clone-button" src={$launcherOptions.theme == "DARK" ? CloneIconWhite : CloneIconDark} alt="Clone" >
         <h1 class="export-button" title="Export" on:click={() => dispatch('export')}>📤</h1>
         {#if profile.name != `${profile.branch} - Default`}
             <h1 class="settings-button" title={lang.profiles.profile.tooltip.editProfile} on:click={() => dispatch('settings')}>
@@ -105,12 +106,21 @@
     
     .clone-button {
         cursor: pointer;
-        transition-duration: 100ms;
+        height: 20px;
+        width: 20px;
         align-self: center;
+        transition-duration: 100ms;
     }
 
-    .clone-button:hover {
+    .clone-click:hover {
         transform: scale(1.2);
         transition-duration: 100ms;
+    }
+
+    .clone-click {
+        position: absolute;
+        height: 20px;
+        width: 20px;
+        cursor: pointer;
     }
 </style>
