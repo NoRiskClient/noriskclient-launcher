@@ -7,9 +7,9 @@ export const defaultUser = writable(null);
 export const users = writable([]);
 
 export async function fetchDefaultUserOrError(printError = false) {
-  /*await fetchUsers().catch((reason) => {
+  await fetchUsers().catch((reason) => {
     addNotification(reason);
-  });*/
+  });
   return await invoke("minecraft_auth_get_default_user").then(async value => {
     defaultUser.set(value);
   }).catch((error) => {

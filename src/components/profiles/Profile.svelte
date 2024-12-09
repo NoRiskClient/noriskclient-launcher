@@ -1,6 +1,9 @@
 <script>
     import {createEventDispatcher} from "svelte";
     import { translations } from '../../utils/translationUtils.js';
+    import { launcherOptions } from "../../stores/optionsStore.js";
+    import CloneIconDark from '../../images/clone_icon_dark.png';
+    import CloneIconWhite from '../../images/clone_icon_white.png';
     
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
@@ -18,6 +21,8 @@
         <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length} Mods)</h2>
     </div>
     <div class="button-wrapper">
+        <div class="clone-click" on:click={() => dispatch('clone')}></div>
+        <img class="clone-button" src={$launcherOptions.theme == "DARK" ? CloneIconWhite : CloneIconDark} alt="Clone" >
         <h1 class="export-button" title="Export" on:click={() => dispatch('export')}>📤</h1>
         {#if profile.name != `${profile.branch} - Default`}
             <h1 class="settings-button" title={lang.profiles.profile.tooltip.editProfile} on:click={() => dispatch('settings')}>
@@ -35,7 +40,6 @@
     .profile-item-wrapper {
         display: flex;
         width: 60em;
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         font-weight: 300;
         border-radius: 7.5px;
@@ -98,5 +102,25 @@
         cursor: default;
         font-weight: 200;
         font-size: 20px;
+    }
+    
+    .clone-button {
+        cursor: pointer;
+        height: 20px;
+        width: 20px;
+        align-self: center;
+        transition-duration: 100ms;
+    }
+
+    .clone-click:hover {
+        transform: scale(1.2);
+        transition-duration: 100ms;
+    }
+
+    .clone-click {
+        position: absolute;
+        height: 20px;
+        width: 20px;
+        cursor: pointer;
     }
 </style>

@@ -57,8 +57,7 @@
         align-items: center;
         justify-content: center;
         align-content: center;
-        font-family: 'Press Start 2P', serif;
-        width: 100%;
+            width: 100%;
         height: 79vh;
     }
 

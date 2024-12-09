@@ -64,7 +64,7 @@ impl ModManager {
                 if let Some(dependency) = dependency_mods.first() {
                     let dependency_mod = ModrinthApiEndpoints::get_project::<Mod>(&dependency.project_id).await?;
                     let already_required_by_nrc = dependency.is_already_required_by_norisk_client(required_mods);
-                    result.push(dependency.to_custom_mod(&dependency_mod.title, &dependency_mod.slug, &dependency_mod.icon_url, Vec::new(), false, if already_required_by_nrc { false } else { true }));
+                    result.push(dependency.to_custom_mod(&dependency_mod.title, &dependency_mod.slug, dependency_mod.icon_url, Vec::new(), false, if already_required_by_nrc { false } else { true }));
                 }
             }
         }
@@ -84,7 +84,7 @@ impl ModManager {
 
         Ok(CustomMod {
             title: mod_project.title.clone(),
-            image_url: "".to_string(), //Ich setze das einfach in Tauri kein bock
+            image_url: None, //Ich setze das einfach in Tauri kein bock
             value: project.to_loader_mod(slug, false, true),
             dependencies,
         })

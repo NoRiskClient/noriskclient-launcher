@@ -202,7 +202,6 @@
     }
 
     h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
     }
 
