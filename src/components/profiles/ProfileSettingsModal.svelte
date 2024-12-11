@@ -45,6 +45,7 @@
   }
 
   function confirmDelete() {
+    animateOut();
     openConfirmPopup({
       title: lang.profiles.modal.delete.title,
       content: lang.profiles.modal.delete.content,
