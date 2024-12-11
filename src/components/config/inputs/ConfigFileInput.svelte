@@ -88,14 +88,12 @@
     }
 
     .input-container h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
     }
 
     .nes-input {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         padding: 6px 8px;
         border: 1px solid #212121;

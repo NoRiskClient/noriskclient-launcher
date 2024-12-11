@@ -118,7 +118,6 @@
     }
 
     .navbar h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: pointer;
@@ -132,7 +131,6 @@
     }
 
     .navbar h2 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin: 0 2em 0.8em 2em;
         cursor: default;
@@ -142,7 +140,6 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 200px;
     }
@@ -158,12 +155,10 @@
     }
 
     .customServerToolbar h4 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
     }
 
     .create-server-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         cursor: pointer;
         transition: transform 0.3s;
@@ -174,7 +169,6 @@
     }
 
     .create-server-button-limit {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         color: red;
         text-shadow: 1px 1px #8b0000;

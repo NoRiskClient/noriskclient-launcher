@@ -8,8 +8,6 @@
     
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
-
-    let dialog; // HTMLDialogElement
     
     let popupTitle = $activePopup?.title ?? null;
     let popupContent = $activePopup?.content ?? lang.popup.defaultContent;
@@ -32,7 +30,6 @@
     let popupTitleFontSize = $activePopup?.titleFontSize ?? '22.5px';
     let popupContentFontSize = $activePopup?.contentFontSize ?? '16.5px';
 
-    $: if (dialog) dialog.showModal();
     let animateOutNow = false;
     let isInputValid = (popupType != "INPUT" || popupInputType != "TEXT") || !liveValidation;
 
@@ -59,7 +56,6 @@
     function animateOut() {
         animateOutNow = true;
         setTimeout(() => {
-            dialog.close();
             killPopup();
         }, 100);
     }
@@ -78,47 +74,49 @@
 </script>
   
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<dialog
-    bind:this={dialog}
-    class:animateOut={animateOutNow}
-    class:animateIn={!animateOutNow}
-    style={`height: ${popupHeight}em; width: ${popupWidth}em;`}
-    on:close={closePopup}
-    on:click|self={animateOut}
->
-<div on:click|stopPropagation class="divider">
-    <div class="header-wrapper">
-        <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? lang.popup.title[popupType.toLowerCase()]}</h1>
-        <h1 class="nes-font red-text-clickable close-button" on:click={closePopup}>X</h1>
-    </div>
-    <hr>
-    <div class="popup-content-wrapper">
-        <div class="content-wrapper" style={`height: ${popupHeight - 11}em;`}>
-            <p class="content nes-font" style={`font-size: ${popupContentFontSize};`}>{@html popupContent}</p>
-            {#if popupType == "INPUT"}
-                {#if popupInputType == "TEXT"}
-                    <ConfigTextInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} placeholder={popupInputPlaceholder} />
-                {:else if popupInputType == "FOLDER"}
-                    <ConfigFolderInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} />
-                {:else if popupInputType == "FILE"}
-                    <ConfigFileInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} />
-                {/if}
-            {/if}
+<div class="overlay" on:click={animateOut}>
+    <div
+        class:animateOut={animateOutNow}
+        class:animateIn={!animateOutNow}
+        class="dialog"
+        style={`height: ${popupHeight}em; width: ${popupWidth}em;`}
+        on:click|self={animateOut}
+    >
+        <div on:click|stopPropagation class="divider">
+            <div class="header-wrapper">
+                <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? lang.popup.title[popupType.toLowerCase()]}</h1>
+                <h1 class="nes-font red-text-clickable close-button" on:click={closePopup}>X</h1>
+            </div>
+            <hr>
+            <div class="popup-content-wrapper">
+                <div class="content-wrapper" style={`height: ${popupHeight - 11}em;`}>
+                    <p class="content nes-font" style={`font-size: ${popupContentFontSize};`}>{@html popupContent}</p>
+                    {#if popupType == "INPUT"}
+                        {#if popupInputType == "TEXT"}
+                            <ConfigTextInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} placeholder={popupInputPlaceholder} />
+                        {:else if popupInputType == "FOLDER"}
+                            <ConfigFolderInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} />
+                        {:else if popupInputType == "FILE"}
+                            <ConfigFileInput id={"popup-input"} title={popupInputName} bind:value={popupInputValue} />
+                        {/if}
+                    {/if}
+                </div>
+                <div class="buttons">
+                    <p 
+                        class="button nes-font enabled"
+                        class:red-text={popupType != "INFO"}
+                        class:primary-text={popupType == "INFO"}
+                        on:click={closePopup}
+                    >{popupCloseButton}</p>
+                    {#if popupType == "CONFIRM" || popupType == "INPUT"}
+                        <p class="button nes-font green-text" class:disabled={!isInputValid} class:enabled={isInputValid} on:click={() => isInputValid ? confirmPopup() : {}} title={!isInputValid ? lang.popup.invalidInput : ""}>{popupConfirmButton}</p>
+                    {/if}
+                </div>
+            </div>
         </div>
-        <div class="buttons">
-            <p 
-                class="button nes-font enabled"
-                class:red-text={popupType != "INFO"}
-                class:primary-text={popupType == "INFO"}
-                on:click={closePopup}
-            >{popupCloseButton}</p>
-            {#if popupType == "CONFIRM" || popupType == "INPUT"}
-                <p class="button nes-font green-text" class:disabled={!isInputValid} class:enabled={isInputValid} on:click={() => isInputValid ? confirmPopup() : {}} title={!isInputValid ? lang.popup.invalidInput : ""}>{popupConfirmButton}</p>
-            {/if}
-        </div>
     </div>
-</dialog>
-  
+</div>
+
 <style>
     .header-wrapper {
         display: flex;
@@ -172,8 +170,16 @@
         height: 100%;
         padding: 1em;
     }
+
+    .overlay {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.2);
+        z-index: 999998;
+    }
     
-    dialog {
+    .dialog {
         background-color: var(--background-color);
         border: 5px solid black;
         border-radius: 0.2em;
@@ -183,25 +189,18 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
+        z-index: 999999;
     }
 
-    dialog::backdrop {
-        background: rgba(0, 0, 0, 0.3);
-    }
-
-    dialog > div {
+    .dialog > div {
         padding: 1em;
     }
 
-    dialog[open]::backdrop {
-        animation: fade 0.2s ease-out;
-    }
-
-    dialog.animateIn {
+    .dialog.animateIn {
         animation: open 0.2s ease-out;
     }
 
-    dialog.animateOut {
+    .dialog.animateOut {
         animation: close 0.2s ease-out;
     }
 
@@ -237,8 +236,7 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
-        user-select: none;
+            user-select: none;
         cursor: default;
     }
 

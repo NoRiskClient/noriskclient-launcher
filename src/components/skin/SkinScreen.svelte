@@ -73,9 +73,9 @@
     if ($defaultUser) {
       await invoke("get_cape_hash_by_uuid", {
         uuid: $defaultUser.id,
-      }).then(async (user) => {
-        if (user) {
-          const url = $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${user}.png` : `https://dl.norisk.gg/capes/prod/${user}.png`;
+      }).then(async (hash) => {
+        if (hash) {
+          const url = `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${hash}.png`;
           await invoke("read_remote_image_file", { location: url })
             .then((capeData) => {
               capeLocation = `data:image/png;base64,${capeData}`;
@@ -332,8 +332,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
-    }
+        }
 
     .title {
         font-size: 35px;

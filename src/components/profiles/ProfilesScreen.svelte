@@ -73,6 +73,28 @@
     })
   }
 
+  async function cloneProfile(profile) {
+    noriskLog("Cloning profile: " + profile.name);
+    
+    let profileClone = {
+      id: uuidv4(),
+      name: `${profile.name} (cloned)`,
+      branch: profile.branch,
+      mods: profile.mods
+    };
+
+    if ($launcherOptions.experimentalMode) {
+      $profiles.experimentalProfiles.push(profileClone);
+    } else {
+      $profiles.mainProfiles.push(profileClone);
+    }
+
+    $profiles.store()
+    launcherProfiles = $launcherOptions.experimentalMode ? $profiles.experimentalProfiles : $profiles.mainProfiles;
+
+    addNotification(lang.profiles.notification.clone.success.replace("{profile}", profile.name), "INFO")
+  }
+
   async function importProfile() {
     try {
       const location = await open({
@@ -127,7 +149,7 @@
     <hr class="devider">
     <VirtualList height="27em" items={launcherProfiles?.filter(p => p.branch == currentBranch) ?? []} let:item>
       <Profile profile={item} active={profileById(activeProfile()).id == item.id} on:settings={() => openSettings(item)}
-               on:select={() => selectProfile(item)} on:export={() => exportProfile(item.id)} />
+               on:select={() => selectProfile(item)} on:export={() => exportProfile(item.id)} on:clone={() => cloneProfile(item)} />
     </VirtualList>
     <div class="create-wrapper">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -163,7 +185,6 @@
 
     .create-button {
         transition-duration: 100ms;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         cursor: pointer;
     }

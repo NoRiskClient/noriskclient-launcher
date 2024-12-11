@@ -26,9 +26,6 @@
 
   const ILLIGAL_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
-  let dialog; // HTMLDialogElement
-
-  $: if (dialog && showModal) dialog.showModal();
   let animateOutNow = false;
 
   async function saveData() {
@@ -48,6 +45,7 @@
   }
 
   function confirmDelete() {
+    animateOut();
     openConfirmPopup({
       title: lang.profiles.modal.delete.title,
       content: lang.profiles.modal.delete.content,
@@ -93,7 +91,6 @@
     animateOutNow = true;
     setTimeout(() => {
       showModal = false;
-      dialog.close();
     }, 100);
   }
 
@@ -103,41 +100,44 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<dialog
-  bind:this={dialog}
-  class:animateOut={animateOutNow}
-  class:animateIn={!animateOutNow}
-  on:close={closeSettings}
-  on:click|self={() => dialog.close()}
->
-  <div on:click|stopPropagation class="divider">
-    <div>
-      <div class="header-wrapper">
+{#if showModal}
+  <div class="overlay" on:click={animateOut}>
+
+    <div
+      class:animateOut={animateOutNow}
+      class:animateIn={!animateOutNow}
+      class="dialog"
+    >
+      <div on:click|stopPropagation class="divider">
+        <div>
+          <div class="header-wrapper">
+            {#if createMode}
+              <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.create.title}</h1>
+            {:else}
+              <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.edit.title}</h1>
+            {/if}
+            <h1 class="nes-font red-text-clickable close-button" on:click={closeSettings}>X</h1>
+          </div>
+          <hr>
+          <div class="settings-wrapper">
+            <ConfigTextInput title={lang.profiles.modal.name} bind:value={settingsProfile.name} />
+            <ConfigTextInput title={lang.profiles.modal.branch} bind:value={settingsProfile.branch} disabled={true} />
+          </div>
+        </div>
+        <!-- svelte-ignore a11y-autofocus -->
         {#if createMode}
-          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.create.title}</h1>
+          <div class="create-profile-button-wrapper">
+            <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={createProfile}>{lang.profiles.modal.button.create}</p>
+          </div>
         {:else}
-          <h1 class="title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.profiles.modal.edit.title}</h1>
+          <div class="delete-profile-button-wrapper">
+            <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>{lang.profiles.modal.button.delete}</p>
+          </div>
         {/if}
-        <h1 class="nes-font red-text-clickable close-button" on:click={closeSettings}>X</h1>
-      </div>
-      <hr>
-      <div class="settings-wrapper">
-        <ConfigTextInput title={lang.profiles.modal.name} bind:value={settingsProfile.name} />
-        <ConfigTextInput title={lang.profiles.modal.branch} bind:value={settingsProfile.branch} disabled={true} />
       </div>
     </div>
-    <!-- svelte-ignore a11y-autofocus -->
-    {#if createMode}
-      <div class="create-profile-button-wrapper">
-        <p class="green-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={createProfile}>{lang.profiles.modal.button.create}</p>
-      </div>
-    {:else}
-      <div class="delete-profile-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmDelete}>{lang.profiles.modal.button.delete}</p>
-      </div>
-    {/if}
   </div>
-</dialog>
+{/if}
 
 <style>
     .header-wrapper {
@@ -148,7 +148,6 @@
     }
 
     .header-wrapper .title {
-        font-family: 'Press Start 2P', serif;
         font-size: 22.5px;
         user-select: none;
         cursor: default;
@@ -178,7 +177,15 @@
         padding: 1em;
     }
 
-    dialog {
+    .overlay {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.2);
+        z-index: 999998;
+    }
+
+    .dialog {
         background-color: var(--background-color);
         border: 5px solid black;
         width: 34em;
@@ -189,25 +196,18 @@
         top: 50%; /* 50% von oben */
         left: 50%; /* 50% von links */
         transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
+        z-index: 999999;
     }
 
-    dialog::backdrop {
-        background: rgba(0, 0, 0, 0.3);
-    }
-
-    dialog > div {
+    .dialog > div {
         padding: 1em;
     }
 
-    dialog[open]::backdrop {
-        animation: fade 0.2s ease-out;
-    }
-
-    dialog.animateIn {
+    .dialog.animateIn {
         animation: open 0.2s ease-out;
     }
 
-    dialog.animateOut {
+    .dialog.animateOut {
         animation: close 0.2s ease-out;
     }
 
@@ -243,7 +243,6 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
@@ -258,7 +257,6 @@
       }
       
       .create-profile-button-wrapper p {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 0.3em;
         cursor: pointer;
@@ -274,7 +272,6 @@
         align-content: center;
         align-items: center;
         justify-content: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 1em;
         text-shadow: 2px 2px #6e0000;

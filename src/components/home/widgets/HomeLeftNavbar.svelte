@@ -125,7 +125,6 @@
 
   .home-navbar-wrapper h1 {
     font-size: 11px;
-    font-family: 'Press Start 2P', serif;
     margin-bottom: 1em;
     cursor: pointer;
     color: var(--secondary-color);

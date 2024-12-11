@@ -16,8 +16,7 @@
         font-size: 20px;
         color: #e8e8e8;
         text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
+            cursor: pointer;
     }
 
     .back-button:hover {
