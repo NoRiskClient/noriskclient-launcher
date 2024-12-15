@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 
 use crate::{app::api::ApiEndpoints, LAUNCHER_VERSION, minecraft::version::AssetObject, utils::{OS, OS_VERSION}};
 use crate::app::api::NoRiskLaunchManifest;
+use crate::app::assets_api::AssetsApi;
 use crate::app::gui::get_keep_local_assets;
 use crate::app::nrc_cache::{NRCCache, RunnerInstance};
 use crate::error::LauncherError;
@@ -265,7 +266,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
         fs::create_dir_all(&norisk_asset_dir).await?;
 
-        let json_data = ApiEndpoints::norisk_assets(manifest.build.branch.clone(), norisk_token, uuid).await;
+        let json_data = AssetsApi::assets(manifest.build.branch.clone(), norisk_token, uuid).await;
 
         let norisk_asset_objects_to_download: HashMap<String, AssetObject> = match json_data {
             Ok(norisk_assets) => norisk_assets.objects,

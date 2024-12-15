@@ -11,10 +11,11 @@ use uuid::Uuid;
 
 use crate::app::api::{ApiEndpoints, NoRiskLaunchManifest};
 use crate::app::app_data::LauncherOptions;
+use crate::app::assets_api::AssetsApi;
 use crate::error::Error;
-use crate::LAUNCHER_DIRECTORY;
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::progress::ProgressUpdate;
+use crate::LAUNCHER_DIRECTORY;
 
 pub struct NRCCache {}
 
@@ -71,7 +72,7 @@ impl NoRiskLaunchManifest {
 impl NRCCache {
     pub async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> Result<NoRiskLaunchManifest, Error> {
         let nrc_cache = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(branch).join("nrc_cache");
-        match ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await {
+        match AssetsApi::launch_manifest(branch, norisk_token, uuid).await {
             Ok(manifest) => {
                 fs::create_dir_all(&nrc_cache).await?;
                 manifest.store(&nrc_cache).await?;
@@ -93,7 +94,7 @@ impl NRCCache {
 
         match credentials.norisk_credentials.get_token(options.experimental_mode).await {
             Ok(token) => {
-                match ApiEndpoints::norisk_branches(&token, &credentials.id.to_string()).await {
+                match AssetsApi::branches(&token, &credentials.id.to_string()).await {
                     Ok(response) => {
                         if let Err(err) = fs::write(&path, serde_json::to_string_pretty(&response)?).await {
                             error!("Failed to store branches: {:?}", err);

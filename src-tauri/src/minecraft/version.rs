@@ -1,19 +1,34 @@
-use std::{collections::HashMap, fmt, marker::PhantomData, path::{Path, PathBuf}, str::FromStr};
+use std::{
+    collections::HashMap,
+    fmt,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use anyhow::Result;
-use tokio::fs;
-use serde::{Deserialize, Deserializer, de::{self, MapAccess, Visitor}, Serialize};
-use void::Void;
-use std::collections::HashSet;
-use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{download_file_untracked, download_private_file_untracked, Architecture}, error};
-use crate::utils::{get_maven_artifact_path, sha1sum};
-use std::sync::Arc;
-use log::{debug, error, info};
-use error::Error;
 use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
+use crate::app::assets_api::get_assets_api_base;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
+use crate::utils::{get_maven_artifact_path, sha1sum};
+use crate::{
+    error,
+    error::LauncherError,
+    utils::{download_file_untracked, download_private_file_untracked, Architecture},
+    HTTP_CLIENT, LAUNCHER_DIRECTORY,
+};
+use anyhow::Result;
+use error::Error;
+use log::{debug, error, info};
+use serde::{
+    de::{self, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::fs;
+use void::Void;
 
 // https://launchermeta.mojang.com/mc/game/version_manifest.json
 
@@ -24,34 +39,40 @@ pub struct VersionManifest {
 
 impl VersionManifest {
     pub async fn download(app_data: &Path) -> Result<Self, Error> {
-        match HTTP_CLIENT.get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
+        match HTTP_CLIENT
+            .get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
             .send()
-            .await {
+            .await
+        {
             Err(error) => {
                 error!("Error Downloading Mojang Version Manifest {:?}", error);
                 Ok(Self::load(app_data).await?)
             }
-            Ok(response) => {
-               match response.json::<VersionManifest>().await {
-                   Ok(manifest) => {
-                       manifest.store(app_data).await?;
-                       Ok(manifest)
-                   }
-                   Err(error) => {
-                       error!("Error Downloading Mojang Version Manifest {:?}", error);
-                       Ok(Self::load(app_data).await?)
-                   }
-               }
-            }
+            Ok(response) => match response.json::<VersionManifest>().await {
+                Ok(manifest) => {
+                    manifest.store(app_data).await?;
+                    Ok(manifest)
+                }
+                Err(error) => {
+                    error!("Error Downloading Mojang Version Manifest {:?}", error);
+                    Ok(Self::load(app_data).await?)
+                }
+            },
         }
     }
     pub async fn load(app_data: &Path) -> Result<Self, Error> {
         // load the options from the file
-        let options = serde_json::from_slice::<VersionManifest>(&fs::read(app_data.join("version_manifest.json")).await?)?;
+        let options = serde_json::from_slice::<VersionManifest>(
+            &fs::read(app_data.join("version_manifest.json")).await?,
+        )?;
         Ok(options)
     }
     pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
-        let _ = fs::write(app_data.join("version_manifest.json"), serde_json::to_string_pretty(&self)?).await?;
+        let _ = fs::write(
+            app_data.join("version_manifest.json"),
+            serde_json::to_string_pretty(&self)?,
+        )
+        .await?;
         debug!("Version manifest was stored...");
         Ok(())
     }
@@ -96,7 +117,10 @@ impl VersionProfile {
         Self::merge_options(&mut self.asset_index_location, parent.asset_index_location);
         Self::merge_options(&mut self.assets, parent.assets);
 
-        Self::merge_larger(&mut self.minimum_launcher_version, parent.minimum_launcher_version);
+        Self::merge_larger(
+            &mut self.minimum_launcher_version,
+            parent.minimum_launcher_version,
+        );
         Self::merge_options(&mut self.downloads, parent.downloads);
         Self::merge_larger(&mut self.compliance_level, parent.compliance_level);
 
@@ -109,7 +133,10 @@ impl VersionProfile {
                 if let ArgumentDeclaration::V14(v14_b) = parent.arguments {
                     Self::merge_options(&mut v14_a.minecraft_arguments, v14_b.minecraft_arguments);
                 } else {
-                    return Err(LauncherError::InvalidVersionProfile("version profile inherits from incompatible profile".to_string()).into());
+                    return Err(LauncherError::InvalidVersionProfile(
+                        "version profile inherits from incompatible profile".to_string(),
+                    )
+                    .into());
                 }
             }
             ArgumentDeclaration::V21(v21_a) => {
@@ -117,7 +144,10 @@ impl VersionProfile {
                     v21_a.arguments.game.append(&mut v21_b.arguments.game);
                     v21_a.arguments.jvm.append(&mut v21_b.arguments.jvm);
                 } else {
-                    return Err(LauncherError::InvalidVersionProfile("version profile inherits from incompatible profile".to_string()).into());
+                    return Err(LauncherError::InvalidVersionProfile(
+                        "version profile inherits from incompatible profile".to_string(),
+                    )
+                    .into());
                 }
             }
         }
@@ -155,7 +185,13 @@ pub enum ArgumentDeclaration {
 }
 
 impl ArgumentDeclaration {
-    pub(crate) fn add_jvm_args_to_vec(&self, norisk_token: &str, command_arguments: &mut Vec<String>, parameter: &LaunchingParameter, features: &HashSet<String>) -> Result<()> {
+    pub(crate) fn add_jvm_args_to_vec(
+        &self,
+        norisk_token: &str,
+        command_arguments: &mut Vec<String>,
+        parameter: &LaunchingParameter,
+        features: &HashSet<String>,
+    ) -> Result<()> {
         command_arguments.push(format!("-Xmx{}M", parameter.memory));
         command_arguments.push("-XX:+UnlockExperimentalVMOptions".to_string());
         command_arguments.push("-XX:+UseG1GC".to_string());
@@ -166,8 +202,14 @@ impl ArgumentDeclaration {
         command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         if parameter.force_server.is_some() {
-            info!("\n\n\nAdded force server arg: {:?}\n\n\n.", parameter.force_server.clone().unwrap());
-            command_arguments.push(format!("-Dnorisk.forceServer={}", parameter.force_server.clone().unwrap()));
+            info!(
+                "\n\n\nAdded force server arg: {:?}\n\n\n.",
+                parameter.force_server.clone().unwrap()
+            );
+            command_arguments.push(format!(
+                "-Dnorisk.forceServer={}",
+                parameter.force_server.clone().unwrap()
+            ));
         }
         for arg in parameter.custom_java_args.split(" ") {
             if arg != " " && arg != "" {
@@ -177,34 +219,58 @@ impl ArgumentDeclaration {
         }
 
         match self {
-            ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec!["-Djava.library.path=${natives_directory}".to_string(), "-cp".to_string(), "${classpath}".to_string()]),
+            ArgumentDeclaration::V14(_) => command_arguments.append(&mut vec![
+                "-Djava.library.path=${natives_directory}".to_string(),
+                "-cp".to_string(),
+                "${classpath}".to_string(),
+            ]),
             ArgumentDeclaration::V21(decl) => {
-                ArgumentDeclaration::check_rules_and_add(command_arguments, &decl.arguments.jvm, features)?;
+                ArgumentDeclaration::check_rules_and_add(
+                    command_arguments,
+                    &decl.arguments.jvm,
+                    features,
+                )?;
             }
         }
 
         Ok(())
     }
-    pub(crate) fn add_game_args_to_vec(&self, command_arguments: &mut Vec<String>, features: &HashSet<String>) -> Result<()> {
+    pub(crate) fn add_game_args_to_vec(
+        &self,
+        command_arguments: &mut Vec<String>,
+        features: &HashSet<String>,
+    ) -> Result<()> {
         match self {
             ArgumentDeclaration::V14(decl) => {
                 command_arguments.extend(
                     decl.minecraft_arguments
                         .as_ref()
-                        .ok_or_else(|| LauncherError::InvalidVersionProfile("no game arguments specified".to_string()))?
+                        .ok_or_else(|| {
+                            LauncherError::InvalidVersionProfile(
+                                "no game arguments specified".to_string(),
+                            )
+                        })?
                         .split(" ")
-                        .map(ToOwned::to_owned)
+                        .map(ToOwned::to_owned),
                 );
             }
             ArgumentDeclaration::V21(decl) => {
-                ArgumentDeclaration::check_rules_and_add(command_arguments, &decl.arguments.game, features)?;
+                ArgumentDeclaration::check_rules_and_add(
+                    command_arguments,
+                    &decl.arguments.game,
+                    features,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    fn check_rules_and_add(command_arguments: &mut Vec<String>, args: &Vec<Argument>, features: &HashSet<String>) -> Result<()> {
+    fn check_rules_and_add(
+        command_arguments: &mut Vec<String>,
+        args: &Vec<Argument>,
+        features: &HashSet<String>,
+    ) -> Result<()> {
         for argument in args {
             if let Some(rules) = &argument.rules {
                 if !crate::minecraft::rule_interpreter::check_condition(rules, &features)? {
@@ -214,7 +280,7 @@ impl ArgumentDeclaration {
 
             match &argument.value {
                 ArgumentValue::SINGLE(value) => command_arguments.push(value.to_owned()),
-                ArgumentValue::VEC(vec) => command_arguments.append(&mut vec.clone())
+                ArgumentValue::VEC(vec) => command_arguments.append(&mut vec.clone()),
             };
         }
 
@@ -235,25 +301,21 @@ pub struct V21ArgumentDeclaration {
 
 impl VersionProfile {
     pub async fn download(app_data: &Path, url: &String) -> Result<Self, Error> {
-        match HTTP_CLIENT.get(url)
-            .send()
-            .await {
+        match HTTP_CLIENT.get(url).send().await {
             Err(error) => {
                 error!("Error Downloading Sub System {:?}", error);
                 Ok(Self::load(app_data).await?)
             }
-            Ok(response) => {
-                match response.json::<VersionProfile>().await {
-                    Ok(manifest) => {
-                        manifest.store(app_data).await?;
-                        Ok(manifest)
-                    }
-                    Err(error) => {
-                        error!("Error Downloading Sub System {:?}", error);
-                        Ok(Self::load(app_data).await?)
-                    }
+            Ok(response) => match response.json::<VersionProfile>().await {
+                Ok(manifest) => {
+                    manifest.store(app_data).await?;
+                    Ok(manifest)
                 }
-            }
+                Err(error) => {
+                    error!("Error Downloading Sub System {:?}", error);
+                    Ok(Self::load(app_data).await?)
+                }
+            },
         }
     }
     pub async fn load(app_data: &Path) -> Result<Self, Error> {
@@ -298,10 +360,12 @@ impl FromStr for Argument {
     type Err = Void;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Argument { value: ArgumentValue::SINGLE(s.to_string()), rules: None })
+        Ok(Argument {
+            value: ArgumentValue::SINGLE(s.to_string()),
+            rules: None,
+        })
     }
 }
-
 
 fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
 where
@@ -316,14 +380,14 @@ where
 
 fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
-    T: Deserialize<'de> + FromStr<Err=Void>,
+    T: Deserialize<'de> + FromStr<Err = Void>,
     D: Deserializer<'de>,
 {
     struct StringOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> Visitor<'de> for StringOrStruct<T>
     where
-        T: Deserialize<'de> + FromStr<Err=Void>,
+        T: Deserialize<'de> + FromStr<Err = Void>,
     {
         type Value = T;
 
@@ -386,7 +450,11 @@ pub struct AssetObject {
 }
 
 impl AssetObject {
-    pub async fn download(&self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+    pub async fn download(
+        &self,
+        assets_objects_folder: impl AsRef<Path>,
+        progress: Arc<impl ProgressReceiver>,
+    ) -> Result<bool> {
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
         let asset_folder = assets_objects_folder.join(&self.hash[0..2]);
 
@@ -397,10 +465,21 @@ impl AssetObject {
         let asset_path = asset_folder.join(&self.hash);
 
         return if !asset_path.exists() {
-            progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingAssetObject&hash%{}", self.hash)));
+            progress.progress_update(ProgressUpdate::set_label(format!(
+                "translation.downloadingAssetObject&hash%{}",
+                self.hash
+            )));
 
             info!("Downloading {}", self.hash);
-            download_file_untracked(&*format!("https://resources.download.minecraft.net/{}/{}", &self.hash[0..2], &self.hash), asset_path).await?;
+            download_file_untracked(
+                &*format!(
+                    "https://resources.download.minecraft.net/{}/{}",
+                    &self.hash[0..2],
+                    &self.hash
+                ),
+                asset_path,
+            )
+            .await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
@@ -409,8 +488,17 @@ impl AssetObject {
         };
     }
 
-    pub async fn download_norisk_cosmetic(&self, branch: String, file_path: String, norisk_token: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+    pub async fn download_norisk_cosmetic(
+        &self,
+        branch: String,
+        file_path: String,
+        norisk_token: String,
+        assets_objects_folder: impl AsRef<Path>,
+        progress: Arc<impl ProgressReceiver>,
+    ) -> Result<bool> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
 
         let mut path_parts: Vec<&str> = file_path.split("/").collect();
@@ -438,9 +526,15 @@ impl AssetObject {
 
             if &self.hash == &sha1 {
                 // If sha1 matches, return
-                info!("Norisk asset {} already exists and matches sha1.", &self.hash);
+                info!(
+                    "Norisk asset {} already exists and matches sha1.",
+                    &self.hash
+                );
             } else {
-                info!("Norisk asset {} already exists but does not match sha1.", &self.hash);
+                info!(
+                    "Norisk asset {} already exists but does not match sha1.",
+                    &self.hash
+                );
                 download = true;
             }
         } else {
@@ -448,10 +542,30 @@ impl AssetObject {
         }
 
         return if download {
-            progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingNoriskAssetObject&hash%{}", self.hash)));
+            progress.progress_update(ProgressUpdate::set_label(format!(
+                "translation.downloadingNoriskAssetObject&hash%{}",
+                self.hash
+            )));
 
             info!("Downloading {}", self.hash);
-            download_private_file_untracked(&*format!("{}/launcher/assets/{}/{}/{}", get_api_base(options.experimental_mode), branch, &self.hash[0..2], &self.hash), norisk_token, asset_file_path).await?;
+            let prod_or_exp = if options.experimental_mode {
+                 "exp"
+            } else {
+                 "prod"
+            };
+            let path = &*format!(
+                "{}/{}/{}/assets/{}",
+                "https://cdn.norisk.gg/branches",
+                prod_or_exp,
+                branch,
+                file_path,
+            );
+            download_private_file_untracked(
+                path,
+                norisk_token,
+                asset_file_path,
+            )
+            .await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
@@ -460,12 +574,31 @@ impl AssetObject {
         };
     }
 
-    pub async fn download_destructing(self, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
+    pub async fn download_destructing(
+        self,
+        assets_objects_folder: impl AsRef<Path>,
+        progress: Arc<impl ProgressReceiver>,
+    ) -> Result<bool> {
         return self.download(assets_objects_folder, progress).await;
     }
 
-    pub async fn download_norisk_cosmetic_destructing(self, branch: String, file_path: String, norisk_token: String, assets_objects_folder: impl AsRef<Path>, progress: Arc<impl ProgressReceiver>) -> Result<bool> {
-        return self.download_norisk_cosmetic(branch, file_path, norisk_token, assets_objects_folder, progress).await;
+    pub async fn download_norisk_cosmetic_destructing(
+        self,
+        branch: String,
+        file_path: String,
+        norisk_token: String,
+        assets_objects_folder: impl AsRef<Path>,
+        progress: Arc<impl ProgressReceiver>,
+    ) -> Result<bool> {
+        return self
+            .download_norisk_cosmetic(
+                branch,
+                file_path,
+                norisk_token,
+                assets_objects_folder,
+                progress,
+            )
+            .await;
     }
 }
 
@@ -477,7 +610,6 @@ pub struct Downloads {
     pub server_mappings: Option<Download>,
     pub windows_server: Option<Download>,
 }
-
 
 #[derive(Deserialize, Serialize)]
 pub struct Download {
@@ -511,16 +643,17 @@ impl Library {
         }
 
         let path = get_maven_artifact_path(&self.name)?;
-        let url = self.url.as_deref().unwrap_or("https://libraries.minecraft.net/");
+        let url = self
+            .url
+            .as_deref()
+            .unwrap_or("https://libraries.minecraft.net/");
 
-        return Ok(
-            LibraryDownloadInfo {
-                url: format!("{}{}", url, path),
-                sha1: None,
-                size: None,
-                path,
-            }
-        );
+        return Ok(LibraryDownloadInfo {
+            url: format!("{}{}", url, path),
+            sha1: None,
+            size: None,
+            path,
+        });
     }
 }
 
@@ -581,16 +714,26 @@ impl From<&LibraryArtifact> for LibraryDownloadInfo {
 
 impl LibraryDownloadInfo {
     async fn fetch_sha1(&self) -> Result<String> {
-        HTTP_CLIENT.get(&format!("{}{}", &self.url, ".sha1"))
-            .send().await?
+        HTTP_CLIENT
+            .get(&format!("{}{}", &self.url, ".sha1"))
+            .send()
+            .await?
             .error_for_status()?
             .text()
             .await
             .map_err(|e| anyhow::anyhow!(e))
     }
 
-    pub async fn download(&self, name: String, libraries_folder: &Path, progress: Arc<impl ProgressReceiver>) -> Result<PathBuf> {
-        info!("Downloading library {}, sha1: {:?}, size: {:?}", name, &self.sha1, &self.size);
+    pub async fn download(
+        &self,
+        name: String,
+        libraries_folder: &Path,
+        progress: Arc<impl ProgressReceiver>,
+    ) -> Result<PathBuf> {
+        info!(
+            "Downloading library {}, sha1: {:?}, size: {:?}",
+            name, &self.sha1, &self.size
+        );
         debug!("Library download url: {}", &self.url);
 
         let path = libraries_folder.to_path_buf();
@@ -612,9 +755,7 @@ impl LibraryDownloadInfo {
                 Some(sha1)
             } else {
                 // If sha1 file doesn't exist, fetch it
-                let sha1 = self.fetch_sha1().await
-                    .map(Some)
-                    .unwrap_or(None);
+                let sha1 = self.fetch_sha1().await.map(Some).unwrap_or(None);
 
                 // Write sha1 file
                 if let Some(sha1) = &sha1 {
@@ -643,12 +784,18 @@ impl LibraryDownloadInfo {
             }
 
             // If sha1 doesn't match, remove the file
-            info!("Library {} already exists but sha1 doesn't match, redownloading", name);
+            info!(
+                "Library {} already exists but sha1 doesn't match, redownloading",
+                name
+            );
             fs::remove_file(&library_path).await?;
         }
 
         // Download library
-        progress.progress_update(ProgressUpdate::set_label(format!("translation.downloadingLibrary&library%{}", name)));
+        progress.progress_update(ProgressUpdate::set_label(format!(
+            "translation.downloadingLibrary&library%{}",
+            name
+        )));
 
         download_file_untracked(&self.url, &library_path).await?;
         info!("Downloaded {}", self.url);

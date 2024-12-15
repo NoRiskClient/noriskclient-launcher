@@ -6,3 +6,4 @@ pub mod modrinth_api;
 pub mod mclogs_api;
 
 pub mod nrc_cache;
+pub mod assets_api;

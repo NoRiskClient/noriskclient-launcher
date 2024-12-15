@@ -48,11 +48,6 @@ impl ApiEndpoints {
     }
 
     /// Request all available branches
-    pub async fn norisk_branches(norisk_token: &str, request_uuid: &str) -> core::result::Result<Vec<String>, crate::error::Error> {
-        Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid).await
-    }
-
-    /// Request all available branches
     pub async fn norisk_full_feature_whitelist(norisk_token: &str, request_uuid: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint("core/whitelist/features", norisk_token, request_uuid).await
     }
@@ -189,19 +184,9 @@ impl ApiEndpoints {
         Self::post_from_await_endpoint("core/auth/await", id).await
     }
 
-    /// Request launch manifest of specific build
-    pub async fn launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> core::result::Result<NoRiskLaunchManifest, crate::error::Error> {
-        Self::request_from_noriskclient_endpoint(&format!("launcher/version/launch/{}", branch),norisk_token,uuid).await
-    }
-
     /// Request download of specified JRE for specific OS and architecture
     pub async fn jre(os_name: &String, os_arch: &String, jre_version: u32) -> Result<JreSource> {
         Self::request_from_norisk_endpoint(&format!("launcher/version/jre/{}/{}/{}", os_name, os_arch, jre_version), "", "").await
-    }
-
-    /// Request norisk assets json for specific branch
-    pub async fn norisk_assets(branch: String, norisk_token: &str, request_uuid: &str) -> Result<NoriskAssets> {
-        Self::request_from_norisk_endpoint(&format!("launcher/assets/{}", branch), norisk_token, request_uuid).await
     }
 
     /// Request changelogs
