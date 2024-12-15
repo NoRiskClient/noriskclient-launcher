@@ -170,7 +170,7 @@
     "profiles.buttons.importProfile": "IMPORT PROFILE",
     "profiles.profile.tooltip.editProfile": "Edit Profile",
     "profiles.profile.tooltip.defaultProfile": "Default Profile",
-    "profiles.notification.illigalCharacterError": "Profile name contains illegal characters.",
+    "profiles.notification.illegalCharacterError": "Profile name contains illegal characters.",
     "profiles.modal.delete.title": "Delete Profile",
     "profiles.modal.delete.content": "Are you sure you want to delete this profile?",
     "profiles.notification.delete.success": "Profile \"{profile}\" has been deleted.",

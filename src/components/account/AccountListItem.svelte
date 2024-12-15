@@ -27,7 +27,7 @@
 <div class="flex-wrapper" class:active={isActive}>
     <div on:selectstart={preventSelection} on:mousedown={preventSelection} class="skin-text-wrapper"
          on:click={() => setDefaultUser(account)}>
-        <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
+        <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Head">
         <h1 class:green-text={isActive} class:longName={account.username.length > 12}>{account.username}</h1>
     </div>
     <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
