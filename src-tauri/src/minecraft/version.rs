@@ -11,7 +11,7 @@ use crate::app::app_data::LauncherOptions;
 use crate::app::assets_api::get_assets_api_base;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
-use crate::utils::{get_maven_artifact_path, sha1sum};
+use crate::utils::{get_maven_artifact_path, md5sum, sha1sum};
 use crate::{
     error,
     error::LauncherError,
@@ -522,17 +522,18 @@ impl AssetObject {
         let mut download = false;
 
         if asset_file_path.exists() {
-            let sha1 = sha1sum(&asset_file_path)?;
+            let md5 = md5sum(&asset_file_path)?;
 
-            if &self.hash == &sha1 {
+            if &self.hash == &md5 {
                 // If sha1 matches, return
                 info!(
-                    "Norisk asset {} already exists and matches sha1.",
+                    "Norisk asset {} already exists and matches md5.",
                     &self.hash
                 );
             } else {
                 info!(
-                    "Norisk asset {} already exists but does not match sha1.",
+                    "Norisk asset {} != {} already exists but does not match md5.",
+                    md5,
                     &self.hash
                 );
                 download = true;
