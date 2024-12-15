@@ -11,33 +11,29 @@
   function hideModal() {
     showModal = false;
   }
-
-  let dialog; // HTMLDialogElement
-
-  $: if (dialog && showModal) dialog.showModal();
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<dialog
-  bind:this={dialog}
-  on:close={hideModal}
-  on:click|self={() => dialog.close()}
->
-  <div on:click|stopPropagation class="divider">
-    <div>
-      <div class="header-wrapper">
-        <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.launchErrorModal.title}</h1>
-        <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
-      </div>
-      <hr>
-      <div class="content">
-        <div class="credit">
-          <p class="nes-font">{reason}</p>
+{#if showModal}
+  <div class="overlay" on:click={hideModal}>
+    <div class="dialog">
+      <div on:click|stopPropagation class="divider">
+        <div>
+          <div class="header-wrapper">
+            <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.launchErrorModal.title}</h1>
+            <h1 class="nes-font red-text-clickable close-button" on:click={hideModal}>X</h1>
+          </div>
+          <hr>
+          <div class="content">
+            <div class="credit">
+              <p class="nes-font">{reason}</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</dialog>
+{/if}
 
 <style>
     .header-wrapper {
@@ -72,7 +68,15 @@
       gap: 1em;
     }
 
-    dialog {
+    .overlay {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.2);
+      z-index: 999998;
+    }
+
+    .dialog {
         background-color: var(--background-color);
         border: 3.5px solid black;
         width: 50em;
@@ -84,27 +88,11 @@
         left: 50%; /* 50% von links */
         transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
         overflow-y: hidden;
+        z-index: 999999;
     }
 
-    dialog::backdrop {
-        background: rgba(0, 0, 0, 0.3);
-    }
-
-    dialog > div {
+    .dialog > div {
         padding: 1em;
-    }
-
-    dialog[open]::backdrop {
-        animation: fade 0.2s ease-out;
-    }
-
-    @keyframes fade {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
     }
 
     .title {
@@ -113,8 +101,7 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
-        /* font-size: 30px; */
+            /* font-size: 30px; */
         user-select: none;
         cursor: default;
     }

@@ -31,7 +31,6 @@
 
 <style>
     .notification {
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         padding: 16px;
         margin: 8px 0;

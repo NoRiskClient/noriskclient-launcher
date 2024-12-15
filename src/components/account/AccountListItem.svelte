@@ -1,15 +1,22 @@
 <script>
-    import {fetchUsers, removeUser, setDefaultUser} from "../../stores/credentialsStore.js";
+	import { defaultUser } from './../../stores/credentialsStore.js';
+	import { createEventDispatcher } from 'svelte';
+    import {fetchUsers, removeUser, setDefaultUser, fetchDefaultUserOrError} from "../../stores/credentialsStore.js";
     import {addNotification} from "../../stores/notificationStore.js";
     import {preventSelection} from "../../utils/svelteUtils.js";
 
     export let account;
     export let isActive;
-    export let dialog;
+
+    const dispatch = createEventDispatcher();
 
     function handleRemoveAccount() {
         removeUser(account).then(async value => {
             await fetchUsers();
+            await fetchDefaultUserOrError();
+            if (!$defaultUser) {
+                dispatch('close');
+            }
         }).catch((reason) => {
             addNotification(reason);
         });
@@ -21,7 +28,7 @@
     <div on:selectstart={preventSelection} on:mousedown={preventSelection} class="skin-text-wrapper"
          on:click={() => setDefaultUser(account)}>
         <img src={`https://crafatar.com/avatars/${account.id}?size=50&overlay`} alt="{account.username}'s Kopf">
-        <h1 class:green-text={isActive}>{account.username}</h1>
+        <h1 class:green-text={isActive} class:longName={account.username.length > 12}>{account.username}</h1>
     </div>
     <h1 class="remove-button" on:click={handleRemoveAccount}>X</h1>
 </div>
@@ -29,7 +36,6 @@
 
 <style>
     h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-left: 10px;
     }
@@ -38,7 +44,7 @@
         display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 30px;
+        gap: 10px;
         justify-content: space-between;
         align-content: space-between;
         width: 100%;
@@ -62,6 +68,10 @@
     img {
         box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
         border-radius: 0.2em;
+    }
+
+    .longName {
+        font-size: 1em;
     }
 
     .remove-button {

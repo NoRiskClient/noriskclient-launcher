@@ -37,23 +37,22 @@
       lightTheme = $launcherOptions.theme === "LIGHT";
     }
 
-
-    async function confirmClearData() {
+    async function confirmClearCache() {
         openConfirmPopup({
-            title: lang.settings.popup.clearData.title,
-            content: lang.settings.popup.clearData.content,
-            onConfirm: clearData
+            title: lang.settings.popup.clearCache.title,
+            content: lang.settings.popup.clearCache.content,
+            onConfirm: clearCache
         });
     }
 
-    async function clearData() {
-        invoke("clear_data", { options: $launcherOptions })
-            .then(async () => {
-                addNotification(lang.settings.notification.clearData.success, "INFO");
+    async function clearCache() {
+        invoke("clear_cache").then(async () => {
+                addNotification(lang.settings.notification.clearCache.success, "INFO");
                 await fetchOptions();
                 await fetchDefaultUserOrError(false);
                 await fetchBranches();
                 await fetchProfiles();
+                await startMicrosoftAuth();
             })
             .catch((error) => {
                 addNotification(error);
@@ -112,10 +111,9 @@
     onMount(async () => {
         const totalBytes = await invoke("get_total_memory");
         totalSystemMemory = Math.round(totalBytes / (1024 * 1024 * 1024)); // Konvertiere Bytes in GB
-        const memoryPercentage = $launcherOptions.memoryPercentage; // Verwende den Wert aus $launcherOptions
-        selectedMemory = Math.round((memoryPercentage / 100) * totalSystemMemory); // Berechne den Speicher in GB
+        selectedMemory = Math.round($launcherOptions.memoryLimit / 1024); // Berechne den Speicher in GB
         noriskLog(`Total system memory: ${totalBytes} bytes (${totalSystemMemory} GB).`);
-        noriskLog(`Selected memory: ${selectedMemory} GB (${memoryPercentage}%).`);
+        noriskLog(`Selected memory: ${selectedMemory} GB.`);
 
         if (keepLocalAssetsPernmission) {
             await invoke("get_keep_local_assets").then((value) => {
@@ -128,18 +126,14 @@
 
     onDestroy(async () => {
         //wir runden es weil wir es in der config als int speichern
-        $launcherOptions.memoryPercentage = Math.round((selectedMemory / totalSystemMemory) * 100);
-        noriskLog(`Selected memory: ${selectedMemory} GB (${$launcherOptions.memoryPercentage}%).`);
+        $launcherOptions.memoryLimit = selectedMemory * 1024;
+        noriskLog(`Selected memory: ${selectedMemory} GB.`);
         await saveOptions();
     });
 </script>
 
-{#if showMcRealAppModal}
-    <McRealAppModal bind:showModal={showMcRealAppModal} />
-{/if}
-{#if showManageAccountsModal}
-    <ManageAccountsModal bind:showModal={showManageAccountsModal} />
-{/if}
+<McRealAppModal bind:showModal={showMcRealAppModal} />
+<ManageAccountsModal bind:showModal={showManageAccountsModal} />
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div on:click|stopPropagation class="settings-container">
     <h1 class="nes-font title" on:selectstart={preventSelection} on:mousedown={preventSelection}>{lang.settings.title}</h1>
@@ -171,8 +165,8 @@
     <ConfigFileInput title={lang.settings.customJavaPath} bind:value={$launcherOptions.customJavaPath} requiredFileName={["javaw", "java"]} defaultValue={""} />
     <ConfigTextInput title={lang.settings.customJavaArgs} bind:value={$launcherOptions.customJavaArgs} placeholder={lang.settings.placeholder.customJavaArgs} />
     <ConfigFolderInput title={lang.settings.dataFolder} bind:value={$launcherOptions.dataPath} />
-    <div class="clear-data-button-wrapper">
-        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearData}>[{lang.settings.clearDataButton}]</p>
+    <div class="clear-cache-button-wrapper">
+        <p class="red-text" on:selectstart={preventSelection} on:mousedown={preventSelection} on:click={confirmClearCache}>[{lang.settings.clearCacheButton}]</p>
     </div>
     </div>
 </div>
@@ -219,7 +213,6 @@
     }
 
     .nes-font {
-        font-family: 'Press Start 2P', serif;
         font-size: 30px;
         user-select: none;
         cursor: default;
@@ -237,14 +230,12 @@
         display: flex;
         flex-direction: row;
         gap: 1em;
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         color: var(--font-color);
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }
 
     .horizontal-wrapper > .button {
-        font-family: 'Press Start 2P', serif;
         font-size: 14px;
         cursor: pointer;
         transition: transform 0.3s;
@@ -267,25 +258,24 @@
         gap: 2em;
     }
 
-    .clear-data-button-wrapper {
+    .clear-cache-button-wrapper {
         display: flex;
         align-content: center;
         align-items: center;
         justify-content: center;
         height: 3em;
         margin-top: 1.5em;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-shadow: 2px 2px #6e0000;
     }
 
-    .clear-data-button-wrapper p {
+    .clear-cache-button-wrapper p {
         color: #ff0000;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
-    .clear-data-button-wrapper p:hover {
+    .clear-cache-button-wrapper p:hover {
         transform: scale(1.2);
     }
   </style>

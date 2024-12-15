@@ -1,4 +1,5 @@
-import "../app.css";
+import "./big-scrollbar.css";
+import "../global.css";
 import Crash from "./Crash.svelte";
 
 const crash = new Crash({

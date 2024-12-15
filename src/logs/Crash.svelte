@@ -96,8 +96,7 @@
         font-size: 20px;
         color: #e8e8e8;
         text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-    }
+        }
 
     .back-button:hover {
         transform: scale(1.2);
@@ -112,7 +111,6 @@
 
     .copy-button {
         transition: 0.3s;
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);

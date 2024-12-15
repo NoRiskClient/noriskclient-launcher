@@ -26,11 +26,7 @@
     };
 </script>
 
-<div class="content">
-    {#if showFilterModal}
-        <FilterModal categories={filterCategories} bind:activeFilters={filters} bind:showModal={showFilterModal} on:search={onChange} />
-    {/if}
-</div>
+<FilterModal categories={filterCategories} bind:activeFilters={filters} bind:showModal={showFilterModal} on:search={onChange} />
 <div class="input-container">
     {#if title !== undefined}
         <h1>{title}</h1>
@@ -69,7 +65,6 @@
     }
     
     .input-container h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
@@ -84,7 +79,6 @@
     }
 
     .nes-input {
-        font-family: 'Press Start 2P', serif;
         font-size: 15px;
         padding: 6px 8px;
         line-height: 1em;

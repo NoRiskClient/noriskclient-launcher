@@ -45,6 +45,33 @@ impl CapeApiEndpoints {
         };
     }
 
+    pub async fn delete_cape(token: &str, uuid: &str, hash: &str) -> Result<(), String> {
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+
+        // Baue die URL mit dem Token als Query-Parameter
+        let url = format!("{}/cosmetics/cape/{}?uuid={}", get_api_base(options.experimental_mode), hash, uuid);
+
+        // Sende den POST-Request
+        let response = HTTP_CLIENT
+            .delete(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+
+        debug!("Cape delete status {:?}",response.status());
+
+        return match response.status() {
+            StatusCode::OK => Ok(()),
+            _ => {
+                let response_text = response.text().await.map_err(|err| {
+                    format!("Error reading the request: {}", err)
+                })?;
+                Err(response_text)
+            }
+        };
+    }
+
     pub async fn upload_cape(token: &str, uuid: &str, image_path: PathBuf) -> Result<String, String> {
         debug!("Image Path {:?}",image_path);
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();

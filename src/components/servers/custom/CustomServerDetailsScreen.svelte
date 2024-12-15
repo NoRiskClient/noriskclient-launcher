@@ -255,7 +255,6 @@
     }
 
     h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
@@ -272,7 +271,6 @@
     }
 
     .navbar p {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         padding: 10px;
         cursor: pointer;
@@ -309,7 +307,6 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         text-align: center;
         margin-top: 25%;
@@ -322,7 +319,6 @@
     }
 
     .startServer-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         cursor: pointer;
         transition: transform 0.3s;
@@ -333,7 +329,6 @@
     }
 
     .stopServer-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         color: #ff0000;
         text-shadow: 2px 2px #a80000;
@@ -354,7 +349,6 @@
     }
 
     .logRow p {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         text-shadow: none;
         margin-bottom: 5px;
@@ -367,35 +361,30 @@
     }
 
     .timestamp {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #868080;
         text-shadow: none;
     }
 
     .INFO {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: var(--primary-color);
         text-shadow: none;
     }
 
     .CONSOLE {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ffcd2b;
         text-shadow: none;
     }
 
     .WARN {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ff9100;
         text-shadow: none;
     }
 
     .ERROR {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ff0000;
         text-shadow: none;
@@ -403,7 +392,6 @@
 
     .console {
         border-radius: 5px;
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         padding: 6px 8px;
         border: 1px solid #212121;
@@ -440,7 +428,6 @@
     }
 
     .overview .infos .item p {
-        font-family: 'Press Start 2P', serif;
         font-size: 13.5px;
         margin-bottom: 0.8em;
         cursor: default;

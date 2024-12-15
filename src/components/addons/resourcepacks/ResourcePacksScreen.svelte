@@ -218,7 +218,7 @@
       });
       if (result.hits.length === 0) {
         updateResourcePacks(null);
-      } else if ((search_offset == 0 && searchterm != "") || Object.values(filters).length > 0) {
+      } else if ((search_offset == 0 && searchterm != "") || (Object.values(filters).length > 0 && search_offset == 0)) {
         updateResourcePacks(result.hits);
       } else {
         updateResourcePacks([...oldResourcePacks, ...result.hits.filter(resourcePack => searchterm != "" || !featuredResourcePacks.some((element) => element.slug === resourcePack.slug))]);
@@ -490,7 +490,6 @@
     }
 
     .navbar h1 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: pointer;
@@ -504,7 +503,6 @@
     }
 
     .navbar h2 {
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: default;
@@ -514,7 +512,6 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 200px;
     }
@@ -524,7 +521,6 @@
         flex-direction: row;
         justify-content: center;
         margin-top: 20px;
-        font-family: 'Press Start 2P', serif;
         font-size: 18px;
         margin-bottom: 0.8em;
         cursor: pointer;

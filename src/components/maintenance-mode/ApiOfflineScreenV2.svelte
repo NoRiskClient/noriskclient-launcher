@@ -6,8 +6,7 @@
         position: absolute;
         font-size: 20px;
         text-shadow: 2px 2px #7a7777;
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
+            cursor: pointer;
     }
 
     .offline-button:hover {

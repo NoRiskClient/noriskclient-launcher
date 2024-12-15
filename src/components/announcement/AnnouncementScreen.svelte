@@ -31,8 +31,7 @@
         margin-top: 20px;
         height: 90%;
         overflow-y: hidden;
-        font-family: 'Press Start 2P', serif;
-    }
+        }
 
     .announcement {
         display: flex;
@@ -75,8 +74,7 @@
         font-size: 1.75em;
         color: var(--primary-color);
         text-shadow: 2px 2px var(--primary-color-text-shadow);
-        font-family: 'Press Start 2P', serif;
-        cursor: pointer;
+            cursor: pointer;
     }
 
     .closeButton:hover {
