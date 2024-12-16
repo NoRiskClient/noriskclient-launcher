@@ -24,15 +24,15 @@
     animateOut();
   }
 
-  const ILLIGAL_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+  const ILLEGAL_CHARACTERS = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
   let animateOutNow = false;
 
   async function saveData() {
     if (settingsProfile.name == '') {
         settingsProfile.name = "Empty Name?";
-    } else if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
-        addNotification(lang.profiles.notification.illigalCharacterError, "ERROR");
+    } else if (settingsProfile.name.split('').some(c => ILLEGAL_CHARACTERS.includes(c))) {
+        addNotification(lang.profiles.notification.illegalCharacterError, "ERROR");
         return;
     }
     if (experimentalMode) {
@@ -69,8 +69,8 @@
 
   async function createProfile() {
     if (settingsProfile.name == '' || settingsProfile.name.toLowerCase() == `${settingsProfile.branch} - Default`.toLowerCase()) return;
-    if (settingsProfile.name.split('').some(c => ILLIGAL_CHARACTERS.includes(c))) {
-        addNotification(lang.profiles.notification.illigalCharacterError, "ERROR");
+    if (settingsProfile.name.split('').some(c => ILLEGAL_CHARACTERS.includes(c))) {
+        addNotification(lang.profiles.notification.illegalCharacterError, "ERROR");
         return;
     }
     noriskLog(`CREATING PROFILE: ${settingsProfile.name} (${settingsProfile.branch})`);

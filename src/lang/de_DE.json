@@ -170,7 +170,7 @@
     "profiles.buttons.importProfile": "PROFIL ERSTELLEN",
     "profiles.profile.tooltip.editProfile": "Profil bearbeiten",
     "profiles.profile.tooltip.defaultProfile": "Standart Profil",
-    "profiles.notification.illigalCharacterError": "Profil Name enthält unerlaubte Zeichen.",
+    "profiles.notification.illegalCharacterError": "Profil Name enthält unerlaubte Zeichen.",
     "profiles.modal.delete.title": "Profil löschen",
     "profiles.modal.delete.content": "Bist du sicher, dass du dieses Profil löschen möchtest?",
     "profiles.notification.delete.success": "Profil \"{profile}\" wurde gelöscht.",
