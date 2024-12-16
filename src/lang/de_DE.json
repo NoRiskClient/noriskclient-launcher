@@ -145,7 +145,7 @@
     "settings.popup.mcRealApp.button.showQrCode": "QR Code anzeigen",
     "settings.popup.mcRealApp.notification.errorWhileGettingMobileAppToken": "Beim Abrufen des Tokens für die Handy App ist ein Fehler aufgetreten: {error}",
     "settings.popup.mcRealApp.notification.errorWhileResettingMobileAppToken": "Beim Zurücksetzen des Tokens der Handy App ist ein Fehler aufgetreten: {error}",
-    "fileInput.WindowTitle": "Datei auswählen {file}",
+    "fileInput.windowTitle": "Datei auswählen {file}",
     "fileInput.filterName": "Erweiterungen filtern",
     "fileInput.notification.invalidFileName": "Bitte wähle eine Datei mit dem Namen {fileNames} aus, abhänging von deinem OS!",
     "fileInput.notification.failedToSelect": "Dateiauswahl fehlgeschlagen: {error}",

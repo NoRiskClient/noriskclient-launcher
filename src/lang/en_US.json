@@ -145,7 +145,7 @@
     "settings.popup.mcRealApp.button.showQrCode": "Show QR Code",
     "settings.popup.mcRealApp.notification.errorWhileGettingMobileAppToken": "An error occurred while getting the mobile app token: {error}",
     "settings.popup.mcRealApp.notification.errorWhileResettingMobileAppToken": "An error occurred while resetting the mobile app token: {error}",
-    "fileInput.WindowTitle": "Select File {file}",
+    "fileInput.windowTitle": "Select File {file}",
     "fileInput.filterName": "Extentions Filter",
     "fileInput.notification.invalidFileName": "Please select a file with the name {fileNames}, depending on your OS!",
     "fileInput.notification.failedToSelect": "Failed to select file using dialog: {error}",
