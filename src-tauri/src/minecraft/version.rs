@@ -8,7 +8,6 @@ use std::{
 
 use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
-use crate::app::assets_api::get_assets_api_base;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
 use crate::utils::{get_maven_artifact_path, md5sum, sha1sum};

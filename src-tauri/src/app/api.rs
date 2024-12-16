@@ -76,6 +76,41 @@ impl ApiEndpoints {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/mods", branch), "", "").await
     }
 
+    pub async fn branches(
+        norisk_token: &str,
+        request_uuid: &str,
+    ) -> core::result::Result<Vec<String>, crate::error::Error> {
+        Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid)
+            .await
+    }
+
+    pub async fn assets(
+        branch: String,
+        norisk_token: &str,
+        request_uuid: &str,
+    ) -> core::result::Result<NoriskAssets, crate::error::Error> {
+        Self::request_from_norisk_endpoint_with_error_handling(
+            &format!("launcher/branch/{}", branch),
+            norisk_token,
+            request_uuid,
+        )
+            .await
+    }
+
+    /// Request launch manifest of specific build
+    pub async fn launch_manifest(
+        branch: &str,
+        norisk_token: &str,
+        uuid: Uuid,
+    ) -> core::result::Result<NoRiskLaunchManifest, crate::error::Error> {
+        Self::request_from_norisk_endpoint_with_error_handling(
+            &format!("launcher/version/launch/{}", branch),
+            norisk_token,
+            &uuid.to_string(),
+        )
+            .await
+    }
+
     /// Request featured resourcepacks
     pub async fn norisk_featured_resourcepacks(branch: &str) -> Result<Vec<String>> {
         Self::request_from_norisk_endpoint(&*format!("launcher/featured/{}/resourcepacks", branch), "", "").await
