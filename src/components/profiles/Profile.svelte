@@ -112,7 +112,7 @@
         transition-duration: 100ms;
     }
 
-    .clone-click:hover {
+    .clone-click:hover + .clone-button {
         transform: scale(1.2);
         transition-duration: 100ms;
     }
