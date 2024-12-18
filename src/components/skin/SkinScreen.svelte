@@ -188,19 +188,19 @@
       slider.classList.toggle("no-slide");
       if (slider.classList.contains("title")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 30%;";
+          slider.style = "top: 25%;";
         } else {
           slider.style = "";
         }
       } else if (slider.classList.contains("change-button")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 65%;";
+          slider.style = "top: 70%;";
         } else {
           slider.style = "";
         }
       } else if (slider.classList.contains("unsavedSkinActionWrapper")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 65%;";
+          slider.style = "top: 70%;";
         } else {
           slider.style = "";
         }
@@ -332,12 +332,12 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        }
+    }
 
     .title {
         font-size: 35px;
         position: absolute;
-        top: 2.5em;
+        top: 0.75em;
     }
 
     .loading {
@@ -370,7 +370,7 @@
         flex-direction: column;
         justify-content: start;
         left: 62.5%;
-        top: 70px;
+        top: 10px;
     }
 
     .settings svg {
@@ -408,7 +408,7 @@
     }
 
     .change-button {
-        top: 82.5%;
+        top: 90%;
         position: absolute;
         flex: 1;
         margin-bottom: 175px;
@@ -425,7 +425,7 @@
         position: absolute;
         display: flex;
         flex-direction: row;
-        top: 82.5%;
+        top: 90%;
         width: 50%;
         overflow: visible;
         justify-content: space-between;

@@ -22,6 +22,10 @@ export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
 
+export const isWinterSeason = ((month = new Date().getMonth()) => {
+  return month === 11 || month === 0 || month === 1;
+})();
+
 export async function getVersion() {
   await invoke("get_launcher_version").then((v) => {
     version.set(v);
