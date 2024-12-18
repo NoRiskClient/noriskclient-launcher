@@ -17,13 +17,13 @@
     let popupInputValue = $activePopup?.inputValue ?? '';
     let popupInputPlaceholder = $activePopup?.inputPlaceholder ?? '';
     let onClose = $activePopup?.onClose ?? (() => closePopup());
-    let onCancel = $activePopup?.onCancel ?? (() => closePopup());
+    let onCancel = $activePopup?.onCancel ?? (() => closePopup(true));
     let onConfirm = $activePopup?.onConfirm ?? (() => closePopup());
     let validateInput = $activePopup?.validateInput ?? (() => true);
     let liveValidation = $activePopup?.liveValidation ?? true;
     // Darf nicht let sein, translation stuff !!?!?!?!
     $: popupConfirmButton = $activePopup?.confirmButton ?? lang.popup.defaultButtons.confirm;
-    $: popupCloseButton = $activePopup?.cancelButton ?? popupType == "INFO" ? "OK" : popupType == "CONFIRM" || popupType == "INPUT" ? lang.popup.defaultButtons.cancel : lang.popup.defaultButtons.close;
+    $: popupCloseButton = $activePopup?.cancelButton ?? (popupType == "INFO" ? "OK" : popupType == "CONFIRM" || popupType == "INPUT" ? lang.popup.defaultButtons.cancel : lang.popup.defaultButtons.close);
     
     let popupHeight = $activePopup?.height ?? 22.5;
     let popupWidth = $activePopup?.width ?? 30;
@@ -33,10 +33,10 @@
     let animateOutNow = false;
     let isInputValid = (popupType != "INPUT" || popupInputType != "TEXT") || !liveValidation;
 
-    function closePopup() {
-        if (popupType == "CONFIRM" || popupType == "INPUT") {
+    function closePopup(isExitButton = false) {
+        if ((popupType == "CONFIRM" || popupType == "INPUT") && !isExitButton) {
             onCancel();
-        } else {
+        } else if (!(popupType == "CONFIRM" || popupType == "INPUT")) {
             onClose();
         }
         animateOut();
@@ -85,7 +85,7 @@
         <div on:click|stopPropagation class="divider">
             <div class="header-wrapper">
                 <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? lang.popup.title[popupType.toLowerCase()]}</h1>
-                <h1 class="nes-font red-text-clickable close-button" on:click={closePopup}>X</h1>
+                <h1 class="nes-font red-text-clickable close-button" on:click={() => closePopup(true)}>X</h1>
             </div>
             <hr>
             <div class="popup-content-wrapper">
@@ -106,7 +106,7 @@
                         class="button nes-font enabled"
                         class:red-text={popupType != "INFO"}
                         class:primary-text={popupType == "INFO"}
-                        on:click={closePopup}
+                        on:click={() => closePopup()}
                     >{popupCloseButton}</p>
                     {#if popupType == "CONFIRM" || popupType == "INPUT"}
                         <p class="button nes-font green-text" class:disabled={!isInputValid} class:enabled={isInputValid} on:click={() => isInputValid ? confirmPopup() : {}} title={!isInputValid ? lang.popup.invalidInput : ""}>{popupConfirmButton}</p>

@@ -1,8 +1,9 @@
 <script>
-	import { scale } from 'svelte/transition';
+	import { invoke } from '@tauri-apps/api';
+	import { get } from 'svelte/store';
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
-    import { openInfoPopup } from "../../../utils/popupUtils.js";
+    import { openInfoPopup, openConfirmPopup } from "../../../utils/popupUtils.js";
     import FallbackIcon from "/src/images/modrinth.png";
     import { translations } from '../../../utils/translationUtils.js';
     
@@ -16,6 +17,7 @@
     export let text;
     export let type;
     export let modVersions;
+    export let manifest;
 
     const slug = mod?.slug ?? mod?.value?.source?.artifact?.split(":")[1];
     const name = mod?.title ?? mod?.value?.name;
@@ -23,8 +25,10 @@
     let versionDropdownOpen = false;
     let isChangingVersion = false;
 
+
     onMount(() => {
         isChangingVersion = false;
+        
         if (slug && text != "DEPENDENCY" && modVersions != null && modVersions[slug] == null) {
             console.log("Fetching versions for " + name);
             dispatch("getVersions");
@@ -45,6 +49,36 @@
             return lang.addons.global.item.downloadCount.thousand.replace("{count}", (mod?.downloads / 1000).toFixed(1));
         } else {
             return lang.addons.global.item.downloadCount.million.replace("{count}", (mod?.downloads / 1000000).toFixed(1));
+        }
+    }
+
+    async function install() {
+        let projectVersions = [];
+        await invoke("get_project_versions", {
+                slug: slug,
+                params: `?game_versions=["${manifest.build.mc_version}"]&loaders=["fabric"]`
+            })
+                .then(versions => projectVersions = versions)
+                .catch(console.error);
+
+        if (["beta", "alpha"].includes(projectVersions[0].version_type.toLowerCase()) && projectVersions[0].game_versions.length > 1) {
+            const stable = projectVersions.filter(v => v.game_versions.includes(manifest.build.mc_version) && v.game_versions.length == 1) ?? [];
+            
+            openConfirmPopup({
+                title: lang.addons.mods.item.weirdVersions.title,
+                content: lang.addons.mods.item.weirdVersions.content,
+                confirmButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useStable : lang.addons.mods.item.weirdVersions.button.confirm,
+                cancelButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useLatest : null,
+                width: 35,
+                onConfirm: () => {
+                    dispatch("install", { version: stable[0].version_number });
+                },
+                onCancel: stable.length > 0 ? () => {
+                    dispatch("install", { version: projectVersions[0].version_number });
+                } : () => {}
+            })
+        } else {
+            dispatch("install", { version: projectVersions[0].version_number });
         }
     }
 </script>
@@ -154,13 +188,13 @@
                         {lang.addons.global.item.featured}
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    <h1 class="install-button green-text" on:click={() => install()}>
                         {lang.addons.global.item.button.install}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                <h1 class="install-button green-text" on:click={() => install()}>
                     {lang.addons.global.item.button.install}
                 </h1>
             {/if}
