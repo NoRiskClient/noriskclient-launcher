@@ -113,6 +113,8 @@ pub struct LauncherOptions {
     #[serde(rename = "concurrentDownloads", default = "default_concurrent_downloads")]
     pub concurrent_downloads: i32,
     pub language: String,
+    #[serde(rename = "configVersion")]
+    pub config_version: String,
 }
 
 // use this to make settings migration possible. this involves some more stuff, ask tim for more info :)
@@ -179,7 +181,8 @@ impl LauncherOptions {
                     latest_branch: old_options.latest_branch,
                     latest_dev_branch: old_options.latest_dev_branch,
                     concurrent_downloads: old_options.concurrent_downloads,
-                    language: default.language
+                    language: default.language,
+                    config_version: default.config_version
                 };
                 info!("Migrated old options.json to new options.json");
                 new_options.store(app_data).await?;
@@ -224,7 +227,8 @@ impl Default for LauncherOptions {
             latest_branch: None,
             latest_dev_branch: None,
             concurrent_downloads: 20,
-            language: String::from("en_US")
+            language: String::from("en_US"),
+            config_version: String::from("1.0"),
         }
     }
 }
