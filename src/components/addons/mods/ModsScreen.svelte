@@ -147,7 +147,7 @@
       slug: slug,
       params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
     }).then(async (result) => {
-      modVersions[slug] = result.map(v => v.version_number);
+      modVersions[slug] = result;
       console.debug(`Project Versions of ${slug}`, modVersions[slug]);
     }).catch((error) => {
       addNotification(error);
