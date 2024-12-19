@@ -1,7 +1,7 @@
 <script>
   import Modal from "../../account/AccountModal.svelte";
   import SteveSkin from "../../../images/steve_head.png";
-  import FallbackSkin from "/src/images/fallback_skin_kopf.png";
+  import FallbackSkin from "/src/images/fallback_skin_head.png";
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { startMicrosoftAuth } from "../../../utils/microsoftUtils.js";
   import { runClient } from "../../../utils/noriskUtils.js";
@@ -19,53 +19,58 @@
 </script>
 
 <Modal bind:showModal />
-<div class="skin-kopf-container">
-  {#if $defaultUser}
+<div class="skin-head-container">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <img class="skin-kopf"
+    <div class="skin-click" on:click={$defaultUser ? handleStart : startMicrosoftAuth}></div>
+  {#if $defaultUser}
+    <img class="skin-head"
          src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
          alt=" "
          onerror="this.src='{FallbackSkin}'"
-         on:click={handleStart}
     >
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div on:click={() => (showModal = true)} class="tag">*</div>
   {:else}
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <img class="skin-kopf zoom glow"
+    <img class="skin-head zoom glow"
          src={SteveSkin}
          alt="Skin Head"
-         on:click={startMicrosoftAuth}
     >
   {/if}
 </div>
 
 <style>
-    .skin-kopf-container {
+    .skin-head-container {
         position: relative;
         transition: transform 0.3s;
         margin-top: 10px;
     }
 
-    .skin-kopf {
+    .skin-head {
         -webkit-user-drag: none;
         box-shadow: 0px 0px 3px 0px rgba(12, 10, 10, 0.75);
         border-radius: 0.45em;
         transition-duration: 200ms;
     }
 
-    .skin-kopf-container:hover {
+    .skin-click {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .skin-head-container:hover {
         position: relative;
         transform: scale(1.2);
         cursor: pointer;
     }
 
-    .skin-kopf-container:hover .skin-kopf {
+    .skin-head-container:hover .skin-head {
         border-radius: 0.25em;
     }
 
     .tag {
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin: 0;
         color: #b7b7b7;

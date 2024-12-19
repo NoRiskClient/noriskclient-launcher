@@ -1,32 +1,37 @@
 <script>
+    import { open } from '@tauri-apps/api/shell';
     import { preventSelection } from "../../utils/svelteUtils.js";
     import { translations } from '../../utils/translationUtils.js';
     
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
+
+    function openUrl(url) {
+        open(url);
+    }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="container" on:selectstart={preventSelection}>
     <h1 class="title">{lang.legal.title}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div class="card" style="margin-top: 60px;" on:click={() => window.open("https://norisk.gg/privacy-policy", "_blanc")}> <!-- push('/legal/privacy-policy') -->
+    <div class="card" style="margin-top: 60px;" on:click={() => openUrl("https://norisk.gg/privacy-policy")}>
         <h2>🔐 {lang.legal.button.privacyPolicy}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => window.open("https://norisk.gg/terms-of-service", "_blanc")}> <!-- push('/legal/terms-of-service') -->
+    <div class="card" on:click={() => openUrl("https://norisk.gg/terms-of-service")}>
         <h2>📝 {lang.legal.button.termsOfService}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => window.open("https://norisk.gg/open-source-licences", "_blanc")}> <!-- push('/legal/open-source-licences') -->
+    <div class="card" on:click={() => openUrl("https://norisk.gg/open-source-licences")}>
         <h2>📜 {lang.legal.button.openSourceLicenses}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => window.open("https://norisk.gg/used-libraries", "_blanc")}> <!-- push('/legal/used-libraries') -->
+    <div class="card" on:click={() => openUrl("https://norisk.gg/used-libraries")}>
         <h2>📦 {lang.legal.button.usedLibraries}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => window.open("https://norisk.gg/imprint", "_blanc")}> <!-- push('/legal/imprint') -->
+    <div class="card" on:click={() => openUrl("https://norisk.gg/imprint")}>
         <h2>📨 {lang.legal.button.imprint}</h2>
         <p>&gt;</p>
     </div>
@@ -40,8 +45,7 @@
         justify-content: center;
         height: 80vh;
         width: 100vw;
-        font-family: 'Press Start 2P', serif;
-        color: var(--font-color);
+            color: var(--font-color);
         padding-top: 2em;
         text-shadow: 2px 2px var(--font-color-text-shadow);
     }

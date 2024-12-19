@@ -9,8 +9,6 @@ use crate::{error::LauncherError, HTTP_CLIENT, LAUNCHER_DIRECTORY, utils::{downl
 use crate::utils::{get_maven_artifact_path, sha1sum};
 use std::sync::Arc;
 use log::{debug, error, info};
-use reqwest::Response;
-use uuid::Uuid;
 use error::Error;
 use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;

@@ -34,8 +34,7 @@
 
 <style>
     .text {
-        font-family: 'Press Start 2P', serif;
-        text-align: center;
+            text-align: center;
         width: 95%;
     }
 
@@ -63,7 +62,6 @@
         cursor: pointer;
         color: #7289da;
         text-shadow: 2px 2px #4d5d97;
-        font-family: 'Press Start 2P', serif;
         font-size: 20px;
         margin-top: 20px;
         transition-duration: 200ms;
@@ -76,8 +74,7 @@
     .quit-button {
         cursor: pointer;
         margin-top: 100px;
-        font-family: 'Press Start 2P', serif;
-        text-align: center;
+            text-align: center;
         font-size: 40px;
         cursor: pointer;
         transition-duration: 300ms;

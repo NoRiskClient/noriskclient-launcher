@@ -73,9 +73,9 @@
     if ($defaultUser) {
       await invoke("get_cape_hash_by_uuid", {
         uuid: $defaultUser.id,
-      }).then(async (user) => {
-        if (user) {
-          const url = $launcherOptions.experimentalMode ? `https://dl-staging.norisk.gg/capes/prod/${user}.png` : `https://dl.norisk.gg/capes/prod/${user}.png`;
+      }).then(async (hash) => {
+        if (hash) {
+          const url = `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${hash}.png`;
           await invoke("read_remote_image_file", { location: url })
             .then((capeData) => {
               capeLocation = `data:image/png;base64,${capeData}`;
@@ -188,19 +188,19 @@
       slider.classList.toggle("no-slide");
       if (slider.classList.contains("title")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 30%;";
+          slider.style = "top: 25%;";
         } else {
           slider.style = "";
         }
       } else if (slider.classList.contains("change-button")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 65%;";
+          slider.style = "top: 70%;";
         } else {
           slider.style = "";
         }
       } else if (slider.classList.contains("unsavedSkinActionWrapper")) {
         if (slider.classList.contains("slide")) {
-          slider.style = "top: 65%;";
+          slider.style = "top: 70%;";
         } else {
           slider.style = "";
         }
@@ -332,13 +332,12 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-family: 'Press Start 2P', serif;
     }
 
     .title {
         font-size: 35px;
         position: absolute;
-        top: 2.5em;
+        top: 0.75em;
     }
 
     .loading {
@@ -371,7 +370,7 @@
         flex-direction: column;
         justify-content: start;
         left: 62.5%;
-        top: 70px;
+        top: 10px;
     }
 
     .settings svg {
@@ -409,7 +408,7 @@
     }
 
     .change-button {
-        top: 82.5%;
+        top: 90%;
         position: absolute;
         flex: 1;
         margin-bottom: 175px;
@@ -426,7 +425,7 @@
         position: absolute;
         display: flex;
         flex-direction: row;
-        top: 82.5%;
+        top: 90%;
         width: 50%;
         overflow: visible;
         justify-content: space-between;
