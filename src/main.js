@@ -1,4 +1,5 @@
-import "./app.css";
+import "./global.css";
+import "./small-scrollbar.css";
 import App from "./App.svelte";
 
 const app = new App({

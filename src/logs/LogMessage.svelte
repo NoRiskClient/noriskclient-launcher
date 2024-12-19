@@ -32,7 +32,6 @@
     }
 
     .logRow p {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         text-shadow: none;
         margin-bottom: 5px;
@@ -53,28 +52,24 @@
     }
 
     .timestamp {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #868080;
         text-shadow: none;
     }
 
     .INFO {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: var(--primary-color);
         text-shadow: none;
     }
 
     .WARN {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ff9100;
         text-shadow: none;
     }
 
     .ERROR {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         color: #ff0000;
         text-shadow: none;

@@ -1,7 +1,8 @@
 <script>
+	import { invoke } from '@tauri-apps/api';
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
-    import { openInfoPopup } from "../../../utils/popupUtils.js";
+    import { openInfoPopup, openConfirmPopup } from "../../../utils/popupUtils.js";
     import FallbackIcon from "/src/images/modrinth.png";
     import { translations } from '../../../utils/translationUtils.js';
     
@@ -15,6 +16,7 @@
     export let text;
     export let type;
     export let modVersions;
+    export let manifest;
 
     const slug = mod?.slug ?? mod?.value?.source?.artifact?.split(":")[1];
     const name = mod?.title ?? mod?.value?.name;
@@ -22,8 +24,10 @@
     let versionDropdownOpen = false;
     let isChangingVersion = false;
 
+
     onMount(() => {
         isChangingVersion = false;
+        
         if (slug && text != "DEPENDENCY" && modVersions != null && modVersions[slug] == null) {
             console.log("Fetching versions for " + name);
             dispatch("getVersions");
@@ -31,10 +35,17 @@
     })
 
     async function changeVersion(version) {
-        console.log("Changing version of " + slug + " to " + version);
-        isChangingVersion = true;
-        versionDropdownOpen = false;
-        await dispatch("changeVersion", { version: version });
+        openConfirmPopup({
+            title: lang.addons.mods.item.unstableVersion.title,
+            content: lang.addons.mods.item.unstableVersion.content.replace("{versionType}", version.version_type),
+            confirmButton: lang.addons.mods.item.unstableVersion.button.confirm,
+            onConfirm: async () => {
+                console.log("Changing version of " + slug + " to " + version.version_number);
+                isChangingVersion = true;
+                versionDropdownOpen = false;
+                await dispatch("changeVersion", { version: version.version_number });
+            }
+        });
     }
 
     function getMinimalisticDownloadCount() {
@@ -44,6 +55,40 @@
             return lang.addons.global.item.downloadCount.thousand.replace("{count}", (mod?.downloads / 1000).toFixed(1));
         } else {
             return lang.addons.global.item.downloadCount.million.replace("{count}", (mod?.downloads / 1000000).toFixed(1));
+        }
+    }
+
+    async function install() {
+        let projectVersions = [];
+        await invoke("get_project_versions", {
+                slug: slug,
+                params: `?game_versions=["${manifest.build.mc_version}"]&loaders=["fabric"]`
+            })
+                .then(versions => projectVersions = versions)
+                .catch(console.error);
+        
+        if (["beta", "alpha"].includes(projectVersions[0].version_type.toLowerCase())) {
+            const stable = projectVersions.filter(v => v.game_versions.includes(manifest.build.mc_version) && (v.game_versions.length == 1)) ?? [];
+            const release = projectVersions.filter(v => v.version_type == "release") ?? [];
+            if (release.length > 0) {
+                return dispatch("install", { version: release[0].version_number });
+            }
+            
+            openConfirmPopup({
+                title: lang.addons.mods.item.weirdVersions.title,
+                content: lang.addons.mods.item.weirdVersions.content,
+                confirmButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useStable : lang.addons.mods.item.weirdVersions.button.confirm,
+                cancelButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useLatest : null,
+                width: 35,
+                onConfirm: () => {
+                    dispatch("install", { version: stable[0].version_number });
+                },
+                onCancel: stable.length > 0 ? () => {
+                    dispatch("install", { version: projectVersions[0].version_number });
+                } : () => {}
+            });
+        } else {
+            dispatch("install", { version: projectVersions[0].version_number });
         }
     }
 </script>
@@ -98,34 +143,54 @@
                         }) : () => {}
                     }>
                 
-                    {lang.addons.mods.item.dependencyText.usedBy.replace("{parents}", mod.parents.length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", "))}
+                    {lang.addons.mods.item.dependencyText.usedBy.replace("{parents}", mod.parents.join(", ").length > 180 ? mod.parents.join(", ").substring(0, 180) + "..." : mod.parents.join(", "))}
                 </p>
             {:else if mod.description != undefined && mod.description != null}
                 <p class="description">{mod.description.length > 85 ? mod.description.substring(0, 85) + '...' : mod.description}</p>
             {:else if modVersions != null && modVersions[slug]?.length > 1}
-                <div class="versionSelect">
-                    <p>Version:</p>
-                    <section class="dropdown">
-                        <button
-                            on:click={async () => {
-                                if (isChangingVersion) return;
-                                versionDropdownOpen = !versionDropdownOpen;
-                                await tick();
-                            }}
-                        >
-                            {#if isChangingVersion}
-                                <span>⏳</span> {lang.addons.mods.item.changingVersion}
-                            {:else}
-                                <span>{versionDropdownOpen ? '⮟' : '⮞'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
-                            {/if}
-                        </button>
-                        <div class="versions" class:show={versionDropdownOpen}>
-                            {#each modVersions[slug].filter(v => v != mod?.value?.source?.artifact?.split(':')[2]) as version}
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <p class="version" on:click={() => changeVersion(version)}>{version}</p>
-                            {/each}
-                        </div>
-                    </section>
+                <div class="versions-wrapper">
+                    <div class="versionSelect">
+                        <p>Version:</p>
+                        <section class="dropdown">
+                            <button
+                                on:click={async () => {
+                                    if (isChangingVersion) return;
+                                    versionDropdownOpen = !versionDropdownOpen;
+                                    await tick();
+                                }}
+                            >
+                                {#if isChangingVersion}
+                                    <span>⏳</span> {lang.addons.mods.item.changingVersion}
+                                {:else}
+                                    <span>{versionDropdownOpen ? '*' : '>'} </span> {mod?.value?.source?.artifact?.split(':')[2]}
+                                {/if}
+                            </button>
+                            <div class="versions" class:show={versionDropdownOpen}>
+                                {#each modVersions[slug] as version}
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <p
+                                        class="version"
+                                        class:current={version.version_number == mod?.value?.source?.artifact?.split(':')[2]}
+                                        class:latest={modVersions[slug].map(v => v.version_number)[0] == version.version_number}
+                                        on:click={version.version_number != mod?.value?.source?.artifact?.split(':')[2] ? () => changeVersion(version) : () => versionDropdownOpen = false}
+                                    >
+                                        {#if version.version_type == "release"}
+                                            <span style="text-shadow: none;">✔️</span>
+                                        {:else if version.version_type == "beta"}
+                                            <span  style="text-shadow: none;">🔮</span>
+                                        {:else if version.version_type == "alpha"}
+                                            <span  style="text-shadow: none;">💥</span>
+                                        {/if}
+                                        {version.version_number}
+                                    </p>
+                                {/each}
+                            </div>
+                        </section>
+                    </div>
+                    {#if !isChangingVersion && modVersions[slug].map(v => v.version_number)[0] != mod?.value?.source?.artifact?.split(':')[2]}
+                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                        <p class="update-button" on:click={() => changeVersion(modVersions[slug][0])}>{lang.addons.mods.item.button.update}</p>
+                    {/if}
                 </div>
             {/if}
         </div>
@@ -142,13 +207,13 @@
                         {lang.addons.global.item.featured}
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    <h1 class="install-button green-text" on:click={() => install()}>
                         {lang.addons.global.item.button.install}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                <h1 class="install-button green-text" on:click={() => install()}>
                     {lang.addons.global.item.button.install}
                 </h1>
             {/if}
@@ -309,8 +374,7 @@
     .mod-title {
         text-decoration-thickness: 0.1em;
         text-decoration: underline;
-        font-family: 'Press Start 2P', serif;
-        line-break: anywhere;
+            line-break: anywhere;
         font-size: 16px;
         cursor: pointer;
         -webkit-user-drag: none;
@@ -327,13 +391,11 @@
 
     .author-container .author {
         white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .author-container .download-count {
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
@@ -345,12 +407,18 @@
     }
 
     .description {
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         line-height: 1.2em;
         padding-top: 2em;
         cursor: default;
         text-shadow: 1px 1px var(--font-color-text-shadow);
+    }
+
+    .versions-wrapper {
+        display: flex;
+        flex-direction: row;
+        align-items: end;
+        gap: 1em;
     }
 
     .versionSelect {
@@ -363,14 +431,12 @@
     }
 
     .versionSelect p {
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         text-shadow: 1px 1px var(--font-color-text-shadow);
     }
 
     .versionSelect button {
         display: flex;
-        font-family: 'Press Start 2P', serif;
         font-size: 11px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
         cursor: pointer;
@@ -411,10 +477,19 @@
     }
 
     .versionSelect .dropdown .versions .version {
-        font-family: 'Press Start 2P', serif;
         font-size: 12px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
         cursor: pointer;
+    }
+
+    .versionSelect .dropdown .versions .version.current {
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+    }
+
+    .versionSelect .dropdown .versions .version.latest {
+        color: var(--green-text);
+        text-shadow: 1.5px 1.5px var(--green-text-shadow);
     }
 
     .versionSelect .dropdown .versions .version:hover {
@@ -423,26 +498,36 @@
         text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
     }
 
+    .update-button {
+        font-size: 14px;
+        color: var(--primary-color);
+        text-shadow: 1.5px 1.5px var(--primary-color-text-shadow);
+        cursor: pointer;
+        margin-bottom: 0.5em;
+        transition-duration: 300ms;
+    }
+
+    .update-button:hover {
+        transform: scale(1.1);
+    }
+
     .isMissing {
         font-size: 14px;
         font-style: italic;
     }
 
     .install-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
     .required-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: default;
     }
 
     .featured-label {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         color: #f0c91a;
         text-shadow: 1.5px 1.5px #9e8704;
@@ -450,7 +535,6 @@
     }
 
     .delete-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition: transform 0.3s;

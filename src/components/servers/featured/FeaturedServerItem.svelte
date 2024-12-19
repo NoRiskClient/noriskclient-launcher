@@ -100,28 +100,24 @@
     .server-name {
         text-decoration-thickness: 0.1em;
         text-decoration: underline;
-        font-family: 'Press Start 2P', serif;
-        line-break: anywhere;
+            line-break: anywhere;
         font-size: 18px;
     }
 
     .server-item-wrapper p {
         width: 350px;
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         line-height: 1.2em;
         padding-top: 2em;
     }
 
     .play-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
     .launching-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         margin-right: 1em;
     }

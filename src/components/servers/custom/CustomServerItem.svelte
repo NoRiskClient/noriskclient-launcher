@@ -146,21 +146,18 @@
     .server-name {
         text-decoration-thickness: 0.1em;
         text-decoration: underline;
-        font-family: 'Press Start 2P', serif;
-        line-break: anywhere;
+            line-break: anywhere;
         font-size: 18px;
     }
 
     .server-item-wrapper p {
         width: 350px;
-        font-family: 'Press Start 2P', serif;
         font-size: 10px;
         line-height: 1.2em;
         padding-top: 2em;
     }
 
     .details-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition-duration: 200ms;

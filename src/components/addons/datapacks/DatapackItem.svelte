@@ -200,8 +200,7 @@
     .datapack-title {
         text-decoration-thickness: 0.1em;
         text-decoration: underline;
-        font-family: 'Press Start 2P', serif;
-        line-break: anywhere;
+            line-break: anywhere;
         font-size: 16px;
         cursor: pointer;
         -webkit-user-drag: none;
@@ -218,19 +217,16 @@
 
     .author-container .author {
         white-space: nowrap;
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .author-container .download-count {
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .description {
-        font-family: 'Press Start 2P', serif;
         font-size: 9px;
         line-height: 1.2em;
         padding-top: 2em;
@@ -239,14 +235,12 @@
     }
 
     .install-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition: transform 0.3s;
     }
 
     .featured-label {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         color: #f0c91a;
         text-shadow: 1.5px 1.5px #9e8704;
@@ -256,7 +250,6 @@
     .progress-text {
         display: flex;
         flex-direction: column;
-        font-family: 'Press Start 2P', serif;
         font-size: 16px;
         gap: 1em;
         text-align: center;
@@ -268,7 +261,6 @@
     }
 
     .delete-button {
-        font-family: 'Press Start 2P', serif;
         font-size: 17px;
         cursor: pointer;
         transition: transform 0.3s;

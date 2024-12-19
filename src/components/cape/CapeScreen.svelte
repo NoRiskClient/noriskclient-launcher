@@ -1,4 +1,5 @@
 <script>
+	import CapePlayer from './CapePlayer.svelte';
   import { invoke } from "@tauri-apps/api/tauri";
   import CapeCarousel from "./CapeCarousel.svelte";
   import CapeEditor from "./CapeEditor.svelte";
@@ -17,6 +18,8 @@
   let capeHash = null;
   let isLoading = true;
   let currentRequest = 0;
+  let previewHash = null;
+  let previewData = null;
 
   async function requestTrendingCapes(alltime) {
     if ($defaultUser) {
@@ -65,7 +68,7 @@
   }
 
   async function switchTab(tab) {
-    const oldRequest = currentRequest;
+    const oldRequest = currentRequest > -1 ? currentRequest : 0;
     currentRequest = tab;
     capes = null;
     if (currentRequest != 3) {
@@ -108,6 +111,18 @@
     }
   }
 
+  function previewCape(hash, data) {
+    previewHash = hash;
+    previewData = data;
+    isLoading = true;
+
+    // ja das braucht man. nicht hinterfragen. :)
+    setTimeout(() => {
+      currentRequest = -1;
+      isLoading = false;
+    }, 0);
+  }
+
   getNoRiskUserByUUID();
 </script>
 
@@ -124,13 +139,17 @@
     </div>
   </div>
   <div class="cape-wrapper">
-    {#if currentRequest === 0}
+    {#if currentRequest === -1}
+      <div class="preview-player">
+        <CapePlayer bind:cape={previewHash} bind:data={previewData} height={350} width={350} />
+      </div>
+    {:else if currentRequest === 0}
       {#if !isLoading}
-        <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capeHash />
+        <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(null, data.detail)} bind:capeHash />
       {/if}
     {:else if currentRequest === 1 || currentRequest === 2 || currentRequest === 3 || currentRequest === 4}
-      {#if capes != null}
-        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} bind:capes />
+      {#if capes != null && !isLoading}
+        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(data.detail)} bind:capes allowDelete={currentRequest === 4} />
       {/if}
     {/if}
   </div>
@@ -151,8 +170,7 @@
 
     .tab-wrapper h1,
     .tab-wrapper h2 {
-        font-family: 'Press Start 2P', serif;
-        padding: 1em;
+            padding: 1em;
         font-size: 1em;
         transition: transform 0.3s, color 0.3s;
     }
@@ -177,5 +195,13 @@
     .button-wrapper {
         display: flex;
         flex-direction: row;
+    }
+
+    .preview-player {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>
