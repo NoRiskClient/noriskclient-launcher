@@ -1,10 +1,10 @@
 <script>
   import { invoke } from "@tauri-apps/api/tauri";
   import { fade } from "svelte/transition";
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
-  import { getNoRiskToken } from "../../utils/noriskUtils.js";
+  import { getNoRiskToken, deletedCapesCache, cacheDeletedCape } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { translations } from '../../utils/translationUtils.js';
   import { openConfirmPopup } from "../../utils/popupUtils.js";
@@ -14,9 +14,11 @@
 
   const dispatch = createEventDispatcher();
 
-  export let capes = [];
+  export let apiCapes = [];
   export let allowDelete = false;
   let visibleCapes = [];
+
+  $: capes = apiCapes.filter(cape => !($deletedCapesCache ?? []).includes(cape._id));
 
   // Der aktuelle Index der Seite für die Iteration
   let currentPage = 0;
@@ -26,6 +28,8 @@
 
   // Funktion, um die aktuellen sichtbaren Elemente zu aktualisieren
   function updateVisibleCapes() {
+    // braucht man evtl nicht, aber zu faul zum testen
+    capes = apiCapes.filter(cape => !($deletedCapesCache ?? []).includes(cape._id))
     if (capes === null) return;
     visibleCapes = [];
 
@@ -94,9 +98,11 @@
           }).then(() => {
             addNotification(lang.capes.notification.delete.success, "INFO");
             dispatch("fetchNoRiskUser");
-            const keepCapes = capes;
-            capes = null;
-            capes = keepCapes.filter(cape => cape._id !== hash);
+            cacheDeletedCape(hash);
+            capes = capes.filter(cape => !$deletedCapesCache.includes(cape._id));
+            setTimeout(() => {
+              dispatch("refresh");
+            }, 3 * 60 * 1000);
             currentPage = 0;
             updateVisibleCapes();
           }).catch((error) => {
@@ -113,6 +119,10 @@
 
   // Rufe die initialen sichtbaren Elemente auf
   updateVisibleCapes();
+
+  onMount(() => {
+    capes = apiCapes.filter(cape => !($deletedCapesCache ?? []).includes(cape._id));
+  });
 </script>
 
 
@@ -294,7 +304,7 @@
 
     .info-text {
         position: absolute;
-        bottom: 5.75em;
+        bottom: 2em;
         left: 50%;
         transform: translateX(-50%);
         padding: 4px 8px;
@@ -306,7 +316,7 @@
     }
 
     .info-text-bottom {
-        bottom: 7.5em;
+        bottom: 1.5em;
         left: 50%;
         transform: translateX(-50%);
         position: absolute;

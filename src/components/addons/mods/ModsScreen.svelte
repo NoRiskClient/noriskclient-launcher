@@ -143,11 +143,11 @@
       return modVersions[slug];
     }
 
-    await invoke("get_project_version", {
+    await invoke("get_project_versions", {
       slug: slug,
       params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
     }).then(async (result) => {
-      modVersions[slug] = result.map(v => v.version_number);
+      modVersions[slug] = result;
       console.debug(`Project Versions of ${slug}`, modVersions[slug]);
     }).catch((error) => {
       addNotification(error);
@@ -157,12 +157,12 @@
     return modVersions[slug];
   }
 
-  async function installModAndDependencies(mod) {
+  async function installModAndDependencies(mod, version) {
     mod.loading = true;
     updateMods(mods);
     await invoke("install_mod_and_dependencies", {
       slug: mod.slug,
-      version: null,
+      version: version,
       params: `?game_versions=["${launchManifest.build.mc_version}"]&loaders=["fabric"]`,
       requiredMods: launchManifest.mods,
     }).then((result) => {
@@ -664,12 +664,13 @@
             <ModItem
               text={checkIfRequiredOrInstalled(item)}
               enabled={launcherProfile.mods.find(mod => mod.value.name === item.slug)?.value?.enabled ?? true}
-              on:install={() => installModAndDependencies(item)}
+              on:install={(data) => installModAndDependencies(item, data.detail.version)}
               on:enable={() => enableRecomendedMod(item.slug)}
               on:disable={() => disableRecomendedMod(item.slug)}
               on:delete={() => deleteInstalledMod(item.slug)}
               type="RESULT"
               modVersions={null}
+              manifest={launchManifest}
               mod={item} />
           {/if}
         {/each}
@@ -715,6 +716,7 @@
               on:toggle={() => toggleInstalledMod(item)}
               type="CUSTOM"
               modVersions={null}
+              manifest={launchManifest}
               mod={item} />
           {:else}
             <ModItem
@@ -730,6 +732,7 @@
               on:getVersions={async () => await getModVersions(item.value.source.artifact.split(":")[1])}
               type="INSTALLED"
               bind:modVersions={modVersions}
+              manifest={launchManifest}
               mod={item} />
           {/if}
         {/each}

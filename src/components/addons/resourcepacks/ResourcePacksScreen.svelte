@@ -356,7 +356,7 @@
   }
 
   onMount(() => {
-    [
+    filterCategories = [
       {
         type: lang.addons.resourcePacks.filters.categories.title,
         entries: [
@@ -401,7 +401,9 @@
           { id: "512x+", name: lang.addons.resourcePacks.filters.performance.x512orHigher},
         ],
       },
-    ]
+    ];
+    console.log(filters);
+    
     load();
   });
 

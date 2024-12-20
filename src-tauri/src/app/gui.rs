@@ -78,9 +78,7 @@ use super::{api::{
     Announcement, ChangeLog, LastViewedPopups,
     LauncherOptions, LauncherProfiles,
 }, modrinth_api::{
-    Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
-    ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
-    ResourcePackInfo, Shader, ShaderInfo,
+    Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo
 }};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -250,6 +248,11 @@ async fn get_mod_info(slug: String) -> Result<ModInfo, Error> {
 }
 
 #[tauri::command]
+async fn get_project_versions(slug: String, params: String) -> Result<Vec<ModrinthProject>, Error> {
+    ModrinthApiEndpoints::get_project_version(&slug, &params).await
+}
+
+#[tauri::command]
 async fn install_mod_and_dependencies(
     slug: &str,
     version: Option<&str>,
@@ -257,11 +260,6 @@ async fn install_mod_and_dependencies(
     required_mods: Vec<LoaderMod>,
 ) -> Result<CustomMod, Error> {
     ModManager::install_mod_and_dependencies(slug, version, params, &required_mods).await
-}
-
-#[tauri::command]
-async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthProject>, Error> {
-    ModrinthApiEndpoints::get_project_version(slug, params).await
 }
 
 #[tauri::command]
@@ -2257,7 +2255,7 @@ pub fn gui_main() {
             console_log_error,
             get_launcher_profiles,
             store_launcher_profiles,
-            get_project_version,
+            get_project_versions,
             get_custom_mods_filenames,
             save_custom_mod_to_folder,
             delete_custom_mod_file,

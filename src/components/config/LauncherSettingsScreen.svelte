@@ -17,7 +17,7 @@
     import { featureWhitelist, noriskUser, noriskLog } from "../../utils/noriskUtils.js";
     import { startMicrosoftAuth } from "../../utils/microsoftUtils.js";
     import { getNoRiskToken } from "../../utils/noriskUtils.js";
-    import { openConfirmPopup } from "../../utils/popupUtils.js";
+    import { openConfirmPopup, openLoadingPopup } from "../../utils/popupUtils.js";
     import { translations } from '../../utils/translationUtils.js';
 
     /** @type {{ [key: string]: any }} */
@@ -60,6 +60,7 @@
     }
 
     async function toggleExperimentalMode() {
+        const closeLoadingPopup = openLoadingPopup({content: `Switching to ${$launcherOptions.experimentalMode ? 'production' : 'experimental'} mode...`});
         if (!$launcherOptions.experimentalMode) {
             await saveOptions(false);
             if (getNoRiskToken() == null) {
@@ -68,6 +69,9 @@
                 await updateNoRiskToken($defaultUser);
                 await fetchDefaultUserOrError(true);
             }
+            setTimeout(() => {
+                closeLoadingPopup();
+            }, 2000);
         } else {
             invoke("enable_experimental_mode", {
               credentials: $defaultUser
@@ -76,13 +80,17 @@
                 $launcherOptions.experimentalMode = true;
                 await saveOptions(false);
                 if (getNoRiskToken() == null) {
-                    await startMicrosoftAuth();
+                    await startMicrosoftAuth(closeLoadingPopup);
                 } else {
                     await updateNoRiskToken($defaultUser);
                     await fetchDefaultUserOrError(true);
+                    setTimeout(() => {
+                        closeLoadingPopup();
+                    }, 2000);
                 }
             }).catch(async (err) => {
                 $launcherOptions.experimentalMode = false;
+                closeLoadingPopup();
                 addNotification(lang.settings.notification.experimentalMode.error.replace("{error}", err));
             });
         }

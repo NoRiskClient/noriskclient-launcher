@@ -21,6 +21,11 @@ export const clientInstances = writable([]);
 export const featureWhitelist = writable([]);
 export const customServerProgress = writable({});
 export const forceServer = writable("");
+export const deletedCapesCache = writable([]);
+
+export const isWinterSeason = ((month = new Date().getMonth()) => {
+  return month === 11 || month === 0 || month === 1;
+})();
 
 export async function getVersion() {
   await invoke("get_launcher_version").then((v) => {
@@ -269,4 +274,15 @@ export async function getMaintenanceMode() {
 
 export function setMaintenanceMode(mode) {
   isInMaintenanceMode.set(mode);
+}
+
+export function cacheDeletedCape(hash, ttl = 5 * 60 * 1000) {
+  let cache = get(deletedCapesCache);
+  cache.push(hash);
+  deletedCapesCache.set(cache);
+  setTimeout(() => {
+    let cache = get(deletedCapesCache);
+    cache = cache.filter(item => item !== hash);
+    deletedCapesCache.set(cache);
+  }, ttl);
 }

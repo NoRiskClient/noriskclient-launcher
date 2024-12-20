@@ -149,7 +149,7 @@
       {/if}
     {:else if currentRequest === 1 || currentRequest === 2 || currentRequest === 3 || currentRequest === 4}
       {#if capes != null && !isLoading}
-        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(data.detail)} bind:capes allowDelete={currentRequest === 4} />
+        <CapeCarousel on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(data.detail)} on:refresh={() => requestOwnedCapes()} bind:apiCapes={capes} allowDelete={currentRequest === 4} />
       {/if}
     {/if}
   </div>

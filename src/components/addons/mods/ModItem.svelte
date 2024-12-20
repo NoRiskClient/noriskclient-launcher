@@ -1,8 +1,8 @@
 <script>
-	import { scale } from 'svelte/transition';
+	import { invoke } from '@tauri-apps/api';
     import { createEventDispatcher } from "svelte";
     import { onMount, tick } from "svelte";
-    import { openInfoPopup } from "../../../utils/popupUtils.js";
+    import { openInfoPopup, openConfirmPopup } from "../../../utils/popupUtils.js";
     import FallbackIcon from "/src/images/modrinth.png";
     import { translations } from '../../../utils/translationUtils.js';
     
@@ -16,6 +16,7 @@
     export let text;
     export let type;
     export let modVersions;
+    export let manifest;
 
     const slug = mod?.slug ?? mod?.value?.source?.artifact?.split(":")[1];
     const name = mod?.title ?? mod?.value?.name;
@@ -23,8 +24,10 @@
     let versionDropdownOpen = false;
     let isChangingVersion = false;
 
+
     onMount(() => {
         isChangingVersion = false;
+        
         if (slug && text != "DEPENDENCY" && modVersions != null && modVersions[slug] == null) {
             console.log("Fetching versions for " + name);
             dispatch("getVersions");
@@ -32,10 +35,17 @@
     })
 
     async function changeVersion(version) {
-        console.log("Changing version of " + slug + " to " + version);
-        isChangingVersion = true;
-        versionDropdownOpen = false;
-        await dispatch("changeVersion", { version: version });
+        openConfirmPopup({
+            title: lang.addons.mods.item.unstableVersion.title,
+            content: lang.addons.mods.item.unstableVersion.content.replace("{versionType}", version.version_type),
+            confirmButton: lang.addons.mods.item.unstableVersion.button.confirm,
+            onConfirm: async () => {
+                console.log("Changing version of " + slug + " to " + version.version_number);
+                isChangingVersion = true;
+                versionDropdownOpen = false;
+                await dispatch("changeVersion", { version: version.version_number });
+            }
+        });
     }
 
     function getMinimalisticDownloadCount() {
@@ -45,6 +55,40 @@
             return lang.addons.global.item.downloadCount.thousand.replace("{count}", (mod?.downloads / 1000).toFixed(1));
         } else {
             return lang.addons.global.item.downloadCount.million.replace("{count}", (mod?.downloads / 1000000).toFixed(1));
+        }
+    }
+
+    async function install() {
+        let projectVersions = [];
+        await invoke("get_project_versions", {
+                slug: slug,
+                params: `?game_versions=["${manifest.build.mc_version}"]&loaders=["fabric"]`
+            })
+                .then(versions => projectVersions = versions)
+                .catch(console.error);
+        
+        if (["beta", "alpha"].includes(projectVersions[0].version_type.toLowerCase())) {
+            const stable = projectVersions.filter(v => v.game_versions.includes(manifest.build.mc_version) && (v.game_versions.length == 1)) ?? [];
+            const release = projectVersions.filter(v => v.version_type == "release") ?? [];
+            if (release.length > 0) {
+                return dispatch("install", { version: release[0].version_number });
+            }
+            
+            openConfirmPopup({
+                title: lang.addons.mods.item.weirdVersions.title,
+                content: lang.addons.mods.item.weirdVersions.content,
+                confirmButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useStable : lang.addons.mods.item.weirdVersions.button.confirm,
+                cancelButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useLatest : null,
+                width: 35,
+                onConfirm: () => {
+                    dispatch("install", { version: stable[0].version_number });
+                },
+                onCancel: stable.length > 0 ? () => {
+                    dispatch("install", { version: projectVersions[0].version_number });
+                } : () => {}
+            });
+        } else {
+            dispatch("install", { version: projectVersions[0].version_number });
         }
     }
 </script>
@@ -126,15 +170,24 @@
                                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                                     <p
                                         class="version"
-                                        class:current={version == mod?.value?.source?.artifact?.split(':')[2]}
-                                        class:latest={modVersions[slug][0] == version}
-                                        on:click={version != mod?.value?.source?.artifact?.split(':')[2] ? () => changeVersion(version) : () => versionDropdownOpen = false}
-                                    >{version}</p>
+                                        class:current={version.version_number == mod?.value?.source?.artifact?.split(':')[2]}
+                                        class:latest={modVersions[slug].map(v => v.version_number)[0] == version.version_number}
+                                        on:click={version.version_number != mod?.value?.source?.artifact?.split(':')[2] ? () => changeVersion(version) : () => versionDropdownOpen = false}
+                                    >
+                                        {#if version.version_type == "release"}
+                                            <span style="text-shadow: none;">✔️</span>
+                                        {:else if version.version_type == "beta"}
+                                            <span  style="text-shadow: none;">🔮</span>
+                                        {:else if version.version_type == "alpha"}
+                                            <span  style="text-shadow: none;">💥</span>
+                                        {/if}
+                                        {version.version_number}
+                                    </p>
                                 {/each}
                             </div>
                         </section>
                     </div>
-                    {#if !isChangingVersion && modVersions[slug][0] != mod?.value?.source?.artifact?.split(':')[2]}
+                    {#if !isChangingVersion && modVersions[slug].map(v => v.version_number)[0] != mod?.value?.source?.artifact?.split(':')[2]}
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <p class="update-button" on:click={() => changeVersion(modVersions[slug][0])}>{lang.addons.mods.item.button.update}</p>
                     {/if}
@@ -154,13 +207,13 @@
                         {lang.addons.global.item.featured}
                     </h1>
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                    <h1 class="install-button green-text" on:click={() => install()}>
                         {lang.addons.global.item.button.install}
                     </h1>
                 </div>
             {:else}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <h1 class="install-button green-text" on:click={() => dispatch("install")}>
+                <h1 class="install-button green-text" on:click={() => install()}>
                     {lang.addons.global.item.button.install}
                 </h1>
             {/if}

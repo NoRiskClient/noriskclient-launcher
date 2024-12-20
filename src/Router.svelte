@@ -1,12 +1,13 @@
 <!-- App.svelte -->
 <script>
+	import SnowOverlay from './components/utils/SnowOverlay.svelte';
   import Announcement from "./pages/Announcement.svelte";
   import ChangeLog from "./pages/ChangeLog.svelte";
   import { setStillRunningCustomServer } from "./stores/customServerLogsStore.js";
   import Router, { location } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { checkApiStatus, isInMaintenanceMode, noriskError, noriskUser, isApiOnline } from "./utils/noriskUtils.js";
+  import { isInMaintenanceMode, noriskError, noriskUser, isApiOnline, isWinterSeason } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
   import Home from "./pages/Home.svelte";
@@ -125,6 +126,11 @@
     <ApiOfflineScreenV2 />
   {/if}
 </div>
+<div class="snow">
+  {#if isWinterSeason}
+    <SnowOverlay/>
+  {/if}
+</div>
 <div class="content">
   <LaunchErrorModal bind:showModal={showLaunchErrorModal} bind:reason={launchErrorReason} />
   <Notifications />
@@ -162,7 +168,16 @@
         background-color: #151515;
     }
 
-    .content {
+    .snow {
+      position: absolute;
       height: 80vh;
+      width: 100%;
+      z-index: 2;
+    }
+
+    .content {
+      position: relative;
+      height: 80vh;
+      z-index: 10;
     }
 </style>

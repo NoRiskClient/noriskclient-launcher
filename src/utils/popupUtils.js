@@ -38,13 +38,15 @@ export function openInfoPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openConfirmPopup({
     title = null,
     content = get(translations).popup.defaultContent,
     confirmButton = null,
-    closeButton = null,
+    cancelButton = null,
     onConfirm = () => { },
     onCancel = () => { },
     height = null,
@@ -57,7 +59,7 @@ export function openConfirmPopup({
         title: title,
         content: content,
         confirmButton: confirmButton,
-        closeButton: closeButton,
+        cancelButton: cancelButton,
         onConfirm: onConfirm,
         onCancel: onCancel,
         height: height,
@@ -65,6 +67,8 @@ export function openConfirmPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openInputPopup({
@@ -104,6 +108,8 @@ export function openInputPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openErrorPopup({
@@ -127,6 +133,22 @@ export function openErrorPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
+}
+
+export function openLoadingPopup({
+    content = "",
+    onClose = () => { },
+}) {
+    activePopup.set({
+        type: "INFO",
+        title: "Loading",
+        content: content,
+        onClose: onClose
+    });
+
+    return closePopup;
 }
 
 // ChangeLog and Announcements

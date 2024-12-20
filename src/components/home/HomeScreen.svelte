@@ -1,8 +1,10 @@
 <!-- pages/Home.svelte -->
 <script>
+	import { isWinterSeason } from './../../utils/noriskUtils.js';
   import SkinButton from "./widgets/SkinButton.svelte";
   import BranchSwitcher from "../BranchSwitcher.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
+  import NoRiskLogoColorSnow from "../../images/norisk_logo_color_snow.png";
   import CopyrightLabel from "./widgets/CopyrightLabel.svelte";
   import HomeNavbar from "./widgets/HomeNavbar.svelte";
   import HomeLeftNavbar from "./widgets/HomeLeftNavbar.svelte";
@@ -22,7 +24,7 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- DO NOT REMOVE THIS! Contact Tim if you have any questions! -->
   <div class="credits-click-field" on:click={showCredits}></div>
-  <img class="pokemon-title title-effect" src={NoRiskLogoColor} alt="Pokemon Title">
+  <img class="pokemon-title title-effect" src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
   <BranchSwitcher />
   <SkinButton />
   <CopyrightLabel />
@@ -44,7 +46,7 @@
     position: absolute;
     width: 360px;
     height: 125px;
-    top: 135px;
+    top: 70px;
     cursor: pointer;
     z-index: 10;
   }
@@ -54,6 +56,7 @@
     max-width: 400px;
     image-rendering: pixelated;
     -webkit-user-drag: none;
+    filter: drop-shadow(0 0 2px black);
   }
   
   .title-effect {
@@ -62,6 +65,8 @@
   }
   
   @keyframes effect {
-    100% {-webkit-mask-position:left}
+    100% {
+        -webkit-mask-position: left;
+    }
   }
 </style>
