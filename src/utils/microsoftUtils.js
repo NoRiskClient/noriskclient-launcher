@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api";
 import { fetchDefaultUserOrError } from "../stores/credentialsStore.js";
 import { noriskLog } from "./noriskUtils.js";
 
-export function startMicrosoftAuth() {
+export function startMicrosoftAuth(closeLoadingPopupFunction = null) {
   invoke("microsoft_auth")
     .then(async result => {
       result.access_token = '********';
@@ -15,7 +15,13 @@ export function startMicrosoftAuth() {
       }
       noriskLog("Microsoft Auth Result: " + JSON.stringify(result));
       await fetchDefaultUserOrError();
+      if (closeLoadingPopupFunction) {
+        closeLoadingPopupFunction();
+      }
     }).catch(async () => {
       await fetchDefaultUserOrError();
+      if (closeLoadingPopupFunction) {
+        closeLoadingPopupFunction();
+      }
     });
 }

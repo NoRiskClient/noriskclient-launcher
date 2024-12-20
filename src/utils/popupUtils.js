@@ -38,6 +38,8 @@ export function openInfoPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openConfirmPopup({
@@ -65,6 +67,8 @@ export function openConfirmPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openInputPopup({
@@ -104,6 +108,8 @@ export function openInputPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
 }
 
 export function openErrorPopup({
@@ -127,6 +133,22 @@ export function openErrorPopup({
         titleFontSize: titleFontSize,
         contentFontSize: contentFontSize,
     });
+
+    return closePopup;
+}
+
+export function openLoadingPopup({
+    content = "",
+    onClose = () => { },
+}) {
+    activePopup.set({
+        type: "INFO",
+        title: "Loading",
+        content: content,
+        onClose: onClose
+    });
+
+    return closePopup;
 }
 
 // ChangeLog and Announcements
