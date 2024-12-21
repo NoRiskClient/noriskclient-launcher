@@ -149,7 +149,9 @@
     <div class="settings-wrapper">
     <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text={lang.settings.keepLauncherOpen} />
     <ConfigRadioButton bind:value={$launcherOptions.multipleInstances} text={lang.settings.multipleInstances} />
-    <ConfigRadioButton text={lang.settings.experimentalMode} bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
+    {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
+        <ConfigRadioButton text={lang.settings.experimentalMode} bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
+    {/if}
     {#if keepLocalAssetsPernmission}
         <ConfigRadioButton text={lang.settings.keepLocalAssets} bind:value={keepLocalAssets} isExclusive={true} isExclusiveLabel={"Designer"} on:toggle={toggleKeepLocalAssets}/>
     {/if}
