@@ -5,33 +5,34 @@
     
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
-
-    function openUrl(url) {
-        open(url);
-    }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="container" on:selectstart={preventSelection}>
     <h1 class="title">{lang.legal.title}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div class="card" style="margin-top: 60px;" on:click={() => openUrl("https://norisk.gg/privacy-policy")}>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="card" style="margin-top: 60px;" on:click={() => open("https://norisk.gg/privacy-policy")}>
         <h2>🔐 {lang.legal.button.privacyPolicy}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => openUrl("https://norisk.gg/terms-of-service")}>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="card" on:click={() => open("https://norisk.gg/terms-of-service")}>
         <h2>📝 {lang.legal.button.termsOfService}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => openUrl("https://norisk.gg/open-source-licences")}>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="card" on:click={() => open("https://norisk.gg/open-source-licences")}>
         <h2>📜 {lang.legal.button.openSourceLicenses}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => openUrl("https://norisk.gg/used-libraries")}>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="card" on:click={() => open("https://norisk.gg/used-libraries")}>
         <h2>📦 {lang.legal.button.usedLibraries}</h2>
         <p>&gt;</p>
     </div>
-    <div class="card" on:click={() => openUrl("https://norisk.gg/imprint")}>
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="card" on:click={() => open("https://norisk.gg/imprint")}>
         <h2>📨 {lang.legal.button.imprint}</h2>
         <p>&gt;</p>
     </div>
