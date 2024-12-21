@@ -35,6 +35,14 @@
     })
 
     async function changeVersion(version) {
+        if (version.release_type == "release") {
+            console.log("Changing version of " + slug + " to " + version.version_number);
+                isChangingVersion = true;
+                versionDropdownOpen = false;
+                await dispatch("changeVersion", { version: version.version_number });
+            return;
+        }
+
         openConfirmPopup({
             title: lang.addons.mods.item.unstableVersion.title,
             content: lang.addons.mods.item.unstableVersion.content.replace("{versionType}", version.version_type),
