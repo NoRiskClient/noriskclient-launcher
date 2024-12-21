@@ -88,8 +88,10 @@
                 confirmButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useStable : lang.addons.mods.item.weirdVersions.button.confirm,
                 cancelButton: stable.length > 0 ? lang.addons.mods.item.weirdVersions.button.useLatest : null,
                 width: 35,
-                onConfirm: () => {
+                onConfirm: stable.length > 0 ? () => {
                     dispatch("install", { version: stable[0].version_number });
+                } : () => {
+                    dispatch("install", { version: projectVersions[0].version_number });
                 },
                 onCancel: stable.length > 0 ? () => {
                     dispatch("install", { version: projectVersions[0].version_number });
