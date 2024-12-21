@@ -426,7 +426,7 @@
     "capes.notification.downloadTemplate.success.details": "Umhangsvorlage heruntergeladen!<br><br>Überprüfe deinen download Ordner.",
     "capes.notification.downloadTemplate.error": "Fehler beim herunterladen der Vorlage: {error}",
     "capes.yourCape": "Dein Umhang",
-    "capes.noCapeUploaded": "Kein Umhang hochgeladen",
+    "capes.noCapeUploaded": "Kein Umhang ausgerüstet",
     "capes.button.upload": "HOCHLADEN",
     "capes.button.preview": "VORSCHAU",
     "capes.button.template": "VORLAGE",

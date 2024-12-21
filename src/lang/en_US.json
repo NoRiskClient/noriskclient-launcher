@@ -426,7 +426,7 @@
     "capes.notification.downloadTemplate.success.details": "Template Cape Downloaded!<br><br>Check your downloads folder.",
     "capes.notification.downloadTemplate.error": "Failed to download template cape: {error}",
     "capes.yourCape": "Your Cape",
-    "capes.noCapeUploaded": "No Cape Uploaded",
+    "capes.noCapeUploaded": "No Cape Equipped",
     "capes.button.upload": "UPLOAD",
     "capes.button.preview": "PREVIEW",
     "capes.button.template": "TEMPLATE",
