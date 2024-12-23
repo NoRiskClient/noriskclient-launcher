@@ -1366,7 +1366,11 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 #[tauri::command]
 async fn get_default_mc_folder() -> Result<String, String> {
     if let Some(appdata_dir) = data_dir() {
-        let minecraft_folder = appdata_dir.join(".minecraft");
+        let minecraft_folder = if cfg!(target_os = "macos") {
+            appdata_dir.join("minecraft")
+        } else {
+            appdata_dir.join(".minecraft")
+        };
         Ok(minecraft_folder.as_os_str().to_str().unwrap().to_string())
     } else {
         Err("Unable to find default Minecraft folder".to_string())
