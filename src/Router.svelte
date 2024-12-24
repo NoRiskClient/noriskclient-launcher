@@ -1,6 +1,5 @@
 <!-- App.svelte -->
 <script>
-	import PrivacyPolicyScreen from './components/maintenance-mode/PrivacyPolicyScreen.svelte';
 	import SnowOverlay from './components/utils/SnowOverlay.svelte';
   import Announcement from "./pages/Announcement.svelte";
   import ChangeLog from "./pages/ChangeLog.svelte";
@@ -8,10 +7,10 @@
   import Router, { location, push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { setLanguage, language } from "./utils/translationUtils.js";
+  import { setLanguage, language, translations } from "./utils/translationUtils.js";
   import { isInMaintenanceMode, noriskError, noriskUser, isApiOnline, isWinterSeason } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
-  import { activePopup } from "./utils/popupUtils.js";
+  import { activePopup, openConfirmPopup } from "./utils/popupUtils.js";
   import { appWindow } from "@tauri-apps/api/window";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
@@ -39,9 +38,11 @@
   import Popup from "./components/utils/Popup.svelte";
   import InstancesHotbar from "./components/instances/InstancesHotbar.svelte";
 
+  /** @type {{ [key: string]: any }} */
+  $: lang = $translations;
+
   const routes = {
     "/": Home,
-    "/privacy-policy": PrivacyPolicyScreen,
     "/changeLog": ChangeLog,
     "/announcement": Announcement,
     "/legal": Legal,
@@ -69,7 +70,7 @@
   onMount(async () => {
     invoke("check_privacy_policy").then(value => {
       if (value) return;
-      push("/privacy-policy");
+      openPrivacyPolicyPopup();
     }).catch(error => {
       noriskError("Failed to check privacy policy: " + error);
       appWindow.close();
@@ -130,6 +131,35 @@
       console.log("Route Loaded:", event.detail);
     }, 300);
   }
+
+  function openPrivacyPolicyPopup() {
+    openConfirmPopup({
+        title: lang.privacyPolicy.title,
+        content: lang.privacyPolicy.text,
+        confirmButton: lang.privacyPolicy.button.accept,
+        cancelButton: lang.privacyPolicy.button.exit,
+        allowEscape: false,
+        onConfirm: acceptPrivacyPolicy,
+        onCancel: () => appWindow.close(),
+        width: "35",
+        height: "25"
+      });
+  }
+
+  async function acceptPrivacyPolicy() {
+    await invoke("accept_privacy_policy").then(async () => {
+      await invoke("check_privacy_policy").then(value => {
+        if (!value) {
+          addNotification("Failed to accept privacy policy!");
+          openPrivacyPolicyPopup();
+          return;
+        }
+      });
+    }).catch(error => {
+      addNotification(error);
+      openPrivacyPolicyPopup();
+    });
+    }
 </script>
 
 <div class="black-bar" data-tauri-drag-region>

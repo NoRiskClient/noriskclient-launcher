@@ -137,6 +137,7 @@ async fn check_privacy_policy() -> Result<bool, String> {
     let config_dir = LAUNCHER_DIRECTORY.config_dir();
     let file = config_dir.join("privacy_policy_accepted.txt");
     if !file.exists() {
+        println!("Privacy policy file does not exist");
         return Ok(false);
     }
     
@@ -145,6 +146,7 @@ async fn check_privacy_policy() -> Result<bool, String> {
         .map_err(|e| format!("unable to read privacy_policy_accepted file: {:?}", e))?;
 
     let is_accpeted = file_content.starts_with("accepted=true");
+    println!("Privacy policy is accepted: {}", is_accpeted);
 
     Ok(is_accpeted)
 }
