@@ -1,15 +1,18 @@
 <!-- App.svelte -->
 <script>
+	import PrivacyPolicyScreen from './components/maintenance-mode/PrivacyPolicyScreen.svelte';
 	import SnowOverlay from './components/utils/SnowOverlay.svelte';
   import Announcement from "./pages/Announcement.svelte";
   import ChangeLog from "./pages/ChangeLog.svelte";
   import { setStillRunningCustomServer } from "./stores/customServerLogsStore.js";
-  import Router, { location } from "svelte-spa-router";
+  import Router, { location, push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
+  import { setLanguage, language } from "./utils/translationUtils.js";
   import { isInMaintenanceMode, noriskError, noriskUser, isApiOnline, isWinterSeason } from "./utils/noriskUtils.js";
   import { addNotification } from "./stores/notificationStore.js";
   import { activePopup } from "./utils/popupUtils.js";
+  import { appWindow } from "@tauri-apps/api/window";
   import Home from "./pages/Home.svelte";
   import Notifications from "./components/notification/Notifications.svelte";
   import LauncherSettings from "./pages/LauncherSettings.svelte";
@@ -34,11 +37,11 @@
   import { listen } from "@tauri-apps/api/event";
   import LaunchErrorModal from "./components/home/widgets/LaunchErrorModal.svelte";
   import Popup from "./components/utils/Popup.svelte";
-  import ApiOfflineScreenV2 from "./components/maintenance-mode/ApiOfflineScreenV2.svelte";
   import InstancesHotbar from "./components/instances/InstancesHotbar.svelte";
 
   const routes = {
     "/": Home,
+    "/privacy-policy": PrivacyPolicyScreen,
     "/changeLog": ChangeLog,
     "/announcement": Announcement,
     "/legal": Legal,
@@ -64,6 +67,14 @@
   let launchErrorReason;
 
   onMount(async () => {
+    invoke("check_privacy_policy").then(value => {
+      if (value) return;
+      push("/privacy-policy");
+    }).catch(error => {
+      noriskError("Failed to check privacy policy: " + error);
+      appWindow.close();
+    });
+
     const clientLaunchError = await listen("client-error", async (event) => {
       let reason = event.payload; // Extract the path from the event's payload
       // Remove the prefix "Failed to launch client:" if it exists
@@ -123,7 +134,7 @@
 
 <div class="black-bar" data-tauri-drag-region>
   {#if $isApiOnline === false}
-    <ApiOfflineScreenV2 />
+    <h1 class="offline-button red-text-clickable">OFFLINE</h1>
   {/if}
 </div>
 <div class="snow">
@@ -150,8 +161,15 @@
 </div>
 <div class="black-bar" data-tauri-drag-region>
   <!-- Bisschen unschön wenn man da in Zukunft noch mehr machen will... aber das ist ein Problem für die Zukunft YOOYOYOYOYOYOJOJOJO-->
-  {#if $location !== "/" && $location !== "/announcement" && (!$isInMaintenanceMode || $noriskUser?.isDev)}
+  {#if $location !== "/" && $location !== "/privacy-policy" && $location !== "/announcement" && (!$isInMaintenanceMode || $noriskUser?.isDev)}
     <BackButton />
+  {:else if $location == "/privacy-policy"}
+    <div class="lang-switcher">
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <p class:active={$language == "de_DE"} on:click={() => setLanguage("de_DE")}>[Deutsch]</p>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <p class:active={$language == "en_US"} on:click={() => setLanguage("en_US")}>[English]</p>
+    </div>
   {:else}
     <InstancesHotbar />
   {/if}
@@ -166,6 +184,40 @@
         width: 100%;
         height: 10vh;
         background-color: #151515;
+    }
+
+    .offline-button {
+        transition: transform 0.3s;
+        position: absolute;
+        font-size: 20px;
+        text-shadow: 2px 2px #7a7777;
+            cursor: pointer;
+    }
+
+    .offline-button:hover {
+        transform: scale(1.2);
+    }
+
+    .lang-switcher {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .lang-switcher p {
+      font-size: 15px;
+      margin-left: 1em;
+      margin-right: 1em;
+      cursor: pointer;
+      transition-duration: 300ms;
+    }
+
+    .lang-switcher p:hover {
+      transform: scale(1.2);
+    }
+
+    .lang-switcher p.active {
+      color: var(--primary-color);
+      text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .snow {

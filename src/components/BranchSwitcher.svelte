@@ -19,6 +19,7 @@
 <div class="branch-wrapper">
   {#if allowBranchSwitching && $branches.length > 1}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection} style="cursor: pointer"
         on:mousedown={preventSelection} class="branch-font switch primary-text"
@@ -36,6 +37,7 @@
       {#if $branches.length > 0}
         {#each $branches as branch, i}
           {#if $currentBranchIndex === i}
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
                 class="branch-font primary-text branch-effect"
                 style="position:absolute"
@@ -45,6 +47,7 @@
           {/if}
         {/each}
       {:else}
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
         <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
             class="branch-font primary-text"
             style="position:absolute"
@@ -56,6 +59,7 @@
   </section>
   {#if allowBranchSwitching && $branches.length > 1}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
         on:selectstart={preventSelection}
         style="cursor: pointer" on:mousedown={preventSelection}
