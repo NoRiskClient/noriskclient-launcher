@@ -1,8 +1,9 @@
 {
     "dummy": "This is used to check if the language file is loaded correctly. DO NOT CHANGE OR DELETE THIS! -> This doesn't need to be translated, since it is never acctually rendered.",
-    "apiOffline.title": "API Offline!",
-    "apiOffline.text": "Unsere API ist aktuell offline.<br>Bitte versuche es später erneut oder schaue in unseren Discord für mehr Informationen.",
-    "apiOffline.button.exit": "Verlassen",
+    "privacyPolicy.title": "Datenschutzbestimmungen",
+    "privacyPolicy.text": "<b>Hey!</b><br><br><section style=\"font-size: 11px;\">Es freut uns, dass du den NoRiskClient nutzen möchtest.</section><br>Bevor du loslegst, bitten wir dich, unsere <a href=\"https://norisk.gg/privacy-policy\" target=\"_blank\" style=\"color: var(--primary-color)\">Datenschutzbestimmungen</a> zu lesen.",
+    "privacyPolicy.button.exit": "Schließen",
+    "privacyPolicy.button.accept": "Akzeptieren",
     "launchErrorModal.title": "START FEHLER",
     "app.notification.failedToRunClient": "Client konnte nicht geladen werden: {error}",
     "notification.error.title": "Fehler",
