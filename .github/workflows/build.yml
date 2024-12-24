@@ -12,6 +12,8 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--verbose --target x86_64-apple-darwin'
+          - platform: 'ubuntu-latest'
+            args: '--verbose'
           - platform: 'windows-latest'
             args: '--verbose'
 
@@ -33,9 +35,10 @@ jobs:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: install dependencies (debian only)
+      - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
         run: |
+          echo "deb http://gb.archive.ubuntu.com/ubuntu jammy main" | sudo tee -a /etc/apt/sources.list
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Cache cargo registry
@@ -119,6 +122,12 @@ jobs:
           name: noriskclient-macos
           path: noriskclient-macos
 
+      - name: Download Artifact Outputs - Ubuntu
+        uses: actions/download-artifact@v4
+        with:
+          name: noriskclient-linux
+          path: noriskclient-linux
+
       - name: Download Artifact Outputs - Windows
         uses: actions/download-artifact@v4
         with:
@@ -133,4 +142,5 @@ jobs:
           prerelease: false
           files: |
             noriskclient-macos/**
+            noriskclient-linux/**
             noriskclient-windows/**
