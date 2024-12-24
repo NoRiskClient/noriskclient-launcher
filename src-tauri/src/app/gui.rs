@@ -140,7 +140,7 @@ async fn check_privacy_policy() -> Result<bool, String> {
         println!("Privacy policy file does not exist");
         return Ok(false);
     }
-    
+
     let file_content = fs::read_to_string(&file)
         .await
         .map_err(|e| format!("unable to read privacy_policy_accepted file: {:?}", e))?;
@@ -1587,6 +1587,26 @@ async fn run_client(
     Ok(runner_id)
 }
 
+#[tauri::command]
+async fn quit_everything() -> Result<(), crate::error::Error> {
+    let pid = NRCCache::get_pid();
+    let mut system = System::new_all();
+    system.refresh_all(); // Alle Prozesse aktualisieren
+
+    if let Some(game_process) = system.process(Pid::from(pid as usize)) {
+        if game_process.name().contains("NoRiskClient") {
+            info!("Killing noriskclient process with pid: {} and name: {}",pid,game_process.name());
+            let _ = game_process.kill();
+            info!("NoRiskClient process killed");
+            return Ok(());
+        } else {
+            info!("Game process with pid: {} is not a NoRiskClient process.", pid);
+        }
+    } else {
+        info!("No running NoRiskClient process found with pid: {}", pid);
+    }
+    Ok(())
+}
 
 #[tauri::command]
 async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
@@ -2338,6 +2358,7 @@ pub fn gui_main() {
             get_launch_manifest,
             default_data_folder_path,
             terminate,
+            quit_everything,
             get_featured_servers,
             get_custom_servers,
             check_custom_server_subdomain,

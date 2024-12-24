@@ -129,6 +129,9 @@ impl NRCCache {
         Ok(Vec::new())
     }
 
+    pub fn get_pid() -> u32 {
+        std::process::id()
+    }
 
     pub async fn get_running_instances(app_state: tauri::State<'_, AppState>) -> Result<Vec<RunnerInstance>, Error> {
         let runner_instances = app_state.runner_instances.lock().unwrap();
