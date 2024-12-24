@@ -10,6 +10,7 @@
   import { openInputPopup } from "../../../utils/popupUtils.js";
   import { addNotification } from "../../../stores/notificationStore.js";
   import { translations } from '../../../utils/translationUtils.js';
+  import { fade, slide } from "svelte/transition";
 
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
@@ -17,6 +18,7 @@
   let friendInviteSlots = {};
 
   let navItems = [];
+  let hovered;
 
   function updateNavItems() {
     navItems = [
@@ -24,47 +26,62 @@
         name: lang.home.navbar.button.legalInfo,
         onClick: () => push("/legal"),
         condition: () => true,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.settings,
         onClick: () => push("/launcher-settings"),
-        condition: true
+        condition: true,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.profiles,
         onClick: () => push("/profiles"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.servers,
         onClick: () => push("/servers"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.addons,
         onClick: () => push("/addons"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
+        submenues: [
+          {
+            name: lang.home.navbar.button.mods,
+            onClick: () => push("/addons/mods"),
+            condition: () => get(branches).length > 0 && get(defaultUser) != null,
+          }
+        ]
       },
       {
         name: lang.home.navbar.button.invite,
         onClick: openInviteFriendsPopup,
         condition: () => get(branches).length > 0 && get(defaultUser) != null && $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots == -1,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.capes,
         onClick: () => push("/capes"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.skin,
         onClick: () => push("/skin"),
         condition: () => get(branches).length > 0 && get(defaultUser) != null,
+        submenues: []
       },
       {
         name: lang.home.navbar.button.quit,
         onClick: () => appWindow.close(),
         condition: true,
         className: "quit",
+        submenues: []
       },
     ];
   }
@@ -149,9 +166,18 @@
     {#each navItems as item (item.name)}
       {#if typeof item.condition === 'function' ? item.condition() : item.condition}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <h1 class={item.className || ''} on:click={item.onClick}>
-          {item.name}
-        </h1>
+        <div on:mouseenter={() => hovered = item.name} on:mouseleave={() => hovered = null}>
+          <h1 class={item.className || ''} on:click={item.onClick}>
+            {item.name}
+          </h1>
+          {#if hovered === item.name}
+            {#each item.submenues as submenu}
+              <h2 class={submenu.className || ''} on:click={submenu.onClick} transition:slide={{ duration: 100 }}>
+                {submenu.name}
+              </h2>
+            {/each}
+          {/if}
+        </div>
       {/if}
     {/each}
   </div>
@@ -190,6 +216,21 @@
     color: var(--secondary-color);
     text-shadow: 1px 1px var(--secondary-color-text-shadow);
     transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+  }
+
+  .home-navbar-wrapper h2 {
+      font-size: 11px;
+      margin-bottom: 1em;
+      cursor: pointer;
+      color: var(--secondary-color);
+      text-shadow: 1px 1px var(--secondary-color-text-shadow);
+      transition: transform 0.3s, color 0.25s, text-shadow 0.25s;
+  }
+
+  .home-navbar-wrapper h2:hover {
+      color: var(--hover-color);
+      text-shadow: 1px 1px var(--hover-color-text-shadow);
+      transform: scale(1.2) translateX(-10px) perspective(1px);
   }
 
   .home-navbar-wrapper h1:hover {
