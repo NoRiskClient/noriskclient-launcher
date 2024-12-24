@@ -1,7 +1,7 @@
 {
     "dummy": "This is used to check if the language file is loaded correctly. DO NOT CHANGE OR DELETE THIS! -> This doesn't need to be translated, since it is never acctually rendered.",
     "privacyPolicy.title": "Datenschutzbestimmungen",
-    "privacyPolicy.text": "<b>Hey!</b><br><br><section style=\"font-size: 11px;\">Es freut uns, dass du den NoRiskClient nutzen möchtest.</section><br>Bevor du loslegst, bitten wir dich, unsere <a href=\"https://norisk.gg/privacy-policy\" target=\"_blank\" style=\"color: var(--primary-color)\">Datenschutzbestimmungen</a> zu lesen.",
+    "privacyPolicy.text": "<b>Hey!</b><br><br><section style=\"font-size: 11px;\">Es freut uns, dass du den NoRiskClient nutzen möchtest.</section><br>Bevor du loslegst, bitten wir dich, unsere <a href=\"https://norisk.gg/privacy-policy\" target=\"_blank\" style=\"color: var(--primary-color); text-shadow: 2px 2px var(--primary-color-text-shadow);\">Datenschutzbestimmungen</a> zu lesen.",
     "privacyPolicy.button.exit": "Schließen",
     "privacyPolicy.button.accept": "Akzeptieren",
     "launchErrorModal.title": "START FEHLER",
