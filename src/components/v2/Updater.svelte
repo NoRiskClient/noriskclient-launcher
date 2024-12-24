@@ -4,10 +4,11 @@
   import { onMount } from "svelte";
   import { checkUpdate, installUpdate, onUpdaterEvent } from "@tauri-apps/api/updater";
   import { relaunch } from "@tauri-apps/api/process";
-  import { isApiOnline, isCheckingForUpdates, noriskLog } from "../../utils/noriskUtils.js";
+  import { isApiOnline, isCheckingForUpdates, noriskLog, noriskError } from "../../utils/noriskUtils.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { delay } from "../../utils/svelteUtils.js";
   import { translations } from '../../utils/translationUtils.js';
+  import { invoke } from "@tauri-apps/api";
 
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
@@ -17,9 +18,15 @@
   onMount(async () => {
     let interval = animateLoadingText();
 
-    const unlisten = await onUpdaterEvent(({ error, status }) => {
+    const unlisten = await onUpdaterEvent(async ({ error, status }) => {
       // This will log all updater events, including status updates and errors.
       noriskLog(`Updater event: ${error} ${status}`);
+      if (status.toString() === "DOWNLOADED") {
+        noriskLog(`Force Killing Process (Triggered By Update Event)`);
+        await invoke("quit_everything").catch(reason => {
+          noriskError(reason);
+        });
+      }
     });
 
     try {
