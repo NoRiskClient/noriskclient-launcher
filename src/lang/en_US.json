@@ -51,6 +51,7 @@
     "home.leftNavbar.button.unlinkDiscord": "UNLINK DISCORD",
     "home.notification.discordUnlinkSuccess": "Discord unlinked successfully!",
     "home.navbar.button.legalInfo": "LEGAL-INFO",
+    "home.navbar.button.accounts": "ACCOUNTS",
     "home.navbar.button.settings": "SETTINGS",
     "home.navbar.button.profiles": "PROFILES",
     "home.navbar.button.servers": "SERVERS",

@@ -2,6 +2,7 @@
   import { branches } from "../../../stores/branchesStore.js";
   import { defaultUser } from "../../../stores/credentialsStore.js";
   import { get } from "svelte/store";
+  import AccountModal from "../../account/AccountModal.svelte";
   import { push } from "svelte-spa-router";
   import { appWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
@@ -16,6 +17,7 @@
   $: lang = $translations;
 
   let friendInviteSlots = {};
+  let showAccountModal = false;
 
   let navItems = [];
   let hovered;
@@ -32,6 +34,12 @@
         name: lang.home.navbar.button.settings,
         onClick: () => push("/launcher-settings"),
         condition: true,
+        submenues: []
+      },
+      {
+        name: lang.home.navbar.button.accounts,
+        onClick: () => showAccountModal = true,
+        condition: () => true,
         submenues: []
       },
       {
@@ -155,6 +163,7 @@
   }
 </script>
 
+<AccountModal bind:showModal={showAccountModal} />
 <div class="container">
   <div class="home-navbar-wrapper topleft">
     {#if $featureWhitelist.includes("INVITE_FRIENDS") && friendInviteSlots.availableSlots !== -1 && friendInviteSlots.availableSlots - friendInviteSlots.previousInvites > 0}
