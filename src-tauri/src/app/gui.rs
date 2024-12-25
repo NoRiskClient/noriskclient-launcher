@@ -133,6 +133,49 @@ fn get_launcher_version() -> String {
 }
 
 #[tauri::command]
+async fn check_privacy_policy() -> Result<bool, String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    let file = config_dir.join("privacy_policy_accepted.txt");
+    if !file.exists() {
+        println!("Privacy policy file does not exist");
+        return Ok(false);
+    }
+    
+    let file_content = fs::read_to_string(&file)
+        .await
+        .map_err(|e| format!("unable to read privacy_policy_accepted file: {:?}", e))?;
+
+    let is_accpeted = file_content.starts_with("accepted=true");
+    println!("Privacy policy is accepted: {}", is_accpeted);
+
+    Ok(is_accpeted)
+}
+
+#[tauri::command]
+async fn accept_privacy_policy() -> Result<(), String> {
+    let config_dir = LAUNCHER_DIRECTORY.config_dir();
+    let file = config_dir.join("privacy_policy_accepted.txt");
+    let date = Utc::now().to_rfc3339();
+
+    let formatted_text = format!("accepted=true\nat={}\nurl=https://norisk.gg/privacy-policy\n", &date);
+    let text = formatted_text.as_bytes();
+
+    if file.exists() {
+        info!("Removing old privacy_policy_accepted file: {:?}", file);
+        fs::remove_file(&file)
+            .await
+            .map_err(|e| format!("unable to remove privacy_policy_accepted file: {:?}", e))?;
+    }
+
+    info!("Creating privacy_policy_accepted file: {:?}", file);
+    fs::write(&file, text)
+        .await
+        .map_err(|e| format!("unable to create privacy_policy_accepted file: {:?}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
     debug!("Uploading Cape...");
 
@@ -1366,7 +1409,11 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 #[tauri::command]
 async fn get_default_mc_folder() -> Result<String, String> {
     if let Some(appdata_dir) = data_dir() {
-        let minecraft_folder = appdata_dir.join(".minecraft");
+        let minecraft_folder = if cfg!(target_os = "macos") {
+            appdata_dir.join("minecraft")
+        } else {
+            appdata_dir.join(".minecraft")
+        };
         Ok(minecraft_folder.as_os_str().to_str().unwrap().to_string())
     } else {
         Err("Unable to find default Minecraft folder".to_string())
@@ -2187,6 +2234,8 @@ pub fn gui_main() {
         .invoke_handler(tauri::generate_handler![
             check_online_status,
             get_launcher_version,
+            check_privacy_policy,
+            accept_privacy_policy,
             get_options,
             open_minecraft_logs_window,
             open_minecraft_crash_window,

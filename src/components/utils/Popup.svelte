@@ -1,6 +1,7 @@
 <script>
 	import { translations } from './../../utils/translationUtils.js';
     import { onMount } from 'svelte';
+    import { open } from '@tauri-apps/api/shell';
     import { activePopup, closePopup as killPopup } from '../../utils/popupUtils.js';
     import ConfigTextInput from '../config/inputs/ConfigTextInput.svelte';
     import ConfigFolderInput from '../config/inputs/ConfigFolderInput.svelte';
@@ -19,6 +20,7 @@
     let onClose = $activePopup?.onClose ?? (() => closePopup());
     let onCancel = $activePopup?.onCancel ?? (() => closePopup(true));
     let onConfirm = $activePopup?.onConfirm ?? (() => closePopup());
+    let allowEscape = $activePopup?.allowEscape ?? true;
     let validateInput = $activePopup?.validateInput ?? (() => true);
     let liveValidation = $activePopup?.liveValidation ?? true;
     // Darf nicht let sein, translation stuff !!?!?!?!
@@ -34,12 +36,13 @@
     let isInputValid = (popupType != "INPUT" || popupInputType != "TEXT") || !liveValidation;
 
     function closePopup(isExitButton = false) {
-        if ((popupType == "CONFIRM" || popupType == "INPUT") && !isExitButton) {
-            onCancel();
+        if (popupType == "CONFIRM" || popupType == "INPUT") {
+            if (!isExitButton) onCancel();
+            animateOut();
         } else if (!(popupType == "CONFIRM" || popupType == "INPUT")) {
             onClose();
+            if (allowEscape) animateOut();
         }
-        animateOut();
     }
 
     async function confirmPopup() {
@@ -61,6 +64,15 @@
     }
 
     onMount(() => {
+        const clicks = document.getElementsByClassName("LINK");
+        for (let i = 0; i < clicks.length; i++) {
+            console.log(`Detected click listener for ${clicks[i].attributes.linkTo.value}`);
+            
+            clicks[i].onclick = () => {
+                open(clicks[i].attributes.linkTo.value);
+            };
+        }
+
         if (popupType != "INPUT" || !liveValidation) return;
         document.getElementById("popup-input").addEventListener("input", async (event) => {
             const currentValue = event.target.value;
@@ -74,18 +86,20 @@
 </script>
   
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div class="overlay" on:click={animateOut}>
+<div class="overlay" on:click={allowEscape ? animateOut : () => {}}>
     <div
         class:animateOut={animateOutNow}
         class:animateIn={!animateOutNow}
         class="dialog"
         style={`height: ${popupHeight}em; width: ${popupWidth}em;`}
-        on:click|self={animateOut}
+        on:click|self={allowEscape ? animateOut : () => {}}
     >
         <div on:click|stopPropagation class="divider">
-            <div class="header-wrapper">
+            <div class="header-wrapper" class:centerText={!allowEscape}>
                 <h1 class="nes-font" style={`font-size: ${popupTitleFontSize};`} on:selectstart={preventSelection} on:mousedown={preventSelection}>{popupTitle ?? lang.popup.title[popupType.toLowerCase()]}</h1>
-                <h1 class="nes-font red-text-clickable close-button" on:click={() => closePopup(true)}>X</h1>
+                {#if allowEscape}
+                    <h1 class="nes-font red-text-clickable close-button" on:click={() => closePopup(true)}>X</h1>
+                {/if}
             </div>
             <hr>
             <div class="popup-content-wrapper">
@@ -124,6 +138,10 @@
         justify-content: space-between;
         width: 100%;
         padding: 0.75em 0.25em;
+    }
+
+    .centerText {
+        justify-content: center;
     }
 
     .close-button {

@@ -1,5 +1,4 @@
 <script>
-  import Modal from "../../account/AccountModal.svelte";
   import SteveSkin from "../../../images/steve_head.png";
   import FallbackSkin from "/src/images/fallback_skin_head.png";
   import { defaultUser } from "../../../stores/credentialsStore.js";
@@ -7,7 +6,6 @@
   import { runClient } from "../../../utils/noriskUtils.js";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
 
-  let showModal = false;
   let canStart = true;
 
   async function handleStart() {
@@ -18,7 +16,6 @@
   }
 </script>
 
-<Modal bind:showModal />
 <div class="skin-head-container">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div class="skin-click" on:click={$defaultUser ? handleStart : startMicrosoftAuth}></div>
@@ -28,8 +25,6 @@
          alt=" "
          onerror="this.src='{FallbackSkin}'"
     >
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div on:click={() => (showModal = true)} class="tag">*</div>
   {:else}
     <img class="skin-head zoom glow"
          src={SteveSkin}
@@ -68,26 +63,6 @@
 
     .skin-head-container:hover .skin-head {
         border-radius: 0.25em;
-    }
-
-    .tag {
-        font-size: 20px;
-        margin: 0;
-        color: #b7b7b7;
-        text-shadow: 2px 2px #000000;
-        float: right;
-        position: absolute;
-        right: 0px;
-        top: 0px;
-        z-index: 1000;
-        padding: 5px;
-        font-weight: bold;
-        transition: transform 0.3s, color 0.25s;
-    }
-
-    .tag:hover {
-        transform: scale(1.2);
-        color: var(--secondary-color);
     }
 
     .zoom {

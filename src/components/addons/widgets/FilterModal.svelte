@@ -14,7 +14,11 @@
   export let list = [];
   export let activeFilters = {};
   let reload = true;
-  
+
+  // kp, aber funktioniert
+  $: if (showModal) {
+    loadList();
+  }
   
   function loadList() {
     list = [];

@@ -1,4 +1,5 @@
 <script>
+    import { open } from '@tauri-apps/api/shell';
     import { appWindow } from "@tauri-apps/api/window";
     import { openInputPopup } from "../../utils/popupUtils.js";
     import { setMaintenanceMode } from "../../utils/noriskUtils.js";
@@ -23,11 +24,14 @@
 <div class="container">
     <div class="maintenance-mode">
         <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
         <h1 class="title text primary-text" on:click={openMaintenanceModeTokenPopup}>{lang.maintenanceMode.title}</h1>
         <p class="text">{@html lang.maintenanceMode.text}</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <p class="discord" on:click={() => window.open("https://discord.norisk.gg", "_blanc")}>-&gt; Discord</p>
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <p class="discord" on:click={() => open("https://discord.norisk.gg")}>-&gt; Discord</p>
         <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
         <h1 class="quit-button red-text" on:click={() => { appWindow.close(); }}>{lang.maintenanceMode.button.exit}</h1>
     </div>
 </div>
