@@ -153,10 +153,10 @@
               noriskToken: getNoRiskToken(),
               requestUuid: $defaultUser.id,
           }).then(async () => {
-              addNotification(lang.home.navbar.natification.invite.success.replace("{user}", identifier), "INFO");
+              addNotification(lang.home.navbar.notification.invite.success.replace("{user}", identifier), "INFO");
               await loadFriendInvites();
           }).catch((error) => {
-              addNotification(lang.home.navbar.natification.invite.error.replace("{user}", identifier).replace("{error}", error));
+              addNotification(lang.home.navbar.notification.invite.error.replace("{user}", identifier).replace("{error}", error));
           });
       }
     })
