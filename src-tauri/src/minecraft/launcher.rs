@@ -287,22 +287,32 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                     let download_count = norisk_assets_downloaded.clone();
                     let data_clone = launcher_data_arc.clone();
                     let folder_clone = norisk_asset_dir.clone();
+                    let game_dir_clone = game_dir.clone();
                     let branch_clone = manifest.build.branch.clone();
 
+                    let is_non_cosmetic = !asset_object.0.starts_with("nrc-cosmetics/");
+
                     async move {
-                        let hash = asset_object.1.hash.clone();
-
-                        match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), folder_clone, data_clone.clone()).await {
-                            Ok(downloaded) => {
-                                let curr = download_count.fetch_add(1, Ordering::Relaxed);
-
-                                if downloaded {
-                                    // the progress bar is only being updated when a asset has been downloaded to improve speeds
-                                    data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
-                                    data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", hash)));
+                        if is_non_cosmetic && game_dir_clone.join(&asset_object.0).exists() {
+                            let curr = download_count.fetch_add(1, Ordering::Relaxed);
+                            data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", asset_object.1.hash)));
+                            info!("Skipping Norisk asset download for non-cosmetic asset: {} since the file already exists!", asset_object.0);
+                        } else {
+                            let hash = asset_object.1.hash.clone();
+    
+                            match asset_object.1.download_norisk_cosmetic_destructing(branch_clone, asset_object.0, norisk_token.to_string(), if is_non_cosmetic { game_dir_clone } else { folder_clone }, data_clone.clone()).await {
+                                Ok(downloaded) => {
+                                    let curr = download_count.fetch_add(1, Ordering::Relaxed);
+    
+                                    if downloaded {
+                                        // the progress bar is only being updated when a asset has been downloaded to improve speeds
+                                        data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
+                                        data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", hash)));
+                                    }
                                 }
+                                Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                             }
-                            Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
                         }
 
                         Ok(())
