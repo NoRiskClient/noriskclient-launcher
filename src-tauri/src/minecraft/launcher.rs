@@ -296,7 +296,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                         if is_non_cosmetic && game_dir_clone.join(&asset_object.0).exists() {
                             let curr = download_count.fetch_add(1, Ordering::Relaxed);
                             data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
-                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", asset_object.1.hash)));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.verifiedNoriskAsset&fileName%{}", asset_object.1.hash)));
                             info!("Skipping Norisk asset download for non-cosmetic asset: {} since the file already exists!", asset_object.0);
                         } else {
                             let hash = asset_object.1.hash.clone();
