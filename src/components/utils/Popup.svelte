@@ -1,6 +1,7 @@
 <script>
 	import { translations } from './../../utils/translationUtils.js';
     import { onMount } from 'svelte';
+    import { open } from '@tauri-apps/api/shell';
     import { activePopup, closePopup as killPopup } from '../../utils/popupUtils.js';
     import ConfigTextInput from '../config/inputs/ConfigTextInput.svelte';
     import ConfigFolderInput from '../config/inputs/ConfigFolderInput.svelte';
@@ -63,6 +64,15 @@
     }
 
     onMount(() => {
+        const clicks = document.getElementsByClassName("LINK");
+        for (let i = 0; i < clicks.length; i++) {
+            console.log(`Detected click listener for ${clicks[i].attributes.linkTo.value}`);
+            
+            clicks[i].onclick = () => {
+                open(clicks[i].attributes.linkTo.value);
+            };
+        }
+
         if (popupType != "INPUT" || !liveValidation) return;
         document.getElementById("popup-input").addEventListener("input", async (event) => {
             const currentValue = event.target.value;

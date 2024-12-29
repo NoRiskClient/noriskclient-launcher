@@ -50,7 +50,7 @@ export async function fetchBranches() {
       } else {
         get(launcherOptions).latestBranch = newBranch;
       }
-      saveOptions();
+      saveOptions(false);
     }
   }
 
@@ -76,5 +76,5 @@ export function switchBranch(isLeft) {
   } else {
     get(launcherOptions).latestBranch = newBranch;
   }
-  saveOptions();
+  saveOptions(false);
 }

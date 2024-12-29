@@ -60,7 +60,7 @@
     }
 
     async function toggleExperimentalMode() {
-        const closeLoadingPopup = openLoadingPopup({content: `Switching to ${$launcherOptions.experimentalMode ? 'production' : 'experimental'} mode...`});
+        const closeLoadingPopup = openLoadingPopup({content: `Switching to ${$launcherOptions.experimentalMode ? 'experimental' : 'production'} mode...`});
         if (!$launcherOptions.experimentalMode) {
             await saveOptions(false);
             if (getNoRiskToken() == null) {
