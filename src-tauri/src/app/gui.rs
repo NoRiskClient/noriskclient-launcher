@@ -9,6 +9,7 @@ use std::convert::From;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::Write;
+use image::GenericImageView;
 
 use anyhow::Result;
 use chrono::Utc;
@@ -176,15 +177,21 @@ async fn accept_privacy_policy() -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
+async fn check_cape_resolution(image_data: &str) -> Result<bool, String> {
+    let image_data = base64::decode(image_data)
+        .map_err(|e| format!("unable to decode base64 image data: {:?}", e))?;
+
+    let image = image::load_from_memory(&image_data)
+        .map_err(|e| format!("unable to load image from memory: {:?}", e))?;
+
+    let (width, height) = image.dimensions();
+    Ok(width == 512 && height == 256)
+}
+
+#[tauri::command]
+async fn upload_cape(norisk_token: &str, uuid: &str, image_path: &str) -> Result<String, String> {
     debug!("Uploading Cape...");
-
-    let dialog_result = FileDialogBuilder::new()
-        .set_title("Select Cape")
-        .add_filter("Pictures", &["png"])
-        .pick_file();
-
-    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
+    CapeApiEndpoints::upload_cape(norisk_token, uuid, &std::path::PathBuf::from(&image_path)).await
 }
 
 #[tauri::command]
@@ -2275,6 +2282,7 @@ pub fn gui_main() {
             discord_auth_link,
             discord_auth_status,
             discord_auth_unlink,
+            check_cape_resolution,
             upload_cape,
             equip_cape,
             delete_cape,
