@@ -103,7 +103,8 @@
         position: fixed; /* Fixierte Positionierung */
         top: 50%; /* 50% von oben */
         left: 50%; /* 50% von links */
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
         transform: translate(-50%, -50%); /* Verschiebung um die Hälfte der eigenen Breite und Höhe */
         background-color: var(--background-color);
         z-index: 999999;
