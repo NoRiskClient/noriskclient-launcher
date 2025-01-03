@@ -127,7 +127,6 @@
   }
 
   async function handleUploadCape() {
-    noriskLog("Cape Location:"+CapeLocation)
     if ($defaultUser) {
       await invoke("upload_cape", {
         noriskToken: getNoRiskToken(),
@@ -143,9 +142,7 @@
       });
     }
   }
-  function handleUploadLocation(location){
-    CapeLocation = location;
-  }
+  
 
   getNoRiskUserByUUID();
 </script>
@@ -165,7 +162,7 @@
   <div class="cape-wrapper">
     {#if currentRequest === -1}
       <div class="preview-player">
-        <CapePlayer bind:cape={previewHash} bind:data={previewData} height={350} width={350}/>
+        <CapePlayer bind:cape={previewHash} bind:data={previewData} height={350} width={350} />
       </div>
       {#if CapeLocation !== null}
       <div class="button-wrapper">
@@ -242,6 +239,7 @@
         display: flex;
         flex-direction: row;
     }
+    
     .preview-player {
         height: auto;
         width: 100%;
