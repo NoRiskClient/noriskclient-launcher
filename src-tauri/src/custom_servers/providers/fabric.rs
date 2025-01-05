@@ -21,7 +21,7 @@ impl FabricProvider {
     
     /// Request all available loader versions
     pub async fn get_all_loader_versions(mc_version: &str) -> Result<Vec<FabricLoaderVersion>> {
-        Self::request_from_endpoint(FABRIC_API_BASE, &format!("versions/loader/{}", mc_version)).await
+        Self::request_from_endpoint(FABRIC_API_BASE, &format!("versions/loader/{mc_version}")).await
     }
     
     /// Request all available installer versions
@@ -35,13 +35,13 @@ impl FabricProvider {
         let installer_version = Self::get_all_installer_versions().await?.first().unwrap().version.clone();
         let url = format!("{}/versions/loader/{}/{}/{}/server/jar", FABRIC_API_BASE, &custom_server.mc_version, custom_server.loader_version.clone().unwrap_or_default(), installer_version);
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
+        let _ = fs::write(path.join("server.jar"), content).await;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

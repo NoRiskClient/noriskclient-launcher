@@ -29,7 +29,7 @@ pub fn check_condition(rules: &Vec<Rule>, features: &HashSet<String>) -> Result<
                 }
             }
             if let Some(version_regex) = &os_requirement.version {
-                if !Regex::new(version_regex)?.is_match(&os_version) {
+                if !Regex::new(version_regex)?.is_match(os_version) {
                     rule_applies = false;
                 }
             }

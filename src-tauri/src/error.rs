@@ -9,7 +9,6 @@ pub enum LauncherError {
     UnknownTemplateParameter(String),
 }
 
-
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorKind {
     #[error("Filesystem error: {0}")]
@@ -121,13 +120,15 @@ impl<E: Into<ErrorKind>> From<E> for Error {
 // we must manually implement serde::Serialize
 impl serde::Serialize for Error {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::ser::Serializer,
+    where
+        S: serde::ser::Serializer,
     {
         serializer.serialize_str(self.to_string().as_ref())
     }
 }
+
 impl ErrorKind {
+    #[allow(clippy::wrong_self_convention)] // TODO: definitely not good practice
     pub fn as_error(self) -> Error {
         self.into()
     }

@@ -6,7 +6,6 @@ use std::{
     str::FromStr,
 };
 
-use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};
@@ -67,7 +66,7 @@ impl VersionManifest {
         Ok(options)
     }
     pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
-        let _ = fs::write(
+        fs::write(
             app_data.join("version_manifest.json"),
             serde_json::to_string_pretty(&self)?,
         )
@@ -198,7 +197,7 @@ impl ArgumentDeclaration {
         command_arguments.push("-XX:G1ReservePercent=20".to_string());
         command_arguments.push("-XX:MaxGCPauseMillis=50".to_string());
         command_arguments.push("-XX:G1HeapRegionSize=32M".to_string());
-        command_arguments.push(format!("-Dnorisk.token={}", norisk_token));
+        command_arguments.push(format!("-Dnorisk.token={norisk_token}"));
         command_arguments.push(format!("-Dnorisk.experimental={}", parameter.dev_mode));
         if parameter.force_server.is_some() {
             info!(
@@ -210,8 +209,8 @@ impl ArgumentDeclaration {
                 parameter.force_server.clone().unwrap()
             ));
         }
-        for arg in parameter.custom_java_args.split(" ") {
-            if arg != " " && arg != "" {
+        for arg in parameter.custom_java_args.split(' ') {
+            if arg != " " && !arg.is_empty() {
                 info!("Added custom java arg: {:?}", arg);
                 command_arguments.push(arg.to_string());
             }
@@ -249,7 +248,7 @@ impl ArgumentDeclaration {
                                 "no game arguments specified".to_string(),
                             )
                         })?
-                        .split(" ")
+                        .split(' ')
                         .map(ToOwned::to_owned),
                 );
             }
@@ -272,7 +271,7 @@ impl ArgumentDeclaration {
     ) -> Result<()> {
         for argument in args {
             if let Some(rules) = &argument.rules {
-                if !crate::minecraft::rule_interpreter::check_condition(rules, &features)? {
+                if !crate::minecraft::rule_interpreter::check_condition(rules, features)? {
                     continue;
                 }
             }
@@ -323,7 +322,7 @@ impl VersionProfile {
         Ok(options)
     }
     pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
-        let _ = fs::write(app_data, serde_json::to_string_pretty(&self)?).await?;
+        fs::write(app_data, serde_json::to_string_pretty(&self)?).await?;
         debug!("Sub System was stored...");
         Ok(())
     }
@@ -366,6 +365,7 @@ impl FromStr for Argument {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)] // For Deserializer
 fn vec_argument<'de, D>(deserializer: D) -> Result<Vec<Argument>, D::Error>
 where
     D: Deserializer<'de>,
@@ -423,7 +423,7 @@ pub struct AssetIndexLocation {
 }
 
 impl AssetIndexLocation {
-    pub async fn load_asset_index(&self, assets_root: &PathBuf) -> Result<AssetIndex> {
+    pub async fn load_asset_index(&self, assets_root: &Path) -> Result<AssetIndex> {
         let asset_index = assets_root.join(format!("{}.json", &self.id));
 
         if !asset_index.exists() {
@@ -463,7 +463,9 @@ impl AssetObject {
 
         let asset_path = asset_folder.join(&self.hash);
 
-        return if !asset_path.exists() {
+        if asset_path.exists() {
+            Ok(false)
+        } else {
             progress.progress_update(ProgressUpdate::set_label(format!(
                 "translation.downloadingAssetObject&hash%{}",
                 self.hash
@@ -471,7 +473,7 @@ impl AssetObject {
 
             info!("Downloading {}", self.hash);
             download_file_untracked(
-                &*format!(
+                &format!(
                     "https://resources.download.minecraft.net/{}/{}",
                     &self.hash[0..2],
                     &self.hash
@@ -482,9 +484,7 @@ impl AssetObject {
             info!("Downloaded {}", self.hash);
 
             Ok(true)
-        } else {
-            Ok(false)
-        };
+        }
     }
 
     pub async fn download_norisk_cosmetic(
@@ -500,7 +500,7 @@ impl AssetObject {
             .unwrap_or_default();
         let assets_objects_folder = assets_objects_folder.as_ref().to_owned();
 
-        let mut path_parts: Vec<&str> = file_path.split("/").collect();
+        let mut path_parts: Vec<&str> = file_path.split('/').collect();
 
         let mut asset_file_path = assets_objects_folder.clone();
         for part in path_parts.clone() {
@@ -523,7 +523,7 @@ impl AssetObject {
         if asset_file_path.exists() {
             let md5 = md5sum(&asset_file_path)?;
 
-            if &self.hash == &md5 {
+            if self.hash == md5 {
                 // If sha1 matches, return
                 info!(
                     "Norisk asset {} already exists and matches md5.",
@@ -532,8 +532,7 @@ impl AssetObject {
             } else {
                 info!(
                     "Norisk asset {} != {} already exists but does not match md5.",
-                    md5,
-                    &self.hash
+                    md5, &self.hash
                 );
                 download = true;
             }
@@ -541,7 +540,7 @@ impl AssetObject {
             download = true;
         }
 
-        return if download {
+        if download {
             progress.progress_update(ProgressUpdate::set_label(format!(
                 "translation.downloadingNoriskAssetObject&hash%{}",
                 self.hash
@@ -549,29 +548,21 @@ impl AssetObject {
 
             info!("Downloading {}", self.hash);
             let prod_or_exp = if options.experimental_mode {
-                 "exp"
+                "exp"
             } else {
-                 "prod"
+                "prod"
             };
             let path = &*format!(
                 "{}/{}/{}/assets/{}",
-                "https://cdn.norisk.gg/branches",
-                prod_or_exp,
-                branch,
-                file_path,
+                "https://cdn.norisk.gg/branches", prod_or_exp, branch, file_path,
             );
-            download_private_file_untracked(
-                path,
-                norisk_token,
-                asset_file_path,
-            )
-            .await?;
+            download_private_file_untracked(path, norisk_token, asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
         } else {
             Ok(false)
-        };
+        }
     }
 
     pub async fn download_destructing(
@@ -648,12 +639,12 @@ impl Library {
             .as_deref()
             .unwrap_or("https://libraries.minecraft.net/");
 
-        return Ok(LibraryDownloadInfo {
-            url: format!("{}{}", url, path),
+        Ok(LibraryDownloadInfo {
+            url: format!("{url}{path}"),
             sha1: None,
             size: None,
             path,
-        });
+        })
     }
 }
 
@@ -704,10 +695,10 @@ pub struct LibraryDownloadInfo {
 impl From<&LibraryArtifact> for LibraryDownloadInfo {
     fn from(artifact: &LibraryArtifact) -> Self {
         LibraryDownloadInfo {
-            path: artifact.path.to_owned(),
-            sha1: Some(artifact.sha1.to_owned()),
+            path: artifact.path.clone(),
+            sha1: Some(artifact.sha1.clone()),
             size: Some(artifact.size),
-            url: artifact.url.to_owned(),
+            url: artifact.url.clone(),
         }
     }
 }
@@ -715,7 +706,7 @@ impl From<&LibraryArtifact> for LibraryDownloadInfo {
 impl LibraryDownloadInfo {
     async fn fetch_sha1(&self) -> Result<String> {
         HTTP_CLIENT
-            .get(&format!("{}{}", &self.url, ".sha1"))
+            .get(format!("{}{}", &self.url, ".sha1"))
             .send()
             .await?
             .error_for_status()?
@@ -793,8 +784,7 @@ impl LibraryDownloadInfo {
 
         // Download library
         progress.progress_update(ProgressUpdate::set_label(format!(
-            "translation.downloadingLibrary&library%{}",
-            name
+            "translation.downloadingLibrary&library%{name}"
         )));
 
         download_file_untracked(&self.url, &library_path).await?;

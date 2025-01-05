@@ -18,9 +18,10 @@ pub struct CustomServer {
     #[serde(rename = "lastOnline")]
     pub last_online: u64,
     #[serde(rename = "createdAt")]
-    pub created_at: u64
+    pub created_at: u64,
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum CustomServerType {
     VANILLA,
@@ -32,13 +33,13 @@ pub enum CustomServerType {
     SPIGOT,
     BUKKIT,
     FOLIA,
-    PURPUR
+    PURPUR,
 }
 
 impl CustomServerType {
+    #[must_use]
     pub fn from_string(s: &str) -> Self {
         match s {
-            "VANILLA" => CustomServerType::VANILLA,
             "FORGE" => CustomServerType::FORGE,
             "FABRIC" => CustomServerType::FABRIC,
             "NEO_FORGE" => CustomServerType::NEO_FORGE,
@@ -48,10 +49,13 @@ impl CustomServerType {
             "BUKKIT" => CustomServerType::BUKKIT,
             "FOLIA" => CustomServerType::FOLIA,
             "PURPUR" => CustomServerType::PURPUR,
-            _ => CustomServerType::VANILLA
+            // VANILLA is the default
+            _ => CustomServerType::VANILLA,
         }
     }
 
+    #[allow(clippy::inherent_to_string)] // TODO: switch to `impl Display` for `CustomServerType`
+    #[must_use]
     pub fn to_string(&self) -> String {
         match self {
             CustomServerType::VANILLA => "VANILLA".to_string(),
@@ -63,7 +67,7 @@ impl CustomServerType {
             CustomServerType::SPIGOT => "SPIGOT".to_string(),
             CustomServerType::BUKKIT => "BUKKIT".to_string(),
             CustomServerType::FOLIA => "FOLIA".to_string(),
-            CustomServerType::PURPUR => "PURPUR".to_string()
+            CustomServerType::PURPUR => "PURPUR".to_string(),
         }
     }
 }
@@ -91,16 +95,16 @@ impl<'de> Deserialize<'de> for CustomServerType {
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct CustomServerEventPayload {
     pub server_id: String,
-    pub data: String
+    pub data: String,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct CustomServerProgressEventPayload {
     pub server_id: String,
-    pub data: ProgressUpdate
+    pub data: ProgressUpdate,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct LatestRunningServer {
     #[serde(rename = "forwarderProcessId")]
     pub forwarder_process_id: Option<u32>,
@@ -108,16 +112,6 @@ pub struct LatestRunningServer {
     pub process_id: Option<u32>,
     #[serde(rename = "serverId")]
     pub server_id: Option<String>,
-}
-
-impl Default for LatestRunningServer {
-    fn default() -> Self {
-        Self {
-            forwarder_process_id: None,
-            process_id: None,
-            server_id: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

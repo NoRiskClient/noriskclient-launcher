@@ -32,5 +32,5 @@ pub fn md5sum(file_path: &Path) -> Result<String> {
 
     let result = context.compute();
 
-    Ok(format!("{:x}", result))
+    Ok(format!("{result:x}"))
 }

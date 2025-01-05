@@ -21,20 +21,20 @@ impl VanillaProvider {
 
     /// Request a vanilla version manifest
     pub async fn get_manifest(hash: &str, version: &str) -> Result<VanillaManifest> {
-        Self::request_from_endpoint(VANILLA_LAUNCHER_API, &format!("v1/packages/{}/{}.json", hash, version)).await
+        Self::request_from_endpoint(VANILLA_LAUNCHER_API, &format!("v1/packages/{hash}/{version}.json")).await
     }
 
     pub async fn download_server_jar(custom_server: &CustomServer, hash: &str) -> Result<()> {
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join(&custom_server.id);
         fs::create_dir_all(&path).await?;
         let manifest = Self::get_manifest(hash, &custom_server.mc_version).await?;
-        let _ = download_file_untracked(&manifest.downloads.server.url, path.join("server.jar")).await?;
+        download_file_untracked(&manifest.downloads.server.url, path.join("server.jar")).await?;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

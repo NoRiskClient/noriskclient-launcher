@@ -12,36 +12,62 @@ use crate::HTTP_CLIENT;
 pub struct ModrinthApiEndpoints;
 
 impl ModrinthApiEndpoints {
-    pub async fn get_project_members(slug: &str) -> Result<Vec<ModrinthTeamMember>, crate::error::Error> {
-        let url = format!("https://api.modrinth.com/v2/project/{}/members", slug);
-        Ok(HTTP_CLIENT.get(url)
+    pub async fn get_project_members(
+        slug: &str,
+    ) -> Result<Vec<ModrinthTeamMember>, crate::error::Error> {
+        let url = format!("https://api.modrinth.com/v2/project/{slug}/members");
+        Ok(HTTP_CLIENT
+            .get(url)
             .send()
             .await?
             .json::<Vec<ModrinthTeamMember>>()
             .await?)
     }
 
-    pub async fn search_projects<T: DeserializeOwned>(params: &ModrinthSearchRequestParams, custom: Option<HashMap<String, String>>) -> Result<T, crate::error::Error> {
-        let url = format!("https://api.modrinth.com/v2/search?facets={}&index={}&limit={}&offset={}&query={}{}", params.facets, params.index, params.limit, params.offset, params.query, if custom.is_some() { format!("&{}", custom.unwrap().iter().map(|(key, value)| format!("{}={}", key, value)).collect::<Vec<String>>().join("&") ) } else { "".to_string() });
-        Ok(HTTP_CLIENT.get(url)
-            .send()
-            .await?
-            .json::<T>()
-            .await?)
+    pub async fn search_projects<T: DeserializeOwned>(
+        params: &ModrinthSearchRequestParams,
+        custom: Option<HashMap<String, String>>,
+    ) -> Result<T, crate::error::Error> {
+        let url = format!(
+            "https://api.modrinth.com/v2/search?facets={}&index={}&limit={}&offset={}&query={}{}",
+            params.facets,
+            params.index,
+            params.limit,
+            params.offset,
+            params.query,
+            if custom.is_some() {
+                format!(
+                    "&{}",
+                    custom
+                        .unwrap()
+                        .iter()
+                        .map(|(key, value)| format!("{key}={value}"))
+                        .collect::<Vec<String>>()
+                        .join("&")
+                )
+            } else {
+                String::new()
+            }
+        );
+        Ok(HTTP_CLIENT.get(url).send().await?.json::<T>().await?)
     }
 
-    pub async fn get_project<T: DeserializeOwned>(slug_or_id: &str) -> Result<T, crate::error::Error> {
-        let url = format!("https://api.modrinth.com/v2/project/{}", slug_or_id);
-        Ok(HTTP_CLIENT.get(url)
-            .send()
-            .await?
-            .json::<T>()
-            .await?)
+    pub async fn get_project<T: DeserializeOwned>(
+        slug_or_id: &str,
+    ) -> Result<T, crate::error::Error> {
+        let url = format!("https://api.modrinth.com/v2/project/{slug_or_id}");
+        Ok(HTTP_CLIENT.get(url).send().await?.json::<T>().await?)
     }
 
-    pub async fn get_project_version(slug: &str, params: &str) -> Result<Vec<ModrinthProject>, crate::error::Error> {
-        let url = format!("https://api.modrinth.com/v2/project/{}/version{}", slug, params);
-        Ok(HTTP_CLIENT.get(url)
+    pub async fn get_project_version(
+        slug: &str,
+        params: &str,
+    ) -> Result<Vec<ModrinthProject>, crate::error::Error> {
+        let url = format!(
+            "https://api.modrinth.com/v2/project/{slug}/version{params}"
+        );
+        Ok(HTTP_CLIENT
+            .get(url)
             .send()
             .await?
             .json::<Vec<ModrinthProject>>()
@@ -57,7 +83,7 @@ pub struct ModrinthTeamMember {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ModrinthUser {
-    pub username: String
+    pub username: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -207,18 +233,28 @@ pub struct ModrinthProject {
 }
 
 impl ModrinthProject {
-    pub fn to_custom_mod(&self, title: &str, slug: &str, image_url: Option<String>, dependencies: Vec<CustomMod>, required: bool, enabled: bool) -> CustomMod {
-        let file_name = self.files.first().map(|file| {
-            file.filename.clone()
-        }).unwrap_or("MOD_FALL_BACK".to_string());
+    #[must_use] pub fn to_custom_mod(
+        &self,
+        title: &str,
+        slug: &str,
+        image_url: Option<String>,
+        dependencies: Vec<CustomMod>,
+        required: bool,
+        enabled: bool,
+    ) -> CustomMod {
+        let file_name = self
+            .files
+            .first()
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.filename.clone());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
-        let url = self.files.first().map(|file| {
-            file.url.clone()
-        }).unwrap_or("MOD_FALL_BACK".to_string());
+        let url = self
+            .files
+            .first()
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.url.clone());
 
-        return CustomMod {
+        CustomMod {
             title: title.to_string(),
-            image_url: image_url,
+            image_url,
             value: LoaderMod {
                 enabled,
                 required,
@@ -226,47 +262,51 @@ impl ModrinthProject {
                 source: ModSource::Repository {
                     repository: "modrinth".to_string(),
                     artifact: repo_artifact,
-                    url: Some(url)
+                    url: Some(url),
                 },
             },
             dependencies,
-        };
+        }
     }
 
-    pub fn to_loader_mod(&self, slug: &str, required: bool, enabled: bool) -> LoaderMod {
-        let file_name = self.files.first().map(|file| {
-            file.filename.clone()
-        }).unwrap_or("MOD_FALL_BACK".to_string());
+    #[must_use] pub fn to_loader_mod(&self, slug: &str, required: bool, enabled: bool) -> LoaderMod {
+        let file_name = self
+            .files
+            .first()
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.filename.clone());
         let repo_artifact = format!("maven.modrinth:{}:{}", slug, self.version_number);
-        let url = self.files.first().map(|file| {
-            file.url.clone()
-        }).unwrap_or("MOD_FALL_BACK".to_string());
+        let url = self
+            .files
+            .first()
+            .map_or("MOD_FALL_BACK".to_string(), |file| file.url.clone());
 
-        return LoaderMod {
+        LoaderMod {
             enabled,
             required,
             name: file_name,
             source: ModSource::Repository {
                 repository: "modrinth".to_string(),
                 artifact: repo_artifact,
-                url: Some(url)
+                url: Some(url),
             },
-        };
+        }
     }
 
-
-    pub fn to_slug(&self) -> String {
-        return self.files.first().map(|file| {
-            return file.filename.replace(format!("-{}.jar", self.version_number).as_str(), "");
-        }).unwrap_or("ERROR-MOD".to_string());
+    #[must_use] pub fn to_slug(&self) -> String {
+        self.files
+            .first()
+            .map_or("ERROR-MOD".to_string(), |file| {
+                file.filename
+                    .replace(format!("-{}.jar", self.version_number).as_str(), "")
+            })
     }
 
-    pub fn is_already_required_by_norisk_client(&self, mods: &Vec<LoaderMod>) -> bool {
+    #[must_use] pub fn is_already_required_by_norisk_client(&self, mods: &[LoaderMod]) -> bool {
         let dependency_slug = self.to_slug();
-        return mods.iter().any(|loader_mod| {
+        mods.iter().any(|loader_mod| {
             let slug = loader_mod.source.get_slug();
-            return dependency_slug.eq_ignore_ascii_case(&slug);
-        });
+            dependency_slug.eq_ignore_ascii_case(&slug)
+        })
     }
 }
 

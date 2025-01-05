@@ -1,3 +1,7 @@
+use std::convert::From;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::Write;
 use std::{
     collections::HashMap,
     io,
@@ -5,10 +9,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use std::convert::From;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::Write;
 
 use anyhow::Result;
 use chrono::Utc;
@@ -21,11 +21,30 @@ use regex::Regex;
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::FileDialogBuilder;
+use tauri::{Manager, UserAttentionType, Window, WindowEvent};
 use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
 
+use crate::addons::datapack_manager::DataPackManager;
+use crate::addons::mod_manager::ModManager;
+use crate::addons::resourcepack_manager::ResourcePackManager;
+use crate::addons::shader_manager::ShaderManager;
+use crate::app::api::{LoginData, NoRiskLaunchManifest};
+use crate::app::cape_api::{Cape, CapeApiEndpoints};
+use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
+use crate::app::modrinth_api::{
+    CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
+    ModrinthSearchRequestParams,
+};
+use crate::app::nrc_cache::{AppState, NRCCache, OutputData, RunnerInstance};
+use crate::error::Error;
+use crate::error::ErrorKind;
+use crate::error::ErrorKind::OtherError;
+use crate::minecraft::auth;
+use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
+use crate::minecraft::progress::ClientProgressUpdate;
+use crate::LAUNCHER_VERSION;
 use crate::{
     custom_servers::{
         manager::CustomServerManager,
@@ -43,43 +62,27 @@ use crate::{
             vanilla::{VanillaManifest, VanillaProvider, VanillaVersions},
         },
     },
-    HTTP_CLIENT,
-    LAUNCHER_DIRECTORY,
     minecraft::{
         launcher::{LauncherData, LaunchingParameter},
         prelauncher,
         progress::ProgressUpdate,
-    }, utils::{McDataHandler, total_memory},
+    },
+    utils::{total_memory, McDataHandler},
+    HTTP_CLIENT, LAUNCHER_DIRECTORY,
 };
-use crate::addons::datapack_manager::DataPackManager;
-use crate::addons::mod_manager::ModManager;
-use crate::addons::resourcepack_manager::ResourcePackManager;
-use crate::addons::shader_manager::ShaderManager;
-use crate::app::api::{LoginData, NoRiskLaunchManifest};
-use crate::app::cape_api::{Cape, CapeApiEndpoints};
-use crate::app::mclogs_api::{McLogsApiEndpoints, McLogsUploadResponse};
-use crate::app::modrinth_api::{
-    CustomMod, ModInfo, ModrinthApiEndpoints, ModrinthModsSearchResponse, ModrinthProject,
-    ModrinthSearchRequestParams,
-};
-use crate::app::nrc_cache::{AppState, NRCCache, OutputData, RunnerInstance};
-use crate::error::Error;
-use crate::error::ErrorKind;
-use crate::error::ErrorKind::OtherError;
-use crate::LAUNCHER_VERSION;
-use crate::minecraft::auth;
-use crate::minecraft::minecraft_auth::{Credentials, MinecraftAuthStore};
-use crate::minecraft::progress::ClientProgressUpdate;
 
-use super::{api::{
-    ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
-    WhitelistSlots,
-}, app_data::{
-    Announcement, ChangeLog, LastViewedPopups,
-    LauncherOptions, LauncherProfiles,
-}, modrinth_api::{
-    Datapack, DatapackInfo, ModrinthDatapacksSearchResponse, ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack, ResourcePackInfo, Shader, ShaderInfo
-}};
+use super::{
+    api::{
+        ApiEndpoints, CustomServersResponse, FeaturedServer, LoaderMod, NoRiskUserMinimal,
+        WhitelistSlots,
+    },
+    app_data::{Announcement, ChangeLog, LastViewedPopups, LauncherOptions, LauncherProfiles},
+    modrinth_api::{
+        Datapack, DatapackInfo, ModrinthDatapacksSearchResponse,
+        ModrinthResourcePacksSearchResponse, ModrinthShadersSearchResponse, ResourcePack,
+        ResourcePackInfo, Shader, ShaderInfo,
+    },
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OnlineStatusInfo {
@@ -124,7 +127,7 @@ struct PlayerDBPlayer {
 async fn check_online_status() -> Result<OnlineStatusInfo, String> {
     ApiEndpoints::norisk_api_status()
         .await
-        .map_err(|e| format!("unable to check online status: {:?}", e))
+        .map_err(|e| format!("unable to check online status: {e:?}"))
 }
 
 #[tauri::command]
@@ -143,10 +146,10 @@ async fn check_privacy_policy() -> Result<bool, String> {
 
     let file_content = fs::read_to_string(&file)
         .await
-        .map_err(|e| format!("unable to read privacy_policy_accepted file: {:?}", e))?;
+        .map_err(|e| format!("unable to read privacy_policy_accepted file: {e:?}"))?;
 
     let is_accpeted = file_content.starts_with("accepted=true");
-    println!("Privacy policy is accepted: {}", is_accpeted);
+    println!("Privacy policy is accepted: {is_accpeted}");
 
     Ok(is_accpeted)
 }
@@ -157,20 +160,23 @@ async fn accept_privacy_policy() -> Result<(), String> {
     let file = config_dir.join("privacy_policy_accepted.txt");
     let date = Utc::now().to_rfc3339();
 
-    let formatted_text = format!("accepted=true\nat={}\nurl=https://norisk.gg/privacy-policy\n", &date);
+    let formatted_text = format!(
+        "accepted=true\nat={}\nurl=https://norisk.gg/privacy-policy\n",
+        &date
+    );
     let text = formatted_text.as_bytes();
 
     if file.exists() {
         info!("Removing old privacy_policy_accepted file: {:?}", file);
         fs::remove_file(&file)
             .await
-            .map_err(|e| format!("unable to remove privacy_policy_accepted file: {:?}", e))?;
+            .map_err(|e| format!("unable to remove privacy_policy_accepted file: {e:?}"))?;
     }
 
     info!("Creating privacy_policy_accepted file: {:?}", file);
     fs::write(&file, text)
         .await
-        .map_err(|e| format!("unable to create privacy_policy_accepted file: {:?}", e))?;
+        .map_err(|e| format!("unable to create privacy_policy_accepted file: {e:?}"))?;
 
     Ok(())
 }
@@ -182,9 +188,9 @@ async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
     let dialog_result = FileDialogBuilder::new()
         .set_title("Select Cape")
         .add_filter("Pictures", &["png"])
-        .pick_file();
-
-    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
+        .pick_file()
+        .expect("Failed to open file dialog");
+    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result).await
 }
 
 #[tauri::command]
@@ -234,33 +240,35 @@ async fn get_featured_datapacks(
 async fn get_blacklisted_mods() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_mods()
         .await
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
 
 #[tauri::command]
 async fn get_blacklisted_resourcepacks() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_resourcepacks()
         .await
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
 
 #[tauri::command]
 async fn get_blacklisted_shaders() -> Result<Vec<String>, Error> {
-    ApiEndpoints::norisk_blacklisted_shaders().await.map_err(|e| e.into())
+    ApiEndpoints::norisk_blacklisted_shaders()
+        .await
+        .map_err(std::convert::Into::into)
 }
 
 #[tauri::command]
 async fn get_blacklisted_datapacks() -> Result<Vec<String>, Error> {
     ApiEndpoints::norisk_blacklisted_datapacks()
         .await
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
 
 #[tauri::command]
 async fn get_blacklisted_servers() -> Result<Vec<FeaturedServer>, Error> {
     ApiEndpoints::norisk_blacklisted_servers()
         .await
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
 
 #[tauri::command]
@@ -323,7 +331,12 @@ async fn get_shader(slug: &str, params: &str) -> Result<Shader, Error> {
 }
 
 #[tauri::command]
-async fn download_shader(options: LauncherOptions, branch: &str, shader: Shader, window: Window) -> Result<(), Error> {
+async fn download_shader(
+    options: LauncherOptions,
+    branch: &str,
+    shader: Shader,
+    window: Window,
+) -> Result<(), Error> {
     ShaderManager::download_shader(options, branch, &shader, window).await
 }
 
@@ -345,7 +358,12 @@ async fn get_resourcepack(slug: &str, params: &str) -> Result<ResourcePack, Erro
 }
 
 #[tauri::command]
-async fn download_resourcepack(options: LauncherOptions, branch: &str, resourcepack: ResourcePack, window: Window) -> Result<(), Error> {
+async fn download_resourcepack(
+    options: LauncherOptions,
+    branch: &str,
+    resourcepack: ResourcePack,
+    window: Window,
+) -> Result<(), Error> {
     ResourcePackManager::download_resourcepack(options, branch, &resourcepack, window).await
 }
 
@@ -353,7 +371,11 @@ async fn download_resourcepack(options: LauncherOptions, branch: &str, resourcep
 async fn search_datapacks(
     params: ModrinthSearchRequestParams,
 ) -> Result<ModrinthDatapacksSearchResponse, Error> {
-    ModrinthApiEndpoints::search_projects(&params, Some(HashMap::from([("l".to_string(), "datapacks".to_string())]))).await
+    ModrinthApiEndpoints::search_projects(
+        &params,
+        Some(HashMap::from([("l".to_string(), "datapacks".to_string())])),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -367,7 +389,13 @@ async fn get_datapack(slug: &str, params: &str, world: &str) -> Result<Datapack,
 }
 
 #[tauri::command]
-async fn download_datapack(options: LauncherOptions, branch: &str, world: &str, datapack: Datapack, window: Window) -> Result<(), Error> {
+async fn download_datapack(
+    options: LauncherOptions,
+    branch: &str,
+    world: &str,
+    datapack: Datapack,
+    window: Window,
+) -> Result<(), Error> {
     DataPackManager::download_datapack(options, branch, world, &datapack, window).await
 }
 
@@ -390,7 +418,7 @@ async fn request_trending_capes(
 ) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_trending_capes(norisk_token, uuid, alltime, limit)
         .await
-        .map_err(|e| format!("unable to request trending capes: {:?}", e))
+        .map_err(|e| format!("unable to request trending capes: {e:?}"))
 }
 
 #[tauri::command]
@@ -401,17 +429,14 @@ async fn request_user_capes(
 ) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_user_capes(norisk_token, uuid, username)
         .await
-        .map_err(|e| format!("unable to request user capes: {:?}", e))
+        .map_err(|e| format!("unable to request user capes: {e:?}"))
 }
 
 #[tauri::command]
-async fn request_owned_capes(
-    norisk_token: &str,
-    uuid: &str,
-) -> Result<Vec<Cape>, String> {
+async fn request_owned_capes(norisk_token: &str, uuid: &str) -> Result<Vec<Cape>, String> {
     CapeApiEndpoints::request_owned_capes(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to request owned capes: {:?}", e))
+        .map_err(|e| format!("unable to request owned capes: {e:?}"))
 }
 
 #[tauri::command]
@@ -424,30 +449,32 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
     } else {
         "https://cdn.norisk.gg/capes/template.png"
     };
-    let user_dirs = UserDirs::new().unwrap();
-    let downloads_dir = user_dirs.download_dir().unwrap();
+    let user_dirs = UserDirs::new().expect("Error getting user directories");
+    let downloads_dir = user_dirs
+        .download_dir()
+        .expect("Error getting downloads directory");
     debug!("Downloads directory: {:?}", downloads_dir);
     let response = HTTP_CLIENT
         .get(template_url)
         .send()
         .await
-        .map_err(|e| format!("Error downloading template: {:?}", e))?;
+        .map_err(|e| format!("Error downloading template: {e:?}"))?;
     let template_bytes = response
         .bytes()
         .await
-        .map_err(|e| format!("Error reading template bytes: {:?}", e))?;
+        .map_err(|e| format!("Error reading template bytes: {e:?}"))?;
 
     let mut file = File::create(downloads_dir.join("nrc_cape_template.png"))
-        .map_err(|e| format!("Error creating file: {:?}", e))?;
+        .map_err(|e| format!("Error creating file: {e:?}"))?;
     file.write_all(&template_bytes)
-        .map_err(|e| format!("Error writing file: {:?}", e))?;
+        .map_err(|e| format!("Error writing file: {e:?}"))?;
 
     CapeApiEndpoints::show_in_folder(
         downloads_dir
             .join("nrc_cape_template.png")
             .into_os_string()
             .to_str()
-            .unwrap(),
+            .expect("Error converting path to string"),
     );
 
     Ok(())
@@ -455,26 +482,30 @@ async fn download_template_and_open_explorer() -> Result<(), String> {
 
 #[tauri::command]
 async fn export_profile_and_open_explorer(profile_id: String) -> Result<(), String> {
-    LauncherProfiles::export(profile_id).await
+    LauncherProfiles::export(profile_id)
+        .await
+        .map_err(|e| format!("unable to export profile: {e:?}"))
 }
 
 #[tauri::command]
 async fn import_launcher_profile(file_location: &str) -> Result<(), String> {
-    LauncherProfiles::import(file_location).await
+    LauncherProfiles::import(file_location)
+        .await
+        .map_err(|e| format!("unable to import profile: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
     ApiEndpoints::get_mcreal_app_token(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to get mcreal app token: {:?}", e))
+        .map_err(|e| format!("unable to get mcreal app token: {e:?}"))
 }
 
 #[tauri::command]
 async fn reset_mobile_app_token(norisk_token: &str, uuid: &str) -> Result<String, String> {
     ApiEndpoints::reset_mcreal_app_token(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to reset mcreal app token: {:?}", e))
+        .map_err(|e| format!("unable to reset mcreal app token: {e:?}"))
 }
 
 #[tauri::command]
@@ -488,9 +519,7 @@ pub async fn open_minecraft_logs_window(
     let runner_instances = app_state.runner_instances.lock().unwrap();
 
     // Finde die Instanz, die der gegebenen UUID entspricht
-    let instance = runner_instances
-        .iter()
-        .find(|instance| instance.id == uuid);
+    let instance = runner_instances.iter().find(|instance| instance.id == uuid);
 
     // Berechne den Branch und die zugehörige Nummer
     let branch_with_number = if let Some(instance) = instance {
@@ -501,7 +530,10 @@ pub async fn open_minecraft_logs_window(
             .collect();
 
         // Finde den Index der aktuellen Instanz innerhalb des gefilterten Arrays
-        let index = filtered.iter().position(|inst| inst.id == uuid).unwrap_or(0);
+        let index = filtered
+            .iter()
+            .position(|inst| inst.id == uuid)
+            .unwrap_or(0);
 
         // Generiere den Namen mit der Nummer, wenn der Index > 0 ist
         if index > 0 {
@@ -515,8 +547,8 @@ pub async fn open_minecraft_logs_window(
     };
 
     // Erstelle eine eindeutige Bezeichnung für das Fenster
-    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
-    let unique_label = format!("logs-{}:{}:{}", random_number, uuid, is_live);
+    let random_number: u64 = rand::thread_rng().gen_range(100_000..999_999);
+    let unique_label = format!("logs-{random_number}:{uuid}:{is_live}");
 
     // Baue das Fenster
     let window = tauri::WindowBuilder::new(
@@ -524,17 +556,16 @@ pub async fn open_minecraft_logs_window(
         unique_label,
         tauri::WindowUrl::App("logs.html".into()),
     )
-        .inner_size(1000.0, 800.0)
-        .build()?;
+    .inner_size(1000.0, 800.0)
+    .build()?;
 
     // Setze den Titel des Fensters mit dem Branch und der Nummer
-    let _ = window.set_title(&format!("Minecraft Logs [{}]", branch_with_number));
+    let _ = window.set_title(&format!("Minecraft Logs [{branch_with_number}]"));
     let _ = window.set_resizable(true);
     let _ = window.set_focus();
 
     Ok(())
 }
-
 
 #[tauri::command]
 pub async fn open_minecraft_crash_window(
@@ -542,16 +573,16 @@ pub async fn open_minecraft_crash_window(
     crash_report_path: String,
 ) -> Result<(), Error> {
     // Generate a random number
-    let random_number: u64 = rand::thread_rng().gen_range(100000..999999);
+    let random_number: u64 = rand::thread_rng().gen_range(100_000..999_9999);
     // Create a unique label using the random number
-    let unique_label = format!("crash-{}", random_number);
+    let unique_label = format!("crash-{random_number}");
     // Create the new window
     let window = tauri::WindowBuilder::new(
         &handle,
         unique_label,
         tauri::WindowUrl::App("crash.html".into()),
     )
-        .build()?;
+    .build()?;
 
     // Set window properties
     let _ = window.set_title("Crash Report");
@@ -576,7 +607,7 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, Error> {
     } else {
         options.latest_branch
     }
-        .ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
+    .ok_or(ErrorKind::OtherError("No Latest Branch was found".to_string()).as_error())?;
 
     let log_path: PathBuf = LAUNCHER_DIRECTORY
         .data_dir()
@@ -599,12 +630,12 @@ pub async fn get_latest_minecraft_logs() -> Result<Vec<String>, Error> {
 #[tauri::command]
 pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, Error> {
     debug!("Incoming Path {:?}", file_path.clone());
-    let normalized_path = file_path.trim().replace("\\", "/");
+    let normalized_path = file_path.trim().replace('\\', "/");
     let path = std::path::Path::new(&normalized_path);
     debug!("Normalized Path {:?}", normalized_path.clone());
 
     if !path.exists() {
-        return Err(ErrorKind::OtherError(format!("File does not exist: {:?}", path)).as_error());
+        return Err(ErrorKind::OtherError(format!("File does not exist: {path:?}")).as_error());
     }
 
     let file = File::open(path)?;
@@ -616,42 +647,56 @@ pub async fn read_txt_file(file_path: String) -> Result<Vec<String>, Error> {
 
 #[tauri::command]
 async fn minecraft_auth_get_store() -> Result<MinecraftAuthStore, Error> {
-    Ok(MinecraftAuthStore::init(None).await?)
+    MinecraftAuthStore::init(None).await
 }
 
 #[tauri::command]
-pub async fn minecraft_auth_remove_user(
-    uuid: uuid::Uuid,
-) -> Result<Option<Credentials>, Error> {
-    Ok(minecraft_auth_get_store().await?.remove(uuid).await?)
+pub async fn minecraft_auth_remove_user(uuid: uuid::Uuid) -> Result<Option<Credentials>, Error> {
+    minecraft_auth_get_store().await?.remove(uuid).await
 }
 
 #[tauri::command]
 pub async fn minecraft_auth_get_default_user() -> Result<Option<Credentials>, Error> {
     let accounts = minecraft_auth_get_store().await?;
-    let account = accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).ok_or(ErrorKind::NoCredentialsError)?;
-    Ok(Option::from(minecraft_auth_update_mojang_and_norisk_token(account.clone()).await?))
+    let account = accounts
+        .users
+        .get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?)
+        .ok_or(ErrorKind::NoCredentialsError)?;
+    Ok(Option::from(
+        minecraft_auth_update_mojang_and_norisk_token(account.clone()).await?,
+    ))
 }
 
-pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>) -> Result<Option<Credentials>, crate::error::Error> {
+pub async fn refresh_norisk_token_if_necessary(
+    credentials: Option<&Credentials>,
+) -> Result<Option<Credentials>, crate::error::Error> {
     let experimental_mode = get_options().await?.experimental_mode;
     if credentials.is_some() {
-        let token_result = credentials.unwrap().norisk_credentials.get_token(experimental_mode).await;
+        let token_result = credentials
+            .unwrap()
+            .norisk_credentials
+            .get_token(experimental_mode)
+            .await;
         match token_result {
             //TODO checken ob token valid ist (api mässig)
             Ok(token) => {
-                let result = ApiEndpoints::get_norisk_user(&token, &credentials.unwrap().id.to_string()).await;
+                let result =
+                    ApiEndpoints::get_norisk_user(&token, &credentials.unwrap().id.to_string())
+                        .await;
                 match result {
                     Ok(_) => {
                         debug!("NoRisk Token is valid");
                     }
                     Err(error) => {
                         // Überprüfen, ob der Fehler ein HTTP-Fehler ist
-                        debug!("Error Fetching NoRiskUser: {:?}",error);
+                        debug!("Error Fetching NoRiskUser: {:?}", error);
                         //ich weiß ich weiß...
                         if error.to_string().contains("(401 Unauthorized)") {
                             info!("Refreshing NoRisk Token because: {}", error.to_string());
-                            return Ok(Option::from(minecraft_auth_update_norisk_token(credentials.unwrap().clone()).await?));
+                            return Ok(Option::from(
+                                minecraft_auth_update_norisk_token(credentials.unwrap().clone())
+                                    .await?,
+                            ));
                         }
                     }
                 }
@@ -659,7 +704,9 @@ pub async fn refresh_norisk_token_if_necessary(credentials: Option<&Credentials>
             Err(error) => {
                 // Versuche den NoRisk-Token zu aktualisieren
                 info!("Refreshing NoRisk Token because: {}", error.to_string());
-                return Ok(Option::from(minecraft_auth_update_norisk_token(credentials.unwrap().clone()).await?));
+                return Ok(Option::from(
+                    minecraft_auth_update_norisk_token(credentials.unwrap().clone()).await?,
+                ));
             }
         };
     }
@@ -688,7 +735,9 @@ pub async fn minecraft_auth_update_norisk_token(
     credentials: Credentials,
 ) -> Result<Credentials, Error> {
     let mut accounts = minecraft_auth_get_store().await?;
-    Ok(accounts.refresh_norisk_token_if_necessary(&credentials, false).await?)
+    accounts
+        .refresh_norisk_token_if_necessary(&credentials, false)
+        .await
 }
 
 #[tauri::command]
@@ -754,7 +803,9 @@ async fn get_custom_shaders_folder(
     options: LauncherOptions,
     branch: &str,
 ) -> Result<String, Error> {
-    Ok(ShaderManager::get_shaders_folder(options, branch).to_string_lossy().to_string())
+    Ok(ShaderManager::get_shaders_folder(&options, branch)
+        .to_string_lossy()
+        .to_string())
 }
 
 #[tauri::command]
@@ -781,7 +832,8 @@ async fn get_custom_resourcepacks_filenames(
     branch: &str,
     installed_resourcepacks: Vec<ResourcePack>,
 ) -> Result<Vec<String>, Error> {
-    ResourcePackManager::get_custom_resourcepack_filenames(options, branch, installed_resourcepacks).await
+    ResourcePackManager::get_custom_resourcepack_filenames(options, branch, installed_resourcepacks)
+        .await
 }
 
 #[tauri::command]
@@ -789,7 +841,11 @@ async fn get_custom_resourcepacks_folder(
     options: LauncherOptions,
     branch: &str,
 ) -> Result<String, Error> {
-    Ok(ResourcePackManager::get_resourcepack_folder(options, branch).to_string_lossy().to_string())
+    Ok(
+        ResourcePackManager::get_resourcepack_folder(&options, branch)
+            .to_string_lossy()
+            .to_string(),
+    )
 }
 
 #[tauri::command]
@@ -817,7 +873,8 @@ async fn get_custom_datapacks_filenames(
     world: &str,
     installed_datapacks: Vec<Datapack>,
 ) -> Result<Vec<String>, Error> {
-    DataPackManager::get_custom_datapack_filenames(options, branch, world, installed_datapacks).await
+    DataPackManager::get_custom_datapack_filenames(options, branch, world, installed_datapacks)
+        .await
 }
 
 #[tauri::command]
@@ -826,7 +883,11 @@ async fn get_custom_datapacks_folder(
     branch: &str,
     world: &str,
 ) -> Result<String, Error> {
-    Ok(DataPackManager::get_datapack_folder(options, branch, world).to_string_lossy().to_string())
+    Ok(
+        DataPackManager::get_datapack_folder(&options, branch, world)
+            .to_string_lossy()
+            .to_string(),
+    )
 }
 
 #[tauri::command]
@@ -860,7 +921,7 @@ async fn enable_keep_local_assets() -> Result<(), String> {
         let content = "Hi, what are you doing here?\nMsg me on discord (aim_shock) for a free cookie!\n\nBye <3";
         fs::write(&file, Vec::from(content))
             .await
-            .map_err(|e| format!("unable to create keepLocalAssets file: {:?}", e))?;
+            .map_err(|e| format!("unable to create keepLocalAssets file: {e:?}"))?;
     }
 
     Ok(())
@@ -876,7 +937,7 @@ async fn disable_keep_local_assets() -> Result<(), String> {
         info!("Removing keepLocalAssets file: {:?}", file);
         fs::remove_file(&file)
             .await
-            .map_err(|e| format!("unable to remove keepLocalAssets file: {:?}", e))?;
+            .map_err(|e| format!("unable to remove keepLocalAssets file: {e:?}"))?;
     }
 
     Ok(())
@@ -895,23 +956,22 @@ pub fn get_keep_local_assets() -> Result<bool, String> {
 async fn get_player_skins(uuid: String) -> Result<Vec<String>, String> {
     let minecraft_profile: Result<MinecraftProfile, reqwest::Error> = HTTP_CLIENT
         .get(format!(
-            "https://sessionserver.mojang.com/session/minecraft/profile/{}",
-            uuid
+            "https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
         ))
         .send()
         .await
-        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {:}", e))?
+        .map_err(|e| format!("unable to connect to sessionserver.mojang.com: {e:}"))?
         .error_for_status()
-        .map_err(|e| format!("sessionserver.mojang.com returned an error: {:}", e))?
+        .map_err(|e| format!("sessionserver.mojang.com returned an error: {e:}"))?
         .json()
         .await;
 
     match minecraft_profile {
         Ok(profile) => {
             let mut textures: Vec<String> = vec![];
-            for property in profile.properties.iter() {
+            for property in &profile.properties {
                 if property.name == "textures" {
-                    textures.push(property.value.clone())
+                    textures.push(property.value.clone());
                 }
             }
             Ok(textures)
@@ -943,7 +1003,7 @@ async fn save_player_skin(
         )
         .send()
         .await
-        .map_err(|e| format!("Failed to send request: {}", e))?;
+        .map_err(|e| format!("Failed to send request: {e}"))?;
 
     if response.status().is_success() {
         info!("Skin {} saved successfully.", &location);
@@ -962,11 +1022,11 @@ async fn read_local_skin_file(location: String) -> Result<String, String> {
         Ok(mut file) => {
             let mut buffer = Vec::new();
             if let Err(err) = file.read_to_end(&mut buffer).await {
-                return Err(format!("Failed to read the file: {}", err));
+                return Err(format!("Failed to read the file: {err}"));
             }
             Ok(base64::encode(buffer))
         }
-        Err(err) => Err(format!("Failed to open the file: {}", err)),
+        Err(err) => Err(format!("Failed to open the file: {err}")),
     }
 }
 
@@ -976,9 +1036,9 @@ async fn read_remote_image_file(location: String) -> Result<String, String> {
         .get(&location)
         .send()
         .await
-        .map_err(|e| format!("unable to connect to {}: {:}", e, location))?
+        .map_err(|e| format!("unable to connect to {e}: {location:}"))?
         .error_for_status()
-        .map_err(|e| format!("{} returned an error: {:}", location, e))?
+        .map_err(|e| format!("{location} returned an error: {e:}"))?
         .bytes()
         .await;
 
@@ -994,7 +1054,7 @@ async fn store_options(options: LauncherOptions) -> Result<(), String> {
     options
         .store(config_dir)
         .await
-        .map_err(|e| format!("unable to store config data: {:?}", e))?;
+        .map_err(|e| format!("unable to store config data: {e:?}"))?;
 
     Ok(())
 }
@@ -1005,7 +1065,7 @@ async fn store_launcher_profiles(launcher_profiles: LauncherProfiles) -> Result<
     launcher_profiles
         .store(config_dir)
         .await
-        .map_err(|e| format!("unable to store launcher_profiles data: {:?}", e))?;
+        .map_err(|e| format!("unable to store launcher_profiles data: {e:?}"))?;
 
     Ok(())
 }
@@ -1021,16 +1081,19 @@ async fn get_norisk_user(
             .get_token(options.experimental_mode)
             .await?,
         &credentials.id.to_string(),
-    ).await?;
+    )
+    .await?;
 
     // ensure user does not have keepLocalAssets enabled depending on rank
-    let allowed_ranks = vec![
+    let allowed_ranks = [
         "ADMIN".to_string(),
         "DEVELOPER".to_string(),
         "DESIGNER".to_string(),
     ];
     if !allowed_ranks.contains(&user.rank) {
-        disable_keep_local_assets().await.map_err(|e| ErrorKind::LauncherError(format!("Disable Keep Local Assets: {:?}", e)).as_error())?;
+        disable_keep_local_assets().await.map_err(|e| {
+            ErrorKind::LauncherError(format!("Disable Keep Local Assets: {e:?}")).as_error()
+        })?;
     }
     Ok(user)
 }
@@ -1039,7 +1102,7 @@ async fn get_norisk_user(
 async fn check_maintenance_mode() -> Result<bool, String> {
     let maintenance_mode = ApiEndpoints::norisk_maintenance_mode()
         .await
-        .map_err(|e| format!("unable to request maintenance mode: {:?}", e))?;
+        .map_err(|e| format!("unable to request maintenance mode: {e:?}"))?;
     Ok(maintenance_mode)
 }
 
@@ -1048,7 +1111,7 @@ async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
 ) -> Result<Vec<String>, Error> {
-    Ok(NRCCache::get_branches(options, credentials).await?)
+    NRCCache::get_branches(options, credentials).await
 }
 
 #[tauri::command]
@@ -1058,20 +1121,24 @@ async fn enable_experimental_mode(credentials: Credentials) -> Result<String, St
         &credentials.norisk_credentials.production.unwrap().value,
         &credentials.id.to_string(),
     )
-        .await
-        .map_err(|e| format!("unable to enable experimental mode: {:?}", e));
+    .await
+    .map_err(|e| format!("unable to enable experimental mode: {e:?}"));
 }
 
 #[tauri::command]
-async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> Result<NoRiskLaunchManifest, Error> {
-    Ok(NRCCache::get_launch_manifest(branch, norisk_token, uuid).await?)
+async fn get_launch_manifest(
+    branch: &str,
+    norisk_token: &str,
+    uuid: Uuid,
+) -> Result<NoRiskLaunchManifest, Error> {
+    NRCCache::get_launch_manifest(branch, norisk_token, uuid).await
 }
 
 #[tauri::command]
 async fn upload_logs(log: String) -> Result<McLogsUploadResponse, String> {
     let log_response = McLogsApiEndpoints::upload_logs(log)
         .await
-        .map_err(|e| format!("unable to upload logs: {:?}", e))?;
+        .map_err(|e| format!("unable to upload logs: {e:?}"))?;
     Ok(log_response)
 }
 
@@ -1087,7 +1154,7 @@ async fn discord_auth_link(
         .await?;
     let url = format!(
         "https://api{}.norisk.gg/api/v1/core/oauth/discord?token={}",
-        if options.experimental_mode.clone() {
+        if options.experimental_mode {
             "-staging"
         } else {
             ""
@@ -1106,11 +1173,11 @@ async fn discord_auth_link(
         "discord-signin",
         tauri::WindowUrl::External(url.parse().unwrap()),
     )
-        .title("Discord X NoRiskClient")
-        .always_on_top(true)
-        .center()
-        .max_inner_size(1250.0, 1000.0)
-        .build()?;
+    .title("Discord X NoRiskClient")
+    .always_on_top(true)
+    .center()
+    .max_inner_size(1250.0, 1000.0)
+    .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
 
@@ -1149,7 +1216,7 @@ async fn discord_auth_status(
             .await?,
         &credentials.id.to_string(),
     )
-        .await?)
+    .await?)
 }
 
 #[tauri::command]
@@ -1164,7 +1231,7 @@ async fn discord_auth_unlink(
             .await?,
         &credentials.id.to_string(),
     )
-        .await?;
+    .await?;
     Ok(())
 }
 
@@ -1184,14 +1251,13 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
         &app,
         "signin",
         tauri::WindowUrl::External(flow.redirect_uri.parse().map_err(|_| {
-            ErrorKind::OtherError("Error parsing auth redirect URL".to_string())
-                .as_error()
+            ErrorKind::OtherError("Error parsing auth redirect URL".to_string()).as_error()
         })?),
     )
-        .title("Sign into NoRiskClient")
-        .always_on_top(true)
-        .center()
-        .build()?;
+    .title("Sign into NoRiskClient")
+    .always_on_top(true)
+    .center()
+    .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
 
@@ -1216,7 +1282,10 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
                     .unwrap()
                     .emit("microsoft-output", "signIn.step.noriskToken")
                     .unwrap_or_default();
-                match accounts.refresh_norisk_token_if_necessary(&credentials.clone(), true).await {
+                match accounts
+                    .refresh_norisk_token_if_necessary(&credentials.clone(), true)
+                    .await
+                {
                     Ok(credentials_with_norisk) => {
                         debug!("After Microsoft Auth: Successfully received NoRiskClient Token");
                         return Ok(Some(credentials_with_norisk));
@@ -1274,25 +1343,35 @@ fn handle_stdout(window: &Arc<Mutex<Window>>, data: &[u8], uuid: Uuid) -> anyhow
         }
     } else {
         // Emit the regular process output
-        window.lock().unwrap().emit("process-output", OutputData {
-            id: uuid,
-            text: data,
-        })?;
+        window.lock().unwrap().emit(
+            "process-output",
+            OutputData {
+                id: uuid,
+                text: data,
+            },
+        )?;
     }
     Ok(())
 }
 
-fn handle_stderr(window: &Arc<std::sync::Mutex<Window>>, data: &[u8], uuid: Uuid) -> anyhow::Result<()> {
+fn handle_stderr(
+    window: &Arc<std::sync::Mutex<Window>>,
+    data: &[u8],
+    uuid: Uuid,
+) -> anyhow::Result<()> {
     let data = String::from_utf8(data.to_vec())?;
     if data.is_empty() {
         return Ok(()); // ignore empty lines
     }
 
     error!("{}", data.trim());
-    window.lock().unwrap().emit("process-output", OutputData {
-        id: uuid,
-        text: data,
-    })?;
+    window.lock().unwrap().emit(
+        "process-output",
+        OutputData {
+            id: uuid,
+            text: data,
+        },
+    )?;
     Ok(())
 }
 
@@ -1300,19 +1379,27 @@ fn handle_progress(
     window: &Arc<std::sync::Mutex<Window>>,
     progress_update: ProgressUpdate,
     instance_id: Uuid,
-    instances: Arc<Mutex<Vec<RunnerInstance>>>,
+    instances: &Arc<Mutex<Vec<RunnerInstance>>>,
 ) -> anyhow::Result<()> {
-    if let Some(instance) = instances.lock().unwrap().iter_mut().find(|r| r.id == instance_id) {
+    if let Some(instance) = instances
+        .lock()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r.id == instance_id)
+    {
         instance.progress_updates.push(progress_update.clone());
         // Ensure the list does not exceed 10 entries
         if instance.progress_updates.len() > 10 {
             instance.progress_updates.remove(0);
         }
     }
-    window
-        .lock()
-        .unwrap()
-        .emit("progress-update", ClientProgressUpdate { instance_id: instance_id.clone(), data: progress_update })?;
+    window.lock().unwrap().emit(
+        "progress-update",
+        ClientProgressUpdate {
+            instance_id,
+            data: progress_update,
+        },
+    )?;
     Ok(())
 }
 
@@ -1330,7 +1417,7 @@ async fn store_last_viewed_popups(last_viewed_popups: LastViewedPopups) -> Resul
     last_viewed_popups
         .store(config_dir)
         .await
-        .map_err(|e| format!("unable to store last viewed popups data: {:?}", e))?;
+        .map_err(|e| format!("unable to store last viewed popups data: {e:?}"))?;
 
     Ok(())
 }
@@ -1339,21 +1426,21 @@ async fn store_last_viewed_popups(last_viewed_popups: LastViewedPopups) -> Resul
 async fn get_changelogs() -> Result<Vec<ChangeLog>, String> {
     ApiEndpoints::changelogs()
         .await
-        .map_err(|e| format!("unable to get changelogs: {:?}", e))
+        .map_err(|e| format!("unable to get changelogs: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_announcements() -> Result<Vec<Announcement>, String> {
     ApiEndpoints::announcements()
         .await
-        .map_err(|e| format!("unable to get announcements: {:?}", e))
+        .map_err(|e| format!("unable to get announcements: {e:?}"))
 }
 
 #[tauri::command]
 async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
     let options = get_options()
         .await
-        .map_err(|e| format!("unable to load options: {:?}", e))?;
+        .map_err(|e| format!("unable to load options: {e:?}"))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
     if !game_dir_path.exists() {
         return Ok(None);
@@ -1361,7 +1448,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
 
     let all_branches = game_dir_path
         .read_dir()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?
+        .map_err(|e| format!("unable to read branches: {e:?}"))?
         .filter(|entry| {
             entry
                 .as_ref()
@@ -1370,8 +1457,8 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
         })
         .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
         .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?;
-    if all_branches.len() <= 0 {
+        .map_err(|e| format!("unable to read branches: {e:?}"))?;
+    if all_branches.is_empty() {
         return Ok(None);
     }
 
@@ -1384,7 +1471,7 @@ async fn check_for_new_branch(branch: &str) -> Result<Option<bool>, String> {
 async fn get_branches_from_folder() -> Result<Vec<String>, String> {
     let options = get_options()
         .await
-        .map_err(|e| format!("unable to load options: {:?}", e))?;
+        .map_err(|e| format!("unable to load options: {e:?}"))?;
     let game_dir_path = options.data_path_buf().join("gameDir");
     if !game_dir_path.exists() {
         return Ok(Vec::new());
@@ -1392,7 +1479,7 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
 
     let branches = game_dir_path
         .read_dir()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?
+        .map_err(|e| format!("unable to read branches: {e:?}"))?
         .filter(|entry| {
             entry
                 .as_ref()
@@ -1401,7 +1488,7 @@ async fn get_branches_from_folder() -> Result<Vec<String>, String> {
         })
         .map(|entry| entry.map(|e| e.file_name().into_string().unwrap()))
         .collect::<Result<Vec<String>, _>>()
-        .map_err(|e| format!("unable to read branches: {:?}", e))?;
+        .map_err(|e| format!("unable to read branches: {e:?}"))?;
 
     Ok(branches)
 }
@@ -1426,8 +1513,10 @@ async fn copy_mc_data(path: &str, branch: &str, app: tauri::AppHandle) -> Result
 }
 
 #[tauri::command]
-async fn get_running_instances(app_state: tauri::State<'_, AppState>) -> Result<Vec<RunnerInstance>, crate::error::Error> {
-    Ok(NRCCache::get_running_instances(app_state).await?)
+async fn get_running_instances(
+    app_state: tauri::State<'_, AppState>,
+) -> Result<Vec<RunnerInstance>, crate::error::Error> {
+    NRCCache::get_running_instances(app_state).await
 }
 
 #[tauri::command]
@@ -1446,21 +1535,24 @@ async fn run_client(
     force_server: Option<String>,
     mods: Vec<LoaderMod>,
     window: Window,
-    app_state: tauri::State<'_, AppState>
+    app_state: tauri::State<'_, AppState>,
 ) -> Result<Uuid, Error> {
     debug!("Starting Client with branch {}", branch);
     fs::create_dir_all(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache")).await?;
 
     let mut accounts = minecraft_auth_get_store().await?;
 
-    let credentials = match accounts
-        .get_default_credential()
-        .await {
-        Ok(creds) => { creds }
-        Err(_) => {
-            Option::from(accounts.users.get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?).ok_or(ErrorKind::NoCredentialsError)?.clone())
-        }
-    }.ok_or(ErrorKind::NoCredentialsError)?;
+    let credentials = match accounts.get_default_credential().await {
+        Ok(creds) => creds,
+        Err(_) => Option::from(
+            accounts
+                .users
+                .get(&accounts.default_user.ok_or(ErrorKind::NoCredentialsError)?)
+                .ok_or(ErrorKind::NoCredentialsError)?
+                .clone(),
+        ),
+    }
+    .ok_or(ErrorKind::NoCredentialsError)?;
 
     debug!("Starting Minecraft with Account {:?}", credentials.username);
 
@@ -1468,13 +1560,13 @@ async fn run_client(
 
     let parameters = LaunchingParameter {
         dev_mode: options.experimental_mode,
-        force_server: force_server,
+        force_server,
         memory: options.memory_limit,
         data_path: options.data_path_buf(),
-        custom_java_path: if !options.custom_java_path.is_empty() {
-            Some(options.custom_java_path)
-        } else {
+        custom_java_path: if options.custom_java_path.is_empty() {
             None
+        } else {
+            Some(options.custom_java_path)
         },
         custom_java_args: options.custom_java_args,
         auth_player_name: credentials.username,
@@ -1510,7 +1602,7 @@ async fn run_client(
     let runner_instances = Arc::clone(&app_state.runner_instances); // Verwende Arc für die Zustandsverwaltung
     runner_instances.lock().unwrap().push(RunnerInstance {
         terminator: Some(terminator_tx),
-        id: runner_id.clone(), // Speichern der ID
+        id: runner_id, // Speichern der ID
         progress_updates: Vec::new(),
         p_id: None,
         is_attached: true,
@@ -1520,11 +1612,12 @@ async fn run_client(
     thread::spawn(move || {
         let runner_instances = runner_instances.clone(); // Der Zustand ist jetzt für den Thread verfügbar
 
-        let is_first_instance_of_branch = !runner_instances.lock().unwrap().iter().filter(|instance| {
-            return instance.id != runner_id;
-        }).any(|instance| {
-            return instance.branch == branch;
-        });
+        let is_first_instance_of_branch = !runner_instances
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|instance| instance.id != runner_id)
+            .any(|instance| instance.branch == branch);
 
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1550,9 +1643,9 @@ async fn run_client(
                         terminator: terminator_rx,
                     },
                     window_mutex.clone(),
-                    runner_id.clone(),
+                    runner_id,
                 )
-                    .await
+                .await
                 {
                     if !keep_launcher_open {
                         window_mutex.lock().unwrap().show().unwrap();
@@ -1561,14 +1654,14 @@ async fn run_client(
                     window_mutex
                         .lock()
                         .unwrap()
-                        .emit("client-error", format!("Failed to launch client: {:?}", e))
+                        .emit("client-error", format!("Failed to launch client: {e:?}"))
                         .unwrap();
                     handle_stderr(
                         &window_mutex,
-                        format!("Failed to launch client: {:?}", e).as_bytes(),
+                        format!("Failed to launch client: {e:?}").as_bytes(),
                         runner_id,
                     )
-                        .unwrap();
+                    .unwrap();
                 }
 
                 // Entferne die Instanz aus der Liste, wenn der Client geschlossen wurde
@@ -1599,13 +1692,19 @@ async fn quit_everything() -> Result<(), crate::error::Error> {
 
     if let Some(game_process) = system.process(Pid::from(pid as usize)) {
         if game_process.name().contains("NoRiskClient") {
-            info!("Killing noriskclient process with pid: {} and name: {}",pid,game_process.name());
+            info!(
+                "Killing noriskclient process with pid: {} and name: {}",
+                pid,
+                game_process.name()
+            );
             let _ = game_process.kill();
             info!("NoRiskClient process killed");
             return Ok(());
-        } else {
-            info!("Game process with pid: {} is not a NoRiskClient process.", pid);
         }
+        info!(
+            "Game process with pid: {} is not a NoRiskClient process.",
+            pid
+        );
     } else {
         info!("No running NoRiskClient process found with pid: {}", pid);
     }
@@ -1613,18 +1712,24 @@ async fn quit_everything() -> Result<(), crate::error::Error> {
 }
 
 #[tauri::command]
-async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> Result<(), crate::error::Error> {
+async fn terminate(
+    instance_id: Uuid,
+    app_state: tauri::State<'_, AppState>,
+) -> Result<(), crate::error::Error> {
     let mut runner_instances = app_state.runner_instances.lock().unwrap();
 
     // Suchen nach der Instanz mit der gegebenen ID
-    if let Some(instance_position) = runner_instances.iter_mut().position(|r| r.id == instance_id) {
+    if let Some(instance_position) = runner_instances
+        .iter_mut()
+        .position(|r| r.id == instance_id)
+    {
         let instance = &mut runner_instances[instance_position];
 
         // Falls ein Terminator existiert, schließen wir das Spiel damit
         if let Some(terminator) = instance.terminator.take() {
             info!("Closing Game {:?}...", instance_id);
             terminator.send(()).map_err(|e| {
-                OtherError(format!("Couldn't close Game {:?}", e).to_string()).as_error()
+                OtherError(format!("Couldn't close Game {e:?}").to_string()).as_error()
             })?;
             info!("Closed Game {:?}!", instance_id);
             return Ok(());
@@ -1638,14 +1743,17 @@ async fn terminate(instance_id: Uuid, app_state: tauri::State<'_, AppState>) -> 
             if let Some(game_process) = system.process(Pid::from(pid as usize)) {
                 // Überprüfen, ob der Prozess "java" im Namen enthält
                 if game_process.name().contains("java") {
-                    info!("Killing game process with pid: {} and name: {}",pid,game_process.name());
+                    info!(
+                        "Killing game process with pid: {} and name: {}",
+                        pid,
+                        game_process.name()
+                    );
                     let _ = game_process.kill();
                     info!("Game process killed");
                     runner_instances.remove(instance_position);
                     return Ok(());
-                } else {
-                    info!("Game process with pid: {} is not a Java process.", pid);
                 }
+                info!("Game process with pid: {} is not a Java process.", pid);
             } else {
                 info!("No running process found with pid: {}", pid);
             }
@@ -1665,7 +1773,7 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
     let account = login_data
         .refresh_maybe_fixed()
         .await
-        .map_err(|e| format!("unable to refresh: {:?}", e))?;
+        .map_err(|e| format!("unable to refresh: {e:?}"))?;
     Ok(account)
 }
 
@@ -1673,21 +1781,21 @@ async fn refresh_via_norisk(login_data: LoginData) -> Result<LoginData, String> 
 async fn mc_name_by_uuid(uuid: &str) -> Result<String, String> {
     CapeApiEndpoints::mc_name_by_uuid(uuid)
         .await
-        .map_err(|e| format!("unable get mc name by uuid: {:?}", e))
+        .map_err(|e| format!("unable get mc name by uuid: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_cape_hash_by_uuid(uuid: &str) -> Result<String, String> {
     CapeApiEndpoints::cape_hash_by_uuid(uuid)
         .await
-        .map_err(|e| format!("unable get cape hash by uuid: {:?}", e))
+        .map_err(|e| format!("unable get cape hash by uuid: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_whitelist_slots(norisk_token: &str, uuid: &str) -> Result<WhitelistSlots, String> {
     ApiEndpoints::whitelist_slots(norisk_token, uuid)
         .await
-        .map_err(|e| format!("unable to get whitelist slots: {:?}", e))
+        .map_err(|e| format!("unable to get whitelist slots: {e:?}"))
 }
 
 #[tauri::command]
@@ -1698,12 +1806,11 @@ async fn add_player_to_whitelist(
 ) -> Result<bool, String> {
     let response = HTTP_CLIENT
         .get(format!(
-            "https://playerdb.co/api/player/minecraft/{}",
-            identifier
+            "https://playerdb.co/api/player/minecraft/{identifier}"
         ))
         .send()
         .await
-        .map_err(|e| format!("invalid username: {:}", e))
+        .map_err(|e| format!("invalid username: {e:}"))
         .unwrap();
     let response_text = response.json::<PlayerDBData>().await.unwrap();
     let uuid = match response_text.data.player {
@@ -1712,7 +1819,7 @@ async fn add_player_to_whitelist(
     };
     ApiEndpoints::whitelist_add_user(&uuid, norisk_token, request_uuid)
         .await
-        .map_err(|e| format!("unable to add player to whitelist: {:?}", e))
+        .map_err(|e| format!("unable to add player to whitelist: {e:?}"))
 }
 
 #[tauri::command]
@@ -1744,12 +1851,12 @@ async fn clear_cache() -> Result<(), Error> {
         "runtimes",
         "versions",
     ]
-        .iter()
-        .map(|dir| options.data_path_buf().join(dir))
-        .filter(|dir| dir.exists())
-        .map(std::fs::remove_dir_all)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ErrorKind::OtherError(format!("unable to clear cache: {:?}", e)))?;
+    .iter()
+    .map(|dir| options.data_path_buf().join(dir))
+    .filter(|dir| dir.exists())
+    .map(std::fs::remove_dir_all)
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| ErrorKind::OtherError(format!("unable to clear cache: {e:?}")))?;
 
     Ok(())
 }
@@ -1761,12 +1868,14 @@ async fn clear_cache() -> Result<(), Error> {
 async fn get_featured_servers(branch: &str) -> Result<Vec<FeaturedServer>, String> {
     ApiEndpoints::norisk_featured_servers(branch)
         .await
-        .map_err(|e| format!("unable to get featured servers {:?}", e))
+        .map_err(|e| format!("unable to get featured servers {e:?}"))
 }
 
 #[tauri::command]
 async fn get_custom_servers(token: &str, uuid: &str) -> Result<CustomServersResponse, String> {
-    ApiEndpoints::norisk_custom_servers(token, uuid).await.map_err(|e| format!("unable to get custom servers {:?}", e))
+    ApiEndpoints::norisk_custom_servers(token, uuid)
+        .await
+        .map_err(|e| format!("unable to get custom servers {e:?}"))
 }
 
 #[tauri::command]
@@ -1777,7 +1886,7 @@ async fn check_custom_server_subdomain(
 ) -> Result<bool, String> {
     ApiEndpoints::norisk_check_custom_server_subdomain(subdomain, token, uuid)
         .await
-        .map_err(|e| format!("unable to check custom server subdomain {:?}", e))
+        .map_err(|e| format!("unable to check custom server subdomain {e:?}"))
 }
 
 #[tauri::command]
@@ -1788,7 +1897,7 @@ async fn get_custom_server_jwt_token(
 ) -> Result<String, String> {
     ApiEndpoints::norisk_get_custom_server_jwt_token(custom_server_id, token, uuid)
         .await
-        .map_err(|e| format!("unable to get custom server jwt token: {:?}", e))
+        .map_err(|e| format!("unable to get custom server jwt token: {e:?}"))
 }
 
 #[tauri::command]
@@ -1810,8 +1919,8 @@ async fn create_custom_server(
         token,
         uuid,
     )
-        .await
-        .map_err(|e| format!("unable to create custom server: {:?}", e))
+    .await
+    .map_err(|e| format!("unable to create custom server: {e:?}"))
 }
 
 #[tauri::command]
@@ -1823,7 +1932,7 @@ async fn initialize_custom_server(
     let window_mutex = Arc::new(std::sync::Mutex::new(window));
     CustomServerManager::initialize_server(&window_mutex, custom_server, additional_data)
         .await
-        .map_err(|e| format!("unable to initialize custom server: {:?}", e))
+        .map_err(|e| format!("unable to initialize custom server: {e:?}"))
 }
 
 #[tauri::command]
@@ -1847,8 +1956,8 @@ async fn run_custom_server(
                     token,
                     window_mutex.clone(),
                 )
-                    .await
-                    .unwrap();
+                .await
+                .unwrap();
                 window_mutex
                     .lock()
                     .unwrap()
@@ -1879,32 +1988,28 @@ async fn check_if_custom_server_running(window: Window) -> Result<(bool, String)
     // check if process is still running
     let custom_server_process =
         system.process(Pid::from(latest_running_server.process_id.unwrap() as usize));
-    match custom_server_process.is_some() {
-        true => {
-            info!("Custom server is already / still running!");
-            CustomServerManager::read_and_process_server_log_file(
-                &window_mutex,
-                &latest_running_server.server_id.clone().unwrap(),
-            )
-                .await
-                .unwrap();
-            Ok((true, latest_running_server.server_id.unwrap()))
-        }
-        false => {
-            info!("No custom server is running!");
-            if latest_running_server.forwarder_process_id.is_some() {
-                let custom_server_forwarder_process = system.process(Pid::from(
-                    latest_running_server.forwarder_process_id.unwrap() as usize,
-                ));
-                if custom_server_forwarder_process.is_some() {
-                    custom_server_forwarder_process.unwrap().kill();
-                }
+    if custom_server_process.is_some() {
+        info!("Custom server is already / still running!");
+        CustomServerManager::read_and_process_server_log_file(
+            &window_mutex,
+            &latest_running_server.server_id.clone().unwrap(),
+        )
+        .await
+        .unwrap();
+        Ok((true, latest_running_server.server_id.unwrap()))
+    } else {
+        info!("No custom server is running!");
+        if latest_running_server.forwarder_process_id.is_some() {
+            if let Some(custom_server_forwarder_process) = system.process(Pid::from(
+                latest_running_server.forwarder_process_id.unwrap() as usize,
+            )) {
+                custom_server_forwarder_process.kill();
             }
-            CustomServerManager::store_latest_running_server(None, None, None)
-                .await
-                .unwrap();
-            Ok((false, String::new()))
         }
+        CustomServerManager::store_latest_running_server(None, None, None)
+            .await
+            .unwrap();
+        Ok((false, String::new()))
     }
 }
 
@@ -1921,11 +2026,11 @@ pub async fn terminate_custom_server(
     system.refresh_all();
 
     info!("Killing Forwarding Manager");
-    let custom_server_forwarder_process = system.process(Pid::from(
+
+    if let Some(custom_server_forwarder_process) = system.process(Pid::from(
         latest_running_server.forwarder_process_id.unwrap() as usize,
-    ));
-    if custom_server_forwarder_process.is_some() {
-        custom_server_forwarder_process.unwrap().kill();
+    )) {
+        custom_server_forwarder_process.kill();
     }
 
     info!("Killing Custom Server");
@@ -1947,7 +2052,7 @@ pub async fn terminate_custom_server(
                     data: String::from("Stopping server"),
                 },
             )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
             .unwrap();
         window
             .emit(
@@ -1957,7 +2062,7 @@ pub async fn terminate_custom_server(
                     data: String::from("Thread RCON Listener stopped"),
                 },
             )
-            .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+            .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
             .unwrap();
     }
 
@@ -1991,7 +2096,7 @@ async fn execute_rcon_command(
                 data: console_info_log.clone(),
             },
         )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
         .unwrap();
 
     let response = client.send_command(command).unwrap();
@@ -2001,11 +2106,11 @@ async fn execute_rcon_command(
         .emit(
             "custom-server-process-output",
             CustomServerEventPayload {
-                server_id: server_id,
+                server_id,
                 data: response_log.clone(),
             },
         )
-        .map_err(|e| format!("Failed to emit custom-server-process-output: {}", e))
+        .map_err(|e| format!("Failed to emit custom-server-process-output: {e}"))
         .unwrap();
 
     Ok(response.body)
@@ -2048,7 +2153,7 @@ async fn get_rcon_server_info() -> Result<HashMap<String, String>, String> {
 async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), String> {
     ApiEndpoints::norisk_delete_custom_server(id, token, uuid)
         .await
-        .map_err(|e| format!("unable to delete custom server: {:?}", e))?;
+        .map_err(|e| format!("unable to delete custom server: {e:?}"))?;
 
     let path = LAUNCHER_DIRECTORY
         .data_dir()
@@ -2058,7 +2163,7 @@ async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), S
     if path.exists() {
         fs::remove_dir_all(path)
             .await
-            .map_err(|e| format!("unable to delete custom server files: {:?}", e))?;
+            .map_err(|e| format!("unable to delete custom server files: {e:?}"))?;
     }
 
     Ok(())
@@ -2071,14 +2176,14 @@ async fn delete_custom_server(id: &str, token: &str, uuid: &str) -> Result<(), S
 async fn get_all_vanilla_versions() -> Result<VanillaVersions, String> {
     VanillaProvider::get_all_versions()
         .await
-        .map_err(|e| format!("unable to get all vanilla versions: {:?}", e))
+        .map_err(|e| format!("unable to get all vanilla versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManifest, String> {
     VanillaProvider::get_manifest(hash, version)
         .await
-        .map_err(|e| format!("unable to get vanilla manifest: {:?}", e))
+        .map_err(|e| format!("unable to get vanilla manifest: {e:?}"))
 }
 
 ///
@@ -2088,7 +2193,7 @@ async fn get_vanilla_manifest(hash: &str, version: &str) -> Result<VanillaManife
 async fn get_all_fabric_game_versions() -> Result<Vec<FabricVersion>, String> {
     FabricProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all fabric game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all fabric game versions: {e:?}"))
 }
 
 #[tauri::command]
@@ -2097,7 +2202,7 @@ async fn get_all_fabric_loader_versions(
 ) -> Result<Vec<FabricLoaderVersion>, String> {
     FabricProvider::get_all_loader_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all fabric loader versions: {:?}", e))
+        .map_err(|e| format!("unable to get all fabric loader versions: {e:?}"))
 }
 
 ///
@@ -2107,7 +2212,7 @@ async fn get_all_fabric_loader_versions(
 async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
     QuiltProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get quilt manifest: {:?}", e))
+        .map_err(|e| format!("unable to get quilt manifest: {e:?}"))
 }
 
 ///
@@ -2117,7 +2222,7 @@ async fn get_quilt_manifest() -> Result<QuiltManifest, String> {
 async fn get_forge_manifest() -> Result<ForgeManifest, String> {
     ForgeProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get forge manifest: {:?}", e))
+        .map_err(|e| format!("unable to get forge manifest: {e:?}"))
 }
 
 ///
@@ -2127,7 +2232,7 @@ async fn get_forge_manifest() -> Result<ForgeManifest, String> {
 async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
     NeoForgeProvider::get_manifest()
         .await
-        .map_err(|e| format!("unable to get neoforge manifest: {:?}", e))
+        .map_err(|e| format!("unable to get neoforge manifest: {e:?}"))
 }
 
 ///
@@ -2137,14 +2242,14 @@ async fn get_neoforge_manifest() -> Result<NeoForgeManifest, String> {
 async fn get_all_paper_game_versions() -> Result<PaperManifest, String> {
     PaperProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all paper game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all paper game versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, String> {
     PaperProvider::get_all_build_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all paper build versions: {:?}", e))
+        .map_err(|e| format!("unable to get all paper build versions: {e:?}"))
 }
 
 ///
@@ -2154,14 +2259,14 @@ async fn get_all_paper_build_versions(mc_version: &str) -> Result<PaperBuilds, S
 async fn get_all_folia_game_versions() -> Result<FoliaManifest, String> {
     FoliaProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all folia game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all folia game versions: {e:?}"))
 }
 
 #[tauri::command]
 async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, String> {
     FoliaProvider::get_all_build_versions(mc_version)
         .await
-        .map_err(|e| format!("unable to get all folia build versions: {:?}", e))
+        .map_err(|e| format!("unable to get all folia build versions: {e:?}"))
 }
 
 ///
@@ -2171,7 +2276,7 @@ async fn get_all_folia_build_versions(mc_version: &str) -> Result<FoliaBuilds, S
 async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
     PurpurProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all purpur game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all purpur game versions: {e:?}"))
 }
 
 ///
@@ -2181,7 +2286,7 @@ async fn get_all_purpur_game_versions() -> Result<PurpurVersions, String> {
 async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
     SpigotProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all spigot game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all spigot game versions: {e:?}"))
 }
 
 ///
@@ -2191,7 +2296,7 @@ async fn get_all_spigot_game_versions() -> Result<Vec<String>, String> {
 async fn get_all_bukkit_game_versions() -> Result<Vec<String>, String> {
     BukkitProvider::get_all_game_versions()
         .await
-        .map_err(|e| format!("unable to get all bukkit game versions: {:?}", e))
+        .map_err(|e| format!("unable to get all bukkit game versions: {e:?}"))
 }
 
 ///
@@ -2210,10 +2315,9 @@ async fn get_full_feature_whitelist(
             .unwrap(),
         &credentials.id.to_string(),
     )
-        .await
-        .map_err(|e| format!("unable to get full feature whitelist: {:?}", e))
+    .await
+    .map_err(|e| format!("unable to get full feature whitelist: {e:?}"))
 }
-
 
 ///
 /// Get Launcher feature toggles
@@ -2233,18 +2337,17 @@ async fn check_feature_whitelist(
             .unwrap(),
         &credentials.id.to_string(),
     )
-        .await
-        .map_err(|e| format!("unable to check feature whitelist: {:?}", e))
+    .await
+    .map_err(|e| format!("unable to check feature whitelist: {e:?}"))
 }
 
 /// Runs the GUI and returns when the window is closed.
 pub fn gui_main() {
     tauri::Builder::default()
-        .on_window_event(move |event| match event.event() {
-            WindowEvent::Destroyed => {
+        .on_window_event(move |event| {
+            if let WindowEvent::Destroyed = event.event() {
                 info!("Window destroyed, quitting application");
             }
-            _ => {}
         })
         .plugin(tauri_plugin_fs_watch::init())
         .setup(|app| {

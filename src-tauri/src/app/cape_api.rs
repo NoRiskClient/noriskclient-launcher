@@ -1,122 +1,146 @@
 use std::error::Error;
-use std::fs::File;
 #[cfg(target_os = "linux")]
 use std::fs::metadata;
+use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 
+use log::debug;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use log::debug;
 
-use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
+use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 
 /// Placeholder struct for API endpoints implementation
 pub struct CapeApiEndpoints;
 
 impl CapeApiEndpoints {
     pub async fn equip_cape(token: &str, uuid: &str, hash: &str) -> Result<(), String> {
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
 
         // Baue die URL mit dem Token als Query-Parameter
-        let url = format!("{}/cosmetics/cape/{}/equip?uuid={}", get_api_base(options.experimental_mode), hash, uuid);
+        let url = format!(
+            "{}/cosmetics/cape/{}/equip?uuid={}",
+            get_api_base(options.experimental_mode),
+            hash,
+            uuid
+        );
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
             .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .send()
             .await
-            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+            .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
-        debug!("Cape equiped status {:?}",response.status());
+        debug!("Cape equiped status {:?}", response.status());
 
-        return match response.status() {
-            StatusCode::OK => Ok(()),
-            _ => {
-                let response_text = response.text().await.map_err(|err| {
-                    format!("Error reading the request: {}", err)
-                })?;
-                Err(response_text)
-            }
-        };
+        if response.status() == StatusCode::OK { Ok(()) } else {
+            let response_text = response
+                .text()
+                .await
+                .map_err(|err| format!("Error reading the request: {err}"))?;
+            Err(response_text)
+        }
     }
 
     pub async fn delete_cape(token: &str, uuid: &str, hash: &str) -> Result<(), String> {
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
 
         // Baue die URL mit dem Token als Query-Parameter
-        let url = format!("{}/cosmetics/cape/{}?uuid={}", get_api_base(options.experimental_mode), hash, uuid);
+        let url = format!(
+            "{}/cosmetics/cape/{}?uuid={}",
+            get_api_base(options.experimental_mode),
+            hash,
+            uuid
+        );
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
             .delete(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .send()
             .await
-            .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+            .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
-        debug!("Cape delete status {:?}",response.status());
+        debug!("Cape delete status {:?}", response.status());
 
-        return match response.status() {
-            StatusCode::OK => Ok(()),
-            _ => {
-                let response_text = response.text().await.map_err(|err| {
-                    format!("Error reading the request: {}", err)
-                })?;
-                Err(response_text)
-            }
-        };
+        if response.status() == StatusCode::OK { Ok(()) } else {
+            let response_text = response
+                .text()
+                .await
+                .map_err(|err| format!("Error reading the request: {err}"))?;
+            Err(response_text)
+        }
     }
 
-    pub async fn upload_cape(token: &str, uuid: &str, image_path: PathBuf) -> Result<String, String> {
-        debug!("Image Path {:?}",image_path);
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
+    pub async fn upload_cape(
+        token: &str,
+        uuid: &str,
+        image_path: PathBuf,
+    ) -> Result<String, String> {
+        debug!("Image Path {:?}", image_path);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
         // Lese den Inhalt der Bilddatei in Bytes ein
         match File::open(image_path) {
             Ok(mut file) => {
                 let mut image_data = Vec::new();
-                file.read_to_end(&mut image_data).expect("Error Reading File");
+                file.read_to_end(&mut image_data)
+                    .expect("Error Reading File");
 
                 // Baue die URL mit dem Token als Query-Parameter
-                let url = format!("{}/cosmetics/cape?uuid={}", get_api_base(options.experimental_mode), uuid);
+                let url = format!(
+                    "{}/cosmetics/cape?uuid={}",
+                    get_api_base(options.experimental_mode),
+                    uuid
+                );
 
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)
-                    .header("Authorization", format!("Bearer {}", token))
+                    .header("Authorization", format!("Bearer {token}"))
                     .body(image_data)
                     .send()
                     .await
-                    .map_err(|err| format!("Fehler beim Senden des Requests: {}", err))?;
+                    .map_err(|err| format!("Fehler beim Senden des Requests: {err}"))?;
 
-                debug!("Cape upload status {:?}",response.status());
+                debug!("Cape upload status {:?}", response.status());
 
-                let response_text = response.text().await.map_err(|err| {
-                    format!("Error reading cape upload response text: {}", err)
-                })?;
+                let response_text = response
+                    .text()
+                    .await
+                    .map_err(|err| format!("Error reading cape upload response text: {err}"))?;
                 Ok(response_text)
             }
-            Err(_err) => {
-                Err("Error Selecting Cape".parse().unwrap())
-            }
+            Err(_err) => Err("Error Selecting Cape".parse().unwrap()),
         }
     }
 
     pub async fn mc_name_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
-        debug!("Requesting Minecraft Username {}",uuid);
-        let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{}", uuid);
+        debug!("Requesting Minecraft Username {}", uuid);
+        let url = format!(
+            "https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
+        );
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         Ok(response_text.name)
     }
 
     pub async fn mc_uuid_by_name(username: &str) -> Result<String, Box<dyn Error>> {
-        debug!("Requesting Minecraft UUID {}",username);
-        let url = format!("https://api.mojang.com/users/profiles/minecraft/{}", username);
+        debug!("Requesting Minecraft UUID {}", username);
+        let url = format!(
+            "https://api.mojang.com/users/profiles/minecraft/{username}"
+        );
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         let uuid = uuid::Uuid::parse_str(&response_text.id)?;
@@ -124,9 +148,15 @@ impl CapeApiEndpoints {
     }
 
     pub async fn cape_hash_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
-        debug!("Requesting Cape Hash {}",uuid);
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/user/{}/cape", get_api_base(options.experimental_mode), uuid);
+        debug!("Requesting Cape Hash {}", uuid);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!(
+            "{}/cosmetics/user/{}/cape",
+            get_api_base(options.experimental_mode),
+            uuid
+        );
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.text().await?;
         Ok(response_text)
@@ -134,77 +164,122 @@ impl CapeApiEndpoints {
 
     pub async fn unequip_cape(norisk_token: &str, uuid: &str) -> Result<(), String> {
         // Baue die URL mit dem Token als Query-Parameter
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/unequip?uuid={}", get_api_base(options.experimental_mode), uuid);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!(
+            "{}/cosmetics/cape/unequip?uuid={}",
+            get_api_base(options.experimental_mode),
+            uuid
+        );
 
         // Sende den POST-Request
         let response = HTTP_CLIENT
             .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+            .header("Authorization", format!("Bearer {norisk_token}"))
             .send()
             .await
-            .map_err(|err| format!("Error while sending the request: {}", err))?;
+            .map_err(|err| format!("Error while sending the request: {err}"))?;
 
-        debug!("Unequip cape status {:?}",response.status());
+        debug!("Unequip cape status {:?}", response.status());
 
-        return match response.status() {
-            StatusCode::OK => {
-                Ok(())
-            }
-            _ => {
-                let response_text = response.text().await.map_err(|err| {
-                    format!("Error reading the request: {}", err)
-                })?;
-                Err(response_text)
-            }
-        };
+        if response.status() == StatusCode::OK { Ok(()) } else {
+            let response_text = response
+                .text()
+                .await
+                .map_err(|err| format!("Error reading the request: {err}"))?;
+            Err(response_text)
+        }
     }
 
-    pub async fn request_trending_capes(norisk_token: &str, uuid: &str, alltime: u32, limit: u32) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_trending_capes(
+        norisk_token: &str,
+        uuid: &str,
+        alltime: u32,
+        limit: u32,
+    ) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Trending Capes...");
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/trending?uuid={}&alltime={}&limit={}", get_api_base(options.experimental_mode), uuid, alltime, limit);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!(
+            "{}/cosmetics/cape/trending?uuid={}&alltime={}&limit={}",
+            get_api_base(options.experimental_mode),
+            uuid,
+            alltime,
+            limit
+        );
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
+            .header("Authorization", format!("Bearer {norisk_token}"))
+            .send()
+            .await?
             .error_for_status()?
-            .json::<Vec<Cape>>().await?)
+            .json::<Vec<Cape>>()
+            .await?)
     }
 
-    pub async fn request_user_capes(norisk_token: &str, uuid: &str, username: &str) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_user_capes(
+        norisk_token: &str,
+        uuid: &str,
+        username: &str,
+    ) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting User Capes of {}...", username);
         let target_uuid = Self::mc_uuid_by_name(username).await?;
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/user/{}?uuid={}", get_api_base(options.experimental_mode), target_uuid, uuid);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!(
+            "{}/cosmetics/cape/user/{}?uuid={}",
+            get_api_base(options.experimental_mode),
+            target_uuid,
+            uuid
+        );
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
+            .header("Authorization", format!("Bearer {norisk_token}"))
+            .send()
+            .await?
             .error_for_status()?
-            .json::<Vec<Cape>>().await?)
+            .json::<Vec<Cape>>()
+            .await?)
     }
 
-    pub async fn request_owned_capes(norisk_token: &str, uuid: &str) -> Result<Vec<Cape>, Box<dyn Error>> {
+    pub async fn request_owned_capes(
+        norisk_token: &str,
+        uuid: &str,
+    ) -> Result<Vec<Cape>, Box<dyn Error>> {
         debug!("Requesting Owned Capes...");
-        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
-        let url = format!("{}/cosmetics/cape/owned?uuid={}&limit=250", get_api_base(options.experimental_mode), uuid);
+        let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir())
+            .await
+            .unwrap_or_default();
+        let url = format!(
+            "{}/cosmetics/cape/owned?uuid={}&limit=250",
+            get_api_base(options.experimental_mode),
+            uuid
+        );
         Ok(HTTP_CLIENT
             .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send().await?
+            .header("Authorization", format!("Bearer {norisk_token}"))
+            .send()
+            .await?
             .error_for_status()?
-            .json::<Vec<Cape>>().await?)
+            .json::<Vec<Cape>>()
+            .await?)
     }
 
     pub fn show_in_folder(path: &str) {
-        debug!("Spawning Path {}",path);
+        debug!("Spawning Path {}", path);
         #[cfg(target_os = "windows")]
         {
-            Command::new("explorer")
-                .args(["/select,", &path]) // The comma after select is not a typo
+            let mut child = Command::new("explorer")
+                .args(["/select,", path]) // The comma after select is not a typo
                 .spawn()
-                .unwrap();
+                .expect("failed to execute child");
+
+            let ecode = child.wait().expect("failed to wait on child");
+
+            assert!(ecode.success());
         }
 
         /* TODO Später
@@ -239,10 +314,7 @@ impl CapeApiEndpoints {
 
         #[cfg(target_os = "macos")]
         {
-            Command::new("open")
-                .args(["-R", &path])
-                .spawn()
-                .unwrap();
+            Command::new("open").args(["-R", &path]).spawn().unwrap();
         }
     }
 }

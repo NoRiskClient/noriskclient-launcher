@@ -15,11 +15,11 @@ static GETBUKKIT_API_BASE: &str = "https://download.getbukkit.org/bukkit";
 
 impl BukkitProvider {
     fn get_nrc_meta_api_base(is_experimental: bool) -> String {
-        return if is_experimental {
+        if is_experimental {
             String::from("https://dl-staging.norisk.gg/meta/bukkit")
         } else {
             String::from("https://dl.norisk.gg/meta/bukkit")
-        };
+        }
     }
     
     /// Request all available minecraft versions
@@ -33,13 +33,13 @@ impl BukkitProvider {
         fs::create_dir_all(&path).await?;
         let url = format!("{}/craftbukkit-{}.jar", GETBUKKIT_API_BASE, custom_server.mc_version);
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join("server.jar"), content).await.map_err(|e| e);
+        let _ = fs::write(path.join("server.jar"), content).await;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

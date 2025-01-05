@@ -25,13 +25,13 @@ impl NeoForgeProvider {
         fs::create_dir_all(&path).await?;
         let url = format!("{}/{loader}/neoforge-{loader}-installer.jar", NEO_FORGE_MAVEN_REPO_BASE, loader = custom_server.loader_version.clone().unwrap_or_default());
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join(format!("neoforge-{}.jar", custom_server.loader_version.clone().unwrap_or_default())), content).await.map_err(|e| e);
+        let _ = fs::write(path.join(format!("neoforge-{}.jar", custom_server.loader_version.clone().unwrap_or_default())), content).await;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

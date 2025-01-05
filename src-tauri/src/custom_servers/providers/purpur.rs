@@ -24,13 +24,13 @@ impl PurpurProvider {
         fs::create_dir_all(&path).await?;
         let url = format!("{}/{mc}/latest/download", PURPUR_API_BASE, mc = custom_server.mc_version);
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join(format!("purpur-{}.jar", custom_server.mc_version)), content).await.map_err(|e| e);
+        let _ = fs::write(path.join(format!("purpur-{}.jar", custom_server.mc_version)), content).await;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

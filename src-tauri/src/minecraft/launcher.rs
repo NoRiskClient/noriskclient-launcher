@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info};
-use path_absolutize::*;
+use path_absolutize::Absolutize;
 use tokio::{fs, fs::OpenOptions};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -31,13 +31,14 @@ pub struct LauncherData<D: Send + Sync> {
     pub instances: Arc<Mutex<Vec<RunnerInstance>>>,
     pub(crate) on_stdout: fn(&D, &[u8], Uuid) -> Result<()>,
     pub(crate) on_stderr: fn(&D, &[u8], Uuid) -> Result<()>,
-    pub(crate) on_progress: fn(&D, ProgressUpdate, Uuid, Arc<Mutex<Vec<RunnerInstance>>>) -> Result<()>,
+    #[allow(clippy::type_complexity)]
+    pub(crate) on_progress: fn(&D, ProgressUpdate, Uuid, &Arc<Mutex<Vec<RunnerInstance>>>) -> Result<()>,
     pub(crate) data: Box<D>,
     pub(crate) terminator: tokio::sync::oneshot::Receiver<()>,
 }
 
 impl<D: Send + Sync> LauncherData<D> {
-    /// Speichert die aktuelle Liste der RunnerInstances als JSON-Datei im angegebenen Pfad.
+    /// Speichert die aktuelle Liste der `RunnerInstances` als JSON-Datei im angegebenen Pfad.
     pub fn store(&self) -> Result<(), crate::error::Error> {
         NRCCache::store_running_instances(&self.instances)?;
         Ok(())
@@ -47,14 +48,15 @@ impl<D: Send + Sync> LauncherData<D> {
 
 impl<D: Send + Sync> ProgressReceiver for LauncherData<D> {
     fn progress_update(&self, progress_update: ProgressUpdate) {
-        let _ = (self.on_progress)(&self.data, progress_update, self.instance_id, self.instances.clone());
+        let _ = (self.on_progress)(&self.data, progress_update, self.instance_id, &self.instances);
         //ui update
-        let _ = (self.on_progress)(&self.data, ProgressUpdate::set_max(), self.instance_id, self.instances.clone());
+        let _ = (self.on_progress)(&self.data, ProgressUpdate::set_max(), self.instance_id, &self.instances);
 
-        self.store().unwrap()
+        self.store().unwrap();
     }
 }
 
+#[allow(clippy::borrow_interior_mutable_const)] // TODO: remove this
 pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str, uuid: &str, data: &Path, manifest: NoRiskLaunchManifest, version_profile: VersionProfile, launching_parameter: LaunchingParameter, launcher_data: LauncherData<D>, window: Arc<Mutex<tauri::Window>>, instance_id: Uuid) -> Result<()> {
     let launcher_data_arc = Arc::new(launcher_data);
 
@@ -68,23 +70,20 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         fs::create_dir(&runtimes_folder).await?;
     }
 
-    let java_bin = match &launching_parameter.custom_java_path {
-        Some(path) => PathBuf::from(path),
-        None => {
-            info!("Checking for JRE...");
-            launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingJRE"));
+    let java_bin = if let Some(path) = &launching_parameter.custom_java_path { PathBuf::from(path) } else {
+        info!("Checking for JRE...");
+        launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingJRE"));
 
-            match find_java_binary(&runtimes_folder, manifest.build.jre_version).await {
-                Ok(jre) => jre,
-                Err(e) => {
-                    error!("Failed to find JRE: {}", e);
+        match find_java_binary(&runtimes_folder, manifest.build.jre_version).await {
+            Ok(jre) => jre,
+            Err(e) => {
+                error!("Failed to find JRE: {}", e);
 
-                    info!("Download JRE...");
-                    launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadingJRE"));
-                    jre_downloader::jre_download(&runtimes_folder, manifest.build.jre_version, |a, b| {
-                        launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadJRE, get_progress(0, a, b), get_max(1)));
-                    }).await?
-                }
+                info!("Download JRE...");
+                launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.downloadingJRE"));
+                jre_downloader::jre_download(&runtimes_folder, manifest.build.jre_version, |a, b| {
+                    launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadJRE, get_progress(0, a, b), get_max(1)));
+                }).await?
             }
         }
     };
@@ -107,13 +106,13 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         write!(class_path, "{}{}", &client_jar.absolutize().unwrap().to_str().unwrap(), OS.get_path_separator()?)?;
 
         // Download client jar
-        let requires_download = if !client_jar.exists() {
-            debug!("Client Jar doesn't exists");
-            true
-        } else {
+        let requires_download = if client_jar.exists() {
             let hash = sha1sum(&client_jar)?;
             debug!("Client Jar Hash {:?} {:?}",hash,client_download.sha1);
             hash != client_download.sha1
+        } else {
+            debug!("Client Jar doesn't exists");
+            true
         };
 
         debug!("Downloading Client jar {:?}", requires_download);
@@ -147,7 +146,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
     }
     fs::create_dir_all(&natives_folder).await?;
 
-    let libraries_to_download = version_profile.libraries.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
+    let libraries_to_download = version_profile.libraries.iter().map(std::borrow::ToOwned::to_owned).collect::<Vec<_>>();
     // let libraries_downloaded = Arc::new(AtomicU64::new(0));
     let libraries_max = libraries_to_download.len() as u64;
 
@@ -158,7 +157,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         libraries_to_download.into_iter().filter_map(|library| {
             // let download_count = libraries_downloaded.clone();
             let data_clone = launcher_data_arc.clone();
-            let folder_clone = libraries_folder.to_path_buf();
+            let folder_clone = libraries_folder.clone();
 
             if !rule_interpreter::check_condition(&library.rules, &features).unwrap_or(false) {
                 return None;
@@ -188,11 +187,11 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                 let path = artifact.download(library.name, folder_clone.as_path(), data_clone).await?;
 
                 // Natives are not included in the classpath
-                return if library.natives.is_none() {
-                    return Ok(path.absolutize()?.to_str().map(|x| x.to_string()));
+                if library.natives.is_none() {
+                    Ok(path.absolutize()?.to_str().map(std::string::ToString::to_string))
                 } else {
                     Ok(None)
-                };
+                }
             })
         })
     ).buffer_unordered(launching_parameter.concurrent_downloads as usize).collect().await;
@@ -215,7 +214,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
 
     let asset_index_location = version_profile.asset_index_location.as_ref().ok_or_else(|| LauncherError::InvalidVersionProfile("Asset index unspecified".to_string()))?;
     let asset_index = asset_index_location.load_asset_index(&indexes_folder).await?;
-    let asset_objects_to_download = asset_index.objects.values().map(|x| x.to_owned()).collect::<Vec<_>>();
+    let asset_objects_to_download = asset_index.objects.values().map(std::borrow::ToOwned::to_owned).collect::<Vec<_>>();
     let assets_downloaded = Arc::new(AtomicU64::new(0));
     let asset_max = asset_objects_to_download.len() as u64;
 
@@ -237,7 +236,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                         if downloaded {
                             // the progress bar is only being updated when a asset has been downloaded to improve speeds
                             data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadAssets, curr, asset_max));
-                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedMinecraftAsset&hash%{}", hash)));
+                            data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedMinecraftAsset&hash%{hash}")));
                         }
                     }
                     Err(err) => error!("Unable to download asset {}: {:?}", hash, err)
@@ -261,7 +260,9 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
         }
     };
 
-    if !keep_local_assets {
+    if keep_local_assets {
+        info!("Skipping Norisk assets check & download.");
+    } else {
         let norisk_asset_dir = game_dir.join("NoRiskClient").join("assets");
         fs::create_dir_all(&norisk_asset_dir).await?;
 
@@ -275,9 +276,9 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
             }
         };
 
-        if norisk_asset_objects_to_download.len() > 0 {
+        if !norisk_asset_objects_to_download.is_empty() {
             let norisk_assets_downloaded = Arc::new(AtomicU64::new(0));
-            let norisk_asset_max = norisk_asset_objects_to_download.values().map(|x| x.to_owned()).collect::<Vec<_>>().len() as u64;
+            let norisk_asset_max = norisk_asset_objects_to_download.values().map(std::borrow::ToOwned::to_owned).collect::<Vec<_>>().len() as u64;
 
             launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.checkingNoriskAssets"));
             launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, 0, norisk_asset_max));
@@ -308,7 +309,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
                                     if downloaded {
                                         // the progress bar is only being updated when a asset has been downloaded to improve speeds
                                         data_clone.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::DownloadNoRiskAssets, curr, norisk_asset_max));
-                                        data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{}", hash)));
+                                        data_clone.progress_update(ProgressUpdate::set_label(format!("translation.downloadedNoriskAsset&hash%{hash}")));
                                     }
                                 }
                                 Err(err) => error!("Unable to download Norisk asset {}: {:?}", hash, err)
@@ -326,8 +327,6 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
 
             verify_norisk_assets(&norisk_asset_dir.clone(), norisk_asset_objects_to_download, launcher_data_arc.clone()).await;
         }
-    } else {
-        info!("Skipping Norisk assets check & download.");
     }
 
     // Game
@@ -346,7 +345,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
 
     let mut mapped: Vec<String> = Vec::with_capacity(command_arguments.len());
 
-    for x in command_arguments.iter() {
+    for x in &command_arguments {
         mapped.push(
             process_templates(x, |output, param| {
                 match param {
@@ -412,7 +411,7 @@ pub async fn launch<D: Send + Sync>(multiple_instances: bool, norisk_token: &str
 async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap<String, AssetObject>, launcher_data_arc: Arc<LauncherData<D>>) {
     let mut keys_vec: Vec<&str> = vec![];
     for location in asset_objetcs.keys() {
-        let parts: Vec<&str> = location.split("/").collect();
+        let parts: Vec<&str> = location.split('/').collect();
 
         if let Some(last_part) = parts.last() {
             keys_vec.push(last_part);
@@ -424,20 +423,18 @@ async fn verify_norisk_assets<D: Send + Sync>(dir: &Path, asset_objetcs: HashMap
 
     launcher_data_arc.progress_update(ProgressUpdate::set_label("translation.verifyingNoriskAssets"));
     launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
-    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(dir).into_iter().filter_map(std::result::Result::ok) {
         let path = entry.path().to_owned();
         if path.is_file() {
             let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-            if !file_names.contains(&file_name.as_ref()) {
-                if let Err(err) = fs::remove_file(&path).await {
-                    info!("Failed to remove {}: {}", path.display(), err);
-                } else {
-                    info!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
-                }
-            } else {
+            if file_names.contains(&file_name.as_ref()) {
                 verified += 1;
                 launcher_data_arc.progress_update(ProgressUpdate::set_for_step(ProgressUpdateSteps::VerifyNoRiskAssets, verified, file_names.len() as u64));
-                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("translation.verifiedNoriskAsset&fileName%{}", file_name)));
+                launcher_data_arc.progress_update(ProgressUpdate::set_label(format!("translation.verifiedNoriskAsset&fileName%{file_name}")));
+            } else if let Err(err) = fs::remove_file(&path).await {
+                info!("Failed to remove {}: {}", path.display(), err);
+            } else {
+                info!("Removed file {} since it was not found in the asset objects for this branch.", path.display());
             }
         }
     }
@@ -462,7 +459,7 @@ pub struct LaunchingParameter {
     pub concurrent_downloads: i32,
 }
 
-fn process_templates<F: Fn(&mut String, &str) -> Result<()>>(input: &String, retriever: F) -> Result<String> {
+fn process_templates<F: Fn(&mut String, &str) -> Result<()>>(input: &str, retriever: F) -> Result<String> {
     let mut output = String::with_capacity(input.len() * 3 / 2);
 
     let mut chars = input.chars().peekable();
@@ -483,7 +480,7 @@ fn process_templates<F: Fn(&mut String, &str) -> Result<()>>(input: &String, ret
                     break;
                 }
                 if !matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9') {
-                    return Err(LauncherError::InvalidVersionProfile(format!("invalid character in template: '{}'", c)).into());
+                    return Err(LauncherError::InvalidVersionProfile(format!("invalid character in template: '{c}'")).into());
                 }
 
                 template_arg.push(c);

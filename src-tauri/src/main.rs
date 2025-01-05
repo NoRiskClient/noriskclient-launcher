@@ -46,12 +46,12 @@ env!("CARGO_PKG_VERSION"),
 
 /// HTTP Client with launcher agent
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
-    let client = reqwest::ClientBuilder::new()
+    
+
+    reqwest::ClientBuilder::new()
         .user_agent(APP_USER_AGENT)
         .build()
-        .unwrap_or_else(|_| Client::new());
-
-    client
+        .unwrap_or_else(|_| Client::new())
 });
 
 const TRIGGER_FILE_SIZE: u64 = 2 * 1024 * 1000;

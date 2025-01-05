@@ -16,11 +16,11 @@ static QUILT_MAVEN_REPO_BASE: &str = "https://maven.quiltmc.org/repository/relea
 
 impl QuiltProvider {
     fn get_nrc_meta_api_base(is_experimental: bool) -> String {
-        return if is_experimental {
+        if is_experimental {
             String::from("https://dl-staging.norisk.gg/meta/quilt")
         } else {
             String::from("https://dl.norisk.gg/meta/quilt")
-        };
+        }
     }
     
     /// Request all available minecraft versions
@@ -38,15 +38,15 @@ impl QuiltProvider {
         let installer_version = Self::get_all_installer_versions().await?.first().unwrap().clone();
         let path = LAUNCHER_DIRECTORY.data_dir().join("custom_servers").join("installers");
         fs::create_dir_all(&path).await?;
-        let url = format!("{}/quilt-installer/{}/quilt-installer-{}.jar", QUILT_MAVEN_REPO_BASE, installer_version, installer_version);
+        let url = format!("{QUILT_MAVEN_REPO_BASE}/quilt-installer/{installer_version}/quilt-installer-{installer_version}.jar");
         let content = download_file(&url, on_progress).await?;
-        let _ = fs::write(path.join(format!("quilt-{}.jar", installer_version)), content).await.map_err(|e| e);
+        let _ = fs::write(path.join(format!("quilt-{installer_version}.jar")), content).await;
         Ok(())
     }
 
     /// Request JSON formatted data from launcher API
     pub async fn request_from_endpoint<T: DeserializeOwned>(base: &str, endpoint: &str) -> Result<T> {
-        let url = format!("{}/{}", base, endpoint);
+        let url = format!("{base}/{endpoint}");
         info!("URL: {}", url); // Den formatierten String ausgeben
         Ok(HTTP_CLIENT.get(url)
             .send().await?

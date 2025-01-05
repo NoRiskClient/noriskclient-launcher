@@ -6,7 +6,7 @@ authors = ["NoRiskk, TimLohrer (Aim_shock)"]
 license = "GNU General Public License v3.0"
 repository = "https://github.com/noriskclient/noriskclient-launcher"
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.80"
 
 [build-dependencies]
 tauri-build = { version = "1.4.0", features = [] }
@@ -40,7 +40,7 @@ open = "5.1.2"
 # FS libs
 async_zip = { version = "0.0.11", features = ["full"] }
 tokio-tar = "0.3.0"
-async-compression = { version= "0.3.15", features = ["gzip"] }
+async-compression = { version = "0.3.15", features = ["gzip"] }
 sanitize-filename = "0.4.0"
 path-absolutize = "3.0.14"
 dirs = "4.0"
@@ -57,11 +57,11 @@ uuid = { version = "1.2", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 sha1 = "0.10.5"
-md5 = "0.7.0"  # Überprüfe die neueste Version
-base16ct = {version = "0.2.0", features = ["alloc"] }
+md5 = "0.7.0"                                          # Überprüfe die neueste Version
+base16ct = { version = "0.2.0", features = ["alloc"] }
 
 # UI library
-tauri = {version = "1.4.0", features = ["api-all", "updater"] }
+tauri = { version = "1.4.0", features = ["api-all", "updater"] }
 
 # HTTP library
 reqwest = { version = "0.12.4", features = ["json", "multipart"] }
@@ -100,3 +100,33 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+
+[lints.rust]
+unsafe_code = "forbid"
+deprecated = "allow"   # Todo: Remove this line
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+perf = { level = "deny", priority = 2 }
+style = { level = "deny", priority = 3 }
+
+# These should be enabled in the future:
+unwrap_used = { level = "allow", priority = 19 }
+missing_errors_doc = { level = "allow", priority = 20 }
+missing_panics_doc = { level = "allow", priority = 21 }
+too_many_lines = { level = "allow", priority = 22 }
+expect_used = { level = "allow", priority = 23 }
+too_many_arguments = { level = "allow", priority = 24 }
+borrow_interior_mutable_const = { level = "allow", priority = 25 }
+declare_interior_mutable_const = { level = "allow", priority = 26 }
+
+# These are okay to allow
+module_name_repetitions = { level = "allow", priority = 21 }
+cast_sign_loss = { level = "allow", priority = 32 }
+cast_possible_truncation = { level = "allow", priority = 33 }
+cast_possible_wrap = { level = "allow", priority = 34 }
+cast_precision_loss = { level = "allow", priority = 35 }
+# seems this a tauri thing
+used_underscore_binding = { level = "allow", priority = 40 }
+# Maybe interesting for the future
+# nursery = { level = "deny", priority = 0 }

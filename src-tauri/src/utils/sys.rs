@@ -1,26 +1,24 @@
-use std::fmt::Display;
-use std::process::Command;
 use anyhow::{bail, Result};
-use log::debug;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use sysinfo::{RefreshKind, System, SystemExt};
 
 /// Get the total memory of the system in bytes
 pub fn total_memory() -> u64 {
     let sys = System::new_with_specifics(RefreshKind::new().with_memory());
 
-    sys.total_memory() as u64
+    sys.total_memory()
 }
 
 pub const OS: OperatingSystem = if cfg!(target_os = "windows") {
-    OperatingSystem::WINDOWS
+    OperatingSystem::Windows
 } else if cfg!(target_os = "macos") {
-    OperatingSystem::OSX
+    OperatingSystem::Osx
 } else if cfg!(target_os = "linux") {
-    OperatingSystem::LINUX
+    OperatingSystem::Linux
 } else {
-    OperatingSystem::UNKNOWN
+    OperatingSystem::Unkown
 };
 
 pub fn is_rosetta() -> bool {
@@ -30,7 +28,10 @@ pub fn is_rosetta() -> bool {
             .arg("sysctl.proc_translated")
             .output()
         {
-            debug!("Rosetta Output: {:?}", String::from_utf8_lossy(&output.stdout));
+            debug!(
+                "Rosetta Output: {:?}",
+                String::from_utf8_lossy(&output.stdout)
+            );
             return String::from_utf8_lossy(&output.stdout).contains("1");
         }
     }
@@ -39,34 +40,32 @@ pub fn is_rosetta() -> bool {
 
 pub fn get_architecture() -> Architecture {
     match () {
-        _ if cfg!(target_arch = "x86") => Architecture::X86,
-        _ if cfg!(target_arch = "x86_64") => {
+        () if cfg!(target_arch = "x86") => Architecture::X86,
+        () if cfg!(target_arch = "x86_64") => {
             if is_rosetta() {
-                Architecture::AARCH64
+                Architecture::Aarch64
             } else {
                 Architecture::X64
             }
         }
-        _ if cfg!(target_arch = "arm") => Architecture::ARM,
-        _ if cfg!(target_arch = "aarch64") => Architecture::AARCH64,
-        _ => Architecture::UNKNOWN,
+        () if cfg!(target_arch = "arm") => Architecture::Arm,
+        () if cfg!(target_arch = "aarch64") => Architecture::Aarch64,
+        () => Architecture::Unknown,
     }
 }
 
-pub const OS_VERSION: Lazy<String> = Lazy::new(|| {
-    os_info::get().version().to_string()
-});
+pub const OS_VERSION: Lazy<String> = Lazy::new(|| os_info::get().version().to_string());
 
 #[derive(Deserialize, PartialEq, Eq, Hash, Debug)]
 pub enum OperatingSystem {
     #[serde(rename = "windows")]
-    WINDOWS,
+    Windows,
     #[serde(rename = "linux")]
-    LINUX,
+    Linux,
     #[serde(rename = "osx")]
-    OSX,
+    Osx,
     #[serde(rename = "unknown")]
-    UNKNOWN,
+    Unkown,
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Hash, Debug)]
@@ -76,37 +75,37 @@ pub enum Architecture {
     #[serde(rename = "x64")]
     X64,
     #[serde(rename = "arm")]
-    ARM,
+    Arm,
     #[serde(rename = "aarch64")]
-    AARCH64,
+    Aarch64,
     #[serde(rename = "unknown")]
-    UNKNOWN,
+    Unknown,
 }
 
 impl OperatingSystem {
     pub fn get_path_separator(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => ";",
-            OperatingSystem::LINUX | OperatingSystem::OSX => ":",
-            _ => bail!("Invalid OS")
+            OperatingSystem::Windows => ";",
+            OperatingSystem::Linux | OperatingSystem::Osx => ":",
+            OperatingSystem::Unkown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => "windows",
-            OperatingSystem::LINUX => "linux",
-            OperatingSystem::OSX => "osx",
-            _ => bail!("Invalid OS")
+            OperatingSystem::Windows => "windows",
+            OperatingSystem::Linux => "linux",
+            OperatingSystem::Osx => "osx",
+            OperatingSystem::Unkown => bail!("Invalid OS"),
         })
     }
 
     pub fn get_adoptium_name(&self) -> Result<&'static str> {
         Ok(match self {
-            OperatingSystem::WINDOWS => "windows",
-            OperatingSystem::LINUX => "linux",
-            OperatingSystem::OSX => "mac",
-            _ => bail!("Invalid OS")
+            OperatingSystem::Windows => "windows",
+            OperatingSystem::Linux => "linux",
+            OperatingSystem::Osx => "mac",
+            OperatingSystem::Unkown => bail!("Invalid OS"),
         })
     }
 }
@@ -122,9 +121,9 @@ impl Architecture {
         Ok(match self {
             Architecture::X86 => "x86",
             Architecture::X64 => "x64",
-            Architecture::ARM => "arm",
-            Architecture::AARCH64 => "aarch64",
-            _ => bail!("Invalid architecture")
+            Architecture::Arm => "arm",
+            Architecture::Aarch64 => "aarch64",
+            Architecture::Unknown => bail!("Invalid architecture"),
         })
     }
 }

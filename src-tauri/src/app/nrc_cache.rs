@@ -29,7 +29,7 @@ pub struct RunnerInstance {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub terminator: Option<tokio::sync::oneshot::Sender<()>>,
-    pub id: Uuid,  // Speichert die ID direkt als Uuid
+    pub id: Uuid, // Speichert die ID direkt als Uuid
     #[serde(rename = "progressUpdates")]
     pub progress_updates: Vec<ProgressUpdate>, // Die Liste der Fortschritts-Updates
     pub p_id: Option<u32>,
@@ -46,7 +46,7 @@ impl Default for RunnerInstance {
             progress_updates: Vec::new(),
             p_id: None,
             is_attached: false,
-            branch: "".to_string(),
+            branch: String::new(),
         }
     }
 }
@@ -58,19 +58,33 @@ pub struct AppState {
 impl NoRiskLaunchManifest {
     pub async fn load(app_data: &Path) -> Result<Self, Error> {
         // load the options from the file
-        let options = serde_json::from_slice::<NoRiskLaunchManifest>(&fs::read(app_data.join("launch_manifest.json")).await?)?;
+        let options = serde_json::from_slice::<NoRiskLaunchManifest>(
+            &fs::read(app_data.join("launch_manifest.json")).await?,
+        )?;
         Ok(options)
     }
     pub async fn store(&self, app_data: &Path) -> Result<(), Error> {
-        let _ = fs::write(app_data.join("launch_manifest.json"), serde_json::to_string_pretty(&self)?).await?;
+        fs::write(
+            app_data.join("launch_manifest.json"),
+            serde_json::to_string_pretty(&self)?,
+        )
+        .await?;
         debug!("Launch manifest was stored...");
         Ok(())
     }
 }
 
 impl NRCCache {
-    pub async fn get_launch_manifest(branch: &str, norisk_token: &str, uuid: Uuid) -> Result<NoRiskLaunchManifest, Error> {
-        let nrc_cache = LAUNCHER_DIRECTORY.data_dir().join("gameDir").join(branch).join("nrc_cache");
+    pub async fn get_launch_manifest(
+        branch: &str,
+        norisk_token: &str,
+        uuid: Uuid,
+    ) -> Result<NoRiskLaunchManifest, Error> {
+        let nrc_cache = LAUNCHER_DIRECTORY
+            .data_dir()
+            .join("gameDir")
+            .join(branch)
+            .join("nrc_cache");
         match ApiEndpoints::launch_manifest(branch, norisk_token, uuid).await {
             Ok(manifest) => {
                 fs::create_dir_all(&nrc_cache).await?;
@@ -85,27 +99,39 @@ impl NRCCache {
         }
     }
 
-    pub async fn get_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, Error> {
-        let path = LAUNCHER_DIRECTORY
-            .data_dir()
-            .join("nrc_cache")
-            .join(if !options.experimental_mode { "branches.json" } else { "exp_branches.json" });
+    pub async fn get_branches(
+        options: LauncherOptions,
+        credentials: Credentials,
+    ) -> Result<Vec<String>, Error> {
+        let path =
+            LAUNCHER_DIRECTORY
+                .data_dir()
+                .join("nrc_cache")
+                .join(if options.experimental_mode {
+                    "exp_branches.json"
+                } else {
+                    "branches.json"
+                });
 
-        match credentials.norisk_credentials.get_token(options.experimental_mode).await {
-            Ok(token) => {
-                match ApiEndpoints::branches(&token, &credentials.id.to_string()).await {
-                    Ok(response) => {
-                        if let Err(err) = fs::write(&path, serde_json::to_string_pretty(&response)?).await {
-                            error!("Failed to store branches: {:?}", err);
-                        }
-                        debug!("Branches were stored...");
-                        return Ok(response);
+        match credentials
+            .norisk_credentials
+            .get_token(options.experimental_mode)
+            .await
+        {
+            Ok(token) => match ApiEndpoints::branches(&token, &credentials.id.to_string()).await {
+                Ok(response) => {
+                    if let Err(err) =
+                        fs::write(&path, serde_json::to_string_pretty(&response)?).await
+                    {
+                        error!("Failed to store branches: {:?}", err);
                     }
-                    Err(error) => {
-                        error!("Error Loading Branches from API: {:?}", error);
-                    }
+                    debug!("Branches were stored...");
+                    return Ok(response);
                 }
-            }
+                Err(error) => {
+                    error!("Error Loading Branches from API: {:?}", error);
+                }
+            },
             Err(error) => {
                 error!("Error Getting Token: {:?}", error);
             }
@@ -116,9 +142,8 @@ impl NRCCache {
             Ok(data) => {
                 if let Ok(options) = serde_json::from_slice::<Vec<String>>(&data) {
                     return Ok(options);
-                } else {
-                    error!("Error deserializing branches from cache.");
                 }
+                error!("Error deserializing branches from cache.");
             }
             Err(err) => {
                 error!("Error Reading Branches Cache: {:?}", err);
@@ -129,11 +154,15 @@ impl NRCCache {
         Ok(Vec::new())
     }
 
+    #[must_use]
     pub fn get_pid() -> u32 {
         std::process::id()
     }
 
-    pub async fn get_running_instances(app_state: tauri::State<'_, AppState>) -> Result<Vec<RunnerInstance>, Error> {
+    #[allow(clippy::unused_async)]
+    pub async fn get_running_instances(
+        app_state: tauri::State<'_, AppState>,
+    ) -> Result<Vec<RunnerInstance>, Error> {
         let runner_instances = app_state.runner_instances.lock().unwrap();
 
         // Initialisiere `sysinfo` um die laufenden Prozesse zu überprüfen
@@ -149,9 +178,9 @@ impl NRCCache {
             })
             .map(|instance| RunnerInstance {
                 terminator: None, // Terminator wird nicht serialisiert
-                id: instance.id.clone(), // Die ID wird serialisiert
+                id: instance.id,  // Die ID wird serialisiert
                 progress_updates: instance.progress_updates.clone(),
-                p_id: instance.p_id.clone(),
+                p_id: instance.p_id,
                 is_attached: instance.terminator.is_some(), //Für LiveLogs
                 branch: instance.branch.clone(),
             })
@@ -161,6 +190,7 @@ impl NRCCache {
     }
 
     // Funktion zur Überprüfung, ob eine p_id zu einem aktiven Prozess gehört
+    #[must_use]
     pub fn is_running(system: &System, pid: Option<u32>) -> bool {
         if let Some(pid) = pid {
             if let Some(game_process) = system.process(Pid::from(pid as usize)) {
@@ -176,17 +206,18 @@ impl NRCCache {
             match std::fs::read_to_string(instances_path) {
                 Ok(content) => {
                     // Deserialisiere den Inhalt zu einer Liste von RunnerInstances
-                    let mut instances: Vec<RunnerInstance> = serde_json::from_str(&content).unwrap_or_else(|err| {
-                        error!("Fehler beim Parsen der gespeicherten Instanzen: {}", err);
-                        Vec::new()
-                    });
+                    let mut instances: Vec<RunnerInstance> = serde_json::from_str(&content)
+                        .unwrap_or_else(|err| {
+                            error!("Fehler beim Parsen der gespeicherten Instanzen: {}", err);
+                            Vec::new()
+                        });
 
                     // Prüfe jede Instanz, ob der zugehörige Prozess existiert
                     let mut system = System::new_all();
                     system.refresh_all();
 
                     // Behalte nur die Instanzen, deren Prozess "java" enthält und existiert
-                    instances.retain(|instance| { return Self::is_running(&system, instance.p_id); });
+                    instances.retain(|instance| Self::is_running(&system, instance.p_id));
                     instances
                 }
                 Err(err) => {
@@ -199,19 +230,31 @@ impl NRCCache {
         }
     }
 
-
-    pub fn store_running_instances(instances: &Arc<Mutex<Vec<RunnerInstance>>>) -> Result<(), crate::error::Error> {
+    pub fn store_running_instances(
+        instances: &Arc<Mutex<Vec<RunnerInstance>>>,
+    ) -> Result<(), crate::error::Error> {
         let instances_guard = instances.lock().unwrap();
         //nicht pretty speichern für maximale performance und größe
         let serialized = serde_json::to_string(&*instances_guard)?;
         std::fs::create_dir_all(LAUNCHER_DIRECTORY.data_dir().join("nrc_cache"))?;
-        std::fs::write(LAUNCHER_DIRECTORY.data_dir().join("nrc_cache").join("running_instances.json"), serialized)?;
+        std::fs::write(
+            LAUNCHER_DIRECTORY
+                .data_dir()
+                .join("nrc_cache")
+                .join("running_instances.json"),
+            serialized,
+        )?;
         Ok(())
     }
 
     pub fn initialize_app_state(app: &tauri::App) {
-        let runner_instances = Self::load_running_instances(&LAUNCHER_DIRECTORY.data_dir().join("nrc_cache").join("running_instances.json"));
-        debug!("Found {:?} Last Instances",runner_instances.len());
+        let runner_instances = Self::load_running_instances(
+            &LAUNCHER_DIRECTORY
+                .data_dir()
+                .join("nrc_cache")
+                .join("running_instances.json"),
+        );
+        debug!("Found {:?} Last Instances", runner_instances.len());
         let instances = Arc::new(Mutex::new(runner_instances));
         app.manage(AppState {
             runner_instances: instances.clone(),
