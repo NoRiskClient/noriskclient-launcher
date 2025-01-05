@@ -6,13 +6,14 @@
 
 use std::fs;
 
+use crate::utils::{get_architecture, is_rosetta};
 use directories::ProjectDirs;
 use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
         rolling_file::policy::compound::{
-            CompoundPolicy, roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger,
+            roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger, CompoundPolicy,
         },
     },
     config::{Appender, Config, Root},
@@ -20,34 +21,26 @@ use log4rs::{
 };
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use crate::utils::{get_architecture, is_rosetta};
 
-pub mod app;
-pub mod minecraft;
 pub mod addons;
+pub mod app;
 pub mod custom_servers;
+pub mod minecraft;
 
 mod error;
 mod utils;
 
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
-static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> = Lazy::new(|| {
-    match ProjectDirs::from("gg", "norisk", "NoRiskClient") {
+static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
+    Lazy::new(|| match ProjectDirs::from("gg", "norisk", "NoRiskClient") {
         Some(proj_dirs) => proj_dirs,
-        None => panic!("no application directory")
-    }
-});
+        None => panic!("no application directory"),
+    });
 
-static APP_USER_AGENT: &str = concat!(
-env!("CARGO_PKG_NAME"),
-"/",
-env!("CARGO_PKG_VERSION"),
-);
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 /// HTTP Client with launcher agent
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
-    
-
     reqwest::ClientBuilder::new()
         .user_agent(APP_USER_AGENT)
         .build()
@@ -69,8 +62,11 @@ pub fn main() -> anyhow::Result<()> {
 
     // Build a stdout logger.
     let stderr = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n")))
-        .target(Target::Stderr).build();
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n",
+        )))
+        .target(Target::Stderr)
+        .build();
 
     // Create a policy to use with the file logging
     let trigger = SizeTrigger::new(TRIGGER_FILE_SIZE);
@@ -83,7 +79,9 @@ pub fn main() -> anyhow::Result<()> {
     // Logging to log file. (with rolling)
     let logfile = log4rs::append::rolling_file::RollingFileAppender::builder()
         // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
-        .encoder(Box::new(PatternEncoder::new("[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n")))
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%d-%m-%Y %H:%M:%S)}] | {h({l}):5.5} | {m}\n",
+        )))
         .build(latest_log.clone(), Box::new(policy))
         .unwrap();
 
@@ -122,8 +120,10 @@ pub fn main() -> anyhow::Result<()> {
     info!("");
 
     info!("Rosetta: {}", is_rosetta());
-    info!("Architecture: {}", get_architecture().get_simple_name()?.to_string());
-
+    info!(
+        "Architecture: {}",
+        get_architecture().get_simple_name()?.to_string()
+    );
 
     // application directory
     info!("Creating launcher directories...");

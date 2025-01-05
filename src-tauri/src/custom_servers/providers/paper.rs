@@ -21,8 +21,7 @@ impl PaperProvider {
 
     /// Request all available loader versions
     pub async fn get_all_build_versions(mc_version: &str) -> Result<PaperBuilds> {
-        Self::request_from_endpoint(PAPER_API_BASE, &format!("versions/{mc_version}/builds"))
-            .await
+        Self::request_from_endpoint(PAPER_API_BASE, &format!("versions/{mc_version}/builds")).await
     }
 
     pub async fn download_server_jar<F>(custom_server: &CustomServer, on_progress: F) -> Result<()>

@@ -63,9 +63,7 @@ impl ModrinthApiEndpoints {
         slug: &str,
         params: &str,
     ) -> Result<Vec<ModrinthProject>, crate::error::Error> {
-        let url = format!(
-            "https://api.modrinth.com/v2/project/{slug}/version{params}"
-        );
+        let url = format!("https://api.modrinth.com/v2/project/{slug}/version{params}");
         Ok(HTTP_CLIENT
             .get(url)
             .send()
@@ -233,7 +231,8 @@ pub struct ModrinthProject {
 }
 
 impl ModrinthProject {
-    #[must_use] pub fn to_custom_mod(
+    #[must_use]
+    pub fn to_custom_mod(
         &self,
         title: &str,
         slug: &str,
@@ -269,7 +268,8 @@ impl ModrinthProject {
         }
     }
 
-    #[must_use] pub fn to_loader_mod(&self, slug: &str, required: bool, enabled: bool) -> LoaderMod {
+    #[must_use]
+    pub fn to_loader_mod(&self, slug: &str, required: bool, enabled: bool) -> LoaderMod {
         let file_name = self
             .files
             .first()
@@ -292,16 +292,16 @@ impl ModrinthProject {
         }
     }
 
-    #[must_use] pub fn to_slug(&self) -> String {
-        self.files
-            .first()
-            .map_or("ERROR-MOD".to_string(), |file| {
-                file.filename
-                    .replace(format!("-{}.jar", self.version_number).as_str(), "")
-            })
+    #[must_use]
+    pub fn to_slug(&self) -> String {
+        self.files.first().map_or("ERROR-MOD".to_string(), |file| {
+            file.filename
+                .replace(format!("-{}.jar", self.version_number).as_str(), "")
+        })
     }
 
-    #[must_use] pub fn is_already_required_by_norisk_client(&self, mods: &[LoaderMod]) -> bool {
+    #[must_use]
+    pub fn is_already_required_by_norisk_client(&self, mods: &[LoaderMod]) -> bool {
         let dependency_slug = self.to_slug();
         mods.iter().any(|loader_mod| {
             let slug = loader_mod.source.get_slug();

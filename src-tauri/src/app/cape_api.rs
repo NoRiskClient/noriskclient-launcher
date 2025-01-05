@@ -41,7 +41,9 @@ impl CapeApiEndpoints {
 
         debug!("Cape equiped status {:?}", response.status());
 
-        if response.status() == StatusCode::OK { Ok(()) } else {
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
             let response_text = response
                 .text()
                 .await
@@ -73,7 +75,9 @@ impl CapeApiEndpoints {
 
         debug!("Cape delete status {:?}", response.status());
 
-        if response.status() == StatusCode::OK { Ok(()) } else {
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
             let response_text = response
                 .text()
                 .await
@@ -128,9 +132,7 @@ impl CapeApiEndpoints {
 
     pub async fn mc_name_by_uuid(uuid: &str) -> Result<String, Box<dyn Error>> {
         debug!("Requesting Minecraft Username {}", uuid);
-        let url = format!(
-            "https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
-        );
+        let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}");
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         Ok(response_text.name)
@@ -138,9 +140,7 @@ impl CapeApiEndpoints {
 
     pub async fn mc_uuid_by_name(username: &str) -> Result<String, Box<dyn Error>> {
         debug!("Requesting Minecraft UUID {}", username);
-        let url = format!(
-            "https://api.mojang.com/users/profiles/minecraft/{username}"
-        );
+        let url = format!("https://api.mojang.com/users/profiles/minecraft/{username}");
         let response = HTTP_CLIENT.get(url).send().await?;
         let response_text = response.json::<McProfile>().await?;
         let uuid = uuid::Uuid::parse_str(&response_text.id)?;
@@ -183,7 +183,9 @@ impl CapeApiEndpoints {
 
         debug!("Unequip cape status {:?}", response.status());
 
-        if response.status() == StatusCode::OK { Ok(()) } else {
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
             let response_text = response
                 .text()
                 .await

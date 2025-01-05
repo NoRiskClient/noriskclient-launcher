@@ -4,5 +4,5 @@ use serde::{Deserialize, Serialize};
 pub struct AddonsProgress {
     pub identifier: String,
     pub current: u64,
-    pub max: u64
+    pub max: u64,
 }
