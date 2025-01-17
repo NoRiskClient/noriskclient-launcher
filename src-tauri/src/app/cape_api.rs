@@ -72,7 +72,7 @@ impl CapeApiEndpoints {
         };
     }
 
-    pub async fn upload_cape(token: &str, uuid: &str, image_path: PathBuf) -> Result<String, String> {
+    pub async fn upload_cape(token: &str, uuid: &str, image_path: &PathBuf) -> Result<String, String> {
         debug!("Image Path {:?}",image_path);
         let options = LauncherOptions::load(LAUNCHER_DIRECTORY.config_dir()).await.unwrap_or_default();
         // Lese den Inhalt der Bilddatei in Bytes ein
@@ -83,7 +83,7 @@ impl CapeApiEndpoints {
 
                 // Baue die URL mit dem Token als Query-Parameter
                 let url = format!("{}/cosmetics/cape?uuid={}", get_api_base(options.experimental_mode), uuid);
-
+                
                 // Sende den POST-Request
                 let response = HTTP_CLIENT
                     .post(&url)

@@ -15,39 +15,32 @@
   const dispatch = createEventDispatcher();
 
   export let capeHash = null;
+  export let previewLocation = null;
 
   onMount(() => {
     dispatch("fetchNoRiskUser");
   });
 
-  async function handleUploadCape() {
-    if ($defaultUser) {
-      await invoke("upload_cape", {
-        noriskToken: getNoRiskToken(),
-        uuid: $defaultUser.id,
-      }).then((text) => {
-        dispatch("fetchNoRiskUser");
-        if (text == "") return;
-        addNotification(text, "INFO");
-      }).catch(reason => {
-        addNotification(lang.capes.notification.failedToUploadCape, "ERROR", reason);
-      });
-    }
-  }
-
   async function handlePreviewCape() {
-    const location = await open({
+    try {
+      const location = await open({
         defaultPath: "/",
         multiple: false,
         directory: false,
         filters: [{ name: "Cape", extensions: ["png"] }],
       });
-      await invoke("read_local_skin_file", { location })
-      .then((content) => {
-        dispatch("preview", `data:image/png;base64,${content}`)
-      }).catch((error) => {
-        addNotification(lang.cape.notification.failedToLoadCapeFile.replace("{error}", error));
-      });
+      if (!location) return;
+      const content = await invoke("read_local_skin_file", { location });
+      const result = await invoke("check_cape_resolution", { imageData: content });
+      if (!result) {
+        addNotification("Wrong Cape Resolution! Please use the template!");
+        return;
+      }
+      dispatch("preview", `data:image/png;base64,${content}`);
+      previewLocation = location;
+    } catch (error) {
+      addNotification(lang.cape.notification.failedToLoadCapeFile.replace("{error}", error));
+    }
   }
 
   async function unequipCape() {
@@ -86,9 +79,7 @@
   {/if}
   <div class="button-wrapper">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={handleUploadCape}>{lang.capes.button.upload}</h1>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <h1 on:click={handlePreviewCape}>{lang.capes.button.preview}</h1>
+    <h1 on:click={handlePreviewCape}>{lang.capes.button.upload}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 on:click={downloadTemplate}>{lang.capes.button.template}</h1>
     <!-- svelte-ignore a11y-click-events-have-key-events -->

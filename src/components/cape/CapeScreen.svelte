@@ -1,17 +1,19 @@
 <script>
 	import CapePlayer from './CapePlayer.svelte';
   import { invoke } from "@tauri-apps/api/tauri";
+  import { createEventDispatcher } from "svelte";
   import CapeCarousel from "./CapeCarousel.svelte";
   import CapeEditor from "./CapeEditor.svelte";
   import { defaultUser } from "../../stores/credentialsStore.js";
   import { launcherOptions } from "../../stores/optionsStore.js";
   import { addNotification } from "../../stores/notificationStore.js";
   import { openInputPopup } from "../../utils/popupUtils.js";
-  import { noriskLog } from "../../utils/noriskUtils.js";
+  import { getNoRiskToken, noriskLog } from "../../utils/noriskUtils.js";
   import { translations } from '../../utils/translationUtils.js';
-    
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
+
+  const dispatch = createEventDispatcher();
 
   let capes = null;
   let userCapes = null;
@@ -20,6 +22,7 @@
   let currentRequest = 0;
   let previewHash = null;
   let previewData = null;
+  let CapeLocation = null;
 
   async function requestTrendingCapes(alltime) {
     if ($defaultUser) {
@@ -110,7 +113,7 @@
       });
     }
   }
-
+  
   function previewCape(hash, data) {
     previewHash = hash;
     previewData = data;
@@ -122,6 +125,24 @@
       isLoading = false;
     }, 0);
   }
+
+  async function handleUploadCape() {
+    if ($defaultUser) {
+      await invoke("upload_cape", {
+        noriskToken: getNoRiskToken(),
+        uuid: $defaultUser.id,
+        imagePath: CapeLocation,
+      }).then((text) => {
+        dispatch("fetchNoRiskUser");
+        if (text == "") return;
+        addNotification(text, "INFO");
+        switchTab(0);
+      }).catch(reason => {
+        addNotification(lang.capes.notification.failedToUploadCape, "ERROR", reason);
+      });
+    }
+  }
+  
 
   getNoRiskUserByUUID();
 </script>
@@ -143,9 +164,16 @@
       <div class="preview-player">
         <CapePlayer bind:cape={previewHash} bind:data={previewData} height={350} width={350} />
       </div>
+      {#if CapeLocation !== null}
+      <div class="button-wrapper">
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <h1 class="red-text-clickable" on:click={()=>switchTab(0)}>{lang.popup.defaultButtons.cancel}</h1>
+        <h1 on:click={handleUploadCape}>{lang.popup.defaultButtons.confirm}</h1>
+      </div>
+      {/if}
     {:else if currentRequest === 0}
       {#if !isLoading}
-        <CapeEditor on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(null, data.detail)} bind:capeHash />
+        <CapeEditor bind:previewLocation={CapeLocation} on:fetchNoRiskUser={getNoRiskUserByUUID} on:preview={(data) => previewCape(null, data.detail)} bind:capeHash />
       {/if}
     {:else if currentRequest === 1 || currentRequest === 2 || currentRequest === 3 || currentRequest === 4}
       {#if capes != null && !isLoading}
@@ -166,6 +194,21 @@
 
     .cape-wrapper {
         height: 100%;
+    }
+
+    .button-wrapper h1 {
+        padding-inline: 2em;
+        transition: transform 0.3s, color 0.3s;
+    }
+
+    .button-wrapper h1:nth-child(2) {
+        cursor:pointer;
+        color: #1cc009;
+        text-shadow: 2px 2px #114609;
+    }
+
+    .button-wrapper h1:hover {
+        transform: scale(1.5);
     }
 
     .tab-wrapper h1,
@@ -196,12 +239,13 @@
         display: flex;
         flex-direction: row;
     }
-
+    
     .preview-player {
+        height: auto;
         width: 100%;
-        height: 100%;
         display: flex;
-        align-items: center;
         justify-content: center;
+        align-items: center;
     }
+    
 </style>
