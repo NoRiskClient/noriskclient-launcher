@@ -76,6 +76,9 @@
         flex-direction: row;
         justify-content: space-between;
         padding: 1em;
+        position: sticky;
+        top: 0;
+        background-color: var(--background-color);
     }
 
     .divider {
@@ -157,6 +160,9 @@
         padding: 1em;
         transition-duration: 200ms;
         cursor: pointer;
+        position: sticky;
+        bottom: 0;
+        background-color: var(--background-color)
     }
 
     .add-account-button:hover {
