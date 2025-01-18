@@ -49,22 +49,23 @@
       class="dialog"
     >
       <div on:click|stopPropagation class="divider">
-        <div>
           <div class="header-wrapper">
             <h1 class="nes-font">{lang.accountModal.title}</h1>
             <h1 class="nes-font red-text-clickable" on:click={animateOut}>X</h1>
           </div>
           <hr>
-          {#each $users as account}
-            <AccountListItem isActive={$defaultUser?.id === account.id} account={account} on:close={animateOut} />
-          {/each}
-          {#if isLoading}
-            <AccountListLoading />
-          {/if}
-        </div>
+          <div class="accounts">
+            {#each $users as account}
+              <AccountListItem isActive={$defaultUser?.id === account.id} account={account} on:close={animateOut} />
+            {/each}
+            {#if isLoading}
+              <AccountListLoading />
+            {/if}
+          </div>
         <!-- svelte-ignore a11y-autofocus -->
-        <div class="add-account-button primary-text"
-             on:click={handleAddAccount}>{lang.accountModal.addAccountButton}</div>
+        <div class="add-account-button" on:click={handleAddAccount}>
+          <p class="primary-text">{lang.accountModal.addAccountButton}</p>
+        </div>
       </div>
     </div>
   </div>
@@ -76,6 +77,8 @@
         flex-direction: row;
         justify-content: space-between;
         padding: 1em;
+        top: 0;
+        background-color: var(--background-color);
     }
 
     .divider {
@@ -83,7 +86,6 @@
         flex-direction: column;
         justify-content: space-between;
         height: 100%;
-        padding: 1em;
     }
 
     .overlay {
@@ -110,7 +112,7 @@
     }
 
     .dialog > div {
-        padding: 1em;
+        padding: 1em 1em 0 1em; 
     }
 
     .dialog.animateIn {
@@ -119,6 +121,14 @@
 
     .dialog.animateOut {
         animation: close 0.2s ease-out;
+    }
+
+    .accounts {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     @keyframes open {
@@ -149,16 +159,19 @@
 
     .add-account-button {
         display: flex;
-        align-content: center;
         align-items: center;
         justify-content: center;
-        font-size: 18px;
         padding: 1em;
-        transition-duration: 200ms;
         cursor: pointer;
+        height: 5em;
+      }
+      
+      .add-account-button p {
+        font-size: 18px;
+        transition-duration: 200ms;
     }
 
-    .add-account-button:hover {
+    .add-account-button p:hover {
         transform: scale(1.15);
     }
 </style>
