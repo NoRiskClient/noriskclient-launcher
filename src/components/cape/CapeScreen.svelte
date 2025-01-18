@@ -102,7 +102,11 @@
         uuid: $defaultUser.id,
       }).then((user) => {
         if (user) {
-          capeHash = user;
+          if(user !== "No Cape Selected") {
+            capeHash = user;
+          }else {
+            capeHash = null;
+          }
         } else {
           noriskLog("No cape found for user: " + $defaultUser.id);
         }
