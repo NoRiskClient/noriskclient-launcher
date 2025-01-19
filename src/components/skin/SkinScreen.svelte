@@ -75,13 +75,18 @@
         uuid: $defaultUser.id,
       }).then(async (hash) => {
         if (hash) {
-          const url = `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${hash}.png`;
-          await invoke("read_remote_image_file", { location: url })
-            .then((capeData) => {
-              capeLocation = `data:image/png;base64,${capeData}`;
-            }).catch((error) => {
-              addNotification(lang.skin.notification.failedToLoadPlayerCapes.replace("{error}", error));
-            });
+          if(hash !=="No Cape Selected"){
+            const url = `https://cdn.norisk.gg/capes${$launcherOptions.experimentalMode ? '-staging' : ''}/prod/${hash}.png`;
+            await invoke("read_remote_image_file", { location: url })
+              .then((capeData) => {
+                capeLocation = `data:image/png;base64,${capeData}`;
+              }).catch((error) => {
+                addNotification(lang.skin.notification.failedToLoadPlayerCapes.replace("{error}", error));
+              });
+          }else{
+            hash = null;
+          }
+
         } else {
           capeLocation = profileTexture.textures.CAPE?.url ?? "";
           noriskLog("No NoRisk Cape Found");
