@@ -1,59 +1,80 @@
 <script>
+  import { onMount } from "svelte";
+  import { writable } from "svelte/store";
 
+  let isFocused = writable(false);
+
+function handleFocus() {
+  isFocused.set(true);
+}
+
+function handleBlur() {
+  isFocused.set(false);
+}
+
+onMount(() => {
+  window.addEventListener("focus", handleFocus);
+  window.addEventListener("blur", handleBlur);
+
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+    window.removeEventListener("blur", handleBlur);
+  };
+});
 </script>
 
 <div class="main">
 	<div class="initial-snow">
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
 	</div>
 </div>
 
@@ -576,4 +597,8 @@
         animation: snowfall 14s linear infinite;
         animation-delay: -9s;
     }
+
+    .snow.paused {
+    animation-play-state: paused;
+  }
 </style>

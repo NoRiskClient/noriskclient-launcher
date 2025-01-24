@@ -1,5 +1,7 @@
 <!-- pages/Home.svelte -->
 <script>
+  import { onMount } from "svelte";
+  import { writable } from "svelte/store";
 	import { isWinterSeason } from './../../utils/noriskUtils.js';
   import SkinButton from "./widgets/SkinButton.svelte";
   import BranchSwitcher from "../BranchSwitcher.svelte";
@@ -15,6 +17,26 @@
   function showCredits() {
     showCreditsModal = true;
   }
+
+  let isFocused = writable(false);
+
+function handleFocus() {
+  isFocused.set(true);
+}
+
+function handleBlur() {
+  isFocused.set(false);
+}
+
+onMount(() => {
+  window.addEventListener("focus", handleFocus);
+  window.addEventListener("blur", handleBlur);
+
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+    window.removeEventListener("blur", handleBlur);
+  };
+});
 </script>
 
 <CreditModal bind:showModal={showCreditsModal} />
@@ -24,7 +46,7 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- DO NOT REMOVE THIS! Contact Tim if you have any questions! -->
   <div class="credits-click-field" on:click={showCredits}></div>
-  <img class="pokemon-title title-effect" src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
+  <img class={ $isFocused ? "pokemon-title title-effect" : "pokemon-title title-effect paused" } src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
   <BranchSwitcher />
   <SkinButton />
   <CopyrightLabel />
@@ -68,5 +90,9 @@
     100% {
         -webkit-mask-position: left;
     }
+  }
+
+  .title-effect.paused {
+    animation-play-state: paused;
   }
 </style>
