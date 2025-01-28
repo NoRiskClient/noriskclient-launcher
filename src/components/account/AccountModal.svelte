@@ -33,9 +33,11 @@
       .then(async result => {
         await fetchUsers();
         isLoading = false;
-        addNotification("Account created successfully.", "INFO");
+        if (result != null) {
+          addNotification(lang.accountModal.notification.accountAdded, "INFO");
+        }
       }).catch(async () => {
-      isLoading = false;
+        isLoading = false;
     });
   }
 </script>
@@ -59,7 +61,7 @@
               <AccountListItem isActive={$defaultUser?.id === account.id} account={account} on:close={animateOut} />
             {/each}
             {#if isLoading}
-              <AccountListLoading />
+              <AccountListLoading bind:isLoading />
             {/if}
           </div>
         <!-- svelte-ignore a11y-autofocus -->

@@ -45,6 +45,7 @@
     "signIn.step.notWhitelisted": "NICHT GEWHITELISTED",
     "accountModal.title": "ACCOUNTS",
     "accountModal.addAccountButton": "ACCOUNT HINZUFÜGEN",
+    "accountModal.notification.accountAdded": "Konto erfolgrich hinzugefügt!",
     "creditsModal.title": "LAUNCHER CREDITS",
     "creditsModal.contributersText": "Alle Mitwirkende und Bug Reporters",
     "home.leftNavbar.button.linkDiscord": "VERBINDE DISCORD",

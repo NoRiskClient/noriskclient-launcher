@@ -8,6 +8,7 @@
   /** @type {{ [key: string]: any }} */
   $: lang = $translations;
 
+  /** @type {any} */
   $: microsoftOutput = lang.signIn.signInText;
   let dots = "";
   let microsoftFlag = false;
@@ -22,10 +23,11 @@
       }
 
       if (event.payload.includes('signIn.')) {
-        if (event.payload.includes('notWhitelisted')) {
+        if (event.payload.includes('notWhitelisted') || event.payload.includes('cancelled')) {
           clearInterval(interval);
           microsoftFlag = false;
           dots = "";
+          return;
         }
 
         let translatedStep = lang;

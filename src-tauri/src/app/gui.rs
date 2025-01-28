@@ -22,7 +22,7 @@ use regex::Regex;
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
-use tauri::{Manager, UserAttentionType, Window, WindowEvent};
+use tauri::{window, Manager, UserAttentionType, Window, WindowEvent};
 use tauri::api::dialog::blocking::FileDialogBuilder;
 use tokio::{fs, io::AsyncReadExt};
 use uuid::Uuid;
@@ -1201,6 +1201,16 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
         .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
+
+    let app_clone = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            app_clone.get_window("main")
+                .unwrap().emit("microsoft-output", "signIn.step.cancelled")
+                .unwrap_or_default();
+            return;
+        }
+    });
 
     while (Utc::now() - start) < chrono::Duration::minutes(10) {
         if window.title().is_err() {

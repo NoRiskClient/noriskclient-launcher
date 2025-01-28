@@ -45,6 +45,7 @@
     "signIn.step.notWhitelisted": "NOT WHITELISTED",
     "accountModal.title": "ACCOUNTS",
     "accountModal.addAccountButton": "ADD ACCOUNT",
+    "accountModal.notification.accountAdded": "Account added successfully!",
     "creditsModal.title": "LAUNCHER CREDITS",
     "creditsModal.contributersText": "All contributers and bug reporters",
     "home.leftNavbar.button.linkDiscord": "LINK DISCORD",
