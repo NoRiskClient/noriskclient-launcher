@@ -1,6 +1,6 @@
 <script>
   import AccountListItem from "./AccountListItem.svelte";
-  import { fetchUsers, users, defaultUser } from "../../stores/credentialsStore.js";
+  import { fetchUsers, users, defaultUser, setDefaultUser } from "../../stores/credentialsStore.js";
   import { translations } from "../../utils/translationUtils.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../../stores/notificationStore.js";
@@ -14,11 +14,6 @@
   let animateOutNow = false;
   let isLoading = false;
 
-  async function openModal() {
-    await fetchUsers();
-    showModal = true;
-  }
-
   function animateOut() {
     animateOutNow = true;
     setTimeout(() => {
@@ -31,11 +26,17 @@
     isLoading = true;
     invoke("microsoft_auth")
       .then(async result => {
+        const oldUsers = $users;
         await fetchUsers();
         isLoading = false;
-        addNotification("Account created successfully.", "INFO");
+        if (result != null) {
+          if (oldUsers.length === 0) {
+            setDefaultUser(result);
+          }
+          addNotification(lang.accountModal.notification.accountAdded, "INFO");
+        }
       }).catch(async () => {
-      isLoading = false;
+        isLoading = false;
     });
   }
 </script>
@@ -59,7 +60,7 @@
               <AccountListItem isActive={$defaultUser?.id === account.id} account={account} on:close={animateOut} />
             {/each}
             {#if isLoading}
-              <AccountListLoading />
+              <AccountListLoading bind:isLoading />
             {/if}
           </div>
         <!-- svelte-ignore a11y-autofocus -->
