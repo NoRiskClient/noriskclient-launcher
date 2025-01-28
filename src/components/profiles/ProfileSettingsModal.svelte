@@ -144,11 +144,12 @@
         display: flex;
         flex-direction: row;
         justify-content: space-between;
+        align-items: center;
         padding: 1em;
     }
 
     .header-wrapper .title {
-        font-size: 22.5px;
+        font-size: 20px;
         user-select: none;
         cursor: default;
     }
