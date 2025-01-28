@@ -25,56 +25,56 @@ onMount(() => {
 
 <div class="main">
 	<div class="initial-snow">
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
-		<div class={ $isFocused ? "snow" : "snow paused" }>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
+		<div class="snow" class:paused={!$isFocused}>❄</div>
 	</div>
 </div>
 
@@ -599,6 +599,6 @@ onMount(() => {
     }
 
     .snow.paused {
-    animation-play-state: paused;
+    animation-play-state: paused !important;
   }
 </style>

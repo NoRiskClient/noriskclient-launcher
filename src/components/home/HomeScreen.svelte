@@ -46,7 +46,7 @@ onMount(() => {
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- DO NOT REMOVE THIS! Contact Tim if you have any questions! -->
   <div class="credits-click-field" on:click={showCredits}></div>
-  <img class={ $isFocused ? "pokemon-title title-effect" : "pokemon-title title-effect paused" } src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
+  <img class="pokemon-title title-effect" class:paused={!$isFocused} src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
   <BranchSwitcher />
   <SkinButton />
   <CopyrightLabel />
@@ -93,6 +93,6 @@ onMount(() => {
   }
 
   .title-effect.paused {
-    animation-play-state: paused;
+    animation-play-state: paused !important;
   }
 </style>
