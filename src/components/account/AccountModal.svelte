@@ -1,6 +1,6 @@
 <script>
   import AccountListItem from "./AccountListItem.svelte";
-  import { fetchUsers, users, defaultUser } from "../../stores/credentialsStore.js";
+  import { fetchUsers, users, defaultUser, setDefaultUser } from "../../stores/credentialsStore.js";
   import { translations } from "../../utils/translationUtils.js";
   import { invoke } from "@tauri-apps/api";
   import { addNotification } from "../../stores/notificationStore.js";
@@ -14,11 +14,6 @@
   let animateOutNow = false;
   let isLoading = false;
 
-  async function openModal() {
-    await fetchUsers();
-    showModal = true;
-  }
-
   function animateOut() {
     animateOutNow = true;
     setTimeout(() => {
@@ -31,9 +26,13 @@
     isLoading = true;
     invoke("microsoft_auth")
       .then(async result => {
+        const oldUsers = $users;
         await fetchUsers();
         isLoading = false;
         if (result != null) {
+          if (oldUsers.length === 0) {
+            setDefaultUser(result);
+          }
           addNotification(lang.accountModal.notification.accountAdded, "INFO");
         }
       }).catch(async () => {
