@@ -5,8 +5,6 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use crate::app::api::get_api_base;
 use crate::app::app_data::LauncherOptions;
 use crate::minecraft::launcher::LaunchingParameter;
 use crate::minecraft::progress::{ProgressReceiver, ProgressUpdate};

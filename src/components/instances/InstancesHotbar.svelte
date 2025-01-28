@@ -25,6 +25,7 @@
 
 <div class="instance-wrapper">
   {#each instances as instance, index}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
     <h1 class="instance-button" on:click={() => push("/start-progress/"+instance.id)}
         style="font-size: {buttonSize}em;">
       [{getName(instance)}]
