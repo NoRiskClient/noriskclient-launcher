@@ -129,6 +129,8 @@
     "settings.title": "EINSTELLUNGEN",
     "settings.keepLauncherOpen": "Launcher offen lassen",
     "settings.multipleInstances": "Erlaube mehrere Instanzen",
+    "settings.potatoMode": "Kartoffelmodus",
+    "settings.potatoModeInfo": "Deaktiviert unnötige Animationen und Effekte im Launcher um die Leistung zu verbessern.",
     "settings.experimentalMode": "Experimenteller Modus",
     "settings.keepLocalAssets": "Assets behalten",
     "settings.theme": "Erscheinungsbild: {theme}",

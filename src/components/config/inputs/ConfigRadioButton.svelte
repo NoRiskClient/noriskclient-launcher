@@ -1,14 +1,23 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { openInfoPopup } from "../../../utils/popupUtils";
   const dispatch = createEventDispatcher();
 
   export let value;
   export let text;
+  export let info = "";
   export let isExclusive = false;
   export let isExclusiveLabel = "";
   export let reversed = false;
   export let spaced = false;
   export let id = "";
+
+  function openInfo() {
+    openInfoPopup({
+      title: text,
+      content: info
+    })
+  }
 
   function preventSelection(event) {
     event.preventDefault();
@@ -32,6 +41,10 @@
       <h1 class="nes-font exclusive" title="You can see this because you have special permissions.">({isExclusiveLabel})</h1>
     {/if}
   {/if}
+  {#if info.length > 0}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <h1 class="info" on:click={openInfo} title={info}>ⓘ</h1>
+  {/if}
 </div>
 
 <style>
@@ -39,6 +52,14 @@
         display: flex;
         align-items: center;
         gap: 1em;
+    }
+
+    .info {
+      margin-left: 1em;
+      font-size: 17px;
+      cursor: pointer;
+      color: var(--font-color);
+      text-shadow: 1.5px 1.5px var(--font-color-text-shadow);
     }
 
     .exclusive {

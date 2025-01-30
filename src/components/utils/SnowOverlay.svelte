@@ -1,81 +1,16 @@
 <script>
-  import { onMount } from "svelte";
-  import { writable } from "svelte/store";
-
-  let isFocused = writable(false);
-
-function handleFocus() {
-  isFocused.set(true);
-}
-
-function handleBlur() {
-  isFocused.set(false);
-}
-
-onMount(() => {
-  window.addEventListener("focus", handleFocus);
-  window.addEventListener("blur", handleBlur);
-
-  return () => {
-    window.removeEventListener("focus", handleFocus);
-    window.removeEventListener("blur", handleBlur);
-  };
-});
+	import { launcherOptions } from './../../stores/optionsStore.js';
+	import { focusState, snowFlakes } from '../../stores/performanceStore.js';
 </script>
 
 <div class="main">
-	<div class="initial-snow">
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-		<div class="snow" class:paused={!$isFocused}>❄</div>
-	</div>
+    {#if !$launcherOptions.potatoMode}
+        <div class="initial-snow">
+            {#each snowFlakes as snowflake}
+                <div class="snow" class:paused={!$focusState}>{snowflake}</div>
+            {/each}
+        </div>
+    {/if}
 </div>
 
 <style>

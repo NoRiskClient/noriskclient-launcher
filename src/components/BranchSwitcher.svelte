@@ -1,4 +1,6 @@
 <script>
+	import { focusState } from './../stores/performanceStore.js';
+	import { launcherOptions } from './../stores/optionsStore.js';
 	import { users } from './../stores/credentialsStore.js';
   import { preventSelection } from "../utils/svelteUtils.js";
   import { defaultUser } from "../stores/credentialsStore.js";
@@ -39,7 +41,9 @@
           {#if $currentBranchIndex === i}
             <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
             <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                class="branch-font primary-text branch-effect"
+                class="branch-font primary-text"
+                class:branch-effect={!$launcherOptions.potatoMode}
+                class:paused={!$focusState}
                 style="position:absolute"
                 on:selectstart={preventSelection}
                 on:mousedown={preventSelection}
@@ -90,11 +94,15 @@
   
     .branch-effect{
         -webkit-mask:linear-gradient(-60deg,#fff 40%,#0005 50%,#fff 60%) right/275% 100%;
-        animation: effect 4.5s;
+        animation: effect 4.5s infinite;
+    }
+
+    .branch-effect.paused {
+        animation-play-state: paused !important;
     }
 
     @keyframes effect {
-   100% {-webkit-mask-position:left}
+        100% {-webkit-mask-position:left}
     }
 
 </style>
