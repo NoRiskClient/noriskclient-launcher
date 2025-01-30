@@ -1,6 +1,8 @@
 <!-- pages/Home.svelte -->
 <script>
+	import { focusState } from '../../stores/performanceStore.js';
 	import { isWinterSeason } from './../../utils/noriskUtils.js';
+  import { launcherOptions } from "../../stores/optionsStore.js";
   import SkinButton from "./widgets/SkinButton.svelte";
   import BranchSwitcher from "../BranchSwitcher.svelte";
   import NoRiskLogoColor from "../../images/norisk_logo_color.png";
@@ -24,7 +26,7 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- DO NOT REMOVE THIS! Contact Tim if you have any questions! -->
   <div class="credits-click-field" on:click={showCredits}></div>
-  <img class="pokemon-title title-effect" src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
+  <img class="pokemon-title" class:title-effect={!$launcherOptions.potatoMode} class:paused={!$focusState} src={isWinterSeason ? NoRiskLogoColorSnow : NoRiskLogoColor} alt="Pokemon Title">
   <BranchSwitcher />
   <SkinButton />
   <CopyrightLabel />
@@ -68,5 +70,9 @@
     100% {
         -webkit-mask-position: left;
     }
+  }
+
+  .title-effect.paused {
+    animation-play-state: paused !important;
   }
 </style>

@@ -96,6 +96,8 @@ pub struct LauncherOptions {
     pub experimental_mode: bool,
     #[serde(rename = "multipleInstances")]
     pub multiple_instances: bool,
+    #[serde(rename = "potatoMode")]
+    pub potato_mode: bool,
     #[serde(rename = "dataPath")]
     pub data_path: String,
     #[serde(rename = "memoryLimit")]
@@ -128,8 +130,8 @@ pub struct OldLauncherOptions {
     pub multiple_instances: bool,
     #[serde(rename = "dataPath")]
     pub data_path: String,
-    #[serde(rename = "memoryPercentage")]
-    pub memory_percentage: i32,
+    #[serde(rename = "memoryLimit")]
+    pub memory_limit: u64,
     #[serde(rename = "customJavaPath", default)]
     pub custom_java_path: String,
     #[serde(rename = "customJavaArgs", default)]
@@ -142,6 +144,9 @@ pub struct OldLauncherOptions {
     pub latest_dev_branch: Option<String>,
     #[serde(rename = "concurrentDownloads", default = "default_concurrent_downloads")]
     pub concurrent_downloads: i32,
+    pub language: String,
+    #[serde(rename = "configVersion")]
+    pub config_version: String,
 }
 
 impl LauncherOptions {
@@ -173,15 +178,16 @@ impl LauncherOptions {
                     keep_launcher_open: old_options.keep_launcher_open,
                     experimental_mode: old_options.experimental_mode,
                     multiple_instances: old_options.multiple_instances,
+                    potato_mode: default.potato_mode,
                     data_path: old_options.data_path,
-                    memory_limit: default.memory_limit,
+                    memory_limit: old_options.memory_limit,
                     custom_java_path: old_options.custom_java_path,
                     custom_java_args: old_options.custom_java_args,
                     theme: old_options.theme,
                     latest_branch: old_options.latest_branch,
                     latest_dev_branch: old_options.latest_dev_branch,
                     concurrent_downloads: old_options.concurrent_downloads,
-                    language: default.language,
+                    language: old_options.language,
                     config_version: default.config_version
                 };
                 info!("Migrated old options.json to new options.json");
@@ -219,6 +225,7 @@ impl Default for LauncherOptions {
             keep_launcher_open: true,
             experimental_mode: false,
             multiple_instances: false,
+            potato_mode: false,
             data_path: LAUNCHER_DIRECTORY.data_dir().to_str().unwrap().to_string(),
             memory_limit: 4 * 1024, // 4GB memory allocated to game
             custom_java_path: String::new(),
@@ -228,7 +235,7 @@ impl Default for LauncherOptions {
             latest_dev_branch: None,
             concurrent_downloads: 20,
             language: String::from("en_US"),
-            config_version: String::from("1.0"),
+            config_version: String::from("1.1"),
         }
     }
 }

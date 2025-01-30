@@ -132,6 +132,8 @@
     "settings.title": "SETTINGS",
     "settings.keepLauncherOpen": "Keep Launcher Open",
     "settings.multipleInstances": "Allow Multiple Instances",
+    "settings.potatoMode": "Potato Mode",
+    "settings.potatoModeInfo": "Deactivates some animations and effects in the launcher to improve performance.",
     "settings.experimentalMode": "Experimental Mode",
     "settings.keepLocalAssets": "Keep Local Assets",
     "settings.theme": "Theme: {theme}",
