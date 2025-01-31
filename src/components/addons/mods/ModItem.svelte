@@ -35,7 +35,7 @@
     })
 
     async function changeVersion(version) {
-        if (version.release_type == "release") {
+        if (version.version_type == "release") {
             console.log("Changing version of " + slug + " to " + version.version_number);
                 isChangingVersion = true;
                 versionDropdownOpen = false;
