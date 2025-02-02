@@ -122,8 +122,8 @@ impl VersionProfile {
         );
         Self::merge_options(&mut self.downloads, parent.downloads);
         Self::merge_larger(&mut self.compliance_level, parent.compliance_level);
+        Self::merge_libraries(&mut self.libraries, parent.libraries);
 
-        self.libraries.append(&mut parent.libraries);
         Self::merge_options(&mut self.main_class, parent.main_class);
         Self::merge_options(&mut self.logging, parent.logging);
 
@@ -152,6 +152,50 @@ impl VersionProfile {
         }
 
         Ok(())
+    }
+
+    fn merge_libraries(current_libraries: &mut Vec<Library>, parent_libraries: Vec<Library>) {
+        let mut library_map: HashMap<String, Library> = current_libraries
+            .iter()
+            .map(|lib| (lib.get_identifier(), lib.clone()))
+            .collect();
+        for parent_lib in parent_libraries {
+            if let Some(lib) = library_map.get_mut(&parent_lib.get_identifier()) {
+                lib.rules.extend(parent_lib.rules);
+                if let Some(parent_downloads) = parent_lib.downloads {
+                    match lib.downloads.as_mut() {
+                        Some(downloads) => {
+                            if let Some(artifact) = parent_downloads.artifact {
+                                downloads.artifact = Some(artifact);
+                            }
+                            if let Some(classifiers) = parent_downloads.classifiers {
+                                match downloads.classifiers.as_mut() {
+                                    Some(lib_classifiers) => lib_classifiers.extend(classifiers),
+                                    None => downloads.classifiers = Some(classifiers),
+                                }
+                            }
+                        }
+                        None => lib.downloads = Some(parent_downloads),
+                    }
+                }
+                if let Some(natives) = parent_lib.natives {
+                    match lib.natives.as_mut() {
+                        Some(lib_natives) => lib_natives.extend(natives),
+                        None => lib.natives = Some(natives),
+                    }
+                } else if lib.natives.is_none() {
+                    lib.natives = parent_lib.natives;
+                }
+                if lib.url.is_none() {
+                    lib.url = parent_lib.url;
+                }
+                continue;
+            }
+
+            library_map.insert(parent_lib.get_identifier(), parent_lib);
+        }
+
+        *current_libraries = library_map.into_values().collect();
     }
 
     fn merge_options<T>(a: &mut Option<T>, b: Option<T>) {
@@ -532,8 +576,7 @@ impl AssetObject {
             } else {
                 info!(
                     "Norisk asset {} != {} already exists but does not match md5.",
-                    md5,
-                    &self.hash
+                    md5, &self.hash
                 );
                 download = true;
             }
@@ -549,23 +592,15 @@ impl AssetObject {
 
             info!("Downloading {}", self.hash);
             let prod_or_exp = if options.experimental_mode {
-                 "exp"
+                "exp"
             } else {
-                 "prod"
+                "prod"
             };
             let path = &*format!(
                 "{}/{}/{}/assets/{}",
-                "https://cdn.norisk.gg/branches",
-                prod_or_exp,
-                branch,
-                file_path,
+                "https://cdn.norisk.gg/branches", prod_or_exp, branch, file_path,
             );
-            download_private_file_untracked(
-                path,
-                norisk_token,
-                asset_file_path,
-            )
-            .await?;
+            download_private_file_untracked(path, norisk_token, asset_file_path).await?;
             info!("Downloaded {}", self.hash);
 
             Ok(true)
@@ -637,6 +672,23 @@ pub struct Library {
 }
 
 impl Library {
+    fn get_identifier(&self) -> String {
+        let parts: Vec<&str> = self.name.split(':').collect();
+        match parts.len() {
+            3 => {
+                // Standard format: group:name:version
+                format!("{}:{}", parts[0], parts[1])
+            }
+            4 => {
+                // Format with classifier: group:name:version:classifier
+                format!("{}:{}:{}", parts[0], parts[1], parts[3])
+            }
+            _ => {
+                // Fallback for unexpected formats - use the whole name
+                self.name.clone()
+            }
+        }
+    }
     pub fn get_library_download(&self) -> Result<LibraryDownloadInfo> {
         if let Some(artifact) = self.downloads.as_ref().and_then(|x| x.artifact.as_ref()) {
             return Ok(artifact.into());
