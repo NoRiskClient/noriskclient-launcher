@@ -1726,6 +1726,7 @@ async fn run_client(
 
 #[tauri::command]
 async fn quit_everything() -> Result<(), crate::error::Error> {
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     let pid = NRCCache::get_pid();
     let mut system = System::new_all();
     system.refresh_all(); // Alle Prozesse aktualisieren
