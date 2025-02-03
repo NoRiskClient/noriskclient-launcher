@@ -1,6 +1,4 @@
 <script>
-    import SteveSkin from "../../images/steve_head.png";
-
     import {onMount} from "svelte";
     import {listen} from "@tauri-apps/api/event";
     import {translations} from "../../utils/translationUtils.js";
@@ -8,6 +6,9 @@
     /** @type {{ [key: string]: any }} */
     $: lang = $translations;
 
+    export let isLoading;
+
+    /** @type {any} */
     $: microsoftOutput = "LOADING";
     let dots = "";
     let microsoftFlag = false;
@@ -21,6 +22,9 @@
             }
 
             if (event.payload.includes('signIn.')) {
+                if (event.payload.includes('cancelled')) {
+                    return isLoading = false;
+                }
                 let translatedStep = lang;
                 event.payload.split('.').forEach(step => {
                     translatedStep = translatedStep[step];
@@ -90,16 +94,5 @@
         box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
         border-radius: 0.2em;
         width: 50px;
-    }
-
-    .remove-button {
-        cursor: pointer;
-        transition-duration: 200ms;
-    }
-
-    .remove-button:hover {
-        color: red;
-        text-shadow: 2px 2px #8b0000;
-        transform: scale(1.15);
     }
 </style>

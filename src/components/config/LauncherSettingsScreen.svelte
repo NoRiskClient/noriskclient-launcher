@@ -149,6 +149,7 @@
     <div class="settings-wrapper">
     <ConfigRadioButton bind:value={$launcherOptions.keepLauncherOpen} text={lang.settings.keepLauncherOpen} />
     <ConfigRadioButton bind:value={$launcherOptions.multipleInstances} text={lang.settings.multipleInstances} />
+    <ConfigRadioButton bind:value={$launcherOptions.potatoMode} text={lang.settings.potatoMode} info={lang.settings.potatoModeInfo} />
     {#if $featureWhitelist.includes("EXPERIMENTAL_MODE") || $noriskUser?.isDev || $launcherOptions.experimentalMode == true}
         <ConfigRadioButton text={lang.settings.experimentalMode} bind:value={$launcherOptions.experimentalMode} isExclusive={$noriskUser?.isDev} isExclusiveLabel={"Dev"} on:toggle={toggleExperimentalMode} />
     {/if}

@@ -1,4 +1,5 @@
 <script>
+	import { replace } from 'svelte-spa-router';
     import {createEventDispatcher} from "svelte";
     import { translations } from '../../utils/translationUtils.js';
     import { launcherOptions } from "../../stores/optionsStore.js";
@@ -17,8 +18,8 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <div class="profile-item-wrapper" class:enabled={active}>
     <div class="text-wrapper" on:click={() => dispatch('select')}>
-        <h2>{profile.name.length > 20 && profile.name != `${profile.branch} - Default` ? profile.name.substring(0, 18) + '...' : profile.name}</h2>
-        <h2 style={profile.name == `${profile.branch} - Default` ? 'margin-left: 4em;' : 'margin-left: 2em;'}>({profile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length} Mods)</h2>
+        <h2 class="name">{profile.name.length > 20 && profile.name != `${profile.branch} - Default` ? profile.name.substring(0, 18) + '...' : profile.name.replace(' - Default', '')}</h2>
+        <h2>({profile.mods.filter(mod => !mod.value.source.artifact.includes("PLACEHOLDER")).length} Mods)</h2>
     </div>
     <div class="button-wrapper">
         <div class="clone-click" on:click={() => dispatch('clone')}></div>
@@ -55,6 +56,8 @@
     .text-wrapper {
         display: flex;
         flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
         padding: 2em;
         height: 100%;
         width: 100%;
@@ -62,6 +65,12 @@
 
     .text-wrapper h2:nth-child(2) {
         align-self: flex-end;
+        margin-left: 2em;
+    }
+
+    .name {
+        font-size: 12px;
+        min-width: fit-content;
     }
 
     .enabled {

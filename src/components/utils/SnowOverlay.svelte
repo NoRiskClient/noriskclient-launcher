@@ -1,60 +1,16 @@
 <script>
-
+	import { launcherOptions } from './../../stores/optionsStore.js';
+	import { focusState, snowFlakes } from '../../stores/performanceStore.js';
 </script>
 
 <div class="main">
-	<div class="initial-snow">
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-		<div class="snow">❄</div>
-	</div>
+    {#if !$launcherOptions.potatoMode}
+        <div class="initial-snow">
+            {#each snowFlakes as snowflake}
+                <div class="snow" class:paused={!$focusState}>{snowflake}</div>
+            {/each}
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -576,4 +532,8 @@
         animation: snowfall 14s linear infinite;
         animation-delay: -9s;
     }
+
+    .snow.paused {
+    animation-play-state: paused !important;
+  }
 </style>

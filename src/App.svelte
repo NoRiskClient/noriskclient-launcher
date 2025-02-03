@@ -1,4 +1,5 @@
 <script>
+	import { setFocusState } from './stores/performanceStore.js';
 	import { relaunch } from '@tauri-apps/api/process';
     import Router from "./Router.svelte";
     import {onMount} from "svelte";
@@ -31,6 +32,9 @@
     $: lang = $translations;
 
     onMount(async () => {
+        window.addEventListener("focus", () => setFocusState(true));
+        window.addEventListener("blur", () => setFocusState(false));
+
         setTimeout(async () => {
             await appWindow.show();
         }, 300);
@@ -94,6 +98,8 @@
         });
 
         return () => {
+            window.removeEventListener("focus", () => setFocusState(true));
+            window.removeEventListener("blur", () => setFocusState(false));
             unlisten();
             minecraftCrashUnlisten();
             userUnlisten();

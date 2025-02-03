@@ -9,6 +9,11 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use std::convert::From;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::Write;
+use image::GenericImageView;
 
 use anyhow::Result;
 use chrono::Utc;
@@ -89,6 +94,12 @@ pub struct OnlineStatusInfo {
     pub online: bool,
     #[serde(rename = "onlinePlayers")]
     pub online_players: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NoRiskBranch {
+    pub name: String,
+    pub subtitle: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -182,15 +193,21 @@ async fn accept_privacy_policy() -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn upload_cape(norisk_token: &str, uuid: &str) -> Result<String, String> {
+async fn check_cape_resolution(image_data: &str) -> Result<bool, String> {
+    let image_data = base64::decode(image_data)
+        .map_err(|e| format!("unable to decode base64 image data: {:?}", e))?;
+
+    let image = image::load_from_memory(&image_data)
+        .map_err(|e| format!("unable to load image from memory: {:?}", e))?;
+
+    let (width, height) = image.dimensions();
+    Ok(width == 512 && height == 256)
+}
+
+#[tauri::command]
+async fn upload_cape(norisk_token: &str, uuid: &str, image_path: &str) -> Result<String, String> {
     debug!("Uploading Cape...");
-
-    let dialog_result = FileDialogBuilder::new()
-        .set_title("Select Cape")
-        .add_filter("Pictures", &["png"])
-        .pick_file();
-
-    CapeApiEndpoints::upload_cape(norisk_token, uuid, dialog_result.unwrap()).await
+    CapeApiEndpoints::upload_cape(norisk_token, uuid, &std::path::PathBuf::from(&image_path)).await
 }
 
 #[tauri::command]
@@ -1113,7 +1130,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<NoRiskBranch>, Error> {
     Ok(NRCCache::get_branches(options, credentials).await?)
 }
 
@@ -1270,6 +1287,16 @@ async fn microsoft_auth(app: tauri::AppHandle) -> Result<Option<Credentials>, Er
     .build()?;
 
     window.request_user_attention(Some(UserAttentionType::Critical))?;
+
+    let app_clone = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { .. } = event {
+            app_clone.get_window("main")
+                .unwrap().emit("microsoft-output", "signIn.step.cancelled")
+                .unwrap_or_default();
+            return;
+        }
+    });
 
     while (Utc::now() - start) < chrono::Duration::minutes(10) {
         if window.title().is_err() {
@@ -2405,6 +2432,7 @@ pub fn gui_main() {
             discord_auth_link,
             discord_auth_status,
             discord_auth_unlink,
+            check_cape_resolution,
             upload_cape,
             equip_cape,
             delete_cape,
