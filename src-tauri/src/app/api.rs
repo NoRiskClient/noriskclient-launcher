@@ -80,7 +80,7 @@ impl ApiEndpoints {
         norisk_token: &str,
         request_uuid: &str,
     ) -> core::result::Result<Vec<NoRiskBranch>, crate::error::Error> {
-        Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid)
+        Self::request_from_norisk_endpoint_with_error_handling("launcher/branches-v2", norisk_token, request_uuid)
             .await
     }
 

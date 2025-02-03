@@ -9,10 +9,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use std::convert::From;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::Write;
 use image::GenericImageView;
 
 use anyhow::Result;
@@ -1137,7 +1133,7 @@ async fn request_norisk_branches(
 #[tauri::command]
 async fn request_norisk_branches_from_cache(
     options: LauncherOptions,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<NoRiskBranch>, Error> {
     Ok(NRCCache::load_branches_from_cache(options).await?)
 }
 
