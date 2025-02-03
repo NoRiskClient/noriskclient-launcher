@@ -116,7 +116,7 @@ export async function runClient(branch, checkedForNewBranch = false) {
     options.latestBranch = branch;
   }
 
-  await saveOptions();
+  await saveOptions(false);
 
   let launcherProfile;
   if (options.experimentalMode) {
