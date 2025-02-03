@@ -88,6 +88,12 @@ pub struct OnlineStatusInfo {
     pub online_players: u32,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NoRiskBranch {
+    pub name: String,
+    pub subtitle: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct FileData {
     pub name: String,
@@ -1053,7 +1059,7 @@ async fn check_maintenance_mode() -> Result<bool, String> {
 async fn request_norisk_branches(
     options: LauncherOptions,
     credentials: Credentials,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<NoRiskBranch>, Error> {
     Ok(NRCCache::get_branches(options, credentials).await?)
 }
 

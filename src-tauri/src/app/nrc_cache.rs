@@ -16,6 +16,8 @@ use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::progress::ProgressUpdate;
 use crate::LAUNCHER_DIRECTORY;
 
+use super::gui::NoRiskBranch;
+
 pub struct NRCCache {}
 
 #[derive(serde::Serialize, Deserialize, Debug, Clone)] // Damit diese Struktur serialisierbar ist
@@ -85,7 +87,7 @@ impl NRCCache {
         }
     }
 
-    pub async fn get_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, Error> {
+    pub async fn get_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<NoRiskBranch>, Error> {
         let path = LAUNCHER_DIRECTORY
             .data_dir()
             .join("nrc_cache")
@@ -114,8 +116,8 @@ impl NRCCache {
         // Try reading from the cache file if API call or token retrieval fails
         match fs::read(&path).await {
             Ok(data) => {
-                if let Ok(options) = serde_json::from_slice::<Vec<String>>(&data) {
-                    return Ok(options);
+                if let Ok(branches) = serde_json::from_slice::<Vec<NoRiskBranch>>(&data) {
+                    return Ok(branches);
                 } else {
                     error!("Error deserializing branches from cache.");
                 }

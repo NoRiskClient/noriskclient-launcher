@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use uuid::Uuid;
 use crate::{HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use super::app_data::{Announcement, ChangeLog, LauncherOptions};
-use super::gui::OnlineStatusInfo;
+use super::gui::{NoRiskBranch, OnlineStatusInfo};
 use crate::custom_servers::models::CustomServer;
 use crate::minecraft::minecraft_auth::NoRiskToken;
 use crate::minecraft::version::AssetObject;
@@ -79,7 +79,7 @@ impl ApiEndpoints {
     pub async fn branches(
         norisk_token: &str,
         request_uuid: &str,
-    ) -> core::result::Result<Vec<String>, crate::error::Error> {
+    ) -> core::result::Result<Vec<NoRiskBranch>, crate::error::Error> {
         Self::request_from_norisk_endpoint_with_error_handling("launcher/branches", norisk_token, request_uuid)
             .await
     }

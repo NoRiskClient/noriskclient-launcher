@@ -5,6 +5,7 @@ import { defaultUser } from "./credentialsStore.js";
 import { noriskLog } from "../utils/noriskUtils.js";
 
 export const branches = writable([]);
+export const branchSubtitles = writable([]);
 export const currentBranchIndex = writable(0);
 
 export async function fetchBranches() {
@@ -12,25 +13,29 @@ export async function fetchBranches() {
   let options = get(launcherOptions);
   if (!credentials || !options) {
     branches.set([])
+    branchSubtitles.set([])
     return;
   }
   await invoke("request_norisk_branches", { options, credentials }).then(result => {
     const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
     result.sort(function(a, b) {
-      if (a === latestBranch) {
+      if (a.name === latestBranch) {
         return -1;
-      } else if (b === latestBranch) {
+      } else if (b.name === latestBranch) {
         return 1;
       } else {
-        return a.localeCompare(b);
+        return a.name.localeCompare(b.name);
       }
     });
-    branches.set(result);
+    branches.set(result.map(branch => branch.name));
+    branchSubtitles.set(result.map(branch => branch.subtitle));
   }).catch((reason) => {
     branches.set([]);
+    branchSubtitles.set([]);
     //addNotification(reason);
   });
   noriskLog("Fetches Branches: " + JSON.stringify(get(branches)));
+  noriskLog("Fetches Branches Subtitles: " + JSON.stringify(get(branchSubtitles)));
 
   let latestBranch = options?.experimentalMode ? options?.latestDevBranch : options?.latestBranch;
   let _branches = get(branches);
@@ -54,7 +59,7 @@ export async function fetchBranches() {
     }
   }
 
-  noriskLog("Current Branch: " + get(branches)[get(currentBranchIndex)])
+  noriskLog("Current Branch: " + get(branches)[get(currentBranchIndex)]);
 }
 
 export function switchBranch(isLeft) {

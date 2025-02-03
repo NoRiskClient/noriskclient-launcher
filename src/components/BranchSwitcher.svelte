@@ -5,7 +5,7 @@
   import { preventSelection } from "../utils/svelteUtils.js";
   import { defaultUser } from "../stores/credentialsStore.js";
   import { quintOut } from "svelte/easing";
-  import { branches, currentBranchIndex, switchBranch } from "../stores/branchesStore.js";
+  import { branches, branchSubtitles, currentBranchIndex, switchBranch } from "../stores/branchesStore.js";
   import { scale } from "svelte/transition";
   import { isCheckingForUpdates } from "../utils/noriskUtils.js";
   import Updater from "./v2/Updater.svelte";
@@ -30,7 +30,6 @@
       &lt;</h1>
   {/if}
   <section style="display: flex; justify-content: center; margin-bottom: 1em;">
-
     {#if $isCheckingForUpdates}
       <Updater />
     {:else if $users.length < 1}
@@ -39,15 +38,20 @@
       {#if $branches.length > 0}
         {#each $branches as branch, i}
           {#if $currentBranchIndex === i}
-            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-            <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
-                class="branch-font primary-text"
-                class:branch-effect={!$launcherOptions.potatoMode}
-                class:paused={!$focusState}
-                style="position:absolute"
-                on:selectstart={preventSelection}
-                on:mousedown={preventSelection}
-            > {lang.branchSwitcher.branch.replace("{branch}", branch.toUpperCase())}</h1>
+            <div class="branch-name-container">
+              <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+              <h1 transition:scale={{ x: 15, duration: 300, easing: quintOut }}
+                  class="branch-font primary-text"
+                  class:branch-effect={!$launcherOptions.potatoMode}
+                  class:paused={!$focusState}
+                  on:selectstart={preventSelection}
+                  on:mousedown={preventSelection}
+              > {lang.branchSwitcher.branch.replace("{branch}", branch.toUpperCase())}</h1>
+              {#if $branchSubtitles[i]}
+                <p transition:scale={{ x: 15, duration: 300, easing: quintOut }} 
+                  class="subtitle">{$branchSubtitles[i].toUpperCase()}</p>
+              {/if}  
+            </div>
           {/if}
         {/each}
       {:else}
@@ -78,13 +82,35 @@
         display: flex;
         align-content: space-evenly;
         flex-direction: row;
-        gap: 200px;
+        margin-bottom: 1em;
+        gap: 200px
+    }
+
+    .branch-name-container {
+      position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .subtitle {
+        font-size: 12px;
+        text-shadow: 1px 1px var(--font-color-text-shadow);
+        margin: 0;
+        cursor: default;
+        width: max-content;
     }
 
     .branch-font {
         font-size: 18px;
         margin: 0;
         cursor: default;
+  }
+
+  .switch {
+    z-index: 100;
   }
   
     .switch:hover {
