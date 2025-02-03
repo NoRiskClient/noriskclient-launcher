@@ -39,6 +39,8 @@
         await checkApiStatus();
         setLanguage($language);
 
+        await fetchBranches();
+        await fetchProfiles();
         await fetchDefaultUserOrError(false);
         const isTokenValid = await getNoRiskUser();
         if ($isApiOnline) {

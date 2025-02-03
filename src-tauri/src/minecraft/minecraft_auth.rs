@@ -372,6 +372,9 @@ impl MinecraftAuthStore {
             };
         }
 
+        //for testing... starting etc
+        //tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
         if force_update || maybe_update {
             let hwid = IdBuilder::new(Encryption::SHA256).add_component(HWIDComponent::SystemID).build("NRC").map_err(|e| {
                 OtherError(format!("HWID Error {:?}", e))

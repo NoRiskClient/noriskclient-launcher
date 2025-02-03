@@ -85,6 +85,29 @@ impl NRCCache {
         }
     }
 
+    pub async fn load_branches_from_cache(options: LauncherOptions) -> Result<Vec<String>, Error> {
+        let path = LAUNCHER_DIRECTORY
+            .data_dir()
+            .join("nrc_cache")
+            .join(if !options.experimental_mode { "branches.json" } else { "exp_branches.json" });
+
+        match fs::read(&path).await {
+            Ok(data) => {
+                if let Ok(branches) = serde_json::from_slice::<Vec<String>>(&data) {
+                    return Ok(branches);
+                } else {
+                    error!("Error deserializing branches from cache.");
+                }
+            }
+            Err(err) => {
+                error!("Error Reading Branches Cache: {:?}", err);
+            }
+        }
+
+        // Return an empty vector as a fallback
+        Ok(Vec::new())
+    }
+
     pub async fn get_branches(options: LauncherOptions, credentials: Credentials) -> Result<Vec<String>, Error> {
         let path = LAUNCHER_DIRECTORY
             .data_dir()
@@ -112,21 +135,7 @@ impl NRCCache {
         }
 
         // Try reading from the cache file if API call or token retrieval fails
-        match fs::read(&path).await {
-            Ok(data) => {
-                if let Ok(options) = serde_json::from_slice::<Vec<String>>(&data) {
-                    return Ok(options);
-                } else {
-                    error!("Error deserializing branches from cache.");
-                }
-            }
-            Err(err) => {
-                error!("Error Reading Branches Cache: {:?}", err);
-            }
-        }
-
-        // Return an empty vector as a fallback
-        Ok(Vec::new())
+        Self::load_branches_from_cache(options).await
     }
 
     pub fn get_pid() -> u32 {

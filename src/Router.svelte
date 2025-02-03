@@ -1,6 +1,6 @@
 <!-- App.svelte -->
 <script>
-	import SnowOverlay from './components/utils/SnowOverlay.svelte';
+  import SnowOverlay from "./components/utils/SnowOverlay.svelte";
   import Announcement from "./pages/Announcement.svelte";
   import ChangeLog from "./pages/ChangeLog.svelte";
   import { setStillRunningCustomServer } from "./stores/customServerLogsStore.js";
@@ -87,6 +87,11 @@
       launchErrorReason = reason;
     });
 
+    const openStartProgress = await listen("open-start-progress", async (event) => {
+      let uuid = event.payload; // Extract the path from the event's payload
+      await push("/start-progress/" + uuid);
+    });
+
     invoke("check_if_custom_server_running").then((value) => {
       console.log(value);
       if (value[0] == true) {
@@ -96,6 +101,7 @@
 
     return () => {
       clientLaunchError();
+      openStartProgress();
     };
   });
 
@@ -134,16 +140,16 @@
 
   function openPrivacyPolicyPopup() {
     openConfirmPopup({
-        title: lang.privacyPolicy.title,
-        content: lang.privacyPolicy.text,
-        confirmButton: lang.privacyPolicy.button.accept,
-        cancelButton: lang.privacyPolicy.button.exit,
-        allowEscape: false,
-        onConfirm: acceptPrivacyPolicy,
-        onCancel: () => appWindow.close(),
-        width: "35",
-        height: "25"
-      });
+      title: lang.privacyPolicy.title,
+      content: lang.privacyPolicy.text,
+      confirmButton: lang.privacyPolicy.button.accept,
+      cancelButton: lang.privacyPolicy.button.exit,
+      allowEscape: false,
+      onConfirm: acceptPrivacyPolicy,
+      onCancel: () => appWindow.close(),
+      width: "35",
+      height: "25",
+    });
   }
 
   async function acceptPrivacyPolicy() {
@@ -159,7 +165,7 @@
       addNotification(error);
       openPrivacyPolicyPopup();
     });
-    }
+  }
 </script>
 
 <div class="black-bar" data-tauri-drag-region>
@@ -169,7 +175,7 @@
 </div>
 <div class="snow">
   {#if isWinterSeason}
-    <SnowOverlay/>
+    <SnowOverlay />
   {/if}
 </div>
 <div class="content">
@@ -221,7 +227,7 @@
         position: absolute;
         font-size: 20px;
         text-shadow: 2px 2px #7a7777;
-            cursor: pointer;
+        cursor: pointer;
     }
 
     .offline-button:hover {
@@ -229,37 +235,37 @@
     }
 
     .lang-switcher {
-      display: flex;
-      flex-direction: row;
+        display: flex;
+        flex-direction: row;
     }
 
     .lang-switcher p {
-      font-size: 15px;
-      margin-left: 1em;
-      margin-right: 1em;
-      cursor: pointer;
-      transition-duration: 300ms;
+        font-size: 15px;
+        margin-left: 1em;
+        margin-right: 1em;
+        cursor: pointer;
+        transition-duration: 300ms;
     }
 
     .lang-switcher p:hover {
-      transform: scale(1.2);
+        transform: scale(1.2);
     }
 
     .lang-switcher p.active {
-      color: var(--primary-color);
-      text-shadow: 2px 2px var(--primary-color-text-shadow);
+        color: var(--primary-color);
+        text-shadow: 2px 2px var(--primary-color-text-shadow);
     }
 
     .snow {
-      position: absolute;
-      height: 80vh;
-      width: 100%;
-      z-index: 2;
+        position: absolute;
+        height: 80vh;
+        width: 100%;
+        z-index: 2;
     }
 
     .content {
-      position: relative;
-      height: 80vh;
-      z-index: 10;
+        position: relative;
+        height: 80vh;
+        z-index: 10;
     }
 </style>

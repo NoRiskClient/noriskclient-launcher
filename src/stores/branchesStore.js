@@ -11,8 +11,24 @@ export async function fetchBranches() {
   let credentials = get(defaultUser);
   let options = get(launcherOptions);
   if (!credentials || !options) {
-    branches.set([])
-    return;
+    await invoke("request_norisk_branches_from_cache", {options}).then(result => {
+      const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
+      result.sort(function(a, b) {
+        if (a === latestBranch) {
+          return -1;
+        } else if (b === latestBranch) {
+          return 1;
+        } else {
+          return a.localeCompare(b);
+        }
+      });
+      branches.set(result);
+    }).catch((reason) => {
+      branches.set([]);
+      //addNotification(reason);
+    })
+    setBranchIndex()
+    return
   }
   await invoke("request_norisk_branches", { options, credentials }).then(result => {
     const latestBranch = options?.experimentalMode ? options.latestDevBranch : options.latestBranch;
@@ -30,7 +46,13 @@ export async function fetchBranches() {
     branches.set([]);
     //addNotification(reason);
   });
+
+  setBranchIndex()
+}
+
+function setBranchIndex() {
   noriskLog("Fetches Branches: " + JSON.stringify(get(branches)));
+  let options = get(launcherOptions);
 
   let latestBranch = options?.experimentalMode ? options?.latestDevBranch : options?.latestBranch;
   let _branches = get(branches);

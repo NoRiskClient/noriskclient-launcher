@@ -146,7 +146,8 @@ export async function runClient(branch, checkedForNewBranch = false) {
     mods: installedMods,
   }).then((uuid) => {
     noriskLog(`Started Instance ${uuid}`);
-    push("/start-progress/" + uuid);
+    //thats not needed anymore as we emit the event beforehand
+    //push("/start-progress/" + uuid);
     if (get(forceServer).length > 0) {
       forceServer.set(get(forceServer) + ":RUNNING");
     }

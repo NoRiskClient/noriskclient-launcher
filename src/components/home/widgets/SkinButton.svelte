@@ -5,23 +5,33 @@
   import { startMicrosoftAuth } from "../../../utils/microsoftUtils.js";
   import { runClient } from "../../../utils/noriskUtils.js";
   import { branches, currentBranchIndex } from "../../../stores/branchesStore.js";
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api";
 
   let canStart = true;
+  let fallBackUser;
 
   async function handleStart() {
-    if (!canStart) return
+    if (!canStart) return;
     canStart = false;
     await runClient($branches[$currentBranchIndex]);
     canStart = true;
   }
+
+  onMount(async () => {
+    await invoke("minecraft_auth_get_default_user_no_check").then(async value => {
+      fallBackUser = value;
+    }).catch((error) => {
+    });
+  });
 </script>
 
 <div class="skin-head-container">
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div class="skin-click" on:click={$defaultUser ? handleStart : startMicrosoftAuth}></div>
-  {#if $defaultUser}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="skin-click" on:click={($defaultUser || fallBackUser) ? handleStart : startMicrosoftAuth}></div>
+  {#if $defaultUser || fallBackUser}
     <img class="skin-head"
-         src={`https://crafatar.com/avatars/${$defaultUser.id}?size=150&overlay`}
+         src={`https://crafatar.com/avatars/${$defaultUser?.id ?? fallBackUser?.id}?size=150&overlay`}
          alt=" "
          onerror="this.src='{FallbackSkin}'"
     >
