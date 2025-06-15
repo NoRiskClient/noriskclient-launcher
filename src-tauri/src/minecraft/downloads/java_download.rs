@@ -6,7 +6,7 @@ use crate::utils::system_info::{Architecture, OperatingSystem, ARCHITECTURE, OS}
 use async_zip::tokio::read::seek::ZipFileReader;
 use flate2::read::GzDecoder;
 use futures::future::try_join_all;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use reqwest;
 use std::fs::File;
 use std::io::Cursor;
@@ -53,9 +53,7 @@ impl JavaDownloadService {
             }
             _ => false,
         }
-    }
-
-    pub async fn get_or_download_java(
+    }    pub async fn get_or_download_java(
         &self,
         version: u32,
         distribution: &JavaDistribution,
@@ -66,23 +64,22 @@ impl JavaDownloadService {
         // Handle architecture override for legacy Java component on ARM64 Mac
         let force_x86_64 = self.needs_x86_64_java(java_component);
 
-        // Check if Java is already downloaded
-        if let Ok(java_binary) = self
-            .find_java_binary(distribution, &version, force_x86_64)
-            .await
-        {
-            info!("Found existing Java installation at: {:?}", java_binary);
-            return Ok(java_binary);
-        }
+        // Check if Java is already downloaded and working
+        match self.find_java_binary(distribution, &version, force_x86_64).await {
+            Ok(java_binary) => {
+                info!("Found existing Java installation at: {:?}", java_binary);
+                return Ok(java_binary);
+            }            Err(e) => {
+                info!("Failed to find Java binary, will download/redownload: {}", e);
+                
+                if let Err(cleanup_err) = self.cleanup_corrupted_java(distribution, &version, force_x86_64).await {
+                    warn!("Failed to cleanup corrupted Java installation: {}", cleanup_err);
+                }
+            }        }
 
-        // Download and setup Java
-        info!("Downloading Java {}...", version);
-        self.download_java(version, distribution, force_x86_64)
-            .await?;
+        info!("Downloading Java {}...", version);        self.download_java(version, distribution, force_x86_64).await?;
 
-        // Find and return Java binary
-        self.find_java_binary(distribution, &version, force_x86_64)
-            .await
+        self.find_java_binary(distribution, &version, force_x86_64).await
     }
 
     pub async fn download_java(
@@ -140,38 +137,158 @@ impl JavaDownloadService {
             if force_x86_64 { "_x86_64" } else { "" }
         );
         let version_dir = self.base_path.join(dir_name);
-        fs::create_dir_all(&version_dir).await?;
+        fs::create_dir_all(&version_dir).await?;        let archive_path = version_dir.join(format!("java.{}", OS.get_archive_type()?));
+        
+        let max_retries = 3;
+        let mut last_error = None;
+          for attempt in 1..=max_retries {
+            info!("Java download attempt {} of {}", attempt, max_retries);
+              let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .connect_timeout(std::time::Duration::from_secs(30))
+                .build()
+                .map_err(|e| AppError::JavaDownload(format!("Failed to create HTTP client: {}", e)))?;
+            
+            let response = client.get(&download_url)
+                .send()
+                .await
+                .map_err(|e| AppError::JavaDownload(e.to_string()))?;
 
-        // Download the Java distribution
-        let response = reqwest::get(&download_url)
-            .await
-            .map_err(|e| AppError::JavaDownload(e.to_string()))?;
+            if !response.status().is_success() {                let err = AppError::JavaDownload(format!(
+                    "Failed to download Java: Status {}",                response.status()
+                ));
+                last_error = Some(err);
+                
+                if attempt < max_retries {
+                    info!("Retrying in {} seconds...", attempt * 2);
+                    tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                }                continue;
+            }
 
-        if !response.status().is_success() {
-            return Err(AppError::JavaDownload(format!(
-                "Failed to download Java: Status {}",
-                response.status()
-            )));
+            let expected_size = response.content_length();
+            info!("Expected download size: {:?} bytes", expected_size);
+
+            let bytes = match response.bytes().await {
+                Ok(data) => data,                Err(e) => {                    let err = AppError::JavaDownload(format!("Failed to read response bytes: {}", e));
+                    last_error = Some(err);
+                    
+                    if attempt < max_retries {
+                        info!("Retrying in {} seconds...", attempt * 2);
+                        tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                    }
+                    continue;
+                }            };
+
+            if let Some(expected) = expected_size {
+                if bytes.len() != expected as usize {
+                    let err = AppError::JavaDownload(format!(
+                        "Downloaded size ({} bytes) doesn't match expected size ({} bytes)",                    bytes.len(), expected
+                    ));
+                    last_error = Some(err);
+                    
+                    if attempt < max_retries {
+                        info!("Retrying in {} seconds...", attempt * 2);
+                        tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                    }
+                    continue;
+                }
+            }            info!("Downloaded {} bytes", bytes.len());
+
+            let mut file = match fs::File::create(&archive_path).await {
+                Ok(f) => f,                Err(e) => {
+                    let err = AppError::JavaDownload(format!("Failed to create archive file: {}", e));
+                    last_error = Some(err);
+                    
+                    // Add delay before retry
+                    if attempt < max_retries {
+                        info!("Retrying in {} seconds...", attempt * 2);
+                        tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                    }
+                    continue;
+                }            };
+
+            if let Err(e) = file.write_all(&bytes).await {                let err = AppError::JavaDownload(format!("Failed to write archive file: {}", e));
+                last_error = Some(err);
+                
+                if attempt < max_retries {
+                    info!("Retrying in {} seconds...", attempt * 2);
+                    tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                }
+                continue;
+            }            if let Err(e) = self.validate_java_archive(&archive_path).await {
+                info!("Archive validation failed on attempt {}: {}", attempt, e);                last_error = Some(e);
+                
+                let _ = fs::remove_file(&archive_path).await;
+                
+                if attempt < max_retries {
+                    info!("Retrying in {} seconds...", attempt * 2);
+                    tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                }
+                continue;
+            }
+
+            info!("Java archive downloaded and validated successfully");
+            break;        }
+
+        if !archive_path.exists() {
+            return Err(last_error.unwrap_or_else(|| {
+                AppError::JavaDownload("Failed to download Java after all retry attempts".to_string())
+            }));
         }
 
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| AppError::JavaDownload(e.to_string()))?;
+        self.extract_java_archive(&archive_path, &version_dir)            .await?;
 
-        // Save the downloaded file
-        let archive_path = version_dir.join(format!("java.{}", OS.get_archive_type()?));
-        let mut file = fs::File::create(&archive_path).await?;
-        file.write_all(&bytes).await?;
-
-        // Extract the archive
-        self.extract_java_archive(&archive_path, &version_dir)
-            .await?;
-
-        // Clean up the archive
         fs::remove_file(&archive_path).await?;
 
         Ok(version_dir)
+    }    async fn validate_java_archive(&self, archive_path: &PathBuf) -> Result<()> {
+        info!("Validating Java archive integrity: {:?}", archive_path);
+
+        match OS {            OperatingSystem::WINDOWS => {
+                let file = match tokio::fs::File::open(archive_path).await {
+                    Ok(f) => f,
+                    Err(e) => return Err(AppError::JavaDownload(format!("Cannot open archive for validation: {}", e))),
+                };
+
+                let mut buf_reader = BufReader::new(file);
+                let zip_reader = match ZipFileReader::with_tokio(&mut buf_reader).await {
+                    Ok(reader) => reader,
+                    Err(e) => return Err(AppError::JavaDownload(format!("ZIP validation failed: {}", e))),                };
+
+                let entry_count = zip_reader.file().entries().len();
+                if entry_count == 0 {
+                    return Err(AppError::JavaDownload("Archive appears to be empty".to_string()));
+                }
+
+                info!("Archive validation successful: {} entries found", entry_count);
+            }            OperatingSystem::LINUX | OperatingSystem::OSX => {
+                let bytes = match fs::read(archive_path).await {
+                    Ok(data) => data,
+                    Err(e) => return Err(AppError::JavaDownload(format!("Cannot read archive for validation: {}", e))),
+                };
+
+                let cursor = Cursor::new(bytes);
+                let gz = GzDecoder::new(cursor);
+                let mut archive = Archive::new(gz);                let entries = match archive.entries() {
+                    Ok(entries) => {
+                        match entries.collect::<std::io::Result<Vec<_>>>() {
+                            Ok(entries_vec) => entries_vec,
+                            Err(e) => return Err(AppError::JavaDownload(format!("Archive validation failed: {}", e))),
+                        }
+                    }
+                    Err(e) => return Err(AppError::JavaDownload(format!("Archive validation failed: {}", e))),
+                };
+
+                if entries.is_empty() {
+                    return Err(AppError::JavaDownload("Archive appears to be empty".to_string()));
+                }
+
+                info!("Archive validation successful: {} entries found", entries.len());
+            }
+            _ => return Err(AppError::JavaDownload("Unsupported OS for archive validation".to_string())),
+        }
+
+        Ok(())
     }
 
     async fn extract_java_archive(
@@ -197,13 +314,21 @@ impl JavaDownloadService {
                     );
                     AppError::JavaDownload(format!("ZIP Open error for listing: {}", e))
                 })?;
-                let mut buf_reader_listing = BufReader::new(file_for_listing);
-                let mut zip_lister = ZipFileReader::with_tokio(&mut buf_reader_listing)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to read Java ZIP for listing: {}", e);
-                        AppError::JavaDownload(format!("ZIP Read error for listing: {}", e))
-                    })?;
+                let mut buf_reader_listing = BufReader::new(file_for_listing);                let mut zip_lister = match ZipFileReader::with_tokio(&mut buf_reader_listing).await {
+                    Ok(reader) => reader,
+                    Err(e) => {                        error!("Failed to read Java ZIP for listing: {}", e);
+                        
+                        if archive_path.exists() {
+                            info!("Removing corrupted Java archive: {:?}", archive_path);
+                            let _ = fs::remove_file(archive_path).await;
+                        }
+                        
+                        return Err(AppError::JavaDownload(format!(
+                            "ZIP Read error for listing: {}. The downloaded Java archive appears to be corrupted. Please try launching again to re-download.", 
+                            e
+                        )));
+                    }
+                };
 
                 let entries_meta = zip_lister
                     .file()
@@ -614,5 +739,22 @@ impl JavaDownloadService {
         Err(AppError::JavaDownload(
             "Failed to find Java binary".to_string(),
         ))
+    }    async fn cleanup_corrupted_java(&self, distribution: &JavaDistribution, version: &u32, force_x86_64: bool) -> Result<()> {
+        let arch_suffix = if force_x86_64 { "_x86_64" } else { "" };
+        let dir_name = format!("{}_{}{}",  distribution.get_name(), version, arch_suffix);
+        let java_dir = self.base_path.join(dir_name);
+        
+        if java_dir.exists() {
+            info!("Cleaning up corrupted Java installation: {:?}", java_dir);
+            match fs::remove_dir_all(&java_dir).await {
+                Ok(_) => info!("Successfully removed corrupted Java installation"),
+                Err(e) => {
+                    warn!("Failed to remove corrupted Java installation: {}", e);
+                    // Continue anyway, the user might need to manually clean up
+                }
+            }
+        }
+        
+        Ok(())
     }
 }
