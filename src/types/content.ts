@@ -31,6 +31,8 @@ export interface ToggleContentPayload {
   // Future: content_type?: 'mod' | 'resourcepack' | 'shaderpack' | 'datapack';
 }
 
+// hacky fix - fix later
+
 /**
  * Enum for content types, mirroring Rust's `profile_utils::ContentType`.
  * Used in InstallContentPayload.
