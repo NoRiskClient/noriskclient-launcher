@@ -23,3 +23,5 @@ export interface JavaInstallation {
   /** The architecture of the Java installation */
   architecture: JavaArchitecture;
 } 
+
+// this is a test comment
