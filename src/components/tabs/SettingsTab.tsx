@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import { Card } from ".././ui/Card";
 import { ToggleSwitch } from ".././ui/ToggleSwitch";
+import { Input } from ".././ui/Input";
 import { ColorPicker } from ".././ColorPicker";
 import type { LauncherConfig } from "../../types/launcherConfig";
 import * as ConfigService from "../../services/launcher-config-service";
@@ -32,11 +33,11 @@ export function SettingsTab() {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced">(
+  const [saving, setSaving] = useState<boolean>(false);  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced">(
     "general",
   );
   const [showFullscreenPreview, setShowFullscreenPreview] = useState<boolean>(false);
+  const [customColor, setCustomColor] = useState("#4f8eff");
   const contentRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,9 +45,10 @@ export function SettingsTab() {
   const flags = useFlags([EXPERIMENTAL_MODE_FEATURE_FLAG_NAME]);
   const showExperimentalMode = flags[EXPERIMENTAL_MODE_FEATURE_FLAG_NAME]?.enabled === true;
   const isResettingRef = useRef<boolean>(false);
-
   const {
     accentColor,
+    setCustomAccentColor,
+    customColorHistory,
     isBackgroundAnimationEnabled,
     staticBackground,
     toggleStaticBackground,
@@ -191,10 +193,18 @@ export function SettingsTab() {
       setTempConfig({ ...tempConfig, concurrent_downloads: value });
     }
   };
-
   const handleConcurrentIoLimitChange = (value: number) => {
     if (tempConfig) {
       setTempConfig({ ...tempConfig, concurrent_io_limit: value });
+    }
+  };
+  const handleCustomColorSubmit = () => {
+    const isValidHex = /^#[0-9A-F]{6}$/i.test(customColor);
+    if (isValidHex) {
+      setCustomAccentColor(customColor);
+      toast.success("Custom color applied!");
+    } else {
+      toast.error("Please enter a valid 6-digit hex color (e.g., #FF5733)");
     }
   };
 
@@ -481,22 +491,67 @@ export function SettingsTab() {
               size="md"
             >
               Download
-            </Button>
-          </div>
+            </Button>          </div>
         </div>
+      </Card>
 
-        <div className="mt-6 p-4 rounded-lg border border-[#ffffff20] bg-black/10">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon icon="solar:lock-bold" className="w-5 h-5 text-white/50" />
-            <h4 className="text-xl font-minecraft text-white/50 lowercase">
+      <Card variant="flat" className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon icon="solar:palette-bold" className="w-5 h-5 text-white" />
+            <h4 className="text-2xl font-minecraft text-white lowercase">
               Custom Colors
             </h4>
           </div>
-          <p className="text-sm text-white/40 font-minecraft-ten">
-            Custom color selection is currently disabled
+          <p className="text-sm text-white/70 font-minecraft-ten mb-4">
+            Create your own custom accent color
           </p>
-        </div>
-      </Card>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  type="text"
+                  value={customColor}
+                  onChange={(e) => setCustomColor(e.target.value)}
+                  placeholder="#RRGGBB"
+                  icon={<Icon icon="solar:palette-bold" />}
+                />
+              </div>
+              <div
+                className="w-10 h-10 rounded-md border-2 border-white/20"
+                style={{ backgroundColor: customColor }}
+              />
+              <Button
+                onClick={handleCustomColorSubmit}
+                size="sm"
+                icon={<Icon icon="solar:check-circle-bold" />}
+              >
+                Apply
+              </Button>
+            </div>
+
+            {customColorHistory.length > 0 && (
+              <div>
+                <h5 className="font-minecraft text-lg lowercase text-white/80 mb-2">
+                  Recent Colors
+                </h5>
+                <div className="flex flex-wrap gap-2">
+                  {customColorHistory.map((color, index) => (
+                    <button
+                      key={`${color}-${index}`}
+                      onClick={() => {
+                        setCustomColor(color);
+                        setCustomAccentColor(color);
+                      }}
+                      className="w-8 h-8 rounded-md border-2 border-white/20 hover:border-white/40 transition-colors"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}          </div>
+        </Card>
 
       <Card variant="flat" className="p-6">
         <div className="mb-4">

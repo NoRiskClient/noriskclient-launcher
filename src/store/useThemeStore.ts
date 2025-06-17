@@ -203,6 +203,9 @@ interface ThemeState {
   setAccentColor: (color: AccentColor) => void;
   setCustomAccentColor: (hexColor: string) => void;
   applyAccentColorToDOM: () => void;
+  customColorHistory: string[];
+  addToCustomColorHistory: (hexColor: string) => void;
+  clearCustomColorHistory: () => void;
   isBackgroundAnimationEnabled: boolean;
   isDetailViewSidebarOnLeft: boolean;
   toggleDetailViewSidebarPosition: () => void;
@@ -224,13 +227,12 @@ export const useThemeStore = create<ThemeState>()(
       profileGroupingCriterion: "none",
       staticBackground: true,
       hasAcceptedTermsOfService: false,
+      customColorHistory: [],
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
         get().applyAccentColorToDOM();
-      },
-
-      setCustomAccentColor: (hexColor: string) => {
+      },      setCustomAccentColor: (hexColor: string) => {
         const colorVariants = calculateColorVariants(hexColor);
         const customColor: AccentColor = {
           name: "Custom",
@@ -239,6 +241,33 @@ export const useThemeStore = create<ThemeState>()(
 
         set({ accentColor: customColor });
         get().applyAccentColorToDOM();
+        get().addToCustomColorHistory(hexColor);
+      },
+
+      addToCustomColorHistory: (hexColor: string) => {
+        set((state) => {
+          const newHistory = [...state.customColorHistory];
+          
+          // Remove if already exists to move to front
+          const existingIndex = newHistory.indexOf(hexColor);
+          if (existingIndex > -1) {
+            newHistory.splice(existingIndex, 1);
+          }
+          
+          // Add to front
+          newHistory.unshift(hexColor);
+          
+          // Keep only last 10 colors
+          if (newHistory.length > 10) {
+            newHistory.pop();
+          }
+          
+          return { customColorHistory: newHistory };
+        });
+      },
+
+      clearCustomColorHistory: () => {
+        set({ customColorHistory: [] });
       },
 
       toggleBackgroundAnimation: () => {
@@ -266,11 +295,8 @@ export const useThemeStore = create<ThemeState>()(
 
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
-      },
-
-      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });
-      },
+      },      acceptTermsOfService: () => {
+        set({ hasAcceptedTermsOfService: true });      },
 
       applyAccentColorToDOM: () => {
         const { accentColor } = get();
