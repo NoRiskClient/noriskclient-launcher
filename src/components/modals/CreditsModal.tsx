@@ -4,7 +4,6 @@ import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "../ui/buttons/IconButton";
-import { openExternalUrl } from "../../services/tauri-service";
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -15,14 +14,6 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   
   if (!isOpen) return null;
-
-  const handleOpenUrl = async (url: string) => {
-    try {
-      await openExternalUrl(url);
-    } catch (error) {
-      console.error("Failed to open external URL:", error);
-    }
-  };
 
   return (
     <Modal
@@ -63,14 +54,14 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               </div>
               <IconButton
                 icon={<Icon icon="solar:global-bold" className="w-4 h-4" />}
-                onClick={() => handleOpenUrl("https://deadmake.dev")}
+                onClick={() => window.open("https://deadmake.dev", "_blank")}
                 variant="default"
                 size="sm"
                 title="Visit deadmake.dev"
               />
               <IconButton
                 icon={<span className="text-sm">🍋</span>}
-                onClick={() => handleOpenUrl("https://fruity.dev")}
+                onClick={() => window.open("https://fruity.dev", "_blank")}
                 variant="default"
                 size="sm"
                 title="Visit fruity.dev"
