@@ -67,7 +67,7 @@
     --accent-shadow: rgba(79, 142, 255, 0.5);
     --accent-rgb: 79, 142, 255;
 
-    --window-border-radius: 8px;
+    --window-border-radius: 0px;
 }
 
 @keyframes fadeIn {

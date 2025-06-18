@@ -31,12 +31,11 @@ export function SettingsTab() {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false);  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced">(
-    "general",
-  );
+  const [saving, setSaving] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced">("general");
   const [showFullscreenPreview, setShowFullscreenPreview] = useState<boolean>(false);
-  const [customColor, setCustomColor] = useState("#4f8eff");
-  const [borderRadius, setBorderRadius] = useState<number>(8);
+  const [borderRadius, setBorderRadius] = useState<number>(0); 
+  const [isConfigLoaded, setIsConfigLoaded] = useState<boolean>(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
@@ -206,7 +205,18 @@ export function SettingsTab() {
     }
   };
 
+  useEffect(() => {
+    if (config && !isConfigLoaded) {
+      const configValue = config.window_border_radius ?? 0; 
+      setBorderRadius(configValue);
+      document.documentElement.style.setProperty('--window-border-radius', `${configValue}px`);
+      setIsConfigLoaded(true);
+    }
+  }, [config, isConfigLoaded]);
+
   const handleBorderRadiusChange = (value: number) => {
+    if (!isConfigLoaded) return; 
+    
     setBorderRadius(value);
     
     document.documentElement.style.setProperty('--window-border-radius', `${value}px`);
@@ -457,96 +467,20 @@ export function SettingsTab() {
           <ColorPicker shape="square" size="md" showCustomOption={false} />
         </div>
 
-        <div className="mt-6 p-4 rounded-lg border border-[#ffffff20]">
-          <div className="flex items-center gap-2 mb-3">
-            <Icon icon="solar:eye-bold" className="w-5 h-5 text-white" />
-            <h4 className="text-2xl font-minecraft text-white lowercase">
-              Preview
-            </h4>
-          </div>
-          <div className="flex flex-wrap gap-4 mt-3">
-            <Button
-              icon={<Icon icon="solar:play-bold" />}
-              size="md"
-              variant="flat"
-            >
-              Play Game
-            </Button>
-            <Button
-              variant="flat-secondary"
-              icon={<Icon icon="solar:settings-bold" />}
-              size="md"
-            >
-              Settings
-            </Button>
-            <Button
-              variant="ghost"
-              icon={<Icon icon="solar:download-bold" />}
-              size="md"
-            >
-              Download
-            </Button>          </div>
-        </div>
-      </Card>
-
-      <Card variant="flat" className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Icon icon="solar:palette-bold" className="w-5 h-5 text-white" />
-            <h4 className="text-2xl font-minecraft text-white lowercase">
+        <div className="mt-6 p-4 rounded-lg border border-[#ffffff20] bg-black/10">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon icon="solar:lock-bold" className="w-5 h-5 text-white/50" />
+            <h4 className="text-xl font-minecraft text-white/50 lowercase">
               Custom Colors
             </h4>
           </div>
-          <p className="text-sm text-white/70 font-minecraft-ten mb-4">
-            Create your own custom accent color
+          <p className="text-sm text-white/40 font-minecraft-ten">
+            Custom color selection is currently disabled
           </p>
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <Input
-                  type="text"
-                  value={customColor}
-                  onChange={(e) => setCustomColor(e.target.value)}
-                  placeholder="#RRGGBB"
-                  icon={<Icon icon="solar:palette-bold" />}
-                />
-              </div>
-              <div
-                className="w-10 h-10 rounded-md border-2 border-white/20"
-                style={{ backgroundColor: customColor }}
-              />
-              <Button
-                onClick={handleCustomColorSubmit}
-                size="sm"
-                icon={<Icon icon="solar:check-circle-bold" />}
-              >
-                Apply
-              </Button>
-            </div>
+        </div>
+      </Card>
 
-            {customColorHistory.length > 0 && (
-              <div>
-                <h5 className="font-minecraft text-lg lowercase text-white/80 mb-2">
-                  Recent Colors
-                </h5>
-                <div className="flex flex-wrap gap-2">
-                  {customColorHistory.map((color, index) => (
-                    <button
-                      key={`${color}-${index}`}
-                      onClick={() => {
-                        setCustomColor(color);
-                        setCustomAccentColor(color);
-                      }}
-                      className="w-8 h-8 rounded-md border-2 border-white/20 hover:border-white/40 transition-colors"
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}          </div>
-        </Card>
-
+      {/* Border Radius Card */}
       <Card variant="flat" className="p-6">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -570,7 +504,7 @@ export function SettingsTab() {
             valueLabel={`Border Radius: ${borderRadius}px`}
             minLabel="Cubic (0px)"
             maxLabel="Rounded (24px)"
-            disabled={saving}
+            disabled={saving || !isConfigLoaded}
             variant="flat"
             size="md"
             icon={<Icon icon="solar:frame-bold" className="w-4 h-4" />}

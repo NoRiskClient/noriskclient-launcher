@@ -80,6 +80,10 @@ fn default_hide_on_process_start() -> bool {
     false
 }
 
+fn default_window_border_radius() -> Option<i32> {
+    Some(0)
+}
+
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
@@ -205,124 +209,20 @@ impl ConfigManager {
                 && current.last_played_profile == new_config.last_played_profile
                 && current.hooks == new_config.hooks
                 && current.hide_on_process_start == new_config.hide_on_process_start
-                && current.window_border_radius == new_config.window_border_radius 
+                && current.window_border_radius == new_config.window_border_radius
             {
-                debug!("No config changes detected, skipping save");
-                false
-            } else {
-                // Preserve version during replacement
-                let version = config.version;
-
-                // Log changes
-                if current.is_experimental != new_config.is_experimental {
-                    info!(
-                        "Changing experimental mode: {} -> {}",
-                        current.is_experimental, new_config.is_experimental
-                    );
-                }
-                if current.auto_check_updates != new_config.auto_check_updates {
-                    info!(
-                        "Changing auto check updates: {} -> {}",
-                        current.auto_check_updates, new_config.auto_check_updates
-                    );
-                }
-                if current.concurrent_downloads != new_config.concurrent_downloads {
-                    info!(
-                        "Changing concurrent downloads: {} -> {}",
-                        current.concurrent_downloads, new_config.concurrent_downloads
-                    );
-                }
-                if current.enable_discord_presence != new_config.enable_discord_presence {
-                    info!(
-                        "Changing Discord Rich Presence: {} -> {}",
-                        current.enable_discord_presence, new_config.enable_discord_presence
-                    );
-                }
-                if current.check_beta_channel != new_config.check_beta_channel {
-                    info!(
-                        "Changing beta channel check: {} -> {}",
-                        current.check_beta_channel, new_config.check_beta_channel
-                    );
-                }
-                if current.profile_grouping_criterion != new_config.profile_grouping_criterion {
-                    info!(
-                        "Changing profile grouping criterion: {:?} -> {:?}",
-                        current.profile_grouping_criterion, new_config.profile_grouping_criterion
-                    );
-                }
-                if current.open_logs_after_starting != new_config.open_logs_after_starting {
-                    info!(
-                        "Changing open logs after starting: {} -> {}",
-                        current.open_logs_after_starting, new_config.open_logs_after_starting
-                    );
-                }
-                if current.concurrent_io_limit != new_config.concurrent_io_limit {
-                    info!(
-                        "Changing concurrent IO limit: {} -> {}",
-                        current.concurrent_io_limit, new_config.concurrent_io_limit
-                    );
-                }
-                if current.last_played_profile != new_config.last_played_profile {
-                    info!(
-                        "Changing last played profile: {:?} -> {:?}",
-                        current.last_played_profile, new_config.last_played_profile
-                    );
-                }
-                if current.hooks != new_config.hooks {
-                    info!(
-                        "Changing hooks: {:?} -> {:?}",
-                        current.hooks, new_config.hooks
-                    );
-                }
-                if current.hide_on_process_start != new_config.hide_on_process_start {
-                    info!(
-                        "Changing hide on process start: {} -> {}",
-                        current.hide_on_process_start, new_config.hide_on_process_start
-                    );
-                }
-                if current.window_border_radius != new_config.window_border_radius {
-                    info!(
-                        "Changing window border radius: {:?} -> {:?}",
-                        current.window_border_radius, new_config.window_border_radius
-                    );
-                }
-
-                // Update config while preserving version
-                *config = LauncherConfig {
-                    version,
-                    is_experimental: new_config.is_experimental,
-                    auto_check_updates: new_config.auto_check_updates,
-                    concurrent_downloads: new_config.concurrent_downloads,
-                    enable_discord_presence: new_config.enable_discord_presence,
-                    check_beta_channel: new_config.check_beta_channel,
-                    profile_grouping_criterion: new_config.profile_grouping_criterion.clone(),
-                    open_logs_after_starting: new_config.open_logs_after_starting,
-                    concurrent_io_limit: new_config.concurrent_io_limit,
-                    last_played_profile: new_config.last_played_profile,
-                    hooks: new_config.hooks,
-                    hide_on_process_start: new_config.hide_on_process_start,
-                    window_border_radius: new_config.window_border_radius,
-                };
-
-                true
+                return Ok(());
             }
+
+            info!("Changing window border radius: {:?} -> {:?}", 
+                  current.window_border_radius, new_config.window_border_radius);
+
+            *config = new_config;
+            true
         };
 
-        // Save the updated config if needed
         if should_save {
             self.save_config().await?;
-
-            // Update Discord status if it changed
-            if let Ok(state) = crate::state::State::get().await {
-                // Check if Discord status changed
-                let discord_enabled = new_config.enable_discord_presence;
-                if let Err(e) = state.discord_manager.set_enabled(discord_enabled).await {
-                    warn!(
-                        "Error updating Discord after config change: {}, continuing anyway",
-                        e
-                    );
-                }
-            }
         }
 
         Ok(())
