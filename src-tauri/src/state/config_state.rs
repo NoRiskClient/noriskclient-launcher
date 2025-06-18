@@ -21,7 +21,7 @@ pub struct Hooks {
     pub post_exit: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LauncherConfig {
     #[serde(default = "default_config_version")]
     pub version: u32,
@@ -48,6 +48,8 @@ pub struct LauncherConfig {
     pub hooks: Hooks,
     #[serde(default = "default_hide_on_process_start")]
     pub hide_on_process_start: bool,
+    #[serde(default)]
+    pub window_border_radius: Option<i32>,
 }
 
 fn default_config_version() -> u32 {
@@ -93,6 +95,7 @@ impl Default for LauncherConfig {
             last_played_profile: None,
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
+            window_border_radius: None,
         }
     }
 }
@@ -202,6 +205,7 @@ impl ConfigManager {
                 && current.last_played_profile == new_config.last_played_profile
                 && current.hooks == new_config.hooks
                 && current.hide_on_process_start == new_config.hide_on_process_start
+                && current.window_border_radius == new_config.window_border_radius 
             {
                 debug!("No config changes detected, skipping save");
                 false
@@ -276,6 +280,12 @@ impl ConfigManager {
                         current.hide_on_process_start, new_config.hide_on_process_start
                     );
                 }
+                if current.window_border_radius != new_config.window_border_radius {
+                    info!(
+                        "Changing window border radius: {:?} -> {:?}",
+                        current.window_border_radius, new_config.window_border_radius
+                    );
+                }
 
                 // Update config while preserving version
                 *config = LauncherConfig {
@@ -291,6 +301,7 @@ impl ConfigManager {
                     last_played_profile: new_config.last_played_profile,
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
+                    window_border_radius: new_config.window_border_radius,
                 };
 
                 true

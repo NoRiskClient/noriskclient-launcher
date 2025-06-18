@@ -25,7 +25,6 @@ import EffectPreviewCard from ".././EffectPreviewCard";
 import { RangeSlider } from ".././ui/RangeSlider";
 import { FullscreenEffectRenderer } from "../FullscreenEffectRenderer";
 import { openExternalUrl } from "../../services/tauri-service";
-import { useDebounce } from "../../hooks/useDebounce";
 
 export function SettingsTab() {
   const [config, setConfig] = useState<LauncherConfig | null>(null);
@@ -38,6 +37,7 @@ export function SettingsTab() {
   const [showFullscreenPreview, setShowFullscreenPreview] = useState<boolean>(false);
   const [customColor, setCustomColor] = useState("#4f8eff");
   const [borderRadius, setBorderRadius] = useState<number>(8);
+
   const contentRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -206,31 +206,28 @@ export function SettingsTab() {
     }
   };
 
-  // Add debounced border radius value
-  const debouncedBorderRadius = useDebounce(borderRadius, 300);
-
-  // Update the border radius handler to only update local state
   const handleBorderRadiusChange = (value: number) => {
     setBorderRadius(value);
-    // Remove immediate CSS and config updates
-  };
-
-  // Apply debounced border radius changes
-  useEffect(() => {
-    document.documentElement.style.setProperty('--window-border-radius', `${debouncedBorderRadius}px`);
+    
+    document.documentElement.style.setProperty('--window-border-radius', `${value}px`);
     
     if (tempConfig) {
-      setTempConfig({ ...tempConfig, window_border_radius: debouncedBorderRadius });
+      setTempConfig({ ...tempConfig, window_border_radius: value });
     }
-  }, [debouncedBorderRadius, tempConfig]);
+  };
 
-  // Load border radius from config on mount (keep existing)
   useEffect(() => {
     if (config?.window_border_radius !== undefined) {
       setBorderRadius(config.window_border_radius);
       document.documentElement.style.setProperty('--window-border-radius', `${config.window_border_radius}px`);
     }
   }, [config]);
+
+  useEffect(() => {
+    if (config && tempConfig && config.window_border_radius !== tempConfig.window_border_radius) {
+      setBorderRadius(config.window_border_radius || 8);
+    }
+  }, [config, tempConfig]);
 
   const resetChanges = () => {
     if (config) {
