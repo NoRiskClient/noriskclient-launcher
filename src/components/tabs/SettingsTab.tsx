@@ -36,6 +36,7 @@ export function SettingsTab() {
   );
   const [showFullscreenPreview, setShowFullscreenPreview] = useState<boolean>(false);
   const [customColor, setCustomColor] = useState("#4f8eff");
+  const [borderRadius, setBorderRadius] = useState<number>(8);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -203,6 +204,22 @@ export function SettingsTab() {
       toast.error("Please enter a valid 6-digit hex color (e.g., #FF5733)");
     }
   };
+
+  const handleBorderRadiusChange = (value: number) => {
+    setBorderRadius(value);
+    document.documentElement.style.setProperty('--window-border-radius', `${value}px`);
+    
+    if (tempConfig) {
+      setTempConfig({ ...tempConfig, window_border_radius: value });
+    }
+  };
+
+  useEffect(() => {
+    if (config?.window_border_radius !== undefined) {
+      setBorderRadius(config.window_border_radius);
+      document.documentElement.style.setProperty('--window-border-radius', `${config.window_border_radius}px`);
+    }
+  }, [config]);
 
   const resetChanges = () => {
     if (config) {
@@ -521,6 +538,47 @@ export function SettingsTab() {
               </div>
             )}          </div>
         </Card>
+
+      {/* Add Border Radius Card */}
+      <Card variant="flat" className="p-6">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon icon="solar:frame-bold" className="w-6 h-6 text-white" />
+            <h3 className="text-3xl font-minecraft text-white lowercase">
+              Window Border Radius
+            </h3>
+          </div>
+          <p className="text-base text-white/70 font-minecraft-ten mt-2">
+            Adjust the roundness of the window corners
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <RangeSlider
+            value={borderRadius}
+            onChange={handleBorderRadiusChange}
+            min={0}
+            max={24}
+            step={1}
+            valueLabel={`Border Radius: ${borderRadius}px`}
+            minLabel="Cubic (0px)"
+            maxLabel="Rounded (24px)"
+            disabled={saving}
+            variant="flat"
+            size="md"
+            icon={<Icon icon="solar:frame-bold" className="w-4 h-4" />}
+          />
+        </div>
+
+        <div className="mt-4 p-3 rounded-lg border border-[#ffffff20] bg-black/10">
+          <p className="text-sm text-white/60 font-minecraft-ten">
+            {borderRadius === 0 && "Sharp, cubic corners for a modern, geometric look."}
+            {borderRadius > 0 && borderRadius <= 8 && "Slightly rounded corners for a subtle softness."}
+            {borderRadius > 8 && borderRadius <= 16 && "Moderately rounded corners for a balanced appearance."}
+            {borderRadius > 16 && "Highly rounded corners for a soft, modern look."}
+          </p>
+        </div>
+      </Card>
 
       <Card variant="flat" className="p-6">
         <div className="mb-4">

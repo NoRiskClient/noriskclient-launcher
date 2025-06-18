@@ -161,6 +161,29 @@ export function AppLayout({
     return () => ctx.revert();
   }, []);
 
+  useEffect(() => {
+    const updateBorderRadius = () => {
+      const borderRadius = getComputedStyle(document.documentElement)
+        .getPropertyValue('--window-border-radius') || '8px';
+      
+      const mainContainer = document.querySelector('[data-tauri-drag-region]')?.parentElement;
+      if (mainContainer) {
+        (mainContainer as HTMLElement).style.borderRadius = borderRadius;
+        (mainContainer as HTMLElement).style.overflow = 'hidden';
+      }
+    };
+
+    updateBorderRadius();
+    
+    const observer = new MutationObserver(updateBorderRadius);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const renderBackgroundEffect = () => {
     switch (currentEffect) {
       case BACKGROUND_EFFECTS.MATRIX_RAIN:
@@ -257,14 +280,9 @@ export function AppLayout({
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]"
+      className="h-screen w-screen overflow-hidden bg-black relative"
       style={{
-        backgroundColor: backgroundColor,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundImage: `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
-        borderColor: `${themeAccentColor.value}30`,
-        boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
+        borderRadius: 'var(--window-border-radius, 8px)',
       }}
     >
       <BorderGlowEffects accentColor={themeAccentColor.value} />

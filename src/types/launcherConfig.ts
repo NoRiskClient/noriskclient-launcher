@@ -17,6 +17,7 @@ export interface LauncherConfig {
   profile_grouping_criterion: string | null; // Option<String>
   open_logs_after_starting: boolean;
   concurrent_io_limit: number; // usize
+  window_border_radius?: number; //for configuring the border radius of the window
   hooks: Hooks;
   hide_on_process_start: boolean;
 } 

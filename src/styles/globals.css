@@ -66,6 +66,8 @@
     --accent-hover: #3a7aff;
     --accent-shadow: rgba(79, 142, 255, 0.5);
     --accent-rgb: 79, 142, 255;
+
+    --window-border-radius: 8px;
 }
 
 @keyframes fadeIn {
@@ -208,6 +210,8 @@
         background-attachment: fixed;
         font-family: var(--font-minecraft), monospace;
         letter-spacing: 0.03em;
+        border-radius: var(--window-border-radius);
+        overflow: hidden;
     }
 
     h1,
@@ -237,7 +241,7 @@
     }
 }
 
-.font-minecraft {
+font-minecraft {
     font-family: var(--font-minecraft), monospace;
     letter-spacing: 0.05em;
 }
