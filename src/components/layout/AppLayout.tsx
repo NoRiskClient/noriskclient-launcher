@@ -278,9 +278,8 @@ export function AppLayout({
   };
 
   return (
-    <div
-      ref={launcherRef}
-      className="h-screen w-screen overflow-hidden bg-black relative"
+    <div 
+      className="h-screen w-screen overflow-hidden bg-black relative flex"
       style={{
         borderRadius: 'var(--window-border-radius, 8px)',
       }}
@@ -291,11 +290,11 @@ export function AppLayout({
         items={navItems}
         activeItem={activeTab}
         onItemClick={onNavChange}
-        className="h-full border-r-2 z-10"
+        className="h-full border-r-2 z-10 flex-shrink-0"
         version={appConfig.version}
       />
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <HeaderBar
           minimizeRef={minimizeRef}
           maximizeRef={maximizeRef}
@@ -305,12 +304,12 @@ export function AppLayout({
         <div className="flex-1 relative overflow-hidden">
           {renderBackgroundEffect()}
 
-          <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
+          <div className="relative z-10 h-full overflow-hidden custom-scrollbar bg-transparent">
             {children}
           </div>
         </div>
       </div>
-      {/* Global Modals Portal */}
+
       <SocialsModal />
     </div>
   );

@@ -25,6 +25,7 @@ import EffectPreviewCard from ".././EffectPreviewCard";
 import { RangeSlider } from ".././ui/RangeSlider";
 import { FullscreenEffectRenderer } from "../FullscreenEffectRenderer";
 import { openExternalUrl } from "../../services/tauri-service";
+import { useDebounce } from "../../hooks/useDebounce";
 
 export function SettingsTab() {
   const [config, setConfig] = useState<LauncherConfig | null>(null);
@@ -205,15 +206,25 @@ export function SettingsTab() {
     }
   };
 
+  // Add debounced border radius value
+  const debouncedBorderRadius = useDebounce(borderRadius, 300);
+
+  // Update the border radius handler to only update local state
   const handleBorderRadiusChange = (value: number) => {
     setBorderRadius(value);
-    document.documentElement.style.setProperty('--window-border-radius', `${value}px`);
-    
-    if (tempConfig) {
-      setTempConfig({ ...tempConfig, window_border_radius: value });
-    }
+    // Remove immediate CSS and config updates
   };
 
+  // Apply debounced border radius changes
+  useEffect(() => {
+    document.documentElement.style.setProperty('--window-border-radius', `${debouncedBorderRadius}px`);
+    
+    if (tempConfig) {
+      setTempConfig({ ...tempConfig, window_border_radius: debouncedBorderRadius });
+    }
+  }, [debouncedBorderRadius, tempConfig]);
+
+  // Load border radius from config on mount (keep existing)
   useEffect(() => {
     if (config?.window_border_radius !== undefined) {
       setBorderRadius(config.window_border_radius);
@@ -539,7 +550,6 @@ export function SettingsTab() {
             )}          </div>
         </Card>
 
-      {/* Add Border Radius Card */}
       <Card variant="flat" className="p-6">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
