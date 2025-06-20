@@ -19,26 +19,26 @@ interface CapeImageProps {
 // The provided svelte code assumes a source image where these parts are at a larger scale.
 // Let's stick to the Svelte's scaled coordinates if the source images are indeed high-resolution like that.
 
-const SVELTE_SCALE_FACTOR = 8; // Re-introduce Svelte's scale factor
-const CAPE_PART_SRC_WIDTH = 10 * SVELTE_SCALE_FACTOR; // 80
-const CAPE_PART_SRC_HEIGHT = 16 * SVELTE_SCALE_FACTOR; // 128
-const FRONT_X = 1 * SVELTE_SCALE_FACTOR;  // 8
-const FRONT_Y = 1 * SVELTE_SCALE_FACTOR;  // 8
-const BACK_X = 12 * SVELTE_SCALE_FACTOR; // 96 (1 + 10 + 1 offset in Svelte example)
-const BACK_Y = 1 * SVELTE_SCALE_FACTOR;  // 8
+const SVELTE_SCALE_FACTOR = 8; 
+const CAPE_PART_SRC_WIDTH = 10 * SVELTE_SCALE_FACTOR; 
+const CAPE_PART_SRC_HEIGHT = 16 * SVELTE_SCALE_FACTOR; 
+const FRONT_X = 1 * SVELTE_SCALE_FACTOR;  
+const FRONT_Y = 1 * SVELTE_SCALE_FACTOR;  
+const BACK_X = 12 * SVELTE_SCALE_FACTOR;
+const BACK_Y = 1 * SVELTE_SCALE_FACTOR;  
 
 
 export const CapeImage = React.memo(function CapeImage({
   imageUrl,
   part = 'front',
-  width = 60, // Default width
+  width = 60,
   className,
 }: CapeImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Calculate height based on width and cape aspect ratio (10:16 for the part)
+  
   const height = useMemo(() => Math.round(width * (CAPE_PART_SRC_HEIGHT / CAPE_PART_SRC_WIDTH)), [width]);
 
   useEffect(() => {
@@ -47,8 +47,8 @@ export const CapeImage = React.memo(function CapeImage({
     
     const canvas = canvasRef.current;
     if (!canvas) {
-      // console.warn("[CapeImage] Effect ran before canvas was ready.");
-      setIsLoading(false); // Not strictly an error, but can't proceed
+    
+      setIsLoading(false); 
       return;
     }
 
@@ -58,20 +58,20 @@ export const CapeImage = React.memo(function CapeImage({
     }
 
     if (!imageUrl) {
-      // console.log("[CapeImage] No imageUrl provided.");
-      setIsLoading(false); // Nothing to load
+   
+      setIsLoading(false); 
       return;
     }
 
-    // console.log(`[CapeImage] Loading ${part} from ${imageUrl} for canvas ${width}x${height}`);
+   
     const img = new Image();
     img.crossOrigin = 'anonymous'; 
     img.src = imageUrl;
 
     const onLoad = () => {
-      // console.log("[CapeImage] Image loaded.");
-      if (!canvasRef.current) { // Check if canvas is still there
-        // console.error("[CapeImage] Canvas lost before drawing.");
+      
+      if (!canvasRef.current) { 
+      
         setErrorMessage("Canvas lost before drawing.");
         setIsLoading(false);
         return;
@@ -88,14 +88,14 @@ export const CapeImage = React.memo(function CapeImage({
         const sy = part === 'back' ? BACK_Y : FRONT_Y;
         
         currentCtx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        currentCtx.imageSmoothingEnabled = false; // Pixelated look
+        currentCtx.imageSmoothingEnabled = false; 
 
         currentCtx.drawImage(
           img,
-          sx, sy, CAPE_PART_SRC_WIDTH, CAPE_PART_SRC_HEIGHT, // Source rectangle
-          0, 0, canvasRef.current.width, canvasRef.current.height  // Destination rectangle
+          sx, sy, CAPE_PART_SRC_WIDTH, CAPE_PART_SRC_HEIGHT, 
+          0, 0, canvasRef.current.width, canvasRef.current.height  
         );
-        // console.log(`[CapeImage] Drawn ${part} part.`);
+    
         setErrorMessage(null);
       } catch (drawError) {
         console.error("[CapeImage] Error drawing cape part:", drawError);
@@ -115,11 +115,11 @@ export const CapeImage = React.memo(function CapeImage({
     img.addEventListener('error', onError);
 
     return () => {
-      // console.log("[CapeImage] Cleanup effect for:", imageUrl);
+     
       img.removeEventListener('load', onLoad);
       img.removeEventListener('error', onError);
     };
-  }, [imageUrl, part, width, height]); // Rerun effect if these change
+  }, [imageUrl, part, width, height]); 
 
   return (
     <div 
