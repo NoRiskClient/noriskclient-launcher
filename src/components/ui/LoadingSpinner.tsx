@@ -111,11 +111,10 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         case "sm":
           return { icon: "h-8 w-8", text: "text-sm", textMarginTop: "mt-2" };
         case "lg":
-          return { icon: "h-16 w-16", text: "text-lg", textMarginTop: "mt-3" };
-        case "xl":
-          return { icon: "h-20 w-20", text: "text-xl", textMarginTop: "mt-3" };
+          return { icon: "h-16 w-16", text: "text-lg", textMarginTop: "mt-3" };        case "xl":
+          return { icon: "h-20 w-20", text: "text-lg", textMarginTop: "mt-3" };
         case "xxl":
-          return { icon: "h-24 w-24", text: "text-2xl", textMarginTop: "mt-4" };
+          return { icon: "h-24 w-24", text: "text-xl", textMarginTop: "mt-4" };
         default:
           return {
             icon: "h-12 w-12",

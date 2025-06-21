@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getVariantColors } from "./design-system";
 
 export function ScrollbarProvider() {
-  const { accentColor } = useThemeStore();
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
 
   useEffect(() => {
     const hexToRgb = (hex: string) => {
@@ -14,18 +16,18 @@ export function ScrollbarProvider() {
         : null;
     };
 
+    const colors = getVariantColors("default", accentColor);
     const root = document.documentElement;
-    root.style.setProperty("--scrollbar-thumb-color", accentColor.value);
-    root.style.setProperty(
-      "--scrollbar-thumb-hover-color",
-      accentColor.hoverValue,
-    );
+    
+    root.style.setProperty("--scrollbar-thumb-color", colors.main);
+    root.style.setProperty("--scrollbar-thumb-hover-color", colors.light);
+    root.style.setProperty("--scrollbar-radius", `${Math.max(2, Math.round(borderRadius * 0.5))}px`);
 
-    const rgbValue = hexToRgb(accentColor.value);
+    const rgbValue = hexToRgb(colors.main);
     if (rgbValue) {
       root.style.setProperty("--scrollbar-thumb-rgb", rgbValue);
     }
-  }, [accentColor]);
+  }, [accentColor, borderRadius]);
 
   return null;
 }

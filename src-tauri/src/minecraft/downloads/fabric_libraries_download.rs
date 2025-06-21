@@ -139,6 +139,15 @@ impl FabricLibrariesDownloadService {
         // Save the file
         let mut file = fs::File::create(&target_path).await?;
         file.write_all(&bytes).await?;
+        
+        // Ensure the file is fully written to disk before attempting to read it.
+        // This prevents potential "end of central directory record not found" errors with jar files
+        // that can occur if we try to read the file before the OS has flushed all write buffers.
+        file.sync_all().await.map_err(|e| {
+            crate::error::AppError::FabricError(format!("Failed to sync fabric maven artifact: {}", e))
+        })?;
+        // Explicitly close the file by dropping the handle
+        drop(file);
 
         info!("💾 Saved Maven artifact: {}", maven);
         Ok(())
@@ -335,6 +344,15 @@ impl FabricLibrariesDownloadService {
         // Save the file
         let mut file = fs::File::create(&target_path).await?;
         file.write_all(&bytes).await?;
+        
+        // Ensure the file is fully written to disk before attempting to read it.
+        // This prevents potential "end of central directory record not found" errors with jar files
+        // that can occur if we try to read the file before the OS has flushed all write buffers.
+        file.sync_all().await.map_err(|e| {
+            crate::error::AppError::FabricError(format!("Failed to sync fabric library: {}", e))
+        })?;
+        // Explicitly close the file by dropping the handle
+        drop(file);
 
         info!("💾 Saved: {}", library.name);
         Ok(())

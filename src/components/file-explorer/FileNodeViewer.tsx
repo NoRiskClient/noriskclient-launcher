@@ -61,10 +61,10 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
     } else if (!checkboxesEnabled) {
         onNodeSelected(node, event);
     }
-  };
-
-  const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    event.stopPropagation();
+  };  const handleCheckboxChange = (event: any) => {
+    if (event.stopPropagation) {
+      event.stopPropagation();
+    }
     onNodeSelected(node, event);
   };
 
@@ -105,14 +105,11 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
           </button>
         ) : (
           <span className="expand-placeholder w-[20px] mr-1 flex-shrink-0"></span>
-        )}
-
-        {checkboxesEnabled && (
+        )}        {checkboxesEnabled && (
           <div className="filenode-checkbox-area mr-2 flex-shrink-0 self-center">
             <Checkbox
               checked={currentIsSelected}
               onChange={handleCheckboxChange}
-              onClick={(e) => e.stopPropagation()}
               customSize="sm"
             />
           </div>
@@ -296,16 +293,16 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
       }
       return newExpanded;
     });
-  }, []);
-
-  const handleNodeSelected = useCallback((node: FileNode, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
-    event.stopPropagation();
+  }, []);  const handleNodeSelected = useCallback((node: FileNode, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
+    if (event.stopPropagation) {
+      event.stopPropagation();
+    }
     const newSelectedFiles = new Set(selectedFiles);
     
     let targetNodeIsNowSelected: boolean;
 
-    if (event.target instanceof HTMLInputElement && 'checked' in event.target) {
-        targetNodeIsNowSelected = event.target.checked;
+    if ('target' in event && event.target && 'checked' in event.target) {
+        targetNodeIsNowSelected = (event.target as any).checked;
     } else {
         const isCurrentlySelected = selectedFiles.has(node.path);
         targetNodeIsNowSelected = !isCurrentlySelected;

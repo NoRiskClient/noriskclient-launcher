@@ -13,6 +13,8 @@ import { Card } from "../../ui/Card";
 import { gsap } from "gsap";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
+import { toast } from "react-hot-toast";
+import * as ProfileService from "../../../services/profile-service";
 
 interface InstallationSettingsTabProps {
   profile: Profile;
@@ -38,6 +40,7 @@ export function InstallationSettingsTab({
   const [isLoadingLoaderVersions, setIsLoadingLoaderVersions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isRepairing, setIsRepairing] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
@@ -169,13 +172,13 @@ export function InstallationSettingsTab({
 
         switch (editedProfile.loader) {
           case "fabric":
-            const fabricResult = await invoke<{ loader_version: string }[]>(
+            const fabricResult = await invoke<{ loader: { version: string } }[]>(
               "get_fabric_loader_versions",
               {
                 minecraftVersion: editedProfile.game_version,
               },
             );
-            versions = fabricResult.map((v) => v.loader_version);
+            versions = fabricResult.map((v) => v.loader.version);
             break;
           case "forge":
             versions = await invoke<string[]>("get_forge_versions", {
@@ -183,13 +186,13 @@ export function InstallationSettingsTab({
             });
             break;
           case "quilt":
-            const quiltResult = await invoke<{ loader_version: string }[]>(
+            const quiltResult = await invoke<{ loader: { version: string } }[]>(
               "get_quilt_loader_versions",
               {
                 minecraftVersion: editedProfile.game_version,
               },
             );
-            versions = quiltResult.map((v) => v.loader_version);
+            versions = quiltResult.map((v) => v.loader.version);
             break;
           case "neoforge":
             versions = await invoke<string[]>("get_neoforge_versions", {
@@ -346,6 +349,24 @@ export function InstallationSettingsTab({
         { scale: 0.98, opacity: 0.5 },
         { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" },
       );
+    }
+  };
+
+  const handleRepair = async () => {
+    try {
+      setIsRepairing(true);
+      setError(null);
+      
+      await ProfileService.repairProfile(profile.id);
+      
+      toast.success("Profile repair completed successfully!");
+    } catch (err) {
+      console.error("Failed to repair profile:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to repair profile: ${errorMessage}`);
+      toast.error(`Failed to repair profile: ${errorMessage}`);
+    } finally {
+      setIsRepairing(false);
     }
   };
 
@@ -577,6 +598,43 @@ export function InstallationSettingsTab({
             )}
           </div>
         )}
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+            repair profile
+          </h3>
+          <Card
+            variant="flat"
+            className="p-4 border border-white/10 bg-black/20"
+          >
+            <div className="flex flex-col space-y-3">
+              <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none">
+                Repairs the profile installation by redownloading missing or corrupted files.
+              </p>
+              <Button
+                onClick={handleRepair}
+                disabled={isRepairing || isLoadingVersions || isLoadingLoaderVersions}
+                variant="secondary"
+                icon={
+                  isRepairing ? (
+                    <Icon
+                      icon="solar:refresh-bold"
+                      className="w-5 h-5 animate-spin text-white"
+                    />
+                  ) : (
+                    <Icon icon="solar:shield-check-bold" className="w-5 h-5 text-white" />
+                  )
+                }
+                size="md"
+                className="text-2xl w-fit"
+              >
+                {isRepairing ? "repairing..." : "repair profile"}
+              </Button>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

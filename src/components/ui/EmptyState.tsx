@@ -37,7 +37,7 @@ export function EmptyState({
   useEffect(() => {
     const contentTimer = setTimeout(() => {
       setIsDelayedContentVisible(true);
-    }, 150); // 1-second delay for content visibility
+    }, 150);
 
     if (isBackgroundAnimationEnabled) {
       if (containerRef.current) {
@@ -52,10 +52,7 @@ export function EmptyState({
             ease: "power2.out",
           },
         );
-      }
-
-      if (iconRef.current) {
-        // Initial animation
+      }      if (iconRef.current) {
         gsap.fromTo(
           iconRef.current,
           { scale: 0.8, opacity: 0 },
@@ -69,7 +66,6 @@ export function EmptyState({
         );
       }
     } else {
-      // Animations are disabled, set elements to their final state
       if (containerRef.current) {
         gsap.set(containerRef.current, { opacity: 1, y: 0, scale: 1 });
       }
@@ -118,12 +114,10 @@ export function EmptyState({
           onClick={onIconClick}
         >
           <Icon icon={icon} className={compact ? "w-12 h-12" : "w-20 h-20"} />
-        </div>
-
-        <p
+        </div>        <p
           className={cn(
-            "font-minecraft-ten text-white lowercase text-center mb-2",
-            compact ? "text-xl" : "text-2xl",
+            "text-white lowercase text-center mb-2",
+            compact ? "text-lg" : "text-xl",
           )}
         >
           {message}
@@ -132,7 +126,7 @@ export function EmptyState({
         {description && (
           <p
             className={cn(
-              "font-minecraft-ten text-white/70 lowercase text-center max-w-md",
+              "text-white/70 lowercase text-center max-w-md",
               compact ? "text-base mb-4" : "text-lg mb-6",
             )}
           >

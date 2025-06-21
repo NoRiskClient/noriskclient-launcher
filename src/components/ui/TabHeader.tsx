@@ -6,12 +6,18 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
+import { 
+  getVariantColors,
+  getAccessibilityProps
+} from "./design-system";
 
 interface TabHeaderProps {
   title: string;
   icon?: string;
   children?: ReactNode;
   className?: string;
+  role?: string;
+  ariaLabel?: string;
 }
 
 export function TabHeader({
@@ -19,9 +25,16 @@ export function TabHeader({
   icon,
   children,
   className,
+  role = "banner",
+  ariaLabel,
 }: TabHeaderProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
+
+  const colors = getVariantColors("default", accentColor);
+  const accessibilityProps = getAccessibilityProps({
+    label: ariaLabel
+  });
 
   useEffect(() => {
     if (headerRef.current) {
@@ -37,39 +50,36 @@ export function TabHeader({
       );
     }
   }, []);
-
   return (
     <div
-      ref={headerRef}
-      className={cn(
+      ref={headerRef}      className={cn(
         "flex-shrink-0 flex flex-col gap-4 p-6 backdrop-blur-md border-b-4 shadow-md",
+        "rounded-none",
         className,
       )}
       style={{
-        backgroundColor: `${accentColor.value}30`,
-        borderColor: `${accentColor.value}60`,
-        borderBottomColor: accentColor.value,
-        boxShadow: `0 4px 0 rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.25), inset 0 1px 0 ${accentColor.value}20, inset 0 0 0 1px ${accentColor.value}10`,
+        backgroundColor: `${colors.main}30`,
+        borderColor: `${colors.main}60`,
+        borderRadius: "0px",
       }}
-    >
-      <span
-        className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
-        style={{ backgroundColor: `${accentColor.value}80` }}
-      />
-
-      <div className="flex items-center justify-between">
-        <h2 className="text-white font-minecraft text-2xl lowercase flex items-center gap-2">
-          {icon && (
-            <Icon
-              icon={icon}
-              className="w-6 h-6"
-              style={{ color: accentColor.value }}
-            />
-          )}
+      role={role}
+      {...accessibilityProps}
+    >      <div className="flex items-center gap-3">        {icon && (
+          <Icon
+            icon={icon}
+            className="text-xl"
+            style={{ color: colors.light }}
+            aria-hidden="true"
+          />
+        )}
+        <h1
+          className="text-xl font-minecraft font-bold"
+          style={{ color: "#ffffff" }}
+        >
           {title}
-        </h2>
-        <div className="flex items-center gap-3">{children}</div>
+        </h1>
       </div>
+      {children}
     </div>
   );
 }

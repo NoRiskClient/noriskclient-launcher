@@ -6,6 +6,7 @@ pub mod java_detector; // Java detector to find Java installations
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod path_utils; // Deklariert das neue Modul und macht seinen Inhalt (wenn `pub`) nutzbar
 pub mod profile_utils; // Utility-Funktionen für Profilinhalte wie das Installieren von Modrinth-Content
+pub mod repair_utils; // Repair utilities for fixing profile issues
 pub mod resourcepack_utils; // ResourcePack-Utils für das Scannen und Verwalten von ResourcePacks
 pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-Servern
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks

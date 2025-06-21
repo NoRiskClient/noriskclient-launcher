@@ -11,7 +11,7 @@ import type {
 } from "../types/localSkin"; // Relative path
 
 // Regex for basic Minecraft username validation (could also be a global constant)
-const MINECRAFT_USERNAME_REGEX = /^[a-zA-Z0-9_]{3,16}$/;
+const MINECRAFT_USERNAME_REGEX = /^[a-zA-Z0-9_]{2,16}$/;
 // Regex to check for UUID format (either 32 hex chars without hyphens, or 36 chars with hyphens in 8-4-4-4-12 format)
 const UUID_REGEX = /^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
 

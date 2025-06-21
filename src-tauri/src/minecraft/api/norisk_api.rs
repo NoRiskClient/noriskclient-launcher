@@ -10,12 +10,20 @@ use crate::{
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use rand;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CrashlogDto {
     pub mc_logs_url: String,
     pub metadata: Option<ProcessMetadata>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerIdResponse {
+    pub server_id: String,
+    pub expires_in: i32,
 }
 
 pub struct NoRiskApi;
@@ -32,6 +40,54 @@ impl NoRiskApi {
         } else {
             debug!("[NoRisk API] Using production API endpoint");
             String::from("https://api.norisk.gg/api/v1")
+        }
+    }
+
+    /// Request a new server ID from NoRisk API for secure authentication
+    pub async fn request_server_id(is_experimental: bool) -> Result<ServerIdResponse> {
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/launcher/auth/request-server-id", base_url);
+
+        debug!("[NoRisk API] Requesting new server ID");
+        debug!("[NoRisk API] Full URL: {}", url);
+
+        let response = HTTP_CLIENT
+            .post(url)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[NoRisk API] Server ID request failed: {}", e);
+                AppError::RequestError(format!("Failed to request server ID from NoRisk API: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!("[NoRisk API] Server ID request response status: {}", status);
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!(
+                "[NoRisk API] Server ID request error response: Status {}, Body: {}",
+                status, error_body
+            );
+            return Err(AppError::RequestError(format!(
+                "NoRisk API returned error status for server ID request: {}, Body: {}",
+                status, error_body
+            )));
+        }
+
+        debug!("[NoRisk API] Parsing server ID response as JSON");
+        match response.json::<ServerIdResponse>().await {
+            Ok(server_response) => {
+                info!("[NoRisk API] Server ID request successful: {}", server_response.server_id);
+                Ok(server_response)
+            }
+            Err(e) => {
+                error!("[NoRisk API] Failed to parse server ID response: {}", e);
+                Err(AppError::ParseError(format!("Failed to parse NoRisk API server ID response: {}", e)))
+            }
         }
     }
 
@@ -190,7 +246,9 @@ impl NoRiskApi {
         })
     }
 
-    pub async fn refresh_norisk_token_v2(
+    /// Secure version of token refresh using server-provided server ID
+    /// This prevents the middleman attack by using controlled server IDs
+    pub async fn refresh_norisk_token_v3(
         hwid: &str,
         username: &str,
         access_token: &str,
@@ -198,26 +256,28 @@ impl NoRiskApi {
         force: bool,
         is_experimental: bool,
     ) -> Result<NoRiskToken> {
-        info!("[NoRisk API] Refreshing NoRisk token v2 with HWID: {}", hwid);
+        info!("[NoRisk API] Refreshing NoRisk token v3 with HWID: {}", hwid);
         debug!("[NoRisk API] Username: {}", username);
         debug!("[NoRisk API] Force refresh: {}", force);
         debug!("[NoRisk API] Experimental mode: {}", is_experimental);
 
-        // Step 1: Generate a random server ID for the authentication
-        let server_id = format!("{:x}", rand::random::<u64>());
-        info!("[NoRisk API] Generated server ID for v2 authentication: {}", server_id);
+        // Step 1: Request server ID from NoRisk API
+        debug!("[NoRisk API] Step 1: Requesting server ID from NoRisk API");
+        let server_response = Self::request_server_id(is_experimental).await?;
+        let server_id = &server_response.server_id;
+        info!("[NoRisk API] Received server ID: {}", server_id);
 
         // Step 2: Join the Minecraft server session (client-side authentication)
-        debug!("[NoRisk API] Step 1: Joining Minecraft server session");
+        debug!("[NoRisk API] Step 2: Joining Minecraft server session with server ID: {}", server_id);
         let mc_api = crate::minecraft::api::mc_api::MinecraftApiService::new();
-        mc_api.join_server_session(access_token, selected_profile, &server_id).await?;
+        mc_api.join_server_session(access_token, selected_profile, server_id).await?;
         info!("[NoRisk API] Successfully joined Minecraft server session");
 
         // Step 3: Call NoRisk API v2 (server will verify with has_joined)
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/auth/validate/v2", base_url);
 
-        debug!("[NoRisk API] Step 2: Making POST request to auth/validate/v2 endpoint");
+        debug!("[NoRisk API] Step 3: Making POST request to auth/validate/v2 endpoint");
         debug!("[NoRisk API] Full URL: {}", url);
 
         // All parameters as query parameters
@@ -226,21 +286,21 @@ impl NoRiskApi {
         query_params.insert("force", force_str.as_str());
         query_params.insert("hwid", hwid);
         query_params.insert("username", username);
-        query_params.insert("server_id", &server_id);
+        query_params.insert("server_id", server_id);
 
-        debug!("[NoRisk API] Sending POST request with all parameters as query params (no auth token, no body)");
+        debug!("[NoRisk API] Sending POST request with server-provided server ID");
         let response = HTTP_CLIENT
             .post(url)
             .query(&query_params)
             .send()
             .await
             .map_err(|e| {
-                error!("[NoRisk API] v2 token refresh request failed: {}", e);
-                AppError::RequestError(format!("Failed to send v2 token refresh request to NoRisk API: {}", e))
+                error!("[NoRisk API] v3 token refresh request failed: {}", e);
+                AppError::RequestError(format!("Failed to send v3 token refresh request to NoRisk API: {}", e))
             })?;
 
         let status = response.status();
-        debug!("[NoRisk API] v2 token refresh response status: {}", status);
+        debug!("[NoRisk API] v3 token refresh response status: {}", status);
 
         if !status.is_success() {
             let error_body = response
@@ -248,25 +308,25 @@ impl NoRiskApi {
                 .await
                 .unwrap_or_else(|_| "Failed to read error body".to_string());
             error!(
-                "[NoRisk API] v2 token refresh error response: Status {}, Body: {}",
+                "[NoRisk API] v3 token refresh error response: Status {}, Body: {}",
                 status, error_body
             );
             return Err(AppError::RequestError(format!(
-                "NoRisk API v2 returned error status: {}, Body: {}",
+                "NoRisk API v3 returned error status: {}, Body: {}",
                 status, error_body
             )));
         }
 
-        debug!("[NoRisk API] Parsing v2 token refresh response body as JSON");
+        debug!("[NoRisk API] Parsing v3 token refresh response body as JSON");
         match response.json::<NoRiskToken>().await {
             Ok(token) => {
-                info!("[NoRisk API] v2 token refresh successful");
+                info!("[NoRisk API] v3 token refresh successful");
                 debug!("[NoRisk API] Token valid status: {}", token.value.len() > 0);
                 Ok(token)
             }
             Err(e) => {
-                error!("[NoRisk API] Failed to parse v2 token refresh response: {}", e);
-                Err(AppError::ParseError(format!("Failed to parse NoRisk API v2 response: {}", e)))
+                error!("[NoRisk API] Failed to parse v3 token refresh response: {}", e);
+                Err(AppError::ParseError(format!("Failed to parse NoRisk API v3 response: {}", e)))
             }
         }
     }

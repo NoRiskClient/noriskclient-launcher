@@ -259,14 +259,12 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     }
   };
 
-  return (
-    <Modal
+  return (    <Modal
       title={`profile settings: ${profile.name}`}
       onClose={onClose}
       width="xl"
       footer={renderFooter()}
-    >
-      <div className="flex flex-1 h-[500px] overflow-hidden">
+    ><div className="flex h-[500px] overflow-hidden">
         <Card
           ref={sidebarRef}
           className="w-64 overflow-y-auto custom-scrollbar bg-black/20 border border-white/10 p-4"

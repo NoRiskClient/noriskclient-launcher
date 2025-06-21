@@ -5,6 +5,7 @@ import { forwardRef, useEffect, useRef } from "react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getBorderRadiusClass } from "./design-system";
 
 interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "text" | "image" | "block";
@@ -31,9 +32,8 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
   ) => {
     const skeletonRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+    const radiusClass = getBorderRadiusClass();
 
     const mergedRef = (node: HTMLDivElement) => {
       if (ref) {
@@ -100,9 +100,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
       }
     };
 
-    const variantStyles = getVariantStyles();
-
-    if (variant === "text" && lines > 1) {
+    const variantStyles = getVariantStyles();    if (variant === "text" && lines > 1) {
       return (
         <div
           className={cn("flex flex-col gap-2", className)}
@@ -114,7 +112,8 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
               key={i}
               className={cn(
                 "relative overflow-hidden backdrop-blur-sm transition-all duration-200",
-                "rounded-md border-2",
+                radiusClass,
+                "border-2",
                 shadowDepth !== "none" && "border-b-4",
                 animated && "animate-skeleton-pulse",
               )}
@@ -146,7 +145,8 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
         ref={mergedRef}
         className={cn(
           "relative overflow-hidden backdrop-blur-sm transition-all duration-200",
-          "rounded-md border-2",
+          radiusClass,
+          "border-2",
           shadowDepth !== "none" && "border-b-4",
           animated && "animate-skeleton-pulse",
           className,

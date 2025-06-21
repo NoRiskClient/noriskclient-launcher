@@ -51,7 +51,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
       "font-minecraft relative overflow-hidden transition-all duration-300",
       "w-16 h-16 rounded-md text-white flex items-center justify-center",
       "text-shadow-sm",
-      "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
+      "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/20",
     );
 
     const activeStateClasses = cn(
@@ -96,7 +96,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
           isActive ? activeStateClasses : nonActiveStateClasses,
           className,
         )}
-        style={isActive ? activeStateStyles : nonActiveStateStyles}
+        style={isActive ? activeStateStyles : { ...nonActiveStateStyles, borderColor: "transparent" }}
         {...props}
       >
         <span

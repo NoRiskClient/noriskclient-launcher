@@ -22,7 +22,7 @@ use crate::utils::resourcepack_utils::ResourcePackInfo;
 use crate::utils::shaderpack_utils::ShaderPackInfo;
 use crate::utils::world_utils;
 use crate::utils::{
-    datapack_utils, path_utils, profile_utils, resourcepack_utils, shaderpack_utils,
+    datapack_utils, path_utils, profile_utils, repair_utils, resourcepack_utils, shaderpack_utils,
 };
 use chrono::Utc;
 use log::{error, info, trace, warn};
@@ -513,6 +513,16 @@ async fn try_update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(),
 pub async fn delete_profile(id: Uuid) -> Result<(), CommandError> {
     let state = State::get().await?;
     state.profile_manager.delete_profile(id).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn repair_profile(id: Uuid) -> Result<(), CommandError> {
+    info!("Executing repair_profile command for profile {}", id);
+    
+    // Call the actual repair function from repair_utils
+    repair_utils::repair_profile(id).await?;
+    
     Ok(())
 }
 

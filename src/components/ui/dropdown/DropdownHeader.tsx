@@ -18,10 +18,9 @@ export function DropdownHeader({
 }: DropdownHeaderProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
 
-  return (
-    <div
+  return (    <div
       className={cn(
-        "px-4 py-3 font-minecraft text-2xl text-white border-b-2 relative",
+        "px-4 py-3 font-minecraft text-xl text-white border-b-2 relative",
         "flex items-center justify-between",
         className,
       )}

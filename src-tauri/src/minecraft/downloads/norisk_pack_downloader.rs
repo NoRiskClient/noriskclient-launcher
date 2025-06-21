@@ -311,6 +311,15 @@ impl NoriskPackDownloadService {
                 .map_err(|e| AppError::Download(format!("Write error: {}", e)))?;
         }
 
+        // Ensure the file is fully written to disk before attempting to read it.
+        // This prevents potential "end of central directory record not found" errors with zip/jar files
+        // that can occur if we try to read the file before the OS has flushed all write buffers.
+        file.sync_all()
+            .await
+            .map_err(|e| AppError::Download(format!("Failed to sync norisk pack file: {}", e)))?;
+        // Explicitly close the file by dropping the handle
+        drop(file);
+
         debug!("Finished writing file: {:?}", target_path);
 
         if let Some(expected_hash) = expected_sha1 {

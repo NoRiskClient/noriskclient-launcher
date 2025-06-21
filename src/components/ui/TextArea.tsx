@@ -1,32 +1,63 @@
 "use client";
 
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { 
+  getSizeClasses,
+  getVariantColors,
+  getAccessibilityProps,
+  getRadiusClasses,
+  createRadiusStyle,
+  type ComponentVariant,
+  type ComponentSize,
+  type StateVariant
+} from "./design-system";
 
 export interface TextAreaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: string;
-  variant?: "default" | "flat" | "3d";
+  success?: boolean;
+  helperText?: string;
+  variant?: ComponentVariant;
+  state?: StateVariant;
+  resize?: "none" | "vertical" | "horizontal" | "both";
+  fullWidth?: boolean;
 }
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
-  ({ className, error, variant = "default", ...props }, ref) => {
+  (
+    {
+      className,
+      error,
+      success,
+      helperText,
+      variant = "default",
+      state,
+      resize = "vertical",
+      fullWidth = true,
+      rows = 4,
+      ...props
+    },
+    ref,
+  ) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+      const accentColor = useThemeStore((state) => state.accentColor);
+    const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+    const borderRadius = useThemeStore((state) => state.borderRadius);
 
-    const handleFocus = () => {
+    const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+      if (props.disabled) return;
       setIsFocused(true);
+      if (props.onFocus) props.onFocus(e);
     };
 
-    const handleBlur = () => {
+    const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+      if (props.disabled) return;
       setIsFocused(false);
+      if (props.onBlur) props.onBlur(e);
     };
 
     const handleMouseEnter = () => {
@@ -37,71 +68,72 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     const handleMouseLeave = () => {
       if (props.disabled) return;
       setIsHovered(false);
-    };
+    };    const currentState = error ? "error" : (success ? "success" : state);
+    const colors = getVariantColors(variant || "default", accentColor);
+    const accessibilityProps = getAccessibilityProps({
+      label: props["aria-label"],
+      description: helperText,
+      error: error,
+      disabled: props.disabled
+    });
 
-    const getBorderClasses = () => {
-      if (variant === "3d") {
-        return "border-2 border-b-4";
-      }
-      return "border border-b-2";
+    const resizeClasses = {
+      none: "resize-none",
+      vertical: "resize-y",
+      horizontal: "resize-x", 
+      both: "resize",
     };
 
     return (
-      <div className="w-full">
+      <div className={cn("w-full", !fullWidth && "w-auto")}>
         <div
-          ref={containerRef}
           className={cn(
-            "relative rounded-md",
-            getBorderClasses(),
-            "overflow-hidden",
-            error ? "border-red-500" : "",
-            props.disabled ? "opacity-50 cursor-not-allowed" : "",
+            "relative overflow-hidden min-h-[100px] border-2 border-b-4 backdrop-blur-md",
+            getRadiusClasses(borderRadius, "input"),
+            props.disabled && "opacity-50 cursor-not-allowed",
             className,
-          )}
-          style={{
-            backgroundColor: `${accentColor.value}${isHovered || isFocused ? "50" : "30"}`,
-            borderColor: error
-              ? "rgba(239, 68, 68, 0.6)"
-              : `${accentColor.value}${isHovered || isFocused ? "90" : "80"}`,
-            borderBottomColor: error
-              ? "rgb(185, 28, 28)"
-              : isHovered || isFocused
-                ? accentColor.hoverValue
-                : accentColor.value,
-            filter:
-              (isHovered || isFocused) && !props.disabled
-                ? "brightness(1.1)"
-                : "brightness(1)",
+          )}          style={{
+            backgroundColor: isFocused || isHovered ? `${colors.main}50` : `${colors.main}30`,
+            borderColor: error ? "rgba(239, 68, 68, 0.6)" : `${colors.main}${isFocused || isHovered ? "90" : "80"}`,
+            borderBottomColor: error ? "rgb(185, 28, 28)" : (isFocused || isHovered ? colors.light : colors.main),
+            filter: (isFocused || isHovered) && !props.disabled ? "brightness(1.1)" : "brightness(1)",
+            transform: isHovered && !props.disabled ? "scale(1.02)" : "scale(1)",
+            ...createRadiusStyle(borderRadius),
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          {variant === "3d" && (
-            <span
-              className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm transition-colors duration-200"
-              style={{
-                backgroundColor: error
-                  ? "rgba(239, 68, 68, 0.8)"
-                  : isHovered || isFocused
-                    ? accentColor.hoverValue
-                    : `${accentColor.value}80`,
-                opacity: isHovered || isFocused ? 1 : 0.8,
-              }}
-            />
-          )}
-
           <textarea
             ref={ref}
-            className="w-full min-h-[100px] bg-transparent border-none outline-none p-3 text-white font-minecraft-ten text-xs placeholder:text-white/50 resize-y custom-scrollbar transition-transform duration-200"
-            onFocus={handleFocus}
+            rows={rows}            className={cn(
+              "w-full h-full bg-transparent outline-none",
+              "text-white placeholder-white placeholder-opacity-50",
+              "font-minecraft lowercase p-4 text-xl",
+              "focus:outline-none",
+              resizeClasses[resize],
+            )}onFocus={handleFocus}
             onBlur={handleBlur}
+            aria-invalid={!!error}
+            aria-describedby={
+              error || helperText ? `${props.id || "textarea"}-description` : undefined
+            }
+            {...accessibilityProps}
             {...props}
           />
         </div>
-        {error && (
-          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
-            {error}
-          </p>
+
+        {(error || helperText) && (
+          <div
+            id={`${props.id || "textarea"}-description`}
+            className={cn(
+              "mt-2 text-sm lowercase",
+              error ? "text-red-400" : "text-white text-opacity-70"
+            )}
+            role={error ? "alert" : "region"}
+            aria-live={error ? "assertive" : "polite"}
+          >
+            {error || helperText}
+          </div>
         )}
       </div>
     );

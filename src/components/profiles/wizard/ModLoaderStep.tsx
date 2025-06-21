@@ -26,6 +26,7 @@ interface LoaderVersionInfo {
 export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
   const [loaderVersions, setLoaderVersions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [checkingCompatibility, setCheckingCompatibility] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compatibility, setCompatibility] = useState<
     Record<ModLoader, boolean>
@@ -96,7 +97,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
   const checkCompatibility = async () => {
     if (!profile.game_version) return;
 
-    setLoading(true);
+    setCheckingCompatibility(true);
     setError(null);
 
     try {
@@ -165,7 +166,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
       console.error("Error checking compatibility:", err);
       setError("failed to check mod loader compatibility");
     } finally {
-      setLoading(false);
+      setCheckingCompatibility(false);
     }
   };
 
@@ -263,7 +264,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
         variant="flat"
         className="p-6 space-y-6 bg-black/20 border border-white/10"
       >
-        <div className="grid grid-cols-2 md:grid-cols-3  gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-stretch">
           <ModLoaderCard
             name="vanilla"
             icon="/icons/minecraft.png"
@@ -271,6 +272,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
             isCompatible={true}
             onClick={() => handleSelectModLoader("vanilla")}
             description="Pure Minecraft without mods"
+            loading={false}
           />
 
           <ModLoaderCard
@@ -280,6 +282,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
             isCompatible={compatibility.fabric}
             onClick={() => handleSelectModLoader("fabric")}
             description="Lightweight mod loader"
+            loading={checkingCompatibility}
           />
 
           <ModLoaderCard
@@ -289,6 +292,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
             isCompatible={compatibility.forge}
             onClick={() => handleSelectModLoader("forge")}
             description="Classic mod loader"
+            loading={checkingCompatibility}
           />
 
           <ModLoaderCard
@@ -298,6 +302,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
             isCompatible={compatibility.quilt}
             onClick={() => handleSelectModLoader("quilt")}
             description="Fork of Fabric with more features"
+            loading={checkingCompatibility}
           />
 
           <ModLoaderCard
@@ -307,6 +312,7 @@ export function ModLoaderStep({ profile, updateProfile }: ModLoaderStepProps) {
             isCompatible={compatibility.neoforge}
             onClick={() => handleSelectModLoader("neoforge")}
             description="Modern fork of Forge"
+            loading={checkingCompatibility}
           />
         </div>
       </Card>
@@ -387,6 +393,7 @@ interface ModLoaderCardProps {
   isCompatible: boolean;
   onClick: () => void;
   description: string;
+  loading?: boolean;
 }
 
 function ModLoaderCard({
@@ -396,6 +403,7 @@ function ModLoaderCard({
   isCompatible,
   onClick,
   description,
+  loading = false,
 }: ModLoaderCardProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
@@ -422,7 +430,7 @@ function ModLoaderCard({
       ref={cardRef}
       variant={isSelected ? "default" : "ghost"}
       className={cn(
-        "p-6 flex flex-col items-center justify-center cursor-pointer w-full h-full min-h-[140px]",
+        "p-6 flex flex-col items-center justify-start cursor-pointer w-full h-[160px]",
         isSelected
           ? "bg-black/30 grayscale-0 text-white"
           : isCompatible
@@ -432,19 +440,33 @@ function ModLoaderCard({
       onClick={isCompatible ? onClick : undefined}
       disabled={!isCompatible}
     >
-      <img
-        src={icon || "/placeholder.svg"}
-        alt={name}
-        className="w-12 h-12 mb-3 object-contain"
-        style={{ opacity: isCompatible ? 1 : 0.5 }}
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = "/icons/minecraft.png";
-        }}
-      />
-      <span className="font-minecraft text-xl lowercase">{name}</span>
-      {!isCompatible && (
-        <span className="text-lg text-white/50 mt-2">not compatible</span>
-      )}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <img
+          src={icon || "/placeholder.svg"}
+          alt={name}
+          className="w-12 h-12 mb-3 object-contain"
+          style={{ opacity: isCompatible ? 1 : 0.5 }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = "/icons/minecraft.png";
+          }}
+        />
+        <span className="font-minecraft text-xl lowercase">{name}</span>
+      </div>
+      <div className="min-h-[20px] flex items-center justify-center">
+        {loading ? (
+          <div className="flex items-center gap-1">
+            <Icon
+              icon="solar:refresh-bold"
+              className="w-4 h-4 animate-spin text-white/50"
+            />
+            <span className="text-sm text-white/50">checking...</span>
+          </div>
+        ) : (
+          !isCompatible && (
+            <span className="text-lg text-white/50">not compatible</span>
+          )
+        )}
+      </div>
     </Button>
   );
 }

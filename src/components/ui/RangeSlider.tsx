@@ -1,10 +1,16 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Icon } from "@iconify/react";
+import { 
+  getBorderRadiusClass,
+  getAccessibilityProps,
+  type ComponentSize,
+  type ComponentVariant 
+} from "./design-system";
 
 interface RangeSliderProps {
   value: number;
@@ -18,10 +24,12 @@ interface RangeSliderProps {
   maxLabel?: string;
   disabled?: boolean;
   showValue?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: ComponentSize;
   className?: string;
-  variant?: "default" | "flat" | "3d";
+  variant?: ComponentVariant;
   icon?: React.ReactNode;
+  label?: string;
+  description?: string;
 }
 
 export function RangeSlider({
@@ -40,6 +48,8 @@ export function RangeSlider({
   className,
   variant = "flat",
   icon,
+  label,
+  description,
 }: RangeSliderProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const [isHovered, setIsHovered] = useState(false);
@@ -51,12 +61,21 @@ export function RangeSlider({
   const thumbRef = useRef<HTMLDivElement>(null);
   const valueDisplayRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastChangeTimeRef = useRef(0);
+  
+  const radiusClass = getBorderRadiusClass();
+  const accessibilityProps = getAccessibilityProps({
+    label,
+    description,
+    disabled,
+    required: false
+  });
 
   useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
-  const sizeConfig = {
+    if (!isDragging) {
+      setLocalValue(value);
+    }
+  }, [value, isDragging]);  const sizeConfig = {
     sm: {
       track: "h-2",
       thumb: "w-5 h-5",
@@ -65,32 +84,46 @@ export function RangeSlider({
     md: {
       track: "h-3",
       thumb: "w-6 h-6",
-      text: "text-sm",
+      text: "text-base",
     },
     lg: {
       track: "h-4",
       thumb: "w-8 h-8",
-      text: "text-base",
+      text: "text-lg",
     },
   };
 
-  const getPercentage = (val: number) => {
+  const getPercentage = useCallback((val: number) => {
     return ((val - min) / (max - min)) * 100;
-  };
+  }, [min, max]);
 
-  const updateUI = () => {
+  const updateVisualPosition = useCallback((newValue: number) => {
     if (!progressRef.current || !thumbRef.current) return;
-
-    const percentage = getPercentage(localValue);
-
+    
+    const percentage = getPercentage(newValue);
     progressRef.current.style.width = `${percentage}%`;
-
     thumbRef.current.style.left = `${percentage}%`;
-  };
+    
+    if (valueDisplayRef.current) {
+      valueDisplayRef.current.textContent = String(newValue);
+    }
+  }, [getPercentage]);
 
-  useEffect(() => {
-    updateUI();
-  }, [localValue, min, max]);
+  const calculateValueFromMouseEvent = useCallback((e: MouseEvent | React.MouseEvent) => {
+    if (!trackRef.current) return localValue;
+    
+    const rect = trackRef.current.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, offsetX / width));
+    let newValue = min + percentage * (max - min);
+
+    if (step > 0) {
+      newValue = Math.round(newValue / step) * step;
+    }
+
+    return Math.max(min, Math.min(max, newValue));
+  }, [min, max, step, localValue]);
 
   const handleMouseEnter = () => {
     if (disabled) return;
@@ -104,23 +137,17 @@ export function RangeSlider({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (disabled) return;
+    
     setIsDragging(true);
-
-    if (trackRef.current) {
-      const rect = trackRef.current.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const width = rect.width;
-      const percentage = Math.max(0, Math.min(1, offsetX / width));
-      let newValue = min + percentage * (max - min);
-
-      if (step > 0) {
-        newValue = Math.round(newValue / step) * step;
-      }
-
-      newValue = Math.max(min, Math.min(max, newValue));
-
-      setLocalValue(newValue);
+    const newValue = calculateValueFromMouseEvent(e);
+    
+    setLocalValue(newValue);
+    updateVisualPosition(newValue);
+    
+    const now = Date.now();
+    if (now - lastChangeTimeRef.current > 16) {
       onChange(newValue);
+      lastChangeTimeRef.current = now;
     }
 
     if (inputRef.current) {
@@ -129,56 +156,54 @@ export function RangeSlider({
     e.preventDefault();
   };
 
-  const handleMouseUp = () => {
-    if (disabled) return;
+  const handleMouseUp = useCallback(() => {
+    if (!isDragging) return;
+    
     setIsDragging(false);
-
-    if (onChangeEnd && localValue !== value) {
+    
+    if (onChangeEnd) {
       onChangeEnd(localValue);
     }
-  };
+  }, [isDragging, localValue, onChangeEnd]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = Number(e.target.value);
     setLocalValue(newValue);
+    updateVisualPosition(newValue);
     onChange(newValue);
   };
 
   useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const newValue = calculateValueFromMouseEvent(e);
+      setLocalValue(newValue);
+      updateVisualPosition(newValue);
+      
+      const now = Date.now();
+      if (now - lastChangeTimeRef.current > 16) {
+        onChange(newValue);
+        lastChangeTimeRef.current = now;
+      }
+    };
+
     const handleGlobalMouseUp = () => {
       if (isDragging) {
         handleMouseUp();
       }
     };
 
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !trackRef.current) return;
-
-      const rect = trackRef.current.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const width = rect.width;
-
-      const percentage = Math.max(0, Math.min(1, offsetX / width));
-      let newValue = min + percentage * (max - min);
-
-      if (step > 0) {
-        newValue = Math.round(newValue / step) * step;
-      }
-
-      newValue = Math.max(min, Math.min(max, newValue));
-
-      setLocalValue(newValue);
-      onChange(newValue);
-    };
-
-    document.addEventListener("mouseup", handleGlobalMouseUp);
-    document.addEventListener("mousemove", handleGlobalMouseMove);
+    if (isDragging) {
+      document.addEventListener("mousemove", handleGlobalMouseMove);
+      document.addEventListener("mouseup", handleGlobalMouseUp);
+    }
 
     return () => {
-      document.removeEventListener("mouseup", handleGlobalMouseUp);
       document.removeEventListener("mousemove", handleGlobalMouseMove);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
     };
-  }, [isDragging, min, max, step, onChange]);
+  }, [isDragging, calculateValueFromMouseEvent, onChange, handleMouseUp]);
 
   return (
     <div
@@ -194,7 +219,7 @@ export function RangeSlider({
           {icon && <span className="text-white">{icon}</span>}
           <span
             className={cn(
-              "text-white font-minecraft-ten tracking-wide",
+              "text-white tracking-wide",
               sizeConfig[size].text,
             )}
           >
@@ -205,22 +230,19 @@ export function RangeSlider({
 
       <div className="mb-2">
         {showValue && (
-          <div className="flex justify-between mb-1">
-            {minLabel && (
+          <div className="flex justify-between mb-1">            {minLabel && (
               <span
                 className={cn(
-                  "text-white/70 font-minecraft-ten",
+                  "text-white/70",
                   sizeConfig[size].text,
                 )}
               >
                 {minLabel}
               </span>
-            )}
-            <div className="flex items-center gap-1">
-              <span
-                ref={valueDisplayRef}
+            )}<div className="flex items-center gap-1">
+              <span                ref={valueDisplayRef}
                 className={cn(
-                  "text-white font-minecraft-ten",
+                  "text-white",
                   sizeConfig[size].text,
                 )}
               >
@@ -232,11 +254,10 @@ export function RangeSlider({
                   className="w-3 h-3 text-yellow-400"
                 />
               )}
-            </div>
-            {maxLabel && (
+            </div>            {maxLabel && (
               <span
                 className={cn(
-                  "text-white/70 font-minecraft-ten",
+                  "text-white/70",
                   sizeConfig[size].text,
                 )}
               >
@@ -251,12 +272,12 @@ export function RangeSlider({
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-        >
-          <div
+        >          <div
             className={cn(
               "relative overflow-hidden transition-colors duration-200",
               "border border-white/10",
               "focus-within:ring-1 focus-within:ring-white/30",
+              radiusClass,
               sizeConfig[size].track,
             )}
             style={{
@@ -267,7 +288,7 @@ export function RangeSlider({
           >
             <div
               ref={progressRef}
-              className="absolute h-full"
+              className={cn("absolute h-full", radiusClass)}
               style={{
                 width: `${getPercentage(localValue)}%`,
                 backgroundColor: `${accentColor.value}${isHovered ? "60" : "50"}`,
@@ -281,6 +302,7 @@ export function RangeSlider({
               "absolute top-2 -translate-x-1/2 z-10 cursor-grab",
               isDragging && "cursor-grabbing",
               "border-2",
+              radiusClass,
               sizeConfig[size].thumb,
               "transition-colors duration-200",
             )}
@@ -294,7 +316,7 @@ export function RangeSlider({
             }}
           >
             <div
-              className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent transition-opacity duration-200"
+              className={cn("absolute inset-0 bg-gradient-to-b from-white/20 to-transparent transition-opacity duration-200", radiusClass)}
               style={{ opacity: isHovered || isDragging ? 0.5 : 0 }}
             />
 
@@ -303,9 +325,7 @@ export function RangeSlider({
             </div>
           </div>
         </div>
-      </div>
-
-      <input
+      </div>      <input
         ref={inputRef}
         type="range"
         min={min}
@@ -321,7 +341,16 @@ export function RangeSlider({
         aria-valuetext={
           valueLabel ? `${valueLabel}: ${localValue}` : `${localValue}`
         }
+        {...accessibilityProps}
       />
+      {description && (
+        <p 
+          id={accessibilityProps["aria-describedby"]}
+          className="text-sm text-gray-400 mt-1"
+        >
+          {description}
+        </p>
+      )}
     </div>
   );
 }

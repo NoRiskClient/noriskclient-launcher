@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
+import { getBorderRadiusClass } from "./design-system";
 
 interface StatusMessageProps {
   type: "success" | "error" | "warning" | "info";
@@ -17,6 +18,7 @@ export function StatusMessage({
   className,
 }: StatusMessageProps) {
   const messageRef = useRef<HTMLDivElement>(null);
+  const radiusClass = getBorderRadiusClass();
 
   useEffect(() => {
     if (messageRef.current) {
@@ -67,20 +69,22 @@ export function StatusMessage({
   };
 
   const styles = getTypeStyles();
-
   return (
     <div
       ref={messageRef}
       className={cn(
-        "flex items-start p-4 mb-6 rounded-md border-2 border-b-4",
+        "flex items-start p-4 mb-6 border-2 border-b-4",
+        radiusClass,
         styles.bg,
         styles.border,
         styles.text,
         className,
       )}
+      role="alert"
+      aria-live="polite"
     >
-      <Icon icon={styles.icon} className="w-6 h-6 mr-3 flex-shrink-0 mt-1" />
-      <div className="text-base font-minecraft-ten">{message}</div>
+      <Icon icon={styles.icon} className="w-6 h-6 mr-3 flex-shrink-0 mt-1" aria-hidden="true" />
+      <div className="text-base">{message}</div>
     </div>
   );
 }

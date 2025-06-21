@@ -82,11 +82,18 @@ export function MainLaunchButton({
 
   useEffect(() => {
     const currentStoreVersion = selectedVersion;
-    const storeVersionIsValidInProps = versions?.some(v => v.id === currentStoreVersion);
+    const storeVersionIsValidInProps = versions?.some(
+      (v) => v.id === currentStoreVersion
+    );
 
     if (defaultVersion) {
-      if (!storeVersionIsValidInProps || currentStoreVersion !== defaultVersion) {
-        const defaultVersionPropIsValidInProps = versions?.some(v => v.id === defaultVersion);
+      if (
+        !storeVersionIsValidInProps ||
+        currentStoreVersion !== defaultVersion
+      ) {
+        const defaultVersionPropIsValidInProps = versions?.some(
+          (v) => v.id === defaultVersion
+        );
         if (defaultVersionPropIsValidInProps) {
           setSelectedVersion(defaultVersion);
         } else if (versions && versions.length > 0) {
@@ -121,7 +128,7 @@ export function MainLaunchButton({
           payload.event_type?.toLowerCase() === "minecraft_output"
         ) {
           console.log(
-            "[LaunchButton] Game started (minecraft_output) event, resetting UI if still launching.",
+            "[LaunchButton] Game started (minecraft_output) event, resetting UI if still launching."
           );
           if (isButtonLaunching) {
             finalizeButtonLaunch(selectedVersion);
@@ -132,7 +139,7 @@ export function MainLaunchButton({
 
     const setupDetailedListener = async () => {
       console.log(
-        `[LaunchButton] Setting up detailed status listener for ${selectedVersion}`,
+        `[LaunchButton] Setting up detailed status listener for ${selectedVersion}`
       );
       unlistenDetailedStateEvent = await listen<FrontendEventPayload>(
         "state_event",
@@ -143,7 +150,7 @@ export function MainLaunchButton({
 
             if (eventTypeFromPayload === FrontendEventType.LaunchSuccessful) {
               console.log(
-                `[LaunchButton] LaunchSuccessful event for ${selectedVersion}`,
+                `[LaunchButton] LaunchSuccessful event for ${selectedVersion}`
               );
               finalizeButtonLaunch(selectedVersion);
               setButtonStatusMessage(selectedVersion, "STARTING!");
@@ -158,7 +165,7 @@ export function MainLaunchButton({
               }
             } else if (eventTypeFromPayload === FrontendEventType.Error) {
               console.log(
-                `[LaunchButton] Error event via state_event for ${selectedVersion}, resetting UI.`,
+                `[LaunchButton] Error event via state_event for ${selectedVersion}, resetting UI.`
               );
               const eventErrorMsg =
                 eventMessage || "Error during launch process.";
@@ -170,7 +177,7 @@ export function MainLaunchButton({
               }
             }
           }
-        },
+        }
       );
     };
 
@@ -187,7 +194,14 @@ export function MainLaunchButton({
       if (unlistenStart) unlistenStart();
       if (unlistenDetailedStateEvent) unlistenDetailedStateEvent();
     };
-  }, [selectedVersion, isButtonLaunching, getProfileState, finalizeButtonLaunch, setButtonStatusMessage, setLaunchError]);
+  }, [
+    selectedVersion,
+    isButtonLaunching,
+    getProfileState,
+    finalizeButtonLaunch,
+    setButtonStatusMessage,
+    setLaunchError,
+  ]);
 
   // Effect for Polling 'is_profile_launching' status
   useEffect(() => {
@@ -202,37 +216,42 @@ export function MainLaunchButton({
     if (isButtonLaunching && selectedVersion) {
       console.log(
         "[LaunchButton] Starting polling for launcher task finished for",
-        selectedVersion,
+        selectedVersion
       );
       pollingIntervalRef.current = setInterval(async () => {
         try {
           const isStillPhysicallyLaunching = await invoke<boolean>(
             "is_profile_launching",
-            { profileId: selectedVersion },
+            { profileId: selectedVersion }
           );
           const launcherTaskFinished = !isStillPhysicallyLaunching;
 
           if (launcherTaskFinished) {
             console.log(
               "[LaunchButton] Polling determined launcher task finished for",
-              selectedVersion,
+              selectedVersion
             );
             clearPolling();
 
-            const currentProfileStateAfterPoll = getProfileState(selectedVersion);
+            const currentProfileStateAfterPoll =
+              getProfileState(selectedVersion);
             if (
               currentProfileStateAfterPoll.launchState === LaunchState.ERROR ||
               currentProfileStateAfterPoll.error
             ) {
               console.log(
-                "[LaunchButton] Polling: Launch task finished, but an error was detected in store.",
+                "[LaunchButton] Polling: Launch task finished, but an error was detected in store."
               );
               if (currentProfileStateAfterPoll.isButtonLaunching) {
-                 finalizeButtonLaunch(selectedVersion, currentProfileStateAfterPoll.error || "Unknown error after completion.");
+                finalizeButtonLaunch(
+                  selectedVersion,
+                  currentProfileStateAfterPoll.error ||
+                    "Unknown error after completion."
+                );
               }
             } else {
               console.log(
-                "[LaunchButton] Polling: Launch task finished successfully.",
+                "[LaunchButton] Polling: Launch task finished successfully."
               );
               if (currentProfileStateAfterPoll.isButtonLaunching) {
                 finalizeButtonLaunch(selectedVersion);
@@ -242,7 +261,7 @@ export function MainLaunchButton({
         } catch (err: any) {
           console.error(
             "[LaunchButton] Error during polling is_profile_launching:",
-            err,
+            err
           );
           const pollErrorMsg =
             err.message ||
@@ -258,7 +277,13 @@ export function MainLaunchButton({
     }
 
     return clearPolling;
-  }, [selectedVersion, isButtonLaunching, finalizeButtonLaunch, getProfileState, setButtonStatusMessage]);
+  }, [
+    selectedVersion,
+    isButtonLaunching,
+    finalizeButtonLaunch,
+    getProfileState,
+    setButtonStatusMessage,
+  ]);
 
   // Effect for initializing profile state (less frequent updates)
   useEffect(() => {
@@ -266,10 +291,17 @@ export function MainLaunchButton({
       initializeProfile(selectedVersion);
       const currentProfile = getProfileState(selectedVersion);
       if (currentProfile.isButtonLaunching) {
-        console.log("[LaunchButton] Init: MC not running, but button state is launching. Polling will handle.");
+        console.log(
+          "[LaunchButton] Init: MC not running, but button state is launching. Polling will handle."
+        );
       }
     }
-  }, [selectedVersion, initializeProfile, getProfileState, finalizeButtonLaunch]);
+  }, [
+    selectedVersion,
+    initializeProfile,
+    getProfileState,
+    finalizeButtonLaunch,
+  ]);
 
   const handleLaunch = async () => {
     if (!selectedVersion) return;
@@ -341,7 +373,10 @@ export function MainLaunchButton({
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {
       statusSubText = buttonStatusMessage || currentStep || "Launching...";
-      statusColorClass = buttonStatusMessage || currentStep ? "opacity-90 text-white" : "opacity-75";
+      statusColorClass =
+        buttonStatusMessage || currentStep
+          ? "opacity-90 text-white"
+          : "opacity-75";
     } else if (buttonStatusMessage && launchState === LaunchState.ERROR) {
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-red-400";
@@ -351,17 +386,20 @@ export function MainLaunchButton({
     }
 
     const displaySubText = statusSubText || selectedVersionLabel;
-
     return (
       <div className="w-full flex flex-col items-center justify-center leading-none -mt-4">
-        <span className="text-5xl text-center lowercase">{actionText}</span>
+        <span className="text-5xl text-center lowercase">{actionText}</span>{" "}
         {displaySubText && (
           <span
             className={cn(
-              "text-xs font-minecraft-ten tracking-normal -mt-1 text-center normal-case",
-              statusColorClass,
+              "text-xs font-minecraft-ten tracking-normal -mt-1 text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
+              isButtonLaunching ? "max-w-64" : "",
+              statusColorClass
             )}
-            title={typeof displaySubText === 'string' ? displaySubText : undefined}
+            style={isButtonLaunching ? { maxWidth: "16rem" } : undefined}
+            title={
+              typeof displaySubText === "string" ? displaySubText : undefined
+            }
           >
             {displaySubText}
           </span>
@@ -387,7 +425,10 @@ export function MainLaunchButton({
         <div className="flex items-center relative">
           <Button
             onClick={handleLaunch}
-            disabled={!selectedVersion || (versions && versions.length === 0 && !selectedVersion)}
+            disabled={
+              !selectedVersion ||
+              (versions && versions.length === 0 && !selectedVersion)
+            }
             size="xl"
             icon={undefined}
             variant={getButtonVariant()}

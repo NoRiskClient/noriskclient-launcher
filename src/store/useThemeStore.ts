@@ -198,6 +198,10 @@ const calculateColorVariants = (baseColor: string): Partial<AccentColor> => {
   };
 };
 
+export const DEFAULT_BORDER_RADIUS = 0; 
+export const MIN_BORDER_RADIUS = 0;
+export const MAX_BORDER_RADIUS = 32;
+
 interface ThemeState {
   accentColor: AccentColor;
   setAccentColor: (color: AccentColor) => void;
@@ -216,6 +220,9 @@ interface ThemeState {
   toggleBackgroundAnimation: () => void;
   hasAcceptedTermsOfService: boolean;
   acceptTermsOfService: () => void;
+  borderRadius: number;
+  setBorderRadius: (radius: number) => void;
+  applyBorderRadiusToDOM: () => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -228,11 +235,20 @@ export const useThemeStore = create<ThemeState>()(
       staticBackground: true,
       hasAcceptedTermsOfService: false,
       customColorHistory: [],
+      borderRadius: DEFAULT_BORDER_RADIUS,
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
         get().applyAccentColorToDOM();
-      },      setCustomAccentColor: (hexColor: string) => {
+      },
+
+      setBorderRadius: (radius: number) => {
+        const clampedRadius = Math.max(MIN_BORDER_RADIUS, Math.min(MAX_BORDER_RADIUS, radius));
+        set({ borderRadius: clampedRadius });
+        get().applyBorderRadiusToDOM();
+      },
+
+      setCustomAccentColor: (hexColor: string) => {
         const colorVariants = calculateColorVariants(hexColor);
         const customColor: AccentColor = {
           name: "Custom",
@@ -248,16 +264,13 @@ export const useThemeStore = create<ThemeState>()(
         set((state) => {
           const newHistory = [...state.customColorHistory];
           
-          // Remove if already exists to move to front
           const existingIndex = newHistory.indexOf(hexColor);
           if (existingIndex > -1) {
             newHistory.splice(existingIndex, 1);
           }
           
-          // Add to front
           newHistory.unshift(hexColor);
           
-          // Keep only last 10 colors
           if (newHistory.length > 10) {
             newHistory.pop();
           }
@@ -296,9 +309,7 @@ export const useThemeStore = create<ThemeState>()(
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
       },      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });      },
-
-      applyAccentColorToDOM: () => {
+        set({ hasAcceptedTermsOfService: true });      },      applyAccentColorToDOM: () => {
         const { accentColor } = get();
 
         const hexToRgb = (hex: string) => {
@@ -333,13 +344,24 @@ export const useThemeStore = create<ThemeState>()(
         if (rgbValue) {
           document.documentElement.style.setProperty("--accent-rgb", rgbValue);
         }
+      },      applyBorderRadiusToDOM: () => {
+        const { borderRadius } = get();
+        
+        document.documentElement.style.setProperty("--border-radius", `${borderRadius}px`);
+        
+        document.documentElement.setAttribute("data-border-radius", borderRadius.toString());
+        if (borderRadius === 0) {
+          document.documentElement.classList.add("radius-flat");
+        } else {
+          document.documentElement.classList.remove("radius-flat");
+        }
       },
-    }),
-    {
+    }),    {
       name: "norisk-theme-storage",
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.applyAccentColorToDOM();
+          state.applyBorderRadiusToDOM();
         }
       },
     },

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
-import { IconButton } from "./buttons/IconButton.tsx";
+import { IconButton } from "./buttons/IconButton";
 
 interface ModalProps {
   title: string;
@@ -42,19 +42,21 @@ export function Modal({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isClosing, setIsClosing] = useState(false);
-
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isClosing) {
         handleClose();
       }
     };
-    window.addEventListener("keydown", handleEscape);
+    
+    if (closeOnClickOutside !== false) {
+      window.addEventListener("keydown", handleEscape);
+    }
 
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, []);
+  }, [closeOnClickOutside, isClosing]);
 
   useEffect(() => {
     const recordMouseDownTarget = (event: MouseEvent) => {
@@ -108,17 +110,11 @@ export function Modal({
     }
     return "none";
   };
-
   return (
     <div
       ref={modalRef}
       className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
       onClick={handleBackdropClick}
-      onMouseDown={(e) => {
-        if (e.target === modalRef.current) {
-          e.stopPropagation();
-        }
-      }}
     >
       <div
         ref={contentRef}
@@ -178,13 +174,11 @@ export function Modal({
               aria-label="Close modal"
             />
           </div>
-        </div>
-
-        <div className="flex-1 overflow-auto custom-scrollbar">{children}</div>
-
-        {footer && (
+        </div>        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {children}
+        </div>{footer && (
           <div
-            className="px-6 py-4 border-t-2"
+            className="px-6 py-4 border-t-2 flex-shrink-0"
             style={{
               borderColor: `${accentColor.value}60`,
               backgroundColor: `${accentColor.value}15`,

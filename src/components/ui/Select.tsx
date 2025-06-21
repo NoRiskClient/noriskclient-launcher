@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getRadiusClasses, createRadiusStyle } from "./design-system";
 import { Dropdown } from "./dropdown/Dropdown.tsx";
 import { DropdownItem } from "./dropdown/DropdownItem.tsx";
 import { gsap } from "gsap";
@@ -41,8 +42,8 @@ export function Select({
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const accentColor = useThemeStore((state) => state.accentColor);
+  const containerRef = useRef<HTMLDivElement>(null);  const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
@@ -96,9 +97,7 @@ export function Select({
   const handleOptionSelect = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
-  };
-
-  const sizeStyles = {
+  };  const sizeStyles = {
     sm: {
       container: "h-[42px]",
       padding: "py-2 px-6",
@@ -138,10 +137,9 @@ export function Select({
   const getBorderColor = () => {
     return isHovered || isOpen ? `${colors.light}` : `${colors.main}80`;
   };
-
   const getBorderClasses = () => {
-    if (variant === "3d") return "border-2 border-b-4 rounded-md";
-    return "border border-b-2 rounded-md";
+    if (variant === "3d") return "border-2 border-b-4";
+    return "border border-b-2";
   };
 
   const getBoxShadow = () => {
@@ -236,21 +234,20 @@ export function Select({
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={cn(
+        onMouseLeave={handleMouseLeave}        className={cn(
           "font-minecraft relative overflow-hidden backdrop-blur-md",
-          "text-white tracking-wider lowercase rounded-md",
+          "text-white tracking-wider lowercase",
           "flex items-center justify-between w-full",
           "text-shadow-sm",
           getBorderClasses(),
+          getRadiusClasses(borderRadius, "input"),
           "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
           sizeStyles[size].container,
           sizeStyles[size].padding,
           sizeStyles[size].text,
           className,
-        )}
-        style={{
+        )}        style={{
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
           borderBottomColor: isHovered || isOpen ? colors.light : colors.dark,
@@ -259,16 +256,17 @@ export function Select({
             (isHovered || isOpen) && !disabled
               ? "brightness(1.1)"
               : "brightness(1)",
+          ...createRadiusStyle(borderRadius),
         }}
         disabled={disabled}
-      >
-        {variant === "3d" && (
+      >        {variant === "3d" && (
           <span
-            className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm transition-colors duration-200"
+            className="absolute inset-x-0 top-0 h-[2px] transition-colors duration-200"
             style={{
               backgroundColor:
                 isHovered || isOpen ? `${colors.light}` : `${colors.light}80`,
-              opacity: isHovered || isOpen ? 1 : 0.8,
+              opacity: isHovered || isOpen ? 1 : 0.8,              borderTopLeftRadius: borderRadius === 0 ? "0" : `${borderRadius}px`,
+              borderTopRightRadius: borderRadius === 0 ? "0" : `${borderRadius}px`,
             }}
           />
         )}

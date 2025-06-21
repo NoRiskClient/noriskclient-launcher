@@ -56,6 +56,15 @@ impl MinecraftClientDownloadService {
 
         let mut file = fs::File::create(&target_path).await?;
         file.write_all(&bytes).await?;
+        
+        // Ensure the file is fully written to disk before attempting to read it.
+        // This prevents potential "end of central directory record not found" errors with jar files
+        // that can occur if we try to read the file before the OS has flushed all write buffers.
+        file.sync_all().await.map_err(|e| {
+            AppError::Download(format!("Failed to sync minecraft client jar: {}", e))
+        })?;
+        // Explicitly close the file by dropping the handle
+        drop(file);
 
         info!("Downloaded client jar to: {}", target_path.display());
         Ok(())

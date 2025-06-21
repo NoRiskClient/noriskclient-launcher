@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getBorderRadiusClass, createRadiusStyle } from "./design-system";
 
 export const toast = {
   success: (message: string) => {
@@ -62,10 +63,14 @@ function animateToast(id: string) {
 
 export function GlobalToaster() {
   const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
   const toasterRef = useRef<HTMLDivElement>(null);
+  
+  const borderRadiusStyle = createRadiusStyle(borderRadius);
+  const borderRadiusClass = getBorderRadiusClass(borderRadius);
 
   useEffect(() => {
     if (!isBackgroundAnimationEnabled) return;
@@ -109,16 +114,14 @@ export function GlobalToaster() {
   };
 
   return (
-    <div ref={toasterRef}>
-      <HotToaster
+    <div ref={toasterRef}>      <HotToaster
         position="bottom-right"
         toastOptions={{
-          className: "font-minecraft tracking-wider lowercase text-shadow-sm",
+          className: `font-minecraft tracking-wider lowercase text-shadow-sm ${borderRadiusClass}`,
           style: {
             borderWidth: "1px",
             borderBottomWidth: "2px",
             borderStyle: "solid",
-            borderRadius: "0px",
             boxShadow: "none",
             padding: "12px 20px",
             backdropFilter: "blur(8px)",
@@ -130,12 +133,13 @@ export function GlobalToaster() {
             minWidth: "300px",
             transition: "all 0.2s ease",
             fontWeight: "500",
+            ...borderRadiusStyle,
           },
           success: {
             style: {
               ...getToastVariantStyles("success"),
-              borderRadius: "0px",
               boxShadow: "none",
+              ...borderRadiusStyle,
             },
             iconTheme: {
               primary: "#059669",
@@ -145,8 +149,8 @@ export function GlobalToaster() {
           error: {
             style: {
               ...getToastVariantStyles("error"),
-              borderRadius: "0px",
               boxShadow: "none",
+              ...borderRadiusStyle,
             },
             iconTheme: {
               primary: "#dc2626",
@@ -156,8 +160,8 @@ export function GlobalToaster() {
           loading: {
             style: {
               ...getToastVariantStyles("default"),
-              borderRadius: "0px",
               boxShadow: "none",
+              ...borderRadiusStyle,
             },
             iconTheme: {
               primary: accentColor.value,

@@ -60,8 +60,8 @@ use commands::profile_command::{
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, is_content_installed, is_profile_launching,
     launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
-    open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, search_profiles,
-    set_custom_mod_enabled, set_norisk_mod_status, set_profile_mod_enabled,
+    open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
+    search_profiles, set_custom_mod_enabled, set_norisk_mod_status, set_profile_mod_enabled,
     update_datapack_from_modrinth, update_modrinth_mod_version, update_profile,
     update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
@@ -338,6 +338,7 @@ async fn main() {
             get_profile,
             update_profile,
             delete_profile,
+            repair_profile,
             list_profiles,
             search_profiles,
             get_minecraft_versions,

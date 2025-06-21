@@ -25,6 +25,7 @@ interface ProfileContextMenuProps {
   onOpenFolder: () => void;
   onExport: () => void;
   onOpenSettings: () => void;
+  onRepair?: () => void;
 }
 
 // Helper function to calculate optimal menu position
@@ -77,6 +78,7 @@ export const ProfileContextMenu = forwardRef<
     onOpenFolder,
     onExport,
     onOpenSettings,
+    onRepair,
   },
   ref: ForwardedRef<HTMLDivElement>,
 ) {
@@ -95,14 +97,21 @@ export const ProfileContextMenu = forwardRef<
     if (visible && menuRef.current) {
       // Use a rough estimate for menu dimensions or measure actual dimensions
       const menuWidth = 220; // Approximate width based on content
-      const menuHeight = profile.is_standard_version ? 140 : 240; // Approximate height based on menu items
+      // Calculate height based on profile type and available options
+      let menuHeight = 140; // Base height for duplicate, open folder, export
+      
+      if (!profile.is_standard_version) {
+        menuHeight = 240; // Non-standard: settings + delete + separators
+      } else if (onRepair) {
+        menuHeight = 180; // Standard with repair: repair button + separator
+      }
       
       const newPosition = calculateMenuPosition(x, y, menuWidth, menuHeight);
       setAdjustedPosition(newPosition);
     } else {
       setAdjustedPosition({ x, y });
     }
-  }, [x, y, visible, profile.is_standard_version]);
+  }, [x, y, visible, profile.is_standard_version, onRepair]);
 
   useEffect(() => {
     if (visible && menuRef.current) {
@@ -253,6 +262,33 @@ export const ProfileContextMenu = forwardRef<
             Export Profile
           </span>
         </li>
+
+        {profile.is_standard_version && onRepair && (
+          <>
+            <li className="px-4 py-1">
+              <div
+                className="h-px"
+                style={{ backgroundColor: accentColor.value + "40" }}
+              />
+            </li>
+            <li
+              className="px-4 py-2.5 flex items-center gap-3 hover:bg-white/10 cursor-pointer transition-colors duration-150"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("[ContextMenu] Repair item clicked");
+                handleAction(onRepair);
+              }}
+            >
+              <Icon
+                icon="solar:shield-check-bold"
+                className="w-5 h-5 text-white"
+              />
+              <span className="font-minecraft-ten text-base text-white/80">
+                Repair Profile
+              </span>
+            </li>
+          </>
+        )}
 
         {!profile.is_standard_version && (
           <>

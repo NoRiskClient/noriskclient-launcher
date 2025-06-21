@@ -5,6 +5,14 @@ import { forwardRef, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { 
+  getSizeClasses, 
+  getBorderRadiusClass, 
+  createRadiusStyle,
+  getAccessibilityProps,
+  type ComponentSize,
+  type ComponentVariant 
+} from "./design-system";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -12,8 +20,10 @@ export interface InputProps
   clearable?: boolean;
   onClear?: () => void;
   error?: string;
-  size?: "sm" | "md" | "lg";
-  variant?: "default" | "flat" | "3d";
+  size?: ComponentSize;
+  variant?: ComponentVariant;
+  label?: string;
+  description?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -26,6 +36,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       error,
       size = "md",
       variant = "default",
+      label,
+      description,
       ...props
     },
     ref,
@@ -34,6 +46,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const [isHovered, setIsHovered] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
+    const borderRadius = useThemeStore((state) => state.borderRadius);
+    
+    const sizeClasses = getSizeClasses(size, "input");
+    const radiusClass = getBorderRadiusClass();
+    const accessibilityProps = getAccessibilityProps({
+      label,
+      description,
+      error,
+      disabled: props.disabled
+    });
 
     const handleFocus = () => {
       if (props.disabled) return;
@@ -62,23 +84,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         const event = {
           target: { value: "" },
         } as React.ChangeEvent<HTMLInputElement>;
-        props.onChange(event);
-      }
+        props.onChange(event);      }
     };
 
-    const sizeClasses = {
-      sm: "h-[42px]",
-      md: "h-[50px]",
-      lg: "h-[58px]",
-    };
-
-    const inputSizeClasses = {
-      sm: "text-xl",
-      md: "text-2xl",
-      lg: "text-3xl",
-    };
-
-    // Get border classes based on variant
     const getBorderClasses = () => {
       if (variant === "3d") {
         return "border-2 border-b-4";
@@ -87,16 +95,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     };
 
     return (
-      <div className="w-full">
-        <div
-          ref={containerRef}
-          className={cn(
-            "relative rounded-md",
+      <div className="w-full">        <div
+          ref={containerRef}          className={cn(
+            "relative overflow-hidden backdrop-blur-md",
             getBorderClasses(),
-            "overflow-hidden",
+            radiusClass,
             error ? "border-red-500" : "",
             props.disabled ? "opacity-50 cursor-not-allowed" : "",
-            sizeClasses[size],
+            sizeClasses,
             className,
           )}
           style={{
@@ -117,41 +123,41 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               (isFocused || isHovered) && !props.disabled
                 ? "brightness(1.1)"
                 : "brightness(1)",
+            ...createRadiusStyle(borderRadius),
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {variant === "3d" && (
             <span
-              className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm transition-colors duration-200"
+              className="absolute inset-x-0 top-0 h-[2px] transition-colors duration-200"
               style={{
                 backgroundColor: error
                   ? "rgba(239, 68, 68, 0.8)"
                   : isHovered || isFocused
                     ? accentColor.hoverValue
                     : `${accentColor.value}80`,
-                opacity: isHovered || isFocused ? 1 : 0.8,
+                opacity: isHovered || isFocused ? 1 : 0.8,                borderTopLeftRadius: borderRadius === 0 ? "0" : `${borderRadius}px`,
+                borderTopRightRadius: borderRadius === 0 ? "0" : `${borderRadius}px`,
               }}
             />
-          )}
-
-          <div className="flex items-center h-full w-full">
+          )}          <div className="flex items-center h-full w-full transition-transform duration-200" style={{
+            transform: isHovered && !props.disabled ? "scale(1.05)" : "scale(1)",
+          }}>
             {icon && (
               <div className="flex items-center justify-center w-10 h-full text-white">
                 {icon}
               </div>
-            )}
-
-            <input
+            )}<input
               ref={ref}
               className={cn(
                 "flex-1 h-full bg-transparent border-none outline-none px-3 py-2 text-white font-minecraft placeholder:text-white/50 lowercase",
-                inputSizeClasses[size],
               )}
               onFocus={handleFocus}
               onBlur={handleBlur}
               spellCheck={false}
               autoComplete="off"
+              {...accessibilityProps}
               {...props}
             />
 
@@ -166,10 +172,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               </button>
             )}
           </div>
-        </div>
-
-        {error && (
-          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
+        </div>        {error && (          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
             {error}
           </p>
         )}

@@ -111,14 +111,12 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
       }
     };
 
-    const colors = getVariantColors();
-
-    const sizeStyles = {
-      xs: "h-[32px] py-1 px-3 text-sm",
-      sm: "h-[42px] py-1 px-3 text-xl",
-      md: "h-[50px] py-1.5 px-4 text-2xl",
-      lg: "h-[58px] py-2 px-5 text-3xl",
-      xl: "h-[66px] py-2.5 px-6 text-4xl",
+    const colors = getVariantColors();    const sizeStyles = {
+      xs: "h-[32px] py-1 px-3 text-xs",
+      sm: "h-[42px] py-1 px-3 text-base",
+      md: "h-[50px] py-1.5 px-4 text-lg",
+      lg: "h-[58px] py-2 px-5 text-xl",
+      xl: "h-[66px] py-2.5 px-6 text-xl",
     };
 
     const iconSizes = {

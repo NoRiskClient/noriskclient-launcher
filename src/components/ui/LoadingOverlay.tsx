@@ -163,26 +163,25 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
             spinner: "md",
             text: "text-base",
             progressHeight: "h-1.5",
-          };
-        case "lg":
+          };        case "lg":
           return {
             container: "p-8 max-w-2xl",
             spinner: "xl",
-            text: "text-2xl",
+            text: "text-xl",
             progressHeight: "h-3",
           };
         case "xl":
           return {
             container: "p-10 max-w-3xl",
             spinner: "xxl",
-            text: "text-3xl",
+            text: "text-2xl",
             progressHeight: "h-4",
           };
         default:
           return {
             container: "p-6 max-w-lg",
             spinner: "lg",
-            text: "text-xl",
+            text: "text-lg",
             progressHeight: "h-2",
           };
       }

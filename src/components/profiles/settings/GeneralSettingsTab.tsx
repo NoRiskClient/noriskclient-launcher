@@ -178,6 +178,19 @@ export function GeneralSettingsTab({
 
         <div>
           <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+            group
+          </label>
+          <Input
+            value={editedProfile.group || ""}
+            onChange={(e) => updateProfile({ group: e.target.value || null })}
+            placeholder="e.g. modpacks, vanilla+"
+            className="text-2xl py-3"
+            variant="flat"
+          />
+        </div>
+
+        <div>
+          <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
             norisk client pack
           </label>
           {loading ? (

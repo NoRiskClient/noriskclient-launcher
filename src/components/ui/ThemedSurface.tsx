@@ -3,6 +3,12 @@
 import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { useThemeStore } from '../../store/useThemeStore';
+import { 
+  getVariantColors,
+  getBorderRadiusClass,
+  createRadiusStyle,
+  getAccessibilityProps
+} from './design-system';
 
 interface ThemedSurfaceProps {
   children: React.ReactNode;
@@ -19,6 +25,8 @@ interface ThemedSurfaceProps {
     right?: boolean;
   };
   style?: React.CSSProperties;
+  role?: string;
+  ariaLabel?: string;
 }
 
 export function ThemedSurface({
@@ -31,9 +39,19 @@ export function ThemedSurface({
   baseColorHex,
   borderVisibility,
   style: incomingStyle,
+  role,
+  ariaLabel,
 }: ThemedSurfaceProps) {
   const accentColorValue = useThemeStore((state) => state.accentColor.value);
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
   const [isSurfaceHovered, setIsSurfaceHovered] = useState(false);
+
+  const colors = getVariantColors("default", accentColor);
+  const radiusClass = getBorderRadiusClass(borderRadius);
+  const accessibilityProps = getAccessibilityProps({
+    label: ariaLabel
+  });
 
   const isValidHex = (hex: string | undefined): hex is string => {
     if (!hex) return false;
@@ -55,7 +73,7 @@ export function ThemedSurface({
 
   const opacityDefault = 0.2;
   const opacityHover = 0.48;
-  const opacityActive = 0.6; // For alwaysActive or future focus state
+  const opacityActive = 0.6;
 
   let currentBorderOpacity = opacityDefault;
   if (alwaysActive) {
@@ -81,25 +99,32 @@ export function ThemedSurface({
   } as React.CSSProperties;
 
   const combinedStyles = { ...internalStyles, ...incomingStyle };
-
   return (
     <div
       ref={surfaceRef}
+      role={role || (onClick ? "button" : undefined)}
+      tabIndex={onClick ? 0 : undefined}
       className={cn(
-        "relative p-3 transition-colors duration-150 w-full select-none rounded-lg",
-        "border-2", // Sets border-width and border-style
+        "relative p-3 transition-colors duration-200 w-full select-none",
+        radiusClass,
+        "border-2",
         alwaysActive
           ? "bg-[var(--surface-bg-hover)]"
           : "bg-[var(--surface-bg-default)] hover:bg-[var(--surface-bg-hover)]",
+        onClick && "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2",
         className
       )}
-      style={combinedStyles}
+      style={{
+        ...combinedStyles,
+        ...createRadiusStyle(borderRadius),
+      }}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsSurfaceHovered(true)}
       onMouseLeave={() => setIsSurfaceHovered(false)}
+      {...accessibilityProps}
     >
       {children}
     </div>
   );
-} 
+}

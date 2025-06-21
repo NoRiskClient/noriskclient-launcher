@@ -6,24 +6,23 @@ import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { ThemedSurface } from "../ThemedSurface";
+import { 
+  getVariantColors,
+  getSizeClasses,
+  getBorderRadiusClass,
+  getAccessibilityProps,
+  type ComponentSize,
+  type ComponentVariant 
+} from "../design-system";
 
-interface IconButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?:
-    | "default"
-    | "secondary"
-    | "ghost"
-    | "warning"
-    | "destructive"
-    | "info"
-    | "success"
-    | "flat"
-    | "flat-secondary"
-    | "3d";
+interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ComponentVariant;
   displayVariant?: "button" | "ghost" | "themed-surface";
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  size?: ComponentSize;
   icon: React.ReactNode;
   shadowDepth?: "default" | "short" | "none";
+  label?: string;
+  description?: string;
 }
 
 interface RippleType {
@@ -44,6 +43,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       icon,
       shadowDepth = "short",
       onClick,
+      label,
+      description,
       ...props
     },
     ref,
@@ -129,92 +130,34 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         variant === "3d" &&
         shadowDepth !== "none"
       );
-    };
-
-    const getVariantColors = () => {
-      switch (variant) {
-        case "warning":
-          return {
-            main: "#f59e0b",
-            light: "#fbbf24",
-            dark: "#d97706",
-            text: "#fef3c7",
-          };
-        case "destructive":
-          return {
-            main: "#ef4444",
-            light: "#f87171",
-            dark: "#dc2626",
-            text: "#fee2e2",
-          };
-        case "info":
-          return {
-            main: "#3b82f6",
-            light: "#60a5fa",
-            dark: "#2563eb",
-            text: "#dbeafe",
-          };
-        case "success":
-          return {
-            main: "#10b981",
-            light: "#34d399",
-            dark: "#059669",
-            text: "#d1fae5",
-          };
-        case "secondary":
-          return {
-            main: "#6b7280",
-            light: "#9ca3af",
-            dark: "#4b5563",
-            text: "#f3f4f6",
-          };
-        case "flat-secondary":
-          return {
-            main: "#6b7280",
-            light: "#9ca3af",
-            dark: "#4b5563",
-            text: "#f3f4f6",
-          };
-        case "ghost":
-          return {
-            main: "transparent",
-            light: accentColor.hoverValue || accentColor.value,
-            dark: accentColor.value,
-            text: "#ffffff",
-          };
-        case "flat":
-          return {
-            main: accentColor.value,
-            light: accentColor.hoverValue || accentColor.value,
-            dark: accentColor.value,
-            text: "#ffffff",
-          };
-        default:
-          return {
-            main: accentColor.value,
-            light: accentColor.hoverValue || accentColor.value,
-            dark: accentColor.value,
-            text: "#ffffff",
-          };
+    };    const colors = getVariantColors(variant, accentColor);
+    const radiusClass = getBorderRadiusClass();
+    const accessibilityProps = getAccessibilityProps({
+      label,
+      description,
+      disabled
+    });    const getIconButtonSizeClasses = () => {
+      switch (size) {
+        case "xs": return "h-[36px] w-[36px] p-2 text-base";
+        case "sm": return "h-[42px] w-[42px] p-2.5 text-lg";
+        case "md": return "h-[50px] w-[50px] p-3 text-xl";
+        case "lg": return "h-[58px] w-[58px] p-3.5 text-2xl";
+        case "xl": return "h-[66px] w-[66px] p-4 text-2xl";
+        default: return "h-[50px] w-[50px] p-3 text-xl";
       }
     };
 
-    const colors = getVariantColors();
+    const sizeClasses = getIconButtonSizeClasses();
 
-    const sizeStyles = {
-      xs: "h-[32px] w-[32px] text-sm",
-      sm: "h-[42px] w-[42px] text-xl",
-      md: "h-[50px] w-[50px] text-2xl",
-      lg: "h-[58px] w-[58px] text-3xl",
-      xl: "h-[66px] w-[66px] text-4xl",
-    };
-
-    const iconSizes = {
-      xs: "w-3.5 h-3.5",
-      sm: "w-5 h-5",
-      md: "w-6 h-6",
-      lg: "w-7 h-7",
-      xl: "w-8 h-8",
+    const getIconSize = () => {
+      switch (size) {
+        case "xs": return "w-4 h-4";
+        case "sm": return "w-5 h-5";
+        case "md": return "w-6 h-6";
+        case "lg": return "w-7 h-7";
+        case "xl": return "w-8 h-8";
+        default: return "w-6 h-6";
+      }
     };
 
     const getBackgroundColor = () => {
@@ -329,7 +272,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           getShadowClasses(),
           "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
           "disabled:opacity-50 disabled:cursor-not-allowed",
-          displayVariant !== "themed-surface" && sizeStyles[size],
+          displayVariant !== "themed-surface" && sizeClasses,
           className,
         )}
         style={{
@@ -355,16 +298,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                 opacity: isHovered ? 1 : 0.8,
               }}
             />
-          )}
-
-        <span
+          )}        <span
           className={cn(
             "relative z-10 flex items-center justify-center transition-transform duration-200",
-            iconSizes[size],
+            getIconSize(),
           )}
           style={{
             transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
           }}
+          aria-hidden="true"
         >
           {icon}
         </span>
@@ -373,12 +315,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
     if (displayVariant === "themed-surface") {
       const surfaceBaseColorHex =
-        variant === "default" || variant === "ghost" ? undefined : colors.main;
-
-      return (
+        variant === "default" || variant === "ghost" ? undefined : colors.main;      return (
         <ThemedSurface
           baseColorHex={surfaceBaseColorHex}
-          className={cn(sizeStyles[size], "!p-0", className)}
+          className={cn(sizeClasses, "!p-0", className)}
         >
           {buttonElement}
         </ThemedSurface>

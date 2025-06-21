@@ -22,10 +22,9 @@ export function DropdownItem({
 }: DropdownItemProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
 
-  return (
-    <button
+  return (    <button
       className={cn(
-        "w-full px-4 py-2 text-left font-minecraft text-base transition-all duration-200 lowercase",
+        "w-full px-4 py-2 text-left font-minecraft text-lg transition-all duration-200 lowercase",
         "flex items-center gap-3",
         "hover:bg-white/10",
         "active:bg-white/5",

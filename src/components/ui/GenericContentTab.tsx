@@ -3,14 +3,13 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from "./buttons/Button";
-// import { SearchInput } from "./SearchInput"; // No longer using internal SearchInput
 import { GenericList } from "./GenericList";
-import { useThemeStore } from "../../store/useThemeStore"; // Assuming path
-import { preloadIcons } from "../../lib/icon-utils"; // Assuming path
+import { useThemeStore } from "../../store/useThemeStore";
+import { preloadIcons } from "../../lib/icon-utils";
 
 const GENERIC_CONTENT_TAB_DEFAULT_ICONS = [
-  "solar:refresh-circle-bold-duotone", // For loading state in refresh button
-  "solar:refresh-outline", // Icon for normal state (added)
+  "solar:refresh-circle-bold-duotone",
+  "solar:refresh-outline",
 ];
 
 interface GenericContentTabProps<T> {
@@ -19,7 +18,7 @@ interface GenericContentTabProps<T> {
   isLoading?: boolean;
   error?: string | null;
   onRefreshData?: () => void;
-  searchQuery?: string; // For GenericList to filter based on external search
+  searchQuery?: string;
   
   primaryLeftActions?: ReactNode;
   primaryRightActions?: ReactNode;
@@ -41,7 +40,7 @@ export function GenericContentTab<T>({
   isLoading = false,
   error = null,
   onRefreshData,
-  searchQuery, // Keep this for passing to GenericList
+  searchQuery,
   primaryLeftActions,
   primaryRightActions,
   secondaryLeftActions,
@@ -62,27 +61,22 @@ export function GenericContentTab<T>({
         preloadIcons([GENERIC_CONTENT_TAB_DEFAULT_ICONS[0]]);
     }
   }, [onRefreshData]);
-
-  // Determine the effective loading item count based on showSkeletons
   const effectiveLoadingItemCount = showSkeletons ? loadingItemCount : 0;
 
   return (
     <div className="h-full flex flex-col select-none p-4">
-      {/* Primary Action Bar */}
       <div
         className="flex items-center justify-between mb-3 p-3 rounded-lg border backdrop-blur-sm flex-wrap gap-y-2 gap-x-4"
         style={{
           backgroundColor: `${accentColor}10`,
           borderColor: `${accentColor}30`,
         }}
-      >
-        <div className="flex items-center gap-3 flex-grow min-w-0"> {/* Ensure flex-grow and min-w-0 for left content */}
+      >        <div className="flex items-center gap-3 flex-grow min-w-0">
           {primaryLeftActions}
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0"> {/* Ensure flex-shrink-0 for right content*/}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {primaryRightActions}
-          {/* Default refresh button if onRefreshData is provided AND no primaryRightActions are given (or primaryRightActions doesn't seem to include a refresh) */}
           {!primaryRightActions && onRefreshData && (
             <Button
               onClick={onRefreshData}
@@ -94,10 +88,7 @@ export function GenericContentTab<T>({
             />
           )}
         </div>
-      </div>
-
-      {/* Secondary Action Bar & Divider - Conditionally render based on actions OR explicit prop */}
-      {(showSecondaryActionsBar || secondaryLeftActions || secondaryRightActions) && showSecondaryActionsBar !== false && (
+      </div>      {(showSecondaryActionsBar || secondaryLeftActions || secondaryRightActions) && showSecondaryActionsBar !== false && (
         <>
           <div 
             className="h-px my-2"
@@ -105,15 +96,14 @@ export function GenericContentTab<T>({
           />
           <div
             className="flex items-center justify-between mb-4 p-3 rounded-lg border backdrop-blur-sm flex-wrap gap-y-2 gap-x-4"
-            style={{
-              backgroundColor: `${accentColor}08`, // Slightly different background for secondary bar
+            style={{              backgroundColor: `${accentColor}08`,
               borderColor: `${accentColor}20`,
             }}
           >
-            <div className="flex items-center gap-3 flex-grow min-w-0"> {/* Ensure flex-grow and min-w-0 for left content */}
+            <div className="flex items-center gap-3 flex-grow min-w-0">
               {secondaryLeftActions}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0"> {/* Ensure flex-shrink-0 for right content*/}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {secondaryRightActions}
             </div>
           </div>
@@ -125,7 +115,7 @@ export function GenericContentTab<T>({
         renderItem={renderListItem}
         isLoading={isLoading}
         error={error}
-        searchQuery={searchQuery} // Pass the main search query for filtering in GenericList
+        searchQuery={searchQuery}
         accentColor={accentColor}
         emptyStateIcon={emptyStateIcon}
         emptyStateMessage={emptyStateMessage}
@@ -134,4 +124,4 @@ export function GenericContentTab<T>({
       />
     </div>
   );
-} 
+}

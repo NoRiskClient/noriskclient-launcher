@@ -7,10 +7,14 @@ export function ThemeInitializer() {
   const applyAccentColorToDOM = useThemeStore(
     (state) => state.applyAccentColorToDOM,
   );
+  const applyBorderRadiusToDOM = useThemeStore(
+    (state) => state.applyBorderRadiusToDOM,
+  );
 
   useEffect(() => {
     applyAccentColorToDOM();
-  }, [applyAccentColorToDOM]);
+    applyBorderRadiusToDOM();
+  }, [applyAccentColorToDOM, applyBorderRadiusToDOM]);
 
   return null;
 }

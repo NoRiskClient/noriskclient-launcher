@@ -7,6 +7,13 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { gsap } from "gsap";
 import { ThemedSurface } from "./ThemedSurface";
+import { 
+  getSizeClasses,
+  getBorderRadiusClass,
+  getAccessibilityProps,
+  type ComponentSize,
+  type ComponentVariant 
+} from "./design-system";
 
 interface SearchInputProps {
   value: string;
@@ -16,8 +23,11 @@ interface SearchInputProps {
   onSearch?: (searchTerm: string) => void;
   loading?: boolean;
   disabled?: boolean;
-  size?: "sm" | "md" | "lg";
-  variant?: "default" | "minimal" | "filled" | "themed-surface" | "flat" | "3d";
+  size?: ComponentSize;
+  variant?: ComponentVariant | "minimal" | "filled" | "themed-surface";
+  label?: string;
+  description?: string;
+  error?: string;
 }
 
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
@@ -32,6 +42,9 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       disabled = false,
       size = "md",
       variant = "default",
+      label,
+      description,
+      error,
     },
     ref,
   ) => {
@@ -41,12 +54,15 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
-
-    // Merge refs
-    const mergedRef = (node: HTMLInputElement) => {
+    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+    const sizeClasses = getSizeClasses(size, "input");
+    const radiusClass = getBorderRadiusClass();
+    const accessibilityProps = getAccessibilityProps({
+      label,
+      description,
+      error,
+      disabled
+    });    const mergedRef = (node: HTMLInputElement) => {
       if (ref) {
         if (typeof ref === "function") {
           ref(node);
@@ -130,10 +146,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       if (e.key === "Enter" && onSearch) {
         onSearch(value);
       }
-    };
-
-    // Size configurations that match Button component exactly
-    const sizeStyles = {
+    };    const sizeStyles = {
       sm: {
         container: "h-[42px]",
         padding: "py-2 px-6",
@@ -152,10 +165,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         text: "text-3xl",
         icon: "w-7 h-7",
       },
-    };
-
-    // Get variant colors to match Button component
-    const getVariantColors = () => {
+    };    const getVariantColors = () => {
       return {
         main: accentColor.value,
         light: accentColor.hoverValue,
@@ -164,46 +174,33 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       };
     };
 
-    const colors = getVariantColors();
-
-    // Get background color based on state
-    const getBackgroundColor = () => {
+    const colors = getVariantColors();    const getBackgroundColor = () => {
       if (variant === "minimal") {
         return "transparent";
       }
 
       const baseOpacity = isHovered || isFocused ? "50" : "30";
       return `${colors.main}${baseOpacity}`;
-    };
-
-    // Get border color based on state
-    const getBorderColor = () => {
+    };    const getBorderColor = () => {
       if (variant === "minimal") return "transparent";
 
       return isHovered || isFocused ? `${colors.light}` : `${colors.main}80`;
     };
 
-    // Get border classes based on variant
     const getBorderClasses = () => {
       if (variant === "minimal")
         return "border-b-2 border-white/30 rounded-none";
-      if (variant === "filled") return "border-none rounded-md";
-      if (variant === "3d") return "border-2 border-b-4 rounded-md";
-      return "border border-b-2 rounded-md";
-    };
-
-    // Get box shadow based on variant and state
-    const getBoxShadow = () => {
+      if (variant === "filled") return "border-none rounded-[var(--border-radius)]";
+      if (variant === "3d") return "border-2 border-b-4 rounded-[var(--border-radius)]";
+      return "border border-b-2 rounded-[var(--border-radius)]";
+    };    const getBoxShadow = () => {
       if (variant === "minimal" || variant === "filled" || variant !== "3d")
         return "none";
 
       return isHovered || isFocused
         ? `0 6px 0 rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`
         : `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
-    };
-
-    // Standard input content for all variants except themed-surface
-    const standardInputContent = (
+    };    const standardInputContent = (
       <>
         {variant === "3d" && (
           <span
@@ -274,10 +271,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             </button>
           )}
         </div>
-      </>
-    );
+      </>    );
 
-    // Themed surface variant
     if (variant === "themed-surface") {
       return (
         <ThemedSurface className={cn("w-full", className)}>
@@ -342,10 +337,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           </div>
         </ThemedSurface>
       );
-    }
-
-    // Standard variants
-    return (
+    }    return (
       <div
         ref={containerRef}
         className={cn(

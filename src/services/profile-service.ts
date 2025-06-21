@@ -54,6 +54,10 @@ export async function deleteProfile(id: string): Promise<void> {
   return invoke<void>("delete_profile", { id });
 }
 
+export async function repairProfile(id: string): Promise<void> {
+  return invoke<void>("repair_profile", { id });
+}
+
 export async function launchProfile(
   id: string,
   quickPlaySingleplayer?: string, 

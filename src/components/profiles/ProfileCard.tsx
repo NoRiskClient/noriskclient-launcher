@@ -265,6 +265,24 @@ export function ProfileCard({
     }
   };
 
+  const handleRepairFromContextMenu = async () => {
+    if (!profile?.id) {
+      toast.error("Profile ID is missing, cannot repair.");
+      return;
+    }
+
+    const repairPromise = ProfileService.repairProfile(profile.id);
+
+    toast.promise(repairPromise, {
+      loading: `Repairing profile '${profile.name}'...`,
+      success: `Profile '${profile.name}' repaired successfully!`,
+      error: (err) => {
+        const message = err instanceof Error ? err.message : String(err.message);
+        return `Failed to repair profile: ${message}`;
+      },
+    });
+  };
+
   const handleDivClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (contextMenuVisible) {
       return;
@@ -435,6 +453,7 @@ export function ProfileCard({
         onOpenFolder={handleOpenFolder}
         onExport={handleExportFromContextMenu}
         onOpenSettings={onEdit}
+        onRepair={handleRepairFromContextMenu}
       />
     </>
   );

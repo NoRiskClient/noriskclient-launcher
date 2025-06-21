@@ -7,6 +7,12 @@ import { Checkbox } from "./Checkbox";
 import { Label } from "./Label";
 import { gsap } from "gsap";
 import { cn } from "../../lib/utils";
+import { 
+  getVariantColors,
+  getBorderRadiusClass,
+  createRadiusStyle,
+  getAccessibilityProps
+} from "./design-system";
 
 interface ContentTableHeader {
   key: string;
@@ -30,6 +36,8 @@ interface ContentTableProps {
   contentType?: string;
   searchQuery?: string;
   className?: string;
+  role?: string;
+  ariaLabel?: string;
 }
 
 export function ContentTable({
@@ -46,8 +54,17 @@ export function ContentTable({
   contentType = "item",
   searchQuery,
   className,
+  role = "table",
+  ariaLabel,
 }: ContentTableProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
+
+  const colors = getVariantColors("default", accentColor);
+  const radiusClass = getBorderRadiusClass(borderRadius);
+  const accessibilityProps = getAccessibilityProps({
+    label: ariaLabel || `${contentType} table`
+  });
   const tableRef = useRef<HTMLDivElement>(null);
   const headerRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -86,40 +103,51 @@ export function ContentTable({
 
     onSort(header.key);
   };
-
   return (
     <div
       ref={tableRef}
+      role={role}
       className={cn(
-        "h-full flex flex-col rounded-lg border-2 border-b-4 overflow-hidden",
+        "h-full flex flex-col border-2 border-b-4 overflow-hidden",
+        radiusClass,
         className,
       )}
       style={{
-        backgroundColor: `${accentColor.value}10`,
-        borderColor: `${accentColor.value}40`,
-        borderBottomColor: `${accentColor.value}60`,
-        boxShadow: `0 8px 0 rgba(0,0,0,0.2), 0 12px 20px rgba(0,0,0,0.3), inset 0 1px 0 ${accentColor.value}30, inset 0 0 0 1px ${accentColor.value}10`,
+        backgroundColor: `${colors.main}10`,
+        borderColor: `${colors.main}40`,
+        borderBottomColor: `${colors.main}60`,
+        boxShadow: `0 8px 0 rgba(0,0,0,0.2), 0 12px 20px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.main}30, inset 0 0 0 1px ${colors.main}10`,
+        ...createRadiusStyle(borderRadius),
       }}
+      {...accessibilityProps}
     >
       <span
-        className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
-        style={{ backgroundColor: `${accentColor.value}80` }}
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ 
+          backgroundColor: `${colors.main}80`,
+          borderTopLeftRadius: borderRadius === 0 ? "0" : `${Math.round(borderRadius)}px`,
+          borderTopRightRadius: borderRadius === 0 ? "0" : `${Math.round(borderRadius)}px`,
+        }}
       />
 
       <div
+        role="rowgroup"
         className="sticky top-0 z-10 border-b-2"
         style={{
-          backgroundColor: `${accentColor.value}30`,
-          borderColor: `${accentColor.value}60`,
+          backgroundColor: `${colors.main}30`,
+          borderColor: `${colors.main}60`,
         }}
       >
-        <div className="flex items-center h-14 px-4">
+        <div 
+          role="row"
+          className="flex items-center h-14 px-4"
+        >
           {onSelectAll && (
             <div className="w-8 flex justify-center">
               <Checkbox
                 checked={selectedCount > 0 && selectedCount === filteredCount}
                 onChange={onSelectAll}
-                aria-label={`Select all ${contentType}s`}
+                label={`Select all ${contentType}s`}
               />
             </div>
           )}
@@ -128,6 +156,7 @@ export function ContentTable({
             <div
               key={header.key}
               ref={(el) => (headerRefs.current[index] = el)}
+              role="columnheader"
               className={cn(
                 header.width || "flex-1",
                 header.className || "",
@@ -139,7 +168,7 @@ export function ContentTable({
               onClick={() => handleHeaderClick(header, index)}
             >
               <div className="flex items-center">
-                <span className="font-minecraft text-lg lowercase">
+                <span className="font-minecraft text-xl lowercase">
                   {header.label}
                 </span>
                 {header.sortable && sortKey === header.key && (
@@ -156,18 +185,25 @@ export function ContentTable({
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      </div>      <div 
+        role="rowgroup"
+        className="flex-1 overflow-y-auto custom-scrollbar"
+      >
         {React.Children.count(children) > 0 ? (
           children
         ) : (
-          <div className="flex flex-col items-center justify-center h-full p-8">
+          <div 
+            role="row"
+            className="flex flex-col items-center justify-center h-full p-8"
+          >
             <Icon
               icon="solar:box-bold"
               className="w-16 h-16 text-white/30 mb-4"
-            />
-            <div className="text-white/60 font-minecraft text-2xl text-center lowercase">
+              aria-hidden="true"
+            />            <div 
+              role="cell"
+              className="text-white/60 font-minecraft text-xl text-center lowercase"
+            >
               {searchQuery
                 ? `no ${contentType}s match your search`
                 : `no ${contentType}s found`}
@@ -176,14 +212,15 @@ export function ContentTable({
         )}
       </div>
 
-      <div
+      <footer
         className="border-t-2 py-3 px-4 flex justify-between items-center sticky bottom-0"
         style={{
-          backgroundColor: `${accentColor.value}20`,
-          borderColor: `${accentColor.value}40`,
+          backgroundColor: `${colors.main}20`,
+          borderColor: `${colors.main}40`,
         }}
+        aria-label="Table summary"
       >
-        <div className="text-white/70 font-minecraft text-lg">
+        <div className="text-white/70 font-minecraft text-xl lowercase">
           {filteredCount > 0 ? (
             <>
               {filteredCount} {contentType}
@@ -202,7 +239,7 @@ export function ContentTable({
             {selectedCount} selected
           </Label>
         )}
-      </div>
+      </footer>
     </div>
   );
 }

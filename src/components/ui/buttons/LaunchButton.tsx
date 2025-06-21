@@ -7,20 +7,26 @@ import { EventPayload as FrontendEventPayload, EventType as FrontendEventType } 
 import * as ProcessService from "../../../services/process-service";
 import * as ProfileService from "../../../services/profile-service";
 import { useLaunchStateStore, LaunchState } from "../../../store/launch-state-store";
+import { 
+  getAccessibilityProps,
+  type ComponentSize,
+  type ComponentVariant
+} from "../design-system";
 
 interface LaunchButtonProps {
   id: string;
   name: string;
   buttonText?: string;
   cancelText?: string;
-  variant?: "default" | "destructive" | "secondary" | "ghost";
-  size?: "xs" | "sm" | "md" | "lg";
+  variant?: ComponentVariant;
+  size?: ComponentSize;
   className?: string;
   disabled?: boolean;
   quickPlaySingleplayer?: string;
   quickPlayMultiplayer?: string;
   isIconOnly?: boolean;
   forceDisplaySpinner?: boolean;
+  ariaLabel?: string;
 }
 
 export function LaunchButton({
@@ -36,9 +42,15 @@ export function LaunchButton({
   quickPlayMultiplayer,
   isIconOnly = false,
   forceDisplaySpinner = false,
+  ariaLabel,
 }: LaunchButtonProps) {
   const [isButtonDisabledBriefly, setIsButtonDisabledBriefly] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const accessibilityProps = getAccessibilityProps({
+    label: ariaLabel || `Launch ${name}`,
+    disabled: disabled || isButtonDisabledBriefly
+  });
 
   const {
     getProfileState,
@@ -226,17 +238,13 @@ export function LaunchButton({
       <Icon icon="eos-icons:loading" width="60%" height="60%" />
     ) : (
       <Icon icon="solar:play-bold" width="60%" height="60%" />
-    );
-
-    return (
-      <div
+    );    return (
+      <button
         onClick={!disabled && !isButtonDisabledBriefly ? handlePlay : undefined}
-        className={`flex w-full h-full items-center justify-center ${
+        className={`flex w-full h-full items-center justify-center transition-opacity ${
           (disabled || isButtonDisabledBriefly) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
         } ${className || ""}`}
-        role="button"
-        aria-label={actualIsLaunching ? `Cancel launch for ${name}` : `Launch ${name}`}
-        aria-disabled={disabled || isButtonDisabledBriefly}
+        disabled={disabled || isButtonDisabledBriefly}
         tabIndex={disabled || isButtonDisabledBriefly ? -1 : 0}
         onKeyDown={(e) => {
           if (!disabled && !isButtonDisabledBriefly && (e.key === 'Enter' || e.key === ' ')) {
@@ -244,12 +252,12 @@ export function LaunchButton({
             handlePlay(e as any);
           }
         }}
+        {...accessibilityProps}
       >
         {iconToShow}
-      </div>
+      </button>
     );
   }
-
   return (
     <Button
       onClick={handlePlay}
@@ -257,18 +265,25 @@ export function LaunchButton({
       size={size}
       className={className}
       disabled={disabled || isButtonDisabledBriefly}
+      label={actualIsLaunching ? `Cancel launch for ${name}` : `Launch ${name}`}
       icon={
         actualIsLaunching ? (
           <Icon
             icon="eos-icons:loading"
             className="w-5 h-5 text-white"
+            aria-hidden="true"
           />
         ) : (
-          <Icon icon="solar:play-bold" className="w-4 h-4 text-white" />
+          <Icon 
+            icon="solar:play-bold" 
+            className="w-4 h-4 text-white"
+            aria-hidden="true"
+          />
         )
       }
+      {...accessibilityProps}
     >
       {currentButtonText}
     </Button>
   );
-} 
+}

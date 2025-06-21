@@ -381,15 +381,13 @@ export function ProfileWizard({ onClose, onSave }: ProfileWizardProps) {
       </div>
     </div>
   );
-
-  return (
-    <Modal
+  return (    <Modal
       title="create new profile"
       onClose={onClose}
       width="xl"
       footer={renderFooter()}
     >
-      <div className="flex flex-1 h-[500px] overflow-hidden">
+      <div className="flex h-[500px] overflow-hidden">
         <WizardSidebar
           currentStep={step}
           totalSteps={totalSteps}

@@ -156,6 +156,15 @@ impl NeoForgeLibrariesDownload {
         // Save the file
         let mut file = fs::File::create(&target_path).await?;
         file.write_all(&bytes).await?;
+        
+        // Ensure the file is fully written to disk before attempting to read it.
+        // This prevents potential "end of central directory record not found" errors with jar files
+        // that can occur if we try to read the file before the OS has flushed all write buffers.
+        file.sync_all().await.map_err(|e| {
+            AppError::Download(format!("Failed to sync neoforge library: {}", e))
+        })?;
+        // Explicitly close the file by dropping the handle
+        drop(file);
 
         info!("💾 Saved: {}", download_info.path);
         Ok(())
@@ -347,6 +356,15 @@ impl NeoForgeLibrariesDownload {
                 // Speichere die Datei
                 let mut file = fs::File::create(&target_path).await?;
                 file.write_all(&bytes).await?;
+                
+                // Ensure the file is fully written to disk before attempting to read it.
+                // This prevents potential "end of central directory record not found" errors with jar files
+                // that can occur if we try to read the file before the OS has flushed all write buffers.
+                file.sync_all().await.map_err(|e| {
+                    AppError::Download(format!("Failed to sync neoforge legacy library: {}", e))
+                })?;
+                // Explicitly close the file by dropping the handle
+                drop(file);
 
                 info!("✅ Successfully downloaded: {}", maven_path);
                 Ok(())

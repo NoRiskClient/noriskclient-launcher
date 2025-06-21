@@ -541,7 +541,7 @@ impl MinecraftAuthStore {
                 }
             );
 
-            match NoRiskApi::refresh_norisk_token_v2(
+            match NoRiskApi::refresh_norisk_token_v3(
                 &hwid,
                 &creds.username,
                 &creds.access_token,

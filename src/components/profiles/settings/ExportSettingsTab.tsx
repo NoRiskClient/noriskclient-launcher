@@ -37,7 +37,7 @@ export function ExportSettingsTab({
 }: ExportSettingsTabProps) {
   const [exportFilename, setExportFilename] = useState(profile.name);
   const [selectedExportPaths, setSelectedExportPaths] = useState<Set<string>>(
-    new Set(),
+    new Set()
   );
   // Ref to hold the latest selection, initialized with the initial state
   const selectedExportPathsRef = useRef<Set<string>>(selectedExportPaths);
@@ -45,7 +45,7 @@ export function ExportSettingsTab({
   const [exportOpenFolder, setExportOpenFolder] = useState(true);
 
   const [directoryStructure, setDirectoryStructure] = useState<FileNode | null>(
-    null,
+    null
   );
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(true);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
@@ -53,15 +53,17 @@ export function ExportSettingsTab({
   const [isExporting, setIsExporting] = useState(false);
 
   const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
-  const accentColor = useThemeStore((state) => state.accentColor);
+    (state) => state.isBackgroundAnimationEnabled
+  );  const accentColor = useThemeStore((state) => state.accentColor);
 
-  // This is the callback passed to FileNodeViewer
   const handleFileSelectionChange = (newSelectedPaths: Set<string>) => {
     setSelectedExportPaths(newSelectedPaths);
     selectedExportPathsRef.current = newSelectedPaths;
   };
+
+  useEffect(() => {
+    selectedExportPathsRef.current = selectedExportPaths;
+  }, [selectedExportPaths]);
 
   useEffect(() => {
     const fetchStructure = async () => {
@@ -74,7 +76,7 @@ export function ExportSettingsTab({
       setDirectoryError(null);
       try {
         const structure = await ProfileService.getProfileDirectoryStructure(
-          profile.id,
+          profile.id
         );
         console.log(structure);
         setDirectoryStructure(structure);
@@ -98,23 +100,22 @@ export function ExportSettingsTab({
       }
     }
   };
-
   const handleSelectAll = () => {
     if (!directoryStructure) return;
     const newSelectedPaths = new Set<string>();
-    // Assuming hideRootNode = true, so we iterate over children of rootNode
     if (directoryStructure.children) {
       directoryStructure.children.forEach((childNode) =>
-        getAllPathsRecursive(childNode, newSelectedPaths),
+        getAllPathsRecursive(childNode, newSelectedPaths)
       );
     }
-    // If hideRootNode was false, and you wanted to include the root node itself:
-    // getAllPathsRecursive(directoryStructure, newSelectedPaths);
     setSelectedExportPaths(newSelectedPaths);
+    selectedExportPathsRef.current = newSelectedPaths;
   };
 
   const handleDeselectAll = () => {
-    setSelectedExportPaths(new Set<string>());
+    const emptySet = new Set<string>();
+    setSelectedExportPaths(emptySet);
+    selectedExportPathsRef.current = emptySet;
   };
 
   const handleExport = async () => {
@@ -143,7 +144,8 @@ export function ExportSettingsTab({
       },
       error: (err) => {
         setIsExporting(false); // Ensure isExporting is reset on error
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message =
+          err instanceof Error ? err.message : String(err.message);
         // console.error is still good for detailed logs in developer console
         console.error("Failed to export profile:", err);
         return `Failed to export profile: ${message}`;
@@ -164,7 +166,7 @@ export function ExportSettingsTab({
       gsap.fromTo(
         contentRef.current,
         { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
       );
     }
   }, [isBackgroundAnimationEnabled]);
@@ -231,7 +233,6 @@ export function ExportSettingsTab({
             The .noriskpack extension will be added automatically.
           </p>
         </div>
-
         {/* File selection section */}
         <div>
           <h4 className="text-2xl font-minecraft text-white lowercase mb-1">
@@ -297,8 +298,7 @@ export function ExportSettingsTab({
               className="text-sm"
             />
           </Card>
-        </div>
-
+        </div>{" "}
         {!isInModalContext && ( // Internal controls only if NOT in modal context
           <>
             <div className="space-y-2 mt-4">

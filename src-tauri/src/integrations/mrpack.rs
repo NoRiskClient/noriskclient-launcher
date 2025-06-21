@@ -874,6 +874,16 @@ pub async fn download_and_process_mrpack(download_url: &str, file_name: &str) ->
         AppError::Io(e)
     })?;
 
+    // Ensure the file is fully written to disk before attempting to read it.
+    // This prevents potential "end of central directory record not found" errors with mrpack files
+    // that can occur if we try to read the file before the OS has flushed all write buffers.
+    file.sync_all().await.map_err(|e| {
+        error!("Failed to sync mrpack file: {}", e);
+        AppError::Io(e)
+    })?;
+    // Explicitly close the file by dropping the handle
+    drop(file);
+
     debug!(
         "Successfully downloaded modpack to temporary file: {:?}",
         temp_file_path

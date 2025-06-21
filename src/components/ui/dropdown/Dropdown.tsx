@@ -5,6 +5,12 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../../lib/utils";
 import { useThemeStore } from "../../../store/useThemeStore";
+import { 
+  getVariantColors,
+  getBorderRadiusClass,
+  createRadiusStyle,
+  getAccessibilityProps
+} from "../design-system";
 
 interface DropdownProps {
   isOpen: boolean;
@@ -14,6 +20,8 @@ interface DropdownProps {
   className?: string;
   children: React.ReactNode;
   position?: "bottom" | "top" | "left" | "right";
+  role?: string;
+  ariaLabel?: string;
 }
 
 export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
@@ -26,6 +34,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       className,
       children,
       position = "bottom",
+      role = "menu",
+      ariaLabel,
     },
     ref,
   ) => {
@@ -37,9 +47,16 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       "entering" | "entered" | "exiting" | "exited"
     >("exited");
     const accentColor = useThemeStore((state) => state.accentColor);
+    const borderRadius = useThemeStore((state) => state.borderRadius);
     const previousIsOpen = useRef(isOpen);
     const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [dropdownHeight, setDropdownHeight] = useState(300);
+
+    const colors = getVariantColors("default", accentColor);
+    const radiusClass = getBorderRadiusClass(borderRadius);
+    const accessibilityProps = getAccessibilityProps({
+      label: ariaLabel
+    });
 
     useEffect(() => {
       setIsMounted(true);
@@ -80,15 +97,12 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }
 
         previousIsOpen.current = isOpen;
-      }
-    }, [isOpen, animationState, isMounted]);
+      }    }, [isOpen, animationState, isMounted]);
 
-    // Update dropdown height after it's rendered
     useEffect(() => {
       if (isOpen && dropdownRef.current && animationState === "entered") {
         const height = dropdownRef.current.offsetHeight;
         setDropdownHeight(height);
-        // Recalculate position with the actual height
         calculatePosition(height);
       }
     }, [isOpen, animationState]);
@@ -102,13 +116,11 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         let left = 0;
 
         const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        const scrollY = window.scrollY || window.pageYOffset;
+        const viewportWidth = window.innerWidth;        const scrollY = window.scrollY || window.pageYOffset;
         const scrollX = window.scrollX || window.pageXOffset;
 
-        // Use actual height if available, otherwise estimate
         const estimatedHeight = actualHeight || Math.min(400, dropdownHeight);
-        const offset = 12; // Increased offset for better spacing
+        const offset = 12;
 
         const spaceBelow = viewportHeight - rect.bottom;
         const spaceAbove = rect.top;
@@ -144,24 +156,18 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           case "right":
             top = rect.top + scrollY + rect.height / 2 - estimatedHeight / 2;
             left = rect.right + scrollX + offset;
-            break;
-        }
+            break;        }
 
-        // Ensure dropdown stays within viewport
         const padding = 16;
         left = Math.max(padding + scrollX, left);
         left = Math.min(left, viewportWidth + scrollX - width - padding);
 
-        // Ensure dropdown doesn't go above the viewport
         top = Math.max(padding + scrollY, top);
 
-        // If dropdown would go below viewport, try to position it above if there's space
         if (top + estimatedHeight > viewportHeight + scrollY - padding) {
           if (rect.top - estimatedHeight - offset > padding) {
-            // Position above if there's enough space
             top = rect.top + scrollY - estimatedHeight - offset;
           } else {
-            // Otherwise, position at the bottom of the viewport with padding
             top = viewportHeight + scrollY - estimatedHeight - padding;
           }
         }
@@ -242,9 +248,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       }
     };
 
-    const animationClasses = getAnimationClasses();
-
-    return createPortal(
+    const animationClasses = getAnimationClasses();    return createPortal(
       <div
         ref={(node) => {
           if (ref) {
@@ -256,10 +260,11 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           }
           dropdownRef.current = node;
         }}
+        role={role}
         className={cn(
           "fixed font-minecraft backdrop-blur-md z-50 overflow-hidden",
-          "rounded-md text-white",
-          "transition-all duration-200",
+          radiusClass,
+          "text-white transition-all duration-200",
           "border-2 border-b-4 shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
           animationState === "entering" && animationClasses.entering,
           animationState === "entered" && animationClasses.entered,
@@ -270,11 +275,13 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           top: `${dropdownTop}px`,
           left: `${dropdownLeft}px`,
           width: `${width}px`,
-          backgroundColor: `${accentColor.value}15`,
-          borderColor: `${accentColor.value}40`,
-          borderBottomColor: accentColor.dark,
-          boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.light}20, inset 0 0 0 1px ${accentColor.value}10`,
+          backgroundColor: `${colors.main}15`,
+          borderColor: `${colors.main}40`,
+          borderBottomColor: colors.dark,
+          boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}20, inset 0 0 0 1px ${colors.main}10`,
+          ...createRadiusStyle(borderRadius),
         }}
+        {...accessibilityProps}
       >
         <div className="absolute inset-0 opacity-20 bg-gradient-radial from-white/20 via-transparent to-transparent pointer-events-none" />
         <div className="relative z-10">{children}</div>

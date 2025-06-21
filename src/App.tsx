@@ -49,7 +49,6 @@ export function App() {
     useState<string>("none");
 
   const FLAGSMITH_ENVIRONMENT_ID = "eNSibjDaDW2nNJQvJnjj9y"; // User confirmed this is set
-
   useEffect(() => {
     const root = document.documentElement;
     const storedTheme = localStorage.getItem("norisk-theme-storage");
@@ -75,6 +74,26 @@ export function App() {
           const rgbValue = hexToRgb(themeData.state.accentColor.value);
           if (rgbValue) {
             root.style.setProperty("--accent-rgb", rgbValue);
+          }
+        }
+        
+        if (themeData.state?.radiusTheme) {
+          const radiusTheme = themeData.state.radiusTheme;
+          root.setAttribute("data-radius-theme", radiusTheme);
+          
+          if (radiusTheme === "flat") {
+            root.classList.add("radius-flat");
+            root.style.setProperty("--radius", "0px");
+          } else {
+            root.classList.remove("radius-flat");
+            const radiusMap: Record<string, string> = {
+              sm: "var(--radius-sm)",
+              md: "var(--radius-md)",
+              lg: "var(--radius-lg)",
+              xl: "var(--radius-xl)",
+              "2xl": "var(--radius-2xl)",
+            };
+            root.style.setProperty("--radius", radiusMap[radiusTheme] || "var(--radius-md)");
           }
         }
       } catch (e) {
