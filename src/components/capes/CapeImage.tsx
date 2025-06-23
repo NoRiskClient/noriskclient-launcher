@@ -19,26 +19,26 @@ interface CapeImageProps {
 // The provided svelte code assumes a source image where these parts are at a larger scale.
 // Let's stick to the Svelte's scaled coordinates if the source images are indeed high-resolution like that.
 
-const SVELTE_SCALE_FACTOR = 8; // Re-introduce Svelte's scale factor
-const CAPE_PART_SRC_WIDTH = 10 * SVELTE_SCALE_FACTOR; // 80
-const CAPE_PART_SRC_HEIGHT = 16 * SVELTE_SCALE_FACTOR; // 128
-const FRONT_X = 1 * SVELTE_SCALE_FACTOR;  // 8
-const FRONT_Y = 1 * SVELTE_SCALE_FACTOR;  // 8
-const BACK_X = 12 * SVELTE_SCALE_FACTOR; // 96 (1 + 10 + 1 offset in Svelte example)
-const BACK_Y = 1 * SVELTE_SCALE_FACTOR;  // 8
+const SVELTE_SCALE_FACTOR = 8; 
+const CAPE_PART_SRC_WIDTH = 10 * SVELTE_SCALE_FACTOR
+const CAPE_PART_SRC_HEIGHT = 16 * SVELTE_SCALE_FACTOR; 
+const FRONT_X = 1 * SVELTE_SCALE_FACTOR;  
+const FRONT_Y = 1 * SVELTE_SCALE_FACTOR; 
+const BACK_X = 12 * SVELTE_SCALE_FACTOR; 
+const BACK_Y = 1 * SVELTE_SCALE_FACTOR;  
 
 
 export const CapeImage = React.memo(function CapeImage({
   imageUrl,
   part = 'front',
-  width = 60, // Default width
+  width = 60, 
   className,
 }: CapeImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Calculate height based on width and cape aspect ratio (10:16 for the part)
+
   const height = useMemo(() => Math.round(width * (CAPE_PART_SRC_HEIGHT / CAPE_PART_SRC_WIDTH)), [width]);
 
   useEffect(() => {
@@ -47,8 +47,8 @@ export const CapeImage = React.memo(function CapeImage({
     
     const canvas = canvasRef.current;
     if (!canvas) {
-      // console.warn("[CapeImage] Effect ran before canvas was ready.");
-      setIsLoading(false); // Not strictly an error, but can't proceed
+    
+      setIsLoading(false);
       return;
     }
 
@@ -58,20 +58,20 @@ export const CapeImage = React.memo(function CapeImage({
     }
 
     if (!imageUrl) {
-      // console.log("[CapeImage] No imageUrl provided.");
-      setIsLoading(false); // Nothing to load
+ 
+      setIsLoading(false); 
       return;
     }
 
-    // console.log(`[CapeImage] Loading ${part} from ${imageUrl} for canvas ${width}x${height}`);
+
     const img = new Image();
     img.crossOrigin = 'anonymous'; 
     img.src = imageUrl;
 
     const onLoad = () => {
-      // console.log("[CapeImage] Image loaded.");
-      if (!canvasRef.current) { // Check if canvas is still there
-        // console.error("[CapeImage] Canvas lost before drawing.");
+      
+      if (!canvasRef.current) { 
+   
         setErrorMessage("Canvas lost before drawing.");
         setIsLoading(false);
         return;
@@ -88,14 +88,14 @@ export const CapeImage = React.memo(function CapeImage({
         const sy = part === 'back' ? BACK_Y : FRONT_Y;
         
         currentCtx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        currentCtx.imageSmoothingEnabled = false; // Pixelated look
+        currentCtx.imageSmoothingEnabled = false; 
 
         currentCtx.drawImage(
           img,
-          sx, sy, CAPE_PART_SRC_WIDTH, CAPE_PART_SRC_HEIGHT, // Source rectangle
-          0, 0, canvasRef.current.width, canvasRef.current.height  // Destination rectangle
+          sx, sy, CAPE_PART_SRC_WIDTH, CAPE_PART_SRC_HEIGHT, 
+          0, 0, canvasRef.current.width, canvasRef.current.height  
         );
-        // console.log(`[CapeImage] Drawn ${part} part.`);
+   
         setErrorMessage(null);
       } catch (drawError) {
         console.error("[CapeImage] Error drawing cape part:", drawError);
@@ -115,49 +115,47 @@ export const CapeImage = React.memo(function CapeImage({
     img.addEventListener('error', onError);
 
     return () => {
-      // console.log("[CapeImage] Cleanup effect for:", imageUrl);
+      
       img.removeEventListener('load', onLoad);
       img.removeEventListener('error', onError);
     };
-  }, [imageUrl, part, width, height]); // Rerun effect if these change
+  }, [imageUrl, part, width, height]); 
 
   return (
     <div 
-      className={cn("cape-image-container relative inline-block align-middle overflow-hidden", className)} 
+      className={cn("cape-image-container relative inline-block align-middle overflow-hidden bg-black/10 rounded-sm", className)} 
       style={{ width: `${width}px`, height: `${height}px` }}
     >
-      {errorMessage ? (
+      {isLoading && !errorMessage && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <svg className="w-6 h-6 text-white/50 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      )}
+      {errorMessage && (
         <div 
-          className="error-message w-full h-full flex justify-center items-center text-center text-xs text-red-600 bg-red-100 border border-red-600 p-1 box-border"
+          className="w-full h-full flex flex-col justify-center items-center text-center text-xs text-white/50 bg-black/20 p-1 box-border"
           title={errorMessage}
         >
-          ⚠️ Error
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="font-minecraft-ten">Failed to load cape image :(</span>
         </div>
-      ) : (
+      )}
         <canvas
           ref={canvasRef}
           width={width}
           height={height}
           className={cn(
             "cape-canvas block w-full h-full image-pixelated transition-opacity duration-300 ease-in-out",
-            isLoading && !errorMessage ? "opacity-0" : "opacity-100"
+            (isLoading || errorMessage) ? "opacity-0" : "opacity-100"
           )}
           title={`Cape ${part} view`}
           style={{ backgroundColor: 'transparent' }}
         />
-      )}
     </div>
   );
 });
-
-// CSS for image-pixelated could be in a global stylesheet or defined via a style tag / CSS-in-JS if preferred
-// For Tailwind, it's often handled by browser defaults or specific image rendering utilities if available.
-// The 'image-rendering: pixelated;' style is important.
-// Adding a global style for this:
-// <style jsx global>{`
-//   .image-pixelated {
-//     image-rendering: pixelated;
-//     image-rendering: -moz-crisp-edges; /* Firefox */
-//     image-rendering: crisp-edges; /* Old Edge, Safari */
-//   }
-// `}</style> 
