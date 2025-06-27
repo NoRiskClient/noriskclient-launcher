@@ -113,7 +113,7 @@ export function Modal({
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
       onClick={handleBackdropClick}
     >
       <div

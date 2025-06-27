@@ -304,6 +304,11 @@
     scrollbar-width: none;  /* Firefox */
 }
 
+/* Backdrop blur which also works on Linux */
+.backdrop-blur-md-anyos {
+    backdrop-filter: blur(12px);
+}
+
 :root {
   --border-radius: 0px; 
 }
