@@ -41,7 +41,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -90,10 +90,12 @@ jobs:
           APP_BASE_NAME="NoRisk Launcher" # Dein productName
           APPIMAGE_DIR=${{ matrix.output_path }}/appimage
           DEB_DIR=${{ matrix.output_path }}/deb
+          RPM_DIR=${{ matrix.output_path }}/rpm
           
-          echo "Listing content of $APPIMAGE_DIR and $DEB_DIR"
+          echo "Listing content of $APPIMAGE_DIR, $DEB_DIR AND $RPM_DIR"
           ls -R "$APPIMAGE_DIR" || true
           ls -R "$DEB_DIR" || true
+          ls -R "$RPM_DIR" || true
           
           # Verschiebe und benenne AppImage um (verwende einfachen Wildcard)
           mv "$APPIMAGE_DIR"/*.AppImage "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.AppImage
@@ -107,6 +109,12 @@ jobs:
           # Verschiebe und benenne Deb Signatur um
           mv "$DEB_DIR"/*.deb.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.deb.sig
           
+          # Verschiebe und benenne Rpm Paket um
+          mv "$ROM_DIR"/*.rpm "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm
+          
+          # Verschiebe und benenne Rpm Signatur um
+          mv "$RPM_DIR"/*.rpm.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm.sig
+
           echo "Final content of $APPIMAGE_DIR after moves"
           ls -R "$APPIMAGE_DIR" || true
           
