@@ -110,7 +110,7 @@ jobs:
           mv "$DEB_DIR"/*.deb.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.deb.sig
           
           # Verschiebe und benenne Rpm Paket um
-          mv "$ROM_DIR"/*.rpm "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm
+          mv "$RPM_DIR"/*.rpm "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm
           
           # Verschiebe und benenne Rpm Signatur um
           mv "$RPM_DIR"/*.rpm.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm.sig
