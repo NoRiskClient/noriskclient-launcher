@@ -92,7 +92,7 @@ jobs:
           DEB_DIR=${{ matrix.output_path }}/deb
           RPM_DIR=${{ matrix.output_path }}/rpm
           
-          echo "Listing content of $APPIMAGE_DIR, $DEB_DIR AND $RPM_DIR"
+          echo "Listing content of $APPIMAGE_DIR, $DEB_DIR and $RPM_DIR"
           ls -R "$APPIMAGE_DIR" || true
           ls -R "$DEB_DIR" || true
           ls -R "$RPM_DIR" || true
