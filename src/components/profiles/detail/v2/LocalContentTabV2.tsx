@@ -44,6 +44,7 @@ import { ModrinthService } from "../../../../services/modrinth-service"; // Adde
 import { EmptyState } from "../../../ui/EmptyState"; // Added import
 import { useProfileStore } from "../../../../store/profile-store"; // Added import
 import { useConfirmDialog } from "../../../../hooks/useConfirmDialog"; // Added import
+import * as FlagsmithService from "../../../../services/flagsmith-service"; // Added
 
 // Generic icons that can be used across different content types
 const LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD = [
@@ -63,6 +64,7 @@ const LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD = [
   "solar:refresh-outline", // For primary refresh button normal state
   "solar:download-minimalistic-bold", // For Update All button
   "solar:alt-arrow-down-bold", // For version dropdown button
+  "solar:shield-cross-bold-duotone", // For NoRisk blocked badge
 ];
 
 interface LocalContentTabV2Props<T extends LocalContentItem> {
@@ -100,6 +102,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
     unregisterRefreshCallback,
   } = useAppDragDropStore();
 
+  const [isBlockedConfigLoaded, setIsBlockedConfigLoaded] = useState(false);
+
   const [noriskPacksConfig, setNoriskPacksConfig] =
     useState<NoriskModpacksConfig | null>(null);
   const [isFetchingPacksConfig, setIsFetchingPacksConfig] = useState(false);
@@ -116,6 +120,25 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   >(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
+
+  // Fetch Flagsmith config when a NoRisk pack is selected
+  useEffect(() => {
+    // Only fetch if a pack is selected, as blocking rules only apply in that context.
+    if (profile?.selected_norisk_pack_id) {
+      FlagsmithService.getBlockedModsConfig()
+        .then(() => {
+          setIsBlockedConfigLoaded(true);
+        })
+        .catch((err) => {
+          console.error("Failed to load NoRisk blocked mods config:", err);
+          // Optionally show a toast, but might be too noisy.
+          // toast.error("Could not load mod compatibility rules.");
+        });
+    } else {
+      // If no pack is selected, the config is not relevant/loaded.
+      setIsBlockedConfigLoaded(false);
+    }
+  }, [profile?.selected_norisk_pack_id]);
 
   const {
     items,
@@ -532,6 +555,14 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
       const isItemOpen = openVersionDropdownId === item.filename;
 
+      const isBlockedByNoRisk =
+        !!profile?.selected_norisk_pack_id &&
+        isBlockedConfigLoaded &&
+        FlagsmithService.isModBlockedByNoRisk(
+          item.filename,
+          item.modrinth_info?.project_id,
+        );
+
       let iconToShow: React.ReactNode;
       const modrinthProjectId = item.modrinth_info?.project_id;
       const modrinthIconUrl = modrinthProjectId
@@ -787,6 +818,20 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
       const itemBadgesNode = (
         <>
+          {isBlockedByNoRisk && (
+            <TagBadge
+              size="sm"
+              variant="destructive"
+              iconElement={
+                <Icon
+                  icon="solar:shield-cross-bold-duotone"
+                  className="w-3 h-3"
+                />
+              }
+            >
+              CRASHES WITH NRC
+            </TagBadge>
+          )}
           <TagBadge
             size="sm"
             variant={!item.is_disabled ? "success" : "destructive"}
@@ -998,6 +1043,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       isLoadingVersions,
       versionsError,
       handleSwitchContentVersion,
+      isBlockedConfigLoaded,
     ],
   );
 
@@ -1204,12 +1250,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   }
 
   // Determine if the special empty state for standard profiles should be shown
-  const shouldShowStandardProfileEmptyState =
-    profile.is_standard_version &&
-    (contentType === "NoRiskMod" && !profile?.selected_norisk_pack_id
-      ? true
-      : filteredItems.length === 0) &&
-    !error;
+  const shouldShowStandardProfileEmptyState = false;
 
   if (shouldShowStandardProfileEmptyState) {
     const handleCloneProfile = async () => {
@@ -1340,7 +1381,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       items.length === 0 &&
       selectedItemIds.size === 0
     ) {
-      return `You can add ${itemTypeNamePlural} to this profile or via Modrinth (if supported).`;
+      return `Drag & drop ${itemTypeNamePlural} here to add them, or click Browse to discover and install content online.`;
     } else if (
       searchQuery &&
       filteredItems.length === 0 &&
@@ -1351,6 +1392,29 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       return `Select ${itemTypeNamePlural} to perform batch actions or manage them individually.`;
     }
   };
+
+  const isTrulyEmptyState =
+    !error && !searchQuery && items.length === 0 && selectedItemIds.size === 0;
+
+  const handleEmptyStateBrowse = useCallback(() => {
+    if (!profile) return;
+    const browseType = ((ct: typeof contentType) => {
+      switch (ct) {
+        case "Mod":
+          return "mods";
+        case "ResourcePack":
+          return "resourcepacks";
+        case "ShaderPack":
+          return "shaderpacks";
+        case "DataPack":
+          return "datapacks";
+        default:
+          return "mods";
+      }
+    })(contentType);
+    if (onBrowseContentRequest) onBrowseContentRequest(browseType);
+    else navigate(`/profiles/${profile.id}/browse/${browseType}`);
+  }, [onBrowseContentRequest, navigate, profile, contentType]);
 
   return (
     <>
@@ -1371,6 +1435,16 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         }
         emptyStateMessage={getEmptyStateMessage()}
         emptyStateDescription={getEmptyStateDescription()}
+        emptyStateAction={isTrulyEmptyState ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleEmptyStateBrowse}
+            icon={<Icon icon="solar:magnifer-bold" />}
+          >
+            Browse {itemTypeNamePlural}
+          </Button>
+        ) : undefined}
         loadingItemCount={Math.min(items.length > 0 ? items.length : 5, 10)}
         showSkeletons={false}
         accentColorOverride={accentColor.value}

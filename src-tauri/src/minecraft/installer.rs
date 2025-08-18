@@ -22,6 +22,7 @@ use super::minecraft_auth::Credentials;
 use super::modloader::ModloaderFactory;
 use crate::minecraft::downloads::MinecraftLoggingDownloadService;
 use crate::utils::mc_utils;
+use tokio::fs as async_fs;
 
 async fn emit_progress_event(
     state: &State,
@@ -678,6 +679,20 @@ pub async fn install_minecraft_version(
     )
     .await?;
 
+    // --- Prototype: Provide managed mods via Fabric addMods meta file (Fabric only) ---
+    if modloader_enum == ModLoader::Fabric {
+        let add_mods_arg = crate::minecraft::downloads::mod_resolver::build_fabric_add_mods_arg(
+            profile.id,
+            version_id,
+            &target_mods,
+        )
+        .await?;
+        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
+        current_jvm_args.push(add_mods_arg);
+        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
+        info!("Configured Fabric addMods meta file for profile '{}'", profile.name);
+    }
+
     // --- Step: Sync mods from cache to profile directory ---
     let sync_event_id = emit_progress_event(
         &state,
@@ -697,10 +712,19 @@ pub async fn install_minecraft_version(
     // Get the correct mods directory path for the profile
     let profile_mods_path = state.profile_manager.get_profile_mods_path(profile)?;
 
+    // Ensure mods folder exists for all loaders before launch/sync
+    async_fs::create_dir_all(&profile_mods_path).await?;
+
     // Pass the resolved target_mods list and the specific mods path to the sync function
-    mod_downloader_service
-        .sync_mods_to_profile(&target_mods, &profile_mods_path)
-        .await?;
+    if modloader_enum == ModLoader::Fabric {
+        info!(
+            "Skipping mods folder sync for Fabric (using addMods meta file instead)."
+        );
+    } else {
+        mod_downloader_service
+            .sync_mods_to_profile(&target_mods, &profile_mods_path)
+            .await?;
+    }
 
     info!("Mod sync completed for profile '{}'", profile.name);
     emit_progress_event(

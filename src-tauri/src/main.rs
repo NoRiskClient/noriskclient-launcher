@@ -470,7 +470,9 @@ async fn main() {
             commands::flagsmith_commands::is_filename_blocked,
             commands::flagsmith_commands::is_mod_id_blocked,
             commands::flagsmith_commands::is_modrinth_project_id_blocked,
-            commands::flagsmith_commands::refresh_blocked_mods_config
+            commands::flagsmith_commands::refresh_blocked_mods_config,
+            commands::nrc_commands::get_mobile_app_token,
+            commands::nrc_commands::reset_mobile_app_token
         ])
         .build(tauri::generate_context!()) 
         .expect("error while building tauri application") 

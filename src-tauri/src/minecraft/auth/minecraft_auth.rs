@@ -230,6 +230,14 @@ impl MinecraftAuthStore {
             );
             *accounts = store.accounts;
             info!("[Storage] Successfully loaded accounts");
+
+            // Also restore saved device token
+            info!("[Storage] Restoring saved device token (if any)");
+            {
+                let mut token_guard = self.token.write().await;
+                *token_guard = store.token;
+            }
+            info!("[Storage] Device token restored");
         } else {
             info!("[Storage] No account file found, starting with empty accounts");
         }
@@ -279,58 +287,72 @@ impl MinecraftAuthStore {
     ) -> Result<(DeviceTokenKey, DeviceToken, DateTime<Utc>, bool)> {
         info!("refresh_and_get_device_token");
 
-        // First, check if we need to generate a new key
-        let should_generate = {
-            let current_token = self.token.read().await;
-            current_token.is_none()
-                || force_generate
-                || current_token
-                    .as_ref()
-                    .map(|t| t.token.not_after <= Utc::now())
-                    .unwrap_or(true)
-        };
-
-        if should_generate {
-            let key = generate_key()?;
-            let res = device_token(&key, current_date).await?;
-
-            let new_token = SaveDeviceToken {
-                id: key.id.clone(),
-                private_key: key
-                    .key
-                    .to_pkcs8_pem(LineEnding::default())
-                    .map_err(|err| MinecraftAuthenticationError::PEMSerialize(err))?
-                    .to_string(),
-                x: key.x.clone(),
-                y: key.y.clone(),
-                token: res.value.clone(),
+        // Prefer reusing the existing key unless explicitly forced to generate a new one
+        if !force_generate {
+            // Read current saved device token/key once
+            let saved = {
+                let current_token = self.token.read().await;
+                current_token.clone()
             };
 
-            {
-                let mut token = self.token.write().await;
-                *token = Some(new_token);
-            }
+            if let Some(saved_token) = saved {
+                // Parse existing private key and construct the key material
+                let private_key = SigningKey::from_pkcs8_pem(&saved_token.private_key)
+                    .map_err(|err| MinecraftAuthenticationError::PEMSerialize(err))?;
 
-            self.save().await?;
-            return Ok((key, res.value, res.date, true));
+                let key = DeviceTokenKey {
+                    id: saved_token.id.clone(),
+                    key: private_key,
+                    x: saved_token.x.clone(),
+                    y: saved_token.y.clone(),
+                };
+
+                // If the cached token is still valid, return it directly without a refresh call
+                if saved_token.token.not_after > current_date {
+                    return Ok((key, saved_token.token.clone(), current_date, false));
+                }
+
+                // Otherwise, request a fresh device token using the same key
+                let res = device_token(&key, current_date).await?;
+
+                // Update only the token in storage (keep the same key)
+                {
+                    let mut token_guard = self.token.write().await;
+                    if let Some(stored) = token_guard.as_mut() {
+                        stored.token = res.value.clone();
+                    }
+                }
+                self.save().await?;
+
+                // false indicates we reused the existing key
+                return Ok((key, res.value, res.date, false));
+            }
         }
 
-        // If we don't need to generate a new key, use the existing one
-        let current_token = self.token.read().await;
-        let token = current_token.as_ref().ok_or(AppError::NoCredentialsError)?;
+        // No existing key or forced generation: create a new key and token
+        let key = generate_key()?;
+        let res = device_token(&key, current_date).await?;
 
-        let private_key = SigningKey::from_pkcs8_pem(&token.private_key)
-            .map_err(|err| MinecraftAuthenticationError::PEMSerialize(err))?;
-
-        let key = DeviceTokenKey {
-            id: token.id.clone(),
-            key: private_key,
-            x: token.x.clone(),
-            y: token.y.clone(),
+        let new_token = SaveDeviceToken {
+            id: key.id.clone(),
+            private_key: key
+                .key
+                .to_pkcs8_pem(LineEnding::default())
+                .map_err(|err| MinecraftAuthenticationError::PEMSerialize(err))?
+                .to_string(),
+            x: key.x.clone(),
+            y: key.y.clone(),
+            token: res.value.clone(),
         };
 
-        let res = device_token(&key, current_date).await?;
-        Ok((key, res.value, res.date, false))
+        {
+            let mut token = self.token.write().await;
+            *token = Some(new_token);
+        }
+
+        self.save().await?;
+        // true indicates a new key was generated
+        Ok((key, res.value, res.date, true))
     }
 
     pub async fn login_begin(&self) -> Result<MinecraftLoginFlow> {
@@ -686,8 +708,8 @@ impl MinecraftAuthStore {
             creds.expires
         );
 
-        if creds.expires < Utc::now() {
-            info!("[Token Check] Microsoft token expired, initiating refresh");
+        if creds.expires <= Utc::now() + Duration::minutes(5) {
+            info!("[Token Check] Microsoft token nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
             let res = self.refresh_token(&old_credentials).await;

@@ -776,21 +776,67 @@ impl ProfileManager {
         game_versions: Option<Vec<String>>,
         add_dependencies: bool, // Allow caller to decide
     ) -> Result<()> {
-        self.add_modrinth_mod_internal(
-            profile_id,
-            project_id,
-            version_id,
-            file_name,
-            download_url,
-            file_hash_sha1,
-            mod_name,
-            version_number,
-            loaders,
-            game_versions,
-            add_dependencies,
-            HashSet::new(),
-        )
-        .await
+           // If profile is a standard version, download directly into its mods folder
+           let profile = self.get_profile(profile_id).await?;
+           if profile.is_standard_version {
+               let mods_dir = self.get_profile_mods_path(&profile)?;
+               tokio::fs::create_dir_all(&mods_dir).await?;
+   
+               let target_path = mods_dir.join(&file_name);
+               let tmp_path = target_path.with_extension("jar.nrc_tmp");
+   
+               let mut config = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
+               if let Some(sha1) = &file_hash_sha1 { config = config.with_sha1(sha1); }
+               crate::utils::download_utils::DownloadUtils::download_file(
+                   &download_url,
+                   &tmp_path,
+                   config,
+               ).await?;
+               // Atomic move
+               tokio::fs::rename(&tmp_path, &target_path).await?;
+   
+               // Optionally install required dependencies if requested
+               if add_dependencies {
+                   // Fetch version details to read dependencies
+                   if let Ok(ver_details) = modrinth::get_version_details(version_id.clone()).await {
+                       for dep in ver_details.dependencies.iter().filter(|d| d.dependency_type == ModrinthDependencyType::Required) {
+                           if let Some(dep_project_id) = &dep.project_id {
+                               // Find a compatible version by loader/profile game version
+                               if let Ok(dep_versions) = modrinth::get_mod_versions(dep_project_id.clone(), Some(vec![profile.loader.as_str().to_string()]), Some(vec![profile.game_version.clone()])).await {
+                                   if let Some(best) = dep_versions.iter().max_by_key(|v| &v.date_published) {
+                                       if let Some(primary) = best.files.iter().find(|f| f.primary) {
+                                           let dep_tmp = mods_dir.join(&primary.filename).with_extension("jar.nrc_tmp");
+                                           let dep_target = mods_dir.join(&primary.filename);
+                                           let mut cfg = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
+                                           if let Some(s) = &primary.hashes.sha1 { cfg = cfg.with_sha1(s); }
+                                           let _ = crate::utils::download_utils::DownloadUtils::download_file(&primary.url, &dep_tmp, cfg).await;
+                                           let _ = tokio::fs::rename(&dep_tmp, &dep_target).await;
+                                       }
+                                   }
+                               }
+                           }
+                       }
+                   }
+               }
+               Ok(())
+           } else {
+               // Non-standard: keep existing behavior (add to profile mods + optional deps)
+               self.add_modrinth_mod_internal(
+                   profile_id,
+                   project_id,
+                   version_id,
+                   file_name,
+                   download_url,
+                   file_hash_sha1,
+                   mod_name,
+                   version_number,
+                   loaders,
+                   game_versions,
+                   add_dependencies,
+                   HashSet::new(),
+               )
+               .await
+           }
     }
 
     // Set the enabled status of a specific mod within a profile
@@ -1285,7 +1331,7 @@ impl ProfileManager {
 
         let mods_path = match profile.loader {
             ModLoader::Fabric => {
-                let fabric_version_folder = format!("{}-{}", profile.game_version, "fabric");
+                let fabric_version_folder = format!("{}-{}-{}", "nrc", profile.game_version, "fabric");
                 instance_path.join("mods").join(fabric_version_folder)
             }
             _ => instance_path.join("mods"),
@@ -1580,10 +1626,15 @@ impl ProfileManager {
             crate::integrations::modrinth::get_versions_by_hashes(hashes_to_check, "sha1").await;
 
         // --- Process Results ---
-        // Get custom_mods_dir ONCE
-        let custom_mods_dir = self.get_profile_custom_mods_path(profile_id).await?;
-        // Ensure custom_mods_dir exists ONCE
-        fs::create_dir_all(&custom_mods_dir)
+        // Use normal mods directory for direct file placement
+        let profile = self.get_profile(profile_id).await?;
+        let mods_dir = if profile.loader == ModLoader::Fabric {
+            self.get_profile_mods_path(&profile)?
+        } else {
+            self.get_profile_custom_mods_path(profile_id).await?
+        };
+        // Ensure mods_dir exists ONCE
+        fs::create_dir_all(&mods_dir)
             .await
             .map_err(AppError::Io)?;
 
@@ -1648,7 +1699,7 @@ impl ProfileManager {
                             error_count += 1; // Count as error because Modrinth add failed essentially
                             path_utils::copy_as_custom_mod(
                                 &src_path_buf,
-                                &custom_mods_dir,
+                                &mods_dir,
                                 profile_id,
                                 &mut custom_added_count,
                                 &mut skipped_count,
@@ -1660,7 +1711,7 @@ impl ProfileManager {
                         log::info!("Mod {:?} (hash: {}) not found on Modrinth for profile {}. Importing as custom mod.", src_path_buf.file_name().unwrap_or_default(), hash, profile_id);
                         path_utils::copy_as_custom_mod(
                             &src_path_buf,
-                            &custom_mods_dir,
+                            &mods_dir,
                             profile_id,
                             &mut custom_added_count,
                             &mut skipped_count,
@@ -1676,7 +1727,7 @@ impl ProfileManager {
                 for (_hash, src_path_buf) in path_map {
                     path_utils::copy_as_custom_mod(
                         &src_path_buf,
-                        &custom_mods_dir,
+                        &mods_dir,
                         profile_id,
                         &mut custom_added_count,
                         &mut skipped_count,
@@ -1753,12 +1804,25 @@ impl ProfileManager {
 impl PostInitializationHandler for ProfileManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         info!("ProfileManager: on_state_ready called. Loading profiles...");
-        let loaded_profiles = self
+        let mut loaded_profiles = self
             .load_profiles_internal(&self.profiles_path.clone())
             .await?;
+        
+        // Perform profile migrations
+        let migration_count = crate::utils::migration_utils::migrate_profiles(&mut loaded_profiles);
+        
+        // Set profiles in memory
         let mut profiles_guard = self.profiles.write().await;
         *profiles_guard = loaded_profiles;
         drop(profiles_guard);
+        
+        // Save profiles to disk if migrations were performed
+        if migration_count > 0 {
+            info!("ProfileManager: Saving migrated profiles to disk...");
+            self.save_profiles().await?;
+            info!("ProfileManager: Successfully saved migrated profiles.");
+        }
+        
         info!("ProfileManager: Successfully loaded profiles in on_state_ready.");
         Ok(())
     }
@@ -1784,6 +1848,16 @@ pub fn get_profile_mod_filename(source: &ModSource) -> crate::error::Result<Stri
 }
 
 pub fn default_profile_path() -> PathBuf {
+    // Check cache first (same system as meta_dir)
+    if let Ok(guard) = crate::config::CUSTOM_GAME_DIR_CACHE.read() {
+        if let Some(cached_value) = guard.as_ref() {
+            if let Some(custom_dir) = cached_value {
+                return custom_dir.join("profiles");
+            }
+        }
+    }
+    
+    // Fallback to standard logic
     LAUNCHER_DIRECTORY.data_dir().join("profiles")
 }
 

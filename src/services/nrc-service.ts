@@ -133,5 +133,25 @@ export const discordAuthUnlink = (): Promise<void> => {
   return invoke('discord_auth_unlink');
 };
 
+/**
+ * Gets the mobile app token for NoRisk mobile app linking.
+ *
+ * @returns A promise that resolves to the mobile app token string.
+ * @throws If the backend command fails.
+ */
+export const getMobileAppToken = (): Promise<string> => {
+  return invoke('get_mobile_app_token');
+};
+
+/**
+ * Resets the mobile app token for NoRisk mobile app linking.
+ *
+ * @returns A promise that resolves to the new mobile app token string.
+ * @throws If the backend command fails.
+ */
+export const resetMobileAppToken = (): Promise<string> => {
+  return invoke('reset_mobile_app_token');
+};
+
 // Re-export logging utilities for backward compatibility
 export { log as logMessage, logDebug as logMessageDebug, logInfo as logMessageInfo, logWarn as logMessageWarn, logError as logMessageError } from '../utils/logging-utils';

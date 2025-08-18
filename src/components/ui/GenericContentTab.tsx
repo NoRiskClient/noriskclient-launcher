@@ -29,6 +29,7 @@ interface GenericContentTabProps<T> {
   emptyStateIcon?: string;
   emptyStateMessage?: string;
   emptyStateDescription?: string;
+  emptyStateAction?: ReactNode;
   loadingItemCount?: number;
   showSkeletons?: boolean;
   accentColorOverride?: string; 
@@ -49,6 +50,7 @@ export function GenericContentTab<T>({
   emptyStateIcon,
   emptyStateMessage,
   emptyStateDescription,
+  emptyStateAction,
   loadingItemCount,
   showSkeletons = true,
   accentColorOverride,
@@ -120,6 +122,7 @@ export function GenericContentTab<T>({
         emptyStateIcon={emptyStateIcon}
         emptyStateMessage={emptyStateMessage}
         emptyStateDescription={emptyStateDescription}
+        emptyStateAction={emptyStateAction}
         loadingItemCount={effectiveLoadingItemCount}
       />
     </div>

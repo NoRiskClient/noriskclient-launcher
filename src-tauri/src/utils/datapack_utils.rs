@@ -42,209 +42,68 @@ pub struct DataPackModrinthInfo {
 }
 
 /// Get all datapacks for a profile
-pub async fn get_datapacks_for_profile(profile: &Profile) -> Result<Vec<DataPackInfo>> {
+pub async fn get_datapacks_for_profile(
+    profile: &Profile,
+    calculate_hashes: bool,
+    fetch_modrinth_data: bool,
+) -> Result<Vec<DataPackInfo>> {
     debug!(
-        "Getting datapacks for profile: {} ({})",
-        profile.name, profile.id
+        "Getting datapacks for profile: {} ({}) via LocalContentLoader. Calculate_hashes: {}, fetch_modrinth_data: {}",
+        profile.name,
+        profile.id,
+        calculate_hashes,
+        fetch_modrinth_data
     );
 
-    // Construct the path to the datapacks directory
-    let datapacks_dir = get_datapacks_dir(profile).await?;
-    debug!("Datapacks directory path: {}", datapacks_dir.display());
+    use crate::utils::profile_utils::{LocalContentLoader, LoadItemsParams, ContentType, GenericModrinthInfo};
 
-    // Return empty list if directory doesn't exist yet
-    if !datapacks_dir.exists() {
-        debug!(
-            "Datapacks directory does not exist for profile: {}",
-            profile.id
-        );
-        return Ok(Vec::new());
-    }
+    // Create LoadItemsParams directly, including profile.id
+    let loader_params = LoadItemsParams {
+        profile_id: profile.id,
+        content_type: ContentType::DataPack,
+        calculate_hashes,
+        fetch_modrinth_data,
+    };
 
-    // Read directory contents
-    debug!("Reading contents of datapacks directory...");
-    let mut entries = fs::read_dir(&datapacks_dir)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read datapacks directory: {}", e)))?;
+    // Call load_items directly
+    match LocalContentLoader::load_items(loader_params).await {
+        Ok(local_items) => {
+            let data_pack_infos: Vec<DataPackInfo> = local_items
+                .into_iter()
+                .map(|item| DataPackInfo {
+                    filename: item.filename,
+                    path: item.path_str,
+                    sha1_hash: item.sha1_hash,
+                    file_size: item.file_size,
+                    is_disabled: item.is_disabled,
+                    modrinth_info: item.modrinth_info.map(|generic_info: GenericModrinthInfo| {
+                        DataPackModrinthInfo {
+                            project_id: generic_info.project_id,
+                            version_id: generic_info.version_id,
+                            name: generic_info.name,
+                            version_number: generic_info.version_number,
+                            download_url: generic_info.download_url.unwrap_or_default(),
+                        }
+                    }),
+                })
+                .collect();
 
-    let mut datapacks = Vec::new();
-    let mut hashes = Vec::new();
-    let mut path_to_info = HashMap::new();
-
-    // Collect all .zip and .zip.disabled files
-    debug!("Scanning datapacks directory for valid data packs...");
-    let mut file_count = 0;
-    let mut valid_count = 0;
-
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read datapack entry: {}", e)))?
-    {
-        file_count += 1;
-        let path = entry.path();
-        debug!("Checking file: {}", path.display());
-
-        if is_datapack_file(&path) {
-            valid_count += 1;
-            let filename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let is_disabled = filename.ends_with(".disabled");
-            let base_filename = if is_disabled {
-                filename
-                    .strip_suffix(".disabled")
-                    .unwrap_or(&filename)
-                    .to_string()
-            } else {
-                filename.clone()
-            };
-
-            debug!(
-                "Found valid datapack: {} (disabled: {})",
-                base_filename, is_disabled
+            info!(
+                "Successfully converted {} LocalContentItems to DataPackInfo for profile {}",
+                data_pack_infos.len(),
+                profile.id
             );
-
-            let metadata = fs::metadata(&path).await.map_err(|e| {
-                AppError::Other(format!("Failed to get metadata for {}: {}", filename, e))
-            })?;
-
-            let file_size = metadata.len();
-            debug!("Datapack size: {} bytes", file_size);
-
-            // Hash the file
-            debug!("Calculating SHA1 hash for {}", filename);
-            let sha1_hash = match hash_utils::calculate_sha1(&path).await {
-                Ok(hash) => {
-                    debug!("SHA1 hash for {}: {}", filename, hash);
-                    // Add to the list of hashes to check against Modrinth
-                    hashes.push(hash.clone());
-                    Some(hash)
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to compute SHA1 hash for datapack {}: {}",
-                        filename, e
-                    );
-                    None
-                }
-            };
-
-            let info = DataPackInfo {
-                filename: base_filename,
-                path: path.to_string_lossy().into_owned(),
-                sha1_hash: sha1_hash.clone(),
-                file_size,
-                is_disabled,
-                modrinth_info: None,
-            };
-
-            // Store info in hashmap to update with Modrinth data later
-            if let Some(hash) = sha1_hash {
-                path_to_info.insert(hash, info);
-            } else {
-                datapacks.push(info);
-            }
-        } else {
-            debug!("Skipping non-datapack file: {}", path.display());
+            Ok(data_pack_infos)
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to load datapacks using LocalContentLoader for profile {}: {}",
+                profile.id,
+                e
+            );
+            Err(e)
         }
     }
-
-    debug!(
-        "Scanned {} files/directories, found {} valid datapacks",
-        file_count, valid_count
-    );
-
-    // If we have hashes, try to look them up on Modrinth
-    if !hashes.is_empty() {
-        debug!(
-            "Looking up {} data packs on Modrinth by hash...",
-            hashes.len()
-        );
-        match modrinth::get_versions_by_hashes(hashes.clone(), "sha1").await {
-            Ok(version_map) => {
-                debug!(
-                    "Modrinth lookup returned {} matches out of {} requested",
-                    version_map.len(),
-                    hashes.len()
-                );
-                for (hash, version) in version_map {
-                    if let Some(info) = path_to_info.get_mut(&hash) {
-                        debug!(
-                            "Found Modrinth info for pack with hash {}: project_id={}, name={}",
-                            hash, version.project_id, version.name
-                        );
-
-                        // Check if this is actually a datapack and not something else
-                        if version.project_id.is_empty() || version.id.is_empty() {
-                            debug!("Skipping invalid Modrinth data for hash {}: empty project_id or version_id", hash);
-                            continue;
-                        }
-
-                        // Find the primary file in the new version
-                        log::debug!(
-                            "Files in new_version for datapack update: {:?}",
-                            version.files
-                        );
-                        let primary_file =
-                            version.files.iter().find(|f| f.primary).ok_or_else(|| {
-                                AppError::Other(format!(
-                                    "No primary file found for Modrinth version {} (ID: {})",
-                                    version.name, version.id
-                                ))
-                            })?;
-
-                        // Find the primary file for the URL
-                        if let Some(primary_file) = version.files.iter().find(|f| f.primary) {
-                            debug!(
-                                "Using primary file from Modrinth: {}",
-                                primary_file.filename
-                            );
-                            info.modrinth_info = Some(DataPackModrinthInfo {
-                                project_id: version.project_id.clone(),
-                                version_id: version.id.clone(),
-                                name: version.name.clone(),
-                                version_number: version.version_number.clone(),
-                                download_url: primary_file.url.clone(),
-                            });
-                        } else {
-                            debug!(
-                                "No primary file found in Modrinth version for hash {}",
-                                hash
-                            );
-                        }
-                    } else {
-                        debug!("Received Modrinth data for unknown hash: {}", hash);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("Failed to lookup datapacks on Modrinth: {}", e);
-            }
-        }
-    } else {
-        debug!("No data packs to lookup on Modrinth");
-    }
-
-    // Add all packs to the result list
-    for (hash, info) in path_to_info {
-        debug!(
-            "Adding pack with hash {} to result list: {}",
-            hash, info.filename
-        );
-        datapacks.push(info);
-    }
-
-    info!(
-        "Found {} total datapacks for profile {}",
-        datapacks.len(),
-        profile.id
-    );
-
-    Ok(datapacks)
 }
 
 /// Get the path to the datapacks directory for a profile

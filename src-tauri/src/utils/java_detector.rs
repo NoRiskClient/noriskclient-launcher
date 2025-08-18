@@ -103,7 +103,7 @@ async fn detect_java_in_launcher_dir() -> Result<Vec<JavaInstallation>> {
     let mut installations = Vec::new();
 
     // Get the launcher's meta/java directory
-    let java_dir = LAUNCHER_DIRECTORY.meta_dir().join("java");
+    let java_dir = crate::config::standard_meta_dir().join("java");
     info!("Checking for Java installations in: {}", java_dir.display());
 
     // Create the directory if it doesn't exist

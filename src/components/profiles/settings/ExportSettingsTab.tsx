@@ -82,7 +82,7 @@ export function ExportSettingsTab({
         setDirectoryStructure(structure);
       } catch (err) {
         console.error("Failed to fetch directory structure:", err);
-        const message = err instanceof Error ? err.message : String(err);
+        const message = err instanceof Error ? err.message : String(err.message);
         setDirectoryError(`Failed to load file structure: ${message}`);
         toast.error(`Failed to load file structure: ${message}`);
       } finally {
@@ -207,11 +207,7 @@ export function ExportSettingsTab({
       )}
 
       {/* Card now always wraps the main form elements */}
-      <Card
-        variant="flat"
-        className="p-5 space-y-4 border border-white/10 bg-black/20"
-        withAnimation={isBackgroundAnimationEnabled}
-      >
+      <>
         {/* Filename input section */}
         <div className="space-y-1">
           <label
@@ -292,6 +288,7 @@ export function ExportSettingsTab({
                 "NoRiskClientLauncher",
                 "config",
                 "custom_mods",
+                "mods",
               ]}
               selectChildrenWithParent={true}
               defaultRootCollapsed={false}
@@ -329,7 +326,7 @@ export function ExportSettingsTab({
             </div>
           </>
         )}
-      </Card>
+      </>
     </div>
   );
 }

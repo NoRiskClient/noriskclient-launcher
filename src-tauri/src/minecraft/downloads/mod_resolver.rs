@@ -7,6 +7,9 @@ use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::command;
+use uuid::Uuid;
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use tokio::fs;
 
 // --- Struct for resolved mods ---
 #[derive(Debug, Clone)]
@@ -556,4 +559,42 @@ pub async fn resolve_target_mods(
     );
     debug!("Final target mods for sync: {:?}", final_target_list);
     Ok(final_target_list)
+}
+
+/// Creates a Fabric addMods meta file that lists one absolute path per line for the provided target mods.
+/// Returns the absolute path to the created meta file.
+pub async fn create_fabric_add_mods_meta(
+    profile_id: Uuid,
+    minecraft_version: &str,
+    target_mods: &[TargetMod],
+) -> crate::error::Result<PathBuf> {
+    let runtime_dir = LAUNCHER_DIRECTORY.meta_dir().join("runtime");
+    fs::create_dir_all(&runtime_dir).await?;
+
+    let meta_file_path = runtime_dir.join(format!(
+        "nrc_fabric_mods_{}_{}.txt",
+        profile_id, minecraft_version
+    ));
+
+    let mut meta_contents = String::new();
+    for tm in target_mods {
+        let p = tm.cache_path.to_string_lossy().replace("\\", "/");
+        meta_contents.push_str(&p);
+        meta_contents.push('\n');
+    }
+    fs::write(&meta_file_path, meta_contents).await?;
+    Ok(meta_file_path)
+}
+
+/// Creates the meta file and returns the formatted JVM argument string for Fabric addMods
+pub async fn build_fabric_add_mods_arg(
+    profile_id: Uuid,
+    minecraft_version: &str,
+    target_mods: &[TargetMod],
+) -> crate::error::Result<String> {
+    let meta = create_fabric_add_mods_meta(profile_id, minecraft_version, target_mods).await?;
+    Ok(format!(
+        "-Dfabric.addMods=@{}",
+        meta.to_string_lossy().replace("\\", "/")
+    ))
 }

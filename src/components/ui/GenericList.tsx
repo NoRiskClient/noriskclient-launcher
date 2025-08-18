@@ -46,6 +46,7 @@ interface GenericListProps<T> {
   emptyStateIcon?: string;
   emptyStateMessage?: string;
   emptyStateDescription?: string;
+  emptyStateAction?: ReactNode;
   searchQuery?: string;  accentColor?: string;
   listContainerClassName?: string;
   listItemClassName?: string;
@@ -63,6 +64,7 @@ export function GenericList<T>({
   emptyStateIcon = GENERIC_LIST_DEFAULT_ICONS[1],
   emptyStateMessage = "no items match your search",
   emptyStateDescription = "Try adjusting your search or filters.",
+  emptyStateAction,
   searchQuery = "",
   accentColor = "#FFFFFF",
   listContainerClassName = "",
@@ -132,6 +134,7 @@ export function GenericList<T>({
         icon={emptyStateIcon}
         message={searchQuery ? emptyStateMessage : "no items found"}
         description={searchQuery ? "Try a different search term." : emptyStateDescription}
+        action={emptyStateAction}
       />
     );
   }

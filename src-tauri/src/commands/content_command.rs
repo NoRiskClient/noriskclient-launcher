@@ -98,16 +98,8 @@ async fn uninstall_content_by_sha1_internal(
     let mut asset_files_deleted_count = 0;
     let mut asset_file_deletion_errors_occurred = false;
 
-    // Only scan asset directories if content_type is None or not ContentType::Mod
-    let should_scan_assets = match content_type {
-        Some(profile_utils::ContentType::Mod) => {
-            log::info!(
-                "Content type is Mod, skipping asset directory scan for SHA1 uninstallation."
-            );
-            false
-        }
-        _ => true, // Includes None or other asset types
-    };
+    // Scan directories based on content type
+    let should_scan_assets = true; // Always scan directories now
 
     if should_scan_assets {
         match state_manager
@@ -116,10 +108,30 @@ async fn uninstall_content_by_sha1_internal(
             .await
         {
             Ok(profile_instance_path) => {
-                let asset_dirs_to_scan = vec!["shaderpacks", "resourcepacks", "datapacks"];
-                for dir_name in asset_dirs_to_scan {
-                    let asset_dir_path = profile_instance_path.join(dir_name);
-                    if asset_dir_path.is_dir() {
+                // Get profile mods path for local mods scanning
+                let profile_mods_path = state_manager.profile_manager.get_profile_mods_path(&profile)?;
+                
+                let mut dirs_to_scan = vec![
+                    ("shaderpacks", profile_instance_path.join("shaderpacks")),
+                    ("resourcepacks", profile_instance_path.join("resourcepacks")), 
+                    ("datapacks", profile_instance_path.join("datapacks")),
+                    ("mods", profile_mods_path),
+                    ("custom_mods", profile_instance_path.join("custom_mods")),
+                ];
+
+                // Filter directories based on content_type
+                if let Some(ref ct) = content_type {
+                    dirs_to_scan = match ct {
+                        profile_utils::ContentType::Mod => dirs_to_scan.into_iter().filter(|(name, _)| name == &"mods" || name == &"custom_mods").collect(),
+                        profile_utils::ContentType::ShaderPack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"shaderpacks").collect(),
+                        profile_utils::ContentType::ResourcePack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"resourcepacks").collect(),
+                        profile_utils::ContentType::DataPack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"datapacks").collect(),
+                        _ => dirs_to_scan, // NoRiskMod or others: scan all
+                    };
+                }
+
+                for (dir_name, asset_dir_path) in dirs_to_scan {
+                    if asset_dir_path.exists() && asset_dir_path.is_dir() {
                         match fs::read_dir(&asset_dir_path).await {
                             Ok(mut entries) => {
                                 while let Some(entry_result) =
@@ -394,7 +406,7 @@ pub async fn toggle_content_from_profile(
                 "Targeted toggle for ShaderPacks with SHA1: {}",
                 current_sha1_hash
             );
-            match shaderpack_utils::get_shaderpacks_for_profile(&profile).await {
+            match shaderpack_utils::get_shaderpacks_for_profile(&profile, true, true).await {
                 Ok(shader_packs) => {
                     for pack_info in shader_packs {
                         if pack_info.sha1_hash.as_deref() == Some(&current_sha1_hash) {
@@ -458,7 +470,7 @@ pub async fn toggle_content_from_profile(
                 "Targeted toggle for DataPacks with SHA1: {}",
                 current_sha1_hash
             );
-            match datapack_utils::get_datapacks_for_profile(&profile).await {
+            match datapack_utils::get_datapacks_for_profile(&profile, true, true).await {
                 Ok(data_packs) => {
                     for pack_info in data_packs {
                         if pack_info.sha1_hash.as_deref() == Some(&current_sha1_hash) {
@@ -488,15 +500,39 @@ pub async fn toggle_content_from_profile(
             }
         }
         Some(profile_utils::ContentType::Mod) => {
-            // Mod type was handled in Phase 1. If mod_entries_toggled_count is 0 here, it means no mod matched.
-            // No further asset scanning is done if ContentType::Mod was specified.
-            log::debug!("ContentType::Mod specified, mod processing already done in Phase 1.");
+            log::debug!("Targeted toggle for Mods with SHA1: {}", current_sha1_hash);
+            // Check local mod files if no profile mod was toggled
             if mod_entries_toggled_count == 0 {
-                log::warn!(
-                    "ContentType::Mod specified, but no Modrinth entry found with SHA1 '{}' in profile {} to toggle.",
-                    current_sha1_hash, payload.profile_id
-                );
-                // We don't return an error here yet, as the final check below will handle it if nothing at all was toggled.
+                match profile_utils::LocalContentLoader::load_items(profile_utils::LoadItemsParams {
+                    profile_id: profile.id,
+                    content_type: profile_utils::ContentType::Mod,
+                    calculate_hashes: true,
+                    fetch_modrinth_data: false, // Don't need Modrinth data for toggling
+                }).await {
+                    Ok(local_mods) => {
+                        for mod_item in local_mods {
+                            if mod_item.sha1_hash.as_deref() == Some(&current_sha1_hash) {
+                                match toggle_single_asset_file(
+                                    &mod_item.path_str,
+                                    &mod_item.filename,
+                                    mod_item.is_disabled,
+                                    payload.enabled,
+                                    "mod",
+                                ).await {
+                                    Ok(_) => asset_files_toggled_count += 1,
+                                    Err(_) => asset_file_toggle_errors = true,
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Failed to list local mods for profile {}: {}. Skipping local mod toggle.",
+                            payload.profile_id, e
+                        );
+                        asset_file_toggle_errors = true;
+                    }
+                }
             }
         }
         Some(profile_utils::ContentType::NoRiskMod) => {
@@ -1057,36 +1093,82 @@ pub async fn switch_content_version(
     match payload.content_type {
         // Use payload.content_type here
         profile_utils::ContentType::Mod => {
-            let mod_id_str = current_item.id.ok_or_else(|| {
-                AppError::InvalidInput(
-                    "Missing 'id' (String Uuid) in current_item_details for Mod type.".to_string(),
-                )
-            })?;
+            if let Some(mod_id_str) = current_item.id.clone() {
+                // Managed Modrinth mod entry update by ID
+                let mod_id_to_update = Uuid::parse_str(&mod_id_str).map_err(|_| {
+                    AppError::InvalidInput(format!("Invalid Uuid format for mod id: {}", mod_id_str))
+                })?;
 
-            let mod_id_to_update = Uuid::parse_str(&mod_id_str).map_err(|_| {
-                AppError::InvalidInput(format!("Invalid Uuid format for mod id: {}", mod_id_str))
-            })?;
-
-            // Verify this mod_id exists in the profile before proceeding (optional, update_profile_modrinth_mod_version should handle it)
-            // let profile_check = state_manager.profile_manager.get_profile(payload.profile_id).await?;
-            // if !profile_check.mods.iter().any(|m| m.id == mod_id_to_update) {
-            //     return Err(CommandError::from(AppError::NotFound(format!("Mod with ID {} not found in profile.", mod_id_to_update))));
-            // }
-
-            log::info!(
-                "Proceeding with version switch for mod ID: {}. New version: {}",
-                mod_id_to_update,
-                new_version_details.id
-            );
-            state_manager
-                .profile_manager
-                .update_profile_modrinth_mod_version(
-                    payload.profile_id,
+                log::info!(
+                    "Proceeding with version switch for mod ID: {}. New version: {}",
                     mod_id_to_update,
-                    &new_version_details,
+                    new_version_details.id
+                );
+                state_manager
+                    .profile_manager
+                    .update_profile_modrinth_mod_version(
+                        payload.profile_id,
+                        mod_id_to_update,
+                        &new_version_details,
+                    )
+                    .await
+                    .map_err(CommandError::from)
+            } else {
+                // Local/custom mod file: replace the JAR in-place using the selected Modrinth version
+                use std::path::PathBuf;
+                use tokio::fs;
+
+                let primary_file = new_version_details
+                    .files
+                    .iter()
+                    .find(|f| f.primary)
+                    .or_else(|| new_version_details.files.first())
+                    .ok_or_else(|| AppError::InvalidInput("Selected version has no files".to_string()))?;
+
+                let current_path = PathBuf::from(&current_item.path_str);
+                let dir = current_path
+                    .parent()
+                    .ok_or_else(|| AppError::InvalidInput("Invalid current item path".to_string()))?;
+
+                let target_path = dir.join(&primary_file.filename);
+
+                // Ensure directory exists
+                fs::create_dir_all(dir).await.map_err(AppError::Io).map_err(CommandError::from)?;
+
+                // Download to a temp path then atomically replace
+                let tmp_path = target_path.with_extension("jar.nrc_tmp");
+                let mut config = crate::utils::download_utils::DownloadConfig::new()
+                    .with_streaming(true);
+                if let Some(sha1) = &primary_file.hashes.sha1 {
+                    config = config.with_sha1(sha1);
+                }
+                crate::utils::download_utils::DownloadUtils::download_file(
+                    &primary_file.url,
+                    &tmp_path,
+                    config,
                 )
                 .await
-                .map_err(CommandError::from)
+                .map_err(CommandError::from)?;
+
+                // Remove old file if it exists (either enabled or disabled variant)
+                if current_path.exists() {
+                    let _ = fs::remove_file(&current_path).await; // ignore errors
+                }
+
+                // Move tmp -> target
+                fs::rename(&tmp_path, &target_path)
+                    .await
+                    .map_err(AppError::Io)
+                    .map_err(CommandError::from)?;
+
+                log::info!(
+                    "Switched local/custom mod '{}' -> '{}'",
+                    current_item.path_str,
+                    target_path.to_string_lossy()
+                );
+
+                Ok(())
+            }
         }
         profile_utils::ContentType::ResourcePack => {
             let profile = state_manager

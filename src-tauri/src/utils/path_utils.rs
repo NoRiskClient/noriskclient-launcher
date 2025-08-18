@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 /// Findet einen eindeutigen Verzeichnisnamen (Segment) in einem Basisverzeichnis.
 /// Wenn "desired_segment" schon existiert, werden Suffixe wie "(1)", "(2)" usw. angehängt.
+/// Stellt zusätzlich sicher, dass keine problematischen Character enthalten sind.
 /// Gibt den eindeutigen Segmentnamen als String zurück.
 pub async fn find_unique_profile_segment(
     base_profiles_dir: &Path,
@@ -22,8 +23,14 @@ pub async fn find_unique_profile_segment(
         base_profiles_dir.display()
     );
 
+    // Problematische Character durch '_' ersetzen
+    let sanitized_segment = desired_segment.replace(
+        ['/', '\\', '?', '!', '<', '>', '*', ':', '\'', '\"', '|'],
+        "_",
+    );
+
     // Bereinigen und sicherstellen, dass der Segmentname nicht leer ist
-    let clean_segment = desired_segment.trim();
+    let clean_segment = sanitized_segment.trim();
     if clean_segment.is_empty() {
         error!("Desired segment name cannot be empty.");
         // Erwäge, hier einen Standardnamen oder einen eindeutigen Zeitstempel zu generieren

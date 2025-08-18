@@ -167,8 +167,9 @@ export function GlobalToaster() {
               primary: accentColor.value,
               secondary: "#ffffff",
             },
+            duration: Infinity,
           },
-          duration: 4000,
+          duration: 3000,
         }}
       />
     </div>

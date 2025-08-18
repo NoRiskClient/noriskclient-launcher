@@ -11,8 +11,8 @@ use tokio::fs;
 
 const LOG_DIR_NAME: &str = "logs";
 const LOG_FILE_NAME: &str = "launcher.log";
-const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} [{l}] {T} - {m}{n}";
-const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} [{l}] - {m}{n}"; // Slightly simpler pattern for console
+const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {m}{n}";
+const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} | {h({l}):5.5} | {m}{n}"; // Slightly simpler pattern for console
 const LOG_FILE_SIZE_LIMIT_MB: u64 = 10;
 const LOG_FILE_BACKUP_COUNT: u32 = 5;
 

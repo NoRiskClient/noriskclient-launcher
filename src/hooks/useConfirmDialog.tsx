@@ -152,13 +152,14 @@ export function useConfirmDialog() {
   );
   const confirmDialog =
     isMounted && isOpen
-      ? createPortal(          <Modal
+      ? createPortal(
+          <Modal
             title={options.title}
             onClose={handleClose}
             width="md"
+            footer={renderFooter()}
           >
             {renderContent()}
-            {renderFooter()}
           </Modal>,
           document.body,
         )

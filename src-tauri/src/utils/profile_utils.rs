@@ -1,3 +1,4 @@
+use crate::config::ProjectDirsExt;
 use crate::error::{AppError, Result};
 use crate::integrations::modrinth::{ModrinthProjectType, ModrinthVersion};
 use crate::integrations::norisk_packs;
@@ -605,7 +606,7 @@ pub async fn check_content_installed(params: CheckContentParams) -> Result<Conte
                 "Checking locally installed shader packs in profile {}...",
                 params.profile_id
             );
-            match shaderpack_utils::get_shaderpacks_for_profile(&profile).await {
+            match shaderpack_utils::get_shaderpacks_for_profile(&profile, true, true).await {
                 Ok(packs) => {
                     for pack_info in &packs {
                         let modrinth_pid = pack_info
@@ -673,7 +674,7 @@ pub async fn check_content_installed(params: CheckContentParams) -> Result<Conte
                 "Checking locally installed data packs in profile {}...",
                 params.profile_id
             );
-            match datapack_utils::get_datapacks_for_profile(&profile).await {
+            match datapack_utils::get_datapacks_for_profile(&profile, true, true).await {
                 Ok(packs) => {
                     for pack_info in &packs {
                         let modrinth_pid = pack_info
@@ -1083,6 +1084,16 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
     // Reset profile ID to ensure it's unique when imported
     export_profile.id = Uuid::new_v4();
 
+    // Exported profiles should always be user profiles, not standard templates
+    export_profile.is_standard_version = false;
+
+    // Change NORISK CLIENT group to CUSTOM for exports
+    if let Some(group) = &export_profile.group {
+        if group.eq_ignore_ascii_case("NORISK CLIENT") {
+            export_profile.group = Some("CUSTOM".to_string());
+        }
+    }
+
     // Keep other essential data
     export_profile
 }
@@ -1394,6 +1405,23 @@ async fn process_mod_requests(
     requests: &[(&ContentCheckRequest, usize)],
     results: &mut Vec<Option<ContentCheckResult>>,
 ) -> Result<()> {
+    // Load all local mods once
+    let local_mods = match LocalContentLoader::load_items(LoadItemsParams {
+        profile_id: profile.id,
+        content_type: ContentType::Mod,
+        calculate_hashes: true,
+        fetch_modrinth_data: true,
+    }).await {
+        Ok(mods) => mods,
+        Err(e) => {
+            warn!(
+                "Failed to list local mods: {}. Assuming none installed.",
+                e
+            );
+            Vec::new()
+        }
+    };
+
     // For each request, we need to check both in NoRisk Pack and local installation
     for (request, idx) in requests {
         // Convert to the old params format for reusing norisk pack check logic
@@ -1497,7 +1525,7 @@ async fn process_mod_requests(
             }
         }
 
-        // Check if locally installed
+        // Check if locally installed - first check profile.mods
         for installed_mod in &profile.mods {
             let mut mod_project_id: Option<&str> = None;
             let mut mod_version_id: Option<&str> = None;
@@ -1562,6 +1590,46 @@ async fn process_mod_requests(
             }
         }
 
+        // If not found in profile.mods, check local files
+        if !status.is_installed {
+            for mod_item in &local_mods {
+                let modrinth_pid = mod_item.modrinth_info.as_ref().map(|m| m.project_id.as_str());
+                let modrinth_vid = mod_item.modrinth_info.as_ref().map(|m| m.version_id.as_str());
+                let mod_hash = mod_item.sha1_hash.as_deref();
+                let mod_filename_str = Some(mod_item.filename.as_str());
+
+                // Match against provided parameters
+                let mut match_project = true;
+                if let Some(pid) = &request.project_id {
+                    match_project = modrinth_pid == Some(pid.as_str());
+                }
+                let mut match_version = true;
+                if let Some(vid) = &request.version_id {
+                    match_version = modrinth_vid == Some(vid.as_str());
+                }
+                let mut match_hash = true;
+                if let Some(hash) = &request.file_hash_sha1 {
+                    match_hash = mod_hash == Some(hash.as_str());
+                }
+                let mut match_name = true;
+                if let Some(name) = &request.file_name {
+                    match_name = mod_filename_str == Some(name.as_str());
+                }
+
+                if match_project && match_version && match_hash && match_name {
+                    status.is_installed = true;
+                    status.is_enabled = Some(!mod_item.is_disabled); // Local files: enabled = !disabled
+                    status.found_item_details = Some(FoundItemDetails {
+                        item_type: ContentType::Mod,
+                        item_id: mod_item.id.clone(),
+                        file_name: Some(mod_item.filename.clone()),
+                        display_name: mod_item.modrinth_info.as_ref().map(|m| m.name.clone()),
+                    });
+                    break;
+                }
+            }
+        }
+
         // Store the result
         results[*idx] = Some(ContentCheckResult {
             request_id: request.request_id.clone(),
@@ -1583,7 +1651,7 @@ async fn process_resourcepack_requests(
     results: &mut Vec<Option<ContentCheckResult>>,
 ) -> Result<()> {
     // Load all resource packs once
-    let packs = match resourcepack_utils::get_resourcepacks_for_profile(profile, true, false).await
+    let packs = match resourcepack_utils::get_resourcepacks_for_profile(profile, true, true).await
     {
         Ok(packs) => packs,
         Err(e) => {
@@ -1689,7 +1757,7 @@ async fn process_shaderpack_requests(
     results: &mut Vec<Option<ContentCheckResult>>,
 ) -> Result<()> {
     // Load all shader packs once
-    let packs = match shaderpack_utils::get_shaderpacks_for_profile(profile).await {
+    let packs = match shaderpack_utils::get_shaderpacks_for_profile(profile, true, true).await {
         Ok(packs) => packs,
         Err(e) => {
             warn!(
@@ -1774,7 +1842,7 @@ async fn process_datapack_requests(
     results: &mut Vec<Option<ContentCheckResult>>,
 ) -> Result<()> {
     // Load all data packs once
-    let packs = match datapack_utils::get_datapacks_for_profile(profile).await {
+    let packs = match datapack_utils::get_datapacks_for_profile(profile, true, true).await {
         Ok(packs) => packs,
         Err(e) => {
             warn!("Failed to list data packs: {}. Assuming none installed.", e);
@@ -1895,6 +1963,7 @@ impl LocalContentLoader {
         let state = State::get().await?;
         // Fetch profile using profile_id from params
         let profile = state.profile_manager.get_profile(params.profile_id).await?;
+        let profile_mods_path = state.profile_manager.get_profile_mods_path(&profile)?;
 
         debug!(
             "Loading items for profile: {} ({}), content_type: {:?}, calculate_hashes: {}, fetch_modrinth_data: {}",
@@ -1908,16 +1977,17 @@ impl LocalContentLoader {
             ContentType::ShaderPack => vec![shaderpack_utils::get_shaderpacks_dir(&profile).await?],
             ContentType::DataPack => vec![datapack_utils::get_datapacks_dir(&profile).await?],
             ContentType::Mod => {
-                // For mods, get both standard and custom mods directories
+                // Prefer standard mods directory first, then custom_mods
                 let instance_path = state
                     .profile_manager
                     .calculate_instance_path_for_profile(&profile)?;
-                vec![instance_path.join("custom_mods")]
+                vec![
+                    profile_mods_path.clone(),
+                    instance_path.join("custom_mods"),
+                ]
             }
             ContentType::NoRiskMod => {
-                // For NoRisk mods, we don't actually need a physical directory
-                // since these are managed via the NoRisk pack system
-                // Return an empty vector as we'll handle it differently
+                // For NoRisk mods, handled differently (no physical directory scan)
                 Vec::new()
             }
         };
@@ -2075,7 +2145,19 @@ impl LocalContentLoader {
                 }
 
                 // Use the first directory as fallback if file not found
-                let path_buf = found_path.unwrap_or_else(|| content_dirs[0].join(&actual_filename));
+                let path_buf = if let Some(found) = found_path { found } else {
+                    // Smarter fallback: if this profile mod comes from Modrinth/Url/Maven, point to mod_cache
+                    match &mod_item.source {
+                        crate::state::profile_state::ModSource::Modrinth { .. }
+                        | crate::state::profile_state::ModSource::Url { .. }
+                        | crate::state::profile_state::ModSource::Maven { .. } => {
+                            crate::config::ProjectDirsExt::meta_dir(&*crate::config::LAUNCHER_DIRECTORY)
+                                .join("mod_cache")
+                                .join(&actual_filename)
+                        }
+                        _ => content_dirs[0].join(&actual_filename),
+                    }
+                };
                 let path_str = path_buf.to_string_lossy().into_owned();
 
                 let file_size = 0; // Placeholder due to cache logic - will revisit
@@ -2208,13 +2290,13 @@ impl LocalContentLoader {
                     file_name_str
                 };
 
-                // Determine source_type based on parent directory name
+                // Determine source_type based on location (only mark custom if under custom_mods)
                 let source_type = if params.content_type == ContentType::Mod {
-                    // Check if this mod is in the custom_mods directory
-                    if path
+                    if path.starts_with(&profile_mods_path) {
+                        Some("custom".to_string())
+                    } else if path
                         .parent()
-                        .map(|p| p.file_name())
-                        .flatten()
+                        .and_then(|p| p.file_name())
                         .map(|name| name.to_string_lossy().to_string() == "custom_mods")
                         .unwrap_or(false)
                     {
@@ -2444,6 +2526,25 @@ impl LocalContentLoader {
             }
         }
 
+        for (idx, item) in final_items.iter().enumerate() {
+            info!(
+                "Final item [{}]: filename='{}', path_str='{}', sha1_hash={:?}, file_size={}, is_disabled={}, is_directory={}, content_type={:?}, source_type={:?}, norisk_info={:?}, id={:?}, associated_loader={:?}, fallback_version={:?}, modrinth_info={:?}",
+                idx,
+                item.filename,
+                item.path_str,
+                item.sha1_hash,
+                item.file_size,
+                item.is_disabled,
+                item.is_directory,
+                item.content_type,
+                item.source_type,
+                item.norisk_info,
+                item.id,
+                item.associated_loader,
+                item.fallback_version,
+                item.modrinth_info
+            );
+        }
         info!(
             "Successfully loaded {} items of type {:?} for profile {}",
             final_items.len(),

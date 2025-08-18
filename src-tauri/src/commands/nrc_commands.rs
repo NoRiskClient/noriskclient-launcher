@@ -236,3 +236,55 @@ pub async fn log_message_command(level: String, message: String) -> Result<(), C
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_mobile_app_token() -> Result<String, CommandError> {
+    debug!("Executing get_mobile_app_token command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for mobile app token.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Getting mobile app token for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::get_mcreal_app_token(&token, &account_id_str, is_experimental).await?)
+}
+
+#[tauri::command]
+pub async fn reset_mobile_app_token() -> Result<String, CommandError> {
+    debug!("Executing reset_mobile_app_token command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for mobile app token reset.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Resetting mobile app token for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::reset_mcreal_app_token(&token, &account_id_str, is_experimental).await?)
+}

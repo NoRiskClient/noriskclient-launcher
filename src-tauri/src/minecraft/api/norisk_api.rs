@@ -525,5 +525,99 @@ impl NoRiskApi {
         Ok(())
     }
 
+    pub async fn get_mcreal_app_token(
+        norisk_token: &str,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<String> {
+        let base_url = Self::get_api_base(is_experimental);
+        let endpoint = "mcreal/user/mobileAppToken";
+        let url = format!("{}/{}", base_url, endpoint);
+        
+        info!("[NoRisk API] Requesting mcreal app token");
+        debug!("[NoRisk API] Full URL: {}", url);
+        
+        let response = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[NoRisk API] McReal app token request failed: {}", e);
+                AppError::RequestError(format!("Failed to get mobile app token from NoRisk API: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!("[NoRisk API] McReal app token response status: {}", status);
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!(
+                "[NoRisk API] McReal app token error response: Status {}, Body: {}",
+                status, error_body
+            );
+            return Err(AppError::RequestError(format!(
+                "NoRisk API returned error status for mobile app token: {}, Body: {}",
+                status, error_body
+            )));
+        }
+
+        response.text().await.map_err(|e| {
+            error!("[NoRisk API] Failed to read mobile app token response: {}", e);
+            AppError::ParseError(format!("Failed to read NoRisk API mobile app token response: {}", e))
+        })
+    }
+
+    pub async fn reset_mcreal_app_token(
+        norisk_token: &str,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<String> {
+        let base_url = Self::get_api_base(is_experimental);
+        let endpoint = "mcreal/user/mobileAppToken/reset";
+        let url = format!("{}/{}", base_url, endpoint);
+        
+        info!("[NoRisk API] Resetting mcreal app token");
+        debug!("[NoRisk API] Full URL: {}", url);
+        
+        let response = HTTP_CLIENT
+            .post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[NoRisk API] McReal app token reset request failed: {}", e);
+                AppError::RequestError(format!("Failed to reset mobile app token from NoRisk API: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!("[NoRisk API] McReal app token reset response status: {}", status);
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!(
+                "[NoRisk API] McReal app token reset error response: Status {}, Body: {}",
+                status, error_body
+            );
+            return Err(AppError::RequestError(format!(
+                "NoRisk API returned error status for mobile app token reset: {}, Body: {}",
+                status, error_body
+            )));
+        }
+
+        response.text().await.map_err(|e| {
+            error!("[NoRisk API] Failed to read mobile app token reset response: {}", e);
+            AppError::ParseError(format!("Failed to read NoRisk API mobile app token reset response: {}", e))
+        })
+    }
+
     // Add more NoRisk API methods as needed
 }

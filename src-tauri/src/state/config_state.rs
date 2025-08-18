@@ -1,4 +1,4 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY, update_custom_game_dir};
 use crate::error::Result;
 use crate::state::post_init::PostInitializationHandler;
 use crate::state::profile_state::MemorySettings;
@@ -51,6 +51,8 @@ pub struct LauncherConfig {
     pub hide_on_process_start: bool,
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
+    #[serde(default)]
+    pub custom_game_directory: Option<PathBuf>,
 }
 
 fn default_config_version() -> u32 {
@@ -104,6 +106,7 @@ impl Default for LauncherConfig {
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
             global_memory_settings: default_global_memory_settings(),
+            custom_game_directory: None,
         }
     }
 }
@@ -150,7 +153,10 @@ impl ConfigManager {
 
                 // Update the stored config
                 let mut config = self.config.write().await;
-                *config = loaded_config;
+                *config = loaded_config.clone();
+                
+                // Update cache
+                update_custom_game_dir(loaded_config.custom_game_directory);
             }
             Err(e) => {
                 error!("Failed to parse config file: {}", e);
@@ -229,15 +235,23 @@ impl ConfigManager {
                                     migrated_config.last_played_profile = Some(uuid);
                                 }
                             }
+                            
+                            // Migrate custom game directory
+                            if let Some(custom_dir_str) = obj.get("custom_game_directory").and_then(|v| v.as_str()) {
+                                migrated_config.custom_game_directory = Some(PathBuf::from(custom_dir_str));
+                            }
                         }
                         
                         info!("Migration completed, saving migrated configuration");
                         let mut config = self.config.write().await;
-                        *config = migrated_config;
+                        *config = migrated_config.clone();
                         drop(config); // Release lock before save
                         
                         // Save the migrated config
                         self.save_config().await?;
+                        
+                        // Update cache
+                        update_custom_game_dir(migrated_config.custom_game_directory);
                     }
                     Err(json_err) => {
                         error!("Config file is not valid JSON: {}", json_err);
@@ -313,6 +327,7 @@ impl ConfigManager {
                 && current.hide_on_process_start == new_config.hide_on_process_start
                 && current.global_memory_settings.min == new_config.global_memory_settings.min
                 && current.global_memory_settings.max == new_config.global_memory_settings.max
+                && current.custom_game_directory == new_config.custom_game_directory
             {
                 debug!("No config changes detected, skipping save");
                 false
@@ -395,6 +410,12 @@ impl ConfigManager {
                         new_config.global_memory_settings.min, new_config.global_memory_settings.max
                     );
                 }
+                if current.custom_game_directory != new_config.custom_game_directory {
+                    info!(
+                        "Changing custom game directory: {:?} -> {:?}",
+                        current.custom_game_directory, new_config.custom_game_directory
+                    );
+                }
 
                 // Update config while preserving version
                 *config = LauncherConfig {
@@ -411,6 +432,7 @@ impl ConfigManager {
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
                     global_memory_settings: new_config.global_memory_settings,
+                    custom_game_directory: new_config.custom_game_directory.clone(),
                 };
 
                 true
@@ -420,6 +442,9 @@ impl ConfigManager {
         // Save the updated config if needed
         if should_save {
             self.save_config().await?;
+
+            // Update cache
+            update_custom_game_dir(new_config.custom_game_directory.clone());
 
             // Update Discord status if it changed
             if let Ok(state) = crate::state::State::get().await {

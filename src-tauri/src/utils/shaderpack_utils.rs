@@ -42,201 +42,68 @@ pub struct ShaderPackModrinthInfo {
 }
 
 /// Get all shaderpacks for a profile
-pub async fn get_shaderpacks_for_profile(profile: &Profile) -> Result<Vec<ShaderPackInfo>> {
+pub async fn get_shaderpacks_for_profile(
+    profile: &Profile,
+    calculate_hashes: bool,
+    fetch_modrinth_data: bool,
+) -> Result<Vec<ShaderPackInfo>> {
     debug!(
-        "Getting shaderpacks for profile: {} ({})",
-        profile.name, profile.id
+        "Getting shaderpacks for profile: {} ({}) via LocalContentLoader. Calculate_hashes: {}, fetch_modrinth_data: {}",
+        profile.name,
+        profile.id,
+        calculate_hashes,
+        fetch_modrinth_data
     );
 
-    // Construct the path to the shaderpacks directory
-    let shaderpacks_dir = get_shaderpacks_dir(profile).await?;
-    debug!("Shaderpacks directory path: {}", shaderpacks_dir.display());
+    use crate::utils::profile_utils::{LocalContentLoader, LoadItemsParams, ContentType, GenericModrinthInfo};
 
-    // Return empty list if directory doesn't exist yet
-    if !shaderpacks_dir.exists() {
-        debug!(
-            "Shaderpacks directory does not exist for profile: {}",
-            profile.id
-        );
-        return Ok(Vec::new());
-    }
+    // Create LoadItemsParams directly, including profile.id
+    let loader_params = LoadItemsParams {
+        profile_id: profile.id,
+        content_type: ContentType::ShaderPack,
+        calculate_hashes,
+        fetch_modrinth_data,
+    };
 
-    // Read directory contents
-    debug!("Reading contents of shaderpacks directory...");
-    let mut entries = fs::read_dir(&shaderpacks_dir)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read shaderpacks directory: {}", e)))?;
+    // Call load_items directly
+    match LocalContentLoader::load_items(loader_params).await {
+        Ok(local_items) => {
+            let shader_pack_infos: Vec<ShaderPackInfo> = local_items
+                .into_iter()
+                .map(|item| ShaderPackInfo {
+                    filename: item.filename,
+                    path: item.path_str,
+                    sha1_hash: item.sha1_hash,
+                    file_size: item.file_size,
+                    is_disabled: item.is_disabled,
+                    modrinth_info: item.modrinth_info.map(|generic_info: GenericModrinthInfo| {
+                        ShaderPackModrinthInfo {
+                            project_id: generic_info.project_id,
+                            version_id: generic_info.version_id,
+                            name: generic_info.name,
+                            version_number: generic_info.version_number,
+                            download_url: generic_info.download_url.unwrap_or_default(),
+                        }
+                    }),
+                })
+                .collect();
 
-    let mut shaderpacks = Vec::new();
-    let mut hashes = Vec::new();
-    let mut path_to_info = HashMap::new();
-
-    // Collect all valid shader files (.zip, .zip.disabled, directories)
-    debug!("Scanning shaderpacks directory for valid shader packs...");
-    let mut file_count = 0;
-    let mut valid_count = 0;
-
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read shaderpack entry: {}", e)))?
-    {
-        file_count += 1;
-        let path = entry.path();
-        debug!("Checking file: {}", path.display());
-
-        if is_shaderpack_file(&path).await? {
-            valid_count += 1;
-            let filename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let is_disabled = filename.ends_with(".disabled");
-            let base_filename = if is_disabled {
-                filename
-                    .strip_suffix(".disabled")
-                    .unwrap_or(&filename)
-                    .to_string()
-            } else {
-                filename.clone()
-            };
-
-            debug!(
-                "Found valid shaderpack: {} (disabled: {})",
-                base_filename, is_disabled
+            info!(
+                "Successfully converted {} LocalContentItems to ShaderPackInfo for profile {}",
+                shader_pack_infos.len(),
+                profile.id
             );
-
-            let metadata = fs::metadata(&path).await.map_err(|e| {
-                AppError::Other(format!("Failed to get metadata for {}: {}", filename, e))
-            })?;
-
-            let file_size = metadata.len();
-            debug!("Shaderpack size: {} bytes", file_size);
-
-            // Only hash files, not directories (shaders can be directories)
-            let sha1_hash = if path.is_file() {
-                debug!("Calculating SHA1 hash for {}", filename);
-                match hash_utils::calculate_sha1(&path).await {
-                    Ok(hash) => {
-                        debug!("SHA1 hash for {}: {}", filename, hash);
-                        // Add to the list of hashes to check against Modrinth
-                        hashes.push(hash.clone());
-                        Some(hash)
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to compute SHA1 hash for shaderpack {}: {}",
-                            filename, e
-                        );
-                        None
-                    }
-                }
-            } else {
-                debug!("Skipping hash calculation for directory: {}", filename);
-                None
-            };
-
-            let info = ShaderPackInfo {
-                filename: base_filename,
-                path: path.to_string_lossy().into_owned(),
-                sha1_hash: sha1_hash.clone(),
-                file_size,
-                is_disabled,
-                modrinth_info: None,
-            };
-
-            // Store info in hashmap to update with Modrinth data later
-            if let Some(hash) = sha1_hash {
-                path_to_info.insert(hash, info);
-            } else {
-                shaderpacks.push(info);
-            }
-        } else {
-            debug!("Skipping non-shaderpack file/directory: {}", path.display());
+            Ok(shader_pack_infos)
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to load shaderpacks using LocalContentLoader for profile {}: {}",
+                profile.id,
+                e
+            );
+            Err(e)
         }
     }
-
-    debug!(
-        "Scanned {} files/directories, found {} valid shaderpacks",
-        file_count, valid_count
-    );
-
-    // If we have hashes, try to look them up on Modrinth
-    if !hashes.is_empty() {
-        debug!(
-            "Looking up {} shader packs on Modrinth by hash...",
-            hashes.len()
-        );
-        match modrinth::get_versions_by_hashes(hashes.clone(), "sha1").await {
-            Ok(version_map) => {
-                debug!(
-                    "Modrinth lookup returned {} matches out of {} requested",
-                    version_map.len(),
-                    hashes.len()
-                );
-                for (hash, version) in version_map {
-                    if let Some(info) = path_to_info.get_mut(&hash) {
-                        debug!(
-                            "Found Modrinth info for pack with hash {}: project_id={}, name={}",
-                            hash, version.project_id, version.name
-                        );
-
-                        // Check if this is actually a shader and not something else
-                        if version.project_id.is_empty() || version.id.is_empty() {
-                            debug!("Skipping invalid Modrinth data for hash {}: empty project_id or version_id", hash);
-                            continue;
-                        }
-
-                        // Find the primary file for the URL
-                        if let Some(primary_file) = version.files.iter().find(|f| f.primary) {
-                            debug!(
-                                "Using primary file from Modrinth: {}",
-                                primary_file.filename
-                            );
-                            info.modrinth_info = Some(ShaderPackModrinthInfo {
-                                project_id: version.project_id.clone(),
-                                version_id: version.id.clone(),
-                                name: version.name.clone(),
-                                version_number: version.version_number.clone(),
-                                download_url: primary_file.url.clone(),
-                            });
-                        } else {
-                            debug!(
-                                "No primary file found in Modrinth version for hash {}",
-                                hash
-                            );
-                        }
-                    } else {
-                        debug!("Received Modrinth data for unknown hash: {}", hash);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("Failed to lookup shaderpacks on Modrinth: {}", e);
-            }
-        }
-    } else {
-        debug!("No shader packs to lookup on Modrinth");
-    }
-
-    // Add all packs to the result list
-    for (hash, info) in path_to_info {
-        debug!(
-            "Adding pack with hash {} to result list: {}",
-            hash, info.filename
-        );
-        shaderpacks.push(info);
-    }
-
-    info!(
-        "Found {} total shaderpacks for profile {}",
-        shaderpacks.len(),
-        profile.id
-    );
-
-    Ok(shaderpacks)
 }
 
 /// Get the path to the shaderpacks directory for a profile

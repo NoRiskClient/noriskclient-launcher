@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ModrinthSearchV2 } from "../modrinth/v2/ModrinthSearchV2"; // Adjusted import path
 import type { Profile } from "../../types/profile";
-import { listProfiles } from "../../services/profile-service";
+import { getAllProfilesAndLastPlayed } from "../../services/profile-service";
 import { ErrorMessage } from "../ui/ErrorMessage";
 // import { LoadingOverlay } from "../ui/LoadingOverlay"; // Removed
 // import { Card } from "../ui/Card"; // Card might not be directly needed here anymore
@@ -30,8 +30,8 @@ export function ModrinthTabV2({
     if (initialProfiles.length === 0 && !profilesLoaded) {
       const loadProfiles = async () => {
         try {
-          const fetchedProfiles = await listProfiles();
-          setProfiles(fetchedProfiles);
+          const fetched = await getAllProfilesAndLastPlayed();
+          setProfiles(fetched.all_profiles);
         } catch (err) {
           console.error("Failed to load profiles:", err);
           setError(
@@ -56,7 +56,7 @@ export function ModrinthTabV2({
     // This might trigger a refresh of profile list or other UI elements
     // setRefreshKey((prev) => prev + 1);
     // Potentially reload profiles if an installation changes them
-    // listProfiles().then(setProfiles).catch(err => console.error("Failed to refresh profiles after install", err));
+    // getAllProfilesAndLastPlayed().then(res => setProfiles(res.all_profiles)).catch(err => console.error("Failed to refresh profiles after install", err));
   }, []);
 
   // Memoize the ModrinthSearchV2 component to prevent unnecessary re-renders
@@ -92,12 +92,12 @@ export function ModrinthTabV2({
 
       <div className="flex-1 overflow-hidden flex space-x-4">
         <div className="flex-1 overflow-hidden">{memoizedSearch}</div>
-        {/*
+        {/**
           Filters are now intended to be part of ModrinthSearchV2 or a new ModrinthFiltersV2.
           If ModrinthFiltersV2 is separate, it would be placed here or within ModrinthSearchV2 layout.
           For now, assuming filters are integrated or will be added to ModrinthSearchV2 itself.
         */}
-        {/*
+        {/**
         <div className="w-1/4 max-w-xs flex-shrink-0">
           <ModrinthFiltersV2 ... />
         </div>

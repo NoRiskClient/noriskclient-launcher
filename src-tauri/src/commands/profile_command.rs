@@ -1097,7 +1097,7 @@ pub async fn get_local_shaderpacks(
     let profile = state.profile_manager.get_profile(profile_id).await?;
 
     // Use the utility function to get all shaderpacks
-    let shaderpacks = shaderpack_utils::get_shaderpacks_for_profile(&profile)
+    let shaderpacks = shaderpack_utils::get_shaderpacks_for_profile(&profile, true, true)
         .await
         .map_err(|e| CommandError::from(e))?;
 
@@ -1285,7 +1285,7 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         last_played: None,
         settings: source_profile.settings.clone(),
         state: ProfileState::NotInstalled, // Neues Profil ist noch nicht installiert
-        mods: Vec::new(),                  // Mods werden erst nach dem Kopieren aktualisiert
+        mods: source_profile.mods.clone(), // Kopiere die Modrinth-Mods aus dem Quellprofil
         selected_norisk_pack_id: source_profile.selected_norisk_pack_id.clone(),
         disabled_norisk_mods_detailed: source_profile.disabled_norisk_mods_detailed.clone(),
         source_standard_profile_id: source_profile.source_standard_profile_id,
@@ -1544,7 +1544,7 @@ pub async fn get_local_datapacks(
     let profile = state.profile_manager.get_profile(profile_id).await?;
 
     // Use the utility function to get all datapacks
-    let datapacks = datapack_utils::get_datapacks_for_profile(&profile)
+    let datapacks = datapack_utils::get_datapacks_for_profile(&profile, true, true)
         .await
         .map_err(|e| CommandError::from(e))?;
 

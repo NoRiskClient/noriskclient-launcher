@@ -40,6 +40,8 @@ export function ProfilesTab() {
   const setProfileGroupingCriterionStore = useThemeStore(
     (state) => state.setProfileGroupingCriterion,
   );
+  const collapsedProfileGroups = useThemeStore((state) => state.collapsedProfileGroups);
+  const toggleCollapsedProfileGroup = useThemeStore((state) => state.toggleCollapsedProfileGroup);
 
   const tabRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -509,25 +511,32 @@ export function ProfilesTab() {
                 {sortedGroupKeys.map((groupKey) => (
                   <div key={groupKey}>
                     <h2
-                      className="text-2xl font-minecraft text-white mb-3 pb-1 border-b-2"
+                      className="text-2xl font-minecraft text-white mb-3 pb-1 border-b-2 flex items-center justify-between cursor-pointer"
                       style={{ borderColor: `${accentColor.value}40` }}
+                      onClick={() => toggleCollapsedProfileGroup(groupKey)}
                     >
-                      {groupKey}
+                      <span>{groupKey}</span>
+                      <Icon
+                        icon="solar:alt-arrow-down-bold"
+                        className={`w-5 h-5 transition-transform ${collapsedProfileGroups.includes(groupKey) ? "-rotate-90" : "rotate-0"}`}
+                      />
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-                      {groupedProfiles[groupKey].map((profile) => (
-                        <ProfileCard
-                          key={profile.id}
-                          profile={profile}
-                          onEdit={() => handleEditProfile(profile)}
-                          onClick={() => handleViewProfile(profile)}
-                          onProfileCloned={fetchProfiles}
-                          onDelete={handleDeleteProfile}
-                          onShouldExport={handleShouldExportProfile}
-                        />
-                      ))}
-                    </div>
-                    {groupedProfiles[groupKey].length === 0 && (
+                    {!collapsedProfileGroups.includes(groupKey) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                        {groupedProfiles[groupKey].map((profile) => (
+                          <ProfileCard
+                            key={profile.id}
+                            profile={profile}
+                            onEdit={() => handleEditProfile(profile)}
+                            onClick={() => handleViewProfile(profile)}
+                            onProfileCloned={fetchProfiles}
+                            onDelete={handleDeleteProfile}
+                            onShouldExport={handleShouldExportProfile}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!collapsedProfileGroups.includes(groupKey) && groupedProfiles[groupKey].length === 0 && (
                       <p className="text-neutral-500 italic text-center py-4">
                         No profiles in this group.
                       </p>

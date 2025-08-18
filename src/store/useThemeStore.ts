@@ -223,6 +223,9 @@ interface ThemeState {
   borderRadius: number;
   setBorderRadius: (radius: number) => void;
   applyBorderRadiusToDOM: () => void;
+  collapsedProfileGroups: string[];
+  setCollapsedProfileGroups: (groups: string[]) => void;
+  toggleCollapsedProfileGroup: (groupKey: string) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -236,6 +239,7 @@ export const useThemeStore = create<ThemeState>()(
       hasAcceptedTermsOfService: false,
       customColorHistory: [],
       borderRadius: DEFAULT_BORDER_RADIUS,
+      collapsedProfileGroups: [],
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
@@ -356,6 +360,20 @@ export const useThemeStore = create<ThemeState>()(
           document.documentElement.classList.remove("radius-flat");
         }
       },
+
+      setCollapsedProfileGroups: (groups: string[]) => {
+        set({ collapsedProfileGroups: [...groups] });
+      },
+
+      toggleCollapsedProfileGroup: (groupKey: string) => {
+        set((state) => {
+          const isCollapsed = state.collapsedProfileGroups.includes(groupKey);
+          const next = isCollapsed
+            ? state.collapsedProfileGroups.filter((g) => g !== groupKey)
+            : [...state.collapsedProfileGroups, groupKey];
+          return { collapsedProfileGroups: next };
+        });
+      },
     }),    {
       name: "norisk-theme-storage",
       onRehydrateStorage: () => (state) => {
@@ -367,6 +385,10 @@ export const useThemeStore = create<ThemeState>()(
           
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
+          // Ensure collapsedProfileGroups exists after rehydrate
+          if (!Array.isArray(state.collapsedProfileGroups)) {
+            state.collapsedProfileGroups = [];
+          }
         }
       },
     },

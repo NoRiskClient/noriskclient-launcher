@@ -25,4 +25,5 @@ export interface LauncherConfig {
   hooks: Hooks;
   hide_on_process_start: boolean;
   global_memory_settings: MemorySettings;
+  custom_game_directory: string | null; // Option<PathBuf>
 } 

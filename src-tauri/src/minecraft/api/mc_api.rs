@@ -113,15 +113,79 @@ impl MinecraftApiService {
         Self::fetch_and_cache_manifest(&cache_path).await
     }
 
-    pub async fn get_piston_meta(&self, url: &str) -> Result<PistonMeta> {
-        let response = HTTP_CLIENT.get(url).send().await.map_err(AppError::MinecraftApi)?;
+    async fn fetch_and_cache_piston_meta(cache_path: &PathBuf, url: &str) -> Result<PistonMeta> {
+        debug!("Fetching Piston Meta from: {}", url);
+        
+        let response = HTTP_CLIENT.get(url)
+            .send()
+            .await
+            .map_err(AppError::MinecraftApi)?;
 
         let meta = response
             .json::<PistonMeta>()
             .await
             .map_err(AppError::MinecraftApi)?;
 
+        // Cache the result
+        let json_data = serde_json::to_string_pretty(&meta).map_err(|e| {
+            AppError::Other(format!("Failed to serialize piston meta: {}", e))
+        })?;
+
+        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+            error!("Failed to write Piston Meta cache: {}", e);
+        } else {
+            debug!("Cached Piston Meta: {:?}", cache_path);
+        }
+
         Ok(meta)
+    }
+
+    async fn background_update_piston_meta(cache_path: PathBuf, url: String) {
+        debug!("[BG] Updating Piston Meta");
+        if let Err(e) = Self::fetch_and_cache_piston_meta(&cache_path, &url).await {
+            error!("[BG] Failed to update Piston Meta cache: {}", e);
+        }
+    }
+
+    pub async fn get_piston_meta(&self, url: &str) -> Result<PistonMeta> {
+        // Create cache filename from URL hash
+        let mut hasher = Sha1::new();
+        hasher.update(url.as_bytes());
+        let hash = format!("{:x}", hasher.finalize());
+        let cache_path = self.cache_dir.join(format!("piston_meta_{}.json", hash));
+
+        if cache_path.exists() {
+            debug!("Cache hit for Piston Meta: {:?}", cache_path);
+            
+            // Return cached data immediately
+            match tokio_fs::read_to_string(&cache_path).await {
+                Ok(cached_data) => {
+                    match serde_json::from_str::<PistonMeta>(&cached_data) {
+                        Ok(cached_meta) => {
+                            // Spawn background update
+                            let cache_path_clone = cache_path.clone();
+                            let url_clone = url.to_string();
+                            
+                            tokio::spawn(async move {
+                                Self::background_update_piston_meta(cache_path_clone, url_clone).await;
+                            });
+                            
+                            return Ok(cached_meta);
+                        }
+                        Err(e) => {
+                            error!("Failed to parse cached Piston Meta: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to read Piston Meta cache: {}", e);
+                }
+            }
+        }
+
+        // Cache miss or invalid cache - fetch in foreground
+        debug!("Cache miss for Piston Meta, fetching...");
+        Self::fetch_and_cache_piston_meta(&cache_path, url).await
     }
 
     // Get user profile including skin information

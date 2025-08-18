@@ -782,6 +782,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
   }, [profile, selectedItemIds]);
 
   const handleOpenItemFolder = useCallback(async (item: T) => {
+    console.log("handleOpenItemFolder", item);
     if (!item.path) {
       toast.error("Path not available for this item.");
       return;
@@ -896,11 +897,17 @@ export function useLocalContentManager<T extends LocalContentItem>({
         case 'ResourcePack': command = "update_resourcepack_from_modrinth"; break;
         case 'DataPack': command = "update_datapack_from_modrinth"; break;
         case 'Mod':
-          if (item.source_type === "custom" || item.norisk_info) {
-            throw new Error(`Automatic updates for this type of mod (${getDisplayFileName(item)}) are not supported.`);
-          }
-          toast.error(`Unsupported mod update scenario for ${getDisplayFileName(item)}. Please check item details.`);
-          return;
+          // For custom/local mods (no id) use the generic switch_content_version path
+          command = "switch_content_version";
+          payload = {
+            payload: {
+              profile_id: profile.id,
+              content_type: mapUiContentTypeToBackend(contentType),
+              current_item_details: { ...item, path_str: item.path },
+              new_modrinth_version_details: updateVersion,
+            },
+          };
+          break;
         default:
           toast.error(`Unsupported content type for update: ${contentType}`);
           return;

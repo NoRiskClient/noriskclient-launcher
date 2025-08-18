@@ -32,7 +32,7 @@ pub struct JavaDownloadService {
 
 impl JavaDownloadService {
     pub fn new() -> Self {
-        let base_path = LAUNCHER_DIRECTORY.meta_dir().join(JAVA_DIR);
+        let base_path = crate::config::standard_meta_dir().join(JAVA_DIR);
         Self {
             base_path,
             concurrent_extractions: DEFAULT_CONCURRENT_EXTRACTIONS,

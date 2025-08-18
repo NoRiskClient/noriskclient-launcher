@@ -1879,8 +1879,8 @@ export function ModrinthSearchV2({
         }
       );
 
-      const updatedProfiles = await ProfileService.listProfiles();
-      setInternalProfiles(updatedProfiles);
+      const refreshed = await ProfileService.getAllProfilesAndLastPlayed();
+      setInternalProfiles(refreshed.all_profiles);
       
       // Call onInstallSuccess if it exists and the installed content was not a modpack
       // (Modpack specific installations as new profiles might have their own success handlers or flows)
