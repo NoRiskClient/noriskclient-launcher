@@ -409,14 +409,12 @@ impl ProfileManager {
         // Attempt to delete the directory (outside the profile map lock)
         if let Some(path) = profile_dir_path {
             if path.exists() {
-                info!("Attempting to delete profile directory: {:?}", path);
-                match fs::remove_dir_all(&path).await {
-                    Ok(_) => info!("Successfully deleted profile directory: {:?}", path),
+                info!("Moving profile directory to trash: {:?}", path);
+                match crate::utils::trash_utils::move_path_to_trash(&path, Some("profiles")).await {
+                    Ok(wrapper) => info!("Profile directory moved to trash wrapper: {:?}", wrapper),
                     Err(e) => {
-                        // Log the error but continue to remove from config
-                        error!("Failed to delete profile directory {:?}: {}. Proceeding to remove profile entry.", path, e);
-                        // Depending on requirements, you might want to return an error here instead:
-                        return Err(AppError::Io(e));
+                        error!("Failed to move profile directory {:?} to trash: {}", path, e);
+                        return Err(e);
                     }
                 }
             } else {
@@ -1824,6 +1822,16 @@ impl PostInitializationHandler for ProfileManager {
         }
         
         info!("ProfileManager: Successfully loaded profiles in on_state_ready.");
+
+        // Fire-and-forget: purge trashed items after init (test: 2 minutes)
+        tauri::async_runtime::spawn(async move {
+            let seconds_30_days = 30 * 24 * 60 * 60;
+            let seconds_2_minutes = 2 * 60;
+            if let Err(e) = crate::utils::trash_utils::purge_expired(seconds_30_days).await {
+                log::warn!("Trash purge after init failed: {}", e);
+            }
+        });
+
         Ok(())
     }
 }

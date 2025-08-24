@@ -3,6 +3,7 @@ use crate::error::Result;
 use crate::integrations::norisk_versions::NoriskVersionsConfig;
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::post_init::PostInitializationHandler;
+use crate::state::state_manager::State;
 use async_trait::async_trait;
 use log::{debug, error, info};
 use std::path::PathBuf;
@@ -16,6 +17,16 @@ use super::profile_state::Profile;
 
 // Default filename for the Norisk versions configuration
 const NORISK_VERSIONS_FILENAME: &str = "norisk_versions.json";
+
+/// Returns the path for the norisk versions config depending on experimental mode
+pub fn norisk_versions_path_for(is_experimental: bool) -> PathBuf {
+    let filename = if is_experimental {
+        "norisk_versions_exp.json"
+    } else {
+        NORISK_VERSIONS_FILENAME
+    };
+    LAUNCHER_DIRECTORY.root_dir().join(filename)
+}
 
 pub struct NoriskVersionManager {
     config: Arc<RwLock<NoriskVersionsConfig>>,
@@ -117,7 +128,15 @@ impl NoriskVersionManager {
             serde_json::to_string_pretty(&*config_guard)?
         };
 
-        if let Some(parent_dir) = self.config_path.parent() {
+        // Choose path based on experimental mode if available; fall back to manager's path
+        let path_to_write = if let Ok(state) = State::get().await {
+            let is_exp = state.config_manager.is_experimental_mode().await;
+            norisk_versions_path_for(is_exp)
+        } else {
+            self.config_path.clone()
+        };
+
+        if let Some(parent_dir) = path_to_write.parent() {
             if !parent_dir.exists() {
                 fs::create_dir_all(parent_dir).await?;
                 info!(
@@ -127,10 +146,10 @@ impl NoriskVersionManager {
             }
         }
 
-        fs::write(&self.config_path, config_data).await?;
+        fs::write(&path_to_write, config_data).await?;
         info!(
             "Successfully saved norisk versions config to {:?}",
-            self.config_path
+            path_to_write
         );
         Ok(())
     }
@@ -176,10 +195,16 @@ impl PostInitializationHandler for NoriskVersionManager {
         info!("NoriskVersionManager: on_state_ready called. Loading configuration...");
         // Load initial config. If loading fails critically (e.g., IO error other than NotFound), propagate the error.
         // If parsing fails or file not found, use default. This logic is now effectively in load_config_internal.
-        let loaded_config = self.load_config_internal(&self.config_path.clone()).await.unwrap_or_else(|e| {
+        let load_path = if let Ok(state) = State::get().await {
+            let is_exp = state.config_manager.is_experimental_mode().await;
+            norisk_versions_path_for(is_exp)
+        } else {
+            self.config_path.clone()
+        };
+        let loaded_config = self.load_config_internal(&load_path).await.unwrap_or_else(|e| {
             error!(
                 "NoriskVersionManager: Critical error in on_state_ready loading config (path: {:?}): {}. Using default empty config.", 
-                self.config_path,
+                load_path,
                 e
             );
             NoriskVersionsConfig::default()

@@ -16,6 +16,7 @@ pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von
 pub mod system_info; // <-- Hinzufügen
 pub mod updater_utils;
 pub mod world_utils; // <-- Hinzugefügt
+pub mod trash_utils; // <-- New trash module
 
 // Füge hier ggf. andere Util-Module hinzu
 // pub mod network_utils;

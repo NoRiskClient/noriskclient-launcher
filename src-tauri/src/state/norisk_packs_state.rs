@@ -15,6 +15,16 @@ use tokio::sync::RwLock;
 // Default filename for the Norisk packs configuration
 const NORISK_PACKS_FILENAME: &str = "norisk_modpacks.json";
 
+/// Returns the path for the norisk packs config depending on experimental mode
+pub fn norisk_packs_path_for(is_experimental: bool) -> PathBuf {
+    let filename = if is_experimental {
+        "norisk_modpacks_exp.json"
+    } else {
+        NORISK_PACKS_FILENAME
+    };
+    LAUNCHER_DIRECTORY.root_dir().join(filename)
+}
+
 pub struct NoriskPackManager {
     config: Arc<RwLock<NoriskModpacksConfig>>,
     config_path: PathBuf,
@@ -114,7 +124,15 @@ impl NoriskPackManager {
             serde_json::to_string_pretty(&*config_guard)?
         }; // Read lock is released here
 
-        if let Some(parent_dir) = self.config_path.parent() {
+        // Choose path based on experimental mode if available; fall back to manager's path
+        let path_to_write = if let Ok(state) = crate::state::state_manager::State::get().await {
+            let is_exp = state.config_manager.is_experimental_mode().await;
+            norisk_packs_path_for(is_exp)
+        } else {
+            self.config_path.clone()
+        };
+
+        if let Some(parent_dir) = path_to_write.parent() {
             if !parent_dir.exists() {
                 fs::create_dir_all(parent_dir).await?;
                 info!(
@@ -124,10 +142,10 @@ impl NoriskPackManager {
             }
         }
 
-        fs::write(&self.config_path, config_data).await?;
+        fs::write(&path_to_write, config_data).await?;
         info!(
             "Successfully saved norisk packs config to {:?}",
-            self.config_path
+            path_to_write
         );
         Ok(())
     }
@@ -168,7 +186,14 @@ impl NoriskPackManager {
 impl PostInitializationHandler for NoriskPackManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         info!("NoriskPackManager: on_state_ready called. Loading configuration...");
-        let loaded_config = self.load_config_internal(&self.config_path.clone()).await?;
+        // Select load path based on experimental mode if accessible
+        let load_path = if let Ok(state) = crate::state::state_manager::State::get().await {
+            let is_exp = state.config_manager.is_experimental_mode().await;
+            norisk_packs_path_for(is_exp)
+        } else {
+            self.config_path.clone()
+        };
+        let loaded_config = self.load_config_internal(&load_path).await?;
         let mut config_guard = self.config.write().await;
         *config_guard = loaded_config;
         drop(config_guard);

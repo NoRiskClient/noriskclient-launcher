@@ -338,6 +338,149 @@ pub async fn equip_cape(
     result
 }
 
+/// Add a cape to the user's favorites
+///
+/// Parameters:
+/// - cape_hash: Hash of the cape to favorite
+/// - norisk_token: Optional NoRisk token
+#[tauri::command]
+pub async fn add_favorite_cape(
+    cape_hash: String,
+    norisk_token: Option<String>,
+) -> Result<Vec<String>, CommandError> {
+    debug!(
+        "Command called: add_favorite_cape for cape_hash: {}",
+        cape_hash
+    );
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    debug!("Using experimental mode: {}", is_experimental);
+
+    let active_account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+
+    let token_to_use = match norisk_token {
+        Some(token) => {
+            debug!("Using provided NoRisk token.");
+            token
+        }
+        None => {
+            debug!("No token provided, retrieving from active account.");
+            active_account
+                .norisk_credentials
+                .get_token_for_mode(is_experimental)?
+        }
+    };
+
+    let cape_api = CapeApi::new();
+
+    cape_api
+        .add_favorite_cape(&token_to_use, &cape_hash, is_experimental)
+        .await
+        .map_err(|e| {
+            debug!("Failed to add favorite cape: {:?}", e);
+            CommandError::from(e)
+        })
+}
+
+/// Get multiple capes by hashes (max 100)
+#[tauri::command]
+pub async fn get_capes_by_hashes(
+    hashes: Vec<String>,
+    norisk_token: Option<String>,
+) -> Result<Vec<CosmeticCape>, CommandError> {
+    debug!(
+        "Command called: get_capes_by_hashes (count={})",
+        hashes.len()
+    );
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    debug!("Using experimental mode: {}", is_experimental);
+
+    let active_account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+
+    let token_to_use = match norisk_token {
+        Some(token) => {
+            debug!("Using provided NoRisk token.");
+            token
+        }
+        None => {
+            debug!("No token provided, retrieving from active account.");
+            active_account
+                .norisk_credentials
+                .get_token_for_mode(is_experimental)?
+        }
+    };
+
+    let cape_api = CapeApi::new();
+
+    cape_api
+        .get_capes_by_hashes(&token_to_use, &hashes, is_experimental)
+        .await
+        .map_err(|e| {
+            debug!("Failed to get capes by hashes: {:?}", e);
+            CommandError::from(e)
+        })
+}
+
+/// Remove a cape from the user's favorites
+///
+/// Parameters:
+/// - cape_hash: Hash of the cape to remove from favorites
+/// - norisk_token: Optional NoRisk token
+#[tauri::command]
+pub async fn remove_favorite_cape(
+    cape_hash: String,
+    norisk_token: Option<String>,
+) -> Result<Vec<String>, CommandError> {
+    debug!(
+        "Command called: remove_favorite_cape for cape_hash: {}",
+        cape_hash
+    );
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    debug!("Using experimental mode: {}", is_experimental);
+
+    let active_account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+
+    let token_to_use = match norisk_token {
+        Some(token) => {
+            debug!("Using provided NoRisk token.");
+            token
+        }
+        None => {
+            debug!("No token provided, retrieving from active account.");
+            active_account
+                .norisk_credentials
+                .get_token_for_mode(is_experimental)?
+        }
+    };
+
+    let cape_api = CapeApi::new();
+
+    cape_api
+        .remove_favorite_cape(&token_to_use, &cape_hash, is_experimental)
+        .await
+        .map_err(|e| {
+            debug!("Failed to remove favorite cape: {:?}", e);
+            CommandError::from(e)
+        })
+}
+
 /// Delete a specific cape owned by the player
 ///
 /// Parameters:

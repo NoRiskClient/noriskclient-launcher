@@ -204,31 +204,13 @@ pub async fn delete_file(file_path: String) -> Result<(), CommandError> {
         CommandError::from(AppError::Io(e))
     })?;
 
-    if metadata.is_dir() {
-        debug!("Deleting directory: {}", actual_path_to_delete.display());
-        fs::remove_dir_all(&actual_path_to_delete)
-            .await
-            .map_err(|e| {
-                log::error!(
-                    "Failed to delete directory {}: {}",
-                    actual_path_to_delete.display(),
-                    e
-                );
-                CommandError::from(AppError::Io(e))
-            })?;
-    } else {
-        debug!("Deleting file: {}", actual_path_to_delete.display());
-        fs::remove_file(&actual_path_to_delete).await.map_err(|e| {
-            log::error!(
-                "Failed to delete file {}: {}",
-                actual_path_to_delete.display(),
-                e
-            );
-            CommandError::from(AppError::Io(e))
-        })?;
-    }
+    // Move to trash instead of hard delete
+    let category = if metadata.is_dir() { Some("directories") } else { Some("files") };
+    crate::utils::trash_utils::move_path_to_trash(&actual_path_to_delete, category)
+        .await
+        .map_err(CommandError::from)?;
 
-    info!("Successfully deleted: {}", actual_path_to_delete.display());
+    info!("Moved to trash: {}", actual_path_to_delete.display());
     Ok(())
 }
 

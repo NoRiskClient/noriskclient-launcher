@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::profile_state::Profile;
+use crate::state::state_manager::State;
 use log::{self, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -8,6 +9,16 @@ use std::path::PathBuf;
 use tokio::fs;
 
 const NORISK_API_BASE_URL: &str = "https://api.noriskclient.com/v1";
+
+/// Helper to compute versions file path based on experimental flag
+fn norisk_versions_path_for(is_experimental: bool) -> PathBuf {
+    let filename = if is_experimental {
+        "norisk_versions_exp.json"
+    } else {
+        "norisk_versions.json"
+    };
+    LAUNCHER_DIRECTORY.root_dir().join(filename)
+}
 
 /// Represents the overall structure of the standard profiles from the backend
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,8 +36,12 @@ impl Default for NoriskVersionsConfig {
 /// Loads standard profiles from the local `norisk_versions.json` file.
 /// Returns an empty config if the file doesn't exist.
 pub async fn load_local_standard_profiles() -> Result<NoriskVersionsConfig> {
-    let root_dir = LAUNCHER_DIRECTORY.root_dir();
-    let file_path = root_dir.join("norisk_versions.json");
+    let file_path = if let Ok(state) = State::get().await {
+        let is_exp = state.config_manager.is_experimental_mode().await;
+        norisk_versions_path_for(is_exp)
+    } else {
+        LAUNCHER_DIRECTORY.root_dir().join("norisk_versions.json")
+    };
 
     info!(
         "Attempting to load local standard profiles from: {:?}",
@@ -73,7 +88,13 @@ pub async fn load_local_standard_profiles() -> Result<NoriskVersionsConfig> {
 /// in a packaged production build. Consider using Tauri's resource resolver for that.
 pub async fn load_dummy_versions() -> Result<()> {
     let target_dir = LAUNCHER_DIRECTORY.root_dir();
-    let target_file = target_dir.join("norisk_versions.json");
+    // Choose target file based on experimental mode when available
+    let target_file = if let Ok(state) = State::get().await {
+        let is_exp = state.config_manager.is_experimental_mode().await;
+        norisk_versions_path_for(is_exp)
+    } else {
+        target_dir.join("norisk_versions.json")
+    };
 
     if target_file.exists() {
         //info!("Target file {:?} already exists. Skipping dummy version loading.", target_file);

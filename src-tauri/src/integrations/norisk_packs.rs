@@ -61,6 +61,9 @@ pub struct NoriskPackDefinition {
     /// Optional: Whether this pack is experimental.
     #[serde(rename = "isExperimental", default)]
     pub is_experimental: bool,
+    /// Optional: Policy controlling loader version per MC version/loader.
+    #[serde(rename = "loaderPolicy", default)]
+    pub loader_policy: Option<LoaderPolicy>,
 }
 
 /// Defines a single mod entry within a Norisk pack definition.
@@ -116,6 +119,38 @@ pub struct CompatibilityTarget {
 /// Type alias for the compatibility map: McVersion -> Loader -> CompatibilityTarget
 /// Example: {"1.8.9": {"vanilla": {"identifier": "URL", "filename": "OptiFine...jar"}}}
 pub type CompatibilityMap = HashMap<String, HashMap<String, CompatibilityTarget>>;
+
+/// Policy to control which mod loader version to use for a given Minecraft version and loader.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct LoaderPolicy {
+    /// Fallback definitions applied when no byMinecraft entry matches
+    #[serde(default)]
+    pub default: HashMap<String, LoaderSpec>,
+    /// Specific definitions per Minecraft version pattern (e.g., "1.20.1", "1.21", "1.21.*")
+    #[serde(rename = "byMinecraft", default)]
+    pub by_minecraft: HashMap<String, HashMap<String, LoaderSpec>>, // mcVersionPattern -> loader -> spec
+}
+
+/// How to pick a loader version given constraints.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LoaderStrategy {
+    Exact,
+    Latest_compatible,
+    Min_compatible,
+}
+
+/// Definition of a desired/allowed loader version.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct LoaderSpec {
+    /// Exact version to use (implies strategy = exact when set)
+    pub version: Option<String>,
+    /// Minimum version allowed/required (used by non-exact strategies)
+    pub min: Option<String>,
+    /// Selection strategy; defaults to latest_compatible if not provided and version is None
+    #[serde(default)]
+    pub strategy: Option<LoaderStrategy>,
+}
 
 /// Helper function to determine the definitive filename for a mod defined within a Norisk Pack.
 /// Prioritizes the filename specified in the compatibility target, otherwise derives it for known types.
@@ -751,6 +786,69 @@ impl NoriskModpacksConfig {
         Ok(final_mod_list)
     }
 
+    // Helper: merge incoming loader policy into accumulator (child overrides parent)
+    fn merge_loader_policy(acc: &mut LoaderPolicy, incoming: &LoaderPolicy) {
+        // Merge default loader specs
+        for (loader, spec) in &incoming.default {
+            acc.default.insert(loader.clone(), spec.clone());
+        }
+        // Merge byMinecraft -> loader -> spec
+        for (mc_pattern, loader_map) in &incoming.by_minecraft {
+            let entry = acc
+                .by_minecraft
+                .entry(mc_pattern.clone())
+                .or_insert_with(HashMap::new);
+            for (loader, spec) in loader_map {
+                entry.insert(loader.clone(), spec.clone());
+            }
+        }
+    }
+
+    // Resolve loader policy across inheritance (parents first, child overrides)
+    fn resolve_loader_policy_for_pack(
+        &self,
+        pack_id: &str,
+        visited: &mut HashSet<String>,
+    ) -> Result<Option<LoaderPolicy>> {
+        if !visited.insert(pack_id.to_string()) {
+            return Err(AppError::Other(format!(
+                "Circular inheritance detected while resolving loader policy for pack ID: {}",
+                pack_id
+            )));
+        }
+
+        let base_definition = self.packs.get(pack_id).ok_or_else(|| {
+            AppError::Other(format!("Pack ID '{}' not found", pack_id))
+        })?;
+
+        let mut merged: Option<LoaderPolicy> = None;
+
+        if let Some(parent_ids) = &base_definition.inherits_from {
+            for parent_id in parent_ids {
+                if let Some(parent_policy) =
+                    self.resolve_loader_policy_for_pack(parent_id, visited)?
+                {
+                    if let Some(acc) = &mut merged {
+                        Self::merge_loader_policy(acc, &parent_policy);
+                    } else {
+                        merged = Some(parent_policy.clone());
+                    }
+                }
+            }
+        }
+
+        if let Some(own) = &base_definition.loader_policy {
+            if let Some(acc) = &mut merged {
+                Self::merge_loader_policy(acc, own);
+            } else {
+                merged = Some(own.clone());
+            }
+        }
+
+        visited.remove(pack_id);
+        Ok(merged)
+    }
+
     // Helper function to get a fully resolved pack definition (including mods)
     // This combines the base definition with the resolved mods.
     pub fn get_resolved_pack_definition(&self, pack_id: &str) -> Result<NoriskPackDefinition> {
@@ -762,6 +860,10 @@ impl NoriskModpacksConfig {
         let mut visited = HashSet::new();
         let resolved_mods_vec = self.resolve_pack_mods(pack_id, &mut visited)?;
 
+        let mut visited_lp = HashSet::new();
+        let resolved_loader_policy =
+            self.resolve_loader_policy_for_pack(pack_id, &mut visited_lp)?;
+
         Ok(NoriskPackDefinition {
             display_name: base_definition.display_name.clone(),
             description: base_definition.description.clone(),
@@ -770,6 +872,7 @@ impl NoriskModpacksConfig {
             mods: resolved_mods_vec, // Use the fully resolved list here
             assets: base_definition.assets.clone(), // Added missing field
             is_experimental: base_definition.is_experimental, // Added missing field
+            loader_policy: resolved_loader_policy, // RESOLVED loader policy
         })
     }
 

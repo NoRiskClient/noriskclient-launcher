@@ -1993,3 +1993,10 @@ pub async fn get_local_content(
         }
     }
 }
+
+#[tauri::command]
+pub async fn purge_trash(max_age_seconds: Option<u64>) -> Result<u64, CommandError> {
+    let secs = max_age_seconds.unwrap_or(120);
+    let removed = crate::utils::trash_utils::purge_expired(secs).await?;
+    Ok(removed)
+}

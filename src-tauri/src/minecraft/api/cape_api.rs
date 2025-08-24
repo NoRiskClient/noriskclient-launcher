@@ -496,6 +496,215 @@ impl CapeApi {
         }
     }
 
+    /// Fetch multiple capes by hashes (max 100)
+    pub async fn get_capes_by_hashes(
+        &self,
+        norisk_token: &str,
+        hashes: &[String],
+        is_experimental: bool,
+    ) -> Result<Vec<CosmeticCape>> {
+        let endpoint = "cape/many";
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/{}", base_url, endpoint);
+
+        let joined: String = hashes.iter().take(100).cloned().collect::<Vec<_>>().join(",");
+        debug!(
+            "[Cape API] Requesting multiple capes (count={}): {}",
+            hashes.len().min(100),
+            joined
+        );
+        debug!("[Cape API] Full URL: {}", url);
+
+        let response = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("hash", joined)])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Cape API] Request failed: {}", e);
+                AppError::RequestError(format!(
+                    "Failed to send get capes by hashes request: {}",
+                    e
+                ))
+            })?;
+
+        let status = response.status();
+        debug!("[Cape API] Response status: {}", status);
+
+        if !status.is_success() {
+            let response_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
+            error!(
+                "[Cape API] Error getting capes by hashes: Status {}, Response: {}",
+                status, response_text
+            );
+            return Err(AppError::RequestError(format!(
+                "Failed to get capes by hashes. Status: {}, Details: {}",
+                status, response_text
+            )));
+        }
+
+        response.json::<Vec<CosmeticCape>>().await.map_err(|e| {
+            error!(
+                "[Cape API] Failed to parse get capes by hashes response body: {}",
+                e
+            );
+            AppError::ParseError(format!(
+                "Failed to parse get capes by hashes response body: {}",
+                e
+            ))
+        })
+    }
+
+    /// Add a cape to user's favorites
+    ///
+    /// Parameters:
+    /// - norisk_token: Authentication token
+    /// - cape_hash: Hash of the cape to favorite
+    /// - is_experimental: Whether to use the experimental API endpoint
+    ///
+    /// Returns: Updated list of favorite cape hashes
+    pub async fn add_favorite_cape(
+        &self,
+        norisk_token: &str,
+        cape_hash: &str,
+        is_experimental: bool,
+    ) -> Result<Vec<String>> {
+        let endpoint = format!("cape/favorite/{}", cape_hash);
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/{}", base_url, endpoint);
+
+        debug!(
+            "[Cape API] Making request to add favorite cape: {}",
+            cape_hash
+        );
+        debug!("[Cape API] Full URL: {}", url);
+
+        let response = HTTP_CLIENT
+            .put(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Cape API] Request failed: {}", e);
+                AppError::RequestError(format!(
+                    "Failed to send add favorite cape request: {}",
+                    e
+                ))
+            })?;
+
+        let status = response.status();
+        debug!("[Cape API] Response status: {}", status);
+
+        if status.is_success() {
+            let favorites = response.json::<Vec<String>>().await.map_err(|e| {
+                error!(
+                    "[Cape API] Failed to parse add favorite response body: {}",
+                    e
+                );
+                AppError::ParseError(format!(
+                    "Failed to parse add favorite cape response body: {}",
+                    e
+                ))
+            })?;
+            info!(
+                "[Cape API] Cape {} added to favorites successfully. Total favorites: {}",
+                cape_hash,
+                favorites.len()
+            );
+            Ok(favorites)
+        } else {
+            let response_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
+            error!(
+                "[Cape API] Error adding favorite cape: Status {}, Response: {}",
+                status, response_text
+            );
+            Err(AppError::RequestError(format!(
+                "Failed to add favorite cape. Status: {}, Details: {}",
+                status, response_text
+            )))
+        }
+    }
+
+    /// Remove a cape from user's favorites
+    ///
+    /// Parameters:
+    /// - norisk_token: Authentication token
+    /// - cape_hash: Hash of the cape to remove from favorites
+    /// - is_experimental: Whether to use the experimental API endpoint
+    ///
+    /// Returns: Updated list of favorite cape hashes
+    pub async fn remove_favorite_cape(
+        &self,
+        norisk_token: &str,
+        cape_hash: &str,
+        is_experimental: bool,
+    ) -> Result<Vec<String>> {
+        let endpoint = format!("cape/favorite/{}", cape_hash);
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/{}", base_url, endpoint);
+
+        debug!(
+            "[Cape API] Making request to remove favorite cape: {}",
+            cape_hash
+        );
+        debug!("[Cape API] Full URL: {}", url);
+
+        let response = HTTP_CLIENT
+            .delete(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Cape API] Request failed: {}", e);
+                AppError::RequestError(format!(
+                    "Failed to send remove favorite cape request: {}",
+                    e
+                ))
+            })?;
+
+        let status = response.status();
+        debug!("[Cape API] Response status: {}", status);
+
+        if status.is_success() {
+            let favorites = response.json::<Vec<String>>().await.map_err(|e| {
+                error!(
+                    "[Cape API] Failed to parse remove favorite response body: {}",
+                    e
+                );
+                AppError::ParseError(format!(
+                    "Failed to parse remove favorite cape response body: {}",
+                    e
+                ))
+            })?;
+            info!(
+                "[Cape API] Cape {} removed from favorites successfully. Total favorites: {}",
+                cape_hash,
+                favorites.len()
+            );
+            Ok(favorites)
+        } else {
+            let response_text = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
+            error!(
+                "[Cape API] Error removing favorite cape: Status {}, Response: {}",
+                status, response_text
+            );
+            Err(AppError::RequestError(format!(
+                "Failed to remove favorite cape. Status: {}, Details: {}",
+                status, response_text
+            )))
+        }
+    }
+
     /// Unequip the currently equipped cape for a player
     ///
     /// Parameters:

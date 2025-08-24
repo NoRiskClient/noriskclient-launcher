@@ -11,6 +11,7 @@ import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage"; // Assuming we want to show a 2D preview
 import { Card } from "../ui/Card";
 import { cn } from "../../lib/utils";
+import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 
 interface CapeCardProps {
   cape: CosmeticCape;
@@ -41,6 +42,8 @@ export function CapeCard({
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
+  const isFavorite = useCapeFavoritesStore((s) => s.isFavorite(capeHash));
+  const toggleFavoriteOptimistic = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
 
   useEffect(() => {
     if (creatorUuid && !creatorName) {
@@ -84,6 +87,28 @@ export function CapeCard({
         variant={isSelected ? "flat" : "flat"}
         onClick={() => !isLoading && onEquip(capeHash)}
       >
+        <div className={cn(
+          "absolute top-1.5 right-1.5 z-10 transition-all duration-300 ease-out group-hover:scale-110",
+          isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+        )}>
+          <IconButton
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleFavoriteOptimistic(capeHash);
+            }}
+            title={isFavorite ? "Unfavorite" : "Favorite"}
+            disabled={isLoading}
+            size="xs"
+            variant="ghost"
+            icon={
+              <Icon
+                icon={isFavorite ? "ph:heart-fill" : "ph:heart"}
+                className="w-5 h-5"
+                style={{ color: "#ef4444" }}
+              />
+            }
+          />
+        </div>
         <p
           className="font-minecraft text-white lowercase truncate text-3xl transition-transform duration-300 ease-out group-hover:scale-110"
           title={creatorName ? `By ${creatorName}` : capeHash}

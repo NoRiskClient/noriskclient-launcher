@@ -234,7 +234,7 @@ impl MinecraftLauncher {
         command.current_dir(&self.game_directory);
 
         // Define paths
-        let natives_path = crate::config::standard_meta_dir()
+        let natives_path = LAUNCHER_DIRECTORY.meta_dir()
             .join("natives")
             .join(&piston_meta.id);
 

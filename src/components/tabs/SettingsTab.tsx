@@ -29,6 +29,7 @@ import { openExternalUrl } from "../../services/tauri-service";
 import { openLauncherDirectory } from "../../services/tauri-service";
 import { IconButton } from ".././ui/buttons/IconButton";
 import { useFlags } from "flagsmith/react";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 
 export function SettingsTab() {
   const [config, setConfig] = useState<LauncherConfig | null>(null);
@@ -44,6 +45,10 @@ export function SettingsTab() {
   const tabRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [isHooksExpanded, setIsHooksExpanded] = useState<boolean>(false);
+  const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState<boolean>(false);
+  const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState<boolean>(false);
+  const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState<boolean>(false);
   const isResettingRef = useRef<boolean>(false);
   const {
     accentColor,
@@ -56,6 +61,8 @@ export function SettingsTab() {
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
+
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const EXPERIMENTAL_FEATURE_FLAG_NAME = "show_experimental_mode";
   const experimentalFlags = useFlags([EXPERIMENTAL_FEATURE_FLAG_NAME]);
@@ -772,24 +779,71 @@ export function SettingsTab() {
 
       <Card variant="flat" className="p-6">
         <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon icon="solar:code-bold" className="w-6 h-6 text-white" />
-            <h3 className="text-3xl font-minecraft text-white lowercase">
-              Game Hooks
-            </h3>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:code-bold" className="w-6 h-6 text-white" />
+              <h3 className="text-3xl font-minecraft text-white lowercase">
+                Game Hooks
+              </h3>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsHooksExpanded((v) => !v)}
+              icon={
+                <Icon
+                  icon={isHooksExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                  className="w-5 h-5"
+                />
+              }
+            >
+              {isHooksExpanded ? "Hide configuration" : "Show configuration"}
+            </Button>
           </div>
           <p className="text-base text-white/70 font-minecraft-ten mt-2">
             Configure custom commands to run before, during, and after game launch
           </p>
         </div>
 
+        {isHooksExpanded && (
         <div className="space-y-6 mt-6">
           <div className="p-4 rounded-lg border border-[#ffffff20] hover:bg-black/30 transition-colors">
-            <div className="flex items-center gap-2 mb-3">
-              <Icon icon="solar:play-circle-bold" className="w-5 h-5 text-white" />
-              <h5 className="font-minecraft text-2xl lowercase text-white">
-                Pre-Launch Hook
-              </h5>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:play-circle-bold" className="w-5 h-5 text-white" />
+                <h5 className="font-minecraft text-2xl lowercase text-white">Pre-Launch Hook</h5>
+              </div>
+              <Button
+                variant={isPreLaunchEditEnabled ? "secondary" : "ghost"}
+                size="sm"
+                onClick={async () => {
+                  if (isPreLaunchEditEnabled) {
+                    setIsPreLaunchEditEnabled(false);
+                    return;
+                  }
+                  const confirmed = await confirm({
+                    title: "enable pre-launch editing",
+                    message:
+                      "Editing the Pre-Launch hook can prevent the game from starting if misconfigured. Proceed only if you know what you're doing.",
+                    confirmText: "ENABLE",
+                    cancelText: "CANCEL",
+                    type: "warning",
+                    fullscreen: true,
+                  });
+                  if (confirmed) {
+                    setIsPreLaunchEditEnabled(true);
+                    toast.success("Pre-Launch editing enabled");
+                  }
+                }}
+                icon={
+                  <Icon
+                    icon={isPreLaunchEditEnabled ? "solar:lock-unlocked-bold" : "solar:lock-keyhole-bold"}
+                    className="w-4 h-4"
+                  />
+                }
+              >
+                {isPreLaunchEditEnabled ? "Disable editing" : "Enable editing"}
+              </Button>
             </div>
             <p className="text-sm text-white/60 font-minecraft-ten mb-4">
               Command to run before Minecraft starts. If this command fails, the launch will be aborted.
@@ -810,16 +864,48 @@ export function SettingsTab() {
               }}
               placeholder='Example: echo "Starting Minecraft..."'
               className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
-              disabled={saving}
+              disabled={saving || !isPreLaunchEditEnabled}
+              title={!isPreLaunchEditEnabled ? "Enable editing to modify this field" : undefined}
             />
           </div>
 
           <div className="p-4 rounded-lg border border-[#ffffff20] hover:bg-black/30 transition-colors">
-            <div className="flex items-center gap-2 mb-3">
-              <Icon icon="solar:shield-bold" className="w-5 h-5 text-white" />
-              <h5 className="font-minecraft text-2xl lowercase text-white">
-                Wrapper Hook
-              </h5>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:shield-bold" className="w-5 h-5 text-white" />
+                <h5 className="font-minecraft text-2xl lowercase text-white">Wrapper Hook</h5>
+              </div>
+              <Button
+                variant={isWrapperEditEnabled ? "secondary" : "ghost"}
+                size="sm"
+                onClick={async () => {
+                  if (isWrapperEditEnabled) {
+                    setIsWrapperEditEnabled(false);
+                    return;
+                  }
+                  const confirmed = await confirm({
+                    title: "enable wrapper editing",
+                    message:
+                      "Changing the Wrapper hook affects how Java is executed. Misconfiguration may prevent launching.",
+                    confirmText: "ENABLE",
+                    cancelText: "CANCEL",
+                    type: "warning",
+                    fullscreen: true,
+                  });
+                  if (confirmed) {
+                    setIsWrapperEditEnabled(true);
+                    toast.success("Wrapper editing enabled");
+                  }
+                }}
+                icon={
+                  <Icon
+                    icon={isWrapperEditEnabled ? "solar:lock-unlocked-bold" : "solar:lock-keyhole-bold"}
+                    className="w-4 h-4"
+                  />
+                }
+              >
+                {isWrapperEditEnabled ? "Disable editing" : "Enable editing"}
+              </Button>
             </div>
             <p className="text-sm text-white/60 font-minecraft-ten mb-4">
               Wrapper command to run Java through (e.g., sandboxing tools). The Java path will be passed as an argument.
@@ -840,16 +926,48 @@ export function SettingsTab() {
               }}
               placeholder="Example: firejail or gamemoderun"
               className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
-              disabled={saving}
+              disabled={saving || !isWrapperEditEnabled}
+              title={!isWrapperEditEnabled ? "Enable editing to modify this field" : undefined}
             />
           </div>
 
           <div className="p-4 rounded-lg border border-[#ffffff20] hover:bg-black/30 transition-colors">
-            <div className="flex items-center gap-2 mb-3">
-              <Icon icon="solar:stop-circle-bold" className="w-5 h-5 text-white" />
-              <h5 className="font-minecraft text-2xl lowercase text-white">
-                Post-Exit Hook
-              </h5>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:stop-circle-bold" className="w-5 h-5 text-white" />
+                <h5 className="font-minecraft text-2xl lowercase text-white">Post-Exit Hook</h5>
+              </div>
+              <Button
+                variant={isPostExitEditEnabled ? "secondary" : "ghost"}
+                size="sm"
+                onClick={async () => {
+                  if (isPostExitEditEnabled) {
+                    setIsPostExitEditEnabled(false);
+                    return;
+                  }
+                  const confirmed = await confirm({
+                    title: "enable post-exit editing",
+                    message:
+                      "Post-Exit hook runs system commands after the game closes. Proceed only if you trust the command.",
+                    confirmText: "ENABLE",
+                    cancelText: "CANCEL",
+                    type: "warning",
+                    fullscreen: true,
+                  });
+                  if (confirmed) {
+                    setIsPostExitEditEnabled(true);
+                    toast.success("Post-Exit editing enabled");
+                  }
+                }}
+                icon={
+                  <Icon
+                    icon={isPostExitEditEnabled ? "solar:lock-unlocked-bold" : "solar:lock-keyhole-bold"}
+                    className="w-4 h-4"
+                  />
+                }
+              >
+                {isPostExitEditEnabled ? "Disable editing" : "Enable editing"}
+              </Button>
             </div>
             <p className="text-sm text-white/60 font-minecraft-ten mb-4">
               Command to run after Minecraft exits successfully. Runs in the background without blocking.
@@ -870,11 +988,11 @@ export function SettingsTab() {
               }}
               placeholder='Example: echo "Minecraft closed"'
               className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
-              disabled={saving}
+              disabled={saving || !isPostExitEditEnabled}
+              title={!isPostExitEditEnabled ? "Enable editing to modify this field" : undefined}
             />
           </div>
-        </div>
-
+        
         <div className="mt-6 p-4 rounded-lg border border-orange-500/30 bg-orange-900/20">
           <div className="flex items-start gap-3">
             <Icon icon="solar:danger-triangle-bold" className="w-6 h-6 text-orange-400 flex-shrink-0 mt-1" />
@@ -905,6 +1023,8 @@ export function SettingsTab() {
             </div>
           </div>
         </div>
+        </div>
+        )}
       </Card>
 
       {canShowExperimental && (
@@ -1142,6 +1262,7 @@ export function SettingsTab() {
           onClose={() => setShowFullscreenPreview(false)} 
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

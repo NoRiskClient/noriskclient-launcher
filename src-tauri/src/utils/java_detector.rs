@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
@@ -340,8 +343,17 @@ pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
     }
 
     // Run java -version and parse the output
-    let output = Command::new(&java_path)
-        .arg("-version")
+    let mut cmd = Command::new(&java_path);
+    cmd.arg("-version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd
         .output()
         .map_err(|e| AppError::Other(format!("Failed to execute java -version: {}", e)))?;
 

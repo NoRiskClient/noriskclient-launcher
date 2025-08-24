@@ -373,6 +373,7 @@ export function CapeBrowser() {
         isFetchingMore={isFetchingMore}
         onTriggerUpload={activeAccount ? handleUploadClick : undefined}
         onDownloadTemplate={activeAccount ? handleDownloadTemplate : undefined}
+        groupFavoritesInHeader={!filters.showOwnedOnly}
       />
 
       {previewImageUrl && previewImagePath && showPreviewModal && (

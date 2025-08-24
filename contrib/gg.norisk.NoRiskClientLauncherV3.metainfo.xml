@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>gg.norisk.NoRiskClientLauncherV3</id>
+
+  <name>NoRisk Client Launcher</name>
+  <summary>A Launcher for the NoRisk Client</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+
+  <developer id="gg.norisk">
+    <name>NoRisk Client Team</name>
+  </developer>
+
+  <description>
+    <p>
+      NoRisk Client Launcher to install and launch Minecraft with several new features.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">gg.norisk.NoRiskClientLauncherV3.desktop</launchable>
+
+  <url type="homepage">https://norisk.gg/</url>
+  <url type="contribute">https://github.com/NoRiskClient/noriskclient-launcher</url>
+  <url type="bugtracker">https://github.com/NoRiskClient/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>
+        https://cdn.norisk.gg/website-assets/launcher_flatpack_image.png
+      </image>
+      <caption>NoRisk Client home screen</caption>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="language-humor">mild</content_attribute>
+    <content_attribute id="social-chat">moderate</content_attribute>
+    <content_attribute id="social-info">moderate</content_attribute>
+    <content_attribute id="social-audio">moderate</content_attribute>
+    <content_attribute id="social-contacts">intense</content_attribute>
+    <content_attribute id="money-purchasing">intense</content_attribute>
+  </content_rating>
+
+  <releases>
+    <release version="0.6.7" date="2025-08-18">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.7</url>
+    </release>
+    <release version="0.6.6" date="2025-06-29">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.6</url>
+    </release>
+    <release version="0.6.5" date="2025-06-24">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.5</url>
+    </release>
+    <release version="0.6.4" date="2025-06-23">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.4</url>
+    </release>
+  </releases>
+</component>

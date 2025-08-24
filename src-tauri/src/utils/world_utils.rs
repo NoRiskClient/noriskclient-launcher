@@ -606,20 +606,12 @@ pub async fn delete_world_directory(profile_id: Uuid, world_folder: &str) -> Res
         world_folder
     );
 
-    // --- Delete Directory ---
-    info!("Attempting recursive delete of: {}", world_path.display());
-    fs::remove_dir_all(&world_path).await.map_err(|e| {
-        error!(
-            "Failed to delete world directory '{}': {}",
-            world_path.display(),
-            e
-        );
-        // Map IO error to a more specific deletion error or keep as AppError::Io
-        AppError::Io(e) // Or create AppError::WorldDeletionError { ... }
-    })?;
+    // --- Move to Trash ---
+    info!("Moving world directory to trash: {}", world_path.display());
+    crate::utils::trash_utils::move_path_to_trash(&world_path, Some("worlds")).await?;
 
     info!(
-        "Successfully deleted world directory '{}' for profile {}",
+        "World directory '{}' moved to trash for profile {}",
         world_folder, profile_id
     );
     Ok(())

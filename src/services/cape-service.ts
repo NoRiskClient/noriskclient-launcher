@@ -131,3 +131,61 @@ export const downloadTemplateAndOpenExplorer = (): Promise<void> => {
 export const getPlayerProfileByUuidOrName = (nameOrUuidQuery: string): Promise<MinecraftProfile> => {
   return invoke('get_profile_by_name_or_uuid', { nameOrUuidQuery });
 }; 
+
+/**
+ * Add a cape to the user's favorites (server-backed)
+ * Returns the updated list of favorite cape hashes
+ */
+export const addFavoriteCape = (
+  capeHash: string,
+  noriskToken?: string,
+): Promise<string[]> => {
+  return invoke('add_favorite_cape', { capeHash, noriskToken });
+};
+
+/**
+ * Remove a cape from the user's favorites (server-backed)
+ * Returns the updated list of favorite cape hashes
+ */
+export const removeFavoriteCape = (
+  capeHash: string,
+  noriskToken?: string,
+): Promise<string[]> => {
+  return invoke('remove_favorite_cape', { capeHash, noriskToken });
+};
+
+/**
+ * Smart helper: set favorite state for a cape.
+ * Calls add or remove on the backend and returns the updated favorites list.
+ */
+export const setCapeFavorite = async (
+  capeHash: string,
+  favorite: boolean,
+  noriskToken?: string,
+): Promise<string[]> => {
+  if (favorite) {
+    return addFavoriteCape(capeHash, noriskToken);
+  }
+  return removeFavoriteCape(capeHash, noriskToken);
+};
+
+/**
+ * Smart helper: toggle favorite by current state (client-known)
+ */
+export const toggleCapeFavorite = async (
+  capeHash: string,
+  isCurrentlyFavorite: boolean,
+  noriskToken?: string,
+): Promise<string[]> => {
+  return setCapeFavorite(capeHash, !isCurrentlyFavorite, noriskToken);
+}; 
+
+/**
+ * Fetch multiple capes by hashes (max 100)
+ */
+export const getCapesByHashes = (
+  hashes: string[],
+  noriskToken?: string,
+): Promise<CosmeticCape[]> => {
+  return invoke('get_capes_by_hashes', { hashes, noriskToken });
+}; 
