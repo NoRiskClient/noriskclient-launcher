@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from 'path';
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
@@ -36,6 +35,14 @@ export default defineConfig(async () => ({
         main: resolve(__dirname, 'index.html'),
         updater: resolve(__dirname, 'updater.html'),
         logWindow: resolve(__dirname, 'log-window.html')
+      },
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'tauri-vendor': ['@tauri-apps/api'],
+          'ui-vendor': ['lucide-react', 'tailwindcss'],
+          '3d-vendor': ['three', '@react-three/fiber']
+        }
       }
     }
   }

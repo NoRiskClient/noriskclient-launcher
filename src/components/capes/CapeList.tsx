@@ -58,7 +58,7 @@ interface CapeItemDisplayProps {
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-function CapeItemDisplay({
+const CapeItemDisplay = React.memo(function CapeItemDisplay({
   cape,
   imageUrl,
   isCurrentlyEquipping,
@@ -199,7 +199,7 @@ function CapeItemDisplay({
       )}
     </Card>
   );
-}
+});
 
 interface AddCapeCardProps {
   onClick: () => void;

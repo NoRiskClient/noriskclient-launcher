@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -26,7 +25,7 @@ const CARD_MIN_WIDTH = 210;
 const IMAGE_TARGET_HEIGHT = 160;
 const IMAGE_TARGET_WIDTH = 100;
 
-export function CapeCard({
+export const CapeCard = React.memo(function CapeCard({
   cape,
   onEquip,
   isSelected,
@@ -175,4 +174,4 @@ export function CapeCard({
       </Card>
     </div>
   );
-}
+});
