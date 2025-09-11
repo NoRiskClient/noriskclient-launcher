@@ -547,11 +547,11 @@ export function SettingsTab() {
                       onClick={() => setHeaderFontPreset(opt.value)}
                     >
                       <div className="flex flex-col gap-2">
-                        <h5 className="text-xl text-white font-minecraft-ten lowercase">{opt.label}</h5>
+                        <p className="text-xl text-white lowercase" style={{ fontFamily: opt.textSample }}>{opt.label}</p>
                         <div className="rounded-md p-3 bg-black/40 border border-white/10">
                           <div
                             className="text-white text-base mb-1"
-                            style={{ fontFamily: opt.headerSample as string }}
+                            style={{ fontFamily: opt.headerSample }}
                           >
                             Heading Sample
                           </div>
@@ -587,11 +587,11 @@ export function SettingsTab() {
                       onClick={() => setTextFontPreset(opt.value)}
                     >
                       <div className="flex flex-col gap-2">
-                        <h5 className="text-xl text-white font-minecraft-ten lowercase">{opt.label}</h5>
+                        <p className="text-xl text-white lowercase" style={{ fontFamily: opt.textSample }}>{opt.label}</p>
                         <div className="rounded-md p-3 bg-black/40 border border-white/10">
                           <div
                             className="text-white/80 text-xs"
-                            style={{ fontFamily: opt.textSample as string }}
+                            style={{ fontFamily: opt.textSample }}
                           >
                             Lorem ipsum dolor sit amet
                           </div>

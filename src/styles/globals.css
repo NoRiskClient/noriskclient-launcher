@@ -247,6 +247,32 @@
     letter-spacing: 0.03em;
 }
 
+/* Normalize heading visual size for non-Minecraft presets */
+:root[data-header-font='system'] .text-6xl.font-minecraft,
+:root[data-header-font='monospace'] .text-6xl.font-minecraft {
+    font-size: 2.5rem;
+}
+:root[data-header-font='system'] .text-5xl.font-minecraft,
+:root[data-header-font='monospace'] .text-5xl.font-minecraft {
+    font-size: 2rem;
+}
+:root[data-header-font='system'] .text-4xl.font-minecraft,
+:root[data-header-font='monospace'] .text-4xl.font-minecraft {
+    font-size: 1.7rem;
+}
+:root[data-header-font='system'] .text-3xl.font-minecraft,
+:root[data-header-font='monospace'] .text-3xl.font-minecraft {
+    font-size: 1.2rem;
+}
+:root[data-header-font='system'] .text-2xl.font-minecraft,
+:root[data-header-font='monospace'] .text-2xl.font-minecraft {
+    font-size: 1.1rem;
+}
+:root[data-header-font='system'] .text-xl.font-minecraft,
+:root[data-header-font='monospace'] .text-xl.font-minecraft {
+    font-size: 0.9rem;
+}
+
 .text-shadow {
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1);
 }

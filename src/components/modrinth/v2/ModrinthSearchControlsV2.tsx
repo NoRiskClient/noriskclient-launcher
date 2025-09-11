@@ -115,7 +115,7 @@ export const ModrinthSearchControlsV2: React.FC<
               onClick={() => onProjectTypeChange(type)}
               variant={projectType === type ? "flat" : "ghost"}
               size={buttonSize}
-              className={`flex-1 min-w-0 text-[1.7em]`}
+              className={`flex-1 min-w-0 text-2xl`}
             >
               {type}s
             </Button>

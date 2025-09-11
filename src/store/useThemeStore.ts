@@ -289,6 +289,8 @@ export const useThemeStore = create<ThemeState>()(
         const textFont = getFont(textFontPreset, 'text');
         document.documentElement.style.setProperty('--font-minecraft', headerFont);
         document.documentElement.style.setProperty('--font-minecraft-ten', textFont);
+        // Expose current header font preset
+        document.documentElement.setAttribute('data-header-font', headerFontPreset);
       },
 
       setCustomAccentColor: (hexColor: string) => {
