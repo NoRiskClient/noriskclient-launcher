@@ -207,6 +207,11 @@ interface ThemeState {
   setAccentColor: (color: AccentColor) => void;
   setCustomAccentColor: (hexColor: string) => void;
   applyAccentColorToDOM: () => void;
+  headerFontPreset: FontPreset;
+  textFontPreset: FontPreset;
+  setHeaderFontPreset: (preset: FontPreset) => void;
+  setTextFontPreset: (preset: FontPreset) => void;
+  applyFontPresetsToDOM: () => void;
   customColorHistory: string[];
   addToCustomColorHistory: (hexColor: string) => void;
   clearCustomColorHistory: () => void;
@@ -232,6 +237,8 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
       accentColor: ACCENT_COLORS.blue,
+      headerFontPreset: 'minecraft',
+      textFontPreset: 'minecraft',
       isBackgroundAnimationEnabled: false,
       isDetailViewSidebarOnLeft: true,
       profileGroupingCriterion: "group",
@@ -250,6 +257,38 @@ export const useThemeStore = create<ThemeState>()(
         const clampedRadius = Math.max(MIN_BORDER_RADIUS, Math.min(MAX_BORDER_RADIUS, radius));
         set({ borderRadius: clampedRadius });
         get().applyBorderRadiusToDOM();
+      },
+
+      setHeaderFontPreset: (preset: FontPreset) => {
+        set({ headerFontPreset: preset });
+        get().applyFontPresetsToDOM();
+      },
+
+      setTextFontPreset: (preset: FontPreset) => {
+        set({ textFontPreset: preset });
+        get().applyFontPresetsToDOM();
+      },
+
+      applyFontPresetsToDOM: () => {
+        const { headerFontPreset, textFontPreset } = get();
+        const getFont = (preset: FontPreset, target: 'header' | 'text') => {
+          switch (preset) {
+            case 'minecraft':
+              return target === 'header'
+                ? '"Minecraft", monospace'
+                : '"MinecraftTen", sans-serif';
+            case 'system':
+              return 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif';
+            case 'monospace':
+              return 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Cascadia Mono", "Fira Code", "Courier New", monospace';
+            default:
+              return '"Minecraft", monospace';
+          }
+        };
+        const headerFont = getFont(headerFontPreset, 'header');
+        const textFont = getFont(textFontPreset, 'text');
+        document.documentElement.style.setProperty('--font-minecraft', headerFont);
+        document.documentElement.style.setProperty('--font-minecraft-ten', textFont);
       },
 
       setCustomAccentColor: (hexColor: string) => {
@@ -385,6 +424,7 @@ export const useThemeStore = create<ThemeState>()(
           
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
+          state.applyFontPresetsToDOM?.();
           // Ensure collapsedProfileGroups exists after rehydrate
           if (!Array.isArray(state.collapsedProfileGroups)) {
             state.collapsedProfileGroups = [];
@@ -394,3 +434,6 @@ export const useThemeStore = create<ThemeState>()(
     },
   ),
 );
+
+// Font presets for appearance settings
+export type FontPreset = 'minecraft' | 'system' | 'monospace';

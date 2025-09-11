@@ -206,7 +206,7 @@
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        font-family: var(--font-minecraft), monospace;
+        font-family: var(--font-minecraft-ten), sans-serif;
         letter-spacing: 0.03em;
     }
 

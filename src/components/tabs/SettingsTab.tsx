@@ -61,6 +61,12 @@ export function SettingsTab() {
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
+  const {
+    headerFontPreset,
+    textFontPreset,
+    setHeaderFontPreset,
+    setTextFontPreset,
+  } = useThemeStore();
 
   const { confirm, confirmDialog } = useConfirmDialog();
 
@@ -478,16 +484,143 @@ export function SettingsTab() {
               size="md"
             >
               Download
-            </Button>          </div>
+            </Button>          
+          </div>
         </div>
+      </Card>
+
+      <Card variant="flat" className="p-6">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon icon="solar:text-bold" className="w-6 h-6 text-white" />
+            <h3 className="text-3xl font-minecraft text-white lowercase">
+              Typography
+            </h3>
+          </div>
+          <p className="text-base text-white/70 font-minecraft-ten mt-2">
+            Choose fonts and base size used throughout the launcher
+          </p>
+        </div>
+
+        {(() => {
+          const options = [
+            {
+              value: "minecraft" as const,
+              label: "Minecraft (default)",
+              headerSample: 'Minecraft, monospace',
+              textSample:
+                'MinecraftTen, ui-sans-serif, system-ui, "Segoe UI", Inter, sans-serif',
+            },
+            {
+              value: "system" as const,
+              label: "System Sans",
+              headerSample:
+                'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif',
+              textSample:
+                'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif',
+            },
+            {
+              value: "monospace" as const,
+              label: "Monospace",
+              headerSample:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Cascadia Mono", "Fira Code", "Courier New", monospace',
+              textSample:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Cascadia Mono", "Fira Code", "Courier New", monospace',
+            },
+          ];
+
+          return (
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-xl font-minecraft text-white lowercase mb-3">Header font</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {options.map((opt) => (
+                    <Card
+                      key={`header-${opt.value}`}
+                      variant="flat"
+                      className={cn(
+                        "relative cursor-pointer transition-all duration-300 p-4",
+                        headerFontPreset === opt.value
+                          ? "ring-2 ring-white/30"
+                          : "hover:bg-black/40",
+                      )}
+                      onClick={() => setHeaderFontPreset(opt.value)}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <h5 className="text-xl text-white font-minecraft-ten lowercase">{opt.label}</h5>
+                        <div className="rounded-md p-3 bg-black/40 border border-white/10">
+                          <div
+                            className="text-white text-base mb-1"
+                            style={{ fontFamily: opt.headerSample as string }}
+                          >
+                            Heading Sample
+                          </div>
+                        </div>
+                      </div>
+                      {headerFontPreset === opt.value && (
+                        <div className="absolute top-2 right-2">
+                          <Icon
+                            icon="solar:check-circle-bold"
+                            className="w-5 h-5"
+                            style={{ color: accentColor.value }}
+                          />
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xl font-minecraft text-white lowercase mb-3">Text font</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {options.map((opt) => (
+                    <Card
+                      key={`text-${opt.value}`}
+                      variant="flat"
+                      className={cn(
+                        "relative cursor-pointer transition-all duration-300 p-4",
+                        textFontPreset === opt.value
+                          ? "ring-2 ring-white/30"
+                          : "hover:bg-black/40",
+                      )}
+                      onClick={() => setTextFontPreset(opt.value)}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <h5 className="text-xl text-white font-minecraft-ten lowercase">{opt.label}</h5>
+                        <div className="rounded-md p-3 bg-black/40 border border-white/10">
+                          <div
+                            className="text-white/80 text-xs"
+                            style={{ fontFamily: opt.textSample as string }}
+                          >
+                            Lorem ipsum dolor sit amet
+                          </div>
+                        </div>
+                      </div>
+                      {textFontPreset === opt.value && (
+                        <div className="absolute top-2 right-2">
+                          <Icon
+                            icon="solar:check-circle-bold"
+                            className="w-5 h-5"
+                            style={{ color: accentColor.value }}
+                          />
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </Card>
 
       <Card variant="flat" className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Icon icon="solar:palette-bold" className="w-5 h-5 text-white" />
-            <h4 className="text-2xl font-minecraft text-white lowercase">
+            <h3 className="text-3xl font-minecraft text-white lowercase">
               Custom Colors
-            </h4>
+            </h3>
           </div>
           <p className="text-sm text-white/70 font-minecraft-ten mb-4">
             Create your own custom accent color
@@ -536,8 +669,11 @@ export function SettingsTab() {
                     />
                   ))}
                 </div>
-              </div>            )}          </div>
-        </Card>      <Card variant="flat" className="p-6">
+              </div>            
+            )}          
+          </div>
+        </Card>      
+        <Card variant="flat" className="p-6">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Icon icon="solar:widget-bold" className="w-6 h-6 text-white" />
