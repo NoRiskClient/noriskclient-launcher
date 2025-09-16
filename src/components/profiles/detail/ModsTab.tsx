@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ModRow } from "./ModRow";
 import type { Mod, Profile } from "../../../types/profile";
 import * as ProfileService from "../../../services/profile-service";
@@ -315,7 +315,7 @@ export function ModsTab({
     }
   }, []);
 
-  const handleToggleMod = async (modId: string) => {
+  const handleToggleMod = useCallback(async (modId: string) => {
     try {
       const mod = mods.find((m) => m.id === modId);
       if (!mod) return;
@@ -335,7 +335,7 @@ export function ModsTab({
         `Failed to toggle mod: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-  };
+  }, [mods, profile.id]);
 
   const handleDeleteMod = async (modId: string) => {
     try {
@@ -355,7 +355,7 @@ export function ModsTab({
     }
   };
 
-  const handleSelectMod = (modId: string) => {
+  const handleSelectMod = useCallback((modId: string) => {
     setSelectedMods((prev) => {
       const updated = new Set(prev);
       if (updated.has(modId)) {
@@ -365,7 +365,7 @@ export function ModsTab({
       }
       return updated;
     });
-  };
+  }, []);
 
   const handleSelectAll = () => {
     if (selectedMods.size === filteredMods.length) {

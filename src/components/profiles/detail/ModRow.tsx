@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../../lib/utils";
 import type { Mod } from "../../../types/profile";
@@ -25,7 +25,7 @@ interface ModRowProps {
   style?: React.CSSProperties;
 }
 
-export function ModRow({
+export const ModRow = React.memo(function ModRow({
   mod,
   isSelected,
   onSelect,
@@ -230,4 +230,4 @@ export function ModRow({
       </div>
     </div>
   );
-}
+});

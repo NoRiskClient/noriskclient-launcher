@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import type { ModrinthVersion } from "../../../types/modrinth";
@@ -52,7 +51,7 @@ interface ContentPackRowProps {
   children?: React.ReactNode;
 }
 
-export function ContentPackRow({
+export const ContentPackRow = React.memo(function ContentPackRow({
   contentPack,
   isSelected,
   onSelect,
@@ -326,4 +325,4 @@ export function ContentPackRow({
       {children}
     </div>
   );
-}
+});
