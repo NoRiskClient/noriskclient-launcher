@@ -387,8 +387,10 @@ export function MainLaunchButton({
 
     const displaySubText = statusSubText || selectedVersionLabel;
     return (
-      <div className="w-full flex flex-col items-center justify-center leading-none -mt-4">
-        <span className="text-5xl text-center lowercase">{actionText}</span>{" "}
+      <div className="launch-btn w-full flex flex-col items-center justify-center leading-none -mt-4">
+        <span className="font-minecraft text-5xl text-center lowercase">
+          {actionText}
+        </span>{" "}
         {displaySubText && (
           <span
             className={cn(

@@ -272,6 +272,11 @@
 :root[data-header-font='monospace'] .text-xl.font-minecraft {
     font-size: 0.9rem;
 }
+:root[data-header-font='system'] .launch-btn,
+:root[data-header-font='monospace'] .launch-btn {
+    /* Reset margin for launch buttons for non Minecraft presets */
+    margin-top: 0;
+}
 
 .text-shadow {
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1);
