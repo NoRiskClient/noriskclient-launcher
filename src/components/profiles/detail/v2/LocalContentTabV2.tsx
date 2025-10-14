@@ -531,28 +531,45 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         versionDropdownRef.current &&
         versionButtonRef.current
       ) {
-        if (!versionButtonRef.current.isConnected) {
-          setOpenVersionDropdownId(null); // Close if button is detached
-          return;
-        }
         const buttonRect = versionButtonRef.current.getBoundingClientRect();
         const dropdownElement = versionDropdownRef.current;
-
+        const viewportHeight = window.innerHeight;
+      
         if (
           buttonRect.width === 0 &&
           buttonRect.height === 0 &&
           buttonRect.x === 0 &&
           buttonRect.y === 0
         ) {
-          // Button likely not properly laid out yet, or invisible
-          // Hide dropdown until next frame attempts to position it
+
+          // Update: Button is fine, now if dropdown opens above or below is random. Caused by different AppWindow Sizes (fullscreen/window)
           dropdownElement.style.visibility = "hidden";
           requestAnimationFrame(updatePosition); // Retry positioning on next frame
           return;
         }
+      
+        // Simple height calculation
+        const maxDropdownHeight = 300;
+        const spaceBelow = viewportHeight - buttonRect.bottom + 35; // change this if you need more/less space buffer (opening to top falsely)
+        const spaceAbove = buttonRect.top - 20;
+      
+        let maxH: number;
 
-        dropdownElement.style.top = `${buttonRect.bottom + 2}px`;
+        // Not so simple space above/below handler
+        if (spaceBelow >= maxDropdownHeight || spaceBelow >= spaceAbove) {
+          dropdownElement.style.top = `${buttonRect.bottom + 2}px`;
+          dropdownElement.style.bottom = 'auto';
+          maxH = Math.max(0, Math.min(maxDropdownHeight, spaceBelow));
+        } else {
+
+          dropdownElement.style.bottom = `${window.innerHeight - buttonRect.top + 2}px`;
+          dropdownElement.style.top = 'auto';
+          maxH = Math.max(0, Math.min(maxDropdownHeight, spaceAbove));
+        }
+      
         dropdownElement.style.left = `${buttonRect.left}px`;
+        dropdownElement.style.maxHeight = `${maxH}px`;
+        dropdownElement.style.height = "auto"; // forced when few entries
         dropdownElement.style.visibility = "visible";
       } else if (versionDropdownRef.current) {
         versionDropdownRef.current.style.visibility = "hidden";
@@ -649,14 +666,41 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
     // Event listeners for keeping position updated and closing
     const scrollableParents = document.querySelectorAll(".custom-scrollbar");
-    const handleScrollOrResize = () => requestAnimationFrame(updatePosition);
+    
+    const handleScrollOrResize = (event: Event) => {
+      // Check if Scroll is by Dropdown
+      if (versionDropdownRef.current && 
+          event.target && 
+          versionDropdownRef.current.contains(event.target as Node)) {
+        // dont kill only reposition
+        requestAnimationFrame(updatePosition);
+        return;
+      }
+      
+      // kill dropdown on scroll container
+      if (openVersionDropdownId) {
+        setOpenVersionDropdownId(null);
+      }
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      if (versionDropdownRef.current && 
+          event.target && 
+          versionDropdownRef.current.contains(event.target as Node)) {
+        return;
+      }
+      
+      if (openVersionDropdownId) {
+        setOpenVersionDropdownId(null);
+      }
+    };
 
     scrollableParents.forEach((el) =>
       el.addEventListener("scroll", handleScrollOrResize),
     );
     window.addEventListener("scroll", handleScrollOrResize);
-    window.addEventListener("resize", handleScrollOrResize);
-    document.addEventListener("wheel", handleScrollOrResize, { passive: true });
+    window.addEventListener("resize", () => requestAnimationFrame(updatePosition));
+    document.addEventListener("wheel", handleWheel, { passive: true });
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -675,8 +719,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         el.removeEventListener("scroll", handleScrollOrResize),
       );
       window.removeEventListener("scroll", handleScrollOrResize);
-      window.removeEventListener("resize", handleScrollOrResize);
-      document.removeEventListener("wheel", handleScrollOrResize);
+      window.removeEventListener("resize", () => requestAnimationFrame(updatePosition));
+      document.removeEventListener("wheel", handleWheel);
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [openVersionDropdownId]); // Effect runs when dropdown open state changes
@@ -805,60 +849,46 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                     </button>
                     {isItemOpen &&
                       createPortal(
-                        <div
-                          ref={versionDropdownRef}
-                          className="fixed z-[100] font-minecraft-ten"
-                          style={{
-                            backgroundColor: "rgb(20, 20, 20)",
-                            border: `2px solid rgba(${parseInt(accentColor.value.substring(1, 3), 16)}, ${parseInt(accentColor.value.substring(3, 5), 16)}, ${parseInt(accentColor.value.substring(5, 7), 16)}, 0.6)`,
-                            boxShadow: `0 6px 16px rgba(0, 0, 0, 0.7)`,
-                            padding: "12px",
-                            minWidth: "170px",
-                            visibility: "hidden",
-                          }}
-                        >
-                          {isLoadingVersions ? (
-                            <div className="text-white/70 text-sm tracking-wider">
-                              Loading versions...
+                      <div
+                        ref={versionDropdownRef}
+                        className="fixed z-[100] font-minecraft-ten flex flex-col"
+                        style={{
+                          backgroundColor: "rgb(20, 20, 20)",
+                          border: `2px solid rgba(${parseInt(accentColor.value.substring(1, 3), 16)}, ${parseInt(accentColor.value.substring(3, 5), 16)}, ${parseInt(accentColor.value.substring(5, 7), 16)}, 0.6)`,
+                          boxShadow: `0 6px 16px rgba(0, 0, 0, 0.7)`,
+                          padding: "12px",
+                          minWidth: "250px",
+                          maxWidth: "350px",
+                          visibility: "hidden",
+                        }}
+                      >
+                        {isLoadingVersions ? (
+                          <div className="text-white/70 text-sm tracking-wider p-4">
+                            Loading versions...
+                          </div>
+                        ) : versionsError ? (
+                          <div className="text-red-400 text-sm tracking-wider p-2">
+                            {versionsError}
+                          </div>
+                        ) : availableVersions && availableVersions.length > 0 ? (
+                          <>
+                            <div className="font-bold mb-2 text-sm tracking-wider flex-shrink-0">
+                              Available Versions on {getItemPlatformDisplayName(item)}:
                             </div>
-                          ) : versionsError ? (
-                            <div className="text-red-400 text-sm tracking-wider">
-                              {versionsError}
-                            </div>
-                          ) : availableVersions &&
-                            availableVersions.length > 0 ? (
-                            <>
-                              <div className="font-bold mb-2 text-sm tracking-wider">
-                                Available Versions on {getItemPlatformDisplayName(item)}:
-                              </div>
-                              <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                                {availableVersions.map((version) => {
-                                  // Use the centralized function to determine if this version is currently installed
-                                  const isCurrent = isCurrentInstalledVersion(
-                                    version,
-                                    item,
-                                    item.filename === openVersionDropdownId // Enable debug mode for the currently open dropdown
-                                  );
-
-                                  return (
-                                    <div
-                                      key={version.id}
-                                      className={`p-1.5 text-xs hover:bg-white/10 cursor-pointer rounded-sm ${isCurrent ? "font-bold text-white" : "text-white/80"}`}
-                                      style={
-                                        {
-                                          // No specific background for individual items unless it's the current one, which is handled by font-bold
-                                        }
-                                      }
-                                      onClick={() => {
-                                        handleSwitchContentVersion(
-                                          item,
-                                          version,
-                                        );
-                                        setOpenVersionDropdownId(null);
-                                      }}
-                                    >
-                                      {version.name}
-                                    </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 fits">
+                              {availableVersions.map((version) => {
+                                const isCurrent = isCurrentInstalledVersion(version, item);
+                                return (
+                                  <div
+                                    key={version.id}
+                                    className={`p-2 text-sm hover:bg-white/10 cursor-pointer rounded-sm transition-colors ${isCurrent ? "font-bold text-white bg-white/5" : "text-white/80"}`}
+                                    onClick={() => {
+                                      handleSwitchContentVersion(item, version);
+                                      setOpenVersionDropdownId(null);
+                                    }}
+                                  >
+                                    {version.name}
+                                  </div>
                                   );
                                 })}
                               </div>
