@@ -24,6 +24,8 @@ pub struct AnalyticsConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PayloadFormat {
+    SingleEvent,
+
     BatchArray,
 
     CustomWrapper {
