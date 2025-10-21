@@ -552,7 +552,7 @@ export function ProfileDetailViewV2({
 
 
         {/* Content Area */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 h-full">
           {activeMainTab === "content" && (
             <div className="flex h-full">
               {/* Content Display Area */}

@@ -152,18 +152,13 @@ export function GenericList<T>({
      return null; // Return nothing for empty state without background
   }
   if (!isEmpty) {
-    // Always use virtualization for better performance and consistent behavior
-    // Calculate height based on item count - min 400px, max 600px
-    const calculatedHeight = Math.min(Math.max(items.length * 60, 400), 600);
-
     return (
         <div
-        className={`${listContainerClassName}`}
+        className={`${listContainerClassName} h-full`}
         >
         <Virtuoso
           data={items}
           itemContent={(index) => renderItem(items[index], index)}
-          style={{ height: `${calculatedHeight}px` }}
         />
         </div>
     );

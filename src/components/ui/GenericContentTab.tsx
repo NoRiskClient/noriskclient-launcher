@@ -67,7 +67,7 @@ export function GenericContentTab<T>({
   const effectiveLoadingItemCount = showSkeletons ? loadingItemCount : 0;
 
   return (
-    <div className="flex flex-col select-none pt-[7px]">
+    <div className="flex flex-col select-none pt-[7px] h-full">
       {/* Header with search, actions etc. */}
       <div className="flex items-center justify-between mb-1 gap-2">
         <div className="flex items-center gap-2 flex-grow min-w-0">
