@@ -1,4 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+pub mod analytics;
 pub mod commands;
 pub mod config;
 pub mod error;
