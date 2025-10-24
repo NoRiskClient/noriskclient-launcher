@@ -8,6 +8,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { EmptyState } from "../ui/EmptyState";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useHiddenProfilesStore } from "../../store/useHiddenProfilesStore";
 import { gsap } from "gsap";
 import { ProfileImport } from "../profiles/ProfileImport";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
@@ -43,6 +44,7 @@ export function ProfilesTab() {
   );
   const collapsedProfileGroups = useThemeStore((state) => state.collapsedProfileGroups);
   const toggleCollapsedProfileGroup = useThemeStore((state) => state.toggleCollapsedProfileGroup);
+  const { isProfileHidden } = useHiddenProfilesStore();
 
   const tabRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -181,6 +183,9 @@ export function ProfilesTab() {
 
   const allProfiles = profiles;
   const initiallyFilteredProfiles = allProfiles.filter((profile) => {
+    // Hide filter - exclude hidden profiles
+    if (isProfileHidden(profile.id)) return false;
+    
     if (
       searchQuery &&
       !profile.name.toLowerCase().includes(searchQuery.toLowerCase())

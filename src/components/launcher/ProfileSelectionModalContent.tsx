@@ -2,6 +2,7 @@
 import { Icon } from "@iconify/react";
 import { useVersionSelectionStore } from "../../store/version-selection-store";
 import { useProfileStore } from "../../store/profile-store";
+import { useHiddenProfilesStore } from "../../store/useHiddenProfilesStore";
 import type { Profile } from "../../types/profile";
 import { ProfileCard } from "../profiles/ProfileCard";
 import { VirtuosoGrid } from "react-virtuoso";
@@ -23,6 +24,7 @@ export function ProfileSelectionModalContent({
 }: ProfileSelectionModalContentProps) {
   const { setSelectedVersion } = useVersionSelectionStore();
   const { profiles, loading: profilesLoading, error: profilesError, fetchProfiles, deleteProfile } = useProfileStore();
+  const { isProfileHidden } = useHiddenProfilesStore();
 
   // Export modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -113,17 +115,24 @@ export function ProfileSelectionModalContent({
         <div className="text-center p-4 text-white/60 font-minecraft text-2xl lowercase tracking-wide select-none">
           no profiles available
         </div>
-      ) : (
-        <VirtuosoGrid
-          totalCount={profiles.length}
-          style={{ height: "60vh" }} // Max height is controlled by Virtuoso
-          className="custom-scrollbar" // Apply custom scrollbar style
-          components={{
-            List: GridList,
-            Item: GridItem,
-          }}
-          itemContent={(index) => {
-            const profile = profiles[index];
+      ) : (() => {
+        const visibleProfiles = profiles.filter(profile => !isProfileHidden(profile.id));
+        
+        return visibleProfiles.length === 0 ? (
+          <div className="text-center p-4 text-white/60 font-minecraft text-2xl lowercase tracking-wide select-none">
+            no profiles available
+          </div>
+        ) : (
+          <VirtuosoGrid
+            totalCount={visibleProfiles.length}
+            style={{ height: "60vh" }}
+            className="custom-scrollbar"
+            components={{
+              List: GridList,
+              Item: GridItem,
+            }}
+            itemContent={(index) => {
+              const profile = visibleProfiles[index];
             return (
               <ProfileCard
                 key={profile.id}
@@ -139,7 +148,8 @@ export function ProfileSelectionModalContent({
             );
           }}
         />
-      )}
+        );
+      })()}
 
       {/* Export Profile Modal */}
       {profileToExport && (
