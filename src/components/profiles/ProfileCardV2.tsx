@@ -18,6 +18,7 @@ import { useProfileLaunch } from "../../hooks/useProfileLaunch.tsx";
 import { Tooltip } from "../ui/Tooltip";
 import UnifiedService from "../../services/unified-service";
 import { useProfileStore } from "../../store/profile-store";
+import { useHiddenProfilesStore } from "../../store/useHiddenProfilesStore";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -60,8 +61,10 @@ export function ProfileCardV2({
   onOpenFolder,
   layoutMode = "list",
 }: ProfileCardV2Props) {
+  const { hideProfile, showProfile, isProfileHidden } = useHiddenProfilesStore();
   const [isHovered, setIsHovered] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
   
   // Settings context menu state
@@ -73,6 +76,7 @@ export function ProfileCardV2({
   // Modpack versions state for conditional rendering
   const [modpackVersions, setModpackVersions] = useState(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [hasNewVersion, setHasNewVersion] = useState(false);
   
   // Profile settings store
   const { openModal } = useProfileSettingsStore();
@@ -166,6 +170,22 @@ export function ProfileCardV2({
         }
       },
     }] : []),
+    // Hide/Show option for standard profiles
+    ...(profile.is_standard_version ? [{
+      id: "hide_show",
+      label: isProfileHidden(profile.id) ? "Show Profile" : "Hide Profile",
+      icon: isProfileHidden(profile.id) ? "solar:eye-bold" : "solar:eye-closed-bold",
+      separator: true,
+      onClick: (profile) => {
+        if (isProfileHidden(profile.id)) {
+          showProfile(profile.id);
+          toast.success(`👁️ Profile "${profile.name}" shown`);
+        } else {
+          hideProfile(profile.id);
+          toast.success(`👁️ Profile "${profile.name}" hidden`);
+        }
+      },
+    }] : []),
     {
       id: "delete",
       label: "Delete",
@@ -209,16 +229,28 @@ export function ProfileCardV2({
     if (profile.modpack_info?.source) {
       setIsLoadingVersions(true);
       UnifiedService.getModpackVersions(profile.modpack_info.source)
-        .then(setModpackVersions)
+        .then(versions => {
+          setModpackVersions(versions);
+          
+          // Use the backend's updates_available logic instead of manual comparison
+          if (versions && typeof versions.updates_available === 'boolean') {
+            setHasNewVersion(versions.updates_available);
+            console.log(`Profile ${profile.name}: Backend says updates_available=${versions.updates_available}`);
+          } else {
+            setHasNewVersion(false);
+          }
+        })
         .catch(err => {
           console.error("Failed to load modpack versions:", err);
           setModpackVersions(null);
+          setHasNewVersion(false);
         })
         .finally(() => setIsLoadingVersions(false));
     } else {
       setModpackVersions(null);
+      setHasNewVersion(false);
     }
-  }, [profile.modpack_info?.source]);
+  }, [profile.modpack_info?.source, profile.modpack_info?.version_number]);
 
 
 
@@ -409,6 +441,8 @@ export function ProfileCardV2({
           </div>
         )}
 
+
+
         {/* Action buttons - top right */}
         <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
           {/* Settings button */}
@@ -466,6 +500,55 @@ export function ProfileCardV2({
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
           </button>
         </div>
+
+        {/* NEW UPDATE Text - outside avatar, top right corner */}
+        {profile.modpack_info?.source && !profile.is_standard_version && hasNewVersion && (
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              // Open modpack versions modal
+              if (profile.modpack_info?.source && modpackVersions) {
+                import("../modals/ModpackVersionsModal").then(({ ModpackVersionsModal }) => {
+                  showModal(`modpack-versions-${profile.id}`, (
+                    <ModpackVersionsModal
+                      isOpen={true}
+                      onClose={() => hideModal(`modpack-versions-${profile.id}`)}
+                      versions={modpackVersions}
+                      modpackName={profile.name}
+                      profileId={profile.id}
+                      onSwitchComplete={async () => {
+                        console.log("Modpack version switched successfully for:", profile.name);
+                        // Refresh profiles to ensure the profile prop is updated
+                        try {
+                          const { fetchProfiles } = useProfileStore.getState();
+                          await fetchProfiles();
+                        } catch (err) {
+                          console.error("Failed to refresh profiles after modpack switch:", err);
+                        }
+                      }}
+                    />
+                  ));
+                });
+              } else {
+                toast.success(`🆕 Checking for updates for ${profile.name}!`);
+                console.log("Checking for updates for profile:", profile.name);
+              }
+            }}
+            className={`absolute ${isCompact ? 'top-1 left-2' : 'top-1 left-3'} cursor-pointer transition-all duration-200 hover:scale-105 z-20`}
+            style={{
+              animation: 'pulse-scale 1.5s ease-in-out infinite',
+            }}
+            title="Check for Updates"
+          >
+            <span className="text-[8px] font-minecraft-ten text-green-400 font-bold leading-none whitespace-nowrap" style={{ 
+              textShadow: '1px 1px 0px #000, -1px -1px 0px #000, 1px -1px 0px #000, -1px 1px 0px #000' 
+            }}>
+              NEW UPDATE
+            </span>
+          </div>
+        )}
 
         {/* Profile content */}
         <div className={`flex items-center ${isCompact ? 'gap-3' : 'gap-4'} relative z-10 w-full`}>
@@ -693,6 +776,7 @@ export function ProfileCardV2({
         useFlexSpacer={true}
         flexSpacerAfterIndex={1}
       />
+
 
              {/* Settings Context Menu */}
        <SettingsContextMenu

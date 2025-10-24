@@ -66,8 +66,9 @@ export async function launchProfile(
 ): Promise<void> {
   return invoke<void>("launch_profile", { 
     id, 
-    quickPlaySingleplayer, 
-    quickPlayMultiplayer 
+    quick_play_singleplayer: quickPlaySingleplayer, 
+    quick_play_multiplayer: quickPlayMultiplayer,
+    migration_info: null
   });
 }
 
