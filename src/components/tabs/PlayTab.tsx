@@ -12,6 +12,7 @@ import {
   BACKGROUND_EFFECTS,
   useBackgroundEffectStore,
 } from "../../store/background-effect-store";
+import { useSkinVisibilityStore } from "../../store/useSkinVisibilityStore";
 
 export function PlayTab() {
   const {
@@ -36,6 +37,7 @@ export function PlayTab() {
     const profileToSelect = profiles.find((p) => p.id === versionId) || null;
     setSelectedProfile(profileToSelect);
   };
+
 
   const currentDisplayProfile =
     storeSelectedProfile || (profiles.length > 0 ? profiles[0] : null);
@@ -83,6 +85,7 @@ export function PlayTab() {
             launchButtonVersions={versions}
             className=""
           />
+
         </div>
       </div>
 

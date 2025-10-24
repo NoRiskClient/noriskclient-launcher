@@ -49,9 +49,9 @@ export async function launch(
 
   return invoke<void>("launch_profile", {
     id,
-    quickPlaySingleplayer,
-    quickPlayMultiplayer,
-    migrationInfo
+    quick_play_singleplayer: quickPlaySingleplayer,
+    quick_play_multiplayer: quickPlayMultiplayer,
+    migration_info: migrationInfo
   });
 }
 

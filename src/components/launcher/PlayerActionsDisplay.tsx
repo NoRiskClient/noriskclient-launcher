@@ -5,9 +5,11 @@ import { cn } from '../../lib/utils';
 import { SkinViewer } from './SkinViewer';
 import { MainLaunchButton } from './MainLaunchButton';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useSkinVisibilityStore } from '../../store/useSkinVisibilityStore';
 import { MinecraftSkinService } from '../../services/minecraft-skin-service';
 import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { Icon } from '@iconify/react';
 
 const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
 
@@ -35,6 +37,7 @@ export function PlayerActionsDisplay({
   displayMode = 'playerName',
 }: PlayerActionsDisplayProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
+  const { isSkinVisible, toggleSkinVisibility } = useSkinVisibilityStore();
   const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
 
   useEffect(() => {
@@ -99,23 +102,36 @@ export function PlayerActionsDisplay({
           }}
         />
       ) : (
-        <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
-          {playerName || "no account"}
-        </h2>
+        isSkinVisible && (
+          <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
+            {playerName || "no account"}
+          </h2>
+        )
       )}
 
       <div className={cn(
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <SkinViewer
-          skinUrl={resolvedSkinUrl} 
-          playerName={playerName?.toString()} 
-          width={skinViewerMaxDisplayWidth} 
-          height={skinViewerDisplayHeight} 
-          className="bg-transparent flex-shrink-0"
-          style={skinViewerStyles}
-        />
+
+        {isSkinVisible ? (
+          <SkinViewer
+            skinUrl={resolvedSkinUrl} 
+            playerName={playerName?.toString()} 
+            width={skinViewerMaxDisplayWidth} 
+            height={skinViewerDisplayHeight} 
+            className="bg-transparent flex-shrink-0"
+            style={skinViewerStyles}
+          />
+        ) : (
+          <div 
+            className="bg-transparent flex-shrink-0"
+            style={{ 
+              width: skinViewerMaxDisplayWidth, 
+              height: skinViewerDisplayHeight 
+            }}
+          />
+        )}
 
         <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
           <div className="max-w-xs sm:max-w-sm">
