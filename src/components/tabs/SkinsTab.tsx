@@ -18,11 +18,16 @@ import { SkinViewer } from "../launcher/SkinViewer";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useSkinStore } from "../../store/useSkinStore";
+import { useSkinFavoritesStore } from "../../store/useSkinFavoritesStore";
+import { useSkinFoldersStore } from "../../store/useSkinFoldersStore";
 import { toast } from "react-hot-toast";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
+import { CreateFolderModal } from "../modals/CreateFolderModal";
+import { MoveToFolderModal } from "../modals/MoveToFolderModal";
+import { FolderCard } from "../skins/FolderCard";
 import { cn } from "../../lib/utils";
 
 const SkinPreview = memo(
@@ -36,6 +41,10 @@ const SkinPreview = memo(
     onClick,
     onEditSkin,
     onDeleteSkin,
+    onMoveToFolder,
+    onDragStart,
+    draggable,
+    hideMoveButton,
   }: {
     skin: MinecraftSkin;
     index: number;
@@ -53,14 +62,20 @@ const SkinPreview = memo(
       skinName: string,
       event: React.MouseEvent<HTMLButtonElement>,
     ) => void;
+    onMoveToFolder?: (skin: MinecraftSkin) => void;
+    onDragStart?: (event: React.DragEvent<HTMLDivElement>) => void;
+    draggable?: boolean;
+    hideMoveButton?: boolean;
   }) => {
     const [isHovered, setIsHovered] = useState(false);
     const accentColor = useThemeStore((state) => state.accentColor);
     const isBackgroundAnimationEnabled = useThemeStore(
       (state) => state.isBackgroundAnimationEnabled,
     );
+    const { isFavorite, toggleFavorite } = useSkinFavoritesStore();
     const isSelected = selectedLocalSkin?.id === skin.id;
     const isDisabled = loading && isSelected;
+    const isSkinFavorite = isFavorite(skin.id);
 
     const [starlightRenderUrl, setStarlightRenderUrl] = useState<string | null>(
       null,
@@ -167,14 +182,36 @@ const SkinPreview = memo(
           animationClasses,
           isDisabled ? "opacity-60 pointer-events-none" : ""
         )}
-        onClick={() =>
-          !isDisabled && !isApplied && !isSelected && onClick(skin)
-        }
+        onClick={(e) => {
+          // Don't trigger click if we just finished dragging
+          if (e.defaultPrevented) return;
+          !isDisabled && !isApplied && !isSelected && onClick(skin);
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onDragStart={onDragStart}
+        draggable={draggable}
       >
         {/* Action buttons - top right */}
         <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
+          {/* Favorite button */}
+          <button
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              toggleFavorite(skin.id);
+            }}
+            className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+            title={isSkinFavorite ? "Unfavorite" : "Favorite"}
+            disabled={isDisabled}
+          >
+            <Icon
+              icon={isSkinFavorite ? "ph:heart-fill" : "ph:heart"}
+              className="w-4 h-4"
+              style={{ color: isSkinFavorite ? "#ef4444" : undefined }}
+            />
+          </button>
+
           {onEditSkin && (
             <button
               onClick={(event) => {
@@ -187,6 +224,21 @@ const SkinPreview = memo(
               disabled={isDisabled}
             >
               <Icon icon="solar:pen-bold" className="w-4 h-4" />
+            </button>
+          )}
+
+          {onMoveToFolder && !hideMoveButton && (
+            <button
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onMoveToFolder(skin);
+              }}
+              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              title="Move to folder"
+              disabled={isDisabled}
+            >
+              <Icon icon="solar:folder-bold" className="w-4 h-4" />
             </button>
           )}
 
@@ -379,6 +431,36 @@ export function SkinsTab() {
   } = useMinecraftAuthStore();
   const { showModal, hideModal } = useGlobalModal();
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
+  const { favoriteSkinIds, isFavorite } = useSkinFavoritesStore();
+  const { folders, addFolder, deleteFolder, addSkinToFolder, removeSkinFromFolder } = useSkinFoldersStore();
+
+  const showMoveToFolderModal = (skin: MinecraftSkin) => {
+    showModal('move-to-folder-modal', (
+      <MoveToFolderModal
+        isOpen={true}
+        skin={skin}
+        folders={folders}
+        onClose={() => hideModal('move-to-folder-modal')}
+        onMoveToFolder={(folderId) => {
+          folders.forEach(folder => {
+            if (folder.id !== folderId && folder.skin_ids.includes(skin.id)) {
+              removeSkinFromFolder(folder.id, skin.id);
+            }
+          });
+
+          addSkinToFolder(folderId, skin.id);
+          
+          const folderName = folders.find(f => f.id === folderId)?.name;
+          toast.success(`📁 Skin moved to folder "${folderName}"`);
+          hideModal('move-to-folder-modal');
+
+          setCurrentFolder(folderId);
+          setSearch("");
+          setShowFavoritesOnly(false);
+        }}
+      />
+    ));
+  };
   const [skinData, setSkinData] = useState<MinecraftProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [localSkins, setLocalSkins] = useState<MinecraftSkin[]>([]);
@@ -388,16 +470,38 @@ export function SkinsTab() {
     useState<MinecraftSkin | null>(null);
   const [search, setSearch] = useState<string>("");
   const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const filteredSkins = useMemo(() => {
-    if (!debouncedSearch.trim()) return localSkins;
-    return localSkins.filter((skin) =>
-      skin.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-    );
-  }, [localSkins, debouncedSearch]);
+    let filtered = localSkins;
+
+    if (debouncedSearch.trim()) {
+      filtered = filtered.filter((skin) =>
+        skin.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
+      );
+    }
+
+    if (showFavoritesOnly) {
+      filtered = filtered.filter((skin) => isFavorite(skin.id));
+    }
+
+    if (currentFolder) {
+      const folder = folders.find(f => f.id === currentFolder);
+      if (folder) {
+        filtered = filtered.filter((skin) => folder.skin_ids.includes(skin.id));
+      }
+    } else {
+      filtered = filtered.filter((skin) => {
+        return !folders.some(folder => folder.skin_ids.includes(skin.id));
+      });
+    }
+
+    return filtered;
+  }, [localSkins, debouncedSearch, showFavoritesOnly, isFavorite, favoriteSkinIds, currentFolder, folders]);
 
   const loadSkinData = useCallback(async () => {
     if (!activeAccount) return;
@@ -491,7 +595,13 @@ export function SkinsTab() {
     showModal('add-skin-modal', (
       <AddSkinModal
         skin={skin}
-        onSave={saveSkin}
+        onSave={async (newSkin) => {
+          await saveSkin(newSkin);
+          if (currentFolder && newSkin.id) {
+            addSkinToFolder(currentFolder, newSkin.id);
+            toast.success(`📁 Skin added to folder "${folders.find(f => f.id === currentFolder)?.name}"`);
+          }
+        }}
         onAdd={addSkin}
         isLoading={localSkinsLoading}
       />
@@ -656,12 +766,103 @@ export function SkinsTab() {
               />
             </div>
 
-            {/* Action Button */}
+            {/* Action Buttons */}
             <div className="flex items-center gap-3">
+              {/* Create Folder Button */}
+              <button
+                onClick={() => {
+                  showModal('create-folder-modal', (
+                    <CreateFolderModal
+                      isOpen={true}
+                      onClose={() => hideModal('create-folder-modal')}
+                      onCreateFolder={(folderName) => {
+                        addFolder(folderName);
+                        toast.success(`📁 Folder "${folderName}" created successfully!`);
+                        hideModal('create-folder-modal');
+                      }}
+                    />
+                  ));
+                }}
+                className="px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20"
+                title="Create New Folder"
+              >
+                <Icon icon="solar:folder-plus-bold" className="w-4 h-4" />
+                <span className="lowercase">folder</span>
+              </button>
+
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowFavoritesOnly(false)}
+                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                    !showFavoritesOnly
+                      ? 'text-white'
+                      : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
+                  }`}
+                  style={{
+                    backgroundColor: !showFavoritesOnly ? `${accentColor.value}20` : undefined,
+                    borderColor: !showFavoritesOnly ? accentColor.value : undefined,
+                  }}
+                >
+                  <span className="lowercase">all</span>
+                </button>
+
+                <button
+                  onClick={() => setShowFavoritesOnly(true)}
+                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                    showFavoritesOnly
+                      ? 'text-white'
+                      : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
+                  }`}
+                  style={{
+                    backgroundColor: showFavoritesOnly ? `${accentColor.value}20` : undefined,
+                    borderColor: showFavoritesOnly ? accentColor.value : undefined,
+                  }}
+                >
+                  <Icon 
+                    icon="ph:heart-fill" 
+                    className="w-5 h-5"
+                    style={{ color: "#ef4444" }}
+                  />
+                  <span className="lowercase">favorites</span>
+                  {favoriteSkinIds.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white/20 text-xs rounded">
+                      {favoriteSkinIds.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
               {activeAccount && addSkinButton}
             </div>
           </div>
         </div>
+
+        {/* Breadcrumb Navigation */}
+        {currentFolder && (
+          <div className="mb-4 pb-4 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setCurrentFolder(null);
+                  setSearch("");
+                  setShowFavoritesOnly(false);
+                }}
+                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-minecraft-ten text-sm"
+              >
+                <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
+                <span>Back to All Skins</span>
+              </button>
+              
+              <div className="w-px h-4 bg-white/30"></div>
+              
+              <div className="flex items-center gap-2 text-white font-minecraft-ten text-sm">
+                <Icon icon="solar:folder-bold" className="w-4 h-4 text-blue-400" />
+                <span>{folders.find(f => f.id === currentFolder)?.name}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="space-y-8">
@@ -701,15 +902,42 @@ export function SkinsTab() {
                 </p>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-                  <AddSkinCard
-                    index={0}
-                    onClick={() => startEditSkin(null, undefined)}
-                  />
+                  {/* Add Skin Card - only show when not in a folder */}
+                  {!currentFolder && (
+                    <AddSkinCard
+                      index={0}
+                      onClick={() => startEditSkin(null, undefined)}
+                    />
+                  )}
+                  
+                  {/* Folders - only show when not in a folder */}
+                  {!currentFolder && folders.map((folder, index) => (
+                    <FolderCard
+                      key={folder.id}
+                      folder={folder}
+                      onClick={() => {
+                        setCurrentFolder(folder.id);
+                        setSearch("");
+                        setShowFavoritesOnly(false);
+                      }}
+                      onDelete={(folderId, folderName) => {
+                        deleteFolder(folderId);
+                        toast.success(`📁 Folder "${folderName}" deleted`);
+                      }}
+                      onDrop={(folderId, skinId) => {
+                        addSkinToFolder(folderId, skinId);
+                        const folderName = folders.find(f => f.id === folderId)?.name;
+                        toast.success(`📁 Skin moved to folder "${folderName}"`);
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Skins */}
                   {filteredSkins.map((skin, index) => (
                     <SkinPreview
                       key={skin.id}
                       skin={skin}
-                      index={index + 1}
+                      index={index + (currentFolder ? 1 : folders.length + 1)}
                       loading={loading}
                       localSkinsLoading={localSkinsLoading}
                       selectedLocalSkin={selectedLocalSkin}
@@ -717,6 +945,14 @@ export function SkinsTab() {
                       onClick={applyLocalSkin}
                       onEditSkin={startEditSkin}
                       onDeleteSkin={handleDeleteSkin}
+                      onMoveToFolder={!currentFolder ? showMoveToFolderModal : undefined}
+                      hideMoveButton={currentFolder !== null}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", skin.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      draggable={true} // Always draggable
                     />
                   ))}
                 </div>
