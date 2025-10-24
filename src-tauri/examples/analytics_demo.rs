@@ -39,7 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         request_timeout_secs: 10,
     };
     
-    let manager = AnalyticsManager::new(config);
+    let temp_dir = std::env::temp_dir().join("analytics_demo");
+    let manager = AnalyticsManager::new(config, temp_dir);
     println!("Analytics manager initialized\n");
 
     println!("Sending demo events...\n");
