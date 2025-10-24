@@ -4,6 +4,7 @@
     windows_subsystem = "windows"
 )]
 
+mod analytics;
 mod commands;
 mod config;
 mod error;
@@ -360,6 +361,11 @@ async fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+        commands::analytics_command::get_analytics_stats,
+        commands::analytics_command::get_analytics_event_count,
+        commands::analytics_command::get_all_analytics_events,
+        commands::image_command::load_image_as_base64,
+            commands::analytics_test_command::test_analytics_event,
             create_profile,
             get_profile,
             update_profile,

@@ -81,6 +81,27 @@ pub async fn install_minecraft_version(
     let is_experimental_mode = state.config_manager.is_experimental_mode().await;
     let launcher_config = state.config_manager.get_config().await;
 
+    // Track profile launch event via Analytics
+    info!("======================================");
+    info!("[Analytics] TRACKING PROFILE LAUNCH from installer");
+    info!("[Analytics] Profile: {}", profile.name);
+    info!("[Analytics] Game Version: {}", version_id);
+    info!("[Analytics] Loader: {:?}", modloader_enum);
+    info!("======================================");
+    
+    state.analytics_manager.event("profile_launched")
+        .property("profile_id", profile.id.to_string())
+        .property("profile_name", &profile.name)
+        .property("game_version", version_id)
+        .property("loader", format!("{:?}", modloader_enum))
+        .property("loader_version", profile.loader_version.as_deref().unwrap_or("unknown"))
+        .property("has_norisk_pack", profile.selected_norisk_pack_id.is_some())
+        .property("mod_count", profile.mods.len())
+        .property("experimental_mode", is_experimental_mode)
+        .send();
+    
+    info!("[Analytics] profile_launched event sent");
+
     info!(
         "[Launch] Setting experimental mode: {}",
         is_experimental_mode
