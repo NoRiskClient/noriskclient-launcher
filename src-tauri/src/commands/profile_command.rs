@@ -164,6 +164,7 @@ pub async fn launch_profile(
     quick_play_multiplayer: Option<String>,
     migration_info: Option<profile_utils::MigrationInfo>,
 ) -> Result<(), CommandError> {
+    log::info!("=== NEW VERSION WITH ANALYTICS ===");
     log::info!(
         "[Command] launch_profile called for ID: {}. QuickPlay Single: {:?}, QuickPlay Multi: {:?}, Migration: {:?}",
         id,
@@ -235,6 +236,18 @@ pub async fn launch_profile(
             standard_profile.clone()
         }
     };
+
+    // Track profile launch event EARLY (before any checks that might fail)
+    // This ensures we capture ALL launch attempts
+    log::info!("======================================");
+    log::info!("[Analytics] TRACKING PROFILE LAUNCH ATTEMPT");
+    log::info!("[Analytics] Profile: {}", profile.name);
+    log::info!("[Analytics] Game Version: {}", profile.game_version);
+    log::info!("[Analytics] Loader: {:?}", profile.loader);
+    log::info!("======================================");
+    
+    // Analytics event will be sent in installer.rs to avoid duplication
+    log::info!("[Analytics] profile_launched event will be sent from installer");
 
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
