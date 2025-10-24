@@ -24,6 +24,7 @@ import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
+import CustomImageBackground from "../effects/CustomImageBackground";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
@@ -64,7 +65,7 @@ export function AppLayout({
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
-  const { currentEffect } = useBackgroundEffectStore();
+  const { currentEffect, customBackgroundImage, backgroundImageOpacity, backgroundImageBlur, backgroundImageScale } = useBackgroundEffectStore();
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
 
@@ -253,6 +254,15 @@ export function AppLayout({
         );
       case BACKGROUND_EFFECTS.PLAIN_BACKGROUND:
         return <PlainBackground accentColorValue={themeAccentColor.value} />;
+      case BACKGROUND_EFFECTS.CUSTOM_IMAGE:
+        return (
+          <CustomImageBackground
+            imagePath={customBackgroundImage}
+            opacity={backgroundImageOpacity}
+            blur={backgroundImageBlur}
+            scale={backgroundImageScale}
+          />
+        );
       default:
         return (
           <div className="absolute inset-0 bg-red-500/20">
@@ -267,10 +277,10 @@ export function AppLayout({
       ref={launcherRef}
       className="h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]"
       style={{
-        backgroundColor: backgroundColor,
+        backgroundColor: currentEffect === BACKGROUND_EFFECTS.CUSTOM_IMAGE ? 'transparent' : backgroundColor,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundImage: `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
+        backgroundImage: currentEffect === BACKGROUND_EFFECTS.CUSTOM_IMAGE ? 'none' : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         borderColor: `${themeAccentColor.value}30`,
         boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
       }}
@@ -295,7 +305,7 @@ export function AppLayout({
         <div className="flex-1 relative overflow-hidden">
           {renderBackgroundEffect()}
 
-          <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
+          <div className="relative z-20 h-full overflow-hidden custom-scrollbar">
             {children}
           </div>
         </div>

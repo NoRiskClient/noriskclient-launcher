@@ -51,6 +51,7 @@ export function MainLaunchButton({
   // Use the profile launch hook for launch logic
   const { handleLaunch: hookHandleLaunch, isLaunching, statusMessage, launchState } = useProfileLaunch({
     profileId: selectedVersion,
+    profileName: selectedVersionLabel,
     onLaunchSuccess: () => {
       setTransientSuccessActive(true);
       setTimeout(() => {

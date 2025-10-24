@@ -19,6 +19,7 @@ import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
 import { ThemedSurface } from "../../ui/ThemedSurface";
+import { useThemeStore } from "../../../store/useThemeStore";
 
 type Profile = any;
 
@@ -191,14 +192,16 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     onDeleteVersionClick,
     onToggleEnableClick,
     itemIndex,
-  }) => {
-    useEffect(() => {
-      preloadIcons([
-        "solar:download-minimalistic-bold",
-        "solar:alt-arrow-up-bold",
-        "solar:alt-arrow-down-bold",
-      ]);
-    }, []);
+   }) => {
+     const borderRadius = useThemeStore((state) => state.borderRadius);
+     
+     useEffect(() => {
+       preloadIcons([
+         "solar:download-minimalistic-bold",
+         "solar:alt-arrow-up-bold",
+         "solar:alt-arrow-down-bold",
+       ]);
+     }, []);
 
     return (
       <div>
@@ -233,6 +236,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             <span>{hit.downloads.toLocaleString()}</span>
           </div>
         </div>
+
 
         {/* Project Icon */}
         <div
