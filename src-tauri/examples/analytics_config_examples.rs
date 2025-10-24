@@ -178,7 +178,8 @@ async fn main() {
     println!("{}", "-".repeat(70));
     println!("   Configuration can be updated at runtime without restart:\n");
     
-    let manager = AnalyticsManager::new(plausible_config.clone());
+    let temp_dir = std::env::temp_dir().join("analytics_config_examples");
+    let manager = AnalyticsManager::new(plausible_config.clone(), temp_dir);
     println!("   - Manager created with Plausible config");
 
     manager.update_config(norisk_api_config.clone()).await;
