@@ -20,6 +20,8 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { Icon } from "@iconify/react";
+import { useRecentProfilesStore } from "../../store/useRecentProfilesStore";
+import { useHiddenProfilesStore } from "../../store/useHiddenProfilesStore";
 
 export function ProfilesTabV2() {
   const {
@@ -31,6 +33,7 @@ export function ProfilesTabV2() {
   const navigate = useNavigate();
   const { confirm, confirmDialog } = useConfirmDialog();
   const { openModal: openWizard } = useProfileWizardStore();
+  const { isProfileHidden, showHiddenProfiles, toggleShowHiddenProfiles } = useHiddenProfilesStore();
 
   // Global modal system
   const { showModal, hideModal } = useGlobalModal();
@@ -49,6 +52,10 @@ export function ProfilesTabV2() {
   
   // Local non-persistent state
   const [searchQuery, setSearchQuery] = useState("");
+  const [showRecentOnly, setShowRecentOnly] = useState(false);
+  
+  // Recent profiles
+  const { getRecentProfiles } = useRecentProfilesStore();
   
   // Use persistent values instead of local state
   const activeGroup = profilesTabActiveGroup;
@@ -256,8 +263,13 @@ export function ProfilesTabV2() {
     );
   }
 
-  // Filter profiles based on search query, active group, and version filter
+  // Filter profiles based on search query, active group, version filter, recent filter, and hidden status
   const filteredProfiles = profiles.filter((profile) => {
+    // Hidden filter - show only hidden profiles when showHiddenProfiles is true
+    const isHidden = isProfileHidden(profile.id);
+    if (showHiddenProfiles && !isHidden) return false;
+    if (!showHiddenProfiles && isHidden) return false;
+    
     // Search filter
     const matchesSearch = searchQuery === "" || 
       profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -274,7 +286,10 @@ export function ProfilesTabV2() {
     const matchesVersion = versionFilter === "all" || 
       profile.game_version?.includes(versionFilter);
     
-    return matchesSearch && matchesGroup && matchesVersion;
+    // Recent filter
+    const matchesRecent = !showRecentOnly || getRecentProfiles().some(recent => recent.id === profile.id);
+    
+    return matchesSearch && matchesGroup && matchesVersion && matchesRecent;
   });
 
   // Sort filtered profiles
@@ -346,6 +361,34 @@ export function ProfilesTabV2() {
               filterValue={versionFilter}
               onFilterChange={setProfilesTabVersionFilter}
             />
+            
+            {/* Recent Filter Button */}
+            <button
+              onClick={() => setShowRecentOnly(!showRecentOnly)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 min-h-[2.5rem] ${
+                showRecentOnly 
+                  ? "bg-white/10 border-white/30 text-white" 
+                  : "bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20"
+              }`}
+              title={showRecentOnly ? "Show all profiles" : "Show only recently launched profiles"}
+            >
+              <Icon icon="solar:clock-circle-bold" className="w-4 h-4" />
+              Recent
+            </button>
+            
+            {/* Show Hidden Profiles Button */}
+            <button
+              onClick={toggleShowHiddenProfiles}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 min-h-[2.5rem] ${
+                showHiddenProfiles 
+                  ? "bg-white/10 border-white/30 text-white" 
+                  : "bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20"
+              }`}
+              title={showHiddenProfiles ? "Show all profiles" : "Show only hidden profiles"}
+            >
+              <Icon icon={showHiddenProfiles ? "solar:eye-closed-bold" : "solar:eye-bold"} className="w-4 h-4" />
+              {showHiddenProfiles ? "Only Hidden" : "Hidden"}
+            </button>
             
                          {/* Layout Toggle Button - Right next to SearchWithFilters */}
                          <button

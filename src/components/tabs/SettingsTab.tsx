@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import { Card } from ".././ui/Card";
+import CustomImagePreview from "../ui/CustomImagePreview";
 import { ToggleSwitch } from ".././ui/ToggleSwitch";
 import { Input } from ".././ui/Input";
 import { ColorPicker } from ".././ColorPicker";
@@ -15,6 +16,7 @@ import {
   BACKGROUND_EFFECTS,
   useBackgroundEffectStore,
 } from "../../store/background-effect-store";
+import { useSkinVisibilityStore } from "../../store/useSkinVisibilityStore";
 import {
   type QualityLevel,
   useQualitySettingsStore,
@@ -87,7 +89,19 @@ export function SettingsTab() {
     toggleStaticBackground,
     toggleBackgroundAnimation,
   } = useThemeStore();
-  const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
+  const { 
+    currentEffect, 
+    setCurrentEffect, 
+    customBackgroundImage, 
+    setCustomBackgroundImage, 
+    backgroundImageOpacity, 
+    setBackgroundImageOpacity, 
+    backgroundImageBlur, 
+    setBackgroundImageBlur,
+    backgroundImageScale,
+    setBackgroundImageScale 
+  } = useBackgroundEffectStore();
+  const { isSkinVisible, toggleSkinVisibility } = useSkinVisibilityStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
   const { borderRadius, setBorderRadius } = useThemeStore();
 
@@ -151,6 +165,11 @@ export function SettingsTab() {
       id: BACKGROUND_EFFECTS.PLAIN_BACKGROUND,
       name: "Plain Color",
       icon: "solar:palette-bold",
+    },
+    {
+      id: BACKGROUND_EFFECTS.CUSTOM_IMAGE,
+      name: "Custom Image",
+      icon: "solar:gallery-bold",
     },
   ];
 
@@ -452,6 +471,43 @@ export function SettingsTab() {
         ]}
         disabled={saving}
       />
+
+      {/* Skin Visibility */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Icon icon="solar:eye-bold" className="w-6 h-6 text-white" />
+          <h3 className="text-3xl font-minecraft text-white">
+            Skin Visibility
+          </h3>
+        </div>
+        <p className="text-base text-white/70 font-minecraft-ten mt-2">
+          Show or hide your Minecraft skin in the launcher
+        </p>
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between p-4 bg-black/20 border border-white/10 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Icon 
+              icon={isSkinVisible ? "solar:eye-bold" : "solar:eye-closed-bold"} 
+              className="w-6 h-6 text-white" 
+            />
+            <div>
+              <h4 className="text-lg font-minecraft text-white">
+                Show Skin in Launcher
+              </h4>
+              <p className="text-sm text-white/60 font-minecraft-ten">
+                {isSkinVisible ? "Your skin is currently visible" : "Your skin is currently hidden"}
+              </p>
+            </div>
+          </div>
+          <ToggleSwitch
+            checked={isSkinVisible}
+            onChange={toggleSkinVisibility}
+            size="lg"
+          />
+        </div>
+      </div>
     </div>
   );
 
@@ -517,6 +573,157 @@ export function SettingsTab() {
           ))}
         </div>
       </div>
+
+      {/* Custom Image Settings */}
+      {currentEffect === BACKGROUND_EFFECTS.CUSTOM_IMAGE && (
+        <div className="mt-8 p-6 bg-black/20 border border-white/10 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon icon="solar:gallery-bold" className="w-6 h-6 text-white" />
+              <h3 className="text-2xl font-minecraft text-white">
+                Custom Background Image
+              </h3>
+            </div>
+            <p className="text-base text-white/70 font-minecraft-ten">
+              Choose a custom image for your launcher background
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Image Selection */}
+            <div>
+              <label className="block text-lg font-minecraft text-white mb-2">
+                Select Image
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={customBackgroundImage || ""}
+                  placeholder="No image selected"
+                  className="flex-1 p-3 rounded-md bg-black/40 border border-white/20 text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+                  disabled={saving}
+                  readOnly
+                />
+                {customBackgroundImage && (
+                  <Button
+                    variant="ghost"
+                    className="px-4 py-3 border border-white/20 hover:bg-red-500/20 hover:border-red-500/30 transition-colors"
+                    disabled={saving}
+                    onClick={() => setCustomBackgroundImage(null)}
+                    title="Remove image"
+                  >
+                    <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-red-400" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  className="px-4 py-3 border border-white/20 hover:bg-white/5 transition-colors"
+                  disabled={saving}
+                  onClick={async () => {
+                    try {
+                      const { open } = await import('@tauri-apps/plugin-dialog');
+                      const file = await open({
+                        multiple: false,
+                        defaultPath: "C:\\Users\\olesc\\AppData\\Roaming\\norisk\\NoRiskClientV3\\backgrounds",
+                        filters: [
+                          {
+                            name: 'Images',
+                            extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
+                          }
+                        ]
+                      });
+
+                      if (file && typeof file === 'string') {
+                        setCustomBackgroundImage(file);
+                        toast.success("Custom background image selected!");
+                      }
+                    } catch (error) {
+                      console.error('Error selecting image:', error);
+                      toast.error("Failed to select image");
+                    }
+                  }}
+                  title="Select image file"
+                >
+                  <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="px-4 py-3 border border-white/20 hover:bg-white/5 transition-colors"
+                  disabled={saving}
+                  onClick={async () => {
+                    try {
+                      const { open } = await import('@tauri-apps/plugin-dialog');
+                      await open({
+                        directory: true,
+                        defaultPath: "C:\\Users\\olesc\\AppData\\Roaming\\norisk\\NoRiskClientV3\\backgrounds"
+                      });
+                    } catch (error) {
+                      console.error('Error opening folder:', error);
+                      toast.error("Failed to open folder");
+                    }
+                  }}
+                  title="Open backgrounds folder"
+                >
+                  <Icon icon="solar:folder-bold" className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+
+
+            {/* Image Settings */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-lg font-minecraft text-white mb-2">
+                  Opacity: {Math.round(backgroundImageOpacity * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1"
+                  step="0.1"
+                  value={backgroundImageOpacity}
+                  onChange={(e) => setBackgroundImageOpacity(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <label className="block text-lg font-minecraft text-white mb-2">
+                  Blur: {backgroundImageBlur}px
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={backgroundImageBlur}
+                  onChange={(e) => setBackgroundImageBlur(parseInt(e.target.value))}
+                  className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <label className="block text-lg font-minecraft text-white mb-2">
+                  Scale: {Math.round(backgroundImageScale * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3"
+                  step="0.1"
+                  value={backgroundImageScale}
+                  onChange={(e) => setBackgroundImageScale(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
