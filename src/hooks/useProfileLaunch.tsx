@@ -12,9 +12,11 @@ import { useGlobalModal } from "./useGlobalModal";
 import { GroupMigrationModal } from "../components/modals/GroupMigrationModal";
 import { checkForGroupMigration } from "../services/profile-service";
 import { MigrationInfo } from "../types/profile";
+import { useRecentProfilesStore } from "../store/useRecentProfilesStore";
 
 interface UseProfileLaunchOptions {
   profileId: string;
+  profileName?: string;
   quickPlaySingleplayer?: string;
   quickPlayMultiplayer?: string;
   onLaunchSuccess?: () => void;
@@ -22,10 +24,11 @@ interface UseProfileLaunchOptions {
 }
 
 export function useProfileLaunch(options: UseProfileLaunchOptions) {
-  const { profileId, quickPlaySingleplayer, quickPlayMultiplayer, onLaunchSuccess, onLaunchError } = options;
+  const { profileId, profileName, quickPlaySingleplayer, quickPlayMultiplayer, onLaunchSuccess, onLaunchError } = options;
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { showModal, hideModal } = useGlobalModal();
+  const { addRecentProfile } = useRecentProfilesStore();
 
 
   const {
@@ -61,6 +64,11 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               console.log(`[useProfileLaunch] LaunchSuccessful event for ${profileId}`);
               finalizeButtonLaunch(profileId);
               setButtonStatusMessage(profileId, "STARTING!");
+
+              if (profileName) {
+                addRecentProfile(profileId, profileName);
+              }
+              
               setTimeout(() => {
                 setButtonStatusMessage(profileId, null);
               }, 3000);
