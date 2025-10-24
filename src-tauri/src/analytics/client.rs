@@ -1,6 +1,6 @@
 use super::config::{AnalyticsConfig, PayloadFormat};
 use super::event::AnalyticsEvent;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use reqwest::Client;
 use serde_json::json;
 use std::time::Duration;
@@ -28,11 +28,11 @@ impl AnalyticsClient {
 
     pub async fn send_batch(&self, events: Vec<AnalyticsEvent>) -> Result<(), String> {
         if events.is_empty() {
-            debug!("No events to send");
+            debug!("[Analytics Client] No events to send");
             return Ok(());
         }
 
-        debug!("Preparing to send {} events", events.len());
+        info!("[Analytics Client] Preparing {} events for {}", events.len(), self.config.endpoint_url);
 
         let payload = self.format_payload(&events)?;
 
@@ -118,24 +118,27 @@ impl AnalyticsClient {
     }
 
     async fn send_request(&self, payload: serde_json::Value) -> Result<(), String> {
-        debug!("Sending request to: {}", self.config.endpoint_url);
-        debug!("Payload: {}", serde_json::to_string_pretty(&payload).unwrap_or_default());
+        info!("[Analytics Client] POST {}", self.config.endpoint_url);
+        info!("[Analytics Client] Payload:\n{}", serde_json::to_string_pretty(&payload).unwrap_or_default());
 
         let mut request = self
             .http_client
             .post(&self.config.endpoint_url)
             .json(&payload);
 
+        info!("[Analytics Client] Adding {} headers", self.config.headers.len());
         for (key, value) in &self.config.headers {
             request = request.header(key, value);
         }
 
+        info!("[Analytics Client] Sending request...");
         match request.send().await {
             Ok(response) => {
                 let status = response.status();
+                info!("[Analytics Client] Response status: {}", status);
 
                 if status.is_success() {
-                    debug!("Analytics request successful (status: {})", status);
+                    info!("[Analytics Client] SUCCESS!");
                     Ok(())
                 } else {
                     let error_body = response
@@ -144,7 +147,7 @@ impl AnalyticsClient {
                         .unwrap_or_else(|_| "<unable to read body>".to_string());
 
                     error!(
-                        "Analytics request failed with status {}: {}",
+                        "[Analytics Client] FAILED status {}: {}",
                         status, error_body
                     );
 
@@ -155,7 +158,7 @@ impl AnalyticsClient {
                 }
             }
             Err(e) => {
-                error!("Failed to send analytics request: {}", e);
+                error!("[Analytics Client] Network error: {}", e);
                 Err(format!("Network error: {}", e))
             }
         }
