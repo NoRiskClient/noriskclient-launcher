@@ -1,6 +1,7 @@
 use super::client::AnalyticsClient;
 use super::config::AnalyticsConfig;
 use super::event::{AnalyticsEvent, EventBuilder};
+use super::storage::AnalyticsStorage;
 use log::{debug, error, info, warn};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -11,6 +12,8 @@ use uuid::Uuid;
 pub struct AnalyticsManager {
     config: Arc<Mutex<AnalyticsConfig>>,
 
+    storage: Arc<AnalyticsStorage>,
+
     event_sender: mpsc::UnboundedSender<AnalyticsEvent>,
 
     session_id: String,
@@ -19,7 +22,7 @@ pub struct AnalyticsManager {
 }
 
 impl AnalyticsManager {
-    pub fn new(config: AnalyticsConfig) -> Self {
+    pub fn new(config: AnalyticsConfig, storage_dir: std::path::PathBuf) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         let session_id = Uuid::new_v4().to_string();
 
@@ -30,11 +33,22 @@ impl AnalyticsManager {
             session_id, config.enabled
         );
 
+        let storage = Arc::new(AnalyticsStorage::new(storage_dir.clone()));
+        
+        // Initialize storage async
+        let storage_clone = storage.clone();
+        tokio::spawn(async move {
+            if let Err(e) = storage_clone.init().await {
+                error!("Failed to initialize analytics storage: {}", e);
+            }
+        });
+
         let config_arc = Arc::new(Mutex::new(config.clone()));
-        tokio::spawn(Self::event_processor(rx, config_arc.clone()));
+        tokio::spawn(Self::event_processor(rx, config_arc.clone(), storage.clone()));
 
         Self {
             config: config_arc,
+            storage,
             event_sender: tx,
             session_id,
             user_id,
@@ -63,8 +77,11 @@ impl AnalyticsManager {
     }
 
     pub fn track(&self, name: impl Into<String>) {
+        let event_name = name.into();
+        info!("[Analytics] Tracking event: {}", event_name);
+        
         let event = AnalyticsEvent {
-            name: name.into(),
+            name: event_name,
             timestamp: chrono::Utc::now(),
             properties: HashMap::new(),
             session_id: Some(self.session_id.clone()),
@@ -98,8 +115,11 @@ impl AnalyticsManager {
     }
 
     fn send_event(&self, event: AnalyticsEvent) {
-        if let Err(e) = self.event_sender.send(event) {
-            error!("Failed to queue analytics event: {}", e);
+        info!("[Analytics] Queueing event '{}' to background processor", event.name);
+        if let Err(e) = self.event_sender.send(event.clone()) {
+            error!("[Analytics] Failed to queue event: {}", e);
+        } else {
+            info!("[Analytics] Event '{}' successfully queued", event.name);
         }
     }
 
@@ -133,9 +153,14 @@ impl AnalyticsManager {
         &self.session_id
     }
 
+    pub fn get_storage(&self) -> Arc<AnalyticsStorage> {
+        self.storage.clone()
+    }
+
     async fn event_processor(
         mut rx: mpsc::UnboundedReceiver<AnalyticsEvent>,
         config: Arc<Mutex<AnalyticsConfig>>,
+        storage: Arc<AnalyticsStorage>,
     ) {
         let mut event_batch: Vec<AnalyticsEvent> = Vec::new();
 
@@ -145,67 +170,89 @@ impl AnalyticsManager {
         ));
         drop(initial_config);
 
-        debug!("Analytics event processor started");
+        info!("[Analytics] Event processor started");
 
         loop {
             tokio::select! {
                 Some(event) = rx.recv() => {
-                    debug!("Received analytics event: {}", event.name);
+                    info!("[Analytics] Processor received event: {}", event.name);
                     event_batch.push(event);
+                    info!("[Analytics] Current batch size: {}", event_batch.len());
 
                     let config_guard = config.lock().await;
-                    if event_batch.len() >= config_guard.batch_size {
-                        drop(config_guard);
-                        Self::flush_batch(&mut event_batch, &config).await;
+                    let batch_size = config_guard.batch_size;
+                    let is_enabled = config_guard.enabled;
+                    drop(config_guard);
+                    
+                    info!("[Analytics] Batch limit: {}, Enabled: {}", batch_size, is_enabled);
+                    
+                    if event_batch.len() >= batch_size {
+                        info!("[Analytics] Batch full! Flushing {} events", event_batch.len());
+                        Self::flush_batch(&mut event_batch, &config, &storage).await;
+                    } else {
+                        info!("[Analytics] Batch not full ({}/{})", event_batch.len(), batch_size);
                     }
                 }
 
                 _ = interval.tick() => {
                     if !event_batch.is_empty() {
-                        debug!("Periodic flush triggered ({} events)", event_batch.len());
-                        Self::flush_batch(&mut event_batch, &config).await;
+                        info!("[Analytics] Periodic flush triggered ({} events)", event_batch.len());
+                        Self::flush_batch(&mut event_batch, &config, &storage).await;
                     }
                 }
             }
         }
     }
 
-    async fn flush_batch(batch: &mut Vec<AnalyticsEvent>, config: &Arc<Mutex<AnalyticsConfig>>) {
+    async fn flush_batch(
+        batch: &mut Vec<AnalyticsEvent>,
+        config: &Arc<Mutex<AnalyticsConfig>>,
+        storage: &Arc<AnalyticsStorage>,
+    ) {
         if batch.is_empty() {
             return;
         }
 
+        info!("[Analytics] flush_batch called with {} events", batch.len());
+        
         let config_guard = config.lock().await;
 
         if !config_guard.enabled {
-            debug!(
-                "Analytics is disabled, dropping {} events",
-                batch.len()
-            );
+            warn!("[Analytics] DISABLED! Dropping {} events", batch.len());
             batch.clear();
             return;
         }
 
-        info!("Flushing {} analytics events to backend", batch.len());
-
+        info!("[Analytics] Saving {} events to local storage", batch.len());
         let events = batch.clone();
+        let storage_clone = storage.clone();
+        
+        // Always store locally first
+        if let Err(e) = storage_clone.store_events(events.clone()).await {
+            error!("[Analytics] Failed to store events locally: {}", e);
+        }
+
+        info!("[Analytics] Sending {} events to: {}", batch.len(), config_guard.endpoint_url);
         let client_config = config_guard.clone();
         drop(config_guard);
 
+        // Then send to HTTP endpoint (non-blocking)
         tokio::spawn(async move {
+            info!("[Analytics] HTTP task spawned for {} events", events.len());
             let client = AnalyticsClient::new(client_config);
 
             match client.send_batch(events).await {
                 Ok(_) => {
-                    debug!("Successfully sent analytics batch");
+                    info!("[Analytics] HTTP request successful!");
                 }
                 Err(e) => {
-                    error!("Failed to send analytics batch: {}", e);
+                    error!("[Analytics] HTTP request failed: {}", e);
                 }
             }
         });
 
         batch.clear();
+        info!("[Analytics] Batch cleared");
     }
 }
 
