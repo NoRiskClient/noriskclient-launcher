@@ -489,15 +489,17 @@ export function SkinsTab() {
       filtered = filtered.filter((skin) => isFavorite(skin.id));
     }
 
-    if (currentFolder) {
-      const folder = folders.find(f => f.id === currentFolder);
-      if (folder) {
-        filtered = filtered.filter((skin) => folder.skin_ids.includes(skin.id));
+    if (!showFavoritesOnly) {
+      if (currentFolder) {
+        const folder = folders.find(f => f.id === currentFolder);
+        if (folder) {
+          filtered = filtered.filter((skin) => folder.skin_ids.includes(skin.id));
+        }
+      } else {
+        filtered = filtered.filter((skin) => {
+          return !folders.some(folder => folder.skin_ids.includes(skin.id));
+        });
       }
-    } else {
-      filtered = filtered.filter((skin) => {
-        return !folders.some(folder => folder.skin_ids.includes(skin.id));
-      });
     }
 
     return filtered;
@@ -825,11 +827,6 @@ export function SkinsTab() {
                     style={{ color: "#ef4444" }}
                   />
                   <span className="lowercase">favorites</span>
-                  {favoriteSkinIds.length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 bg-white/20 text-xs rounded">
-                      {favoriteSkinIds.length}
-                    </span>
-                  )}
                 </button>
               </div>
 
@@ -910,8 +907,8 @@ export function SkinsTab() {
                     />
                   )}
                   
-                  {/* Folders - only show when not in a folder */}
-                  {!currentFolder && folders.map((folder, index) => (
+                  {/* Folders - only show when not in a folder and not showing favorites */}
+                  {!currentFolder && !showFavoritesOnly && folders.map((folder, index) => (
                     <FolderCard
                       key={folder.id}
                       folder={folder}
