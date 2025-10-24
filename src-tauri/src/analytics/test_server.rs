@@ -162,7 +162,8 @@ mod tests {
             request_timeout_secs: 5,
         };
         
-        let manager = AnalyticsManager::new(config);
+        let temp_dir = std::env::temp_dir().join("analytics_test");
+        let manager = AnalyticsManager::new(config, temp_dir);
 
         manager.track("test_event_1");
         manager.track("test_event_2");
@@ -208,7 +209,8 @@ mod tests {
             request_timeout_secs: 5,
         };
         
-        let manager = AnalyticsManager::new(config);
+        let temp_dir = std::env::temp_dir().join("analytics_test_custom");
+        let manager = AnalyticsManager::new(config, temp_dir);
         manager.track("custom_test");
         
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -240,7 +242,8 @@ mod tests {
             request_timeout_secs: 5,
         };
         
-        let manager = AnalyticsManager::new(config);
+        let temp_dir = std::env::temp_dir().join("analytics_test_props");
+        let manager = AnalyticsManager::new(config, temp_dir);
 
         manager.event("mod_installed")
             .property("source", "modrinth")

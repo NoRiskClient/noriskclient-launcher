@@ -1,3 +1,4 @@
+use crate::analytics::{AnalyticsConfig, AnalyticsManager, PayloadFormat};
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::minecraft_auth::MinecraftAuthStore;
@@ -29,6 +30,7 @@ pub struct State {
     pub skin_manager: SkinManager,
     pub discord_manager: DiscordManager,
     pub io_semaphore: Arc<Semaphore>,
+    pub analytics_manager: AnalyticsManager,
 }
 
 impl State {
@@ -48,6 +50,41 @@ impl State {
                 let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
+                // Initialize analytics with localhost for testing
+                let analytics_config = AnalyticsConfig {
+                    enabled: true,
+                    endpoint_url: "http://127.0.0.1:9090/api/track".to_string(),
+                    headers: {
+                        let mut h = std::collections::HashMap::new();
+                        h.insert("X-Client-Version".to_string(), env!("CARGO_PKG_VERSION").to_string());
+                        h.insert("X-Platform".to_string(), std::env::consts::OS.to_string());
+                        h
+                    },
+                    payload_format: PayloadFormat::CustomWrapper {
+                        events_key: "events".to_string(),
+                        wrapper_fields: {
+                            let mut w = std::collections::HashMap::new();
+                            w.insert("launcher_version".to_string(), serde_json::json!(env!("CARGO_PKG_VERSION")));
+                            w.insert("platform".to_string(), serde_json::json!(std::env::consts::OS));
+                            w
+                        },
+                    },
+                    batch_size: 1, // Send immediately for testing
+                    batch_interval_secs: 5,
+                    enable_retry: false, // Disabled for localhost testing
+                    max_retries: 0,
+                    request_timeout_secs: 5,
+                };
+                let analytics_storage_dir = LAUNCHER_DIRECTORY.root_dir().join("analytics");
+                let analytics_manager = AnalyticsManager::new(analytics_config, analytics_storage_dir.clone());
+                log::info!("======================================");
+                log::info!("[Analytics] Manager initialized!");
+                log::info!("[Analytics] Endpoint: http://127.0.0.1:9090/api/track");
+                log::info!("[Analytics] Storage: {:?}", analytics_storage_dir);
+                log::info!("[Analytics] Batch size: 1 event (immediate send for testing)");
+                log::info!("[Analytics] Batch interval: 5 seconds");
+                log::info!("======================================");
+
                 log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
@@ -61,6 +98,7 @@ impl State {
                     skin_manager,
                     discord_manager,
                     io_semaphore,
+                    analytics_manager,
                 }))
             })
             .await?;
@@ -144,6 +182,13 @@ impl State {
         log::info!(
             "State::init - Full initialization, including all post-init handlers, complete."
         );
+
+        // Track launcher start event
+        log::info!("======================================");
+        log::info!("[Analytics] Tracking launcher_started event NOW");
+        log::info!("======================================");
+        initial_state_arc.analytics_manager.track("launcher_started");
+        log::info!("[Analytics] launcher_started event call completed");
 
         Ok(())
     }
