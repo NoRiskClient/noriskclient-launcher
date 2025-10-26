@@ -6,6 +6,8 @@ import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";
 import type { MinecraftSkin } from "../../types/localSkin";
 import type { SkinFolder } from "../../store/useSkinFoldersStore";
+import { useThemeStore } from "../../store/useThemeStore";
+import { Modal } from "../ui/Modal";
 
 interface MoveToFolderModalProps {
   isOpen: boolean;
@@ -23,10 +25,9 @@ export function MoveToFolderModal({
   onMoveToFolder,
 }: MoveToFolderModalProps) {
   const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+  const accentColor = useThemeStore((state) => state.accentColor);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = () => {
     if (!selectedFolderId) {
       return;
     }
@@ -37,30 +38,37 @@ export function MoveToFolderModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-white/20 rounded-lg p-6 w-full max-w-md mx-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Icon 
-              icon="solar:folder-bold" 
-              className="w-6 h-6 text-blue-400" 
-            />
-            <h2 className="text-xl font-minecraft-ten text-white">
-              Move Skin to Folder
-            </h2>
-          </div>
-          
-          <button
+    <Modal
+      title="Move Skin to Folder"
+      onClose={onClose}
+      variant="flat"
+      width="sm"
+      footer={
+        <div className="flex gap-3 justify-center">
+          <Button
+            type="button"
+            variant="flat-secondary"
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
+            size="sm"
           >
-            <Icon icon="solar:close-circle-bold" className="w-6 h-6" />
-          </button>
+            Cancel
+          </Button>
+          
+          <Button
+            type="button"
+            variant="flat"
+            disabled={!selectedFolderId}
+            size="sm"
+            onClick={handleSubmit}
+          >
+            Move to Folder
+          </Button>
         </div>
-
+      }
+    >
+      <div className="p-4 space-y-4">
         {/* Skin Info */}
-        <div className="mb-6 p-4 bg-black/20 rounded-lg border border-white/10">
+        <div className="p-4 bg-black/20 rounded-lg border border-white/10">
           <div>
             <h3 
               className="text-white font-minecraft-ten text-sm truncate mb-1" 
@@ -75,65 +83,53 @@ export function MoveToFolderModal({
         </div>
 
         {/* Folder Selection */}
-        <div className="space-y-4">
-          <div>
-            <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
-              {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => setSelectedFolderId(folder.id)}
-                  className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${
-                    selectedFolderId === folder.id
-                      ? 'bg-blue-500/20 border-blue-400 text-white'
-                      : 'bg-black/20 border-white/10 hover:border-white/20 text-white/80 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon 
-                      icon="solar:folder-bold" 
-                      className="w-5 h-5 text-blue-400" 
-                    />
-                    <div>
-                      <div className="font-minecraft-ten text-sm">{folder.name}</div>
-                      <div className="text-xs text-white/60 font-minecraft-ten">
-                        {folder.skin_ids.length} skins
-                      </div>
+        <div>
+          <label className="block text-sm font-minecraft-ten text-white/80 mb-2">
+            Select Folder
+          </label>
+          <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+            {folders.map((folder) => (
+              <button
+                key={folder.id}
+                onClick={() => setSelectedFolderId(folder.id)}
+                className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${
+                  selectedFolderId === folder.id
+                    ? 'text-white'
+                    : 'bg-black/20 border-white/10 hover:border-white/20 text-white/80 hover:text-white'
+                }`}
+                style={
+                  selectedFolderId === folder.id
+                    ? {
+                        backgroundColor: `${accentColor.value}20`,
+                        borderColor: accentColor.value,
+                      }
+                    : undefined
+                }
+              >
+                <div className="flex items-center gap-3">
+                  <Icon 
+                    icon="solar:folder-bold" 
+                    className="w-5 h-5"
+                    style={{ color: accentColor.value }}
+                  />
+                  <div>
+                    <div className="font-minecraft-ten text-sm">{folder.name}</div>
+                    <div className="text-xs text-white/60 font-minecraft-ten">
+                      {folder.skin_ids.length} skins
                     </div>
                   </div>
-                </button>
-              ))}
-              
-              {folders.length === 0 && (
-                <div className="text-center py-8 text-white/60 font-minecraft-ten text-sm">
-                  No folders available. Create a folder first.
                 </div>
-              )}
-            </div>
+              </button>
+            ))}
+            
+            {folders.length === 0 && (
+              <div className="text-center py-8 text-white/60 font-minecraft-ten text-sm">
+                No folders available. Create a folder first.
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-center gap-3 pt-6 mt-6 border-t border-white/10">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="w-32"
-          >
-            Cancel
-          </Button>
-          
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!selectedFolderId}
-            onClick={handleSubmit}
-            className="w-32"
-          >
-            Move
-          </Button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
