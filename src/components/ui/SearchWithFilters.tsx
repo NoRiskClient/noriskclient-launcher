@@ -65,15 +65,15 @@ export function SearchWithFilters({
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       {/* Search with integrated filters */}
-      <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors flex-1 max-w-md">
-        <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50" />
+      <div className="flex items-center gap-3 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors flex-1 max-w-md">
+        <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50 flex-shrink-0" />
         <input
           type="text"
           placeholder={placeholder}
           value={searchValue}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
-          className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none"
+          className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none leading-relaxed pl-1"
         />
         
         {/* Sort Filter */}
