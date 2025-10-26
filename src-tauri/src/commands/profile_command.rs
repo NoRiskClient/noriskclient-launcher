@@ -237,18 +237,6 @@ pub async fn launch_profile(
         }
     };
 
-    // Track profile launch event EARLY (before any checks that might fail)
-    // This ensures we capture ALL launch attempts
-    log::info!("======================================");
-    log::info!("[Analytics] TRACKING PROFILE LAUNCH ATTEMPT");
-    log::info!("[Analytics] Profile: {}", profile.name);
-    log::info!("[Analytics] Game Version: {}", profile.game_version);
-    log::info!("[Analytics] Loader: {:?}", profile.loader);
-    log::info!("======================================");
-    
-    // Analytics event will be sent in installer.rs to avoid duplication
-    log::info!("[Analytics] profile_launched event will be sent from installer");
-
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
     let credentials = match state

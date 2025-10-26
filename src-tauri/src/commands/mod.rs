@@ -1,6 +1,4 @@
-pub mod analytics_command;
 pub mod image_command;
-pub mod analytics_test_command;
 pub mod cape_command;
 pub mod config_commands;
 pub mod content_command;

@@ -624,7 +624,6 @@ export function SettingsTab() {
                       const { open } = await import('@tauri-apps/plugin-dialog');
                       const file = await open({
                         multiple: false,
-                        defaultPath: "C:\\Users\\olesc\\AppData\\Roaming\\norisk\\NoRiskClientV3\\backgrounds",
                         filters: [
                           {
                             name: 'Images',
@@ -645,27 +644,6 @@ export function SettingsTab() {
                   title="Select image file"
                 >
                   <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="px-4 py-3 border border-white/20 hover:bg-white/5 transition-colors"
-                  disabled={saving}
-                  onClick={async () => {
-                    try {
-                      const { open } = await import('@tauri-apps/plugin-dialog');
-                      await open({
-                        directory: true,
-                        defaultPath: "C:\\Users\\olesc\\AppData\\Roaming\\norisk\\NoRiskClientV3\\backgrounds"
-                      });
-                    } catch (error) {
-                      console.error('Error opening folder:', error);
-                      toast.error("Failed to open folder");
-                    }
-                  }}
-                  title="Open backgrounds folder"
-                >
-                  <Icon icon="solar:folder-bold" className="w-5 h-5" />
                 </Button>
               </div>
             </div>
