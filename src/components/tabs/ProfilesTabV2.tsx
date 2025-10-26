@@ -365,7 +365,7 @@ export function ProfilesTabV2() {
             {/* Recent Filter Button */}
             <button
               onClick={() => setShowRecentOnly(!showRecentOnly)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 min-h-[2.5rem] ${
+              className={`flex items-center gap-2 px-4 py-3 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 ${
                 showRecentOnly 
                   ? "bg-white/10 border-white/30 text-white" 
                   : "bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20"
@@ -379,7 +379,7 @@ export function ProfilesTabV2() {
             {/* Show Hidden Profiles Button */}
             <button
               onClick={toggleShowHiddenProfiles}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 min-h-[2.5rem] ${
+              className={`flex items-center gap-2 px-4 py-3 border rounded-lg font-minecraft text-sm uppercase transition-all duration-200 ${
                 showHiddenProfiles 
                   ? "bg-white/10 border-white/30 text-white" 
                   : "bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20"

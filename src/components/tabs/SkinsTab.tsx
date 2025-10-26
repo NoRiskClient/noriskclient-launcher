@@ -789,7 +789,7 @@ export function SkinsTab() {
                 title="Create New Folder"
               >
                 <Icon icon="solar:folder-plus-bold" className="w-4 h-4" />
-                <span className="lowercase">folder</span>
+                <span className="lowercase">New Folder</span>
               </button>
 
               {/* Filter Tabs */}
