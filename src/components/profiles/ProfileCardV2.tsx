@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 import type { Profile, ResolvedLoaderVersion } from "../../types/profile";
 import { ProfileIconV2 } from "./ProfileIconV2";
@@ -49,6 +50,7 @@ interface ProfileCardV2Props {
   onDelete?: (profileId: string, profileName: string) => void;
   onOpenFolder?: (profile: Profile) => void;
   layoutMode?: "list" | "grid" | "compact";
+  variant?: "default" | "3d";
 }
 
 export function ProfileCardV2({
@@ -59,8 +61,11 @@ export function ProfileCardV2({
   onDelete,
   onOpenFolder,
   layoutMode = "list",
+  variant = "default",
 }: ProfileCardV2Props) {
+  const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
+  const [modsButtonHovered, setModsButtonHovered] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
   
@@ -193,6 +198,7 @@ export function ProfileCardV2({
     onLaunchError: (error) => {
       console.error("Profile launch error:", error);
     },
+    skipLastPlayedUpdate: variant === "3d", // Skip for featured profiles in 3D mode
   });
 
 
@@ -262,6 +268,72 @@ export function ProfileCardV2({
       default:
         return "/icons/minecraft.png";
     }
+  };
+
+  // Get 3D styling for variant (matching Button.tsx exactly)
+  const get3DStyling = () => {
+    if (variant !== "3d") return {};
+
+    const colors = {
+      main: accentColor.value,
+      light: accentColor.hoverValue || accentColor.value,
+      dark: accentColor.value,
+    };
+
+    const shadowDepth = "short";
+
+    const backgroundColor = isHovered ? `${colors.main}50` : `${colors.main}30`;
+    const borderColor = isHovered ? colors.light : `${colors.main}80`;
+    const borderBottomColor = isHovered ? colors.light : colors.dark;
+
+    const part1Y = shadowDepth === "short" ? "4px" : "8px";
+    const part2Y = shadowDepth === "short" ? "6px" : "10px";
+    const part2Blur = shadowDepth === "short" ? "10px" : "15px";
+    const boxShadow = `0 ${part1Y} 0 rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+
+    return {
+      backgroundColor,
+      border: "2px solid",
+      borderBottom: "4px solid",
+      borderColor,
+      borderBottomColor,
+      boxShadow,
+      transform: isHovered ? "scale(1.02)" : "scale(1)",
+      filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+      transition: "all 0.2s ease",
+    };
+  };
+
+  // Get 3D styling for small buttons (settings/mods buttons)
+  const get3DButtonStyling = (isHovered: boolean = false) => {
+    if (variant !== "3d") return {};
+
+    const colors = {
+      main: accentColor.value,
+      light: accentColor.hoverValue || accentColor.value,
+      dark: accentColor.value,
+    };
+
+    const backgroundColor = isHovered ? `${colors.main}40` : `${colors.main}25`;
+    const borderColor = isHovered ? colors.light : `${colors.main}70`;
+    const borderBottomColor = isHovered ? colors.light : colors.dark;
+
+    const boxShadow = isHovered
+      ? `0 2px 0 rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}50, inset 0 0 0 1px ${colors.main}30`
+      : `0 2px 0 rgba(0,0,0,0.3), 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}20`;
+
+    return {
+      backgroundColor,
+      border: "1px solid",
+      borderBottom: "2px solid",
+      borderColor,
+      borderBottomColor,
+      boxShadow,
+      color: "#ffffff",
+      transform: isHovered ? "scale(1.05)" : "scale(1)",
+      filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+      transition: "all 0.2s ease",
+    };
   };
 
   // Format last played date
@@ -366,18 +438,29 @@ export function ProfileCardV2({
     
     return (
       <div
-        className={`relative flex flex-col ${gap} ${padding} rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer`}
+        className={`relative flex flex-col ${gap} ${padding} rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+        style={variant === "3d" ? get3DStyling() : {}}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={(e) => {
           // Don't trigger if clicking on action buttons or play overlay
           const target = e.target as Element;
           if (e.target === e.currentTarget || (!target.closest('button') && !target.closest('.play-overlay'))) {
-            if (onMods) {
-              onMods(profile);
+            if (variant === "3d") {
+              // In 3D mode, launch the profile when clicking the card
+              if (onPlay) {
+                onPlay(profile);
+              } else {
+                handleLaunch();
+              }
             } else {
-              toast.success(`📦 Managing mods for ${profile.name}!`);
-              console.log("Managing mods for profile:", profile.name);
+              // Default behavior: manage mods
+              if (onMods) {
+                onMods(profile);
+              } else {
+                toast.success(`📦 Managing mods for ${profile.name}!`);
+                console.log("Managing mods for profile:", profile.name);
+              }
             }
           }
         }}
@@ -411,28 +494,29 @@ export function ProfileCardV2({
 
         {/* Action buttons - top right */}
         <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
-          {/* Settings button */}
-          <button
+          {/* Settings button - hidden in 3D mode */}
+          {variant === "default" && (
+            <button
             ref={settingsButtonRef}
                          onClick={(e) => {
                e.preventDefault();
                e.stopPropagation();
-               
+
                // Close any other open context menus first
                if (openContextMenuId && openContextMenuId !== contextMenuId) {
                  setOpenContextMenuId(null);
                }
-               
+
                // Simple toggle like CustomDropdown
                const newState = !isContextMenuOpen;
                setIsContextMenuOpen(newState);
                setOpenContextMenuId(newState ? contextMenuId : null);
-               
+
                // Calculate position when opening
                if (!isContextMenuOpen) {
                  const buttonRect = e.currentTarget.getBoundingClientRect();
                  const cardRect = e.currentTarget.closest('.relative')?.getBoundingClientRect();
-                 
+
                  if (cardRect) {
                    setContextMenuPosition({
                      x: buttonRect.right - cardRect.left - 200, // Position menu to the left of the button
@@ -441,13 +525,14 @@ export function ProfileCardV2({
                  }
                }
              }}
-            className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200`}
+            className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
             title="Profile Options"
             data-action="settings"
           >
             <Icon icon="solar:settings-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
           </button>
-          
+          )}
+
           {/* Mods button */}
           <button
             onClick={(e) => {
@@ -456,14 +541,20 @@ export function ProfileCardV2({
               if (onMods) {
                 onMods(profile);
               } else {
-                toast.success(`📦 Managing mods for ${profile.name}!`);
-                console.log("Managing mods for profile:", profile.name);
+                // Navigate to specific profile detail view for mod management
+                navigate(`/profilesv2/${profile.id}`);
               }
             }}
-            className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200`}
+            className={`${variant === "3d" ? (isCompact ? 'w-auto px-2 h-6' : 'w-auto px-3 h-8') : (isCompact ? 'w-6 h-6' : 'w-8 h-8')} flex items-center justify-center gap-1 rounded transition-all duration-200 ${variant === "3d" ? "" : "bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20"}`}
+            style={variant === "3d" ? get3DButtonStyling(modsButtonHovered) : {}}
+            onMouseEnter={() => setModsButtonHovered(true)}
+            onMouseLeave={() => setModsButtonHovered(false)}
             title="Manage Mods"
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
+            {variant === "3d" && (
+              <span className={`font-minecraft-ten ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
+            )}
           </button>
         </div>
 
@@ -498,18 +589,22 @@ export function ProfileCardV2({
           <div className={`flex-grow min-w-0 mr-auto pr-2 ${isCompact ? 'max-w-[calc(100%-64px)]' : 'max-w-[calc(100%-80px)]'}`}>
             <h3
               className={`font-minecraft-ten text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case`}
+              style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
               title={profile.name}
             >
               {profile.name}
             </h3>
             {isLaunching ? (
-              <div className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+              <div
+                className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+              >
                 {statusMessage || "Starting..."}
               </div>
             ) : (
               isCompact ? (
                  // Compact mode: Only MC version + last played
-                 <div className="flex items-center gap-1.5 text-xs font-minecraft-ten">
+                 <div className="flex items-center gap-1.5 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                    {/* Minecraft Version */}
                    <div className="text-white/70 flex items-center gap-0.5">
                      <img
@@ -519,9 +614,9 @@ export function ProfileCardV2({
                      />
                      <span>{profile.game_version}</span>
                    </div>
-                   
+
                    <div className="w-px h-2.5 bg-white/30"></div>
-                   
+
                    {/* Last Played */}
                    <div className="text-white/50">
                      {formatLastPlayed(profile.last_played)}
@@ -529,7 +624,7 @@ export function ProfileCardV2({
                  </div>
                ) : (
                  // Grid mode: Full info display
-                 <div className="flex items-center gap-2 text-xs font-minecraft-ten">
+                 <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                    {/* Minecraft Version */}
                    <div className="text-white/70 flex items-center gap-1">
                      <img
@@ -588,18 +683,29 @@ export function ProfileCardV2({
   // List layout (original layout)
   return (
     <div
-      className="relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
+      className={`relative flex items-center gap-4 p-3 rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+      style={variant === "3d" ? get3DStyling() : {}}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={(e) => {
         // Don't trigger if clicking on action buttons
         const target = e.target as Element;
         if (e.target === e.currentTarget || !target.closest('button')) {
-          if (onMods) {
-            onMods(profile);
+          if (variant === "3d") {
+            // In 3D mode, launch the profile when clicking the card
+            if (onPlay) {
+              onPlay(profile);
+            } else {
+              handleLaunch();
+            }
           } else {
-            toast.success(`📦 Managing mods for ${profile.name}!`);
-            console.log("Managing mods for profile:", profile.name);
+            // Default behavior: manage mods
+            if (onMods) {
+              onMods(profile);
+            } else {
+              toast.success(`📦 Managing mods for ${profile.name}!`);
+              console.log("Managing mods for profile:", profile.name);
+            }
           }
         }
       }}
@@ -636,19 +742,23 @@ export function ProfileCardV2({
 
       {/* Profile Info */}
       <div className="flex-1 min-w-0">
-        <h3 
+        <h3
           className="text-white font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case mb-1"
+          style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
           title={profile.name}
         >
           {profile.name}
         </h3>
         
         {isLaunching ? (
-          <div className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+          <div
+            className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+          >
             {statusMessage || "Starting..."}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-xs font-minecraft-ten">
+          <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
           {/* Minecraft Version */}
           <div className="text-white/70 flex items-center gap-1">
             <img

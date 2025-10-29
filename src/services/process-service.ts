@@ -27,7 +27,8 @@ export async function launch(
   id: string,
   quickPlaySingleplayer?: string,
   quickPlayMultiplayer?: string,
-  migrationInfo?: any
+  migrationInfo?: any,
+  skipLastPlayedUpdate?: boolean
 ): Promise<void> {
   // Guard: If experimental mode is enabled in settings, require feature flag to be enabled
   try {
@@ -51,7 +52,8 @@ export async function launch(
     id,
     quickPlaySingleplayer,
     quickPlayMultiplayer,
-    migrationInfo
+    migrationInfo,
+    skipLastPlayedUpdate
   });
 }
 

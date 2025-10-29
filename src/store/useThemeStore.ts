@@ -245,6 +245,9 @@ interface ThemeState {
   // News section width
   newsSectionWidth: number;
   setNewsSectionWidth: (width: number) => void;
+  // Featured profile mode
+  featureMode: boolean;
+  setFeatureMode: (enabled: boolean) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -270,6 +273,8 @@ export const useThemeStore = create<ThemeState>()(
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
       newsSectionWidth: 375,
+      // Featured profile mode - defaults
+      featureMode: false,
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
@@ -435,6 +440,11 @@ export const useThemeStore = create<ThemeState>()(
       // News section width
       setNewsSectionWidth: (width: number) => {
         set({ newsSectionWidth: width });
+      },
+
+      // Featured profile mode
+      setFeatureMode: (enabled: boolean) => {
+        set({ featureMode: enabled });
       },
     }),    {
       name: "norisk-theme-storage",

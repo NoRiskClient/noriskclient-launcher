@@ -19,10 +19,11 @@ interface UseProfileLaunchOptions {
   quickPlayMultiplayer?: string;
   onLaunchSuccess?: () => void;
   onLaunchError?: (error: string) => void;
+  skipLastPlayedUpdate?: boolean;
 }
 
 export function useProfileLaunch(options: UseProfileLaunchOptions) {
-  const { profileId, quickPlaySingleplayer, quickPlayMultiplayer, onLaunchSuccess, onLaunchError } = options;
+  const { profileId, quickPlaySingleplayer, quickPlayMultiplayer, onLaunchSuccess, onLaunchError, skipLastPlayedUpdate } = options;
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { showModal, hideModal } = useGlobalModal();
@@ -156,7 +157,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     initiateButtonLaunch(profileId);
 
     try {
-      await ProcessService.launch(profileId, quickPlaySingleplayer, quickPlayMultiplayer, migrationInfo);
+      await ProcessService.launch(profileId, quickPlaySingleplayer, quickPlayMultiplayer, migrationInfo, skipLastPlayedUpdate);
     } catch (err: any) {
       console.error("Failed to launch profile:", err);
       const launchErrorMsg =
@@ -265,7 +266,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           // No migration needed, launch directly
           initiateButtonLaunch(profileId);
           try {
-            await ProcessService.launch(profileId, singleplayer, multiplayer);
+            await ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
           } catch (err: any) {
             console.error("Failed to launch profile:", err);
             const launchErrorMsg =
@@ -290,7 +291,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               initiateButtonLaunch(profileId);
 
               try {
-                ProcessService.launch(profileId, singleplayer, multiplayer);
+                ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
               } catch (err: any) {
                 console.error("Failed to launch profile:", err);
                 const launchErrorMsg =
@@ -311,7 +312,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               // Launch with migration info (will handle migration in install_minecraft_version)
               const performQuickPlayLaunch = async () => {
                 initiateButtonLaunch(profileId);
-                await ProcessService.launch(profileId, singleplayer, multiplayer, migrationInfo);
+                await ProcessService.launch(profileId, singleplayer, multiplayer, migrationInfo, skipLastPlayedUpdate);
               };
               performQuickPlayLaunch();
             }}
@@ -323,7 +324,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         // If migration check fails, proceed with normal launch
         initiateButtonLaunch(profileId);
         try {
-          await ProcessService.launch(profileId, singleplayer, multiplayer);
+          await ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
         } catch (err: any) {
           console.error("Failed to launch profile:", err);
           const launchErrorMsg =

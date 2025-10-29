@@ -163,6 +163,7 @@ pub async fn launch_profile(
     quick_play_singleplayer: Option<String>,
     quick_play_multiplayer: Option<String>,
     migration_info: Option<profile_utils::MigrationInfo>,
+    skip_last_played_update: Option<bool>,
 ) -> Result<(), CommandError> {
     log::info!(
         "[Command] launch_profile called for ID: {}. QuickPlay Single: {:?}, QuickPlay Multi: {:?}, Migration: {:?}",
@@ -185,11 +186,13 @@ pub async fn launch_profile(
                 .update_profile(id, profile.clone())
                 .await?;
 
-            // Update launcher config with last played profile ID
-            let mut current_config = state.config_manager.get_config().await;
-            current_config.last_played_profile = Some(id);
-            if let Err(e) = state.config_manager.set_config(current_config).await {
-                warn!("Failed to update last_played_profile in config: {}", e);
+            // Update launcher config with last played profile ID (unless skipped)
+            if !skip_last_played_update.unwrap_or(false) {
+                let mut current_config = state.config_manager.get_config().await;
+                current_config.last_played_profile = Some(id);
+                if let Err(e) = state.config_manager.set_config(current_config).await {
+                    warn!("Failed to update last_played_profile in config: {}", e);
+                }
             }
 
             profile
@@ -220,15 +223,17 @@ pub async fn launch_profile(
                 standard_profile.name
             );
 
-            // Update launcher config with last played profile ID (for standard versions too)
+            // Update launcher config with last played profile ID (for standard versions too, unless skipped)
             // Even though it's not a "user" profile, we still record it was the last one launched.
-            let mut current_config = state.config_manager.get_config().await;
-            current_config.last_played_profile = Some(id); // id here is the standard_profile.id
-            if let Err(e) = state.config_manager.set_config(current_config).await {
-                warn!(
-                    "Failed to update last_played_profile in config for standard version: {}",
-                    e
-                );
+            if !skip_last_played_update.unwrap_or(false) {
+                let mut current_config = state.config_manager.get_config().await;
+                current_config.last_played_profile = Some(id); // id here is the standard_profile.id
+                if let Err(e) = state.config_manager.set_config(current_config).await {
+                    warn!(
+                        "Failed to update last_played_profile in config for standard version: {}",
+                        e
+                    );
+                }
             }
 
             // Return the converted profile without saving it
