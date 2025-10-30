@@ -40,10 +40,21 @@ export function SettingsTab() {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced">(
+  const [saving, setSaving] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced" | "customize" | "themes">(
     "general",
   );
 
+
+  // Whether to show the Customize tab (persisted)
+  const [showCustomizeTab, setShowCustomizeTab] = useState<boolean>(() => {
+    try {
+      const val = localStorage.getItem('nr_show_customize_tab');
+      return val === null ? true : val === 'true';
+    } catch (err) {
+      return true;
+    }
+  });
 
   // Create groups array for tabs
   const createGroups = (): GroupTab[] => {
@@ -64,6 +75,12 @@ export function SettingsTab() {
         count: undefined,
       },
     ];
+
+    if (showCustomizeTab) {
+      groups.push({ id: "customize", name: "Customize", count: undefined });
+    }
+
+    groups.push({ id: "themes", name: "Themes", count: undefined });
     return groups;
   };
 
@@ -73,7 +90,105 @@ export function SettingsTab() {
   const tabRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Custom CSS editor state
+  const [customCss, setCustomCss] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [externalCssPath, setExternalCssPath] = useState<string | null>(null);
+  const externalCssPollRef = useRef<number | null>(null);
+  const externalCssLastRef = useRef<string | null>(null);
+
+  // Themes management (stored in localStorage)
+  type ThemeEntry = {
+    id: string;
+    name: string; // display name
+    filename?: string;
+    content: string;
+    enabled: boolean;
+    source?: "imported" | "external" | "builtin";
+  };
+
+  const [themes, setThemes] = useState<ThemeEntry[]>([]);
+  const themesFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadThemes = () => {
+    try {
+      const raw = localStorage.getItem("nr_themes") || "[]";
+      const parsed: ThemeEntry[] = JSON.parse(raw || "[]");
+      setThemes(parsed || []);
+    } catch (err) {
+      console.error("Failed to load themes from localStorage", err);
+      setThemes([]);
+    }
+  };
+
+  const saveThemes = (next: ThemeEntry[]) => {
+    try {
+      localStorage.setItem("nr_themes", JSON.stringify(next));
+    } catch (err) {
+      console.error("Failed to save themes to localStorage", err);
+    }
+  };
+
+  const displayNameFromFilename = (filename: string) => {
+    const base = filename.replace(/\.[^/.]+$/, "");
+    if (!base) return filename;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  };
+
+  const applyEnabledThemes = (list: ThemeEntry[]) => {
+    const enabledCss = list.filter((t) => t.enabled).map((t) => t.content).join("\n\n");
+    applyCustomCss(enabledCss);
+    try {
+      localStorage.setItem('nr_custom_css', enabledCss);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const toggleTheme = (id: string) => {
+    const next = themes.map((t) => (t.id === id ? { ...t, enabled: !t.enabled } : t));
+    setThemes(next);
+    saveThemes(next);
+    applyEnabledThemes(next);
+    toast.success('Theme toggled');
+  };
+
+  const deleteTheme = (id: string) => {
+    const next = themes.filter((t) => t.id !== id);
+    setThemes(next);
+    saveThemes(next);
+    applyEnabledThemes(next);
+    toast.success('Theme removed');
+  };
+
+  const importThemeFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      const id = String(Date.now()) + Math.random().toString(36).slice(2, 8);
+      const name = displayNameFromFilename(file.name || `theme-${id}`);
+      const entry: ThemeEntry = {
+        id,
+        name,
+        filename: file.name,
+        content: text,
+        enabled: false,
+        source: 'imported',
+      };
+      const next = [...themes, entry];
+      setThemes(next);
+      saveThemes(next);
+      toast.success('Theme imported');
+    };
+    reader.onerror = (e) => {
+      console.error('Failed to read theme file', e);
+      toast.error('Failed to import theme');
+    };
+    reader.readAsText(file);
+  };
+
   const [isHooksExpanded, setIsHooksExpanded] = useState<boolean>(false);
+  const [exportLocation, setExportLocation] = useState<string | null>(null);
   const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState<boolean>(false);
   const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState<boolean>(false);
   const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState<boolean>(false);
@@ -93,6 +208,9 @@ export function SettingsTab() {
 
   const { confirm, confirmDialog } = useConfirmDialog();
   const { showModal, hideModal } = useGlobalModal();
+
+  // Detect whether we run inside Tauri (desktop) or plain browser dev
+  const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || Boolean((import.meta as any).env?.TAURI));
 
   const EXPERIMENTAL_FEATURE_FLAG_NAME = "show_experimental_mode";
   const experimentalFlags = useFlags([EXPERIMENTAL_FEATURE_FLAG_NAME]);
@@ -288,7 +406,7 @@ export function SettingsTab() {
         </p>
       </div>
 
-      <div className="mt-6 flex items-center gap-6">
+        <div className="mt-6 flex items-center gap-6">
         <div className="flex-1">
           <ColorPicker shape="square" size="md" showCustomOption={false} />
         </div>
@@ -389,6 +507,22 @@ export function SettingsTab() {
               }),
           },
           {
+            id: "show-customize-tab",
+            label: "Show Customize Tab",
+            tooltip: "Show or hide the Customize tab in Settings (your custom CSS editor).",
+            type: "toggle",
+            value: showCustomizeTab,
+            onChange: (checked: boolean) => {
+              try {
+                localStorage.setItem('nr_show_customize_tab', checked ? 'true' : 'false');
+              } catch (err) {
+                /* ignore */
+              }
+              setShowCustomizeTab(checked);
+              if (!checked && activeTab === 'customize') setActiveTab('general');
+            },
+          },
+          {
             id: "hide-window",
             label: "Hide Window on Launch",
             tooltip: "Automatically hide the launcher window when Minecraft starts. Reduces desktop clutter during gameplay.",
@@ -404,6 +538,7 @@ export function SettingsTab() {
         ]}
         disabled={saving}
       />
+      
 
       <CompactSettingsGrid
         settings={[
@@ -872,6 +1007,143 @@ export function SettingsTab() {
 
     </div>
   );
+  const renderCustomize = () => (
+    <div className="space-y-6">
+      <div>
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:stars-bold" className="w-6 h-6 text-white" />
+              <h3 className="text-3xl font-minecraft text-white">
+                Customize your Launcher
+              </h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-lg border border-[#ffffff20] bg-black/10">
+        <p className="text-sm text-white/70 font-minecraft-ten mb-3">
+          Edit custom CSS for the launcher. Changes can be applied live and exported as a .css file.
+        </p>
+
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <textarea
+              value={customCss}
+              onChange={(e) => setCustomCss(e.target.value)}
+              className="w-full h-64 p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-white/30 resize-none"
+              placeholder="/* Enter CSS here, for example: \nbody { background: linear-gradient(#111, #222); } */"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setCustomCss((c) => c);
+                  applyCustomCss(customCss);
+                  try {
+                    localStorage.setItem('nr_custom_css', customCss || '');
+                    toast.success('Custom CSS applied and saved locally');
+                  } catch (err) {
+                    console.error('Failed to save custom css to localStorage', err);
+                    toast.error('Failed to save custom CSS');
+                  }
+                }}
+                className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-white"
+              >
+                Apply
+              </button>
+
+              <button
+                onClick={() => exportCustomCss(customCss)}
+                className="px-3 py-2 rounded bg-transparent border border-white/10 hover:bg-white/5 text-white"
+                title="Export CSS as .css file"
+              >
+                Export
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-2 rounded bg-transparent border border-white/10 hover:bg-white/5 text-white"
+              >
+                Import
+              </button>
+
+              <button
+                onClick={() => {
+                  const saved = localStorage.getItem('nr_custom_css') || '';
+                  setCustomCss(saved);
+                  applyCustomCss(saved);
+                  toast.success('Loaded saved CSS');
+                }}
+                className="px-3 py-2 rounded bg-transparent border border-white/10 hover:bg-white/5 text-white"
+              >
+                Load saved
+              </button>
+
+              <button
+                onClick={() => {
+                  setCustomCss('');
+                  removeCustomCss();
+                  try {
+                    localStorage.removeItem('nr_custom_css');
+                  } catch (err) {
+                    /* ignore */
+                  }
+                  toast('Custom CSS reset');
+                }}
+                className="px-3 py-2 rounded bg-red-600/70 hover:bg-red-600 text-white ml-auto"
+              >
+                Reset
+              </button>
+            </div>
+
+            {exportLocation && (
+              <div className="mt-2 text-sm text-white/70 font-minecraft-ten">
+                Exported to: <span className="font-mono text-xs">{exportLocation}</span>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".css,text/css"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const text = String(reader.result || '');
+                  setCustomCss(text);
+                  applyCustomCss(text);
+                  try {
+                    localStorage.setItem('nr_custom_css', text);
+                  } catch (err) {
+                    /* ignore */
+                  }
+                  toast.success('Imported CSS file');
+                };
+                reader.readAsText(f);
+                e.currentTarget.value = '';
+              }}
+            />
+          </div>
+
+          <div className="w-full md:w-96 p-3 rounded border border-[#ffffff15] bg-black/20">
+            <p className="text-xs text-white/60 mb-2">Live Preview</p>
+            <div className="p-3 rounded bg-black/40 text-white text-sm" id="nr-css-preview">
+              <p className="font-minecraft-ten">This is a small preview area to show applied CSS.</p>
+              <div className="mt-2">
+                <button className="px-2 py-1 rounded bg-white/10">Button</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
 
   const renderTabContent = () => {
     if (loading) {
@@ -936,10 +1208,192 @@ export function SettingsTab() {
         return renderAppearanceTab();
       case "advanced":
         return renderAdvancedTab();
+      case "customize":
+        return renderCustomize();
+      case "themes":
+        return renderThemesTab();
       default:
         return null;
     }
   };
+
+  // --- helper functions for custom CSS ---
+  function applyCustomCss(css: string) {
+    try {
+      const id = 'nr-custom-css';
+      let style = document.getElementById(id) as HTMLStyleElement | null;
+      if (!style) {
+        style = document.createElement('style');
+        style.id = id;
+        document.head.appendChild(style);
+      }
+      style.innerHTML = css || '';
+    } catch (err) {
+      console.error('Failed to apply custom CSS', err);
+      toast.error('Failed to apply custom CSS');
+    }
+  }
+
+  function removeCustomCss() {
+    try {
+      const id = 'nr-custom-css';
+      const style = document.getElementById(id);
+      if (style && style.parentNode) style.parentNode.removeChild(style);
+    } catch (err) {
+      console.error('Failed to remove custom CSS', err);
+    }
+  }
+
+  function exportCustomCss(css: string) {
+    (async () => {
+      try {
+        // Prefer File System Access API (browser) to let user choose path
+        // @ts-ignore
+        if (typeof (window as any).showSaveFilePicker === 'function') {
+          try {
+            // @ts-ignore
+            const handle = await (window as any).showSaveFilePicker({
+              suggestedName: 'norisk-custom.css',
+              types: [
+                {
+                  description: 'CSS',
+                  accept: { 'text/css': ['.css'] },
+                },
+              ],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(css || '');
+            await writable.close();
+            setExportLocation(handle.name || 'Saved file');
+            toast.success('Exported CSS file');
+            return;
+          } catch (err) {
+            console.error('showSaveFilePicker cancelled or failed', err);
+            // fallback to download
+          }
+        }
+
+        // Fallback: classic anchor download
+        const blob = new Blob([css || ''], { type: 'text/css' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'norisk-custom.css';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setExportLocation('Downloads/norisk-custom.css');
+        toast.success(`Exported CSS file to:\n${exportLocation}`);
+      } catch (err) {
+        console.error('Failed to export CSS', err);
+        toast.error('Failed to export CSS');
+      }
+    })();
+  }
+
+  // load saved CSS on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nr_custom_css') || '';
+      if (saved) {
+        setCustomCss(saved);
+        applyCustomCss(saved);
+      }
+    } catch (err) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // load saved themes on mount
+  useEffect(() => {
+    loadThemes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const renderThemesTab = () => (
+    <div className="space-y-6">
+      <div>
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon icon="solar:palette-bold" className="w-6 h-6 text-white" />
+            <h3 className="text-3xl font-minecraft text-white">Themes</h3>
+          </div>
+          <p className="text-base text-white/70 font-minecraft-ten mt-2">
+            Manage theme CSS files. Import .css files and enable or disable them. Enabled themes are applied and combined.
+          </p>
+        </div>
+
+        <div className="p-4 rounded-lg border border-[#ffffff20] bg-black/10">
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => themesFileInputRef.current?.click()}
+              className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-white"
+            >
+              Import Theme
+            </button>
+            <button
+              onClick={() => {
+                setThemes([]);
+                saveThemes([]);
+                applyCustomCss('');
+                toast('Cleared themes');
+              }}
+              className="px-3 py-2 rounded bg-red-600/70 hover:bg-red-600 text-white ml-2"
+            >
+              Clear All
+            </button>
+            <input
+              ref={themesFileInputRef}
+              type="file"
+              accept=".css,text/css"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                importThemeFile(f);
+                e.currentTarget.value = '';
+              }}
+            />
+          </div>
+
+          <div className="space-y-3">
+            {themes.length === 0 && (
+              <p className="text-sm text-white/60">No themes imported yet. Use "Import Theme" to add a .css file.</p>
+            )}
+
+            {themes.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 p-2 rounded border border-[#ffffff10]">
+                <div className="flex-1">
+                  <div className="text-white font-minecraft-ten">{t.name || displayNameFromFilename(t.filename || 'theme')}</div>
+                  <div className="text-xs text-white/60">{t.filename || t.id}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ToggleSwitch checked={t.enabled} onChange={() => toggleTheme(t.id)} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    style={{ backgroundColor: 'rgba(220,38,38,0.95)', color: '#fff' }}
+                    className="px-3 py-1 rounded shadow flex items-center gap-2"
+                    onClick={() => {
+                      const confirmed = window.confirm('Delete theme "' + (t.name || t.filename || t.id) + '"?');
+                      if (confirmed) deleteTheme(t.id);
+                    }}
+                    title="Delete theme"
+                    aria-label={`Delete theme ${t.name || t.filename || t.id}`}
+                  >
+                    <Icon icon="solar:trash-bold" className="w-4 h-4 text-white" />
+                    <span className="text-sm font-minecraft-ten">Delete</span>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
 
   return (
@@ -950,7 +1404,7 @@ export function SettingsTab() {
         <GroupTabs
           groups={groups}
           activeGroup={activeTab}
-          onGroupChange={(groupId) => setActiveTab(groupId as "general" | "appearance" | "advanced")}
+          onGroupChange={(groupId) => setActiveTab(groupId as "general" | "appearance" | "advanced" | "customize" | "themes")}
           showAddButton={false}
         />
 
@@ -964,6 +1418,10 @@ export function SettingsTab() {
             tooltip="Open Launcher Directory"
             size="sm"
             onClick={async () => {
+              if (!isTauri) {
+                toast('This action is only available in the desktop app');
+                return;
+              }
               try {
                 await openLauncherDirectory();
               } catch (err) {
