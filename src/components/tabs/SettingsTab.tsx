@@ -146,11 +146,21 @@ export function SettingsTab() {
   };
 
   const toggleTheme = (id: string) => {
-    const next = themes.map((t) => (t.id === id ? { ...t, enabled: !t.enabled } : t));
+    // Ensure only one theme can be enabled at a time. If the clicked theme
+    // was disabled, enable it and disable all others. If it was enabled,
+    // disable it (resulting in no active theme).
+    const next = themes.map((t) =>
+      t.id === id ? { ...t, enabled: !t.enabled } : { ...t, enabled: false },
+    );
     setThemes(next);
     saveThemes(next);
     applyEnabledThemes(next);
-    toast.success('Theme toggled');
+    const clicked = next.find((t) => t.id === id);
+    if (clicked?.enabled) {
+      toast.success('Theme enabled');
+    } else {
+      toast('No theme active');
+    }
   };
 
   const deleteTheme = (id: string) => {
