@@ -1,54 +1,40 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { BlogPost } from "../types/wordPress";
+import type { BlogPost } from "../../types/wordPress";
 
 interface NewsState {
   posts: BlogPost[];
-  lastFetched: number | null;
   isLoading: boolean;
   error: string | null;
-}
-
-interface NewsActions {
+  lastFetched: number | null;
   setPosts: (posts: BlogPost[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setLastFetched: (timestamp: number) => void;
-  clearCache: () => void;
   isCacheValid: () => boolean;
 }
 
-export const useNewsStore = create<NewsState & NewsActions>()(
+export const useNewsStore = create<NewsState>()(
   persist(
     (set, get) => ({
       posts: [],
-      lastFetched: null,
-      isLoading: false,
+      isLoading: true,
       error: null,
-
-      setPosts: (posts) => set({ posts, lastFetched: Date.now() }),
-      setLoading: (loading) => set({ isLoading: loading }),
-      setError: (error) => set({ error }),
-      setLastFetched: (timestamp) => set({ lastFetched: timestamp }),
-
-      clearCache: () => set({ posts: [], lastFetched: null, error: null }),
-
+      lastFetched: null,
+      setPosts: (posts: BlogPost[]) =>
+        set({ posts, isLoading: false, error: null, lastFetched: Date.now() }),
+      setLoading: (isLoading: boolean) => set({ isLoading }),
+      setError: (error: string | null) => set({ error, isLoading: false }),
       isCacheValid: () => {
         const { lastFetched } = get();
-        if (!lastFetched) return false;
-
-        // Cache ist 1 Stunde gültig
-        const CACHE_DURATION = 60 * 60 * 1000; // 1 Stunde in Millisekunden
-        return Date.now() - lastFetched < CACHE_DURATION;
+        if (!lastFetched) {
+          return false;
+        }
+        // Cache is valid for 5 minutes
+        return Date.now() - lastFetched < 5 * 60 * 1000;
       },
     }),
     {
-      name: "news-store",
-      // Nur posts und lastFetched persistieren
-      partialize: (state) => ({
-        posts: state.posts,
-        lastFetched: state.lastFetched,
-      }),
-    }
-  )
+      name: "news-storage",
+    },
+  ),
 );

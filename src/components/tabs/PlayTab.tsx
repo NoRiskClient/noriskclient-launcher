@@ -8,6 +8,7 @@ import { useProfileStore } from "../../store/profile-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { PlayerActionsDisplay } from "../launcher/PlayerActionsDisplay";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
+import { usePlayTabStore } from "../../store/usePlayTabStore";
 import {
   BACKGROUND_EFFECTS,
   useBackgroundEffectStore,
@@ -25,6 +26,7 @@ export function PlayTab() {
   const { activeAccount } = useMinecraftAuthStore();
   const { staticBackground, accentColor } = useThemeStore();
   const { currentEffect } = useBackgroundEffectStore();
+  const { isNewsSectionVisible } = usePlayTabStore();
 
   useEffect(() => {
     if (!storeSelectedProfile && profiles.length > 0) {
@@ -86,7 +88,9 @@ export function PlayTab() {
         </div>
       </div>
 
-      <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />
+      {isNewsSectionVisible && (
+        <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />
+      )}
     </div>
   );
 }
