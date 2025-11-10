@@ -64,7 +64,7 @@ function CapeItemDisplay({
   hideModal,
   isVanilla = false,
 }: CapeItemDisplayProps) {
-  const handleCapeClick = useCallback(() => {
+  const handleCapeClick = useCallback(async () => {
     if (isCurrentlyEquipping || !showModal) return;
 
     const userSkinUrl = activeAccount?.id
@@ -73,6 +73,30 @@ function CapeItemDisplay({
 
     const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
     const capeUrl = isVanilla ? (cape as VanillaCape).url : `https://cdn.norisk.gg/capes/prod/${capeId}.png`;
+
+    // Try to detect the user's skin variant (slim vs classic) when possible so the 3D preview shows correctly.
+    // Fallback to 'classic' if detection fails or no access token is available.
+    let skinVariant: 'classic' | 'slim' = 'classic';
+    try {
+      if (activeAccount?.id && (activeAccount as any).access_token) {
+        // Lazy import to avoid adding extra weight when not needed
+        const { MinecraftSkinService } = await import("../../services/minecraft-skin-service");
+        const profile = await MinecraftSkinService.getUserSkinData(activeAccount.id, (activeAccount as any).access_token);
+        const texturesProp = profile?.properties?.find((p) => p.name === 'textures')?.value;
+        if (texturesProp) {
+          try {
+            const decoded = JSON.parse(atob(texturesProp));
+            const model = decoded?.textures?.SKIN?.metadata?.model;
+            if (model === 'slim') skinVariant = 'slim';
+          } catch (err) {
+            // ignore parse errors and keep default
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore errors - we'll fallback to classic
+      console.warn('[CapeList] Failed to detect skin variant, using classic.', err);
+    }
 
     showModal(`cape-preview-${capeId}`, (
       <Modal
@@ -86,11 +110,13 @@ function CapeItemDisplay({
           capeUrl={isVanilla ? capeUrl : undefined}
           capeId={capeId}
           isEquipped={false}
+          skinVariant={skinVariant}
           onEquipCape={() => {
             onEquipCape(capeId);
             hideModal && hideModal(`cape-preview-${capeId}`);
           }}
         />
+        {/* Pass skinVariant to SkinView3DWrapper via the preview component by mounting a small wrapper that sets the prop. */}
       </Modal>
     ));
   }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla]);
@@ -716,13 +742,15 @@ function Cape3DPreviewWithToggle({
   capeUrl,
   capeId,
   onEquipCape,
-  isEquipped = false
+  isEquipped = false,
+  skinVariant = 'classic',
 }: {
   skinUrl?: string;
   capeUrl?: string; // Optional - falls nicht übergeben, wird CDN URL verwendet
   capeId: string;
   onEquipCape: () => void;
   isEquipped?: boolean; // Optional - für Vanilla Capes relevant
+  skinVariant?: 'classic' | 'slim'
 }) {
   const [showElytra, setShowElytra] = useState(false);
 
@@ -749,6 +777,7 @@ function Cape3DPreviewWithToggle({
         <SkinView3DWrapper
           skinUrl={skinUrl}
           capeUrl={finalCapeUrl}
+          skinVariant={skinVariant}
           enableAutoRotate={true}
           autoRotateSpeed={0.5}
           startFromBack={true}
