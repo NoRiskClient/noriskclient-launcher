@@ -75,9 +75,62 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
   addAccount: async () => {
     set({ isLoading: true, error: null });
 
+    const openSystemBrowser = async (url: string) => {
+      // try Tauri first, then window.open as fallback
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const tauriShell = await import("@tauri-apps/plugin-shell");
+        if (tauriShell && typeof tauriShell.open === "function") {
+          await tauriShell.open(url);
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Fallback to normal window.open
+      try {
+        window.open(url, "_blank", "noopener");
+      } catch (e) {
+        console.error("Failed to open external browser for login:", e);
+      }
+    };
+
+    const isLinux =
+      (typeof process !== "undefined" && (process as any).platform === "linux") ||
+      (typeof navigator !== "undefined" && /linux/.test(navigator.userAgent.toLowerCase()));
+
     const fullProcessPromise = (async () => {
       // Step 1: Login
-      const newAccount = await MinecraftAuthService.beginLogin();
+      // On Linux: prefer opening the system default browser to avoid embedded-webview issues.
+      let newAccount: MinecraftAccount | null = null;
+
+      try {
+        if (isLinux) {
+          // If the service exposes a direct external-start helper, use it
+          if (typeof (MinecraftAuthService as any).beginLoginExternal === "function") {
+            newAccount = await (MinecraftAuthService as any).beginLoginExternal();
+          } else if (typeof (MinecraftAuthService as any).getLoginUrl === "function") {
+            // If we can obtain a URL, open it in the system browser and then wait for the normal beginLogin flow
+            const url = await (MinecraftAuthService as any).getLoginUrl();
+            if (url) {
+              await openSystemBrowser(url);
+            }
+            // After opening external browser, beginLogin may wait/poll for the completed auth
+            newAccount = await MinecraftAuthService.beginLogin();
+          } else {
+            // Fallback: call standard beginLogin (may open embedded window)
+            newAccount = await MinecraftAuthService.beginLogin();
+          }
+        } else {
+          // Non-Linux: original behavior
+          newAccount = await MinecraftAuthService.beginLogin();
+        }
+      } catch (err) {
+        // propagate error to be handled below
+        throw err;
+      }
+
       if (!newAccount) {
         // This will be caught by toast.promise and the try/catch block
         throw new Error("Login cancelled by user.");
