@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
+import { useRef } from "react";
 import { StableIcon } from "./IconWrapper";
 import { CustomDropdown } from "./CustomDropdown";
 import type { DropdownOption } from "./CustomDropdown";
@@ -52,6 +53,8 @@ export function SearchWithFilters({
   showSort = true,
   showFilter = true,
 }: SearchWithFiltersProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onSearchChange?.(e.target.value);
   };
@@ -62,22 +65,46 @@ export function SearchWithFilters({
     }
   };
 
+  const handleClearSearch = () => {
+    onSearchChange?.("");
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const showSortSection = showSort && sortOptions.length > 0;
+  const showFilterSection = showFilter && filterOptions.length > 0;
+  const hasSearchValue = Boolean(searchValue);
+
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       {/* Search with integrated filters */}
       <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors flex-1 max-w-md">
-        <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50" />
-        <input
-          type="text"
-          placeholder={placeholder}
-          value={searchValue}
-          onChange={handleSearchChange}
-          onKeyDown={handleSearchKeyDown}
-          className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none"
-        />
+        <div className="flex items-center gap-2 flex-1">
+          <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={placeholder}
+            value={searchValue}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+            className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none"
+          />
+          {hasSearchValue && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              aria-label="Clear search"
+              className="text-white/60 hover:text-white transition-colors duration-200"
+            >
+              <Icon icon="lucide:x" className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         
         {/* Sort Filter */}
-        {showSort && sortOptions.length > 0 && (
+        {showSortSection && (
           <>
             {/* Separator */}
             <div className="h-4 w-px bg-white/20 mx-2"></div>
@@ -96,7 +123,7 @@ export function SearchWithFilters({
         )}
         
         {/* Version/Filter */}
-        {showFilter && filterOptions.length > 0 && (
+        {showFilterSection && (
           <>
             {/* Separator */}
             <div className="h-4 w-px bg-white/20 mx-2"></div>
