@@ -768,7 +768,12 @@ impl MinecraftAuthStore {
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
                 info!("[Account Manager] Found existing account, updating credentials");
+
+                // Preserve the current active state to avoid race conditions with set_active_account
+                let was_active = existing.active;
                 *existing = credentials;
+                existing.active = was_active;
+
                 info!("[Account Manager] Account successfully updated");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
