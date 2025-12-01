@@ -119,7 +119,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
       } else if (isDraggingHue && hueRef.current) {
         const rect = hueRef.current.getBoundingClientRect();
         const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        const hue = y * 360;
+        const hue = y * 359.99; // Keep hue between 0-359.99 to avoid wrapping issues
         setHsv(prev => ({ ...prev, h: hue }));
       }
     };
@@ -194,7 +194,9 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
               <div
                 className="absolute inset-0 rounded-lg"
                 style={{
-                  background: 'linear-gradient(to right, white, transparent), linear-gradient(to top, black, transparent)'
+                  background:
+                      "linear-gradient(to top, rgb(0, 0, 0), rgba(0, 0, 0, 0)), " +
+                      "linear-gradient(to right, rgb(255, 255, 255), rgba(255, 255, 255, 0))"
                 }}
               />
               {/* Color indicator */}
@@ -223,7 +225,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
                 if (hueRef.current) {
                   const rect = hueRef.current.getBoundingClientRect();
                   const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-                  const hue = y * 360;
+                  const hue = y * 359.99; // Keep hue between 0-359.99 to avoid wrapping issues
                   setHsv(prev => ({ ...prev, h: hue }));
                 }
               }}
@@ -232,7 +234,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
               <div
                 className="absolute left-0 w-full h-1 bg-white border border-black transform -translate-y-1/2"
                 style={{
-                  top: `${(hsv.h / 360) * 100}%`
+                  top: `${(hsv.h / 359.99) * 100}%`
                 }}
               />
             </div>

@@ -43,6 +43,20 @@ export const copyWorld = (params: CopyWorldParams): Promise<string> => {
 };
 
 /**
+ * Imports a Minecraft world from an external path into a profile's saves directory.
+ */
+export const importWorld = (profileId: string, sourceWorldPath: string, targetWorldName: string): Promise<string> => {
+  console.debug(`[WorldService] Importing world from ${sourceWorldPath} to profile ${profileId} as ${targetWorldName}`);
+  return invoke('import_world', { 
+    params: {
+      profile_id: profileId,
+      source_world_path: sourceWorldPath,
+      target_world_name: targetWorldName,
+    }
+  });
+};
+
+/**
  * Deletes a specific world from a profile.
  */
 export const deleteWorld = (profileId: string, worldFolder: string): Promise<void> => {

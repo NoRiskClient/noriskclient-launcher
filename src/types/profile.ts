@@ -84,6 +84,13 @@ export interface ProfileSettings {
   quick_play_path: string | null;   // Option<String> -> string | null (Quick Play path)
 }
 
+export interface SymlinkInfo {
+  link_path: string; // Relative path within profile
+  target_path: string; // Absolute target path
+  link_type: string; // "junction", "symlink", or "hardlink"
+  is_directory: boolean;
+}
+
 interface ModSourceBase {
   type: "local" | "url" | "maven" | "embedded" | "modrinth" | "curseforge";
 }
@@ -206,6 +213,7 @@ export interface Profile {
   background: ProfileBanner | null;
   norisk_information: NoriskInformation | null;
   modpack_info?: ModPackInfo | null;
+  preferred_account_id: string | null;
 }
 
 export interface ProfileGroup {
@@ -249,6 +257,8 @@ export interface UpdateProfileParams {
   banner?: ProfileBanner | null;
   background?: ProfileBanner | null;
   norisk_information?: NoriskInformation | null;
+  preferred_account_id?: string | null;
+  clear_preferred_account?: boolean;
 }
 
 export interface CopyProfileParams {

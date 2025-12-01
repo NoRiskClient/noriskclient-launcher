@@ -364,3 +364,35 @@ export async function toggleModUpdates(
 ): Promise<void> {
   return invoke<void>("toggle_mod_updates", { payload });
 }
+
+// Symlink commands
+export async function getProfileInstancePath(profileId: string): Promise<string> {
+  return invoke<string>("get_profile_instance_path", { profileId });
+}
+export async function getDefaultProfilePath(): Promise<string> {
+  return invoke<string>("get_default_profile_path");
+}
+
+export interface AddSymlinkParams {
+  profile_id: string;
+  relative_path: string;
+  external_path: string;
+}
+
+export async function addProfileSymlink(params: AddSymlinkParams): Promise<void> {
+  return invoke<void>("add_profile_symlink", { params });
+}
+
+export async function removeProfileSymlink(
+  profileId: string,
+  relativePath: string,
+): Promise<void> {
+  return invoke<void>("remove_profile_symlink", { 
+    profileId, 
+    relativePath 
+  });
+}
+
+export async function getProfileSymlinks(profileId: string): Promise<import("../types/profile").SymlinkInfo[]> {
+  return invoke<import("../types/profile").SymlinkInfo[]>("get_profile_symlinks", { profileId });
+}

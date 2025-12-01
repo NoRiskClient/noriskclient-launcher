@@ -31,6 +31,7 @@ export enum EventType {
   MigrationStarted = "migration_started",
   MigrationCompleted = "migration_completed",
   MigrationFailed = "migration_failed",
+  ExportingProfile = "exporting_profile",
 }
 
 export interface EventPayload {

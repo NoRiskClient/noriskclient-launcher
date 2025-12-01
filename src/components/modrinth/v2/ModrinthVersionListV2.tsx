@@ -86,6 +86,8 @@ interface ModrinthVersionListV2Props {
     newEnabledState: boolean,
     sha1Hash: string,
   ) => void;
+  isProjectBlocked?: boolean; // Deprecated, use projectNoRiskStatus instead
+  projectNoRiskStatus?: 'blocked' | 'warning' | null;
 }
 
 // --- Component Implementation ---
@@ -117,6 +119,8 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
   selectedProfileId,
   onDeleteClick,
   onToggleEnableClick,
+  isProjectBlocked = false, // Deprecated
+  projectNoRiskStatus = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -498,6 +502,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
                 selectedProfileId={selectedProfileId}
                 onDeleteClick={onDeleteClick}
                 onToggleEnableClick={onToggleEnableClick}
+                noRiskStatus={(version as any).noRiskStatus || projectNoRiskStatus}
               />
             );
           })}

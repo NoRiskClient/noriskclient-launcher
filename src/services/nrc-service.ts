@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { BlogPost } from '../types/wordPress';
 import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
+import type { AdventCalendarDay, Reward } from '../types/advent';
 import { useProfileStore } from '../store/profile-store';
 import { getBlockedModsConfig } from './flagsmith-service';
 
@@ -178,6 +179,27 @@ export const checkUpdateAvailable = (): Promise<UpdateInfo | null> => {
  */
 export const downloadAndInstallUpdate = (): Promise<void> => {
   return invoke('download_and_install_update_command');
+};
+
+/**
+ * Fetches the advent calendar data from the backend.
+ *
+ * @returns A promise that resolves to an array of AdventCalendarDay objects.
+ * @throws If the backend command fails.
+ */
+export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => {
+  return invoke('get_advent_calendar_command');
+};
+
+/**
+ * Claims a reward for a specific day in the advent calendar.
+ *
+ * @param tag The day number (1-24) to claim.
+ * @returns A promise that resolves to the claimed AdventCalendarDay.
+ * @throws If the backend command fails.
+ */
+export const claimAdventCalendarDay = (tag: number): Promise<AdventCalendarDay> => {
+  return invoke('claim_advent_calendar_day_command', { tag });
 };
 
 // Re-export logging utilities for backward compatibility

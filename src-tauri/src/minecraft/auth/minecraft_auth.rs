@@ -692,6 +692,71 @@ impl MinecraftAuthStore {
         Ok(accounts.iter().find(|acc| acc.id == id).cloned())
     }
 
+    /// Gets an account by ID and refreshes its tokens if necessary.
+    /// 
+    /// This method retrieves an account by its ID, refreshes Microsoft and NoRisk tokens
+    /// if needed, updates the account in storage, and returns the refreshed credentials.
+    /// 
+    /// # Arguments
+    /// * `id` - The UUID of the account to retrieve
+    /// * `experimental_mode` - Whether to use experimental mode for NoRisk token refresh
+    /// 
+    /// # Returns
+    /// * `Ok(Some(Credentials))` - The refreshed account credentials
+    /// * `Ok(None)` - Account not found
+    /// * `Err` - Error during retrieval or refresh
+    pub async fn get_account_by_id_with_refresh(
+        &self,
+        id: Uuid,
+        experimental_mode: bool,
+    ) -> Result<Option<Credentials>> {
+        info!(
+            "[Account Manager] Getting account by ID with refresh: {}",
+            id
+        );
+
+        // Get the account from storage
+        let account = self.get_account_by_id(id).await?;
+
+        if let Some(creds) = account {
+            info!(
+                "[Account Manager] Found account: {}. Refreshing tokens.",
+                creds.username
+            );
+
+            // Refresh tokens if needed
+            let updated_account = self
+                .update_norisk_and_microsoft_token(&creds, experimental_mode)
+                .await?;
+
+            if let Some(updated) = updated_account {
+                // Update account in storage after refresh
+                {
+                    info!("[Account Manager] Acquiring write lock to update account");
+                    let mut accounts = self.accounts.write().await;
+                    info!("[Account Manager] Successfully acquired write lock");
+                    if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
+                        info!("[Account Manager] Updating account in list");
+                        *existing = updated.clone();
+                    }
+                    info!("[Account Manager] Releasing write lock");
+                } // Write-Lock wird hier freigegeben
+
+                info!("[Account Manager] Saving updated account");
+                self.save().await?;
+                info!("[Account Manager] Successfully saved account");
+
+                Ok(Some(updated))
+            } else {
+                info!("[Account Manager] Token refresh returned None, using original credentials");
+                Ok(Some(creds))
+            }
+        } else {
+            info!("[Account Manager] Account with ID {} not found", id);
+            Ok(None)
+        }
+    }
+
     pub async fn update_or_insert(&self, credentials: Credentials) -> Result<()> {
         info!("[Account Manager] Starting account update/insert operation");
         info!("[Account Manager] Account ID: {}", credentials.id);

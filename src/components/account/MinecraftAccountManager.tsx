@@ -12,6 +12,7 @@ import { DropdownDivider } from "../ui/dropdown/DropdownDivider";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useRef, useState } from "react";
 import { gsap } from "gsap";
+import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 
 interface MinecraftAccountManagerProps {
   onClose: () => void;
@@ -58,7 +59,7 @@ export function MinecraftAccountManager({
   if (isInDropdown) {
     return (
       <div className="flex flex-col max-h-[400px]">
-        <DropdownHeader title="Minecraft Accounts">
+        <DropdownHeader title="minecraft accounts">
           <button
             onClick={onClose}
             className="text-white/70 hover:text-white transition-colors"
@@ -233,10 +234,13 @@ function AccountItem({
   const itemRef = useRef<HTMLDivElement>(null);
   const [isActivating, setIsActivating] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
-
-  const avatarUrl = account.id
-    ? `https://crafatar.com/avatars/${account.id}?overlay&size=${isDropdownItem ? 24 : 40}`
-    : null;
+  // Avatar sizes in pixels
+  const avatarSizePx = isDropdownItem ? 32 : 40;
+  const avatarUrl = useCrafatarAvatar({
+    uuid: account.id,
+    size: avatarSizePx,
+    overlay: true,
+  });
 
   const handleAccountClick = () => {
     if (
@@ -299,15 +303,24 @@ function AccountItem({
     >
       <div className="flex items-center gap-2 min-w-0 flex-grow p-2">
         <div
-          className={`relative ${
-            isDropdownItem ? "w-6 h-6" : "w-10 h-10"
-          } overflow-hidden border border-white/20 flex items-center justify-center bg-black/50 flex-shrink-0 rounded-sm`}
+          className="relative overflow-hidden border border-white/20 flex items-center justify-center bg-black/50 flex-shrink-0 rounded-sm"
+          style={{
+            width: isDropdownItem ? '32px' : '40px',
+            height: isDropdownItem ? '32px' : '40px',
+          }}
         >
           {avatarUrl ? (
             <img
               src={avatarUrl || "/placeholder.svg"}
               alt={`${account.minecraft_username || account.username}'s avatar`}
-              className="w-full h-full object-cover"
+              className="pixelated"
+              style={{
+                width: `${avatarSizePx}px`,
+                height: `${avatarSizePx}px`,
+                objectFit: 'cover',
+                display: 'block',
+                imageRendering: 'pixelated' as const,
+              }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -315,9 +328,9 @@ function AccountItem({
             />
           ) : (
             <span
-              className={`text-white font-minecraft ${isDropdownItem ? "text-xs" : ""}`}
+              className={`text-white font-minecraft lowercase ${isDropdownItem ? "text-xs" : ""}`}
             >
-              {account.minecraft_username?.charAt(0).toUpperCase() || "?"}
+              {account.minecraft_username?.charAt(0) || "?"}
             </span>
           )}
         </div>

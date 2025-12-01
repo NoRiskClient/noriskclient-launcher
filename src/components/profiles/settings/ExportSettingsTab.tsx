@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type { Profile } from "../../../types/profile"; // Adjust path as needed
-import { Input } from "../../ui/Input";
+import { SearchStyleInput } from "../../ui/Input";
 import { Checkbox } from "../../ui/Checkbox";
 import { Button } from "../../ui/buttons/Button";
 import { Card } from "../../ui/Card";
@@ -13,6 +13,8 @@ import * as ProfileService from "../../../services/profile-service"; // Adjust p
 import { toast } from "react-hot-toast";
 import { useThemeStore } from "../../../store/useThemeStore";
 import gsap from "gsap";
+import { listen } from "@tauri-apps/api/event";
+import { EventType, type EventPayload } from "../../../types/events";
 
 interface ExportSettingsTabProps {
   profile: Profile;
@@ -25,6 +27,7 @@ interface ExportSettingsTabProps {
     isDisabled: () => boolean;
     exportOpenFolder: boolean;
     setExportOpenFolder: (value: boolean) => void;
+    isExporting?: boolean;
   }) => void;
   isInModalContext?: boolean; // New prop, defaults to false
 }
@@ -51,6 +54,9 @@ export function ExportSettingsTab({
   const [directoryError, setDirectoryError] = useState<string | null>(null);
 
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportMessage, setExportMessage] = useState<string>("");
+  const exportToastIdRef = useRef<string | null>(null);
 
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled
@@ -64,6 +70,40 @@ export function ExportSettingsTab({
   useEffect(() => {
     selectedExportPathsRef.current = selectedExportPaths;
   }, [selectedExportPaths]);
+
+  // Listen for export progress events
+  useEffect(() => {
+    if (!isExporting || !profile.id) return;
+
+    let isMounted = true;
+    const unlistenPromise = listen<EventPayload>("state_event", (event) => {
+      if (!isMounted) return;
+      const payload = event.payload;
+
+      // Only handle events for this profile
+      if (payload.target_id === profile.id && payload.event_type === EventType.ExportingProfile) {
+        setExportMessage(payload.message);
+        
+        if (payload.progress !== null) {
+          const progressPercent = Math.round(payload.progress * 100);
+          setExportProgress(progressPercent);
+          
+          // Update the existing loading toast with progress
+          if (exportToastIdRef.current) {
+            toast.loading(
+              `${payload.message} (${progressPercent}%)`,
+              { id: exportToastIdRef.current }
+            );
+          }
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unlistenPromise.then((unlisten) => unlisten()).catch(console.error);
+    };
+  }, [isExporting, profile.id]);
 
   useEffect(() => {
     const fetchStructure = async () => {
@@ -126,6 +166,11 @@ export function ExportSettingsTab({
 
     const currentPathsForExport = selectedExportPathsRef.current;
 
+    // Set exporting state and reset progress
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportMessage("Starting export...");
+
     const exportPromise = ProfileService.exportProfile({
       profile_id: profile.id,
       file_name: exportFilename,
@@ -136,27 +181,26 @@ export function ExportSettingsTab({
       open_folder: exportOpenFolder,
     });
 
-    toast.promise(exportPromise, {
-      loading: `Exporting profile '${exportFilename}'...`,
-      success: (exportPath) => {
-        setIsExporting(false); // Ensure isExporting is reset on success
-        return `Profile successfully exported to: ${exportPath}`;
-      },
-      error: (err) => {
-        setIsExporting(false); // Ensure isExporting is reset on error
-        const message =
-          err instanceof Error ? err.message : String(err.message);
-        // console.error is still good for detailed logs in developer console
-        console.error("Failed to export profile:", err);
-        return `Failed to export profile: ${message}`;
-      },
-    });
+    // Store the toast ID so we can update it with progress
+    const toastId = toast.loading(`Exporting profile '${exportFilename}'...`);
+    exportToastIdRef.current = toastId;
 
-    // Set isExporting to true when the operation starts,
-    // and let the promise toast handle resetting it or further actions.
-    // It might be better to set it right before the toast.promise if ProfileService.exportProfile is truly async setup
-    setIsExporting(true);
-    // The setIsExporting(false) will be handled by the success/error callbacks of the toast
+    try {
+      const exportPath = await exportPromise;
+      toast.success(`Profile successfully exported to: ${exportPath}`, { id: toastId });
+      setIsExporting(false);
+      setExportProgress(null);
+      setExportMessage("");
+      exportToastIdRef.current = null;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err.message);
+      console.error("Failed to export profile:", err);
+      toast.error(`Failed to export profile: ${message}`, { id: toastId });
+      setIsExporting(false);
+      setExportProgress(null);
+      setExportMessage("");
+      exportToastIdRef.current = null;
+    }
   };
 
   // GSAP animation for the tab content, similar to other tabs
@@ -180,6 +224,7 @@ export function ExportSettingsTab({
           isExporting || !exportFilename.trim() || isLoadingDirectory,
         exportOpenFolder,
         setExportOpenFolder,
+        isExporting,
       });
     }
   }, [
@@ -216,14 +261,12 @@ export function ExportSettingsTab({
           >
             Export Filename
           </label>
-          <Input
-            id="exportFilename"
+          <SearchStyleInput
             value={exportFilename}
             onChange={(e) => setExportFilename(e.target.value)}
             placeholder="Enter filename without extension"
-            className="text-xl py-2.5"
+            icon="solar:document-text-bold"
             disabled={isExporting}
-            variant="flat"
           />
           <p className="mt-1 text-xs text-white/50 font-minecraft-ten tracking-wide">
             The .noriskpack extension will be added automatically.
@@ -295,7 +338,28 @@ export function ExportSettingsTab({
               className="text-sm"
             />
           </Card>
-        </div>{" "}
+        </div>
+
+        {/* Progress indicator during export (shown in both contexts) */}
+        {isInModalContext && isExporting && exportProgress !== null && (
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between items-center text-sm font-minecraft-ten">
+              <span className="text-white/70">{exportMessage}</span>
+              <span className="text-white font-minecraft">{exportProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-black/30 border border-white/10 overflow-hidden">
+              <div
+                className="h-full transition-all duration-300 ease-out"
+                style={{
+                  width: `${exportProgress}%`,
+                  backgroundColor: `rgb(${accentColor})`,
+                  boxShadow: `0 0 10px rgba(${accentColor}, 0.5)`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {!isInModalContext && ( // Internal controls only if NOT in modal context
           <>
             <div className="space-y-2 mt-4">
@@ -310,6 +374,26 @@ export function ExportSettingsTab({
               />
             </div>
 
+            {/* Progress indicator during export */}
+            {isExporting && exportProgress !== null && (
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between items-center text-sm font-minecraft-ten">
+                  <span className="text-white/70">{exportMessage}</span>
+                  <span className="text-white font-minecraft">{exportProgress}%</span>
+                </div>
+                <div className="w-full h-2 bg-black/30 border border-white/10 overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-300 ease-out"
+                    style={{
+                      width: `${exportProgress}%`,
+                      backgroundColor: `rgb(${accentColor})`,
+                      boxShadow: `0 0 10px rgba(${accentColor}, 0.5)`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 pt-4 border-t border-white/10">
               <Button
                 variant="default"
@@ -321,7 +405,7 @@ export function ExportSettingsTab({
                 size="md"
                 className="text-xl w-full md:w-auto"
               >
-                Export Profile
+                {isExporting ? "Exporting..." : "Export Profile"}
               </Button>
             </div>
           </>

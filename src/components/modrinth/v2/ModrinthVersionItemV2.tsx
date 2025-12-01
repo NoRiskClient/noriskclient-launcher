@@ -13,6 +13,7 @@ import { ActionButton } from "../../ui/ActionButton";
 import { TagBadge } from "../../ui/TagBadge";
 import { gsap } from "gsap";
 import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
+import { Tooltip } from "../../ui/Tooltip";
 
 interface ModrinthVersionItemV2Props {
   version: UnifiedVersion;
@@ -45,6 +46,8 @@ interface ModrinthVersionItemV2Props {
     version: UnifiedVersion,
   ) => void;
   selectedProfileId?: string | null;
+  isBlocked?: boolean; // Deprecated, use noRiskStatus instead
+  noRiskStatus?: 'blocked' | 'warning' | null;
 }
 
 export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
@@ -63,6 +66,8 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     onToggleEnableClick,
     onInstallModpackVersionAsProfileClick,
     selectedProfileId,
+    isBlocked = false, // Deprecated
+    noRiskStatus = null,
   }) => {
     const isModpack = project.project_type === "modpack";
     const cardRef = useRef<HTMLDivElement>(null);
@@ -279,13 +284,40 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
         <div className="relative z-10 p-2.5">
           <div className="flex flex-col space-y-2">
             <div className="flex justify-between items-baseline gap-2">
-              <div className="flex-shrink min-w-0">
-                <h5 className="text-gray-100 text-sm font-minecraft-ten normal-case truncate">
-                  {version.name}
-                </h5>
-                <p className="text-gray-400 text-xs font-minecraft-ten normal-case truncate">
-                  {version.version_number}
-                </p>
+              <div className="flex-shrink min-w-0 flex items-center gap-2">
+                {noRiskStatus === 'blocked' && (
+                  <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+                    <Icon 
+                      icon="solar:danger-triangle-bold" 
+                      className="w-4 h-4 text-red-500 flex-shrink-0"
+                    />
+                  </Tooltip>
+                )}
+                {noRiskStatus === 'warning' && (
+                  <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+                    <Icon 
+                      icon="solar:danger-triangle-bold" 
+                      className="w-4 h-4 text-yellow-500 flex-shrink-0"
+                    />
+                  </Tooltip>
+                )}
+                {/* Fallback for deprecated isBlocked prop */}
+                {!noRiskStatus && isBlocked && (
+                  <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+                    <Icon 
+                      icon="solar:danger-triangle-bold" 
+                      className="w-4 h-4 text-red-500 flex-shrink-0"
+                    />
+                  </Tooltip>
+                )}
+                <div className="min-w-0">
+                  <h5 className="text-gray-100 text-sm font-minecraft-ten normal-case truncate">
+                    {version.name}
+                  </h5>
+                  <p className="text-gray-400 text-xs font-minecraft-ten normal-case truncate">
+                    {version.version_number}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-minecraft-ten flex-shrink-0">
                 {" "}
@@ -406,7 +438,13 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                     variant={buttonVariant}
                     disabled={buttonDisabled || isInstalling}
                     className="min-w-[80px]"
-                    icon={isInstalling || isInstallingModpackVersion ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
+                    icon={
+                      isInstalling || isInstallingModpackVersion 
+                        ? "solar:refresh-bold" 
+                        : (noRiskStatus === 'blocked' || noRiskStatus === 'warning')
+                          ? "solar:danger-triangle-bold"
+                          : "solar:download-minimalistic-bold"
+                    }
                     iconClassName={(isInstalling || isInstallingModpackVersion) ? "animate-spin-slow" : ""}
                     label={buttonText}
                   />

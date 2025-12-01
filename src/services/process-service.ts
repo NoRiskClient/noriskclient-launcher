@@ -122,6 +122,25 @@ export async function getLogContentForProcess(processId: string): Promise<string
 }
 
 /**
+ * Manually fetches the latest crash report for a specific profile and process.
+ * @param profileId - The profile UUID (to locate crash-reports folder)
+ * @param processId - The process UUID (for event emission, optional)
+ */
+export async function fetchCrashReport(profileId: string, processId?: string): Promise<string | null> {
+  console.debug(`[ProcessService] Fetching crash report for profile ${profileId}, process ${processId || 'none'}`);
+  try {
+    const crashContent = await invoke<string | null>("fetch_crash_report", { 
+      profileId, 
+      processId: processId || null 
+    });
+    return crashContent || null;
+  } catch (error) {
+    console.error(`[ProcessService] Failed to fetch crash report:`, error);
+    return null;
+  }
+}
+
+/**
  * Submits a crash log to the backend.
  */
 export async function submitCrashLog(payload: CrashlogDto): Promise<void> {

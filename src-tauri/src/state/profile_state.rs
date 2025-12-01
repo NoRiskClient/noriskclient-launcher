@@ -154,6 +154,10 @@ pub struct Profile {
     /// Information about this profile's modpack origin (if it was created from a modpack)
     #[serde(default)]
     pub modpack_info: Option<ModPackInfo>,
+    /// Optional preferred account UUID for launching this profile
+    /// If set, this account will be used instead of the global active account
+    #[serde(default)]
+    pub preferred_account_id: Option<Uuid>,
 }
 
 fn default_true() -> bool {

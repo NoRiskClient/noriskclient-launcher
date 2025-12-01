@@ -19,6 +19,7 @@ pub mod updater_utils;
 pub mod world_utils; // <-- Hinzugefügt
 pub mod trash_utils; // <-- New trash module
 pub mod backup_utils; // <-- New backup module for critical files
+pub mod symlink_utils; // <-- Symlink utilities for profile folder sharing
 
 // Füge hier ggf. andere Util-Module hinzu
 // pub mod network_utils;

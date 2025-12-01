@@ -19,6 +19,7 @@ import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
 import { ThemedSurface } from "../../ui/ThemedSurface";
+import { Tooltip } from "../../ui/Tooltip";
 
 type Profile = any;
 
@@ -100,6 +101,8 @@ export interface ModrinthProjectCardV2Props
   onToggleVersionsClick: (projectId: string) => void;
   isExpanded: boolean;
   isLoadingVersions: boolean;
+  isBlocked?: boolean; // Deprecated, use projectNoRiskStatus instead
+  projectNoRiskStatus?: 'blocked' | 'warning' | null;
   projectVersions: UnifiedVersion[] | null | "loading";
   displayedCount: number;
   versionDropdownUIState: {
@@ -191,6 +194,8 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     onDeleteVersionClick,
     onToggleEnableClick,
     itemIndex,
+    isBlocked = false, // Deprecated
+    projectNoRiskStatus = null,
   }) => {
     useEffect(() => {
       preloadIcons([
@@ -217,6 +222,44 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             "border-l-blue-500",
         )}
       >
+        {/* Blocked Mod Warning Icon - Top Left */}
+        {projectNoRiskStatus === 'blocked' && (
+          <div className="absolute top-2 left-2 z-10 pointer-events-auto">
+            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+              <div>
+                <Icon 
+                  icon="solar:danger-triangle-bold" 
+                  className="w-5 h-5 text-red-500"
+                />
+              </div>
+            </Tooltip>
+          </div>
+        )}
+        {projectNoRiskStatus === 'warning' && (
+          <div className="absolute top-2 left-2 z-10 pointer-events-auto">
+            <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+              <div>
+                <Icon 
+                  icon="solar:danger-triangle-bold" 
+                  className="w-5 h-5 text-yellow-500"
+                />
+              </div>
+            </Tooltip>
+          </div>
+        )}
+        {/* Fallback for deprecated isBlocked prop */}
+        {!projectNoRiskStatus && isBlocked && (
+          <div className="absolute top-2 left-2 z-10 pointer-events-auto">
+            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+              <div>
+                <Icon 
+                  icon="solar:danger-triangle-bold" 
+                  className="w-5 h-5 text-red-500"
+                />
+              </div>
+            </Tooltip>
+          </div>
+        )}
 
         {/* Stats - absolute oben rechts */}
         <div className="absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft-ten">
@@ -375,7 +418,13 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
           ) : (
             <ActionButton
               label={isQuickInstalling ? "Installing..." : "Install"}
-              icon={isQuickInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
+              icon={
+                isQuickInstalling 
+                  ? "solar:refresh-bold" 
+                  : (projectNoRiskStatus === 'blocked' || projectNoRiskStatus === 'warning')
+                    ? "solar:danger-triangle-bold"
+                    : "solar:download-minimalistic-bold"
+              }
               iconClassName={isQuickInstalling ? "animate-spin-slow" : ""}
               variant={isQuickInstalling ? "secondary" : "primary"}
               disabled={isQuickInstalling || (!!installStatus?.is_installed && !!selectedProfile)}
@@ -443,6 +492,8 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               onHoverVersion={onHoverVersion}
               onDeleteClick={onDeleteVersionClick}
                 onToggleEnableClick={onToggleEnableClick}
+                isProjectBlocked={isBlocked}
+                projectNoRiskStatus={projectNoRiskStatus || (isBlocked ? 'blocked' : null)}
               />
             </div>
           )}

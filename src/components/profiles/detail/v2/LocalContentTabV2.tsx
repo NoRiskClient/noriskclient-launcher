@@ -52,6 +52,7 @@ import { Tooltip } from "../../../ui/Tooltip"; // Added for custom tooltips
 import { ActionButton } from "../../../ui/ActionButton"; // Added for custom update button
 import { ModUpdateText, useModUpdateText } from "../../../ui/ModUpdateText"; // Added for formatted update text
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
+import { parseMotdToHtml } from "../../../../utils/motd-utils";
 
 /**
  * Determines if a given version is the currently installed version for an item
@@ -727,7 +728,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
   const renderListItem = useCallback(
     (item: T) => {
-      const itemTitle = getDisplayFileName(item);
+      const itemTitleRaw = getDisplayFileName(item);
+      const itemTitle = (
+        <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(itemTitleRaw) }} />
+      );
       const isToggling = itemBeingToggled === item.filename;
       const isDeleting = itemBeingDeleted === item.filename;
       const isCurrentlyUpdating = itemsBeingUpdated.has(item.filename);
@@ -741,13 +745,20 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
       const isItemOpen = openVersionDropdownId === item.filename;
 
-      const isBlockedByNoRisk =
-        !!profile?.selected_norisk_pack_id &&
-        isBlockedConfigLoaded &&
-        FlagsmithService.isModBlockedByNoRisk(
-          item.filename,
-          item.modrinth_info?.project_id,
-        );
+      const noRiskStatus = isBlockedConfigLoaded
+        ? FlagsmithService.getModNoRiskStatus(
+            item.filename,
+            item.modrinth_info?.project_id || item.curseforge_info?.project_id,
+            item.modrinth_info?.version_id || item.curseforge_info?.file_id,
+          )
+        : null;
+      const isBlockedByNoRisk = noRiskStatus === 'blocked';
+      const isWarningByNoRisk = noRiskStatus === 'warning';
+      
+      // Debug logging
+      if (noRiskStatus) {
+        console.log('[LocalContentTabV2] Item:', item.filename, 'noRiskStatus:', noRiskStatus, 'isBlocked:', isBlockedByNoRisk, 'isWarning:', isWarningByNoRisk);
+      }
 
       // Get the appropriate icon using the platform-aware helper function
       const itemIconUrl = getItemIcon(item);
@@ -781,6 +792,30 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       const itemIconNode = (
         <div className="absolute inset-0 w-full h-full flex items-center justify-center">
           {iconToShow}
+          {isBlockedByNoRisk && (
+            <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
+              <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+                <div>
+                  <Icon 
+                    icon="solar:danger-triangle-bold" 
+                    className="w-4 h-4 text-red-500 drop-shadow-lg"
+                  />
+                </div>
+              </Tooltip>
+            </div>
+          )}
+          {!isBlockedByNoRisk && isWarningByNoRisk && (
+            <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
+              <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+                <div>
+                  <Icon 
+                    icon="solar:danger-triangle-bold" 
+                    className="w-4 h-4 text-yellow-500 drop-shadow-lg"
+                  />
+                </div>
+              </Tooltip>
+            </div>
+          )}
         </div>
       );
 

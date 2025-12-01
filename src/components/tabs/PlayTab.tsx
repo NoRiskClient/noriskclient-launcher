@@ -12,6 +12,8 @@ import {
   BACKGROUND_EFFECTS,
   useBackgroundEffectStore,
 } from "../../store/background-effect-store";
+import { SnowEffectToggle } from "../ui/SnowEffectToggle";
+import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 
 export function PlayTab() {
   const {
@@ -25,6 +27,7 @@ export function PlayTab() {
   const { activeAccount } = useMinecraftAuthStore();
   const { staticBackground, accentColor } = useThemeStore();
   const { currentEffect } = useBackgroundEffectStore();
+  const { isThemeActive, selectedTheme } = useLauncherTheme();
 
   useEffect(() => {
     if (!storeSelectedProfile && profiles.length > 0) {
@@ -51,13 +54,19 @@ export function PlayTab() {
   return (
     <div className="flex h-full relative">
       <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
-        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && (
+        {/* Only show RetroGrid effect if no theme background is active */}
+        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && !(isThemeActive && selectedTheme?.backgroundImage) && (
           <RetroGridEffect
             renderMode="both"
             isAnimationEnabled={!staticBackground}
             customGridLineColor={`${accentColor.value}80`}
           />
         )}
+
+        {/* Snow Effect Toggle - Top Right */}
+        <div className="absolute top-6 right-6 z-20">
+          <SnowEffectToggle variant="compact" size="sm" />
+        </div>
 
         {/* <VersionInfo
           profileId={currentDisplayProfile?.id || ""}

@@ -41,6 +41,7 @@ pub enum EventType {
     MigrationStarted,
     MigrationCompleted,
     MigrationFailed,
+    ExportingProfile,
 }
 
 #[derive(Serialize, Clone)]

@@ -7,6 +7,7 @@ import type {
     SkinVariant, 
     AddLocalSkinCommandPayload, 
     GetStarlightSkinRenderPayload, // Added new payload type
+    GetCrafatarAvatarPayload, // Added Crafatar payload type
     SkinSourceDetails // Keep this for internal construction
 } from "../types/localSkin"; // Relative path
 
@@ -175,5 +176,17 @@ export class MinecraftSkinService {
     static async getStarlightSkinRender(payload: GetStarlightSkinRenderPayload): Promise<string> {
         // The Rust command returns a PathBuf, which will be serialized as a string (the path).
         return await invoke<string>("get_starlight_skin_render", { payload });
+    }
+
+    /**
+     * Fetches a cached avatar from the Crafatar API via the backend.
+     * The backend handles caching and potential background updates.
+     * Falls back to cached version if API returns 503 or other errors.
+     * @param payload - The parameters for the avatar (UUID, optional size, optional overlay).
+     * @returns A promise resolving to the local file path (string) of the cached avatar image.
+     */
+    static async getCrafatarAvatar(payload: GetCrafatarAvatarPayload): Promise<string> {
+        // The Rust command returns a PathBuf, which will be serialized as a string (the path).
+        return await invoke<string>("get_crafatar_avatar", { payload });
     }
 }

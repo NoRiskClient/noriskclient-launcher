@@ -17,6 +17,7 @@ use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
@@ -1082,6 +1083,35 @@ pub async fn execute_group_migration(migration_info: MigrationInfo, profile_id: 
     }
 }
 
+/// Determines the optimal compression type for a file based on its extension and size.
+/// Already-compressed files and large files use Stored (no compression) for speed.
+/// Small text/config files use Deflate for better compression.
+fn determine_compression(file_path: &Path, file_size: u64) -> Compression {
+    // Files larger than 1MB - use Stored for speed
+    if file_size > 1_048_576 {
+        return Compression::Stored;
+    }
+
+    // Check file extension for already-compressed formats
+    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+        let ext_lower = ext.to_lowercase();
+        match ext_lower.as_str() {
+            // Already compressed formats
+            "png" | "jpg" | "jpeg" | "gif" | "zip" | "jar" | "gz" | "mca" | "dat" | "dat_old" | "dat_mcr" => {
+                return Compression::Stored;
+            }
+            // Text files benefit from compression
+            "json" | "txt" | "toml" | "cfg" | "properties" | "yml" | "yaml" => {
+                return Compression::Deflate;
+            }
+            _ => {}
+        }
+    }
+
+    // Default to Deflate for small files
+    Compression::Deflate
+}
+
 /// Exports a profile to a `.noriskpack` file
 ///
 /// This creates a zip archive with the .noriskpack extension that contains:
@@ -1099,9 +1129,8 @@ pub async fn export_profile_to_noriskpack(
 ) -> Result<PathBuf> {
     info!("Exporting profile {} to .noriskpack", profile_id);
 
-    // Get the profile and acquire semaphore for I/O limiting
+    // Get the profile (no global semaphore - we'll use per-file permits)
     let state = crate::state::state_manager::State::get().await?;
-    let _permit = state.io_semaphore.acquire().await;
     let profile = state.profile_manager.get_profile(profile_id).await?;
 
     // Single traversal strategy like Modrinth
@@ -1135,6 +1164,9 @@ pub async fn export_profile_to_noriskpack(
     } else {
         all_files.clear(); // No include_files = no files to export
     }
+
+    let total_files = all_files.len();
+    info!("Exporting {} files to .noriskpack", total_files);
 
     // Create a sanitized copy of the profile for export
     let export_profile = sanitize_profile_for_export(&profile);
@@ -1184,52 +1216,128 @@ pub async fn export_profile_to_noriskpack(
         .await
         .map_err(|e| AppError::Other(format!("Failed to write profile.json to zip: {}", e)))?;
 
-    // Add files to overrides with STREAMING (zero-copy like the example)
+    // Progress tracking
+    let export_event_id = Uuid::new_v4();
+    let completed_files = Arc::new(AtomicUsize::new(0));
+
+    // Emit initial progress
+    state.event_state.emit(crate::state::event_state::EventPayload {
+        event_id: export_event_id,
+        event_type: crate::state::event_state::EventType::ExportingProfile,
+        target_id: Some(profile_id),
+        message: format!("Starting export of {} files...", total_files),
+        progress: Some(0.0),
+        error: None,
+    }).await?;
+
+    // Channel for parallel file processing
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<(String, Vec<u8>, Compression)>(100);
+    
+    // Spawn worker tasks to read files in parallel
+    let mut tasks: Vec<JoinHandle<Result<()>>> = Vec::new();
+    let io_semaphore = state.io_semaphore.clone();
+    
     for file_path in all_files {
         if let Ok(rel_path) = file_path.strip_prefix(&profile_instance_path) {
             let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
             let zip_path = format!("overrides/{}", rel_path_str);
-
-            info!("Processing file: {}", file_path.display());
-
-            // STREAMING approach - no memory buffering
-            let mut source_file = fs::File::open(&file_path)
-                .await
-                .map_err(|e| AppError::Io(e))?;
-
-            let file_builder = ZipEntryBuilder::new(zip_path.into(), Compression::Deflate);
-            let mut entry_writer = writer.write_entry_stream(file_builder).await.map_err(|e| {
-                AppError::Other(format!("Failed to create zip entry stream: {}", e))
-            })?;
-
-            // Stream file content in chunks (using EntryStreamWriter's native API)
-            let mut buffer = [0u8; 8192];
-            loop {
-                let n = source_file
-                    .read(&mut buffer)
-                    .await
-                    .map_err(|e| AppError::Io(e))?;
-                if n == 0 {
-                    break;
+            
+            let tx_clone = tx.clone();
+            let file_path_clone = file_path.clone();
+            let semaphore_clone = io_semaphore.clone();
+            let completed_clone = completed_files.clone();
+            let state_clone = state.clone();
+            let total = total_files;
+            
+            let task = tokio::spawn(async move {
+                // Acquire semaphore for this file
+                let _permit = semaphore_clone.acquire().await.map_err(|e| {
+                    AppError::Other(format!("Failed to acquire semaphore: {}", e))
+                })?;
+                
+                // Get file metadata for compression decision
+                let metadata = fs::metadata(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
+                let file_size = metadata.len();
+                let compression = determine_compression(&file_path_clone, file_size);
+                
+                // Read file data
+                let data = fs::read(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
+                
+                // Send to writer
+                tx_clone.send((zip_path, data, compression)).await.map_err(|e| {
+                    AppError::Other(format!("Failed to send file data: {}", e))
+                })?;
+                
+                // Update progress
+                let completed = completed_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                let progress = (completed as f64) / (total as f64);
+                
+                // Emit progress every 5% or every 100 files
+                if completed % 100 == 0 || (progress - (completed as f64 - 1.0) / total as f64) >= 0.05 {
+                    let _ = state_clone.event_state.emit(crate::state::event_state::EventPayload {
+                        event_id: export_event_id,
+                        event_type: crate::state::event_state::EventType::ExportingProfile,
+                        target_id: Some(profile_id),
+                        message: format!("Exporting files... {}/{}", completed, total),
+                        progress: Some(progress),
+                        error: None,
+                    }).await;
                 }
-                entry_writer
-                    .write_all(&buffer[..n])
-                    .await
-                    .map_err(|e| AppError::Other(format!("Failed to write chunk: {}", e)))?;
-            }
-
-            entry_writer
-                .close()
-                .await
-                .map_err(|e| AppError::Other(format!("Failed to close zip entry: {}", e)))?;
+                
+                debug!("Processed file: {}", file_path_clone.display());
+                
+                Ok(())
+            });
+            
+            tasks.push(task);
         }
     }
+    
+    // Drop the original sender so the channel closes when all tasks finish
+    drop(tx);
+    
+    // Spawn a task to wait for all workers to complete
+    let workers_handle = tokio::spawn(async move {
+        let results = join_all(tasks).await;
+        for result in results {
+            match result {
+                Ok(Ok(())) => {},
+                Ok(Err(e)) => return Err(e),
+                Err(e) => return Err(AppError::Other(format!("Task panicked: {}", e))),
+            }
+        }
+        Ok(())
+    });
+    
+    // Write files to zip as they come from the channel
+    while let Some((zip_path, data, compression)) = rx.recv().await {
+        let entry_builder = ZipEntryBuilder::new(zip_path.into(), compression);
+        writer
+            .write_entry_whole(entry_builder, &data)
+            .await
+            .map_err(|e| AppError::Other(format!("Failed to write zip entry: {}", e)))?;
+    }
+    
+    // Wait for all workers to complete
+    workers_handle.await.map_err(|e| {
+        AppError::Other(format!("Workers task panicked: {}", e))
+    })??;
 
     // Close the zip writer
     writer
         .close()
         .await
         .map_err(|e| AppError::Other(format!("Failed to finalize zip file: {}", e)))?;
+
+    // Emit completion progress
+    state.event_state.emit(crate::state::event_state::EventPayload {
+        event_id: export_event_id,
+        event_type: crate::state::event_state::EventType::ExportingProfile,
+        target_id: Some(profile_id),
+        message: format!("Export completed! {} files exported.", total_files),
+        progress: Some(1.0),
+        error: None,
+    }).await?;
 
     info!(
         "Successfully exported profile to: {}",

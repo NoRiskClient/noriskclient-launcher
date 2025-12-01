@@ -24,8 +24,8 @@ use utils::debug_utils;
 use utils::updater_utils;
 
 use crate::commands::process_command::{
-    get_full_log, get_process, get_processes, get_processes_by_profile, open_log_window,
-    set_discord_state, stop_process,
+    fetch_crash_report, get_full_log, get_process, get_processes, get_processes_by_profile,
+    open_log_window, set_discord_state, stop_process,
 };
 use commands::minecraft_auth_command::{
     begin_login, get_accounts, get_active_account, remove_account, set_active_account,
@@ -36,6 +36,7 @@ use commands::minecraft_command::{
     apply_skin_from_base64,
     // Local skin database commands
     get_all_skins,
+    get_crafatar_avatar,
     get_fabric_loader_versions,
     get_forge_versions,
     get_minecraft_versions,
@@ -60,7 +61,7 @@ use commands::profile_command::{
     get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_structure,
     get_profile_latest_log_content, get_profile_log_files, get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
-    import_profile, import_profile_from_file, is_content_installed, is_profile_launching,
+    import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
     resolve_loader_version, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
@@ -107,8 +108,11 @@ use commands::vanilla_cape_command::{
     get_vanilla_cape_info, refresh_vanilla_cape_data,
 };
 
+// Import Assets commands
+use commands::assets_command::get_or_download_asset_model;
+
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command, get_advent_calendar_command, claim_advent_calendar_day_command};
 
 // Import Content commands
 use commands::content_command::{
@@ -406,6 +410,7 @@ async fn main() {
             update_modrinth_mod_version,
             get_all_modrinth_versions_for_contexts,
             get_full_log,
+            fetch_crash_report,
             get_custom_mods,
             get_local_resourcepacks,
             get_local_shaderpacks,
@@ -472,6 +477,7 @@ async fn main() {
             get_worlds_for_profile,
             get_servers_for_profile,
             copy_world,
+            import_world,
             check_world_lock_status,
             ping_minecraft_server,
             delete_world,
@@ -504,6 +510,7 @@ async fn main() {
             install_local_content_to_profile,
             switch_content_version,
             commands::minecraft_command::get_starlight_skin_render,
+            commands::minecraft_command::get_crafatar_avatar,
             commands::nrc_commands::discord_auth_link,
             commands::nrc_commands::discord_auth_status,
             commands::nrc_commands::discord_auth_unlink,
@@ -517,15 +524,23 @@ async fn main() {
             commands::flagsmith_commands::refresh_blocked_mods_config,
             commands::nrc_commands::get_mobile_app_token,
             commands::nrc_commands::reset_mobile_app_token,
+            commands::nrc_commands::get_advent_calendar_command,
+            commands::nrc_commands::claim_advent_calendar_day_command,
             get_capes_by_hashes,
             get_owned_vanilla_capes,
             get_currently_equipped_vanilla_cape,
             equip_vanilla_cape,
             get_vanilla_cape_info,
-            refresh_vanilla_cape_data
+            refresh_vanilla_cape_data,
+            commands::profile_command::add_profile_symlink,
+            commands::profile_command::remove_profile_symlink,
+            commands::profile_command::get_profile_symlinks,
+            commands::profile_command::get_profile_instance_path,
+            commands::profile_command::get_default_profile_path,
+            get_or_download_asset_model
         ])
-        .build(tauri::generate_context!()) 
-        .expect("error while building tauri application") 
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {

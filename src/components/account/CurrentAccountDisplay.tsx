@@ -6,6 +6,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 
 interface CurrentAccountDisplayProps {
   onClick?: () => void;
@@ -24,6 +25,11 @@ export function CurrentAccountDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const avatarUrl = useCrafatarAvatar({
+    uuid: activeAccount?.id,
+    size: 28,
+    overlay: true,
+  });
 
   useEffect(() => {
     if (buttonRef.current) {
@@ -165,10 +171,6 @@ export function CurrentAccountDisplay({
     );
   }
 
-  const avatarUrl = activeAccount.id
-    ? `https://crafatar.com/avatars/${activeAccount.id}?overlay&size=28`
-    : null;
-
   const username =
     activeAccount.minecraft_username || activeAccount.username || "Unknown";
 
@@ -227,7 +229,8 @@ export function CurrentAccountDisplay({
           <img
             src={avatarUrl || "/placeholder.svg"}
             alt={`${username}'s avatar`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover pixelated"
+            style={{ imageRendering: 'pixelated' }}
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = "none";

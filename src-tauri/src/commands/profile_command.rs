@@ -11,6 +11,7 @@ use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
     default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
 };
+use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
@@ -62,6 +63,8 @@ pub struct UpdateProfileParams {
     use_shared_minecraft_folder: Option<bool>,
     clear_selected_norisk_pack: Option<bool>,
     norisk_information: Option<crate::state::profile_state::NoriskInformation>,
+    preferred_account_id: Option<String>,
+    clear_preferred_account: Option<bool>,
 }
 
 // Neue DTO für den copy_profile Command
@@ -90,6 +93,14 @@ pub struct CopyWorldParams {
     source_profile_id: Uuid,
     source_world_folder: String,
     target_profile_id: Uuid,
+    target_world_name: String,
+}
+
+// DTO for importing a world from an external path
+#[derive(Deserialize)]
+pub struct ImportWorldParams {
+    profile_id: Uuid,
+    source_world_path: String,
     target_world_name: String,
 }
 
@@ -151,6 +162,7 @@ pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, Command
         is_standard_version: false,
         norisk_information: None,
         modpack_info: None,
+        preferred_account_id: None,
     };
 
     let id = state.profile_manager.create_profile(profile).await?;
@@ -243,19 +255,66 @@ pub async fn launch_profile(
 
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
-    let credentials = match state
-        .minecraft_account_manager_v2
-        .get_active_account()
-        .await
-    {
-        Ok(Some(creds)) => Some(creds),
-        Ok(None) => {
-            return Err(CommandError::from(AppError::NoCredentialsError));
+    
+    // Get experimental_mode from state config (needed for token refresh)
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    log::info!(
+        "[Command] Global experimental mode is: {}",
+        is_experimental
+    );
+    
+    // Helper function to get active account with proper error handling
+    let get_active_account = || async {
+        match state
+            .minecraft_account_manager_v2
+            .get_active_account()
+            .await
+        {
+            Ok(Some(creds)) => Ok(Some(creds)),
+            Ok(None) => Err(CommandError::from(AppError::NoCredentialsError)),
+            Err(e) => {
+                log::info!("Error getting active account: {}", e);
+                Err(CommandError::from(AppError::NoCredentialsError))
+            }
         }
-        Err(e) => {
-            info!("Error getting active account: {}", e);
-            return Err(CommandError::from(AppError::NoCredentialsError));
+    };
+    
+    // Determine which account to use: preferred account or global active account
+    let credentials = if let Some(preferred_account_id) = profile.preferred_account_id {
+        log::info!(
+            "[Command] Profile has preferred account set: {}. Attempting to use it.",
+            preferred_account_id
+        );
+        match state
+            .minecraft_account_manager_v2
+            .get_account_by_id_with_refresh(preferred_account_id, is_experimental)
+            .await
+        {
+            Ok(Some(creds)) => {
+                log::info!(
+                    "[Command] Successfully retrieved and refreshed preferred account: {}",
+                    creds.username
+                );
+                Some(creds)
+            }
+            Ok(None) => {
+                log::warn!(
+                    "[Command] Preferred account {} not found. Falling back to global active account.",
+                    preferred_account_id
+                );
+                get_active_account().await?
+            }
+            Err(e) => {
+                log::warn!(
+                    "[Command] Error getting/refreshing preferred account: {}. Falling back to global active account.",
+                    e
+                );
+                get_active_account().await?
+            }
         }
+    } else {
+        log::info!("[Command] No preferred account set. Using global active account.");
+        get_active_account().await?
     };
 
     let profile_id = profile.id; // Store profile ID for later use
@@ -644,6 +703,33 @@ async fn try_update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(),
         info!(
             "norisk_information not provided or explicitly null, keeping existing: {:?}",
             profile.norisk_information
+        );
+    }
+
+    // Handle preferred_account_id based on clear_preferred_account and new value
+    if params.clear_preferred_account == Some(true) {
+        info!("Clearing preferred_account_id for profile {}", id);
+        profile.preferred_account_id = None;
+    } else if let Some(account_id_str) = &params.preferred_account_id {
+        match Uuid::parse_str(account_id_str) {
+            Ok(account_uuid) => {
+                info!(
+                    "Updating preferred_account_id to: {} for profile {}",
+                    account_uuid, id
+                );
+                profile.preferred_account_id = Some(account_uuid);
+            }
+            Err(e) => {
+                return Err(CommandError::from(AppError::Other(format!(
+                    "Invalid UUID format for preferred_account_id: {}",
+                    e
+                ))));
+            }
+        }
+    } else {
+        info!(
+            "preferred_account_id not explicitly changed or cleared for profile {}. Current: {:?}",
+            id, profile.preferred_account_id
         );
     }
 
@@ -1495,7 +1581,7 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         mods: source_profile.mods.clone(), // Kopiere die Modrinth-Mods aus dem Quellprofil
         selected_norisk_pack_id: source_profile.selected_norisk_pack_id.clone(),
         disabled_norisk_mods_detailed: source_profile.disabled_norisk_mods_detailed.clone(),
-        source_standard_profile_id: source_profile.source_standard_profile_id,
+        source_standard_profile_id: None, // Manual copies are independent and not linked to standard profiles
         group: source_profile.group.clone(),
         use_shared_minecraft_folder: params.use_shared_minecraft_folder.unwrap_or(source_profile.should_use_shared_minecraft_folder()),
         is_standard_version: false,
@@ -1504,6 +1590,7 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         banner: source_profile.banner.clone(),
         background: source_profile.background.clone(),
         modpack_info: source_profile.modpack_info.clone(),
+        preferred_account_id: source_profile.preferred_account_id,
     };
 
     // 6. Erstelle das neue Profilverzeichnis
@@ -1971,6 +2058,49 @@ pub async fn copy_world(params: CopyWorldParams) -> Result<String, CommandError>
     Ok(generated_folder_name) // Return the actual folder name created
 }
 
+/// Imports a Minecraft world from an external path into a profile's saves directory.
+#[tauri::command]
+pub async fn import_world(params: ImportWorldParams) -> Result<String, CommandError> {
+    info!(
+        "Executing import_world command: importing world from '{}' to profile {} with name '{}'",
+        params.source_world_path,
+        params.profile_id,
+        params.target_world_name
+    );
+
+    let source_world_path = std::path::PathBuf::from(&params.source_world_path);
+
+    // Call the utility function
+    let generated_folder_name = world_utils::import_world_from_external_path(
+        params.profile_id,
+        source_world_path,
+        &params.target_world_name,
+    )
+    .await?;
+
+    // Trigger UI updates for the profile
+    if let Ok(state) = State::get().await {
+        if let Err(e) = state
+            .event_state
+            .trigger_profile_update(params.profile_id)
+            .await
+        {
+            warn!(
+                "Failed to emit profile update event for profile {}: {}",
+                params.profile_id, e
+            );
+        }
+    } else {
+        warn!("Could not get state to emit profile update event after world import.");
+    }
+
+    info!(
+        "Successfully executed import_world command. New folder name: {}",
+        generated_folder_name
+    );
+    Ok(generated_folder_name) // Return the actual folder name created
+}
+
 /// Checks if a specific world's session.lock file can be locked, indicating if it's likely in use.
 #[tauri::command]
 pub async fn check_world_lock_status(
@@ -2227,4 +2357,184 @@ pub async fn purge_trash(max_age_seconds: Option<u64>) -> Result<u64, CommandErr
     let secs = max_age_seconds.unwrap_or(120);
     let removed = crate::utils::trash_utils::purge_expired(secs).await?;
     Ok(removed)
+}
+// === Symlink Commands ===
+
+#[derive(Debug, Deserialize)]
+pub struct AddSymlinkParams {
+    pub profile_id: Uuid,
+    pub relative_path: String,
+    pub external_path: String,
+}
+
+#[tauri::command]
+pub async fn add_profile_symlink(params: AddSymlinkParams) -> Result<(), CommandError> {
+    use crate::utils::symlink_utils;
+    
+    info!("Adding symlink for profile {}: {} -> {}", 
+          params.profile_id, params.relative_path, params.external_path);
+    
+    let state = State::get().await?;
+    
+    // Get the profile instance path
+    let instance_path = state
+        .profile_manager
+        .get_profile_instance_path(params.profile_id)
+        .await?;
+    
+    // Normalize relative_path by converting to PathBuf (handles forward/backslash normalization)
+    // Split by '/' and push segments individually to ensure platform-appropriate separators
+    let mut normalized_relative = PathBuf::new();
+    for segment in params.relative_path.split('/') {
+        if !segment.is_empty() {
+            normalized_relative.push(segment);
+        }
+    }
+    
+    let link_path = instance_path.join(&normalized_relative);
+    let target_path = PathBuf::from(&params.external_path);
+    
+    // Check if target exists
+    if !target_path.exists() {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Target path does not exist: {}",
+            params.external_path
+        ))));
+    }
+    
+    let is_dir = target_path.is_dir();
+    
+    // Create parent directories if needed
+    if let Some(parent) = link_path.parent() {
+        tokio::fs::create_dir_all(parent).await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?;
+    }
+    
+    // Remove existing link/file if it exists
+    if link_path.exists() {
+        if symlink_utils::is_symlink(&link_path).await? {
+            symlink_utils::remove_symlink(&link_path).await?;
+        } else {
+            // Backup existing content
+            let backup_path = instance_path.join(&normalized_relative).with_extension("backup");
+            tokio::fs::rename(&link_path, &backup_path).await
+                .map_err(|e| CommandError::from(AppError::Io(e)))?;
+            info!("Backed up existing content to {:?}", backup_path);
+        }
+    }
+    
+    // Create the symlink/junction/hardlink
+    symlink_utils::create_symlink(&target_path, &link_path, is_dir).await?;
+    
+    info!("Successfully created symlink at {:?}", link_path);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_profile_symlink(
+    profile_id: Uuid,
+    relative_path: String,
+) -> Result<(), CommandError> {
+    use crate::utils::symlink_utils;
+    
+    info!("Removing symlink for profile {}: {}", profile_id, relative_path);
+    
+    let state = State::get().await?;
+    
+    let instance_path = state
+        .profile_manager
+        .get_profile_instance_path(profile_id)
+        .await?;
+    
+    let link_path = instance_path.join(&relative_path);
+    
+    if !link_path.exists() {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Symlink does not exist: {}",
+            relative_path
+        ))));
+    }
+    
+    if !symlink_utils::is_symlink(&link_path).await? {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Path is not a symlink: {}",
+            relative_path
+        ))));
+    }
+    
+    symlink_utils::remove_symlink(&link_path).await?;
+    
+    info!("Successfully removed symlink at {:?}", link_path);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_profile_symlinks(profile_id: Uuid) -> Result<Vec<crate::utils::symlink_utils::SymlinkInfo>, CommandError> {
+    use crate::utils::symlink_utils;
+    
+    info!("Getting symlinks for profile {}", profile_id);
+    
+    let state = State::get().await?;
+    
+    let instance_path = state
+        .profile_manager
+        .get_profile_instance_path(profile_id)
+        .await?;
+    
+    let links = symlink_utils::find_all_links(&instance_path).await?;
+    
+    info!("Found {} symlinks for profile {}", links.len(), profile_id);
+    Ok(links)
+}
+
+#[tauri::command]
+pub async fn get_profile_instance_path(profile_id: Uuid) -> Result<String, CommandError> {
+    info!(
+        "Executing get_profile_instance_path command for profile {}",
+        profile_id
+    );
+    let state = State::get().await?;
+    let path = state
+        .profile_manager
+        .get_profile_instance_path(profile_id)
+        .await?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn get_default_profile_path() -> Result<String, CommandError> {
+    let path = default_profile_path();
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn get_profile_folders(profile_id: Uuid) -> Result<Vec<String>, CommandError> {
+    let state = State::get().await?;
+
+    let profile = state
+        .profile_manager
+        .get_profile(profile_id)
+        .await?;
+
+    let instance_path = state
+        .profile_manager
+        .calculate_instance_path_for_profile(&profile)?;
+
+    let mut folders = Vec::new();
+    if let Ok(mut entries) = tokio::fs::read_dir(&instance_path).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if entry
+                .file_type()
+                .await
+                .map(|ft| ft.is_dir())
+                .unwrap_or(false)
+            {
+                if let Some(name) = entry.file_name().to_str() {
+                    folders.push(name.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(folders)
 }

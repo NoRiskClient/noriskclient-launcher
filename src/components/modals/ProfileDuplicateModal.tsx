@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
 import { Modal } from "../ui/Modal";
-import { Input } from "../ui/Input";
+import { SearchStyleInput } from "../ui/Input";
 import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,6 +16,14 @@ export function ProfileDuplicateModal() {
   const { fetchProfiles } = useProfileStore();
   const [newProfileName, setNewProfileName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Set default name when modal opens
+  useEffect(() => {
+    if (isModalOpen && sourceProfile) {
+      const defaultName = `${sourceProfile.name} (copy)`;
+      setNewProfileName(defaultName);
+    }
+  }, [isModalOpen, sourceProfile]);
 
   if (!isModalOpen || !sourceProfile) {
     return null;
@@ -56,12 +64,6 @@ export function ProfileDuplicateModal() {
     closeModal();
     setNewProfileName("");
   };
-
-  // Set default name when modal opens
-  const defaultName = `${sourceProfile.name} (copy)`;
-  if (newProfileName === "" && sourceProfile) {
-    setNewProfileName(defaultName);
-  }
 
   return (
     <Modal
@@ -118,12 +120,10 @@ export function ProfileDuplicateModal() {
           <label className="block text-2xl font-minecraft text-white mb-2 lowercase">
             new profile name
           </label>
-          <Input
+          <SearchStyleInput
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
             placeholder="Enter name for the new profile"
-            className="text-xl py-3"
-            variant="flat"
             disabled={isLoading}
             autoFocus
             onKeyDown={(e) => {

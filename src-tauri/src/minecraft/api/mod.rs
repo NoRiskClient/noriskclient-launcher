@@ -1,4 +1,5 @@
 pub mod cape_api;
+pub mod crafatar_api;
 pub mod fabric_api;
 pub mod forge_api;
 pub mod mc_api;

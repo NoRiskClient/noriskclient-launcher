@@ -25,12 +25,17 @@ import UnifiedService from "../../services/unified-service";
 import type { UnifiedModpackVersionsResponse } from "../../types/unified";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch.tsx";
+import { useAppDragDropStore } from "../../store/appStore";
 
 import { WorldsTab } from "./detail/WorldsTab";
 import { ScreenshotsTab } from "./detail/ScreenshotsTab";
 import { LogsTab } from "./detail/LogsTab";
 import type { LocalContentItem } from "../../hooks/useLocalContentManager";
 import { ModpackDebugInfo } from "../../debug";
+import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
+import { Tooltip } from "../ui/Tooltip";
+import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { parseMotdToHtml } from "../../utils/motd-utils";
 
 type MainTabType = "content" | "worlds" | "logs" | "screenshots";
 type ContentTabType = "mods" | "resourcepacks" | "datapacks" | "shaderpacks" | "nrc";
@@ -75,10 +80,25 @@ export function ProfileDetailViewV2({
   // Profile store
   const { fetchProfiles } = useProfileStore();
 
-
+  // Drag and drop store
+  const { setActiveMainTab: setDragDropMainTab } = useAppDragDropStore();
 
   // Profile duplicate store
   const { openModal: openDuplicateModal } = useProfileDuplicateStore();
+
+  // Get accounts from Minecraft Auth Store
+  const accounts = useMinecraftAuthStore((state) => state.accounts);
+  
+  // Find preferred account if one is set
+  const preferredAccount = currentProfile.preferred_account_id 
+    ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)
+    : null;
+
+  // Load preferred account avatar
+  const preferredAccountAvatarUrl = useCrafatarAvatar({
+    uuid: preferredAccount?.id,
+    overlay: true,
+  });
 
   // Profile launch hook
   const { isLaunching, statusMessage, handleLaunch, handleQuickPlayLaunch } = useProfileLaunch({
@@ -155,7 +175,6 @@ export function ProfileDetailViewV2({
       icon: "solar:trash-bin-trash-bold",
       destructive: true,
       separator: true, // Trennstrich vor Delete
-      disabled: currentProfile.is_standard_version,
       onClick: () => handleDeleteProfile(),
     },
   ];
@@ -288,6 +307,15 @@ export function ProfileDetailViewV2({
   useEffect(() => {
     setCurrentProfile(profile);
   }, [profile]);
+
+  // Effect to sync activeMainTab with drag drop store for world import functionality
+  useEffect(() => {
+    setDragDropMainTab(activeMainTab);
+    return () => {
+      // Clear when component unmounts
+      setDragDropMainTab(null);
+    };
+  }, [activeMainTab, setDragDropMainTab]);
 
   // Function to refresh modpack versions
   const refreshModpackVersions = useCallback(async () => {
@@ -424,10 +452,32 @@ export function ProfileDetailViewV2({
 
             {/* Profile Details */}
             <div className="flex flex-col gap-2 flex-1">
-              {/* Profile Name */}
-              <h1 className="font-minecraft-ten text-2xl text-white normal-case">
-                {profile.name || profile.id}
-              </h1>
+              {/* Profile Name with Account Indicator */}
+              <div className="flex items-center gap-2">
+                <h1 className="font-minecraft-ten text-2xl text-white normal-case">
+                  <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name || profile.id) }} />
+                </h1>
+                
+                {/* Preferred Account Indicator next to title */}
+                {preferredAccount && (
+                  <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+                    <div className="flex items-center gap-1 text-white/60">
+                      {preferredAccountAvatarUrl && (
+                        <img
+                          src={preferredAccountAvatarUrl}
+                          alt={preferredAccount.username}
+                          className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
+                          style={{ imageRendering: 'pixelated' }}
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                          }}
+                        />
+                      )}
+                      <span className="truncate max-w-[100px] text-base lowercase">{preferredAccount.username}</span>
+                    </div>
+                  </Tooltip>
+                )}
+              </div>
 
 
 

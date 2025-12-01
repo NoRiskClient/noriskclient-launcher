@@ -8,7 +8,7 @@ use fs4::tokio::AsyncFileExt;
 use fs_extra::dir::{copy as copy_dir, CopyOptions};
 use log::{error, info, warn};
 use sanitize_filename;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 use uuid::Uuid;
 
@@ -315,6 +315,169 @@ pub async fn copy_world_directory(
 
     info!(
         "World copy process completed successfully for target folder: {}",
+        final_target_folder_name
+    );
+    Ok(final_target_folder_name) // Return the generated folder name
+}
+
+/// Imports a Minecraft world directory from an external path into a profile's saves directory.
+///
+/// # Arguments
+///
+/// * `profile_id` - UUID of the profile where the world should be imported to.
+/// * `source_world_path` - The absolute path to the external world directory.
+/// * `target_world_name` - The desired display name for the world. A unique folder name will be generated.
+///
+/// # Returns
+///
+/// Returns `Ok(String)` with the generated target folder name on success, or an `AppError` variant on failure.
+pub async fn import_world_from_external_path(
+    profile_id: Uuid,
+    source_world_path: PathBuf,
+    target_world_name: &str,
+) -> Result<String> {
+    info!(
+        "Attempting to import world from external path '{}' to profile {} with desired name '{}'",
+        source_world_path.display(),
+        profile_id,
+        target_world_name
+    );
+
+    // Validate target name
+    if target_world_name.is_empty() {
+        error!("Empty target world name provided.");
+        return Err(AppError::InvalidInput(
+            "Target world name cannot be empty.".to_string(),
+        ));
+    }
+
+    // Validate source path
+    if !source_world_path.is_dir() {
+        error!(
+            "Source world directory not found: {}",
+            source_world_path.display()
+        );
+        return Err(AppError::InvalidInput(format!(
+            "Source path is not a directory: {}",
+            source_world_path.display()
+        )));
+    }
+
+    // Check for level.dat to validate it's a Minecraft world
+    let level_dat_path = source_world_path.join("level.dat");
+    if !level_dat_path.is_file() {
+        error!(
+            "Source world level.dat not found: {}",
+            level_dat_path.display()
+        );
+        return Err(AppError::InvalidInput(format!(
+            "Source path does not contain a valid Minecraft world (missing level.dat): {}",
+            source_world_path.display()
+        )));
+    }
+
+    let state = State::get().await?;
+    let profile_manager = &state.profile_manager;
+
+    // Calculate target saves directory path
+    let target_instance_path = profile_manager
+        .get_profile_instance_path(profile_id)
+        .await?;
+    let target_saves_path = target_instance_path.join("saves");
+
+    // Ensure target saves directory exists
+    info!(
+        "Ensuring target saves directory exists: {}",
+        target_saves_path.display()
+    );
+    fs::create_dir_all(&target_saves_path).await.map_err(|e| {
+        error!("Failed to create target saves directory: {}", e);
+        AppError::Io(e)
+    })?;
+
+    // Find a unique folder name in the target saves directory
+    let final_target_folder_name =
+        find_unique_world_folder_name(&target_saves_path, target_world_name).await?;
+    let target_world_path = target_saves_path.join(&final_target_folder_name);
+
+    info!("Source world path: {}", source_world_path.display());
+    info!(
+        "Target world path (generated folder): {}",
+        target_world_path.display()
+    );
+
+    // Note: We skip session lock checking for external imports since the world
+    // is not part of any profile's saves directory yet
+
+    // --- Copy Directory ---
+    info!(
+        "Starting directory copy for target folder '{}'...",
+        final_target_folder_name
+    );
+    let options = CopyOptions {
+        overwrite: false,
+        skip_exist: false, // We explicitly want an error if the target exists, checked by find_unique
+        content_only: true, // Copy the *content* of source_world_path into target_world_path
+        ..Default::default()
+    };
+
+    // Create the empty target directory before copying content into it
+    fs::create_dir(&target_world_path).await.map_err(|e| {
+        error!(
+            "Failed to create target world directory '{}': {}",
+            target_world_path.display(),
+            e
+        );
+        if target_world_path.exists() {
+            AppError::WorldAlreadyExists {
+                profile_id,
+                world_folder: final_target_folder_name.clone(),
+            }
+        } else {
+            AppError::Io(e)
+        }
+    })?;
+
+    match copy_dir(&source_world_path, &target_world_path, &options) {
+        Ok(bytes_copied) => {
+            info!(
+                "Successfully copied world directory content ({} bytes) from {} to {}",
+                bytes_copied,
+                source_world_path.display(),
+                target_world_path.display()
+            );
+        }
+        Err(e) => {
+            error!(
+                "Failed to copy world directory from {} to {}: {}",
+                source_world_path.display(),
+                target_world_path.display(),
+                e
+            );
+            let _ = fs::remove_dir_all(&target_world_path).await; // Cleanup
+            return Err(AppError::FsExtra(e));
+        }
+    }
+
+    // --- Modify level.dat in Target Directory ---
+    info!(
+        "Modifying level.dat in target directory: {}",
+        target_world_path.display()
+    );
+    let target_level_dat_path = target_world_path.join("level.dat");
+
+    if let Err(e) = modify_level_dat_name(&target_level_dat_path, target_world_name).await {
+        error!(
+            "Failed to modify level.dat name in target world '{}': {}. Cleaning up.",
+            final_target_folder_name, e
+        );
+        // Cleanup the copied directory if modifying level.dat fails
+        let _ = fs::remove_dir_all(&target_world_path).await;
+        return Err(e);
+    }
+
+    info!(
+        "World import process completed successfully for target folder: {}",
         final_target_folder_name
     );
     Ok(final_target_folder_name) // Return the generated folder name

@@ -27,6 +27,7 @@ export function ExportProfileModal({
     isDisabled: () => boolean;
     exportOpenFolder: boolean;
     setExportOpenFolder: (value: boolean) => void;
+    isExporting?: boolean;
   } | null>(null);
 
   if (!isOpen) {
@@ -54,7 +55,7 @@ export function ExportProfileModal({
           size="md"
           className="text-xl"
         >
-          Export Profile
+          {exportAction.isExporting ? "Exporting..." : "Export Profile"}
         </Button>
       </div>
     </div>

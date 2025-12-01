@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import { getProfile, getProfileLatestLogContent } from '../../services/profile-service';
 import { uploadLogToMclogs } from '../../services/log-service';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { submitCrashLog } from '../../services/process-service';
+import { submitCrashLog, fetchCrashReport } from '../../services/process-service';
 import type { CrashlogDto } from '../../types/processState';
 import { openExternalUrl } from '../../services/tauri-service';
 import { Window } from '@tauri-apps/api/window';
@@ -23,6 +23,7 @@ export function GlobalCrashReportModal() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
   const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
+  const hasFetchedCrashReportRef = React.useRef(false);
 
   useEffect(() => {
     if (crashData?.profile_id) {
@@ -45,6 +46,7 @@ export function GlobalCrashReportModal() {
       setIsProcessing(false);
       setDisplayedCrashReportContent(crashData.crash_report_content);
       setIsListeningForCrashContent(false);
+      hasFetchedCrashReportRef.current = false; // Reset fetch flag for new crash
     } else {
       setProfileName('');
       setMclogsUrl(null);
@@ -52,6 +54,7 @@ export function GlobalCrashReportModal() {
       setIsProcessing(false);
       setDisplayedCrashReportContent(undefined);
       setIsListeningForCrashContent(false);
+      hasFetchedCrashReportRef.current = false; // Reset fetch flag
     }
   }, [crashData]);
 
@@ -93,31 +96,63 @@ export function GlobalCrashReportModal() {
 
   useEffect(() => {
     let unlistenFn: UnlistenFn | undefined;
+    let contentReceived = false;
 
     const listenForCrashContent = async () => {
-      if (isCrashModalOpen && crashData?.process_id && !displayedCrashReportContent && !isListeningForCrashContent) {
-        setIsListeningForCrashContent(true);
-        console.log(`Listening for CrashReportContentAvailable for process ${crashData.process_id}`);
-        try {
-          unlistenFn = await listen<EventPayload>(EventType.CrashReportContentAvailable, (event) => {
-            if (event.payload.target_id === crashData.process_id) {
-              try {
-                const contentPayload = JSON.parse(event.payload.message) as CrashReportContentAvailablePayload;
-                if (contentPayload.content) {
-                  console.log(`Received CrashReportContentAvailable for process ${crashData.process_id}`);
-                  setDisplayedCrashReportContent(contentPayload.content);
-                  toast.success("Detailed crash report loaded!");
-                  setIsListeningForCrashContent(false);
-                  if (unlistenFn) unlistenFn();
-                }
-              } catch (e) {
-                console.error("Failed to parse CrashReportContentAvailablePayload:", e);
+      // Only run once per modal opening - check if we already fetched for this crash
+      if (!isCrashModalOpen || !crashData?.process_id || !crashData?.profile_id || hasFetchedCrashReportRef.current) {
+        return;
+      }
+      
+      // Mark as fetched to prevent re-runs
+      hasFetchedCrashReportRef.current = true;
+      setIsListeningForCrashContent(true);
+      
+      console.log(`Setting up crash report handling for profile ${crashData.profile_id}, process ${crashData.process_id}`);
+      
+      // SCHRITT 1: Event-Listener SOFORT registrieren (um schnelle Events zu fangen)
+      try {
+        unlistenFn = await listen<EventPayload>(EventType.CrashReportContentAvailable, (event) => {
+          if (event.payload.target_id === crashData.process_id && !contentReceived) {
+            try {
+              const contentPayload = JSON.parse(event.payload.message) as CrashReportContentAvailablePayload;
+              if (contentPayload.content) {
+                console.log(`Received CrashReportContentAvailable event for process ${crashData.process_id}`);
+                contentReceived = true;
+                setDisplayedCrashReportContent(contentPayload.content);
+                toast.success("Crash report loaded!");
+                setIsListeningForCrashContent(false);
+                if (unlistenFn) unlistenFn();
               }
+            } catch (e) {
+              console.error("Failed to parse CrashReportContentAvailablePayload:", e);
             }
-          });
-        } catch (error) {
-          console.error("Failed to set up listener for CrashReportContentAvailable:", error);
-          setIsListeningForCrashContent(false);
+          }
+        });
+        console.log(`Event listener registered for process ${crashData.process_id}`);
+      } catch (error) {
+        console.error("Failed to set up listener for CrashReportContentAvailable:", error);
+      }
+      
+      // SCHRITT 2: Warte 1 Sekunde (gibt der Datei Zeit sich zu erstellen)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // SCHRITT 3: Falls Event noch nicht empfangen, aktiv fetchen als Fallback
+      if (!contentReceived) {
+        console.log(`Actively fetching crash report as fallback for process ${crashData.process_id}`);
+        try {
+          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id);
+          if (fetchedContent && !contentReceived) {
+            console.log(`Successfully fetched crash report via fallback`);
+            contentReceived = true;
+            setDisplayedCrashReportContent(fetchedContent);
+            toast.success("Crash report loaded!");
+            setIsListeningForCrashContent(false);
+          } else if (!fetchedContent) {
+            console.log(`No crash report found yet, listener remains active`);
+          }
+        } catch (e) {
+          console.error("Failed to fetch crash report as fallback:", e);
         }
       }
     };
@@ -129,9 +164,8 @@ export function GlobalCrashReportModal() {
         console.log("Cleaning up CrashReportContentAvailable listener.");
         unlistenFn();
       }
-      setIsListeningForCrashContent(false);
     };
-  }, [isCrashModalOpen, crashData?.process_id, displayedCrashReportContent, isListeningForCrashContent]);
+  }, [isCrashModalOpen, crashData?.process_id, crashData?.profile_id]);
 
   if (!isCrashModalOpen || !crashData) {
     return null;
@@ -149,6 +183,20 @@ export function GlobalCrashReportModal() {
     const mainToastId = toast.loading('Processing crash report...');
 
     try {
+      // NEUE LOGIK: Vor dem Upload nochmal den neuesten Crash-Report holen
+      if (crashData.process_id && !displayedCrashReportContent) {
+        toast.loading('Fetching latest crash report before upload...', { id: mainToastId });
+        try {
+          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id);
+          if (fetchedContent) {
+            console.log('Fetched fresh crash report before upload');
+            setDisplayedCrashReportContent(fetchedContent);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch crash report before upload, continuing with existing data:', e);
+        }
+      }
+
       if (!currentMclogsUrl) {
         toast.loading('Fetching latest log content...', { id: mainToastId });
         const logContent = await getProfileLatestLogContent(crashData.profile_id);
@@ -185,10 +233,26 @@ export function GlobalCrashReportModal() {
           console.error("Failed to copy mclogs URL after report:", copyError);
           toast.success(`Report submitted. Log URL: ${currentMclogsUrl} (Copying failed)`, { id: mainToastId });
         }
+        
+        // Open browser with mclogs URL
+        try {
+          await openExternalUrl(currentMclogsUrl);
+          console.log("Opened mclogs URL in browser:", currentMclogsUrl);
+        } catch (browserError) {
+          console.error("Failed to open mclogs URL in browser:", browserError);
+        }
       } else if (currentMclogsUrl && noriskReportSubmitted) {
         toast.dismiss(mainToastId);
         await writeText(currentMclogsUrl);
         toast.success("mclogs.com URL copied to clipboard!");
+        
+        // Open browser with mclogs URL
+        try {
+          await openExternalUrl(currentMclogsUrl);
+          console.log("Opened mclogs URL in browser:", currentMclogsUrl);
+        } catch (browserError) {
+          console.error("Failed to open mclogs URL in browser:", browserError);
+        }
       } else {
         toast.dismiss(mainToastId);
       }

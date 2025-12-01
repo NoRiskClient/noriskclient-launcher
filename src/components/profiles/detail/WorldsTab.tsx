@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Icon } from "@iconify/react";
-import motdParser from "@sfirew/minecraft-motd-parser";
+import { parseMotdToHtml } from "../../../utils/motd-utils";
 import { Button } from "../../ui/buttons/Button";
 import { IconButton } from "../../ui/buttons/IconButton";
 import { ActionButton } from "../../ui/ActionButton";
 import { ActionButtons } from "../../ui/ActionButtons";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useProfileStore } from "../../../store/profile-store";
+import { useAppDragDropStore } from "../../../store/appStore";
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import { gsap } from "gsap";
 import { TagBadge } from "../../ui/TagBadge";
@@ -19,6 +20,7 @@ import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { useProfileLaunch } from "../../../hooks/useProfileLaunch.tsx";
 import { toast } from "react-hot-toast";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { LaunchButton } from "../../ui/buttons/LaunchButton";
 import { GenericList } from "../../ui/GenericList";
 import { GenericListItem } from "../../ui/GenericListItem";
@@ -55,6 +57,7 @@ const WORLDS_TAB_ICONS_TO_PRELOAD = [
   "solar:copy-bold",
   "solar:folder-open-bold-duotone",
   "solar:trash-bin-trash-bold",
+  "solar:folder-with-files-bold", // Import button
   // Common / Dynamic states
   "solar:refresh-circle-bold-duotone", // For loading states in buttons
   // Note: LaunchButton icons are internal to it. GenericList preloads its own defaults.
@@ -91,6 +94,11 @@ export function WorldsTab({
   const allProfilesFromStore = useProfileStore((state) => state.profiles);
   const isLoadingProfilesFromStore = useProfileStore((state) => state.loading);
   const { showModal, hideModal } = useGlobalModal();
+  const { 
+    setActiveDropContext,
+    registerWorldsRefreshCallback,
+    unregisterWorldsRefreshCallback,
+  } = useAppDragDropStore();
 
   // Profile launch hook for world/server launching
   const { isLaunching, statusMessage, handleQuickPlayLaunch } = useProfileLaunch({
@@ -161,6 +169,20 @@ export function WorldsTab({
     preloadIcons(WORLDS_TAB_ICONS_TO_PRELOAD);
   }, []);
 
+  // Set drag drop context when WorldsTab is active
+  useEffect(() => {
+    if (profile && isActive) {
+      // Set profile context for drag & drop (contentType null for worlds tab)
+      setActiveDropContext(profile.id, null);
+    }
+    return () => {
+      // Clear context when tab becomes inactive or component unmounts
+      if (isActive) {
+        setActiveDropContext(null, null);
+      }
+    };
+  }, [profile, isActive, setActiveDropContext]);
+
   // Use parent's search query if provided
   useEffect(() => {
     if (searchQuery !== undefined) {
@@ -223,29 +245,6 @@ export function WorldsTab({
     [serverPings],
   );
 
-  const parseMotdToHtml = useCallback((motd: any): string => {
-    if (!motd) return '<span class="text-white/50">No description</span>';
-    try {
-      const html = motdParser.autoToHTML(motd);
-      return html || '<span class="text-white/50">No description</span>';
-    } catch (err) {
-      console.error("Failed to parse MOTD:", err);
-      if (typeof motd === "string") {
-        const cleaned = motdParser.cleanCodes(motd);
-        // Basic HTML escape
-        return cleaned
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-      try {
-        return JSON.stringify(motd);
-      } catch (e) {}
-      return '<span class="text-red-400">Invalid MOTD format</span>';
-    }
-  }, []);
 
   const updateDisplayItems = useCallback(
     (currentWorlds: WorldInfo[], currentServers: ServerInfo[]) => {
@@ -429,6 +428,21 @@ export function WorldsTab({
     loadData();
   }, [loadData]);
 
+  // Register worlds refresh callback after loadData is defined
+  useEffect(() => {
+    if (profile && isActive) {
+      // Register refresh callback for worlds
+      const refreshWorldsData = () => loadData();
+      registerWorldsRefreshCallback(refreshWorldsData);
+    }
+    return () => {
+      // Clear callback when tab becomes inactive or component unmounts
+      if (isActive) {
+        unregisterWorldsRefreshCallback();
+      }
+    };
+  }, [profile, isActive, loadData, registerWorldsRefreshCallback, unregisterWorldsRefreshCallback]);
+
   useEffect(() => {
     if (profile?.id) {
       updateDisplayItems(worlds, servers);
@@ -562,6 +576,58 @@ export function WorldsTab({
       onRefresh();
     }
   };
+
+  const handleImportWorld = useCallback(async () => {
+    try {
+      const selectedPath = await openDialog({
+        directory: true,
+        multiple: false,
+        title: 'Select Minecraft World Folder to Import',
+      });
+
+      if (!selectedPath) {
+        return; // User cancelled
+      }
+
+      // Handle both string and string[] (though multiple: false should return string)
+      const worldPath = typeof selectedPath === 'string' ? selectedPath : selectedPath[0];
+      if (!worldPath) {
+        return;
+      }
+
+      // Extract folder name from path for target name
+      const pathParts = worldPath.split(/[/\\]/);
+      const folderName = pathParts[pathParts.length - 1] || 'Imported World';
+
+      const operationId = `world-import-button-${Date.now()}`;
+      const loadingToastId = `loading-${operationId}`;
+      toast.loading(`Importing world '${folderName}'...`, { id: loadingToastId });
+
+      try {
+        const generatedFolderName = await WorldService.importWorld(
+          profile.id,
+          worldPath,
+          folderName
+        );
+        console.log(`[WorldsTab] World import SUCCESS: ${worldPath} -> ${generatedFolderName}`);
+        toast.success(
+          `World '${folderName}' imported successfully as '${generatedFolderName}'!`,
+          { id: loadingToastId, duration: 4000 }
+        );
+        // Refresh the worlds list
+        await loadData();
+      } catch (err) {
+        console.error(`[WorldsTab] World import ERROR for: ${worldPath}:`, err);
+        toast.error(
+          `Failed to import world: ${err instanceof Error ? err.message : String(err)}`,
+          { id: loadingToastId }
+        );
+      }
+    } catch (error) {
+      console.error('[WorldsTab] Failed to open folder picker:', error);
+      toast.error('Failed to open folder picker');
+    }
+  }, [profile.id, loadData]);
 
   const effectiveSearchQuery = searchQuery || localSearchQuery;
 
@@ -927,7 +993,6 @@ export function WorldsTab({
       getServerIconSrc,
       serverPings,
       pingingServers,
-      parseMotdToHtml,
       handleOpenCopyDialog,
       handleOpenWorldFolder,
       handleDeleteRequest,
@@ -958,6 +1023,15 @@ export function WorldsTab({
         )}
 
         <div className="flex items-center gap-4 ml-auto">
+          <ActionButton
+            icon="solar:folder-with-files-bold"
+            label="IMPORT"
+            variant="text"
+            size="sm"
+            onClick={handleImportWorld}
+            disabled={loading}
+            tooltip="Import world folder"
+          />
           <ActionButton
             icon={loading ? "solar:refresh-circle-bold-duotone" : "solar:refresh-bold"}
             label="REFRESH"

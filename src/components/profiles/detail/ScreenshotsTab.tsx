@@ -387,7 +387,7 @@ export function ScreenshotsTab({
             <EmptyState
               icon="solar:camera-minimalistic-bold-duotone"
               message="no screenshots yet"
-              description="take some in-game screenshots and they\'ll appear here!"
+              description="take some in-game screenshots and they'll appear here!"
               // iconClassName="text-white/30" // Icon color is handled by EmptyState or can be passed to Icon if customization is needed beyond accent
             />
           )}

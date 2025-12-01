@@ -10,12 +10,14 @@ interface ColorPickerProps {
   shape?: "square" | "circle";
   size?: "sm" | "md" | "lg";
   showCustomOption?: boolean;
+  disabled?: boolean;
 }
 
 export function ColorPicker({
   shape = "square",
   size = "md",
   showCustomOption = true,
+  disabled = false,
 }: ColorPickerProps) {
   const { accentColor, setAccentColor, setCustomAccentColor, customColorHistory } = useThemeStore();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
@@ -62,16 +64,16 @@ export function ColorPicker({
         {Object.values(ACCENT_COLORS).map((color) => (
           <button
             key={color.name}
-            onClick={() => setAccentColor(color)}
+            onClick={() => !disabled && setAccentColor(color)}
+            disabled={disabled}
             className={`
               ${sizeClasses[size]} 
               ${shapeClasses[shape]} 
-              relative cursor-pointer transition-all duration-200
-              shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)]
-              hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)]
-              hover:translate-y-[-2px]
-              active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)]
-              active:translate-y-[1px]
+              relative transition-all duration-200
+              ${disabled 
+                ? "opacity-40 cursor-not-allowed" 
+                : "cursor-pointer shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
+              }
               ${accentColor.value === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
             `}
             style={{ backgroundColor: color.value }}
@@ -98,16 +100,16 @@ export function ColorPicker({
 
         {showCustomOption && (
           <button
-            onClick={() => setShowCustomPicker(!showCustomPicker)}
+            onClick={() => !disabled && setShowCustomPicker(!showCustomPicker)}
+            disabled={disabled}
             className={`
               ${sizeClasses[size]} 
               ${shapeClasses[shape]} 
-              relative cursor-pointer transition-all duration-200
-              shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)]
-              hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)]
-              hover:translate-y-[-2px]
-              active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)]
-              active:translate-y-[1px]
+              relative transition-all duration-200
+              ${disabled 
+                ? "opacity-40 cursor-not-allowed" 
+                : "cursor-pointer shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
+              }
               bg-gradient-to-r from-purple-500 via-pink-500 to-red-500
               ${accentColor.isCustom ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
             `}

@@ -19,6 +19,9 @@ import { useProfileLaunch } from "../../hooks/useProfileLaunch.tsx";
 import { Tooltip } from "../ui/Tooltip";
 import UnifiedService from "../../services/unified-service";
 import { useProfileStore } from "../../store/profile-store";
+import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
+import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { parseMotdToHtml } from "../../utils/motd-utils";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -90,6 +93,20 @@ export function ProfileCardV2({
 
   // Resolved loader version state
   const [resolvedLoaderVersion, setResolvedLoaderVersion] = useState<ResolvedLoaderVersion | null>(null);
+
+  // Get accounts from Minecraft Auth Store
+  const accounts = useMinecraftAuthStore((state) => state.accounts);
+  
+  // Find preferred account if one is set
+  const preferredAccount = profile.preferred_account_id 
+    ? accounts.find(acc => acc.id === profile.preferred_account_id)
+    : null;
+
+  // Load preferred account avatar
+  const preferredAccountAvatarUrl = useCrafatarAvatar({
+    uuid: preferredAccount?.id,
+    overlay: true,
+  });
 
   // Settings context menu items
   const contextMenuItems: ContextMenuItem[] = [
@@ -177,7 +194,6 @@ export function ProfileCardV2({
       icon: "solar:trash-bin-trash-bold",
       destructive: true,
       separator: true, // Trennstrich vor Delete
-      disabled: profile.is_standard_version,
       onClick: (profile) => {
         if (onDelete) {
           onDelete(profile.id, profile.name);
@@ -587,13 +603,35 @@ export function ProfileCardV2({
           </div>
 
           <div className={`flex-grow min-w-0 mr-auto pr-2 ${isCompact ? 'max-w-[calc(100%-64px)]' : 'max-w-[calc(100%-80px)]'}`}>
-            <h3
-              className={`font-minecraft-ten text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case`}
-              style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
-              title={profile.name}
-            >
-              {profile.name}
-            </h3>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3
+                className={`font-minecraft-ten text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis normal-case`}
+                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
+                title={profile.name}
+              >
+                <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+              </h3>
+              
+              {/* Preferred Account Indicator next to title */}
+              {preferredAccount && (
+                <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+                  <div className="flex items-center gap-1.5 text-white/60">
+                    {preferredAccountAvatarUrl && (
+                      <img
+                        src={preferredAccountAvatarUrl}
+                        alt={preferredAccount.username}
+                        className={`${isCompact ? 'w-4 h-4' : 'w-5 h-5'} rounded-sm pixelated flex-shrink-0`}
+                        style={{ imageRendering: 'pixelated' }}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                        }}
+                      />
+                    )}
+                    <span className={`truncate max-w-[100px] ${isCompact ? 'text-base' : 'text-lg'} lowercase`}>{preferredAccount.username}</span>
+                  </div>
+                </Tooltip>
+              )}
+            </div>
             {isLaunching ? (
               <div
                 className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
@@ -742,13 +780,35 @@ export function ProfileCardV2({
 
       {/* Profile Info */}
       <div className="flex-1 min-w-0">
-        <h3
-          className="text-white font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case mb-1"
-          style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
-          title={profile.name}
-        >
-          {profile.name}
-        </h3>
+        <div className="flex items-center gap-2 mb-1">
+          <h3
+            className="text-white font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case"
+            style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
+            title={profile.name}
+          >
+            <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+          </h3>
+          
+          {/* Preferred Account Indicator next to title */}
+          {preferredAccount && (
+            <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+              <div className="flex items-center gap-1.5 text-white/60">
+                {preferredAccountAvatarUrl && (
+                  <img
+                    src={preferredAccountAvatarUrl}
+                    alt={preferredAccount.username}
+                    className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
+                    style={{ imageRendering: 'pixelated' }}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                    }}
+                  />
+                )}
+                <span className="truncate max-w-[100px] text-lg lowercase">{preferredAccount.username}</span>
+              </div>
+            </Tooltip>
+          )}
+        </div>
         
         {isLaunching ? (
           <div

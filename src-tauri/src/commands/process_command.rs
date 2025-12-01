@@ -88,6 +88,16 @@ pub async fn open_log_window<R: tauri::Runtime>(
 }
 
 #[tauri::command]
+pub async fn fetch_crash_report(profile_id: Uuid, process_id: Option<Uuid>) -> Result<Option<String>, CommandError> {
+    let state = State::get().await?;
+    let crash_content = state
+        .process_manager
+        .fetch_latest_crash_report(profile_id, process_id)
+        .await?;
+    Ok(crash_content)
+}
+
+#[tauri::command]
 pub async fn set_discord_state(
     state_type: String,
     profile_name: Option<String>,

@@ -10,6 +10,7 @@ export interface BlockedModsConfig {
   filename_patterns: string[];
   mod_ids: string[];
   modrinth_project_ids: string[];
+  warning_project_ids: string[];
   description: string;
 }
 
@@ -100,42 +101,57 @@ export const getBlockedModsConfig = async (): Promise<BlockedModsConfig> => {
 };
 
 /**
- * Checks if a mod is blocked by the NoRisk client configuration based on the cached config.
+ * Returns the NoRisk status of a mod based on the cached config.
  * Assumes getBlockedModsConfig() has been called at least once.
  *
  * @param filename The filename of the mod.
  * @param modrinthProjectId The Modrinth project ID, if available.
- * @returns `true` if the mod is blocked, otherwise `false`.
+ * @param versionId The version ID (mod_id), if available.
+ * @returns `'blocked'` if the mod is blocked, `'warning'` if it should trigger a warning, or `null` if neither.
  */
-export const isModBlockedByNoRisk = (
+export const getModNoRiskStatus = (
   filename: string,
   modrinthProjectId?: string | null,
-): boolean => {
+  versionId?: string | null,
+): 'blocked' | 'warning' | null => {
+  console.log('[getModNoRiskStatus] Called with filename:', filename, 'projectId:', modrinthProjectId, 'versionId:', versionId, 'cachedConfig:', cachedBlockedModsConfig);
+
   if (!cachedBlockedModsConfig) {
-    // Silently return false if config is not loaded. The UI should trigger the load.
-    return false;
+    console.log('[getModNoRiskStatus] Config not cached, returning null');
+    // Silently return null if config is not loaded. The UI should trigger the load.
+    return null;
   }
 
   const config = cachedBlockedModsConfig;
+  console.log('[getModNoRiskStatus] Checking against config:', config);
 
-  // 1. Check exact filename match
+  // 1. Check exact filename match (blocked)
   if (config.exact_filenames?.includes(filename)) {
-    return true;
+    console.log('[getModNoRiskStatus] MATCHED exact filename - BLOCKED!');
+    return 'blocked';
   }
 
-  // 2. Check Modrinth project ID
+  // 2. Check Modrinth project ID for blocking
   if (modrinthProjectId && config.modrinth_project_ids?.includes(modrinthProjectId)) {
-    return true;
+    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - BLOCKED!');
+    return 'blocked';
   }
 
-  // 3. Check filename patterns (they are full regex)
+  // 3. Check version ID (mod_ids) (blocked)
+  if (versionId && config.mod_ids?.includes(versionId)) {
+    console.log('[getModNoRiskStatus] MATCHED version ID (mod_id) - BLOCKED!');
+    return 'blocked';
+  }
+
+  // 4. Check filename patterns (they are full regex) (blocked)
   if (config.filename_patterns) {
     for (const pattern of config.filename_patterns) {
       try {
         // The pattern from Flagsmith is already a complete regex.
         const regex = new RegExp(pattern);
         if (regex.test(filename)) {
-          return true;
+          console.log('[getModNoRiskStatus] MATCHED filename pattern - BLOCKED!', pattern);
+          return 'blocked';
         }
       } catch (e) {
         log('error', `Invalid regex pattern in blocked_mods_config: ${pattern}`);
@@ -143,5 +159,12 @@ export const isModBlockedByNoRisk = (
     }
   }
 
-  return false;
-}; 
+  // 5. Check Modrinth project ID for warnings (only if not blocked)
+  if (modrinthProjectId && config.warning_project_ids?.includes(modrinthProjectId)) {
+    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - WARNING!');
+    return 'warning';
+  }
+
+  console.log('[getModNoRiskStatus] No match found, returning null');
+  return null;
+};

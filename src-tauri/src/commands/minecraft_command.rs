@@ -5,6 +5,7 @@ use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::api::mclogs_api::upload_log_to_mclogs;
 use crate::minecraft::api::neo_forge_api::NeoForgeApi;
 use crate::minecraft::api::quilt_api::QuiltApi;
+use crate::minecraft::api::crafatar_api::{CrafatarApiService, GetCrafatarAvatarPayload};
 use crate::minecraft::api::starlight_api::{GetSkinRenderPayload, StarlightApiService};
 use crate::minecraft::dto::fabric_meta::FabricVersionInfo;
 use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
@@ -737,6 +738,44 @@ pub async fn get_starlight_skin_render(
         }
         Err(e) => {
             error!("Command failed: get_starlight_skin_render: {:?}", e);
+            Err(CommandError::from(e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_crafatar_avatar(
+    payload: GetCrafatarAvatarPayload,
+) -> Result<PathBuf, CommandError> {
+    debug!(
+        "Command called: get_crafatar_avatar with payload: {:?}",
+        payload
+    );
+
+    let crafatar_service = match CrafatarApiService::new() {
+        Ok(service) => service,
+        Err(e) => {
+            error!(
+                "[CMD] get_crafatar_avatar: Failed to create CrafatarApiService: {:?}",
+                e
+            );
+            return Err(CommandError::from(e));
+        }
+    };
+
+    match crafatar_service
+        .get_avatar(&payload.uuid, payload.size, payload.overlay)
+        .await
+    {
+        Ok(path_buf) => {
+            debug!(
+                "Command completed: get_crafatar_avatar, path: {:?}",
+                path_buf
+            );
+            Ok(path_buf)
+        }
+        Err(e) => {
+            error!("Command failed: get_crafatar_avatar: {:?}", e);
             Err(CommandError::from(e))
         }
     }

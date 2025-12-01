@@ -9,6 +9,7 @@ import { InstallationSettingsTab } from "./settings/InstallationSettingsTab";
 import { JavaSettingsTab } from "./settings/JavaSettingsTab";
 import { WindowSettingsTab } from "./settings/WindowSettingsTab";
 import { NRCTab } from "./settings/NRCTab";
+import { SymlinkSettingsTab } from "./settings/SymlinkSettingsTab";
 
 import { useProfileStore } from "../../store/profile-store";
 import * as ProfileService from "../../services/profile-service";
@@ -31,7 +32,8 @@ type SettingsTab =
   | "java"
   | "window"
   | "nrc"
-  | "designer";
+  | "designer"
+  | "symlinks";
 
 const DESIGNER_FEATURE_FLAG_NAME = "show_keep_local_assets";
 
@@ -129,6 +131,8 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         description: editedProfile.description,
         norisk_information: editedProfile.norisk_information,
         use_shared_minecraft_folder: editedProfile.use_shared_minecraft_folder,
+        preferred_account_id: editedProfile.preferred_account_id,
+        clear_preferred_account: !editedProfile.preferred_account_id,
       });
 
       toast.success("Profile saved successfully!");
@@ -176,6 +180,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     { id: "java", label: "JAVA & Memory", icon: "solar:code-bold" },
     { id: "window", label: "Window", icon: "solar:widget-bold" },
     { id: "nrc", label: "NRC", icon: "solar:gamepad-bold" },
+    { id: "symlinks", label: "Symlinks", icon: "solar:link-bold" },
   ];
 
   const tabConfig = showDesignerTab
@@ -250,6 +255,14 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
           );
         }
         return null;
+      case "symlinks":
+        return (
+          <SymlinkSettingsTab
+            editedProfile={editedProfile}
+            updateProfile={updateProfileData}
+            allProfiles={useProfileStore.getState().profiles}
+          />
+        );
       default:
         return null;
     }
@@ -373,10 +386,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
           <div className="border-l border-white/10 mx-4 my-3 h-[85%]"></div>
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div
-            className="flex-1 py-2 pl-0 pr-4 overflow-y-auto custom-scrollbar"
+            className="flex-1 py-2 pl-0 pr-4 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
             ref={contentRef}
+            style={{ maxWidth: '100%', boxSizing: 'border-box' }}
           >
             {renderTabContent()}
           </div>

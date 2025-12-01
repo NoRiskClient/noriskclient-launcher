@@ -1168,8 +1168,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
       return;
     }
 
-    // 1.5. Check if this is a modpack mod (completely blocked)
-    if (contentType === 'Mod' && item.modpack_origin !== null && item.modpack_origin !== undefined) {
+    // 1.5. Check if this is a modpack mod (blocked unless updates are explicitly enabled)
+    if (contentType === 'Mod' && item.modpack_origin !== null && item.modpack_origin !== undefined && item.updates_enabled !== true) {
       toast.error(`Cannot update ${getDisplayFileName(item)}. This mod comes from a modpack and must be updated through the modpack. Individual updates are disabled to prevent breaking changes.`);
       return;
     }

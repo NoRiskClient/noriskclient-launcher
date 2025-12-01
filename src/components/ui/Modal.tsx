@@ -19,6 +19,7 @@ interface ModalProps {
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
+  contentClassName?: string;
 }
 
 export function Modal({
@@ -33,6 +34,7 @@ export function Modal({
   headerActions,
   variant = "default",
   className,
+  contentClassName,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -179,7 +181,7 @@ export function Modal({
 
         <div
           ref={contentRef}
-          className="flex-1 overflow-y-auto custom-scrollbar"
+          className={cn("flex-1 overflow-y-auto custom-scrollbar", contentClassName)}
         >
           {children}
         </div>

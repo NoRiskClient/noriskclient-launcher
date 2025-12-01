@@ -1374,6 +1374,113 @@ impl ProcessManager {
         Ok(log_content)
     }
 
+    /// Fetches the latest crash report for a given profile.
+    /// Uses profile_id to locate the crash-reports directory (since process might be removed from map).
+    /// If process_id is provided, emits events and stores content for that process.
+    pub async fn fetch_latest_crash_report(&self, profile_id: Uuid, process_id: Option<Uuid>) -> Result<Option<String>> {
+        log::info!("Manually fetching latest crash report for profile {} (process {:?})", profile_id, process_id);
+        
+        // 1. Get crash-reports directory path using profile_id
+        let app_state = state::State::get().await?;
+        let instance_path = app_state.profile_manager.get_profile_instance_path(profile_id).await?;
+        let crash_reports_dir = instance_path.join("crash-reports");
+        
+        if !crash_reports_dir.exists() {
+            log::info!("Crash reports directory does not exist for profile {}", profile_id);
+            return Ok(None);
+        }
+        
+        // 2. Find the latest crash-*.txt file by modification time
+        let mut latest_crash_file: Option<(PathBuf, std::time::SystemTime)> = None;
+        
+        let mut entries = async_fs::read_dir(&crash_reports_dir).await.map_err(AppError::Io)?;
+        while let Some(entry) = entries.next_entry().await.map_err(AppError::Io)? {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(file_name) = path.file_name() {
+                    let name_str = file_name.to_string_lossy();
+                    if name_str.starts_with("crash-") && name_str.ends_with(".txt") {
+                        if let Ok(metadata) = async_fs::metadata(&path).await {
+                            if let Ok(modified) = metadata.modified() {
+                                match &latest_crash_file {
+                                    None => latest_crash_file = Some((path.clone(), modified)),
+                                    Some((_, latest_time)) if modified > *latest_time => {
+                                        latest_crash_file = Some((path.clone(), modified));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. If found, read content and optionally emit events
+        if let Some((crash_file_path, _)) = latest_crash_file {
+            log::info!("Found latest crash report: {:?}", crash_file_path);
+            
+            match async_fs::read_to_string(&crash_file_path).await {
+                Ok(content) => {
+                    // Only emit events if process_id is provided
+                    if let Some(pid) = process_id {
+                        let file_name = crash_file_path.file_name().unwrap_or_default().to_string_lossy();
+                        let message_to_log = format!("[CRASH REPORT - {}]:\n{}", file_name, content);
+                        
+                        // Store content using process_id
+                        self.crash_report_contents.insert(pid, content.clone());
+                        log::info!("Stored crash report content for process {}", pid);
+                        
+                        // Emit CrashReportContentAvailable event
+                        let crash_report_available_payload = crate::state::event_state::CrashReportContentAvailablePayload {
+                            process_id: pid,
+                            content: content.clone(),
+                        };
+                        let event_payload = EventPayload {
+                            event_id: Uuid::new_v4(),
+                            event_type: EventType::CrashReportContentAvailable,
+                            target_id: Some(pid),
+                            message: serde_json::to_string(&crash_report_available_payload).unwrap_or_default(),
+                            progress: None,
+                            error: None,
+                        };
+                        if let Err(e) = app_state.event_state.emit(event_payload).await {
+                            log::error!("Failed to emit CrashReportContentAvailable: {}", e);
+                        }
+                        
+                        // Emit as MinecraftOutput (for log window)
+                        let log_event_payload = EventPayload {
+                            event_id: Uuid::new_v4(),
+                            event_type: EventType::MinecraftOutput,
+                            target_id: Some(pid),
+                            message: message_to_log,
+                            progress: None,
+                            error: None,
+                        };
+                        if let Err(e) = app_state.event_state.emit(log_event_payload).await {
+                            log::error!("Failed to emit crash report as MinecraftOutput: {}", e);
+                        } else {
+                            log::info!("Emitted crash report as MinecraftOutput for log window");
+                        }
+                        
+                        log::info!("Successfully fetched and emitted crash report for process {}", pid);
+                    } else {
+                        log::info!("Fetched crash report without process_id, skipping event emission");
+                    }
+                    
+                    Ok(Some(content))
+                }
+                Err(e) => {
+                    log::error!("Failed to read crash report file {:?}: {}", crash_file_path, e);
+                    Err(AppError::Io(e))
+                }
+            }
+        } else {
+            log::info!("No crash report files found in {:?} for profile {}", crash_reports_dir, profile_id);
+            Ok(None)
+        }
+    }
+
     /// Adds a task handle to the launching_processes map
     pub fn add_launching_process(&self, profile_id: Uuid, handle: JoinHandle<()>) {
         log::info!("Adding launching task for profile ID: {}", profile_id);

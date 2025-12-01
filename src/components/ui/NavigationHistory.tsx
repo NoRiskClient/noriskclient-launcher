@@ -100,12 +100,14 @@ export function NavigationHistory({ className }: NavigationHistoryProps) {
         return prev;
       }
 
-      // It's a new path - add it to history
-      const newHistory = [...prev, currentPath];
+      // It's a new path - truncate forward history and add new path
+      // This implements standard browser behavior: when navigating to a new page
+      // from the middle of history, all forward history is cleared
+      const newHistory = [...prev.slice(0, currentIndex + 1), currentPath];
       setCurrentIndex(newHistory.length - 1);
       return newHistory;
     });
-  }, [location.pathname]);
+  }, [location.pathname, currentIndex]);
 
   const canGoBack = currentIndex > 0;
   const canGoForward = currentIndex < history.length - 1;
@@ -129,6 +131,33 @@ export function NavigationHistory({ className }: NavigationHistoryProps) {
       navigate(`/${targetPath}`);
     }
   };
+
+  // Keyboard shortcut support: Alt+Arrow and Cmd+Arrow (macOS)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input field or textarea
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Handle Alt+Arrow or Meta+Arrow (Cmd key on macOS)
+      if ((e.altKey || e.metaKey) && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleGoBack();
+      } else if ((e.altKey || e.metaKey) && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleGoForward();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [history, currentIndex]);
 
   return (
     <div className={`flex items-center gap-1 ${className}`}>

@@ -10,6 +10,7 @@ import { useAppDragDropStore } from '../store/appStore'; // Use the real store
 import { useProfileStore } from '../store/profile-store'; // Import useProfileStore
 import * as ContentService from '../services/content-service';
 import * as ProfileService from '../services/profile-service'; // Import ProfileService
+import * as WorldService from '../services/world-service'; // Import WorldService
 import { ContentType as BackendContentType } from '../types/content';
 
 // Define the expected structure of the drag-drop event payload based on common Tauri patterns
@@ -102,7 +103,77 @@ export function useGlobalDragAndDrop() {
             const {
               activeDropProfileId: currentProfileId,
               activeDropContentType: currentContentType,
+              activeMainTab: currentMainTab,
             } = useAppDragDropStore.getState();
+
+            console.log(`[DragDrop Hook ${instanceId}] Drop context - MainTab: ${currentMainTab}, ProfileId: ${currentProfileId}, ContentType: ${currentContentType}`);
+
+            // Check if WorldsTab is active and handle world folder drops
+            if (currentMainTab === 'worlds' && currentProfileId) {
+              // Filter for potential world folders (directories - paths without file extensions)
+              // We'll try to import all dropped paths that don't have known file extensions
+              const knownFileExtensions = ['.jar', '.zip', '.noriskpack', '.mrpack', '.disabled'];
+              const potentialWorldFolders = droppedPaths.filter(path => {
+                const lowerPath = path.toLowerCase();
+                // Check if path doesn't end with a known file extension
+                return !knownFileExtensions.some(ext => lowerPath.endsWith(ext));
+              });
+
+              if (potentialWorldFolders.length > 0) {
+                const operationId = `world-import-${Date.now()}`;
+                console.log(`[DragDrop Hook ${instanceId}] Initiating world import (OpID: ${operationId}) for ${potentialWorldFolders.length} folder(s) at ${eventTimestamp}`);
+                
+                // Process each potential world folder
+                const importPromises = potentialWorldFolders.map(async (worldPath) => {
+                  // Extract folder name from path for target name
+                  const pathParts = worldPath.split(/[/\\]/);
+                  const folderName = pathParts[pathParts.length - 1] || 'Imported World';
+                  
+                  try {
+                    const generatedFolderName = await WorldService.importWorld(
+                      currentProfileId,
+                      worldPath,
+                      folderName
+                    );
+                    console.log(`[DragDrop Hook ${instanceId}] World import SUCCESS for: ${worldPath} -> ${generatedFolderName}`);
+                    return { success: true, path: worldPath, folderName: generatedFolderName };
+                  } catch (err) {
+                    console.error(`[DragDrop Hook ${instanceId}] World import ERROR for: ${worldPath}:`, err);
+                    return { success: false, path: worldPath, error: err };
+                  }
+                });
+
+                const loadingToastId = `loading-${operationId}`;
+                toast.loading(`Importing ${potentialWorldFolders.length} world folder(s)...`, { id: loadingToastId });
+
+                Promise.all(importPromises).then((results) => {
+                  const successful = results.filter(r => r.success);
+                  const failed = results.filter(r => !r.success);
+
+                  if (successful.length > 0) {
+                    console.log(`[DragDrop Hook ${instanceId}] World import completed: ${successful.length} successful, ${failed.length} failed`);
+                    toast.success(
+                      `${successful.length} world(s) imported successfully.${failed.length > 0 ? ` ${failed.length} failed.` : ''}`,
+                      { id: loadingToastId, duration: 4000 }
+                    );
+                    // Trigger refresh of worlds list
+                    useAppDragDropStore.getState().triggerWorldsRefresh();
+                  } else {
+                    console.error(`[DragDrop Hook ${instanceId}] All world imports failed`);
+                    const errorMsg = failed.length > 0 && failed[0].error instanceof Error 
+                      ? failed[0].error.message 
+                      : 'Failed to import worlds';
+                    toast.error(
+                      `Failed to import worlds: ${errorMsg}`,
+                      { id: loadingToastId }
+                    );
+                  }
+                });
+                return;
+              } else {
+                toast('Drop a Minecraft world folder to import it. World folders must contain a level.dat file.');
+              }
+            }
 
             if (currentProfileId && currentContentType) {
               let relevantFiles: string[] = [];

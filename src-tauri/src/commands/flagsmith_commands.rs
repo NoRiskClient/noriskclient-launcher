@@ -13,6 +13,7 @@ pub struct BlockedModsConfig {
     pub filename_patterns: Vec<String>,
     pub mod_ids: Vec<String>,
     pub modrinth_project_ids: Vec<String>,
+    pub warning_project_ids: Vec<String>,
     pub description: String,
 }
 
@@ -23,6 +24,7 @@ impl Default for BlockedModsConfig {
             filename_patterns: Vec::new(),
             mod_ids: Vec::new(),
             modrinth_project_ids: Vec::new(),
+            warning_project_ids: Vec::new(),
             description: "Default empty configuration".to_string(),
         }
     }
@@ -66,11 +68,12 @@ async fn get_combined_regex() -> &'static Arc<RwLock<Option<Regex>>> {
 pub async fn set_blocked_mods_config(config: BlockedModsConfig) -> Result<(), CommandError> {
     debug!("Command called: set_blocked_mods_config");
     debug!(
-        "Setting blocked mods config: {} exact filenames, {} patterns, {} mod IDs, {} modrinth project IDs",
+        "Setting blocked mods config: {} exact filenames, {} patterns, {} mod IDs, {} modrinth project IDs, {} warning project IDs",
         config.exact_filenames.len(),
         config.filename_patterns.len(),
         config.mod_ids.len(),
-        config.modrinth_project_ids.len()
+        config.modrinth_project_ids.len(),
+        config.warning_project_ids.len()
     );
 
     // Pre-compile all regex patterns and cache them
@@ -138,11 +141,12 @@ pub async fn get_blocked_mods_config() -> Result<BlockedModsConfig, CommandError
     drop(config_guard);
     
     debug!(
-        "Retrieved blocked mods config: {} exact filenames, {} patterns, {} mod IDs, {} modrinth project IDs",
+        "Retrieved blocked mods config: {} exact filenames, {} patterns, {} mod IDs, {} modrinth project IDs, {} warning project IDs",
         config.exact_filenames.len(),
         config.filename_patterns.len(),
         config.mod_ids.len(),
-        config.modrinth_project_ids.len()
+        config.modrinth_project_ids.len(),
+        config.warning_project_ids.len()
     );
 
     debug!("Command completed: get_blocked_mods_config");

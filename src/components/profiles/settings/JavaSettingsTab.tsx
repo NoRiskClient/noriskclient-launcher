@@ -80,6 +80,7 @@ export function JavaSettingsTab({
   const [globalMemorySettings, setGlobalMemorySettingsState] = useState<MemorySettings | null>(null);
   const [isLoadingGlobalMemory, setIsLoadingGlobalMemory] = useState(false);
   const [isSystemRamLoaded, setIsSystemRamLoaded] = useState(false);
+  
 
   useEffect(() => {
     if (isBackgroundAnimationEnabled) {
@@ -356,6 +357,7 @@ export function JavaSettingsTab({
       }
     }
   };
+
 
   return (
     <div ref={tabRef} className="space-y-6 select-none">

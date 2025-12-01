@@ -9,8 +9,10 @@ use crate::{
 };
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use rand;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +26,70 @@ pub struct CrashlogDto {
 pub struct ServerIdResponse {
     pub server_id: String,
     pub expires_in: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AdventCalendarDayStatus {
+    Locked,
+    Available,
+    Claimed,
+    Expired,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum ShopItemRewardType {
+    Cosmetic,
+    Emote,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+pub enum Reward {
+    #[serde(rename = "Coins")]
+    CoinReward {
+        amount: i32,
+    },
+    #[serde(rename = "ShopItem")]
+    ShopItemReward {
+        #[serde(rename = "shopItemId")]
+        shop_item_id: Uuid,
+        duration: Option<i64>,
+    },
+    #[serde(rename = "RandomShopItem")]
+    RandomShopItemReward {
+        #[serde(rename = "itemType")]
+        item_type: ShopItemRewardType,
+        duration: Option<i64>,
+    },
+    #[serde(rename = "Discount")]
+    DiscountReward {
+        percentage: f64,
+        #[serde(rename = "endTimestamp")]
+        end_timestamp: String,
+    },
+    #[serde(rename = "NrcPlus")]
+    NrcPlusReward {
+        duration: i64,
+    },
+    #[serde(rename = "Theme")]
+    ThemeReward {
+        #[serde(rename = "themeId")]
+        theme_id: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AdventCalendarDay {
+    pub day: i32,
+    pub status: AdventCalendarDayStatus,
+    pub reward: Option<Reward>,
+    #[serde(rename = "shopItemName")]
+    pub shop_item_name: Option<String>,
+    #[serde(rename = "shopItemModelUrl")]
+    pub shop_item_model_url: Option<String>,
 }
 
 pub struct NoRiskApi;
@@ -616,6 +682,151 @@ impl NoRiskApi {
         response.text().await.map_err(|e| {
             error!("[NoRisk API] Failed to read mobile app token reset response: {}", e);
             AppError::ParseError(format!("Failed to read NoRisk API mobile app token reset response: {}", e))
+        })
+    }
+
+    /// Fetches the advent calendar data from the NoRisk API.
+    pub async fn get_advent_calendar(
+        norisk_token: &str,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<Vec<AdventCalendarDay>> {
+        debug!(
+            "[NoRisk API] Fetching advent calendar. Experimental: {}",
+            is_experimental
+        );
+        let base_url = Self::get_api_base(is_experimental);
+        let endpoint = "core/advent/calendar";
+        let url = format!("{}/{}", base_url, endpoint);
+
+        debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
+        debug!("[NoRisk API] Full URL: {}", url);
+
+        let mut extra_params = HashMap::new();
+        extra_params.insert("uuid", request_uuid);
+
+        let mut request = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token));
+
+        debug!("[NoRisk API] Adding UUID query parameter: {}", request_uuid);
+        request = request.query(&extra_params);
+
+        debug!("[NoRisk API] Sending GET request");
+        let response = request.send().await.map_err(|e| {
+            error!("[NoRisk API] GET request failed: {}", e);
+            AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
+        })?;
+
+        let status = response.status();
+        debug!("[NoRisk API] Response status: {}", status);
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!(
+                "[NoRisk API] Error response: Status {}, Body: {}",
+                status, error_body
+            );
+            return Err(AppError::RequestError(format!(
+                "NoRisk API returned error status: {}, Body: {}",
+                status, error_body
+            )));
+        }
+
+        debug!("[NoRisk API] Reading response body as text before parsing");
+        let response_text = response.text().await.map_err(|e| {
+            error!("[NoRisk API] Failed to read response text: {}", e);
+            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
+        })?;
+
+        debug!("[NoRisk API] Response body (first 500 chars): {}", 
+            if response_text.len() > 500 {
+                format!("{}...", &response_text[..500])
+            } else {
+                response_text.clone()
+            }
+        );
+
+        debug!("[NoRisk API] Parsing response body as JSON");
+        serde_json::from_str::<Vec<AdventCalendarDay>>(&response_text).map_err(|e| {
+            error!("[NoRisk API] Failed to parse response: {}", e);
+            error!("[NoRisk API] Full response body: {}", response_text);
+            AppError::ParseError(format!("Failed to parse NoRisk API response: {}. Response body: {}", e, response_text))
+        })
+    }
+
+    /// Claims a reward for a specific day in the advent calendar.
+    pub async fn claim_advent_calendar_day(
+        norisk_token: &str,
+        tag: u32,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<AdventCalendarDay> {
+        let base_url = Self::get_api_base(is_experimental);
+        let endpoint = format!("core/advent/claim/{}", tag);
+        let url = format!("{}/{}", base_url, endpoint);
+
+        debug!(
+            "[NoRisk API] Claiming advent calendar day {}",
+            tag
+        );
+        debug!("[NoRisk API] Full URL: {}", url);
+        debug!("[NoRisk API] With request UUID: {}", request_uuid);
+
+        let response = HTTP_CLIENT
+            .post(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("uuid", request_uuid)])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[NoRisk API] Advent calendar claim request failed: {}", e);
+                AppError::RequestError(format!("Failed to claim advent calendar day: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!(
+            "[NoRisk API] Advent calendar claim response status: {}",
+            status
+        );
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!(
+                "[NoRisk API] Advent calendar claim error response: Status {}, Body: {}",
+                status, error_body
+            );
+            return Err(AppError::RequestError(format!(
+                "NoRisk API returned error status for advent calendar claim: {}, Body: {}",
+                status, error_body
+            )));
+        }
+
+        debug!("[NoRisk API] Reading response body as text before parsing");
+        let response_text = response.text().await.map_err(|e| {
+            error!("[NoRisk API] Failed to read response text: {}", e);
+            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
+        })?;
+
+        debug!("[NoRisk API] Response body (first 500 chars): {}", 
+            if response_text.len() > 500 {
+                format!("{}...", &response_text[..500])
+            } else {
+                response_text.clone()
+            }
+        );
+
+        debug!("[NoRisk API] Parsing advent calendar claim response body as JSON");
+        serde_json::from_str::<AdventCalendarDay>(&response_text).map_err(|e| {
+            error!("[NoRisk API] Failed to parse advent calendar claim response: {}", e);
+            error!("[NoRisk API] Full response body: {}", response_text);
+            AppError::ParseError(format!("Failed to parse NoRisk API advent calendar claim response: {}. Response body: {}", e, response_text))
         })
     }
 
