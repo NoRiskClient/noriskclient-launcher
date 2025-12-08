@@ -8,6 +8,8 @@ import { cn } from "../../lib/utils";
 import { LaunchState } from "../../store/launch-state-store";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
+import bedrock_logo from "/bedrock_logo.png";
+import { invoke } from "@tauri-apps/api/core";
 
 import { useThemeStore } from "../../store/useThemeStore";
 import { useVersionSelectionStore } from "../../store/version-selection-store";
@@ -42,11 +44,32 @@ export function MainLaunchButton({
   mainButtonWidth,
   mainButtonHeight,
 }: MainLaunchButtonProps) {
+  const [bedrock, setBedrock] = useState(false);
   // Local state for transient success message styling (can be further integrated if needed)
   const [transientSuccessActive, setTransientSuccessActive] = useState(false);
 
   const { selectedVersion, setSelectedVersion } = useVersionSelectionStore();
   const navigate = useNavigate();
+
+  const updateBedrock = (value: boolean) => {
+    localStorage.setItem("bedrock", `${value}`);
+    setBedrock(value);
+  }
+  useEffect(() => {
+    if (bedrock) return;
+    const checkBedrock = async () => {
+      const windows = await invoke<boolean>("is_windows_cmd");
+      if (!windows) return updateBedrock(false);
+      const mcbe = await invoke<boolean>("mcbe_installed_cmd");
+      if (!mcbe) return updateBedrock(false);
+      return updateBedrock(true);
+    }
+    checkBedrock();
+  }, []);
+
+  const startBedrock = async () => {
+    const a = await invoke("launch_mcbe_cmd");
+  }
 
   // Use the profile launch hook for launch logic
   const { handleLaunch: hookHandleLaunch, isLaunching, statusMessage, launchState } = useProfileLaunch({
@@ -190,6 +213,16 @@ export function MainLaunchButton({
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-center relative">
+          {bedrock && <IconButton 
+            size="xl"
+            onClick={startBedrock}
+            className={cn("rounded-r-none border-0-l", mainButtonHeight)}
+            icon={
+              <img src={bedrock_logo} alt="a" />
+            }
+            variant={getButtonVariant()}
+            aria-label="Select version"
+          />}
           <Button
             onClick={handleLaunch}
             disabled={

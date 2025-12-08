@@ -30,6 +30,11 @@ use crate::commands::process_command::{
 use commands::minecraft_auth_command::{
     begin_login, get_accounts, get_active_account, remove_account, set_active_account,
 };
+use commands::bedrock::{
+    mcbe_installed_cmd, 
+    is_windows_cmd, 
+    launch_mcbe_cmd,
+};
 use commands::minecraft_command::{
     add_skin,
     add_skin_locally,
@@ -364,6 +369,9 @@ async fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            mcbe_installed_cmd, 
+            is_windows_cmd, 
+            launch_mcbe_cmd,
             create_profile,
             get_profile,
             update_profile,
