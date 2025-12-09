@@ -22,15 +22,15 @@ export function timeAgo(timestamp: number | null): string {
     return `${Math.round(secondsPast / 3600)}h ago`;
   }
   
-  // For older dates, just show the date
+  // For older dates, just show the calendar date
   const date = new Date(timestamp);
   const day = date.getDate();
   const month = date.toLocaleString('default', { month: 'short' });
   const year = date.getFullYear();
   
-  if (secondsPast <= 86400 * 30) { // Roughly within a month
-     return `${day} ${month} ago`;
+  if (secondsPast <= 86400 * 30) {
+    return `${day} ${month}`;
   }
- 
+
   return `${day} ${month} ${year}`;
 } 
