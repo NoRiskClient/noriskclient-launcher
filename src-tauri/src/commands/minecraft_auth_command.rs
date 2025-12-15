@@ -3,9 +3,13 @@ use crate::minecraft::minecraft_auth::Credentials;
 use crate::state::state_manager::State;
 use chrono::{Duration, Utc};
 use tauri::plugin::TauriPlugin;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 use tauri::{Runtime, UserAttentionType};
 use uuid::Uuid;
+use tokio::sync::oneshot;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 //TODO das wäre geiler aber habs noch nicht hinbekommen
 //Error during login: minecraft_auth.begin_login not allowed. Plugin not found
@@ -21,8 +25,19 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .build()
 }
 
+fn extract_code(u: &url::Url) -> Option<String> {
+    let is_callback = u.as_str().starts_with("https://login.live.com/oauth20_desktop.srf");
+    if !is_callback {
+        return None;
+    }
+
+    u.query_pairs()
+        .find(|(k, _)| k == "code")
+        .map(|(_, v)| v.into_owned())
+}
+
 /// Begin the Minecraft login flow
-/// Returns a URL that the user needs to visit to sign in
+/// Returns Some(Credentials) if login was successful, None if cancelled or timed out
 #[tauri::command]
 pub async fn begin_login<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -38,6 +53,12 @@ pub async fn begin_login<R: Runtime>(
         window.close().map_err(|e| AppError::Other(e.to_string()))?;
     }
 
+    // We can try creating a fancy oneshot cancellation system, but I was too stupid to get it working. 50ms polling is fine ig
+    // https://gist.github.com/brentspine/c6335b53b529edba94755d8e9947e43c
+    // Oneshot->Send Once; Mutex->Safe sharing; Arc->Multiple ownership
+    // let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+    // let cancel_tx = Arc::new(Mutex::new(Some(cancel_tx)));
+
     // Create a new window for the sign-in process
     let window =
         tauri::WebviewWindowBuilder::new(
@@ -47,11 +68,24 @@ pub async fn begin_login<R: Runtime>(
                 AppError::AccountError("Error parsing auth redirect URL".to_string())
             })?),
         )
-        .title("Sign into Minecraft")
-        .always_on_top(true)
-        .center()
-        .build()
-        .map_err(|e| AppError::Other(e.to_string()))?;
+            .title("Sign into Minecraft")
+            .always_on_top(true)
+            .center()
+            .build()
+            .map_err(|e| AppError::Other(e.to_string()))?;
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let cancelled2 = Arc::clone(&cancelled);
+
+    window.on_window_event(move |e| {
+        let is_close =
+            matches!(e, WindowEvent::CloseRequested { .. }) ||
+                matches!(e, WindowEvent::Destroyed);
+
+        if is_close {
+            cancelled2.store(true, Ordering::Relaxed);
+        }
+    });
 
     window
         .request_user_attention(Some(UserAttentionType::Critical))
@@ -59,41 +93,29 @@ pub async fn begin_login<R: Runtime>(
 
     let start = Utc::now();
 
-    // Wait for the user to complete the login (10 minutes = 600 seconds)
     while (Utc::now() - start) < Duration::seconds(600) {
-        if window.title().is_err() {
-            // User closed the window, cancelling flow
-            window.close().map_err(|e| AppError::Other(e.to_string()))?;
+        if cancelled.load(Ordering::Relaxed) {
             return Ok(None);
         }
 
-        if let Ok(url) = window.url() {
-            if url
-                .as_str()
-                .starts_with("https://login.live.com/oauth20_desktop.srf")
-            {
-                if let Some((_, code)) = url.query_pairs().find(|x| x.0 == "code") {
-                    window.close().map_err(|e| AppError::Other(e.to_string()))?;
+        let url = window.url().ok();
+        let code = url.as_ref().and_then(extract_code);
 
-                    // Complete the login flow with the code
-                    let account = State::get()
-                        .await?
-                        .minecraft_account_manager_v2
-                        .login_finish(&code, flow)
-                        .await?;
+        if let Some(code) = code {
+            let _ = window.close();
+            let account = State::get()
+                .await?
+                .minecraft_account_manager_v2
+                .login_finish(&code, flow)
+                .await?;
 
-                    // Add the account to the manager
-                    //state.minecraft_account_manager.add_account(account.clone()).await?;
-
-                    return Ok(Some(account));
-                }
-            }
+            return Ok(Some(account));
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
 
-    window.close().map_err(|e| AppError::Other(e.to_string()))?;
+    let _ = window.close();
     Ok(None)
 }
 
