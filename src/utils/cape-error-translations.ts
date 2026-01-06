@@ -14,6 +14,9 @@ const CAPE_ERROR_TRANSLATIONS: Record<string, string> = {
   "Copyright": "Your cape was rejected due to copyright infringement.",
   "Incomplete": "Your cape was rejected because the design is incomplete.",
   
+  // Static message for custom reason
+  "Custom Reason": "Your cape was rejected: {0}",
+  
   // Static messages (from CosmeticCapeRoute.kt)
   "In Review": "Your cape is currently being reviewed. Please be patient.",
   "Image does not fit the required resolution": "Your cape image must be 512x256 pixels.",
@@ -89,6 +92,11 @@ export function translateCapeError(errorText: string): string {
         result = result.replace(`{${index}}`, arg);
       });
       return result;
+    }
+    
+    // Custom reason will also be in translatableKey
+    if(translated == parsedError.translatableKey) {
+      return translateCapeErrorKey("Custom Reason").replace("{0}", parsedError.translatableKey);
     }
     
     return translated;
