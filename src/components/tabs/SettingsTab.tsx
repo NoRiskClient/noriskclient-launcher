@@ -476,26 +476,6 @@ export function SettingsTab() {
         ]}
         disabled={saving}
       />
-    </div>
-  );
-
-  const renderAppearanceTab = () => (
-    <div className="space-y-6">
-      {/* Theme Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Icon icon="solar:star-bold" className="w-6 h-6 text-white" />
-          <h3 className="text-3xl font-minecraft text-white">
-            Theme
-          </h3>
-        </div>
-        <p className="text-base text-white/70 font-minecraft-ten mt-2">
-          Select a theme to customize your launcher's appearance
-        </p>
-      </div>
-      <div className="mt-4">
-        <ThemeSelector />
-      </div>
 
       {/* Font Family Section */}
       <div className="mt-8">
@@ -623,6 +603,26 @@ export function SettingsTab() {
             </span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+
+  const renderAppearanceTab = () => (
+    <div className="space-y-6">
+      {/* Theme Section */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Icon icon="solar:star-bold" className="w-6 h-6 text-white" />
+          <h3 className="text-3xl font-minecraft text-white">
+            Theme
+          </h3>
+        </div>
+        <p className="text-base text-white/70 font-minecraft-ten mt-2">
+          Select a theme to customize your launcher's appearance
+        </p>
+      </div>
+      <div className="mt-4">
+        <ThemeSelector />
       </div>
 
       {/* Background Effect Section */}
