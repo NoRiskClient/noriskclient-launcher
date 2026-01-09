@@ -285,7 +285,7 @@ export const useThemeStore = create<ThemeState>()(
       // Featured profile mode - defaults
       featureMode: false,
       // Font family - defaults
-      fontFamily: "modern" as "modern" | "minecraft",
+      fontFamily: "minecraft" as "modern" | "minecraft",
       // Font sizes - defaults (in px)
       modernFontSize: 18,
       minecraftFontSize: 22,
