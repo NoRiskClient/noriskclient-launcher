@@ -98,7 +98,7 @@ export function SettingsTab() {
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
-  const { borderRadius, setBorderRadius, fontFamily, setFontFamily } = useThemeStore();
+  const { borderRadius, setBorderRadius, fontFamily, setFontFamily, modernFontSize, minecraftFontSize, setModernFontSize, setMinecraftFontSize } = useThemeStore();
 
   const { confirm, confirmDialog } = useConfirmDialog();
   const { showModal, hideModal } = useGlobalModal();
@@ -581,6 +581,47 @@ export function SettingsTab() {
               )}
             </div>
           </button>
+        </div>
+
+        {/* Font Size Slider */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="text-xl font-minecraft text-white mb-1">
+                Schriftgröße
+              </h4>
+              <p className="text-sm text-white/60 font-minecraft-ten">
+                {fontFamily === "modern" 
+                  ? `Aktuell: ${modernFontSize}px`
+                  : `Aktuell: ${minecraftFontSize}px`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-white/60 font-minecraft-ten min-w-[40px]">
+              {fontFamily === "modern" ? "10px" : "12px"}
+            </span>
+            <input
+              type="range"
+              min={fontFamily === "modern" ? 10 : 12}
+              max={fontFamily === "modern" ? 20 : 24}
+              step="1"
+              value={fontFamily === "modern" ? modernFontSize : minecraftFontSize}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (fontFamily === "modern") {
+                  setModernFontSize(value);
+                } else {
+                  setMinecraftFontSize(value);
+                }
+              }}
+              className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+              disabled={saving}
+            />
+            <span className="text-sm text-white/60 font-minecraft-ten min-w-[40px] text-right">
+              {fontFamily === "modern" ? "20px" : "24px"}
+            </span>
+          </div>
         </div>
       </div>
 

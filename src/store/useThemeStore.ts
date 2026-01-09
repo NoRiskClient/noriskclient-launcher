@@ -252,6 +252,11 @@ interface ThemeState {
   fontFamily: "modern" | "minecraft";
   setFontFamily: (family: "modern" | "minecraft") => void;
   applyFontFamilyToDOM: () => void;
+  // Font sizes
+  modernFontSize: number;
+  minecraftFontSize: number;
+  setModernFontSize: (size: number) => void;
+  setMinecraftFontSize: (size: number) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -281,6 +286,9 @@ export const useThemeStore = create<ThemeState>()(
       featureMode: false,
       // Font family - defaults
       fontFamily: "modern" as "modern" | "minecraft",
+      // Font sizes - defaults (in px)
+      modernFontSize: 18,
+      minecraftFontSize: 22,
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
@@ -459,8 +467,20 @@ export const useThemeStore = create<ThemeState>()(
         get().applyFontFamilyToDOM();
       },
 
+      setModernFontSize: (size: number) => {
+        const clampedSize = Math.max(10, Math.min(20, size));
+        set({ modernFontSize: clampedSize });
+        get().applyFontFamilyToDOM();
+      },
+
+      setMinecraftFontSize: (size: number) => {
+        const clampedSize = Math.max(12, Math.min(24, size));
+        set({ minecraftFontSize: clampedSize });
+        get().applyFontFamilyToDOM();
+      },
+
       applyFontFamilyToDOM: () => {
-        const { fontFamily } = get();
+        const { fontFamily, modernFontSize, minecraftFontSize } = get();
         
         if (fontFamily === "minecraft") {
           // Minecraft-Schriftart
@@ -481,10 +501,10 @@ export const useThemeStore = create<ThemeState>()(
             "--font-letter-spacing-ten",
             "0.03em"
           );
-          // Normale Schriftgröße für Minecraft
+          // Schriftgröße für Minecraft
           document.documentElement.style.setProperty(
             "--base-font-size",
-            "16px"
+            `${minecraftFontSize}px`
           );
           // Überschriften-Schriftgröße für Minecraft
           document.documentElement.style.setProperty(
@@ -519,10 +539,10 @@ export const useThemeStore = create<ThemeState>()(
             "--font-minecraft-ten",
             '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
           );
-          // Kleinere Schriftgröße für moderne Schriftart
+          // Schriftgröße für moderne Schriftart
           document.documentElement.style.setProperty(
             "--base-font-size",
-            "13px"
+            `${modernFontSize}px`
           );
           // Leicht erhöhtes Letter-spacing für bessere Lesbarkeit
           document.documentElement.style.setProperty(
@@ -546,10 +566,11 @@ export const useThemeStore = create<ThemeState>()(
             "--heading-font-weight",
             "600"
           );
-          // Kleinere Schriftgröße für Überschriften/CAPS
+          // Kleinere Schriftgröße für Überschriften/CAPS (proportional zur Basis-Schriftgröße)
+          const headingSizeRatio = 0.92;
           document.documentElement.style.setProperty(
             "--heading-font-size",
-            "0.92em"
+            `${headingSizeRatio * modernFontSize}px`
           );
           // Small Caps für gleichmäßiges Aussehen von Groß- und Kleinbuchstaben
           document.documentElement.style.setProperty(
