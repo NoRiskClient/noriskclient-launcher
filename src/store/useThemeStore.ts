@@ -481,6 +481,16 @@ export const useThemeStore = create<ThemeState>()(
             "--font-letter-spacing-ten",
             "0.03em"
           );
+          // Normale Schriftgröße für Minecraft
+          document.documentElement.style.setProperty(
+            "--base-font-size",
+            "16px"
+          );
+          // Überschriften-Schriftgröße für Minecraft
+          document.documentElement.style.setProperty(
+            "--heading-font-size",
+            "1em"
+          );
           // Überschriften-Styles für Minecraft
           document.documentElement.style.setProperty(
             "--heading-text-transform",
@@ -494,15 +504,25 @@ export const useThemeStore = create<ThemeState>()(
             "--heading-font-weight",
             "normal"
           );
+          document.documentElement.style.setProperty(
+            "--heading-font-variant",
+            "normal"
+          );
         } else {
-          // Moderne System-Schriftart mit Small Caps für gleichmäßiges Aussehen
+          // Moderne Monospace-Schriftart
           document.documentElement.style.setProperty(
             "--font-minecraft",
-            '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+            '"Noto Sans Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", "Courier New", monospace'
           );
+          // Normale Schriftart für Beschreibungen (keine Monospace)
           document.documentElement.style.setProperty(
             "--font-minecraft-ten",
             '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+          );
+          // Kleinere Schriftgröße für moderne Schriftart
+          document.documentElement.style.setProperty(
+            "--base-font-size",
+            "13px"
           );
           // Leicht erhöhtes Letter-spacing für bessere Lesbarkeit
           document.documentElement.style.setProperty(
@@ -513,10 +533,10 @@ export const useThemeStore = create<ThemeState>()(
             "--font-letter-spacing-ten",
             "normal"
           );
-          // Überschriften-Styles für moderne Schriftart mit Small Caps
+          // Überschriften-Styles: Alles in CAPS mit Small Caps für gleichmäßiges Aussehen
           document.documentElement.style.setProperty(
             "--heading-text-transform",
-            "none"
+            "uppercase"
           );
           document.documentElement.style.setProperty(
             "--heading-letter-spacing",
@@ -525,6 +545,11 @@ export const useThemeStore = create<ThemeState>()(
           document.documentElement.style.setProperty(
             "--heading-font-weight",
             "600"
+          );
+          // Kleinere Schriftgröße für Überschriften/CAPS
+          document.documentElement.style.setProperty(
+            "--heading-font-size",
+            "0.92em"
           );
           // Small Caps für gleichmäßiges Aussehen von Groß- und Kleinbuchstaben
           document.documentElement.style.setProperty(

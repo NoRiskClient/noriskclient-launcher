@@ -57,6 +57,8 @@
     --heading-letter-spacing: normal;
     --heading-font-weight: 600;
     --heading-font-variant: normal;
+    --heading-font-size: 1em;
+    --base-font-size: 14px;
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -245,6 +247,7 @@
         background-position: center;
         background-attachment: fixed;
         font-family: var(--font-minecraft), sans-serif;
+        font-size: var(--base-font-size);
         letter-spacing: var(--font-letter-spacing);
     }
 
@@ -255,6 +258,7 @@
     h5,
     h6 {
         @apply font-minecraft;
+        font-size: var(--heading-font-size);
         font-weight: var(--heading-font-weight);
         text-transform: var(--heading-text-transform);
         font-variant: var(--heading-font-variant);
@@ -280,8 +284,10 @@
 
 .font-minecraft {
     font-family: var(--font-minecraft), sans-serif;
+    font-size: var(--heading-font-size);
     letter-spacing: var(--font-letter-spacing);
-    font-variant: var(--heading-font-variant);
+    font-variant: var(--heading-font-variant); /* Small Caps für gleichmäßiges Aussehen */
+    text-transform: uppercase; /* Alles in CAPS */
 }
 
 .font-minecraft-ten {
