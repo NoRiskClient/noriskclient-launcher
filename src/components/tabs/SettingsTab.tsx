@@ -482,11 +482,11 @@ export function SettingsTab() {
         <div className="flex items-center gap-2 mb-2">
           <Icon icon="solar:text-bold" className="w-6 h-6 text-white" />
           <h3 className="text-3xl font-minecraft text-white">
-            Schriftart
+            Font Family
           </h3>
         </div>
         <p className="text-base text-white/70 font-minecraft-ten mt-2">
-          Wähle zwischen der Minecraft-Schriftart und einer modernen System-Schriftart
+          Choose between the Minecraft font and a modern system font
         </p>
         <div className="mt-4 grid grid-cols-2 gap-4">
           <button
@@ -515,7 +515,7 @@ export function SettingsTab() {
                   Modern
                 </div>
                 <div className="text-xs text-white/60 font-minecraft-ten">
-                  System-Schriftart
+                  System Font
                 </div>
               </div>
               {fontFamily === "modern" && (
@@ -551,7 +551,7 @@ export function SettingsTab() {
                   Minecraft
                 </div>
                 <div className="text-xs text-white/60 font-minecraft-ten">
-                  Original-Schriftart
+                  Original Font
                 </div>
               </div>
               {fontFamily === "minecraft" && (
@@ -568,12 +568,12 @@ export function SettingsTab() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h4 className="text-xl font-minecraft text-white mb-1">
-                Schriftgröße
+                Font Size
               </h4>
               <p className="text-sm text-white/60 font-minecraft-ten">
                 {fontFamily === "modern" 
-                  ? `Aktuell: ${modernFontSize}px`
-                  : `Aktuell: ${minecraftFontSize}px`}
+                  ? `Current: ${modernFontSize}px`
+                  : `Current: ${minecraftFontSize}px`}
               </p>
             </div>
           </div>
