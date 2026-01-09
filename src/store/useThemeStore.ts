@@ -248,6 +248,10 @@ interface ThemeState {
   // Featured profile mode
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
+  // Font family
+  fontFamily: "modern" | "minecraft";
+  setFontFamily: (family: "modern" | "minecraft") => void;
+  applyFontFamilyToDOM: () => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -275,6 +279,8 @@ export const useThemeStore = create<ThemeState>()(
       newsSectionWidth: 375,
       // Featured profile mode - defaults
       featureMode: false,
+      // Font family - defaults
+      fontFamily: "modern" as "modern" | "minecraft",
 
       setAccentColor: (color: AccentColor) => {
         set({ accentColor: color });
@@ -446,6 +452,87 @@ export const useThemeStore = create<ThemeState>()(
       setFeatureMode: (enabled: boolean) => {
         set({ featureMode: enabled });
       },
+
+      // Font family
+      setFontFamily: (family: "modern" | "minecraft") => {
+        set({ fontFamily: family });
+        get().applyFontFamilyToDOM();
+      },
+
+      applyFontFamilyToDOM: () => {
+        const { fontFamily } = get();
+        
+        if (fontFamily === "minecraft") {
+          // Minecraft-Schriftart
+          document.documentElement.style.setProperty(
+            "--font-minecraft",
+            '"Minecraft", monospace'
+          );
+          document.documentElement.style.setProperty(
+            "--font-minecraft-ten",
+            '"MinecraftTen", sans-serif'
+          );
+          // Letter-spacing für Minecraft-Schriftart
+          document.documentElement.style.setProperty(
+            "--font-letter-spacing",
+            "0.05em"
+          );
+          document.documentElement.style.setProperty(
+            "--font-letter-spacing-ten",
+            "0.03em"
+          );
+          // Überschriften-Styles für Minecraft
+          document.documentElement.style.setProperty(
+            "--heading-text-transform",
+            "lowercase"
+          );
+          document.documentElement.style.setProperty(
+            "--heading-letter-spacing",
+            "0.05em"
+          );
+          document.documentElement.style.setProperty(
+            "--heading-font-weight",
+            "normal"
+          );
+        } else {
+          // Moderne System-Schriftart mit Small Caps für gleichmäßiges Aussehen
+          document.documentElement.style.setProperty(
+            "--font-minecraft",
+            '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+          );
+          document.documentElement.style.setProperty(
+            "--font-minecraft-ten",
+            '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+          );
+          // Leicht erhöhtes Letter-spacing für bessere Lesbarkeit
+          document.documentElement.style.setProperty(
+            "--font-letter-spacing",
+            "0.01em"
+          );
+          document.documentElement.style.setProperty(
+            "--font-letter-spacing-ten",
+            "normal"
+          );
+          // Überschriften-Styles für moderne Schriftart mit Small Caps
+          document.documentElement.style.setProperty(
+            "--heading-text-transform",
+            "none"
+          );
+          document.documentElement.style.setProperty(
+            "--heading-letter-spacing",
+            "0.02em"
+          );
+          document.documentElement.style.setProperty(
+            "--heading-font-weight",
+            "600"
+          );
+          // Small Caps für gleichmäßiges Aussehen von Groß- und Kleinbuchstaben
+          document.documentElement.style.setProperty(
+            "--heading-font-variant",
+            "small-caps"
+          );
+        }
+      },
     }),    {
       name: "norisk-theme-storage",
       onRehydrateStorage: () => (state) => {
@@ -457,6 +544,7 @@ export const useThemeStore = create<ThemeState>()(
           
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
+          state.applyFontFamilyToDOM();
           // Ensure collapsedProfileGroups exists after rehydrate
           if (!Array.isArray(state.collapsedProfileGroups)) {
             state.collapsedProfileGroups = [];

@@ -98,7 +98,7 @@ export function SettingsTab() {
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
-  const { borderRadius, setBorderRadius } = useThemeStore();
+  const { borderRadius, setBorderRadius, fontFamily, setFontFamily } = useThemeStore();
 
   const { confirm, confirmDialog } = useConfirmDialog();
   const { showModal, hideModal } = useGlobalModal();
@@ -495,6 +495,93 @@ export function SettingsTab() {
       </div>
       <div className="mt-4">
         <ThemeSelector />
+      </div>
+
+      {/* Font Family Section */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-2">
+          <Icon icon="solar:text-bold" className="w-6 h-6 text-white" />
+          <h3 className="text-3xl font-minecraft text-white">
+            Schriftart
+          </h3>
+        </div>
+        <p className="text-base text-white/70 font-minecraft-ten mt-2">
+          Wähle zwischen der Minecraft-Schriftart und einer modernen System-Schriftart
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <button
+            onClick={() => setFontFamily("modern")}
+            className={cn(
+              "group relative p-4 rounded-lg border-2 transition-all duration-200",
+              fontFamily === "modern"
+                ? "border-white/50 bg-white/10"
+                : "border-white/20 hover:border-white/30 hover:bg-white/5"
+            )}
+            disabled={saving}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <Icon
+                icon="solar:text-field-bold"
+                className={cn(
+                  "w-8 h-8 transition-colors",
+                  fontFamily === "modern" ? "text-white" : "text-white/60 group-hover:text-white/80"
+                )}
+              />
+              <div className="text-center">
+                <div className={cn(
+                  "text-lg font-minecraft-ten mb-1",
+                  fontFamily === "modern" ? "text-white" : "text-white/80"
+                )}>
+                  Modern
+                </div>
+                <div className="text-xs text-white/60 font-minecraft-ten">
+                  System-Schriftart
+                </div>
+              </div>
+              {fontFamily === "modern" && (
+                <div className="absolute top-2 right-2">
+                  <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white" />
+                </div>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={() => setFontFamily("minecraft")}
+            className={cn(
+              "group relative p-4 rounded-lg border-2 transition-all duration-200",
+              fontFamily === "minecraft"
+                ? "border-white/50 bg-white/10"
+                : "border-white/20 hover:border-white/30 hover:bg-white/5"
+            )}
+            disabled={saving}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <Icon
+                icon="solar:gamepad-bold"
+                className={cn(
+                  "w-8 h-8 transition-colors",
+                  fontFamily === "minecraft" ? "text-white" : "text-white/60 group-hover:text-white/80"
+                )}
+              />
+              <div className="text-center">
+                <div className={cn(
+                  "text-lg font-minecraft-ten mb-1",
+                  fontFamily === "minecraft" ? "text-white" : "text-white/80"
+                )}>
+                  Minecraft
+                </div>
+                <div className="text-xs text-white/60 font-minecraft-ten">
+                  Original-Schriftart
+                </div>
+              </div>
+              {fontFamily === "minecraft" && (
+                <div className="absolute top-2 right-2">
+                  <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white" />
+                </div>
+              )}
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Background Effect Section */}

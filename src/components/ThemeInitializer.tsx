@@ -11,12 +11,16 @@ export function ThemeInitializer() {
   const applyBorderRadiusToDOM = useThemeStore(
     (state) => state.applyBorderRadiusToDOM,
   );
+  const applyFontFamilyToDOM = useThemeStore(
+    (state) => state.applyFontFamilyToDOM,
+  );
   useLauncherTheme();
 
   useEffect(() => {
     applyAccentColorToDOM();
     applyBorderRadiusToDOM();
-  }, [applyAccentColorToDOM, applyBorderRadiusToDOM]);
+    applyFontFamilyToDOM();
+  }, [applyAccentColorToDOM, applyBorderRadiusToDOM, applyFontFamilyToDOM]);
 
   return null;
 }

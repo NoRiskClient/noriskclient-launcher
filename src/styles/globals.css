@@ -49,8 +49,14 @@
     --radius-xl: 16px;
     --radius-2xl: 24px;
     --border-radius: 0px; 
-    --font-minecraft: "Minecraft", monospace;
-    --font-minecraft-ten: "MinecraftTen", sans-serif;
+    --font-minecraft: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-minecraft-ten: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-letter-spacing: normal;
+    --font-letter-spacing-ten: normal;
+    --heading-text-transform: none;
+    --heading-letter-spacing: normal;
+    --heading-font-weight: 600;
+    --heading-font-variant: normal;
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -238,8 +244,8 @@
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        font-family: var(--font-minecraft), monospace;
-        letter-spacing: 0.03em;
+        font-family: var(--font-minecraft), sans-serif;
+        letter-spacing: var(--font-letter-spacing);
     }
 
     h1,
@@ -248,9 +254,12 @@
     h4,
     h5,
     h6 {
-        @apply font-minecraft tracking-wider lowercase;
-        font-weight: normal;
+        @apply font-minecraft;
+        font-weight: var(--heading-font-weight);
+        text-transform: var(--heading-text-transform);
+        font-variant: var(--heading-font-variant);
         user-select: none;
+        letter-spacing: var(--heading-letter-spacing);
     }
 
     button,
@@ -260,7 +269,7 @@
 
     p {
         line-height: 1.6;
-        letter-spacing: 0.02em;
+        letter-spacing: var(--font-letter-spacing-ten);
     }
 
     [data-tauri-drag-region] {
@@ -270,13 +279,15 @@
 }
 
 .font-minecraft {
-    font-family: var(--font-minecraft), monospace;
-    letter-spacing: 0.05em;
+    font-family: var(--font-minecraft), sans-serif;
+    letter-spacing: var(--font-letter-spacing);
+    font-variant: var(--heading-font-variant);
 }
 
 .font-minecraft-ten {
     font-family: var(--font-minecraft-ten), sans-serif;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--font-letter-spacing-ten);
+    font-variant: normal; /* Beschreibungen bleiben normal, kein Small Caps */
 }
 
 .text-shadow {
