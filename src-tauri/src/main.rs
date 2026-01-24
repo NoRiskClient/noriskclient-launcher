@@ -170,7 +170,7 @@ async fn main() {
                             .dialog()
                             .message("The NoRisk Launcher encountered a critical error.\n\n\
                                 Please join our Discord for support:\n\
-                                https://discord.gg/norisk")
+                                https://discord.norisk.gg")
                             .kind(MessageDialogKind::Error)
                             .title("NoRisk Launcher - Critical Error")
                             .blocking_show();
@@ -383,7 +383,7 @@ async fn main() {
                                     .dialog()
                                     .message("The NoRisk Launcher encountered a critical error.\n\n\
                                         Please join our Discord for support:\n\
-                                        https://discord.gg/norisk")
+                                        https://discord.norisk.gg")
                                     .kind(MessageDialogKind::Error)
                                     .title("NoRisk Launcher - Critical Error")
                                     .blocking_show();
@@ -402,7 +402,7 @@ async fn main() {
                             .dialog()
                             .message("The NoRisk Launcher encountered a critical error.\n\n\
                                 Please join our Discord for support:\n\
-                                https://discord.gg/norisk")
+                                https://discord.norisk.gg")
                             .kind(MessageDialogKind::Error)
                             .title("NoRisk Launcher - Critical Error")
                             .blocking_show();

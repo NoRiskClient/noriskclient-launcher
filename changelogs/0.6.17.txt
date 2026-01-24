@@ -1,0 +1,4 @@
+## 📋 Launcher Changelog v0.6.17
+
+### 🐛 Bug Fixes
+- Fixed wrong Discord link in error modal
