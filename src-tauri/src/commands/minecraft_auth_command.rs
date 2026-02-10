@@ -24,7 +24,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             remove_account,
             get_active_account,
             set_active_account,
-            get_accounts,
+            get_accounts
         ])
         .build()
 }

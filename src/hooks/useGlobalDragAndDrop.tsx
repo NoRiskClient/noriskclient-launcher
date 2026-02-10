@@ -1,17 +1,20 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import type { UnlistenFn, Event as TauriEvent } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn, type Event as TauriEvent } from '@tauri-apps/api/event';
 import type { PhysicalPosition } from '@tauri-apps/api/window'; // For payload.position
 import { toast } from 'react-hot-toast';
 // import { invoke } from '@tauri-apps/api/core'; // No longer directly needed here
 
 import { useAppDragDropStore } from '../store/appStore'; // Use the real store
 import { useProfileStore } from '../store/profile-store'; // Import useProfileStore
+import { parseErrorMessage } from '../utils/error-utils';
 import * as ContentService from '../services/content-service';
 import * as ProfileService from '../services/profile-service'; // Import ProfileService
 import * as WorldService from '../services/world-service'; // Import WorldService
 import { ContentType as BackendContentType } from '../types/content';
+import { EventType, type EventPayload } from '../types/events';
+import { ProgressToast } from '../components/ui/ProgressToast';
 
 // Define the expected structure of the drag-drop event payload based on common Tauri patterns
 interface WebviewDragDropPayload {
@@ -73,31 +76,86 @@ export function useGlobalDragAndDrop() {
             );
 
             if (profilePackPath) {
-              const operationId = `profile-import-${Date.now()}`;
-              console.log(`[DragDrop Hook ${instanceId}] Initiating profile import (OpID: ${operationId}) for: ${profilePackPath} at ${eventTimestamp}`);
-              const loadingToastId = `loading-${operationId}`;
+              const { isPathImporting, addImportingPath, removeImportingPath } = useProfileStore.getState();
+
+              // Check if this file is already being imported
+              if (isPathImporting(profilePackPath)) {
+                toast.error("This file is already being imported.");
+                return;
+              }
+
+              const eventId = crypto.randomUUID();
+              const toastId = `import-${eventId}`;
+              let progressUnlisten: UnlistenFn | null = null;
+
+              console.log(`[DragDrop Hook ${instanceId}] Initiating profile import (EventID: ${eventId}) for: ${profilePackPath} at ${eventTimestamp}`);
               const fileName = profilePackPath.substring(profilePackPath.lastIndexOf('/') + 1).substring(profilePackPath.lastIndexOf('\\') + 1); // Get file name for toast
-              toast.loading(`Importing profile from ${fileName}...`, { id: loadingToastId });
+
+              addImportingPath(profilePackPath);
 
               try {
-                const newProfileId = await ProfileService.importProfileByPath(profilePackPath);
-                console.log(`[DragDrop Hook ${instanceId}] Profile import SUCCESS (OpID: ${operationId}) for: ${profilePackPath} at ${new Date().toISOString()}`);
+                // Set up event listener for progress updates
+                progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+                  const progressPayload = progressEvent.payload;
+                  if (progressPayload.event_type !== EventType.TaskProgress) return;
+                  if (progressPayload.event_id !== eventId) return;
+
+                  const progress = (progressPayload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+                  // Update toast with progress
+                  toast.custom(
+                    () => <ProgressToast message={`Importing ${fileName}`} progress={progress} />,
+                    { id: toastId, duration: Infinity }
+                  );
+                });
+
+                // Show initial progress toast
+                toast.custom(
+                  () => <ProgressToast message={`Importing ${fileName}`} progress={0} />,
+                  { id: toastId, duration: Infinity }
+                );
+
+                const newProfileId = await ProfileService.importProfileByPath(profilePackPath, eventId);
+                console.log(`[DragDrop Hook ${instanceId}] Profile import SUCCESS (EventID: ${eventId}) for: ${profilePackPath} at ${new Date().toISOString()}`);
+
+                // Clean up listener before showing success
+                if (progressUnlisten) {
+                  progressUnlisten();
+                  progressUnlisten = null;
+                }
+
                 toast.success(
                   `Profile import initiated for ${fileName}. Opening profile...`,
-                  { id: loadingToastId, duration: 3000 }
+                  { id: toastId, duration: 3000 }
                 );
                 useProfileStore.getState().fetchProfiles(); // Fetch profiles after successful import
 
                 // Navigate to the new profile
                 navigate(`/profilesv2/${newProfileId}`);
               } catch (err) {
-                console.error(`[DragDrop Hook ${instanceId}] Profile import ERROR (OpID: ${operationId}) for: ${profilePackPath} at ${new Date().toISOString()}:`, err);
-                toast.error(
-                  `Failed to import profile from ${fileName}: ${err instanceof Error ? err.message : String(err)}`,
-                  { id: loadingToastId }
-                );
+                console.error(`[DragDrop Hook ${instanceId}] Profile import ERROR (EventID: ${eventId}) for: ${profilePackPath} at ${new Date().toISOString()}:`, err);
+                const errorMessage = parseErrorMessage(err);
+
+                // Check for disk space error and provide helpful hint
+                if (errorMessage.toLowerCase().includes("insufficient disk space")) {
+                  toast.error(
+                    `${errorMessage}\n\nTip: You can change the data location in Settings.`,
+                    { id: toastId, duration: 8000 }
+                  );
+                } else {
+                  toast.error(
+                    `Failed to import profile from ${fileName}: ${errorMessage}`,
+                    { id: toastId }
+                  );
+                }
+              } finally {
+                // Clean up listener
+                if (progressUnlisten) {
+                  progressUnlisten();
+                }
+                removeImportingPath(profilePackPath);
               }
-              return; 
+              return;
             }
 
             const {

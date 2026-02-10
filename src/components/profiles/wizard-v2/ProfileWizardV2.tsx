@@ -16,6 +16,23 @@ import { ProfileWizardV2Step3 } from "./ProfileWizardV2Step3";
 import { useProfileStore } from "../../../store/profile-store";
 import type { CreateProfileParams } from "../../../types/profile";
 import { toast } from "react-hot-toast";
+import { Tooltip } from "../../ui/Tooltip";
+import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
+import { extractNrcCompatibility, type NrcCompatibilityData } from "../../../utils/nrc-compatibility";
+
+function NrcCompatibleTooltipContent() {
+  return (
+    <div className="space-y-2">
+      <div className="text-sm text-white">This version supports NoRisk Client</div>
+      <div className="flex items-start gap-2">
+        <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
+        <div className="text-gray-300 text-xs italic">
+          NRC features and mods will be available.
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ProfileWizardV2Props {
   onClose: () => void;
@@ -39,6 +56,9 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
   // Step 2 data
   const [selectedLoader, setSelectedLoader] = useState<ModLoader>("fabric");
   const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<string | null>(null);
+
+  // NRC compatibility data
+  const [nrcCompatibility, setNrcCompatibility] = useState<NrcCompatibilityData | null>(null);
 
   useEffect(() => {
     const loadMinecraftVersions = async () => {
@@ -72,6 +92,19 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     };
 
     loadMinecraftVersions();
+  }, []);
+
+  // Load NRC compatibility data in parallel
+  useEffect(() => {
+    const loadNrcCompatibility = async () => {
+      try {
+        const packsConfig = await invoke<NoriskModpacksConfig>("get_norisk_packs_resolved");
+        setNrcCompatibility(extractNrcCompatibility(packsConfig));
+      } catch (err) {
+        console.error("Failed to load NRC compatibility:", err);
+      }
+    };
+    loadNrcCompatibility();
   }, []);
 
   const filteredVersions = minecraftVersions
@@ -212,30 +245,44 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
         {/* Version List */}
         <div className="max-h-96 overflow-y-auto overflow-x-hidden scrollbar-hide grid grid-cols-3 gap-3">
-          {filteredVersions.map(version => (
-            <div
-              key={version.id}
-              className={`p-4 cursor-pointer transition-all duration-200 border-2 rounded-lg ${
-                selectedVersion === version.id
-                  ? "border-current bg-current/10 hover:bg-current/15"
-                  : "border-transparent bg-black/20 hover:bg-black/30"
-              }`}
-              style={selectedVersion === version.id ? {
-                borderColor: accentColor.value,
-                color: accentColor.value
-              } : {}}
-              onClick={() => setSelectedVersion(version.id)}
-            >
-              <div className="flex flex-col items-center text-center">
-                <h4 className="font-minecraft text-3xl text-white lowercase">
-                  {version.id}
-                </h4>
-                <p className="text-xs text-white/60 font-minecraft-ten capitalize mt-1">
-                  {version.type}
-                </p>
+          {filteredVersions.map(version => {
+            const isNrcCompatible = nrcCompatibility?.compatibleVersions.has(version.id);
+
+            return (
+              <div
+                key={version.id}
+                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 rounded-lg ${
+                  selectedVersion === version.id
+                    ? "border-current bg-current/10 hover:bg-current/15"
+                    : "border-transparent bg-black/20 hover:bg-black/30"
+                }`}
+                style={selectedVersion === version.id ? {
+                  borderColor: accentColor.value,
+                  color: accentColor.value
+                } : {}}
+                onClick={() => setSelectedVersion(version.id)}
+              >
+                {/* NRC Compatibility Star */}
+                {isNrcCompatible && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <Tooltip content={<NrcCompatibleTooltipContent />}>
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full">
+                        <Icon icon="solar:star-bold" className="w-4 h-4 text-yellow-400" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                )}
+                <div className="flex flex-col items-center text-center">
+                  <h4 className="font-minecraft text-3xl text-white lowercase">
+                    {version.id}
+                  </h4>
+                  <p className="text-xs text-white/60 font-minecraft-ten capitalize mt-1">
+                    {version.type}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filteredVersions.length === 0 && !loading && (
@@ -272,6 +319,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         onNext={handleStep2Next}
         onBack={handleBackToStep1}
         selectedMinecraftVersion={selectedVersion}
+        nrcCompatibility={nrcCompatibility}
       />
     );
   }

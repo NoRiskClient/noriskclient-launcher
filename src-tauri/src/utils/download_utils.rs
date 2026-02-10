@@ -8,6 +8,7 @@ use reqwest::Response;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use crate::utils::string_utils::safe_truncate;
 
 /// Configuration for file downloads
 pub struct DownloadConfig {
@@ -294,7 +295,7 @@ impl DownloadUtils {
             // Try to get response body for more details (but limit to avoid hanging)
             if let Ok(body) = response.text().await {
                 let truncated_body = if body.len() > 200 {
-                    format!("{}...", &body[..200])
+                    format!("{}...", safe_truncate(&body, 200))
                 } else {
                     body
                 };

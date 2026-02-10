@@ -52,6 +52,7 @@ pub enum EventType {
     MigrationFailed,
     ExportingProfile,
     ProcessMetricsUpdate,
+    TaskProgress,
 }
 
 #[derive(Serialize, Clone)]

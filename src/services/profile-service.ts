@@ -336,8 +336,8 @@ export async function checkForGroupMigration(profileId: string): Promise<Migrati
   return invoke<MigrationInfo>("check_for_group_migration_command", { profileId });
 }
 
-export async function importProfileByPath(filePathStr: string): Promise<string> {
-  return invoke<string>("import_profile", { filePathStr });
+export async function importProfileByPath(filePathStr: string, eventId?: string): Promise<string> {
+  return invoke<string>("import_profile", { filePathStr, eventId });
 }
 
 export async function resolveImagePath(

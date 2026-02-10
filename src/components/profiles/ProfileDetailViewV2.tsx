@@ -88,7 +88,7 @@ export function ProfileDetailViewV2({
 
   // Get accounts from Minecraft Auth Store
   const accounts = useMinecraftAuthStore((state) => state.accounts);
-  
+
   // Find preferred account if one is set
   const preferredAccount = currentProfile.preferred_account_id 
     ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)

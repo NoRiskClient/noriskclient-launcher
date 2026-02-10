@@ -29,6 +29,11 @@ import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
+import { FriendsSidebar } from "../friends/FriendsSidebar";
+// TODO: Re-enable when WebSocket is stable
+// import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
+import { useFriendsStore } from "../../store/friends-store";
+import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
@@ -74,6 +79,26 @@ export function AppLayout({
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
+  const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
+  const { loadChats } = useChatStore();
+
+  // TODO: Re-enable when WebSocket is stable
+  // useFriendsWebSocket();
+
+  useEffect(() => {
+    const initFriends = async () => {
+      try {
+        await loadCurrentUser();
+        await loadFriends();
+        await loadChats();
+        // TODO: Re-enable when WebSocket is stable
+        // await connectWebSocket();
+      } catch (e) {
+        // Silently fail - user might not be logged in yet
+      }
+    };
+    initFriends();
+  }, []);
 
   const getComplementaryBackground = () => {
     const hexToRgb = (hex: string) => {
@@ -327,6 +352,7 @@ export function AppLayout({
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
       <ProfileDuplicateModal />
+      <FriendsSidebar />
     </div>
   );
 }
@@ -372,8 +398,12 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdateClick = async () => {
+    if (isUpdating) return; // Prevent multiple simultaneous downloads
+
+    setIsUpdating(true);
     try {
       await toast.promise(
         downloadAndInstallUpdate(),
@@ -386,6 +416,8 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     } catch (error) {
       console.error("Failed to download and install update:", error);
       // Toast error is already handled by the promise toast
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -480,11 +512,14 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               noriskclient
             </h1>
             {availableUpdate && (
-              <Tooltip content={`Click to update: ${availableUpdate.version}`}>
-                <div className="cursor-pointer mt-2.5" onClick={handleUpdateClick}>
+              <Tooltip content={isUpdating ? 'Downloading update...' : `Click to update: ${availableUpdate.version}`}>
+                <div
+                  className={`mt-2.5 ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  onClick={handleUpdateClick}
+                >
                   <Icon
-                    icon="solar:download-minimalistic-bold"
-                    className="w-6 h-6 transition-colors"
+                    icon={isUpdating ? "solar:download-minimalistic-bold" : "solar:download-minimalistic-bold"}
+                    className={`w-6 h-6 transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
                     style={{
                       color: accentColor.value,
                     }}

@@ -1,5 +1,5 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward};
+use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward, UserNotification};
 use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::state::state_manager::State;
@@ -546,10 +546,90 @@ pub async fn claim_advent_calendar_day_command(tag: u32) -> Result<AdventCalenda
 pub async fn get_referral_info(code: String) -> Result<ReferralInfo, CommandError> {
     debug!("Executing get_referral_info command for code: {}", code);
 
-    // TODO: Remove this after testing - force experimental for referral testing
-    let is_experimental = true;
-    // let state = State::get().await?;
-    // let is_experimental = state.config_manager.is_experimental_mode().await;
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
 
     Ok(NoRiskApi::get_referral_info(&code, is_experimental).await?)
+}
+
+/// Get all notifications for the current user
+#[tauri::command]
+pub async fn get_notifications() -> Result<Vec<UserNotification>, CommandError> {
+    debug!("Executing get_notifications command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for notifications.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Fetching notifications for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::get_notifications(&token, &account_id_str, is_experimental).await?)
+}
+
+/// Mark all notifications as read
+#[tauri::command]
+pub async fn mark_all_notifications_read() -> Result<(), CommandError> {
+    debug!("Executing mark_all_notifications_read command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for marking notifications read.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Marking all notifications as read for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    NoRiskApi::mark_all_notifications_read(&token, &account_id_str, is_experimental).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn mark_notification_read(notification_id: String) -> Result<(), CommandError> {
+    debug!("Executing mark_notification_read command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for marking notification read.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Marking notification as read for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    NoRiskApi::mark_notification_read(&token, &notification_id, &account_id_str, is_experimental).await?;
+    Ok(())
 }

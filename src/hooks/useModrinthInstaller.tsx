@@ -10,6 +10,10 @@ import {
   isContentInstalled,
 } from "../services/profile-service";
 import { ModrinthService } from "../services/modrinth-service";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { EventType, type EventPayload } from "../types/events";
+import { toast } from "react-hot-toast";
+import { ProgressToast } from "../components/ui/ProgressToast";
 
 interface PendingInstall {
   version: ModrinthVersion;
@@ -273,6 +277,10 @@ export function useModrinthInstaller(
   const installModpack = useCallback(
     async (version: ModrinthVersion, file: ModrinthFile) => {
       const versionId = version.id;
+      const eventId = crypto.randomUUID();
+      const toastId = `install-${eventId}`;
+      let progressUnlisten: UnlistenFn | null = null;
+
       setInstallState((prev) => ({ ...prev, [versionId]: "adding" }));
       setError(null);
 
@@ -282,12 +290,46 @@ export function useModrinthInstaller(
           throw new Error("Missing search hit context");
         }
 
+        const fileName = file.filename || hit.title || "modpack";
+
+        // Set up event listener for progress updates
+        progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+          const progressPayload = progressEvent.payload;
+          if (progressPayload.event_type !== EventType.TaskProgress) return;
+          if (progressPayload.event_id !== eventId) return;
+
+          const progress = (progressPayload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+          // Update toast with progress
+          toast.custom(
+            () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+            { id: toastId, duration: Infinity }
+          );
+        });
+
+        // Show initial progress toast
+        toast.custom(
+          () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+          { id: toastId, duration: Infinity }
+        );
+
         const newProfileId = await ModrinthService.downloadAndInstallModpack(
           version.project_id,
           version.id,
           file.filename,
           file.url,
+          undefined, // iconUrl
+          file.size,
+          eventId,
         );
+
+        // Clean up listener before showing success
+        if (progressUnlisten) {
+          progressUnlisten();
+          progressUnlisten = null;
+        }
+
+        toast.success(`${fileName} installed successfully!`, { id: toastId, duration: 3000 });
 
         setInstallState((prev) => ({ ...prev, [versionId]: "success" }));
 
@@ -302,10 +344,11 @@ export function useModrinthInstaller(
         return newProfileId;
       } catch (err) {
         console.error("❌ Failed to install modpack:", err);
-        setError(
-          `Failed to install: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setError(`Failed to install: ${errorMessage}`);
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
+
+        toast.error(`Failed to install: ${errorMessage}`, { id: toastId });
 
         setTimeout(() => {
           setInstallState((prev) => {
@@ -320,6 +363,11 @@ export function useModrinthInstaller(
         }, 5000);
 
         throw err;
+      } finally {
+        // Clean up listener
+        if (progressUnlisten) {
+          progressUnlisten();
+        }
       }
     },
     [onInstallSuccess],

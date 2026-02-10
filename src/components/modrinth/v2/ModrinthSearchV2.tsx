@@ -34,6 +34,9 @@ const convertToUnifiedProjectType = (modrinthType: ModrinthProjectType): Unified
 };
 import * as ProfileService from '../../../services/profile-service';
 import { toast } from 'react-hot-toast';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { EventType, type EventPayload } from '../../../types/events';
+import { ProgressToast } from '../../ui/ProgressToast';
 import { Button } from '../../ui/buttons/Button';
 import { SearchInput } from '../../ui/SearchInput';
 import { Dropdown } from '../../ui/dropdown/Dropdown';
@@ -2150,8 +2153,12 @@ export function ModrinthSearchV2({
       }
       return;
     }
+    const eventId = crypto.randomUUID();
+    const toastId = `install-${eventId}`;
+    let progressUnlisten: UnlistenFn | null = null;
+
     setInstallingModpackAsProfile(prev => ({ ...prev, [project.project_id]: true })); // Start loading
-    const toastId = toast.loading(`Fetching versions for ${project.title}...`);
+    toast.loading(`Fetching versions for ${project.title}...`, { id: toastId });
 
     try {
       const response = await UnifiedService.getModVersions({
@@ -2179,7 +2186,27 @@ export function ModrinthSearchV2({
       const primaryFile = latestVersion.files.find(f => f.primary) || latestVersion.files[0];
       if (!primaryFile) { throw new Error("No primary file found for the latest version."); }
 
-      toast.loading(`Installing ${project.title} (v${latestVersion.version_number}) as new profile...`, { id: toastId });
+      const fileName = primaryFile.filename || project.title || "modpack";
+
+      // Set up event listener for progress updates
+      progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+        const progressPayload = progressEvent.payload;
+        if (progressPayload.event_type !== EventType.TaskProgress) return;
+        if (progressPayload.event_id !== eventId) return;
+
+        const progress = (progressPayload.progress ?? 0) * 100;
+
+        toast.custom(
+          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          { id: toastId, duration: Infinity }
+        );
+      });
+
+      // Show initial progress toast
+      toast.custom(
+        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        { id: toastId, duration: Infinity }
+      );
 
       let newProfileId: string;
 
@@ -2198,7 +2225,9 @@ export function ModrinthSearchV2({
           fileId,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       } else {
         // Default to Modrinth
@@ -2207,20 +2236,19 @@ export function ModrinthSearchV2({
           latestVersion.id,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       }
 
-      toast.success(
-        (t) => (
-          <div className="flex flex-col">
-            <span>Successfully installed {project.title} as a new profile!</span>
-            <span className="text-xs text-gray-400">Profile ID: {newProfileId}</span>
-            {/* TODO: Maybe add a button to switch to this profile or open its settings */}
-          </div>
-        ),
-        { id: toastId, duration: 1000 }
-      );
+      // Clean up listener before showing success
+      if (progressUnlisten) {
+        progressUnlisten();
+        progressUnlisten = null;
+      }
+
+      toast.success(`Successfully installed ${project.title} as a new profile!`, { id: toastId, duration: 3000 });
 
       try {
         // Wait for the profile list to be updated in the global store
@@ -2246,6 +2274,10 @@ export function ModrinthSearchV2({
       console.error("Failed to install modpack as profile:", err);
       toast.error(`Error installing ${project.title}: ${err.message || 'Unknown error'}`, { id: toastId });
     } finally {
+      // Clean up listener
+      if (progressUnlisten) {
+        progressUnlisten();
+      }
       setInstallingModpackAsProfile(prev => ({ ...prev, [project.project_id]: false })); // Stop loading
     }
   };
@@ -2263,6 +2295,10 @@ export function ModrinthSearchV2({
       return;
     }
 
+    const eventId = crypto.randomUUID();
+    const toastId = `install-${eventId}`;
+    let progressUnlisten: UnlistenFn | null = null;
+
     setInstallingModpackVersion(prev => ({ ...prev, [version.id]: true })); // Start loading for this modpack version
 
     const primaryFile = version.files.find(f => f.primary) || version.files[0];
@@ -2270,9 +2306,30 @@ export function ModrinthSearchV2({
         toast.error("No primary file found for the selected version.");
         return;
     }
-    const toastId = toast.loading(`Installing ${project.title} (version ${version.version_number}) as new profile...`);
+
+    const fileName = primaryFile.filename || project.title || "modpack";
 
     try {
+      // Set up event listener for progress updates
+      progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+        const progressPayload = progressEvent.payload;
+        if (progressPayload.event_type !== EventType.TaskProgress) return;
+        if (progressPayload.event_id !== eventId) return;
+
+        const progress = (progressPayload.progress ?? 0) * 100;
+
+        toast.custom(
+          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          { id: toastId, duration: Infinity }
+        );
+      });
+
+      // Show initial progress toast
+      toast.custom(
+        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        { id: toastId, duration: Infinity }
+      );
+
       let newProfileId: string;
 
       // Choose the appropriate service based on modSource
@@ -2290,7 +2347,9 @@ export function ModrinthSearchV2({
           fileId,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       } else {
         // Default to Modrinth
@@ -2299,19 +2358,19 @@ export function ModrinthSearchV2({
           version.id,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       }
 
-      toast.success(
-        (t) => (
-          <div className="flex flex-col">
-            <span>Successfully installed {project.title} (v{version.version_number}) as a new profile!</span>
-            <span className="text-xs text-gray-400">Profile ID: {newProfileId}</span>
-          </div>
-        ),
-        { id: toastId, duration: 1000 }
-      );
+      // Clean up listener before showing success
+      if (progressUnlisten) {
+        progressUnlisten();
+        progressUnlisten = null;
+      }
+
+      toast.success(`Successfully installed ${project.title} (v${version.version_number}) as a new profile!`, { id: toastId, duration: 3000 });
 
       try {
         // Wait for the profile list to be updated in the global store
@@ -2336,6 +2395,10 @@ export function ModrinthSearchV2({
       console.error("Failed to install modpack version as profile:", err);
       toast.error(`Error installing ${project.title}: ${err.message || 'Unknown error'}`, { id: toastId });
     } finally {
+      // Clean up listener
+      if (progressUnlisten) {
+        progressUnlisten();
+      }
       setInstallingModpackVersion(prev => ({ ...prev, [version.id]: false })); // Stop loading for this modpack version
     }
   };

@@ -159,9 +159,9 @@ export function CapeBrowser(): JSX.Element {
 
   // Filter options for SearchWithFilters
   const sortOptions = [
-    { value: "", label: "Newest", icon: "solar:sort-by-time-linear" },
-    { value: "oldest", label: "Oldest", icon: "mdi:arrow-up-bold-circle-outline" },
     { value: "mostUsed", label: "Most Used", icon: "solar:heart-bold" },
+    { value: "newest", label: "Newest", icon: "solar:sort-by-time-linear" },
+    { value: "oldest", label: "Oldest", icon: "mdi:arrow-up-bold-circle-outline" },
   ];
 
   const filterOptions = [

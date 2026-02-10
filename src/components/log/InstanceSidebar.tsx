@@ -70,6 +70,8 @@ const formatElapsedTime = (startTime: number, currentTime: number): string => {
 // Convert ProcessMetadata to InstanceData
 function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, endTime?: number): InstanceData {
   const startTimeMs = new Date(process.start_time).getTime();
+  // Convert memory_max_mb (MB) to bytes for consistency with memoryUsage
+  const memoryMaxBytes = (process.memory_max_mb || 4096) * 1024 * 1024;
 
   return {
     id: process.id,
@@ -83,7 +85,7 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
     startTime: startTimeMs,
     endTime: endTime,
     memoryUsage: metrics?.memoryBytes || 0,
-    memoryMax: 4096 * 1024 * 1024, // Default 4GB, will be updated from metrics
+    memoryMax: memoryMaxBytes,
     cpuUsage: metrics?.cpuPercent || 0,
     profileImageUrl: process.profile_image_url || undefined,
     accountUuid: process.account_uuid || undefined,

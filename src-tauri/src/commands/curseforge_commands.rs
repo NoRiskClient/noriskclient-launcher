@@ -4,6 +4,8 @@ use crate::integrations::curseforge::{
     import_curseforge_pack_as_profile, download_and_install_curseforge_modpack, get_file_changelog,
     get_mod_description
 };
+use crate::state::profile_state::default_profile_path;
+use crate::utils::disk_space_utils::DiskSpaceUtils;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -48,7 +50,7 @@ pub async fn import_curseforge_pack(pack_path: String) -> Result<String, Command
     }
 
     // Import the pack (without project_id/file_id for manually imported packs)
-    let profile_id = import_curseforge_pack_as_profile(path_buf, None, None)
+    let profile_id = import_curseforge_pack_as_profile(path_buf, None, None, None, 0.0, 1.0)
         .await
         .map_err(CommandError::from)?;
 
@@ -65,11 +67,28 @@ pub async fn download_and_install_curseforge_modpack_command(
     file_name: String,
     download_url: String,
     icon_url: Option<String>,
+    file_size: Option<u64>,
+    event_id: Option<String>,
 ) -> Result<String, CommandError> {
     log::info!(
-        "Executing download_and_install_curseforge_modpack for project {}, file {}, icon_url: {:?}",
-        project_id, file_id, icon_url
+        "Executing download_and_install_curseforge_modpack for project {}, file {}, icon_url: {:?}, file_size: {:?}",
+        project_id, file_id, icon_url, file_size
     );
+
+    // Check disk space before downloading if file_size is known
+    if let Some(size) = file_size {
+        let estimated_required = size * 3; // 3x for download + extraction + mod downloads overhead
+        let profiles_dir = default_profile_path();
+        log::info!(
+            "Checking disk space: file size = {} bytes, estimated required = {} bytes",
+            size,
+            estimated_required
+        );
+        DiskSpaceUtils::ensure_space_for_download(&profiles_dir, estimated_required, 0.1).await?;
+    }
+
+    // Parse event_id if provided
+    let event_id_uuid = event_id.and_then(|id| uuid::Uuid::parse_str(&id).ok());
 
     let profile_id_uuid = download_and_install_curseforge_modpack(
         project_id,
@@ -77,6 +96,7 @@ pub async fn download_and_install_curseforge_modpack_command(
         file_name,
         download_url,
         icon_url,
+        event_id_uuid,
     )
     .await
     .map_err(|e| {

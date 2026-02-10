@@ -1,5 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::integrations::modrinth;
+use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
     Mod, ModLoader, ModSource, ModPackInfo, ModPackSource, Profile, ProfileSettings, ProfileState,
 };
@@ -373,7 +374,14 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
 
 /// Extracts files from the "overrides" or "client-overrides" directory within a .mrpack archive
 /// into the specified target profile directory, using concurrent streaming operations.
-pub async fn extract_mrpack_overrides(pack_path: &Path, profile: &Profile) -> Result<()> {
+/// If event_id is provided with progress_offset and progress_scale, progress events will be emitted.
+pub async fn extract_mrpack_overrides(
+    pack_path: &Path,
+    profile: &Profile,
+    event_id: Option<Uuid>,
+    progress_offset: f64,
+    progress_scale: f64,
+) -> Result<()> {
     info!(
         "Extracting overrides for profile '{}' from {:?} using concurrent streaming...",
         profile.name, pack_path
@@ -420,6 +428,22 @@ pub async fn extract_mrpack_overrides(pack_path: &Path, profile: &Profile) -> Re
         "Found {} entries in the zip archive. Preparing concurrent streaming for overrides...",
         num_entries
     );
+
+    // Count override files for progress tracking
+    let mut override_file_count = 0usize;
+    for index in 0..num_entries {
+        if let Some(entry) = zip_lister.file().entries().get(index) {
+            if let Ok(name) = entry.filename().as_str() {
+                if (name.starts_with("overrides/") || name.starts_with("client-overrides/")) && !name.ends_with('/') {
+                    override_file_count += 1;
+                }
+            }
+        }
+    }
+
+    // Create a counter for tracking extraction progress
+    let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
 
@@ -560,6 +584,12 @@ pub async fn extract_mrpack_overrides(pack_path: &Path, profile: &Profile) -> Re
                     entry_filename_str, final_dest_path, entry_uncompressed_size
                 );
 
+                let task_counter = extraction_counter.clone();
+                let task_total = total_files;
+                let task_state = state.clone();
+                let task_event_id = event_id;
+                let task_progress_offset = progress_offset;
+                let task_progress_scale = progress_scale;
                 extraction_tasks.push(tokio::spawn(async move {
                     let _permit = task_io_semaphore.acquire().await.map_err(|e| {
                         error!(
@@ -653,6 +683,25 @@ pub async fn extract_mrpack_overrides(pack_path: &Path, profile: &Profile) -> Re
                         bytes_copied,
                         task_final_dest_path.display()
                     );
+
+                    // Increment counter and emit progress
+                    let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    if task_total > 0 {
+                        // Scale progress within the provided range
+                        let extraction_progress = completed as f64 / task_total as f64;
+                        let overall_progress = task_progress_offset + (extraction_progress * task_progress_scale);
+                        if let Some(id) = task_event_id {
+                            let _ = task_state.event_state.emit(EventPayload {
+                                event_id: id,
+                                event_type: EventType::TaskProgress,
+                                target_id: None,
+                                message: format!("Extracting files... ({}/{})", completed, task_total),
+                                progress: Some(overall_progress),
+                                error: None,
+                            }).await;
+                        }
+                    }
+
                     Ok::<(), AppError>(())
                 }));
             }
@@ -756,19 +805,49 @@ pub async fn test_mrpack_processing() -> Result<()> {
         profile.mods.len()
     );
 
-    extract_mrpack_overrides(&absolute_pack_path, &profile).await?;
+    extract_mrpack_overrides(&absolute_pack_path, &profile, None, 0.0, 1.0).await?;
 
     return Ok(());
 }
 
 /// Imports a profile from a .mrpack file, processing, resolving, extracting, and saving it.
 /// If project_id and version_id are provided, detailed ModPackInfo will be created.
+/// If event_id is provided, progress events will be emitted.
+/// progress_offset and progress_scale can be used to adjust progress range (e.g. when called after a download phase).
 pub async fn import_mrpack_as_profile(
     pack_path: PathBuf,
     project_id: Option<String>,
-    version_id: Option<String>
+    version_id: Option<String>,
+    event_id: Option<Uuid>,
+    progress_offset: f64,
+    progress_scale: f64,
 ) -> Result<Uuid> {
     info!("Starting full import process for mrpack: {:?}", pack_path);
+
+    let state = State::get().await?;
+
+    // Helper to emit progress if event_id is provided
+    // Progress is scaled: actual = offset + (progress * scale)
+    let emit_progress = |progress: f64, message: String| {
+        let state = state.clone();
+        let event_id = event_id;
+        let scaled_progress = progress_offset + (progress * progress_scale);
+        async move {
+            if let Some(id) = event_id {
+                let _ = state.event_state.emit(EventPayload {
+                    event_id: id,
+                    event_type: EventType::TaskProgress,
+                    target_id: None,
+                    message,
+                    progress: Some(scaled_progress),
+                    error: None,
+                }).await;
+            }
+        }
+    };
+
+    // Emit initial progress
+    emit_progress(0.05, "Parsing modpack manifest...".to_string()).await;
 
     // 1. Process mrpack to get base profile and manifest
     let (mut profile, manifest) = process_mrpack(pack_path.clone()).await?;
@@ -777,6 +856,10 @@ pub async fn import_mrpack_as_profile(
         profile.name
     );
 
+    emit_progress(0.10, format!("Parsed manifest for '{}'", profile.name)).await;
+
+    emit_progress(0.15, format!("Resolving {} mods...", manifest.files.len())).await;
+
     // 2. Resolve mods from manifest files
     let resolved_mods = resolve_manifest_files(&manifest).await?;
     info!(
@@ -784,6 +867,8 @@ pub async fn import_mrpack_as_profile(
         resolved_mods.len()
     );
     profile.mods = resolved_mods;
+
+    emit_progress(0.40, format!("Resolved {} mods", profile.mods.len())).await;
 
     // 2.5. Create ModPackInfo for this modpack (if we have the required parameters)
     if let (Some(project_id), Some(version_id)) = (project_id, version_id) {
@@ -843,17 +928,23 @@ pub async fn import_mrpack_as_profile(
         })?;
     }
 
+    emit_progress(0.45, "Extracting files...".to_string()).await;
+
     // 4. Extract overrides to the *correct* final profile location
     info!(
         "Extracting overrides to profile directory: {:?}",
         target_dir
     );
     // Use the absolute path to the pack file for extraction
-    extract_mrpack_overrides(&pack_path, &profile).await?;
+    // Progress from 0.45 to 0.90 during extraction (45% of the remaining scale)
+    let extraction_progress_offset = progress_offset + (0.45 * progress_scale);
+    let extraction_progress_scale = 0.45 * progress_scale; // 45% of the total scale for extraction
+    extract_mrpack_overrides(&pack_path, &profile, event_id, extraction_progress_offset, extraction_progress_scale).await?;
     info!("Successfully extracted overrides.");
 
+    emit_progress(0.90, "Saving profile...".to_string()).await;
+
     // 5. Save the profile using ProfileManager via State
-    let state = State::get().await?;
     info!(
         "Saving the new profile '{}' (ID: {})...",
         profile.name, profile.id
@@ -864,18 +955,44 @@ pub async fn import_mrpack_as_profile(
         profile_id
     );
 
+    emit_progress(1.0, "Import complete!".to_string()).await;
+
     Ok(profile_id) // Return the ID of the created profile
 }
 
 /// Downloads a modpack from a URL and returns the temporary file path
 /// For Modrinth packs, provide project_id and version_id to create ModPackInfo
+/// If event_id is provided, progress events will be emitted.
 pub async fn download_and_process_mrpack(
     download_url: &str,
     file_name: &str,
     project_id: Option<String>,
-    version_id: Option<String>
+    version_id: Option<String>,
+    event_id: Option<Uuid>,
 ) -> Result<Uuid> {
     info!("Downloading modpack from URL: {}", download_url);
+
+    let state = State::get().await?;
+
+    // Helper to emit progress if event_id is provided
+    let emit_progress = |progress: f64, message: String| {
+        let state = state.clone();
+        let event_id = event_id;
+        async move {
+            if let Some(id) = event_id {
+                let _ = state.event_state.emit(EventPayload {
+                    event_id: id,
+                    event_type: EventType::TaskProgress,
+                    target_id: None,
+                    message,
+                    progress: Some(progress),
+                    error: None,
+                }).await;
+            }
+        }
+    };
+
+    emit_progress(0.0, "Downloading modpack...".to_string()).await;
 
     // Create a temporary directory
     let temp_dir = tempdir().map_err(|e| {
@@ -916,11 +1033,15 @@ pub async fn download_and_process_mrpack(
         )));
     }
 
+    emit_progress(0.10, "Downloading modpack...".to_string()).await;
+
     // Get the bytes
     let bytes = response.bytes().await.map_err(|e| {
         error!("Failed to read modpack bytes: {}", e);
         AppError::Download(format!("Failed to read modpack bytes: {}", e))
     })?;
+
+    emit_progress(0.18, "Saving downloaded file...".to_string()).await;
 
     // Write the file to temporary location
     let mut file = File::create(&temp_file_path).await.map_err(|e| {
@@ -943,16 +1064,22 @@ pub async fn download_and_process_mrpack(
     // Explicitly close the file by dropping the handle
     drop(file);
 
+    emit_progress(0.20, "Download complete, processing...".to_string()).await;
+
     debug!(
         "Successfully downloaded modpack to temporary file: {:?}",
         temp_file_path
     );
 
     // Import the modpack and get profile ID
+    // Use progress offset 0.20 and scale 0.80 to continue from download progress
     let profile_id = import_mrpack_as_profile(
         temp_file_path.clone(),
         project_id,
-        version_id
+        version_id,
+        event_id,
+        0.20, // offset: download used 0-20%
+        0.80, // scale: import uses remaining 80%
     ).await?;
     info!(
         "Successfully imported modpack as new profile with ID: {}",

@@ -244,3 +244,59 @@ export const getTextSizeClass = (size: ComponentSize, element: "button" | "input
     default: return "text-xl";
   }
 };
+
+// Toast styling utilities
+export type ToastVariant = "default" | "success" | "error" | "loading";
+
+export interface ToastStyleConfig {
+  accentColor: string;
+  borderRadius?: number;
+}
+
+export const getToastVariantStyles = (variant: ToastVariant, accentColor: string): React.CSSProperties => {
+  switch (variant) {
+    case "success":
+      return {
+        backgroundColor: "rgba(16, 185, 129, 0.3)",
+        borderColor: "rgba(16, 185, 129, 0.8)",
+        borderBottomColor: "#059669",
+        color: "#d1fae5",
+      };
+    case "error":
+      return {
+        backgroundColor: "rgba(239, 68, 68, 0.3)",
+        borderColor: "rgba(239, 68, 68, 0.8)",
+        borderBottomColor: "#dc2626",
+        color: "#fee2e2",
+      };
+    default:
+      return {
+        backgroundColor: `${accentColor}30`,
+        borderColor: `${accentColor}80`,
+        borderBottomColor: accentColor,
+        color: "#ffffff",
+      };
+  }
+};
+
+export const getToastBaseStyles = (config: ToastStyleConfig): React.CSSProperties => {
+  const radiusStyle = createRadiusStyle(config.borderRadius);
+  const variantStyles = getToastVariantStyles("default", config.accentColor);
+
+  return {
+    borderWidth: "1px",
+    borderBottomWidth: "2px",
+    borderStyle: "solid",
+    boxShadow: "none",
+    padding: "12px 20px",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    minWidth: "300px",
+    transition: "all 0.2s ease",
+    fontWeight: "500",
+    ...variantStyles,
+    ...radiusStyle,
+  };
+};
+
+export const TOAST_BASE_CLASSES = "font-minecraft tracking-wider lowercase text-shadow-sm";

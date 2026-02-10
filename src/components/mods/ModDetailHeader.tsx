@@ -3,12 +3,14 @@
 import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { UnifiedProjectDetails, UnifiedVersion, UnifiedModSearchResult } from "../../types/unified";
 import { ModPlatform } from "../../types/unified";
 import type { AccentColor } from "../../store/useThemeStore";
 import type { Profile } from "../../types/profile";
 import { TagBadge } from "../ui/TagBadge";
 import { ActionButton } from "../ui/ActionButton";
+import { ProgressToast } from "../ui/ProgressToast";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useProfileStore } from "../../store/profile-store";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
@@ -18,6 +20,7 @@ import { ModrinthService } from "../../services/modrinth-service";
 import { CurseForgeService } from "../../services/curseforge-service";
 import { installContentToProfile } from "../../services/content-service";
 import { ContentType, type InstallContentPayload } from "../../types/content";
+import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 
 interface ModDetailHeaderProps {
@@ -131,8 +134,12 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
   // Handle modpack installation (creates a new profile)
   const handleModpackInstall = async () => {
+    const eventId = crypto.randomUUID();
+    const toastId = `install-${eventId}`;
+    let progressUnlisten: UnlistenFn | null = null;
+
     setIsInstalling(true);
-    const toastId = toast.loading(`Fetching versions for ${project.title}...`);
+    toast.loading(`Fetching versions for ${project.title}...`, { id: toastId });
 
     try {
       const response = await UnifiedService.getModVersions({
@@ -165,7 +172,28 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         throw new Error("No primary file found for the latest version.");
       }
 
-      toast.loading(`Installing ${project.title} (v${latestVersion.version_number}) as new profile...`, { id: toastId });
+      const fileName = primaryFile.filename || project.title || "modpack";
+
+      // Set up event listener for progress updates
+      progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+        const progressPayload = progressEvent.payload;
+        if (progressPayload.event_type !== EventType.TaskProgress) return;
+        if (progressPayload.event_id !== eventId) return;
+
+        const progress = (progressPayload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+        // Update toast with progress
+        toast.custom(
+          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          { id: toastId, duration: Infinity }
+        );
+      });
+
+      // Show initial progress toast
+      toast.custom(
+        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        { id: toastId, duration: Infinity }
+      );
 
       let newProfileId: string;
 
@@ -182,7 +210,9 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           fileId,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       } else {
         newProfileId = await ModrinthService.downloadAndInstallModpack(
@@ -190,11 +220,19 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           latestVersion.id,
           primaryFile.filename,
           primaryFile.url,
-          project.icon_url || undefined
+          project.icon_url || undefined,
+          primaryFile.size,
+          eventId
         );
       }
 
-      toast.success(`Successfully installed ${project.title} as a new profile!`, { id: toastId, duration: 2000 });
+      // Clean up listener before showing success
+      if (progressUnlisten) {
+        progressUnlisten();
+        progressUnlisten = null;
+      }
+
+      toast.success(`Successfully installed ${project.title} as a new profile!`, { id: toastId, duration: 3000 });
 
       // Refresh profiles and navigate
       await fetchProfiles();
@@ -204,6 +242,10 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       console.error("Modpack installation failed:", error);
       toast.error(`Failed to install modpack: ${error.message || error}`, { id: toastId });
     } finally {
+      // Clean up listener
+      if (progressUnlisten) {
+        progressUnlisten();
+      }
       setIsInstalling(false);
     }
   };

@@ -15,6 +15,7 @@ interface ProfileState {
   error: string | null;
   selectedProfile: Profile | null;
   lastPlayedProfileId: string | null;
+  importingPaths: Set<string>;
 
   fetchProfiles: () => Promise<void>;
   getProfile: (id: string) => Promise<Profile>;
@@ -39,6 +40,9 @@ interface ProfileState {
   ) => Promise<string>;
   setSelectedProfile: (profile: Profile | null) => void;
   refreshSingleProfileInStore: (profileData: Profile) => void;
+  addImportingPath: (path: string) => void;
+  removeImportingPath: (path: string) => void;
+  isPathImporting: (path: string) => boolean;
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
@@ -48,6 +52,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   error: null,
   selectedProfile: null,
   lastPlayedProfileId: null,
+  importingPaths: new Set<string>(),
 
   fetchProfiles: async () => {
     try {
@@ -260,5 +265,23 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         selectedProfile: updatedSelectedProfile,
       };
     });
+  },
+
+  addImportingPath: (path: string) => {
+    set((state) => ({
+      importingPaths: new Set(state.importingPaths).add(path),
+    }));
+  },
+
+  removeImportingPath: (path: string) => {
+    set((state) => {
+      const newSet = new Set(state.importingPaths);
+      newSet.delete(path);
+      return { importingPaths: newSet };
+    });
+  },
+
+  isPathImporting: (path: string) => {
+    return get().importingPaths.has(path);
   },
 }));

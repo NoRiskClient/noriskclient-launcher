@@ -9,6 +9,22 @@ import { Button } from "../../ui/buttons/Button";
 import { StatusMessage } from "../../ui/StatusMessage";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { Select } from "../../ui/Select";
+import { Tooltip } from "../../ui/Tooltip";
+import type { NrcCompatibilityData } from "../../../utils/nrc-compatibility";
+
+function NrcLoaderCompatibleTooltipContent() {
+  return (
+    <div className="space-y-2">
+      <div className="text-sm text-white">This loader supports NoRisk Client</div>
+      <div className="flex items-start gap-2">
+        <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
+        <div className="text-gray-300 text-xs italic">
+          NRC features will work with this mod loader.
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface LoaderVersionInfo {
   loader: {
@@ -22,13 +38,15 @@ interface ProfileWizardV2Step2Props {
   onNext: (selectedLoader: ModLoader, selectedLoaderVersion: string | null) => void;
   onBack: () => void;
   selectedMinecraftVersion: string;
+  nrcCompatibility: NrcCompatibilityData | null;
 }
 
-export function ProfileWizardV2Step2({ 
-  onClose, 
-  onNext, 
+export function ProfileWizardV2Step2({
+  onClose,
+  onNext,
   onBack,
-  selectedMinecraftVersion 
+  selectedMinecraftVersion,
+  nrcCompatibility
 }: ProfileWizardV2Step2Props) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const [loading, setLoading] = useState(false);
@@ -293,7 +311,11 @@ export function ProfileWizardV2Step2({
           {modLoaders.map(loader => {
             const isUnavailable = unavailableLoaders.has(loader.key);
             const isDisabled = isUnavailable && loader.key !== "vanilla";
-            
+            const isNrcCompatible = nrcCompatibility
+              ?.compatibleLoadersByVersion
+              .get(selectedMinecraftVersion)
+              ?.has(loader.key) ?? false;
+
             return (
               <div
                 key={loader.key}
@@ -317,6 +339,16 @@ export function ProfileWizardV2Step2({
                 }}
                 onClick={() => !isDisabled && setSelectedLoader(loader.key)}
               >
+                {/* NRC Compatibility Star */}
+                {isNrcCompatible && !isDisabled && (
+                  <div className="absolute top-2 right-2 z-20">
+                    <Tooltip content={<NrcLoaderCompatibleTooltipContent />}>
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full">
+                        <Icon icon="solar:star-bold" className="w-4 h-4 text-yellow-400 drop-shadow-lg" />
+                      </div>
+                    </Tooltip>
+                  </div>
+                )}
                 {/* Dark overlay for better text readability */}
                 <div className={`absolute inset-0 transition-all duration-200 ${
                   selectedLoader === loader.key && !isDisabled
@@ -325,7 +357,7 @@ export function ProfileWizardV2Step2({
                     ? "bg-black/80"
                     : "bg-black/60"
                 }`} />
-                
+
                 {/* Content */}
                 <div className="relative z-10 flex flex-col items-center text-center justify-center h-full">
                   <h4 className="font-minecraft text-4xl text-white lowercase drop-shadow-lg">

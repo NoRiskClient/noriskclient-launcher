@@ -62,6 +62,7 @@ pub struct ProcessMetadata {
     pub profile_name: Option<String>,
     pub profile_image_url: Option<String>,
     pub post_exit_hook: Option<String>,
+    pub memory_max_mb: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -523,6 +524,7 @@ impl ProcessManager {
         profile_name: Option<String>,
         profile_image_url: Option<String>,
         post_exit_hook: Option<String>,
+        memory_max_mb: u32,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -574,6 +576,7 @@ impl ProcessManager {
             profile_name: profile_name.clone(),
             profile_image_url,
             post_exit_hook,
+            memory_max_mb,
         };
 
         log::info!(

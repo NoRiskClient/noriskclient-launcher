@@ -42,8 +42,68 @@
   </content_rating>
 
   <releases>
+    <release version="0.6.19" date="2026-01-31">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.19</url>
+    </release>
+    <release version="0.6.18" date="2026-01-31">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18</url>
+    </release>
+    <release version="0.6.18~beta.10" date="2026-01-31">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.10</url>
+    </release>
+    <release version="0.6.18~beta.9" date="2026-01-31">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.9</url>
+    </release>
+    <release version="0.6.18~beta.8" date="2026-01-31">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.8</url>
+    </release>
+    <release version="0.6.18~beta.7" date="2026-01-30">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.7</url>
+    </release>
+    <release version="0.6.18~beta.6" date="2026-01-30">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.6</url>
+    </release>
+    <release version="0.6.18~beta.5" date="2026-01-29">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.5</url>
+    </release>
+    <release version="0.6.18~beta.4" date="2026-01-29">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.4</url>
+    </release>
+    <release version="0.6.18~beta.3" date="2026-01-28">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.3</url>
+    </release>
+    <release version="0.6.18~beta.2" date="2026-01-26">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.2</url>
+    </release>
+    <release version="0.6.18~beta.1" date="2026-01-26">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.18-beta.1</url>
+    </release>
     <release version="0.6.17" date="2026-01-23">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17</url>
+    </release>
+    <release version="0.6.17~beta.8" date="2026-01-17">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.8</url>
+    </release>
+    <release version="0.6.17~beta.7" date="2026-01-17">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.7</url>
+    </release>
+    <release version="0.6.17~beta.6" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.6</url>
+    </release>
+    <release version="0.6.17~beta.5" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.5</url>
+    </release>
+    <release version="0.6.17~beta.4" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.4</url>
+    </release>
+    <release version="0.6.17~beta.3" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.3</url>
+    </release>
+    <release version="0.6.17~beta.2" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.2</url>
+    </release>
+    <release version="0.6.17~beta.1" date="2026-01-14">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.17-beta.1</url>
     </release>
     <release version="0.6.16" date="2026-01-02">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.16</url>

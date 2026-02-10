@@ -5,7 +5,34 @@ import { useEffect, useRef } from "react";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
-import { getBorderRadiusClass, createRadiusStyle } from "./design-system";
+import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import {
+  getBorderRadiusClass,
+  createRadiusStyle,
+  getToastVariantStyles,
+  getToastBaseStyles,
+  TOAST_BASE_CLASSES
+} from "./design-system";
+
+function PlayerToastContent({ message, uuid }: { message: string; uuid: string }) {
+  const avatarUrl = useCrafatarAvatar({ uuid, size: 32 });
+
+  return (
+    <div className="flex items-center gap-3">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt=""
+          className="w-8 h-8 rounded flex-shrink-0"
+          style={{ imageRendering: "pixelated" }}
+        />
+      ) : (
+        <div className="w-8 h-8 rounded flex-shrink-0 bg-white/20 animate-pulse" />
+      )}
+      <span>{message}</span>
+    </div>
+  );
+}
 
 export const toast = {
   success: (message: string) => {
@@ -20,6 +47,19 @@ export const toast = {
   },
   loading: (message: string) => {
     const id = hotToast.loading(message);
+    animateToast(id);
+    return id;
+  },
+  info: (message: string) => {
+    const id = hotToast(message);
+    animateToast(id);
+    return id;
+  },
+  player: (message: string, uuid: string) => {
+    const id = hotToast(
+      (t) => <PlayerToastContent message={message} uuid={uuid} />,
+      { duration: 3000 }
+    );
     animateToast(id);
     return id;
   },
@@ -68,9 +108,10 @@ export function GlobalToaster() {
     (state) => state.isBackgroundAnimationEnabled,
   );
   const toasterRef = useRef<HTMLDivElement>(null);
-  
+
   const borderRadiusStyle = createRadiusStyle(borderRadius);
   const borderRadiusClass = getBorderRadiusClass(borderRadius);
+  const baseStyles = getToastBaseStyles({ accentColor: accentColor.value, borderRadius });
 
   useEffect(() => {
     if (!isBackgroundAnimationEnabled) return;
@@ -87,57 +128,16 @@ export function GlobalToaster() {
     });
   }, [accentColor, isBackgroundAnimationEnabled]);
 
-  const getToastVariantStyles = (variant: string) => {
-    switch (variant) {
-      case "success":
-        return {
-          backgroundColor: "rgba(16, 185, 129, 0.3)",
-          borderColor: "rgba(16, 185, 129, 0.8)",
-          borderBottomColor: "#059669",
-          color: "#d1fae5",
-        };
-      case "error":
-        return {
-          backgroundColor: "rgba(239, 68, 68, 0.3)",
-          borderColor: "rgba(239, 68, 68, 0.8)",
-          borderBottomColor: "#dc2626",
-          color: "#fee2e2",
-        };
-      default:
-        return {
-          backgroundColor: `${accentColor.value}30`,
-          borderColor: `${accentColor.value}80`,
-          borderBottomColor: accentColor.value,
-          color: "#ffffff",
-        };
-    }
-  };
-
   return (
-    <div ref={toasterRef}>      <HotToaster
+    <div ref={toasterRef}>
+      <HotToaster
         position="bottom-right"
         toastOptions={{
-          className: `font-minecraft tracking-wider lowercase text-shadow-sm ${borderRadiusClass}`,
-          style: {
-            borderWidth: "1px",
-            borderBottomWidth: "2px",
-            borderStyle: "solid",
-            boxShadow: "none",
-            padding: "12px 20px",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            backgroundColor: `${accentColor.value}30`,
-            borderColor: `${accentColor.value}80`,
-            borderBottomColor: accentColor.value,
-            color: "#ffffff",
-            minWidth: "300px",
-            transition: "all 0.2s ease",
-            fontWeight: "500",
-            ...borderRadiusStyle,
-          },
+          className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
+          style: baseStyles,
           success: {
             style: {
-              ...getToastVariantStyles("success"),
+              ...getToastVariantStyles("success", accentColor.value),
               boxShadow: "none",
               ...borderRadiusStyle,
             },
@@ -148,7 +148,7 @@ export function GlobalToaster() {
           },
           error: {
             style: {
-              ...getToastVariantStyles("error"),
+              ...getToastVariantStyles("error", accentColor.value),
               boxShadow: "none",
               ...borderRadiusStyle,
             },
@@ -159,7 +159,7 @@ export function GlobalToaster() {
           },
           loading: {
             style: {
-              ...getToastVariantStyles("default"),
+              ...getToastVariantStyles("default", accentColor.value),
               boxShadow: "none",
               ...borderRadiusStyle,
             },

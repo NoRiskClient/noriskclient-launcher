@@ -62,6 +62,9 @@ pub struct Credentials {
     pub expires: DateTime<Utc>,
     pub norisk_credentials: NoRiskCredentials,
     pub active: bool,
+    /// If true, the launcher will not show the child-protection multiplayer warning modal for this account
+    #[serde(default)]
+    pub ignore_child_protection_warning: bool,
     /// The authentication flow used to create this account (optional for backwards compatibility)
     #[serde(default)]
     pub auth_flow: Option<AuthFlow>,
@@ -656,6 +659,7 @@ impl MinecraftAuthStore {
                     experimental: None,
                 },
             },
+            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
         };
 
@@ -728,6 +732,7 @@ impl MinecraftAuthStore {
                     experimental: None,
                 },
             },
+            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
         };
 
@@ -823,6 +828,8 @@ impl MinecraftAuthStore {
                 }
             );
 
+            info!("[NoRisk Token] Account is known to have child protection enabled: {}", creds.ignore_child_protection_warning);
+
             match NoRiskApi::refresh_norisk_token_v3(
                 &system_id,
                 &creds.username,
@@ -845,6 +852,9 @@ impl MinecraftAuthStore {
                         copied_credentials.norisk_credentials.production = Some(norisk_token);
                     }
 
+                    // reset child protection warning flag on successful token refresh
+                    copied_credentials.ignore_child_protection_warning = false;
+
                     // Update the account in storage
                     info!("[NoRisk Token] Updating account in storage");
                     self.update_or_insert(copied_credentials.clone()).await?;
@@ -856,7 +866,12 @@ impl MinecraftAuthStore {
                     info!("[NoRisk Token] Token refresh failed: {:?}", e);
                     info!("[NoRisk Token] Falling back to original credentials");
                     // Return the original credentials if token refresh fails
-                    Ok(creds.clone())
+                    let creds_mut =  &mut creds.clone();
+                    if e.to_string().contains("InsufficientPrivilegesException") && e.to_string().contains("/session/minecraft/join") {
+                        info!("[NoRisk Token] Detected child protection restriction, setting ignore_child_protection_warning to true");
+                        creds_mut.ignore_child_protection_warning = true;
+                    }
+                    Ok(creds_mut.clone())
                 }
             }
         } else {
@@ -921,6 +936,7 @@ impl MinecraftAuthStore {
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
             norisk_credentials: creds.norisk_credentials.clone(),
             active: creds.active,
+            ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
         };
 
@@ -972,6 +988,7 @@ impl MinecraftAuthStore {
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
             norisk_credentials: creds.norisk_credentials.clone(),
             active: creds.active,
+            ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
         };
 
@@ -1032,7 +1049,12 @@ impl MinecraftAuthStore {
                     info!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         info!("[Account Manager] Updating account in list");
-                        *existing = updated.clone();
+                        // Preserve ignore flag from in-memory existing account to avoid
+                        // overwriting a recent user 'ignore' action performed concurrently.
+                        let existing_flag = existing.ignore_child_protection_warning;
+                        let mut merged = updated.clone();
+                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                        *existing = merged;
                     }
                     info!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
@@ -1060,11 +1082,25 @@ impl MinecraftAuthStore {
         {
             let mut accounts = self.accounts.write().await;
 
+            // If new credentials are active, deactivate all other accounts first
+            if credentials.active {
+                info!("[Account Manager] New account is active, deactivating all other accounts");
+                for account in accounts.iter_mut() {
+                    account.active = false;
+                }
+            }
+
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
                 info!("[Account Manager] Found existing account, updating credentials");
-                *existing = credentials;
-                info!("[Account Manager] Account successfully updated");
+                // Preserve the existing ignore_child_protection_warning flag to avoid
+                // races where another concurrent flow set the flag while this flow
+                // was constructing credentials from stale data.
+                let existing_flag = existing.ignore_child_protection_warning;
+                let mut merged = credentials.clone();
+                merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                *existing = merged;
+                info!("[Account Manager] Account successfully updated (merged ignore flag)");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
                 info!("[Account Manager] No existing account found, creating new account");
@@ -1133,11 +1169,16 @@ impl MinecraftAuthStore {
             }
         } else {
             info!("[Token Check] Microsoft token is still valid");
-            info!("[Token Check] Checking NoRisk token status");
-            Ok(Some(
-                self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
-                    .await?,
-            ))
+            if creds.ignore_child_protection_warning {
+                info!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
+                Ok(None)
+            } else {
+                info!("[Token Check] Checking NoRisk token status");
+                Ok(Some(
+                    self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
+                        .await?,
+                ))
+            }
         }
     }
 
@@ -1183,7 +1224,12 @@ impl MinecraftAuthStore {
                     info!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         info!("[Account Manager] Updating account in list");
-                        *existing = updated.clone();
+                        // Preserve ignore flag from in-memory existing account to avoid
+                        // overwriting a recent user 'ignore' action performed concurrently.
+                        let existing_flag = existing.ignore_child_protection_warning;
+                        let mut merged = updated.clone();
+                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                        *existing = merged;
                     }
                     info!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben

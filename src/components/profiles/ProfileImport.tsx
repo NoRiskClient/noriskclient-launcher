@@ -1,17 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { StatusMessage } from "../ui/StatusMessage";
+import { ProgressToast } from "../ui/ProgressToast";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import * as ProfileService from "../../services/profile-service";
 import { useProfileStore } from "../../store/profile-store";
+import { useImportProgressStore } from "../../store/import-progress-store";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { EventType, type EventPayload } from "../../types/events";
 
 interface ProfileImportProps {
   onClose: () => void;
@@ -31,8 +36,9 @@ export function ProfileImport({
   const navigate = useNavigate();
 
   const handleImport = async () => {
-    const operationId = `profile-import-dialog-${Date.now()}`;
-    let loadingToastId: string | undefined = undefined; // To ensure it's only used if a file is selected
+    const eventId = crypto.randomUUID();
+    const toastId = `import-${eventId}`;
+    let unlisten: UnlistenFn | null = null;
 
     try {
       const selectedPath = await openDialog({
@@ -48,24 +54,62 @@ export function ProfileImport({
       });
 
       if (selectedPath && typeof selectedPath === "string") {
+        const { isPathImporting, addImportingPath, removeImportingPath } = useProfileStore.getState();
+
+        // Check if this file is already being imported
+        if (isPathImporting(selectedPath)) {
+          toast.error("This file is already being imported.");
+          return;
+        }
+
         setIsImporting(true);
         onClose();
+        addImportingPath(selectedPath);
 
-        loadingToastId = `loading-${operationId}`;
         const fileName = selectedPath.substring(selectedPath.lastIndexOf('/') + 1).substring(selectedPath.lastIndexOf('\\') + 1);
-        toast.loading(`Importing profile from ${fileName}...`, { id: loadingToastId });
 
-        const newProfileId = await ProfileService.importProfileByPath(selectedPath);
+        // Set up event listener for progress updates
+        unlisten = await listen<EventPayload>("state_event", (event) => {
+          const payload = event.payload;
+          if (payload.event_type !== EventType.TaskProgress) return;
+          if (payload.event_id !== eventId) return;
 
-        toast.success(`Profile from ${fileName} imported successfully! Opening profile...`, {
-          id: loadingToastId,
-          duration: 3000,
+          const progress = (payload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+          // Update toast with progress
+          toast.custom(
+            () => <ProgressToast message={`Importing ${fileName}`} progress={progress} />,
+            { id: toastId, duration: Infinity }
+          );
         });
-        useProfileStore.getState().fetchProfiles();
-        onImportComplete();
 
-        // Navigate to the new profile
-        navigate(`/profilesv2/${newProfileId}`);
+        // Show initial progress toast
+        toast.custom(
+          () => <ProgressToast message={`Importing ${fileName}`} progress={0} />,
+          { id: toastId, duration: Infinity }
+        );
+
+        try {
+          const newProfileId = await ProfileService.importProfileByPath(selectedPath, eventId);
+
+          // Clean up listener before showing success
+          if (unlisten) {
+            unlisten();
+            unlisten = null;
+          }
+
+          toast.success(`Profile from ${fileName} imported successfully! Opening profile...`, {
+            id: toastId,
+            duration: 3000,
+          });
+          useProfileStore.getState().fetchProfiles();
+          onImportComplete();
+
+          // Navigate to the new profile
+          navigate(`/profilesv2/${newProfileId}`);
+        } finally {
+          removeImportingPath(selectedPath);
+        }
 
       } else {
         if (selectedPath === null) {
@@ -78,13 +122,20 @@ export function ProfileImport({
       }
     } catch (err) {
       console.error("Failed to import profile:", err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (loadingToastId) {
-        toast.error(`Failed to import profile: ${errorMessage}`, { id: loadingToastId });
+      const errorMessage = parseErrorMessage(err);
+
+      // Check for disk space error and provide helpful hint
+      if (errorMessage.toLowerCase().includes("insufficient disk space")) {
+        const enhancedMessage = `${errorMessage}\n\nTip: You can change the data location in Settings.`;
+        toast.error(enhancedMessage, { id: toastId, duration: 8000 });
       } else {
-        toast.error(`Failed to import profile: ${errorMessage}`);
+        toast.error(`Failed to import profile: ${errorMessage}`, { id: toastId });
       }
     } finally {
+      // Clean up listener
+      if (unlisten) {
+        unlisten();
+      }
       setIsImporting(false);
     }
   };

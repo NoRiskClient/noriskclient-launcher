@@ -59,7 +59,12 @@ export function CapeFilters({
 
   const sortOptions: SelectOption[] = [
     {
-      value: "",
+      value: "mostUsed",
+      label: "Most Used",
+      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
+    },
+    {
+      value: "newest",
       label: "Newest",
       icon: <Icon icon="solar:sort-by-time-linear" className="w-5 h-5" />,
     },
@@ -69,11 +74,6 @@ export function CapeFilters({
       icon: (
         <Icon icon="mdi:arrow-up-bold-circle-outline" className="w-5 h-5" />
       ),
-    },
-    {
-      value: "mostUsed",
-      label: "Most Used",
-      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
     },
   ];
 

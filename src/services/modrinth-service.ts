@@ -109,6 +109,8 @@ export class ModrinthService {
     fileName: string,
     downloadUrl: string,
     iconUrl?: string,
+    fileSize?: number,
+    eventId?: string,
   ): Promise<string> {
     return invoke<string>("download_and_install_modrinth_modpack", {
       projectId,
@@ -116,6 +118,8 @@ export class ModrinthService {
       fileName,
       downloadUrl,
       iconUrl,
+      fileSize,
+      eventId,
     });
   }
 
