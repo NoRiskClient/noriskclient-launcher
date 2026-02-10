@@ -5,8 +5,9 @@ use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWin
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 use log4rs::append::rolling_file::RollingFileAppender;
-use log4rs::config::{Appender, Config, Root};
+use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
+use log4rs::filter::threshold::ThresholdFilter;
 use tokio::fs;
 
 const LOG_DIR_NAME: &str = "logs";
@@ -54,13 +55,20 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- Configure log4rs ---
     let config = Config::builder()
-        .appender(Appender::builder().build("file", Box::new(file_appender)))
+        .appender(
+            Appender::builder()
+                .filter(Box::new(ThresholdFilter::new(LevelFilter::Info)))
+                .build("file", Box::new(file_appender)),
+        )
         .appender(Appender::builder().build("stdout", Box::new(console_appender))) // Add console appender
+        // Suppress noisy event-loop warnings from window focus/tab-in transitions.
+        .logger(Logger::builder().build("winit", LevelFilter::Error)) // prevent winit from logging at all levels (WARN on window focus)
+        .logger(Logger::builder().build("tao", LevelFilter::Error)) // prevent tao from logging at all levels (WARN on window focus)
         .build(
             Root::builder()
                 .appender("file") // Log to file
                 .appender("stdout") // Log to console
-                .build(LevelFilter::Debug), // Log Debug and above to both
+                .build(LevelFilter::Debug),
         )?;
 
     // Initialize log4rs
