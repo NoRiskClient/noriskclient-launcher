@@ -23,6 +23,7 @@ import type {
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog"; // Import ConfirmDeleteDialog
 import { GenericDetailListItem } from "../items/GenericDetailListItem"; // Import new component
 import { toast } from 'react-hot-toast'; // Import toast
+import { useTranslation } from 'react-i18next';
 import { toggleContentFromProfile } from "../../../../services/content-service"; // Import toggleContentFromProfile
 import type { ToggleContentPayload } from "../../../../types/content"; // Import ToggleContentPayload
 
@@ -62,17 +63,18 @@ const getModFileNameFromSource = (mod: Mod | null | undefined): string | null =>
 };
 
 export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
+  const { t } = useTranslation();
+  const accentColor = useThemeStore((state) => state.accentColor);
+
   // Early return or loading state if profile is not yet available
   if (!profile) {
     // Optionally, render a more specific loading/error state for this case
     return (
       <div className="p-4 font-minecraft text-center text-white/70">
-        Profile data is not available. Cannot display mods.
+        {t('mods.profile_unavailable')}
       </div>
     );
   }
-
-  const accentColor = useThemeStore((state) => state.accentColor);
   const [mods, setMods] = useState<Mod[]>(profile.mods || []);
   const [isLoading, setIsLoading] = useState(false); // For general loading like initial fetch or refresh
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +225,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
     const modDisplayName = mod.display_name || getModFileNameFromSource(mod) || mod.id;
 
     setModBeingToggled(modId);
-    const toastMessage = newEnabledStateForBackend ? "Enabling" : "Disabling"; // For error message
+    const actionKey = newEnabledStateForBackend ? "enabling" : "disabling"; // For error message
     justToggledRef.current = true; // Set flag before backend call
 
     try {
@@ -233,7 +235,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         modId,
         newEnabledStateForBackend,
       );
-      
+
       // Success case: update state, no toast
       setMods((currentMods) =>
         currentMods.map((m) =>
@@ -241,8 +243,8 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         )
       );
     } catch (err) {
-      console.error(`Failed to ${toastMessage.toLowerCase()} ${modDisplayName}:`, err);
-      toast.error(`Failed to ${toastMessage.toLowerCase()} ${modDisplayName}: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`Failed to ${actionKey} ${modDisplayName}:`, err);
+      toast.error(t('mods.toggle_failed', { action: actionKey, name: modDisplayName, error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setModBeingToggled(null);
     }
@@ -250,7 +252,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
 
   const handleDeleteMod = useCallback(async (mod: Mod) => {
     if (!profile) {
-      setError("Profile data is missing, cannot initiate delete.");
+      setError(t('mods.errors.profile_missing_delete'));
       return;
     }
     setModToDelete(mod);
@@ -337,20 +339,20 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
 
     // Description Node (Version)
     const itemDescriptionNode = (
-      <span title={`Version: ${mod.version || "N/A"}`}>
-        Version: {mod.version || "N/A"}
+      <span title={t('mods.version_label', { version: mod.version || t('common.not_available') })}>
+        {t('mods.version_label', { version: mod.version || t('common.not_available') })}
       </span>
     );
 
     // Badges Node
     const itemBadgesNode = (
       <>
-        <TagBadge 
+        <TagBadge
           size="sm"
           variant={mod.enabled ? "success" : "destructive"}
           iconElement={mod.enabled ? <Icon icon={MODS_TAB_ICONS_TO_PRELOAD[3]} className="w-3 h-3"/> : <Icon icon={MODS_TAB_ICONS_TO_PRELOAD[4]} className="w-3 h-3"/>}
         >
-          {mod.enabled ? "Enabled" : "Disabled"}
+          {mod.enabled ? t('mods.enabled') : t('mods.disabled')}
         </TagBadge>
         {mod.source?.type === "modrinth" && <TagBadge size="sm" variant="info">Modrinth</TagBadge>}
       </>
@@ -367,7 +369,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
           onClick={() => handleUpdateMod(mod, updateAvailableVersion)}
           disabled={isToggling || isDeleting || isThisModInBatchProcess || isBatchDeleting || checkingUpdates || isCurrentlyUpdatingThisMod}
           icon={<Icon icon="solar:cloud-download-bold-duotone" className="w-3.5 h-3.5" />}
-          title={`Update to ${updateAvailableVersion.version_number}`}
+          title={t('mods.update_to', { version: updateAvailableVersion.version_number })}
         />
       );
     } else if (isCurrentlyUpdatingThisMod) {
@@ -376,28 +378,28 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
           size="sm"
           disabled={true}
           icon={<Icon icon="solar:refresh-bold" className="animate-spin w-3.5 h-3.5" />}
-          title={`Updating to ${updateAvailableVersion?.version_number}...`}
+          title={t('mods.updating_to', { version: updateAvailableVersion?.version_number })}
         />
       );
     }
 
     // Main Action Node (Toggle)
     const itemMainActionNode = (
-      <Button 
-        size="sm" 
+      <Button
+        size="sm"
         variant={mod.enabled ? "secondary" : "default"}
         onClick={() => handleToggleMod(mod.id, mod.enabled)}
         disabled={isToggling || isDeleting || isThisModInBatchProcess || isBatchDeleting || checkingUpdates || isCurrentlyUpdatingThisMod}
       >
-        {isToggling || isThisModInBatchProcess ? (mod.enabled ? "..." : "...") : (mod.enabled ? "Disable" : "Enable")}
+        {isToggling || isThisModInBatchProcess ? t('mods.toggling') : (mod.enabled ? t('common.disable') : t('common.enable'))}
       </Button>
     );
 
     // Delete Action Node
     const itemDeleteActionNode = (
       <IconButton
-        title="Delete Mod"
-        icon={isDeleting ? <Icon icon="solar:refresh-circle-bold-duotone" className="animate-spin w-3.5 h-3.5" /> : <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />} 
+        title={t('mods.delete_mod')}
+        icon={isDeleting ? <Icon icon="solar:refresh-circle-bold-duotone" className="animate-spin w-3.5 h-3.5" /> : <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />}
         size="sm"
         onClick={() => handleDeleteMod(mod)}
         disabled={isToggling || isDeleting || isThisModInBatchProcess || isBatchDeleting || checkingUpdates || isCurrentlyUpdatingThisMod}
@@ -407,7 +409,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
     // More Actions Trigger Node
     const itemMoreActionsTriggerNode = (
       <IconButton
-        title="More Actions"
+        title={t('mods.more_actions')}
         icon={<Icon icon="solar:menu-dots-bold" className="w-3.5 h-3.5" />} 
         size="sm"
         onClick={(e) => {
@@ -632,7 +634,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
     }
     if (!profile) {
         console.error("Profile not available for updating mod");
-        setError("Profile data is missing, cannot update mod.");
+        setError(t('mods.errors.profile_missing_update'));
         return;
     }
 
@@ -798,7 +800,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
 
   const handleConfirmDeletion = async () => {
     if (!profile) {
-      setError("Profile data missing, cannot complete deletion.");
+      setError(t('mods.errors.profile_missing_complete'));
       handleCloseDeleteDialog();
       return;
     }
@@ -905,7 +907,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search mods..."
+          placeholder={t('mods.search_placeholder')}
           className="flex-grow !h-9"
           disabled={isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
         />
@@ -914,7 +916,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             onClick={handleAddMods}
             disabled={isLoading || isBatchToggling || isBatchDeleting || checkingUpdates || isUpdatingAll}
             size="sm"
-            title="Add Mods"
+            title={t('mods.add_mods')}
             className="!h-9 !w-9 flex-shrink-0"
         />
         {/* Check for Updates Button REMOVED */}
@@ -923,7 +925,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             onClick={refreshModsData}
             disabled={isLoading || isBatchToggling || isBatchDeleting || checkingUpdates || isUpdatingAll}
             size="sm"
-            title={isLoading ? "Refreshing..." : "Refresh Mods"}
+            title={isLoading ? t('mods.refreshing') : t('mods.refresh_mods')}
             className="!h-9 !w-9 flex-shrink-0 ml-auto"
         />
       </div>
@@ -941,7 +943,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             icon="solar:danger-triangle-bold"
             className="w-4 h-4 text-red-400 flex-shrink-0"
           />
-          <span className="font-minecraft">Update Error: {updateError}</span>
+          <span className="font-minecraft">{t('mods.update_error')}: {updateError}</span>
         </div>
       )}
       {mods.length > 0 && (
@@ -956,8 +958,8 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
               checked={areAllFilteredSelected}
               onChange={(e) => handleSelectAllToggle(e.target.checked)}
               disabled={filteredMods.length === 0 || isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
-              label={selectedModIds.size > 0 ? `${selectedModIds.size} selected` : "Select All"}
-              title={areAllFilteredSelected ? "Deselect all visible" : "Select all visible"}
+              label={selectedModIds.size > 0 ? t('mods.count_selected', { count: selectedModIds.size }) : t('mods.select_all')}
+              title={areAllFilteredSelected ? t('mods.deselect_all_visible') : t('mods.select_all_visible')}
             />
             <div className="flex items-center gap-2"> {/* Wrapper for batch actions and Update All */}
               {selectedModIds.size > 0 && (
@@ -969,7 +971,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                     disabled={isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
                     icon={isBatchToggling ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : undefined}
                   >
-                    {isBatchToggling ? "Toggling..." : `Toggle (${selectedModIds.size})`}
+                    {isBatchToggling ? t('mods.toggling') : t('mods.toggle_count', { count: selectedModIds.size })}
                   </Button>
                   <Button
                     size="sm"
@@ -978,7 +980,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                     disabled={isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
                     icon={isBatchDeleting ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : undefined}
                   >
-                    {isBatchDeleting ? "Deleting..." : `Delete (${selectedModIds.size})`}
+                    {isBatchDeleting ? t('mods.deleting') : t('mods.delete_count', { count: selectedModIds.size })}
                   </Button>
                 </>
               )}
@@ -991,7 +993,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                   icon={isUpdatingAll ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : <Icon icon="solar:double-alt-arrow-up-bold-duotone" className="mr-1.5" />}
                   className={selectedModIds.size > 0 ? "ml-2" : ""} // Add margin if batch actions are present
                 >
-                  {isUpdatingAll ? "Updating All..." : `Update All (${Object.keys(modUpdates).length})`}
+                  {isUpdatingAll ? t('mods.updating_all') : t('mods.update_all_count', { count: Object.keys(modUpdates).length })}
                 </Button>
               )}
             </div>
@@ -1014,19 +1016,19 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         primaryLeftActions={primaryLeftActionsContent}
         primaryRightActions={primaryRightActionsContent}
         emptyStateIcon={MODS_TAB_ICONS_TO_PRELOAD[0]} 
-        emptyStateMessage={ 
-          error ? "Error loading mods" :
-          isLoading && mods.length === 0 ? "Loading mods..." :
-          !searchQuery && mods.length === 0 && selectedModIds.size === 0 ? "No mods found in this profile." :
-          searchQuery && filteredMods.length === 0 && selectedModIds.size === 0 ? "No mods match your search." :
-          "Manage your mods"
+        emptyStateMessage={
+          error ? t('mods.error_loading') :
+          isLoading && mods.length === 0 ? t('mods.loading') :
+          !searchQuery && mods.length === 0 && selectedModIds.size === 0 ? t('mods.no_mods_found') :
+          searchQuery && filteredMods.length === 0 && selectedModIds.size === 0 ? t('mods.no_mods_match') :
+          t('mods.manage_mods')
         }
         emptyStateDescription={
-          error ? "Please try refreshing or check the console." :
-          isLoading && mods.length === 0 ? "Please wait while mods are being loaded." :
-          !searchQuery && mods.length === 0 && selectedModIds.size === 0 ? "You can add mods to this profile through the Mod Discovery tab or by manually adding files (feature coming soon)." :
-          searchQuery && filteredMods.length === 0 && selectedModIds.size === 0 ? "Try a different search term or clear the search filter." :
-          "Select mods to perform batch actions or manage them individually."
+          error ? t('mods.please_try_refreshing') :
+          isLoading && mods.length === 0 ? t('mods.please_wait_loading') :
+          !searchQuery && mods.length === 0 && selectedModIds.size === 0 ? t('mods.add_mods_desc') :
+          searchQuery && filteredMods.length === 0 && selectedModIds.size === 0 ? t('mods.try_different_search') :
+          t('mods.select_to_manage')
         }
         loadingItemCount={Math.min(mods.length > 0 ? mods.length : 5, 10)} 
         accentColorOverride={accentColor.value}
@@ -1039,7 +1041,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDeletion}
         isDeleting={isDialogActionLoading} // This controls the dialog's confirm button state
-        title={isBatchDeleteConfirmActive ? "Delete Selected Mods?" : `Delete Mod?`}
+        title={isBatchDeleteConfirmActive ? t('mods.delete_selected_title') : t('mods.delete_mod_title')}
       />
     </>
   );

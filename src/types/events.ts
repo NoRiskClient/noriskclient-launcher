@@ -42,6 +42,7 @@ export enum EventType {
   MigrationFailed = "migration_failed",
   ExportingProfile = "exporting_profile",
   ProcessMetricsUpdate = "process_metrics_update",
+  TaskProgress = "task_progress",
 }
 
 export interface EventPayload {

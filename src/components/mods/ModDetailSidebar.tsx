@@ -3,6 +3,8 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { useNavigate } from "react-router-dom";
 import type { UnifiedProjectDetails } from "../../types/unified";
 import { UnifiedDependencyType } from "../../types/unified";
@@ -28,7 +30,7 @@ function LinkItem({ icon, label, url }: LinkItemProps) {
       await openExternalUrl(url);
     } catch (error) {
       console.error("Failed to open URL:", error);
-      toast.error("Could not open link in browser.");
+      toast.error(i18n.t('common.open_link_failed'));
     }
   };
 
@@ -86,13 +88,13 @@ function getLoaderIcon(loader: string): string {
 function formatSideSupport(side: string | null): { label: string; color: string } {
   switch (side) {
     case "required":
-      return { label: "Required", color: "text-green-400" };
+      return { label: i18n.t('mod_detail.support.required'), color: "text-green-400" };
     case "optional":
-      return { label: "Optional", color: "text-yellow-400" };
+      return { label: i18n.t('mod_detail.support.optional'), color: "text-yellow-400" };
     case "unsupported":
-      return { label: "Unsupported", color: "text-red-400" };
+      return { label: i18n.t('mod_detail.support.unsupported'), color: "text-red-400" };
     default:
-      return { label: "Unknown", color: "text-white/50" };
+      return { label: i18n.t('mod_detail.support.unknown'), color: "text-white/50" };
   }
 }
 
@@ -145,6 +147,7 @@ function formatGameVersions(versions: string[]): string[] {
 }
 
 export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleOpenLicense = async () => {
@@ -181,7 +184,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="bg-black/20 rounded-lg p-4 border border-white/10">
           <h3 className="text-sm font-minecraft-ten text-white/70 mb-3 uppercase flex items-center gap-2">
             <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-            Compatibility
+            {t('mod_detail.compatibility')}
           </h3>
 
           <div className="space-y-3 text-xs font-minecraft-ten">
@@ -189,7 +192,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
             {formattedVersions.length > 0 && (
               <div>
                 <span className="text-white/50 mb-2 block">
-                  Minecraft: Java Edition
+                  {t('mod_detail.minecraft_java')}
                 </span>
                 <div className="flex flex-wrap gap-1">
                   {formattedVersions.slice(0, 8).map((version) => (
@@ -202,7 +205,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                   ))}
                   {formattedVersions.length > 8 && (
                     <span className="px-2 py-0.5 text-white/50 text-[10px]">
-                      +{formattedVersions.length - 8} more
+                      +{formattedVersions.length - 8} {t('common.more')}
                     </span>
                   )}
                 </div>
@@ -213,7 +216,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
             {project.loaders.length > 0 && (
               <div>
                 <span className="text-white/50 mb-2 block">
-                  Platforms
+                  {t('mod_detail.platforms')}
                 </span>
                 <div className="flex flex-wrap gap-1">
                   {project.loaders.map((loader) => (
@@ -233,13 +236,13 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
             {hasEnvironmentInfo && (
               <div>
                 <span className="text-white/50 mb-2 block">
-                  Supported Environments
+                  {t('mod_detail.supported_environments')}
                 </span>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-white/70 flex items-center gap-1">
                       <Icon icon="solar:monitor-bold" className="w-3 h-3" />
-                      Client
+                      {t('content.filters.client')}
                     </span>
                     <span className={formatSideSupport(project.client_side).color}>
                       {formatSideSupport(project.client_side).label}
@@ -248,7 +251,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                   <div className="flex items-center justify-between">
                     <span className="text-white/70 flex items-center gap-1">
                       <Icon icon="solar:server-bold" className="w-3 h-3" />
-                      Server
+                      {t('content.filters.server')}
                     </span>
                     <span className={formatSideSupport(project.server_side).color}>
                       {formatSideSupport(project.server_side).label}
@@ -354,7 +357,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="bg-black/20 rounded-lg p-4 border border-white/10">
           <h3 className="text-sm font-minecraft-ten text-white/70 mb-3 uppercase flex items-center gap-2">
             <Icon icon="solar:heart-bold" className="w-4 h-4 text-red-400" />
-            Support
+            {t('mod_detail.support')}
           </h3>
 
           <div className="space-y-2">
@@ -375,33 +378,33 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="bg-black/20 rounded-lg p-4 border border-white/10">
           <h3 className="text-sm font-minecraft-ten text-white/70 mb-3 uppercase flex items-center gap-2">
             <Icon icon="solar:link-bold" className="w-4 h-4" />
-            Links
+            {t('mod_detail.links_title')}
           </h3>
 
           <div className="space-y-2">
             <LinkItem
               icon="solar:globe-bold"
-              label="Website"
+              label={t('mod_detail.links.website')}
               url={project.links.website}
             />
             <LinkItem
               icon="solar:code-bold"
-              label="Source Code"
+              label={t('mod_detail.links.source_code')}
               url={project.links.source}
             />
             <LinkItem
               icon="solar:bug-bold"
-              label="Issue Tracker"
+              label={t('mod_detail.links.issue_tracker')}
               url={project.links.issues}
             />
             <LinkItem
               icon="solar:book-bold"
-              label="Wiki"
+              label={t('mod_detail.links.wiki')}
               url={project.links.wiki}
             />
             <LinkItem
               icon="ic:baseline-discord"
-              label="Discord"
+              label={t('mod_detail.links.discord')}
               url={project.links.discord}
             />
           </div>
@@ -412,14 +415,14 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
       <div className="bg-black/20 rounded-lg p-4 border border-white/10">
         <h3 className="text-sm font-minecraft-ten text-white/70 mb-3 uppercase flex items-center gap-2">
           <Icon icon="solar:info-circle-bold" className="w-4 h-4" />
-          Details
+          {t('mod_detail.details')}
         </h3>
 
         <div className="space-y-3 text-xs font-minecraft-ten">
           {/* License */}
           {project.license && (
             <div className="flex justify-between items-center">
-              <span className="text-white/50">License</span>
+              <span className="text-white/50">{t('mod_detail.license')}</span>
               {project.license.url ? (
                 <button
                   onClick={handleOpenLicense}
@@ -435,22 +438,22 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
           {/* Dates */}
           <div className="flex justify-between">
-            <span className="text-white/50">Created</span>
+            <span className="text-white/50">{t('mod_detail.created')}</span>
             <span className="text-white/90">{formatDate(project.date_created)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-white/50">Updated</span>
+            <span className="text-white/50">{t('mod_detail.updated')}</span>
             <span className="text-white/90">{formatDate(project.date_modified)}</span>
           </div>
 
           {/* Project Info */}
           <div className="border-t border-white/10 pt-3 mt-3">
             <div className="flex justify-between">
-              <span className="text-white/50">Project ID</span>
+              <span className="text-white/50">{t('mod_detail.project_id')}</span>
               <span className="text-white/70 font-mono text-[10px]">{project.id}</span>
             </div>
             <div className="flex justify-between mt-2">
-              <span className="text-white/50">Type</span>
+              <span className="text-white/50">{t('mod_detail.type')}</span>
               <span className="text-white/90 capitalize">{project.project_type}</span>
             </div>
           </div>

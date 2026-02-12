@@ -36,6 +36,7 @@ import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { Tooltip } from "../ui/Tooltip";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
+import { useTranslation } from "react-i18next";
 
 type MainTabType = "content" | "worlds" | "logs" | "screenshots";
 type ContentTabType = "mods" | "resourcepacks" | "datapacks" | "shaderpacks" | "nrc";
@@ -51,6 +52,7 @@ export function ProfileDetailViewV2({
   onClose,
   onEdit,
 }: ProfileDetailViewV2Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentProfile, setCurrentProfile] = useState<Profile>(profile);
   const [activeMainTab, setActiveMainTab] = useState<MainTabType>("content");
@@ -88,7 +90,7 @@ export function ProfileDetailViewV2({
 
   // Get accounts from Minecraft Auth Store
   const accounts = useMinecraftAuthStore((state) => state.accounts);
-  
+
   // Find preferred account if one is set
   const preferredAccount = currentProfile.preferred_account_id 
     ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)
@@ -122,12 +124,12 @@ export function ProfileDetailViewV2({
     if (params.quickPlaySingleplayer) {
       // Launch with specific world using QuickPlay
       console.log(`🚀 QuickPlay Singleplayer: Launching world: ${params.quickPlaySingleplayer}`);
-      toast.success(`🚀 Launching world: ${params.quickPlaySingleplayer}`);
+      toast.success(t('profiles.toast.launching_world', { name: params.quickPlaySingleplayer }));
       handleQuickPlayLaunch(params.quickPlaySingleplayer, undefined);
     } else if (params.quickPlayMultiplayer) {
       // Launch with specific server using QuickPlay
       console.log(`🌐 QuickPlay Multiplayer: Joining server: ${params.quickPlayMultiplayer}`);
-      toast.success(`🌐 Joining server: ${params.quickPlayMultiplayer}`);
+      toast.success(t('profiles.toast.joining_server', { name: params.quickPlayMultiplayer }));
       handleQuickPlayLaunch(undefined, params.quickPlayMultiplayer);
     } else {
       // Regular launch
@@ -140,41 +142,41 @@ export function ProfileDetailViewV2({
   const contextMenuItems: ContextMenuItem[] = [
     {
       id: "edit",
-      label: "Edit Profile",
+      label: t('profiles.editProfile'),
       icon: "solar:settings-bold",
       onClick: () => onEdit(),
     },
     {
       id: "duplicate",
-      label: "Duplicate",
+      label: t('profiles.duplicate'),
       icon: "solar:copy-bold",
       onClick: () => handleDuplicateProfile(),
     },
     {
       id: "export",
-      label: "Export",
+      label: t('profiles.export'),
       icon: "solar:download-bold",
       onClick: () => handleOpenExportModal(),
     },
     // Show modpack versions only if modpack info exists and versions are loaded
     ...(currentProfile.modpack_info && modpackVersions ? [{
       id: "modpack-versions",
-      label: "Modpack Versions",
+      label: t('profiles.modpackVersions'),
       icon: "solar:archive-bold",
       onClick: () => handleOpenModpackVersionsModal(),
     }] : []),
     {
       id: "open-folder",
-      label: "Open Folder",
+      label: t('profiles.openFolder'),
       icon: "solar:folder-bold",
       onClick: () => handleOpenFolder(),
     },
     {
       id: "delete",
-      label: "Delete",
+      label: t('profiles.delete'),
       icon: "solar:trash-bin-trash-bold",
       destructive: true,
-      separator: true, // Trennstrich vor Delete
+      separator: true,
       onClick: () => handleDeleteProfile(),
     },
   ];
@@ -201,7 +203,7 @@ export function ProfileDetailViewV2({
 
     // Check if it's a standard version
     if (currentProfile.is_standard_version) {
-      toast.error("Standard profiles cannot be deleted.");
+      toast.error(t('profiles.cannotDeleteStandard'));
       return;
     }
 
@@ -216,15 +218,15 @@ export function ProfileDetailViewV2({
     try {
       const deletePromise = useProfileStore.getState().deleteProfile(currentProfile.id);
       await toast.promise(deletePromise, {
-        loading: `Deleting profile '${currentProfile.name}'...`,
+        loading: t('profiles.deletingProfile', { name: currentProfile.name }),
         success: () => {
           fetchProfiles();
           navigate("/profiles");
           setIsDeleteModalOpen(false);
-          return `Profile '${currentProfile.name}' deleted successfully!`;
+          return t('profiles.deleteSuccess', { name: currentProfile.name });
         },
         error: (err) =>
-          `Failed to delete profile: ${err instanceof Error ? err.message : String(err.message)}`,
+          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
       });
     } catch (error) {
       console.error("Delete failed:", error);
@@ -256,12 +258,12 @@ export function ProfileDetailViewV2({
     console.log("[ProfileDetailViewV2] handleOpenFolder called for:", currentProfile.name);
     const openPromise = ProfileService.openProfileFolder(currentProfile.id);
     toast.promise(openPromise, {
-      loading: `Opening folder for '${currentProfile.name}'...`,
-      success: `Successfully opened folder for '${currentProfile.name}'!`,
+      loading: t('profiles.openingFolder', { name: currentProfile.name }),
+      success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
       error: (err) => {
         const message = err instanceof Error ? err.message : String(err.message);
         console.error(`Failed to open folder for ${currentProfile.name}:`, err);
-        return `Failed to open folder: ${message}`;
+        return t('profiles.openFolderError', { error: message });
       },
     });
   }, [currentProfile, profile.id]);
@@ -369,10 +371,10 @@ export function ProfileDetailViewV2({
 
   // Main tabs configuration
   const mainTabs: GroupTab[] = [
-    { id: "content", name: "Content", count: 0, icon: "solar:widget-bold" },
-    { id: "worlds", name: "Worlds", count: 0, icon: "solar:planet-bold" },
-    { id: "screenshots", name: "Screenshots", count: 0, icon: "solar:camera-bold" },
-    { id: "logs", name: "Logs", count: 0, icon: "solar:code-bold" },
+    { id: "content", name: t('profiles.tabs.content'), count: 0, icon: "solar:widget-bold" },
+    { id: "worlds", name: t('profiles.tabs.worlds'), count: 0, icon: "solar:planet-bold" },
+    { id: "screenshots", name: t('profiles.tabs.screenshots'), count: 0, icon: "solar:camera-bold" },
+    { id: "logs", name: t('profiles.tabs.logs'), count: 0, icon: "solar:code-bold" },
   ];
 
 
@@ -381,30 +383,30 @@ export function ProfileDetailViewV2({
   const actionButtons: ActionButton[] = [
     {
       id: "back",
-      label: "BACK",
+      label: t('profiles.back').toUpperCase(),
       icon: "solar:arrow-left-bold",
-      tooltip: "Back to profiles",
+      tooltip: t('profiles.backToProfiles'),
       onClick: () => onClose(),
     },
     {
       id: "play",
-      label: isLaunching ? "STOP" : "PLAY",
+      label: isLaunching ? t('profiles.stop').toUpperCase() : t('profiles.play').toUpperCase(),
       icon: isLaunching ? "solar:stop-bold" : "solar:play-bold",
-      tooltip: isLaunching ? "Stop playing" : "Start playing",
+      tooltip: isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying'),
       onClick: handleLaunch,
     },
     {
       id: "settings",
-      label: "SETTINGS",
+      label: t('profiles.settingsLabel').toUpperCase(),
       icon: "solar:settings-bold",
-      tooltip: profile.is_standard_version ? "Java Settings" : "Edit profile",
+      tooltip: profile.is_standard_version ? t('profiles.javaSettings') : t('profiles.editProfile'),
       onClick: () => onEdit(),
     },
     {
       id: "more",
       label: null,
       icon: "solar:menu-dots-bold",
-      tooltip: "More options",
+      tooltip: t('profiles.moreOptions'),
       onClick: (event?: React.MouseEvent<HTMLButtonElement>) => {
         event?.preventDefault();
         event?.stopPropagation();
@@ -460,7 +462,7 @@ export function ProfileDetailViewV2({
                 
                 {/* Preferred Account Indicator next to title */}
                 {preferredAccount && (
-                  <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+                  <Tooltip content={t('profiles.launchWith', { username: preferredAccount.username })}>
                     <div className="flex items-center gap-1 text-white/60">
                       {preferredAccountAvatarUrl && (
                         <img
@@ -570,13 +572,10 @@ export function ProfileDetailViewV2({
                 onClose={handleCancelDelete}
                 onConfirm={handleConfirmDelete}
                 isDeleting={isDeleting}
-                title="Delete Profile"
+                title={t('profiles.deleteProfileTitle')}
                 message={
                   <p className="text-white/80 font-minecraft-ten">
-                    Are you sure you want to permanently delete the profile{" "}
-                    <strong className="text-white">"{currentProfile.name}"</strong>?
-                    <br />
-                    This action cannot be undone.
+                    {t('profiles.deleteConfirmMessage', { name: currentProfile.name })}
                   </p>
                 }
               />
@@ -612,9 +611,9 @@ export function ProfileDetailViewV2({
                     profile={currentProfile}
                     contentType="Mod"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="mod"
-                    itemTypeNamePlural="mods"
-                    addContentButtonText="Add Mods"
+                    itemTypeName={t('profiles.content.mod')}
+                    itemTypeNamePlural={t('profiles.content.mods')}
+                    addContentButtonText={t('profiles.content.addMods')}
                     emptyStateIconOverride="solar:bolt-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -626,9 +625,9 @@ export function ProfileDetailViewV2({
                     profile={currentProfile}
                     contentType="ResourcePack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="resource pack"
-                    itemTypeNamePlural="resource packs"
-                    addContentButtonText="Add Resource Packs"
+                    itemTypeName={t('profiles.content.resourcePack')}
+                    itemTypeNamePlural={t('profiles.content.resourcePacks')}
+                    addContentButtonText={t('profiles.content.addResourcePacks')}
                     emptyStateIconOverride="solar:gallery-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -640,9 +639,9 @@ export function ProfileDetailViewV2({
                     profile={currentProfile}
                     contentType="DataPack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="data pack"
-                    itemTypeNamePlural="data packs"
-                    addContentButtonText="Add Data Packs"
+                    itemTypeName={t('profiles.content.dataPack')}
+                    itemTypeNamePlural={t('profiles.content.dataPacks')}
+                    addContentButtonText={t('profiles.content.addDataPacks')}
                     emptyStateIconOverride="solar:database-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -654,9 +653,9 @@ export function ProfileDetailViewV2({
                     profile={currentProfile}
                     contentType="ShaderPack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="shader pack"
-                    itemTypeNamePlural="shader packs"
-                    addContentButtonText="Add Shader Packs"
+                    itemTypeName={t('profiles.content.shaderPack')}
+                    itemTypeNamePlural={t('profiles.content.shaderPacks')}
+                    addContentButtonText={t('profiles.content.addShaderPacks')}
                     emptyStateIconOverride="solar:sun-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -668,9 +667,9 @@ export function ProfileDetailViewV2({
                     profile={currentProfile}
                     contentType="NoRiskMod"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="NoRisk Mod"
-                    itemTypeNamePlural="NoRisk Mods"
-                    addContentButtonText="Add NoRisk Mods"
+                    itemTypeName={t('profiles.content.noriskMod')}
+                    itemTypeNamePlural={t('profiles.content.noriskMods')}
+                    addContentButtonText={t('profiles.content.addNoriskMods')}
                     emptyStateIconOverride="solar:shield-check-bold-duotone"
                     onRefreshRequired={async () => {
                       // Force refresh of profile data when NoRisk pack changes
@@ -693,7 +692,7 @@ export function ProfileDetailViewV2({
               <div className="w-64 flex-shrink-0 border-l border-white/10 pl-4">
                 <div className="space-y-2">
                   <div className="text-white/70 text-sm font-minecraft-ten uppercase tracking-wide mb-4">
-                    Content Types
+                    {t('profiles.contentTypes')}
                   </div>
 
                   <button
@@ -705,7 +704,7 @@ export function ProfileDetailViewV2({
                   >
                     <Icon icon="solar:widget-bold" className="w-5 h-5 flex-shrink-0" />
                     <span className="font-minecraft-ten text-sm uppercase tracking-wide">
-                      Mods
+                      {t('profiles.content.mods')}
                     </span>
                   </button>
 
@@ -718,7 +717,7 @@ export function ProfileDetailViewV2({
                   >
                     <Icon icon="solar:palette-bold" className="w-5 h-5 flex-shrink-0" />
                     <span className="font-minecraft-ten text-sm uppercase tracking-wide">
-                      Resource Packs
+                      {t('profiles.content.resourcePacks')}
                     </span>
                   </button>
 
@@ -731,7 +730,7 @@ export function ProfileDetailViewV2({
                   >
                     <Icon icon="solar:database-bold" className="w-5 h-5 flex-shrink-0" />
                     <span className="font-minecraft-ten text-sm uppercase tracking-wide">
-                      Data Packs
+                      {t('profiles.content.dataPacks')}
                     </span>
                   </button>
 
@@ -744,7 +743,7 @@ export function ProfileDetailViewV2({
                   >
                     <Icon icon="solar:sun-bold" className="w-5 h-5 flex-shrink-0" />
                     <span className="font-minecraft-ten text-sm uppercase tracking-wide">
-                      Shader Packs
+                      {t('profiles.content.shaderPacks')}
                     </span>
                   </button>
 
@@ -757,7 +756,7 @@ export function ProfileDetailViewV2({
                   >
                     <Icon icon="solar:shield-check-bold" className="w-5 h-5 flex-shrink-0" />
                     <span className="font-minecraft-ten text-sm uppercase tracking-wide">
-                      NoRisk Client
+                      {t('profiles.content.noriskClient')}
                     </span>
                   </button>
                 </div>

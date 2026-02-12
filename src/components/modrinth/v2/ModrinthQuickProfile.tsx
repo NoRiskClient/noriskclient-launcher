@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { SearchStyleInput } from "../../ui/Input";
 import { IconButton } from "../../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
@@ -34,6 +35,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
   selectedSourceProfileId,
   onSourceProfileChange,
 }) => {
+  const { t } = useTranslation();
   const [showSourceSelectInput, setShowSourceSelectInput] = useState(false);
   const [profileSearchValue, setProfileSearchValue] = useState('');
   const [maxProfilesToShow, setMaxProfilesToShow] = useState(9);
@@ -114,7 +116,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
             id="quickProfileNameInput"
             value={profileName}
             onChange={(e) => onProfileNameChange(e.target.value)}
-            placeholder="Enter name for new profile"
+            placeholder={t('placeholders.new_profile_name')}
             icon="solar:user-bold"
             error={error || undefined}
             disabled={isLoading}
@@ -159,12 +161,12 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
           {profilesLoading ? (
             <div className="flex items-center justify-center gap-2 p-3 bg-black/20 rounded-lg">
               <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin text-white/50" />
-              <span className="text-sm text-white/50 font-minecraft-ten">Loading profiles...</span>
+              <span className="text-sm text-white/50 font-minecraft-ten">{t('profiles.loadingProfiles')}</span>
             </div>
           ) : storeProfiles.length === 0 ? (
             <div className="flex items-center justify-center gap-2 p-3 bg-black/20 rounded-lg">
               <Icon icon="solar:folder-error-bold" className="w-4 h-4 text-amber-500" />
-              <span className="text-sm text-amber-500 font-minecraft-ten">No profiles available</span>
+              <span className="text-sm text-amber-500 font-minecraft-ten">{t('profiles.no_profiles_available')}</span>
             </div>
           ) : (
             <>
@@ -177,7 +179,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                   type="text"
                   value={profileSearchValue}
                   onChange={(e) => setProfileSearchValue(e.target.value)}
-                  placeholder="Search profiles..."
+                  placeholder={t('placeholders.search_profiles')}
                   className="w-full pl-7 pr-3 py-1.5 bg-black/20 border border-white/10 rounded-md text-xs font-minecraft-ten text-white placeholder-white/50 focus:border-accent focus:outline-none transition-colors"
                   disabled={isLoading}
                 />
@@ -243,7 +245,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
               {filteredProfiles.length === 0 && profileSearchValue && (
                 <div className="text-center py-2">
                   <Icon icon="solar:search-bold" className="w-4 h-4 text-white/30 mx-auto mb-1" />
-                  <span className="text-xs text-white/50 font-minecraft-ten">No profiles found</span>
+                  <span className="text-xs text-white/50 font-minecraft-ten">{t('profiles.noProfilesFound')}</span>
                 </div>
               )}
             </>

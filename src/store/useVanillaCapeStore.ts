@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { VanillaCapeService } from "../services/vanilla-cape-service";
 import type { VanillaCape, VanillaCapeInfo } from "../types/vanillaCapes";
 import { toast } from "react-hot-toast";
+import i18n from '../i18n/i18n';
 
 interface VanillaCapeState {
   ownedCapes: VanillaCape[];
@@ -121,7 +122,7 @@ export const useVanillaCapeStore = create<VanillaCapeState>()(
             isLoading: false,
             lastFetchTime: Date.now()
           });
-          toast.success("Cape data refreshed!");
+          toast.success(i18n.t('capes.data_refreshed'));
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Failed to refresh cape data";
           set({ error: errorMessage, isLoading: false });

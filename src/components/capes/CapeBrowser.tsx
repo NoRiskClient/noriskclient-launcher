@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   browseCapes,
   downloadTemplateAndOpenExplorer,
@@ -40,6 +41,7 @@ import { translateCapeError, isCapeInReview } from "../../utils/cape-error-trans
 
 
 export function CapeBrowser(): JSX.Element {
+  const { t } = useTranslation();
   // Separate state for ALL capes and MY CAPES
   const [allCapes, setAllCapes] = useState<CosmeticCape[]>([]);
   const [myCapes, setMyCapes] = useState<CosmeticCape[]>([]);
@@ -126,8 +128,8 @@ export function CapeBrowser(): JSX.Element {
       const hasEquippedCape = vanillaCapes.some(cape => cape.equipped);
       const noCapeOption: VanillaCape = {
         id: "no-cape",
-        name: "No Cape",
-        description: "Remove your equipped cape",
+        name: t('capes.noCape'),
+        description: t('capes.removeEquippedCape'),
         url: "", // Empty URL for no cape
         equipped: !hasEquippedCape, // Equipped if no other cape is equipped
         category: "special",
@@ -159,15 +161,15 @@ export function CapeBrowser(): JSX.Element {
 
   // Filter options for SearchWithFilters
   const sortOptions = [
-    { value: "", label: "Newest", icon: "solar:sort-by-time-linear" },
-    { value: "oldest", label: "Oldest", icon: "mdi:arrow-up-bold-circle-outline" },
-    { value: "mostUsed", label: "Most Used", icon: "solar:heart-bold" },
+    { value: "mostUsed", label: t('capes.mostUsed'), icon: "solar:heart-bold" },
+    { value: "newest", label: t('capes.newest'), icon: "solar:sort-by-time-linear" },
+    { value: "oldest", label: t('capes.oldest'), icon: "mdi:arrow-up-bold-circle-outline" },
   ];
 
   const filterOptions = [
-    { value: "", label: "All Time", icon: "solar:calendar-mark-linear" },
-    { value: "weekly", label: "Weekly", icon: "mdi:calendar-week-outline" },
-    { value: "monthly", label: "Monthly", icon: "solar:calendar-date-linear" },
+    { value: "", label: t('capes.allTime'), icon: "solar:calendar-mark-linear" },
+    { value: "weekly", label: t('capes.weekly'), icon: "mdi:calendar-week-outline" },
+    { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
   ];
 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -364,7 +366,7 @@ export function CapeBrowser(): JSX.Element {
       } catch (err: any) {
         console.error("Error fetching capes:", err);
         const errorMessage =
-          err?.message || "Failed to load capes. Please try again later.";
+          err?.message || t('capes.failedToLoadCapes');
         toast.error(errorMessage);
         if (!append) {
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
@@ -587,15 +589,15 @@ export function CapeBrowser(): JSX.Element {
     }
 
     toast.promise(promise, {
-      loading: "Equipping cape...",
+      loading: t('capes.equippingCape'),
       success: () => {
         setIsEquippingCapeId(null);
-        return "Cape equipped successfully!";
+        return t('capes.capeEquippedSuccess');
       },
       error: (err: any) => {
         setIsEquippingCapeId(null);
         console.error("Error equipping cape:", err);
-        return `Failed to equip cape: ${err.message || "Unknown error"}`;
+        return t('capes.failedToEquipCape', { error: err.message || t('common.unknownError') });
       },
     });
   };
@@ -604,10 +606,10 @@ export function CapeBrowser(): JSX.Element {
     setIsUnequipping(true);
     try {
       await unequipCape();
-      toast.success("Cape unequipped successfully!");
+      toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
-      toast.error(`Failed to unequip cape: ${err.message || "Unknown error"}`);
+      toast.error(t('capes.failedToUnequipCape', { error: err.message || t('common.unknownError') }));
     } finally {
       setIsUnequipping(false);
     }
@@ -620,12 +622,12 @@ export function CapeBrowser(): JSX.Element {
         onConfirmDelete={async () => {
           try {
             await deleteCape(cape._id);
-            toast.success("Cape deleted successfully!");
+            toast.success(t('capes.capeDeletedSuccess'));
             refreshCurrentView();
             hideModal('delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape:", err);
-            toast.error(`Failed to delete cape: ${err.message || "Unknown error"}`);
+            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
           }
         }}
         onCancelDelete={() => hideModal('delete-cape-modal')}
@@ -638,7 +640,7 @@ export function CapeBrowser(): JSX.Element {
       const selectedFile = await open({
         multiple: false,
         directory: false,
-        filters: [{ name: "PNG Images", extensions: ["png"] }],
+        filters: [{ name: t('capes.pngImages'), extensions: ["png"] }],
       });
       if (!selectedFile) return;
       const filePath = selectedFile as string;
@@ -660,12 +662,12 @@ export function CapeBrowser(): JSX.Element {
         ));
       } catch (err: any) {
         console.error("Error creating preview URL:", err);
-        toast.error(`Couldn't preview file: ${err.message || "Unknown error"}`);
+        toast.error(t('capes.couldntPreviewFile', { error: err.message || t('common.unknownError') }));
       }
     } catch (err: any) {
       console.error("Error selecting cape file:", err);
       toast.error(
-        `Failed to select cape file: ${err.message || "Unknown error"}`,
+        t('capes.failedToSelectCapeFile', { error: err.message || t('common.unknownError') }),
       );
     }
   };
@@ -685,10 +687,10 @@ export function CapeBrowser(): JSX.Element {
   const handleDownloadTemplate = async () => {
     const promise = downloadTemplateAndOpenExplorer();
     toast.promise(promise, {
-      loading: "Downloading template...",
-      success: "Template downloaded and folder opened!",
+      loading: t('capes.downloadingTemplate'),
+      success: t('capes.templateDownloadedSuccess'),
       error: (err: any) =>
-        `Failed to download template: ${err.message || "Unknown error"}`,
+        t('capes.failedToDownloadTemplate', { error: err.message || t('common.unknownError') }),
     });
   };
 
@@ -725,7 +727,7 @@ export function CapeBrowser(): JSX.Element {
                     borderColor: (!filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
                   }}
                 >
-                  <span className="lowercase">all</span>
+                  <span className="lowercase">{t('capes.all')}</span>
                 </button>
 
                 <button
@@ -752,9 +754,9 @@ export function CapeBrowser(): JSX.Element {
                     backgroundColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.value}20` : undefined,
                     borderColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
                   }}
-                  title={!activeAccount ? "No active Minecraft account" : undefined}
+                  title={!activeAccount ? t('capes.noActiveAccount') : undefined}
                 >
-                  <span className="lowercase">my capes</span>
+                  <span className="lowercase">{t('capes.myCapes')}</span>
                 </button>
 
                 <button
@@ -774,7 +776,7 @@ export function CapeBrowser(): JSX.Element {
                     borderColor: (filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
                   }}
                 >
-                  <span className="lowercase">favorites</span>
+                  <span className="lowercase">{t('capes.favorites')}</span>
                 </button>
 
                 <button
@@ -795,9 +797,9 @@ export function CapeBrowser(): JSX.Element {
                     backgroundColor: filters.showVanillaOnly ? `${accentColor.value}20` : undefined,
                     borderColor: filters.showVanillaOnly ? accentColor.value : undefined,
                   }}
-                  title={!activeAccount ? "No active Minecraft account" : undefined}
+                  title={!activeAccount ? t('capes.noActiveAccount') : undefined}
                 >
-                  <span className="lowercase">vanilla</span>
+                  <span className="lowercase">{t('capes.vanilla')}</span>
                 </button>
               </div>
             </div>
@@ -807,7 +809,7 @@ export function CapeBrowser(): JSX.Element {
                 <div className="flex-1">
                   {!filters.showVanillaOnly ? (
                     <SearchWithFilters
-                      placeholder="Search player..."
+                      placeholder={t('capes.searchPlayerPlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
                       onSearchEnter={handleSearchEnter}
@@ -820,7 +822,7 @@ export function CapeBrowser(): JSX.Element {
                     />
                   ) : (
                     <SearchWithFilters
-                      placeholder="Search vanilla cape..."
+                      placeholder={t('capes.searchVanillaCapePlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
                       onSearchEnter={handleSearchEnter}
@@ -841,23 +843,23 @@ export function CapeBrowser(): JSX.Element {
                       <button
                         onClick={handleDownloadTemplate}
                         className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
-                        title="Download Cape Template"
+                        title={t('capes.downloadTemplate')}
                       >
                         <div className="w-4 h-4 flex items-center justify-center">
                           <Icon icon="solar:download-bold" className="w-4 h-4" />
                         </div>
-                        <span>template</span>
+                        <span>{t('capes.template')}</span>
                       </button>
 
                       <button
                         onClick={handleUploadClick}
                         className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
-                        title="Upload Cape"
+                        title={t('capes.uploadCape')}
                       >
                         <div className="w-4 h-4 flex items-center justify-center">
                           <Icon icon="solar:upload-bold" className="w-4 h-4" />
                         </div>
-                        <span>upload</span>
+                        <span>{t('capes.upload')}</span>
                       </button>
                     </>
                   )}

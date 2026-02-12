@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
 import { useCrashModalStore } from '../../store/crash-modal-store';
 import { Button } from '../ui/buttons/Button';
@@ -17,6 +18,7 @@ import type { EventPayload, CrashReportContentAvailablePayload } from '../../typ
 import { EventType } from '../../types/events';
 
 export function GlobalCrashReportModal() {
+  const { t } = useTranslation();
   const { isCrashModalOpen, crashData, closeCrashModal } = useCrashModalStore();
   const [profileName, setProfileName] = useState<string>('');
   const [mclogsUrl, setMclogsUrl] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export function GlobalCrashReportModal() {
                 console.log(`Received CrashReportContentAvailable event for process ${crashData.process_id}`);
                 contentReceived = true;
                 setDisplayedCrashReportContent(contentPayload.content);
-                toast.success("Crash report loaded!");
+                toast.success(t('crash_modal.toast.report_loaded'));
                 setIsListeningForCrashContent(false);
                 if (unlistenFn) unlistenFn();
               }
@@ -169,12 +171,12 @@ export function GlobalCrashReportModal() {
       if (!contentReceived) {
         console.log(`Actively fetching crash report as fallback for process ${crashData.process_id}`);
         try {
-          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id);
+          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id, crashData.process_metadata?.start_time);
           if (fetchedContent && !contentReceived) {
             console.log(`Successfully fetched crash report via fallback`);
             contentReceived = true;
             setDisplayedCrashReportContent(fetchedContent);
-            toast.success("Crash report loaded!");
+            toast.success(t('crash_modal.toast.report_loaded'));
             setIsListeningForCrashContent(false);
           } else if (!fetchedContent) {
             console.log(`No crash report found yet, listener remains active`);
@@ -201,21 +203,21 @@ export function GlobalCrashReportModal() {
 
   const handlePrimaryAction = async () => {
     if (!crashData?.profile_id || !crashData?.process_metadata) {
-      toast.error("Cannot proceed: Missing critical crash data.");
+      toast.error(t('crash_modal.toast.missing_data'));
       console.error("Action error: Missing profile_id or process_metadata", crashData);
       return;
     }
 
     setIsProcessing(true);
     let currentMclogsUrl = mclogsUrl;
-    const mainToastId = toast.loading('Processing crash report...');
+    const mainToastId = toast.loading(t('crash_modal.toast.processing'));
 
     try {
       // NEUE LOGIK: Vor dem Upload nochmal den neuesten Crash-Report holen
       if (crashData.process_id && !displayedCrashReportContent) {
-        toast.loading('Fetching latest crash report before upload...', { id: mainToastId });
+        toast.loading(t('crash_modal.toast.fetching_before_upload'), { id: mainToastId });
         try {
-          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id);
+          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id, crashData.process_metadata?.start_time);
           if (fetchedContent) {
             console.log('Fetched fresh crash report before upload');
             setDisplayedCrashReportContent(fetchedContent);
@@ -226,26 +228,26 @@ export function GlobalCrashReportModal() {
       }
 
       if (!currentMclogsUrl) {
-        toast.loading('Fetching latest log content...', { id: mainToastId });
+        toast.loading(t('crash_modal.toast.fetching_log'), { id: mainToastId });
         const logContent = await getProfileLatestLogContent(crashData.profile_id);
         
         let combinedLogContent = logContent;
         if (displayedCrashReportContent && displayedCrashReportContent.trim() !== "") {
           combinedLogContent = `--- CRASH REPORT ---\n${displayedCrashReportContent}\n\n--- LATEST LOG ---\n${logContent}`;
-          toast.loading('Preparing combined log (crash report + latest.log)...', { id: mainToastId });
+          toast.loading(t('crash_modal.toast.preparing_combined'), { id: mainToastId });
         }
 
         if (!combinedLogContent || combinedLogContent.trim() === "") {
-          throw new Error("No log content found to upload.");
+          throw new Error(t('crash_modal.error.no_log_content'));
         }
         
-        toast.loading('Uploading to mclogs.com...', { id: mainToastId });
+        toast.loading(t('crash_modal.toast.uploading_mclogs'), { id: mainToastId });
         currentMclogsUrl = await uploadLogToMclogs(combinedLogContent);
         setMclogsUrl(currentMclogsUrl);
       }
 
       if (currentMclogsUrl && !noriskReportSubmitted) {
-        toast.loading('Submitting crash report to NoRisk...', { id: mainToastId });
+        toast.loading(t('crash_modal.toast.submitting_norisk'), { id: mainToastId });
         const crashReportPayload: CrashlogDto = {
           mcLogsUrl: currentMclogsUrl,
           metadata: crashData.process_metadata!, 
@@ -256,10 +258,10 @@ export function GlobalCrashReportModal() {
         
         try {
           await writeText(currentMclogsUrl);
-          toast.success("Report submitted & Log URL copied!", { id: mainToastId });
+          toast.success(t('crash_modal.toast.submitted_and_copied'), { id: mainToastId });
         } catch (copyError) {
           console.error("Failed to copy mclogs URL after report:", copyError);
-          toast.success(`Report submitted. Log URL: ${currentMclogsUrl} (Copying failed)`, { id: mainToastId });
+          toast.success(t('crash_modal.toast.submitted_copy_failed', { url: currentMclogsUrl }), { id: mainToastId });
         }
         
         // Open browser with mclogs URL
@@ -272,7 +274,7 @@ export function GlobalCrashReportModal() {
       } else if (currentMclogsUrl && noriskReportSubmitted) {
         toast.dismiss(mainToastId);
         await writeText(currentMclogsUrl);
-        toast.success("mclogs.com URL copied to clipboard!");
+        toast.success(t('crash_modal.toast.url_copied'));
         
         // Open browser with mclogs URL
         try {
@@ -285,7 +287,7 @@ export function GlobalCrashReportModal() {
         toast.dismiss(mainToastId);
       }
     } catch (error: any) {
-      toast.error(error.message || 'An unexpected error occurred.', { id: mainToastId });
+      toast.error(error.message || t('crash_modal.toast.unexpected_error'), { id: mainToastId });
       console.error("Crash report processing error:", error);
     } finally {
       setIsProcessing(false);
@@ -295,61 +297,63 @@ export function GlobalCrashReportModal() {
   const handleContactSupport = async () => {
     try {
       await openExternalUrl('https://discord.norisk.gg');
-      toast.success("Opened NoRisk Discord in your browser!");
+      toast.success(t('crash_modal.toast.discord_opened'));
     } catch (error) {
       console.error("Failed to open Discord URL:", error);
-      toast.error("Could not open Discord. Please go to discord.norisk.gg manually.");
+      toast.error(t('crash_modal.toast.discord_failed'));
     }
   };
 
-  let primaryButtonText = 'Upload Logs & Report';
+  let primaryButtonText = t('crash_modal.button.upload_logs');
   if (mclogsUrl && noriskReportSubmitted) {
-    primaryButtonText = 'Copy Log URL';
+    primaryButtonText = t('crash_modal.button.copy_log_url');
   }
 
   const modalFooter = (
-    <div className="flex flex-wrap justify-end gap-3">
-      <Button 
-        onClick={handlePrimaryAction} 
-        variant="secondary" 
+    <div className="flex gap-3 w-full">
+      <Button
+        onClick={handlePrimaryAction}
+        variant="secondary"
         icon={<Icon icon={mclogsUrl && noriskReportSubmitted ? "solar:copy-line-duotone" : "solar:upload-linear"} className="w-5 h-5" />}
         disabled={isProcessing || !crashData?.process_metadata}
+        className="flex-1 justify-center whitespace-nowrap"
       >
         {primaryButtonText}
       </Button>
-      <Button 
-        onClick={handleContactSupport} 
-        variant="default" 
+      <Button
+        onClick={handleContactSupport}
+        variant="default"
         icon={<Icon icon="solar:letter-linear" className="w-5 h-5" />}
         disabled={isProcessing}
+        className="flex-1 justify-center whitespace-nowrap"
       >
-        Contact Support
+        {t('crash_modal.button.contact_support')}
       </Button>
     </div>
   );
 
   const titleSubtitleNode = (
     <p className="text-xs font-minecraft-ten text-gray-400">
-      Profile: {crashData.process_metadata?.profile_name || profileName || 'Loading...'}
+      {t('crash_modal.profile_label')}: {crashData.process_metadata?.profile_name || profileName || t('common.loading')}
     </p>
   );
 
   return (
     <Modal
-      title="Minecraft Crash Report"
+      title={t('crash_modal.title')}
       titleIcon={<Icon icon="solar:danger-bold" className="w-7 h-7 text-red-400" />}
       titleSubtitle={titleSubtitleNode}
       onClose={() => !isProcessing && closeCrashModal()}
-      width="md"
+      width="lg"
       footer={modalFooter}
     >
       <div className="p-6 space-y-4 text-white text-base text-center">
         <p className="pt-3 text-gray-300 text-lg font-minecraft-ten">
-          An unexpected error occurred and the game crashed. We are sorry for the inconvenience.
+          {t('crash_modal.description')}
         </p>
 
         <p className="pt-4 text-2xl font-minecraft text-red-400">
-          exit code: {crashData.exit_code ?? 'N/A'}
+          {t('crash_modal.exit_code')}: {crashData.exit_code ?? 'N/A'}
         </p>
       </div>
     </Modal>

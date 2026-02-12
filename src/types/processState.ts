@@ -31,6 +31,7 @@ export interface ProcessMetadata {
   norisk_pack?: string | null;
   profile_name?: string | null;
   profile_image_url?: string | null;
+  memory_max_mb: number; // u32 - Max RAM allocated for the process
 }
 
 /**

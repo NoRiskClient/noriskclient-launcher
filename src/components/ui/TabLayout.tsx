@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { Icon } from "@iconify/react";
@@ -37,6 +38,7 @@ export function TabLayout({
   role = "main",
   ariaLabel,
 }: TabLayoutProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const colors = getVariantColors("default", accentColor);
@@ -84,14 +86,14 @@ export function TabLayout({
             <SearchInput
               value={search.value}
               onChange={search.onChange}
-              placeholder={search.placeholder || "Search..."}
+              placeholder={search.placeholder || t('common.search')}
               className="w-full md:w-auto flex-grow md:flex-grow-0 h-[42px]"
               variant="flat"
               aria-label={`Search ${title.toLowerCase()}`}
             />
           )}
           {actions && (
-            <div role="toolbar" aria-label="Actions">
+            <div role="toolbar" aria-label={t('common.actions')}>
               {actions}
             </div>
           )}

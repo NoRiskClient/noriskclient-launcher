@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import type { CosmeticCape } from "../../types/noriskCapes";
@@ -16,6 +17,7 @@ export function ConfirmDeletionModal({
   onConfirmDelete,
   onCancelDelete
 }: ConfirmDeletionModalProps) {
+  const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleConfirmDelete = async () => {
@@ -29,16 +31,16 @@ export function ConfirmDeletionModal({
 
   return (
     <Modal
-      title="Confirm Deletion"
+      title={t('capes.confirmDeletion')}
       onClose={onCancelDelete}
       width="sm"
       variant="flat"
     >
       <div className="p-4">
         <p className="text-white/90 mb-6 text-center font-minecraft-ten">
-          Are you sure you want to delete the cape{" "}
+          {t('capes.confirmDeleteMessagePrefix')}{" "}
           <span style={{ color: "var(--accent)" }}>{capeToDelete._id}</span>
-          ? This action cannot be undone.
+          {t('capes.confirmDeleteMessageSuffix')}
         </p>
         <div className="flex justify-center gap-4">
           <Button
@@ -47,7 +49,7 @@ export function ConfirmDeletionModal({
             disabled={isDeleting}
             size="md"
           >
-            {isDeleting ? "Deleting..." : "Delete Cape"}
+            {isDeleting ? t('capes.deleting') : t('capes.deleteCape')}
           </Button>
           <Button
             onClick={onCancelDelete}
@@ -55,7 +57,7 @@ export function ConfirmDeletionModal({
             disabled={isDeleting}
             size="md"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </div>

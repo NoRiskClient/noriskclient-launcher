@@ -26,6 +26,7 @@ import { toast } from "react-hot-toast";
 // import { toggleContentFromProfile } from "../../../../services/content-service"; // NoRisk has its own toggle
 // import type { ToggleContentPayload } from "../../../../types/content"; // Not directly needed
 import { Select, type SelectOption } from "../../../ui/Select"; // Import Select and SelectOption
+import { useTranslation } from "react-i18next";
 
 // Icons specific to NoRiskModsTabV2 (can be adjusted)
 const NORISK_MODS_TAB_ICONS_TO_PRELOAD = [
@@ -72,12 +73,14 @@ export function NoRiskModsTabV2({
   profile,
   onRefreshRequired,
 }: NoRiskModsTabV2Props) {
+  const { t } = useTranslation();
+
   if (!profile) {
     // This should ideally not happen if Profile is marked as required
     // but as a safeguard:
     return (
       <div className="p-4 font-minecraft text-center text-white/70">
-        Profile data is not available. Cannot display NoRisk mods.
+        {t('content.norisk.profile_unavailable')}
       </div>
     );
   }
@@ -388,12 +391,12 @@ export function NoRiskModsTabV2({
   const handleToggleNoRiskMod = useCallback(
     async (modId: string) => {
       if (!profile.selected_norisk_pack_id) {
-        toast.error("No NoRisk pack selected.");
+        toast.error(t('content.norisk.toast.no_pack_selected'));
         return;
       }
       const mod = noriskMods.find((m) => m.id === modId);
       if (!mod) {
-        toast.error("Mod not found locally. Try refreshing.");
+        toast.error(t('content.norisk.toast.mod_not_found'));
         return;
       }
 
@@ -422,7 +425,7 @@ export function NoRiskModsTabV2({
       } catch (err) {
         console.error(`Failed to toggle NoRisk mod ${mod.display_name}:`, err);
         toast.error(
-          `Failed to toggle ${mod.display_name}: ${err instanceof Error ? err.message : String(err.message)}`,
+          t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: err instanceof Error ? err.message : String(err) }),
         );
         setNoriskMods((prevMods) =>
           prevMods.map((m) =>
@@ -433,7 +436,7 @@ export function NoRiskModsTabV2({
         setModBeingToggled(null);
       }
     },
-    [noriskMods, profile, onRefreshRequired],
+    [noriskMods, profile, onRefreshRequired, t],
   ); // Keep onRefreshRequired in deps if other parts of the callback chain might still need it, though we are not calling it.
   // Or remove if truly not needed by any path from this callback.
   // For now, let's assume it might be used by error paths or future extensions, so keep it.
@@ -492,7 +495,7 @@ export function NoRiskModsTabV2({
 
   const handleBatchToggleSelected = async () => {
     if (!profile.selected_norisk_pack_id || selectedModIds.size === 0) {
-      if (selectedModIds.size > 0) toast.error("No NoRisk pack selected.");
+      if (selectedModIds.size > 0) toast.error(t('content.norisk.toast.no_pack_selected'));
       return;
     }
 
@@ -507,7 +510,7 @@ export function NoRiskModsTabV2({
     for (const mod of modsToToggle) {
       const currentModState = noriskMods.find((m) => m.id === mod.id);
       if (!currentModState) {
-        errors.push(`Mod ${mod.id} not found during batch operation.`);
+        errors.push(t('content.norisk.toast.mod_not_found_batch', { id: mod.id }));
         continue;
       }
       const newEnabledState = !currentModState.enabled;
@@ -529,8 +532,8 @@ export function NoRiskModsTabV2({
         );
       } catch (err) {
         const errorDetail = err instanceof Error ? err.message : String(err);
-        errors.push(`Failed to toggle ${mod.display_name}: ${errorDetail}`);
-        toast.error(`Failed to toggle ${mod.display_name}: ${errorDetail}`);
+        errors.push(t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: errorDetail }));
+        toast.error(t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: errorDetail }));
         // No individual revert here; the full list isn't reverted on partial batch failure.
         // The items that failed will remain in their original state in the UI due to lack of optimistic update for them.
       }
@@ -561,14 +564,14 @@ export function NoRiskModsTabV2({
     } catch (err) {
       console.error("Failed to update selected NoRisk pack:", err);
       toast.error(
-        `Failed to switch NoRisk pack: ${err instanceof Error ? err.message : String(err)}`,
+        t('content.norisk.toast.switch_pack_failed', { error: err instanceof Error ? err.message : String(err) }),
       );
     }
   };
 
   const noriskPackOptions = useMemo((): SelectOption[] => {
     if (!noriskPacksConfig)
-      return [{ value: "", label: "- No Pack Selected -" }]; // Return default if no config
+      return [{ value: "", label: t('content.no_pack_selected') }]; // Return default if no config
 
     const options = Object.entries(noriskPacksConfig.packs).map(
       ([id, packDef]) => ({
@@ -581,8 +584,8 @@ export function NoRiskModsTabV2({
     options.sort((a, b) => a.label.localeCompare(b.label));
 
     // Prepend the "No Pack Selected" option
-    return [{ value: "", label: "- No Pack Selected -" }, ...options];
-  }, [noriskPacksConfig]);
+    return [{ value: "", label: t('content.no_pack_selected') }, ...options];
+  }, [noriskPacksConfig, t]);
 
   const renderNoRiskModItem = useCallback(
     (mod: NoRiskModV2) => {
@@ -613,8 +616,8 @@ export function NoRiskModsTabV2({
         </div>
       );
       const itemDescriptionNode = (
-        <span title={`Version: ${mod.version || "N/A"}`}>
-          Version: {mod.version || "N/A"}
+        <span title={`${t('content.version_label')} ${mod.version || t('common.not_available')}`}>
+          {t('content.version_label')} {mod.version || t('common.not_available')}
         </span>
       );
       const sourceTypeDisplay: Record<
@@ -624,9 +627,9 @@ export function NoRiskModsTabV2({
         >,
         { label: string; variant: "info" | "default" | "warning" }
       > = {
-        modrinth: { label: "Modrinth", variant: "info" },
-        maven: { label: "Maven", variant: "default" },
-        url: { label: "URL", variant: "warning" },
+        modrinth: { label: t('content.platforms.modrinth'), variant: "info" },
+        maven: { label: t('content.platforms.maven'), variant: "default" },
+        url: { label: t('content.platforms.url'), variant: "warning" },
       };
       const itemBadgesNode = (
         <>
@@ -641,7 +644,7 @@ export function NoRiskModsTabV2({
               )
             }
           >
-            {mod.enabled ? "Enabled" : "Disabled"}
+            {mod.enabled ? t('common.enabled') : t('common.disabled')}
           </TagBadge>
           {mod.source_type &&
             sourceTypeDisplay[
@@ -681,7 +684,7 @@ export function NoRiskModsTabV2({
           onClick={() => handleToggleNoRiskMod(mod.id)}
           disabled={isToggling || isBatchToggling}
         >
-          {isToggling ? "..." : mod.enabled ? "Disable" : "Enable"}
+          {isToggling ? "..." : mod.enabled ? t('common.disable') : t('common.enable')}
         </Button>
       );
 
@@ -709,6 +712,7 @@ export function NoRiskModsTabV2({
       NORISK_MODS_TAB_ICONS_TO_PRELOAD,
       selectedModIds,
       handleModSelectionChange, // Now correctly defined before this usage
+      t,
     ],
   );
 
@@ -718,7 +722,7 @@ export function NoRiskModsTabV2({
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search NoRisk mods..."
+          placeholder={t('content.norisk.search_placeholder')}
           className="flex-grow !h-9"
           disabled={
             isLoading ||
@@ -745,7 +749,7 @@ export function NoRiskModsTabV2({
           variant="secondary"
           size="sm"
           title={
-            isRefreshingPacks ? "Refreshing..." : "Refresh NoRisk Packs List"
+            isRefreshingPacks ? t('common.refreshing') : t('content.norisk.refresh_packs')
           }
           className="!h-9 !w-9 flex-shrink-0"
         />
@@ -764,13 +768,13 @@ export function NoRiskModsTabV2({
           disabled={filteredMods.length === 0 || isBatchToggling || isLoading}
           label={
             selectedModIds.size > 0
-              ? `${selectedModIds.size} selected`
-              : "Select All"
+              ? `${selectedModIds.size} ${t('common.selected')}`
+              : t('common.select_all')
           }
           title={
             areAllFilteredSelected
-              ? "Deselect all visible"
-              : "Select all visible"
+              ? t('common.deselect_all_visible')
+              : t('common.select_all_visible')
           }
         />
         <div className="flex items-center gap-2">
@@ -790,8 +794,8 @@ export function NoRiskModsTabV2({
               }
             >
               {isBatchToggling
-                ? "Toggling..."
-                : `Toggle Selected (${selectedModIds.size})`}
+                ? t('content.actions.toggling')
+                : `${t('content.actions.toggle_selected')} (${selectedModIds.size})`}
             </Button>
           )}
           {noriskPacksConfig && noriskPackOptions.length > 0 && (
@@ -802,7 +806,7 @@ export function NoRiskModsTabV2({
                   handleSelectedPackChange(value === "" ? null : value)
                 }
                 options={noriskPackOptions}
-                placeholder="Select Pack..."
+                placeholder={t('content.norisk.select_pack')}
                 className="!h-9 text-sm min-w-[180px]"
                 size="sm"
                 disabled={isLoading || isRefreshingPacks || isBatchToggling}
@@ -811,7 +815,7 @@ export function NoRiskModsTabV2({
                 noriskPacksConfig?.packs[profile.selected_norisk_pack_id]
                   ?.isExperimental && (
                   <div className="text-xs text-yellow-500/80 font-minecraft mt-0.5 text-right">
-                    Experimental Pack
+                    {t('content.experimental_pack')}
                   </div>
                 )}
             </div>
@@ -833,41 +837,41 @@ export function NoRiskModsTabV2({
         emptyStateIcon={NORISK_MODS_TAB_ICONS_TO_PRELOAD[0]}
         emptyStateMessage={
           !profile.selected_norisk_pack_id
-            ? "No NoRisk Pack Selected"
+            ? t('content.norisk.no_pack_selected_title')
             : error
-              ? "Error loading NoRisk mods"
+              ? t('content.norisk.error_loading')
               : isLoading &&
                   filteredMods.length === 0 &&
                   !!profile.selected_norisk_pack_id
-                ? "Loading NoRisk mods..."
+                ? t('content.norisk.loading')
                 : !searchQuery &&
                     filteredMods.length === 0 &&
                     !!profile.selected_norisk_pack_id
-                  ? "No mods in this NoRisk pack."
+                  ? t('content.norisk.empty_pack')
                   : searchQuery &&
                       filteredMods.length === 0 &&
                       !!profile.selected_norisk_pack_id
-                    ? "No NoRisk mods match your search."
-                    : "Manage your NoRisk mods"
+                    ? t('content.norisk.no_search_results')
+                    : t('content.norisk.manage_title')
         }
         emptyStateDescription={
           !profile.selected_norisk_pack_id
-            ? "Please select a NoRisk Modpack from the dropdown above to manage its mods."
+            ? t('content.norisk.no_pack_selected_desc')
             : error
-              ? "Please try refreshing or check the console."
+              ? t('content.norisk.error_desc')
               : isLoading &&
                   filteredMods.length === 0 &&
                   !!profile.selected_norisk_pack_id
-                ? "Please wait..."
+                ? t('content.norisk.loading_desc')
                 : !searchQuery &&
                     filteredMods.length === 0 &&
                     !!profile.selected_norisk_pack_id
-                  ? "This pack might be empty, or mods are still loading."
+                  ? t('content.norisk.empty_pack_desc')
                   : searchQuery &&
                       filteredMods.length === 0 &&
                       !!profile.selected_norisk_pack_id
-                    ? "Try a different search term."
-                    : "Toggle mods on or off for this profile."
+                    ? t('content.norisk.no_search_results_desc')
+                    : t('content.norisk.manage_desc')
         }
         loadingItemCount={
           isLoading &&

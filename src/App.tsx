@@ -23,6 +23,8 @@ import { TermsOfServiceModal } from "./components/modals/TermsOfServiceModal";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
+import { useGlobalModal } from "./hooks/useGlobalModal";
+import { Modal } from "./components/ui/Modal";
 import { refreshNrcDataOnMount } from "./services/nrc-service";
 import {
   getLauncherConfig,
@@ -33,6 +35,15 @@ import { loadIcons } from '@iconify/react';
 
 import flagsmith from 'flagsmith';
 import { FlagsmithProvider } from 'flagsmith/react';
+import { Button } from "./components/ui/buttons/Button";
+import { openExternalUrl } from "./services/tauri-service";
+import { ExternalLink } from "lucide-react";
+import { MinecraftAuthService } from "./services/minecraft-auth-service";
+import ChildProtectionModal from "./components/modals/ChildProtectionModal";
+import { NotificationModal } from "./components/modals/NotificationModal";
+import { useNotificationStore } from "./store/notification-store";
+import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
+import { useTranslation } from "react-i18next";
 
 export type ProfilesTabContext = {
   currentGroupingCriterion: string;
@@ -40,10 +51,14 @@ export type ProfilesTabContext = {
 };
 
 export function App() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { openCrashModal } = useCrashModalStore();
   const { hasAcceptedTermsOfService } = useThemeStore();
+  const { showModal, hideModal } = useGlobalModal();
+  const { activeAccount } = useMinecraftAuthStore();
+  const { fetchNotifications } = useNotificationStore();
 
   const activeTab = location.pathname.substring(1) || "play";
 
@@ -129,7 +144,7 @@ export function App() {
               "[App.tsx] Failed to parse MinecraftProcessExitedPayload:",
               e,
             );
-            toast.error("Could not globally process Minecraft process status.");
+            toast.error(t('app.errors.process_status'));
           }
         }
       },
@@ -159,6 +174,15 @@ export function App() {
   useEffect(() => {
     refreshNrcDataOnMount();
   }, []);
+
+  // Fetch notifications when user is logged in
+  useEffect(() => {
+    if (activeAccount) {
+      fetchNotifications().catch((error) => {
+        console.error("[App.tsx] Failed to fetch notifications:", error);
+      });
+    }
+  }, [activeAccount, fetchNotifications]);
 
   // Icons beim App-Start vorladen
   useEffect(() => {
@@ -233,7 +257,7 @@ export function App() {
       console.log("[App.tsx] Grouping preference saved successfully.");
     } catch (error) {
       console.error("[App.tsx] Failed to save grouping preference:", error);
-      toast.error("Failed to save grouping preference.");
+      toast.error(t('app.errors.save_grouping'));
     }
   };
 
@@ -263,6 +287,8 @@ export function App() {
         <GlobalCrashReportModal />
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
         <GlobalModalPortal />
+        <ChildProtectionModal />
+        <NotificationModal />
         <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
           <Outlet context={profilesTabContext} />
         </AppLayout>

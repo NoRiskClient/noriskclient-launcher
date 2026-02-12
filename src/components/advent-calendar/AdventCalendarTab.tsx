@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
@@ -149,6 +150,7 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
 }
 
 export function AdventCalendarTab() {
+  const { t } = useTranslation();
   const [calendarData, setCalendarData] = useState<AdventCalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -200,7 +202,7 @@ export function AdventCalendarTab() {
       } catch (err) {
         console.error("Failed to load advent calendar:", err);
         setError(err.message);
-        toast.error("Failed to load advent calendar");
+        toast.error(t('advent.load_failed'));
       } finally {
         setLoading(false);
       }
@@ -295,10 +297,10 @@ export function AdventCalendarTab() {
         />,
       );
       
-      toast.success(`Day ${day} reward claimed!`);
+      toast.success(t('advent.reward_claimed', { day }));
     } catch (error) {
       console.error("Failed to claim reward:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to claim reward";
+      const errorMessage = error instanceof Error ? error.message : t('advent.claim_failed');
       toast.error(errorMessage);
       
       // Show error in modal

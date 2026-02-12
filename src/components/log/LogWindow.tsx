@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { LogViewerDisplay } from "./LogViewerDisplay";
 import * as ProcessService from "../../services/process-service";
 import {
@@ -35,6 +36,7 @@ type StateEventPayload =
 const MAX_LOG_LINES = 5000;
 
 export function LogWindow() {
+  const { t } = useTranslation();
   const [processId, setProcessId] = useState<string | null>(null);
   const [parsedLogLines, setParsedLogLines] = useState<ParsedLogLine[]>([]);
   const [rawLogContentForCopy, setRawLogContentForCopy] = useState<
@@ -444,7 +446,7 @@ export function LogWindow() {
 
     try {
       await writeText(filteredLogContent);
-      toast.success("Log content copied to clipboard!");
+      toast.success(t('logs.copy_success'));
       setCopied(true);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => {
@@ -452,9 +454,9 @@ export function LogWindow() {
       }, 2000);
     } catch (err) {
       console.error("[LogWindow] Failed to copy log to clipboard:", err);
-      toast.error("Failed to copy log content.");
+      toast.error(t('logs.copy_failed'));
     }
-  }, [displayLines]);
+  }, [displayLines, t]);
 
   const handleOpenUploadUrl = useCallback(async (url: string) => {
     if (!url) return;
@@ -468,12 +470,12 @@ export function LogWindow() {
 
   const handleUploadLogForProcess = useCallback(async (): Promise<string> => {
     if (!rawLogContentForCopy) {
-      throw new Error("No log content available to upload.");
+      throw new Error(t('logs.no_content_upload'));
     }
     console.log(`[LogWindow] Uploading log content for process: ${processId}`);
     setError(null);
     return uploadLogToMclogs(rawLogContentForCopy);
-  }, [rawLogContentForCopy, processId]);
+  }, [rawLogContentForCopy, processId, t]);
 
   return (
     <div

@@ -22,23 +22,22 @@ import { useProfileStore } from "../../store/profile-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
+import { useTranslation } from "react-i18next";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
-      {/* Main explanation */}
       <div className="text-left">
         <div className="text-sm leading-relaxed text-white">
-          This version is provided and updated by NRC.
+          {t('profiles.card.standardVersionInfo')}
         </div>
       </div>
-
-      {/* Tip section */}
       <div className="flex items-start gap-2">
         <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
         <div className="text-gray-300 text-xs leading-snug italic">
-          <span className="text-yellow-300 font-medium">Tip:</span> Create your own profiles for full customization.
+          <span className="text-yellow-300 font-medium">{t('profiles.card.tip')}:</span> {t('profiles.card.createOwnProfiles')}
         </div>
       </div>
     </div>
@@ -66,6 +65,7 @@ export function ProfileCardV2({
   layoutMode = "list",
   variant = "default",
 }: ProfileCardV2Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
   const [modsButtonHovered, setModsButtonHovered] = useState(false);
@@ -112,7 +112,7 @@ export function ProfileCardV2({
   const contextMenuItems: ContextMenuItem[] = [
     {
       id: "edit",
-      label: "Edit Profile",
+      label: t('profiles.editProfile'),
       icon: "solar:settings-bold",
       onClick: (profile) => {
         console.log("Edit Profile clicked for:", profile.name);
@@ -121,7 +121,7 @@ export function ProfileCardV2({
     },
     {
       id: "duplicate",
-      label: "Duplicate",
+      label: t('profiles.duplicate'),
       icon: "solar:copy-bold",
       onClick: (profile) => {
         console.log("Duplicate Profile clicked for:", profile.name);
@@ -130,7 +130,7 @@ export function ProfileCardV2({
     },
     {
       id: "export",
-      label: "Export",
+      label: t('profiles.export'),
       icon: "solar:download-bold",
       onClick: (profile) => {
         showModal(`export-profile-${profile.id}`, (
@@ -144,13 +144,13 @@ export function ProfileCardV2({
     },
     {
       id: "open-folder",
-      label: "Open Folder",
+      label: t('profiles.openFolder'),
       icon: "solar:folder-bold",
       onClick: (profile) => {
         if (onOpenFolder) {
           onOpenFolder(profile);
         } else {
-          toast.success(`📁 Opening folder for ${profile.name}!`);
+          toast.success(t('profiles.toast.opening_folder', { name: profile.name }));
           console.log("Opening folder for profile:", profile.name);
         }
       },
@@ -158,7 +158,7 @@ export function ProfileCardV2({
     // Show modpack versions only if modpack info exists and versions are loaded
     ...(profile.modpack_info?.source && modpackVersions ? [{
       id: "switch_modpack",
-      label: "Modpack Versions",
+      label: t('profiles.modpackVersions'),
       icon: "solar:refresh-circle-bold",
       onClick: (profile) => {
         console.log("Switch modpack version for profile:", profile.name);
@@ -190,7 +190,7 @@ export function ProfileCardV2({
     }] : []),
     {
       id: "delete",
-      label: "Delete",
+      label: t('profiles.delete'),
       icon: "solar:trash-bin-trash-bold",
       destructive: true,
       separator: true, // Trennstrich vor Delete
@@ -198,7 +198,7 @@ export function ProfileCardV2({
         if (onDelete) {
           onDelete(profile.id, profile.name);
         } else {
-          toast.error(`🗑️ Delete ${profile.name}!`);
+          toast.error(t('profiles.toast.delete_fallback', { name: profile.name }));
           console.log("Deleting profile:", profile.name);
         }
       },
@@ -354,8 +354,8 @@ export function ProfileCardV2({
 
   // Format last played date
   const formatLastPlayed = (lastPlayed: string | null): string => {
-    if (!lastPlayed) return "Never played";
-    
+    if (!lastPlayed) return t('profiles.card.neverPlayed');
+
     const date = new Date(lastPlayed);
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
@@ -365,15 +365,15 @@ export function ProfileCardV2({
     const diffInWeeks = Math.floor(diffInDays / 7);
     const diffInMonths = Math.floor(diffInDays / 30);
     const diffInYears = Math.floor(diffInDays / 365);
-    
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
-    if (diffInMonths < 12) return `${diffInMonths}mo ago`;
-    
-    return `${diffInYears}y ago`;
+
+    if (diffInMinutes < 1) return t('profiles.card.justNow');
+    if (diffInMinutes < 60) return t('profiles.card.minutesAgo', { count: diffInMinutes });
+    if (diffInHours < 24) return t('profiles.card.hoursAgo', { count: diffInHours });
+    if (diffInDays < 7) return t('profiles.card.daysAgo', { count: diffInDays });
+    if (diffInWeeks < 4) return t('profiles.card.weeksAgo', { count: diffInWeeks });
+    if (diffInMonths < 12) return t('profiles.card.monthsAgo', { count: diffInMonths });
+
+    return t('profiles.card.yearsAgo', { count: diffInYears });
   };
 
 
@@ -382,10 +382,10 @@ export function ProfileCardV2({
   const actionButtons: ProfileActionButton[] = [
     {
       id: "play",
-      label: isLaunching ? "STOP" : "PLAY",
+      label: isLaunching ? t('profiles.stop').toUpperCase() : t('profiles.play').toUpperCase(),
       icon: isLaunching ? "solar:stop-bold" : "solar:play-bold",
       variant: isLaunching ? "destructive" : "primary",
-      tooltip: isLaunching ? "Launch stoppen" : "Minecraft spielen!",
+      tooltip: isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying'),
       onClick: (profile, e) => {
         if (onPlay) {
           onPlay(profile);
@@ -399,12 +399,12 @@ export function ProfileCardV2({
       label: "MODS",
       icon: "solar:box-bold",
       variant: "secondary",
-      tooltip: "Mods verwalten",
+      tooltip: t('profiles.manageMods'),
       onClick: (profile, e) => {
         if (onMods) {
           onMods(profile);
         } else {
-          toast.success(`📦 Managing mods for ${profile.name}!`);
+          toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
           console.log("Managing mods for profile:", profile.name);
         }
       },
@@ -414,7 +414,7 @@ export function ProfileCardV2({
       label: "SETTINGS",
       icon: "solar:settings-bold",
       variant: "icon-only",
-      tooltip: "Profile Options",
+      tooltip: t('profiles.profileOptions'),
              onClick: (profile, e) => {
          e.preventDefault();
          e.stopPropagation();
@@ -474,7 +474,7 @@ export function ProfileCardV2({
               if (onMods) {
                 onMods(profile);
               } else {
-                toast.success(`📦 Managing mods for ${profile.name}!`);
+                toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
                 console.log("Managing mods for profile:", profile.name);
               }
             }
@@ -542,7 +542,7 @@ export function ProfileCardV2({
                }
              }}
             className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
-            title="Profile Options"
+            title={t('profiles.profileOptions')}
             data-action="settings"
           >
             <Icon icon="solar:settings-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
@@ -565,7 +565,7 @@ export function ProfileCardV2({
             style={variant === "3d" ? get3DButtonStyling(modsButtonHovered) : {}}
             onMouseEnter={() => setModsButtonHovered(true)}
             onMouseLeave={() => setModsButtonHovered(false)}
-            title="Manage Mods"
+            title={t('profiles.manageMods')}
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
             {variant === "3d" && (
@@ -614,7 +614,7 @@ export function ProfileCardV2({
               
               {/* Preferred Account Indicator next to title */}
               {preferredAccount && (
-                <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+                <Tooltip content={t('profiles.launchWith', { username: preferredAccount.username })}>
                   <div className="flex items-center gap-1.5 text-white/60">
                     {preferredAccountAvatarUrl && (
                       <img
@@ -637,7 +637,7 @@ export function ProfileCardV2({
                 className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
               >
-                {statusMessage || "Starting..."}
+                {statusMessage || t('profiles.card.starting')}
               </div>
             ) : (
               isCompact ? (
@@ -679,7 +679,7 @@ export function ProfileCardV2({
                    <div className="text-white/60 flex items-center gap-1">
                      <img
                        src={getModLoaderIcon()}
-                       alt={profile.loader || "Vanilla"}
+                       alt={profile.loader || t('common.vanilla')}
                        className="w-3 h-3 object-contain"
                      />
                      <span>
@@ -741,7 +741,7 @@ export function ProfileCardV2({
             if (onMods) {
               onMods(profile);
             } else {
-              toast.success(`📦 Managing mods for ${profile.name}!`);
+              toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
               console.log("Managing mods for profile:", profile.name);
             }
           }
@@ -791,7 +791,7 @@ export function ProfileCardV2({
           
           {/* Preferred Account Indicator next to title */}
           {preferredAccount && (
-            <Tooltip content={`Launch with: ${preferredAccount.username}`}>
+            <Tooltip content={t('profiles.launchWith', { username: preferredAccount.username })}>
               <div className="flex items-center gap-1.5 text-white/60">
                 {preferredAccountAvatarUrl && (
                   <img
@@ -815,7 +815,7 @@ export function ProfileCardV2({
             className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
             style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
           >
-            {statusMessage || "Starting..."}
+            {statusMessage || t('profiles.card.starting')}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
@@ -835,13 +835,13 @@ export function ProfileCardV2({
           <div className="text-white/60 flex items-center gap-1">
             <img
               src={getModLoaderIcon()}
-              alt={profile.loader || "Vanilla"}
+              alt={profile.loader || t('common.vanilla')}
               className="w-3 h-3 object-contain"
             />
             <span>
-              {profile.loader === "vanilla" 
-                ? "Vanilla" 
-                : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`
+              {profile.loader === "vanilla"
+                ? t('common.vanilla')
+                : `${resolvedLoaderVersion?.version || profile.loader_version || t('common.unknown')}`
               }
             </span>
           </div>

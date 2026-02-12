@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from "./Button";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { listen, Event as TauriEvent } from "@tauri-apps/api/event";
 import { EventPayload as FrontendEventPayload, EventType as FrontendEventType } from "../../../types/events";
 import * as ProcessService from "../../../services/process-service";
@@ -32,8 +33,8 @@ interface LaunchButtonProps {
 export function LaunchButton({
   id,
   name,
-  buttonText = "LAUNCH GAME",
-  cancelText = "CANCEL",
+  buttonText,
+  cancelText,
   variant = "default",
   size = "md",
   className,
@@ -44,6 +45,9 @@ export function LaunchButton({
   forceDisplaySpinner = false,
   ariaLabel,
 }: LaunchButtonProps) {
+  const { t } = useTranslation();
+  const resolvedButtonText = buttonText ?? t('launch.button');
+  const resolvedCancelText = cancelText ?? t('launch.cancel');
   const [isButtonDisabledBriefly, setIsButtonDisabledBriefly] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -75,7 +79,7 @@ export function LaunchButton({
               `[LaunchButton ${id}] Initial check: Backend says profile is launching. Updating store.`,
             );
             initiateButtonLaunch(id);
-            setButtonStatusMessage(id, "Launching...");
+            setButtonStatusMessage(id, t('launch.launching'));
           }
         })
         .catch((err) => {
@@ -98,14 +102,14 @@ export function LaunchButton({
       if (payload.target_id === id) {
         if (payload.event_type === FrontendEventType.LaunchSuccessful) {
           console.log(`[LaunchButton ${id}] Event: LaunchSuccessful`);
-          toast.success(`Profile '${name}' launched successfully!`);
+          toast.success(t('launch.success', { name }));
           finalizeButtonLaunch(id);
-          setButtonStatusMessage(id, "Launched!");
+          setButtonStatusMessage(id, t('launch.launched'));
           setTimeout(() => setButtonStatusMessage(id, null), 3000);
           stopPolling();
         } else if (payload.event_type === FrontendEventType.Error) {
           const errorMessage =
-            payload.message || "An unknown error occurred during launch.";
+            payload.message || t('launch.error.unknown');
           console.error(
             `[LaunchButton ${id}] Event: Error - ${errorMessage}`,
           );
@@ -162,7 +166,7 @@ export function LaunchButton({
           }
         } catch (err: any) {
           console.error(`[LaunchButton ${id}] Error during is_profile_launching polling:`, err);
-          toast.error(`Polling error: ${err.message || "Unknown error"}`);
+          toast.error(t('launch.polling_error', { error: err.message || "Unknown error" }));
           if (getProfileState(id).isButtonLaunching) {
             setLaunchError(id, `Polling failed: ${err.message || "Unknown error"}`);
           }
@@ -200,14 +204,14 @@ export function LaunchButton({
 
     if (currentProfileState.isButtonLaunching) {
       try {
-        setButtonStatusMessage(id, "Attempting to abort...");
+        setButtonStatusMessage(id, t('launch.aborting'));
         await ProcessService.abort(id);
-        toast.success("Launch cancellation requested.");
+        toast.success(t('launch.abort_requested'));
         finalizeButtonLaunch(id);
       } catch (error) {
         console.error("Failed to request launch cancellation:", error);
-        const message = error instanceof Error ? error.message : "Failed to cancel launch";
-        toast.error(`Cancellation request failed: ${message}`);
+        const message = error instanceof Error ? error.message : t('launch.cancel_failed');
+        toast.error(t('launch.abort_failed', { error: message }));
         setLaunchError(id, `Abort failed: ${message}`);
       }
       return;
@@ -223,14 +227,14 @@ export function LaunchButton({
       }
     } catch (error) {
       console.error("Failed to initiate launch:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to launch";
-      toast.error(`Launch initiation failed: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : t('launch.cancel_failed');
+      toast.error(t('launch.failed', { error: errorMessage }));
       setLaunchError(id, `Launch failed: ${errorMessage}`);
     }
   };
 
   const actualIsLaunching = forceDisplaySpinner || isButtonLaunching;
-  const currentButtonText = actualIsLaunching ? cancelText : buttonText;
+  const currentButtonText = actualIsLaunching ? resolvedCancelText : resolvedButtonText;
   const buttonVariant = actualIsLaunching ? "destructive" : variant;
 
   if (isIconOnly) {

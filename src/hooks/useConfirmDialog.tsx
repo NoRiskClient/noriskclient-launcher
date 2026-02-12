@@ -3,6 +3,7 @@
 import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/buttons/Button";
 import { Input } from "../components/ui/Input";
@@ -23,6 +24,7 @@ interface ConfirmOptions {
 }
 
 export function useConfirmDialog() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions>({
@@ -105,7 +107,7 @@ export function useConfirmDialog() {
         size="md"
         className="text-2xl"
       >
-        {options.cancelText || "Cancel"}
+        {options.cancelText || t('common.cancel')}
       </Button>
       <Button
         ref={confirmButtonRef}
@@ -115,7 +117,7 @@ export function useConfirmDialog() {
         size="md"
         className="text-2xl"
       >
-        {options.confirmText || "Confirm"}
+        {options.confirmText || t('common.confirm')}
       </Button>
     </div>
   );
@@ -150,7 +152,7 @@ export function useConfirmDialog() {
             onChange={handleInputChange}
             placeholder={options.inputPlaceholder}
             className="text-2xl py-3"
-            error={!isValid ? "This field is required" : undefined}
+            error={!isValid ? t('common.field_required') : undefined}
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />

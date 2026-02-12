@@ -1,5 +1,7 @@
 use crate::commands::path_commands::UploadProfileImagesPayload;
 use crate::error::{AppError, CommandError};
+use crate::state::profile_state::default_profile_path;
+use crate::utils::disk_space_utils::DiskSpaceUtils;
 use crate::integrations::modrinth::{
     self, get_mod_versions as get_modrinth_versions_api, search_mods, search_projects,
     ModrinthBulkUpdateRequestBody, ModrinthProjectContext, ModrinthProjectType, ModrinthSearchHit,
@@ -162,13 +164,28 @@ pub async fn download_and_install_modrinth_modpack(
     file_name: String,
     download_url: String,
     icon_url: Option<String>,
+    file_size: Option<u64>,
+    event_id: Option<String>,
 ) -> Result<Uuid, CommandError> {
     log::info!(
-        "Executing download_and_install_modrinth_modpack for project \"{}\", version \"{}\", icon_url: {:?}",
+        "Executing download_and_install_modrinth_modpack for project \"{}\", version \"{}\", icon_url: {:?}, file_size: {:?}",
         project_id,
         version_id,
-        icon_url
+        icon_url,
+        file_size
     );
+
+    // Check disk space before downloading if file_size is known
+    if let Some(size) = file_size {
+        let estimated_required = size * 3; // 3x for download + extraction + mod downloads overhead
+        let profiles_dir = default_profile_path();
+        log::info!(
+            "Checking disk space: file size = {} bytes, estimated required = {} bytes",
+            size,
+            estimated_required
+        );
+        DiskSpaceUtils::ensure_space_for_download(&profiles_dir, estimated_required, 0.1).await?;
+    }
 
     // Ensure the file name has .mrpack extension
     let file_name_mrpack = if !file_name.ends_with(".mrpack") {
@@ -177,11 +194,15 @@ pub async fn download_and_install_modrinth_modpack(
         file_name.clone() // Clone if already correct to ensure ownership for logging later if needed
     };
 
+    // Parse event_id if provided
+    let event_id_uuid = event_id.and_then(|id| uuid::Uuid::parse_str(&id).ok());
+
     let profile_id_uuid = mrpack::download_and_process_mrpack(
             &download_url,
             &file_name_mrpack,
             Some(project_id),
             Some(version_id),
+            event_id_uuid,
         )
     .await
     .map_err(|e| {

@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "react-i18next";
 import type { PaginationInfo } from "../../types/noriskCapes";
 import { Button } from "../ui/buttons/Button";
 import { Card } from "../ui/Card";
@@ -12,6 +13,7 @@ export function CapePagination({
   paginationInfo,
   onPageChange,
 }: CapePaginationProps) {
+  const { t } = useTranslation();
   const { currentPage, totalPages, totalItems } = paginationInfo;
 
   if (totalPages <= 1) {
@@ -36,7 +38,7 @@ export function CapePagination({
       variant="flat"
     >
       <p className="font-minecraft lowercase text-sm text-white/60">
-        Page {currentPage + 1} / {totalPages}
+        {t('capes.pageInfo', { current: currentPage + 1, total: totalPages })}
         <span className="text-white/40 text-xs ml-1">({totalItems})</span>
       </p>
       <div className="flex items-center space-x-1.5">

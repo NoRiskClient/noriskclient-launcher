@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useLogSettingsStore } from "../../store/useLogSettingsStore";
 import { LogEntry, LogLevel } from "../../store/useProcessStore";
@@ -83,6 +84,7 @@ export function LogViewerCore({
   noLogsTitle = "NO LOGS YET",
   noLogsSubtitle = "Waiting for log output...",
 }: LogViewerCoreProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const { showThreadPrefix, toggleShowThreadPrefix } = useLogSettingsStore();
   const [searchTerm, setSearchTerm] = useState("");
@@ -193,7 +195,7 @@ export function LogViewerCore({
 
   const handleUpload = async () => {
     if (filteredLogs.length === 0) {
-      toast.error("No logs to upload");
+      toast.error(t('logs.no_logs_to_upload'));
       return;
     }
 
@@ -214,7 +216,7 @@ export function LogViewerCore({
       const url = await uploadLogToMclogs(logText);
 
       await writeText(url);
-      toast.success("Uploaded! URL copied to clipboard");
+      toast.success(t('logs.uploaded_url_copied'));
       await openExternalUrl(url);
     } catch (error) {
       console.error("Failed to upload logs:", error);
@@ -222,7 +224,7 @@ export function LogViewerCore({
       const errorMessage = error && typeof error === 'object' && 'message' in error
         ? (error as { message: string }).message
         : String(error);
-      toast.error(errorMessage || "Failed to upload logs");
+      toast.error(errorMessage || t('logs.upload_failed'));
     } finally {
       setIsUploading(false);
     }
@@ -253,7 +255,7 @@ export function LogViewerCore({
           <Icon icon="solar:magnifer-bold" className="w-4 h-4 text-white/50" />
           <input
             type="text"
-            placeholder="Search logs..."
+            placeholder={t('placeholders.search_logs')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-transparent text-sm font-minecraft-ten text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"

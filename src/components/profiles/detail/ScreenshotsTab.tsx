@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import { Icon } from "@iconify/react";
 import type {
@@ -162,6 +163,7 @@ export function ScreenshotsTab({
   isActive = true, // Assuming it's active when rendered by ProfileDetailView logic
   onOpenScreenshotModal, // Destructure the new prop
 }: ScreenshotsTabProps) {
+  const { t } = useTranslation();
   const [selectedScreenshot, setSelectedScreenshot] = useState<ActualScreenshotInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -331,7 +333,7 @@ export function ScreenshotsTab({
         {/* Header without border/background like WorldsTab */}
         <div className="flex items-center gap-4 mb-4 flex-shrink-0">
           <SearchWithFilters
-            placeholder="search screenshots..."
+            placeholder={t('screenshots.search_placeholder')}
             searchIcon="solar:magnifer-bold"
             sortOptions={sortOptions}
             sortValue={sortOrder}
@@ -346,7 +348,7 @@ export function ScreenshotsTab({
           {isLoading && (
             <EmptyState
               icon="solar:gallery-send-bold-duotone"
-              message="loading screenshots..."
+              message={t('screenshots.loading')}
             />
           )}
 
@@ -375,10 +377,10 @@ export function ScreenshotsTab({
                   className="w-20 h-20 mb-4 text-white/40"
                 />
                 <p className="font-minecraft-ten text-xl text-white/70 mb-2">
-                  No Screenshots Match Filter
+                  {t('screenshots.no_match_filter')}
                 </p>
                 <p className="text-white/50 font-minecraft-five text-base">
-                  Try adjusting your sort options.
+                  {t('empty_states.try_adjusting_sort')}
                 </p>
               </div>
             )}

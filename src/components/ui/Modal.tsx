@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -36,6 +37,7 @@ export function Modal({
   className,
   contentClassName,
 }: ModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -174,7 +176,7 @@ export function Modal({
               }}
               variant="ghost"
               size="sm"
-              aria-label="Close modal"
+              aria-label={t('common.close_modal')}
             />
           </div>
         </div>

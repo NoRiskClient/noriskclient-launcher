@@ -1,4 +1,5 @@
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -8,8 +9,10 @@ interface LogWindowTitlebarProps {
   title?: string;
 }
 
-export function LogWindowTitlebar({ title = "Minecraft Logs" }: LogWindowTitlebarProps) {
+export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
+  const displayTitle = title || t('logs.window_title');
 
   const handleMinimize = () => {
     appWindow.minimize();
@@ -39,7 +42,7 @@ export function LogWindowTitlebar({ title = "Minecraft Logs" }: LogWindowTitleba
           className="font-minecraft-ten text-sm tracking-wider"
           style={{ color: accentColor.value }}
         >
-          {title.toUpperCase()}
+          {displayTitle.toUpperCase()}
         </span>
       </div>
 
@@ -49,7 +52,7 @@ export function LogWindowTitlebar({ title = "Minecraft Logs" }: LogWindowTitleba
         <button
           onClick={handleMinimize}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-          title="Minimize"
+          title={t('window.minimize')}
         >
           <Icon icon="mdi:minus" className="w-4 h-4 text-white/70" />
         </button>
@@ -58,7 +61,7 @@ export function LogWindowTitlebar({ title = "Minecraft Logs" }: LogWindowTitleba
         <button
           onClick={handleMaximize}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-          title="Maximize"
+          title={t('window.maximize')}
         >
           <Icon icon="mdi:checkbox-blank-outline" className="w-3.5 h-3.5 text-white/70" />
         </button>
@@ -67,7 +70,7 @@ export function LogWindowTitlebar({ title = "Minecraft Logs" }: LogWindowTitleba
         <button
           onClick={handleClose}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-500/80 transition-colors"
-          title="Close"
+          title={t('window.close')}
         >
           <Icon icon="mdi:close" className="w-4 h-4 text-white/70" />
         </button>

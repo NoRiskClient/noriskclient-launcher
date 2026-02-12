@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{Profile, ProfileState};
 use crate::state::state_manager::State;
 use async_zip::tokio::read::seek::ZipFileReader;
@@ -203,8 +204,31 @@ pub fn get_norisk_pack_mod_filename(
 
 /// Imports a profile from a .noriskpack file.
 /// This function reads profile.json, creates a new profile, and extracts overrides concurrently.
-pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
+/// If event_id is provided, progress events will be emitted.
+pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<Uuid>) -> Result<Uuid> {
     info!("Starting import process for noriskpack: {:?}", pack_path);
+
+    let state = State::get().await?;
+
+    // Helper to emit progress if event_id is provided
+    let emit_progress = |progress: f64, message: String| {
+        let state = state.clone();
+        let event_id = event_id;
+        async move {
+            if let Some(id) = event_id {
+                let _ = state.event_state.emit(EventPayload {
+                    event_id: id,
+                    event_type: EventType::TaskProgress,
+                    target_id: None,
+                    message,
+                    progress: Some(progress),
+                    error: None,
+                }).await;
+            }
+        }
+    };
+
+    emit_progress(0.05, "Reading profile data...".to_string()).await;
 
     // 1. Open the file and create a reader for profile.json initially
     let profile_json_file = File::open(&pack_path).await.map_err(|e| {
@@ -285,6 +309,8 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
         exported_profile.name, exported_profile.game_version, exported_profile.loader
     );
 
+    emit_progress(0.15, format!("Parsed profile '{}'", exported_profile.name)).await;
+
     // 6. Create a new profile with a unique path
     let base_profiles_dir = crate::state::profile_state::default_profile_path();
     let sanitized_base_name = sanitize(&exported_profile.name);
@@ -326,13 +352,13 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
         })?;
     }
 
+    emit_progress(0.25, "Extracting files...".to_string()).await;
+
     // 8. Extract the overrides directory concurrently using streaming
     info!(
         "Extracting overrides to profile directory: {:?} using concurrent streaming...",
         target_dir
     );
-
-    let state = State::get().await?;
     let io_semaphore = state.io_semaphore.clone();
 
     // Open the zip file again for listing entries for override extraction
@@ -362,6 +388,22 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
         "Found {} entries in noriskpack. Preparing concurrent streaming for overrides...",
         num_entries
     );
+
+    // Count override files for progress tracking
+    let mut override_file_count = 0usize;
+    for index in 0..num_entries {
+        if let Some(entry) = zip_lister_for_overrides.file().entries().get(index) {
+            if let Ok(name) = entry.filename().as_str() {
+                if name.starts_with("overrides/") && !name.ends_with('/') {
+                    override_file_count += 1;
+                }
+            }
+        }
+    }
+
+    // Create a counter for tracking extraction progress
+    let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
 
@@ -478,6 +520,10 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
                     "Overrides Task: Queueing concurrent streaming for '{}' -> {:?} (Size: {} bytes)",
                     entry_filename_str, task_final_dest_path, entry_uncompressed_size
                 );
+                let task_counter = extraction_counter.clone();
+                let task_total = total_files;
+                let task_state = state.clone();
+                let task_event_id = event_id;
                 extraction_tasks.push(tokio::spawn(async move {
                     let _permit = task_io_semaphore.acquire().await.map_err(|e| {
                         error!(
@@ -570,6 +616,25 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
                         bytes_copied,
                         task_final_dest_path.display()
                     );
+
+                    // Increment counter and emit progress
+                    let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    if task_total > 0 {
+                        // Progress from 0.25 to 0.90 during extraction (65% of total)
+                        let extraction_progress = completed as f64 / task_total as f64;
+                        let overall_progress = 0.25 + (extraction_progress * 0.65);
+                        if let Some(id) = task_event_id {
+                            let _ = task_state.event_state.emit(EventPayload {
+                                event_id: id,
+                                event_type: EventType::TaskProgress,
+                                target_id: None,
+                                message: format!("Extracting files... ({}/{})", completed, task_total),
+                                progress: Some(overall_progress),
+                                error: None,
+                            }).await;
+                        }
+                    }
+
                     Ok::<(), AppError>(())
                 }));
             }
@@ -604,6 +669,8 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
         info!("No override files found or queued for extraction in noriskpack.");
     }
 
+    emit_progress(0.90, "Saving profile...".to_string()).await;
+
     // 9. Save the profile using ProfileManager
     // let state_for_save = State::get().await?; // Already have state from above
     let profile_id = state
@@ -614,6 +681,8 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf) -> Result<Uuid> {
         "Successfully created and saved profile with ID: {}",
         profile_id
     );
+
+    emit_progress(1.0, "Import complete!".to_string()).await;
 
     Ok(profile_id)
 }
@@ -666,7 +735,7 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
 
             // Spawn an async task to handle the import
             tauri::async_runtime::spawn(async move {
-                match crate::commands::profile_command::import_profile(path_string_for_task).await {
+                match crate::commands::profile_command::import_profile(path_string_for_task, None).await {
                     Ok(profile_id) => {
                         info!("Profile {} imported successfully.", profile_id);
                         // Attempt to bring the main window to the front and focus it.

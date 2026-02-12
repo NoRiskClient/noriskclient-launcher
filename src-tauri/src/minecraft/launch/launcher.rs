@@ -555,6 +555,7 @@ impl MinecraftLauncher {
                 profile_name,
                 profile_image_url,
                 post_exit_hook,
+                params.memory_max_mb,
             )
             .await?;
 

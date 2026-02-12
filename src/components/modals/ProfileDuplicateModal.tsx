@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
 import { Modal } from "../ui/Modal";
 import { SearchStyleInput } from "../ui/Input";
@@ -12,6 +13,7 @@ import { useProfileStore } from "../../store/profile-store";
 import { copyProfile } from "../../services/profile-service";
 
 export function ProfileDuplicateModal() {
+  const { t } = useTranslation();
   const { isModalOpen, sourceProfile, closeModal } = useProfileDuplicateStore();
   const { fetchProfiles } = useProfileStore();
   const [newProfileName, setNewProfileName] = useState("");
@@ -31,7 +33,7 @@ export function ProfileDuplicateModal() {
 
   const handleDuplicate = async () => {
     if (!newProfileName.trim()) {
-      toast.error("Please enter a name for the new profile");
+      toast.error(t('profile_duplicate.error.enter_name'));
       return;
     }
 
@@ -44,7 +46,7 @@ export function ProfileDuplicateModal() {
         include_files: undefined,
       });
 
-      toast.success(`Profile '${newProfileName.trim()}' created successfully!`);
+      toast.success(t('profile_duplicate.toast.success', { name: newProfileName.trim() }));
       
       // Refresh profiles and close modal
       await fetchProfiles();
@@ -53,7 +55,7 @@ export function ProfileDuplicateModal() {
     } catch (err) {
       console.error("Failed to duplicate profile:", err);
       toast.error(
-        `Failed to duplicate profile: ${err instanceof Error ? err.message : String(err)}`
+        t('profile_duplicate.toast.failed', { error: err instanceof Error ? err.message : String(err) })
       );
     } finally {
       setIsLoading(false);
@@ -67,7 +69,7 @@ export function ProfileDuplicateModal() {
 
   return (
     <Modal
-      title="duplicate profile"
+      title={t('profile_duplicate.title')}
       onClose={handleClose}
       width="md"
       footer={
@@ -79,7 +81,7 @@ export function ProfileDuplicateModal() {
             className="text-2xl"
             disabled={isLoading}
           >
-            cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="default"
@@ -94,12 +96,12 @@ export function ProfileDuplicateModal() {
                   icon="solar:refresh-bold"
                   className="w-6 h-6 animate-spin text-white"
                 />
-                <span>duplicating...</span>
+                <span>{t('profile_duplicate.button.duplicating')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-3">
                 <Icon icon="solar:copy-bold" className="w-6 h-6 text-white" />
-                <span>duplicate</span>
+                <span>{t('profile_duplicate.button.duplicate')}</span>
               </div>
             )}
           </Button>
@@ -109,21 +111,21 @@ export function ProfileDuplicateModal() {
       <div className="space-y-6 p-6">
         <div className="text-center">
           <p className="text-2xl font-minecraft text-white/80 mb-4 lowercase">
-            duplicate profile "{sourceProfile.name}"
+            {t('profile_duplicate.description', { name: sourceProfile.name })}
           </p>
           <p className="text-xs text-white/60 font-minecraft-ten tracking-wide">
-            This will create a copy of the profile including worlds, configs, mods, and settings.
+            {t('profile_duplicate.copy_notice')}
           </p>
         </div>
 
         <div>
           <label className="block text-2xl font-minecraft text-white mb-2 lowercase">
-            new profile name
+            {t('profile_duplicate.new_name_label')}
           </label>
           <SearchStyleInput
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
-            placeholder="Enter name for the new profile"
+            placeholder={t('profile_duplicate.name_placeholder')}
             disabled={isLoading}
             autoFocus
             onKeyDown={(e) => {

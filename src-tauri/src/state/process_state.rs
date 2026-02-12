@@ -62,6 +62,7 @@ pub struct ProcessMetadata {
     pub profile_name: Option<String>,
     pub profile_image_url: Option<String>,
     pub post_exit_hook: Option<String>,
+    pub memory_max_mb: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -523,6 +524,7 @@ impl ProcessManager {
         profile_name: Option<String>,
         profile_image_url: Option<String>,
         post_exit_hook: Option<String>,
+        memory_max_mb: u32,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -574,6 +576,7 @@ impl ProcessManager {
             profile_name: profile_name.clone(),
             profile_image_url,
             post_exit_hook,
+            memory_max_mb,
         };
 
         log::info!(
@@ -1519,8 +1522,9 @@ impl ProcessManager {
     /// Fetches the latest crash report for a given profile.
     /// Uses profile_id to locate the crash-reports directory (since process might be removed from map).
     /// If process_id is provided, emits events and stores content for that process.
-    pub async fn fetch_latest_crash_report(&self, profile_id: Uuid, process_id: Option<Uuid>) -> Result<Option<String>> {
-        log::info!("Manually fetching latest crash report for profile {} (process {:?})", profile_id, process_id);
+    /// If process_start_time is provided, only considers crash reports created after that time.
+    pub async fn fetch_latest_crash_report(&self, profile_id: Uuid, process_id: Option<Uuid>, process_start_time: Option<DateTime<Utc>>) -> Result<Option<String>> {
+        log::info!("Manually fetching latest crash report for profile {} (process {:?}, start_time {:?})", profile_id, process_id, process_start_time);
         
         // 1. Get crash-reports directory path using profile_id
         let app_state = state::State::get().await?;
@@ -1544,6 +1548,14 @@ impl ProcessManager {
                     if name_str.starts_with("crash-") && name_str.ends_with(".txt") {
                         if let Ok(metadata) = async_fs::metadata(&path).await {
                             if let Ok(modified) = metadata.modified() {
+                                // Skip crash reports that are older than the process start time
+                                if let Some(start_time) = process_start_time {
+                                    let start_system_time: std::time::SystemTime = start_time.into();
+                                    if modified < start_system_time {
+                                        log::debug!("Skipping crash report {:?} - created before process start time", path);
+                                        continue;
+                                    }
+                                }
                                 match &latest_crash_file {
                                     None => latest_crash_file = Some((path.clone(), modified)),
                                     Some((_, latest_time)) if modified > *latest_time => {

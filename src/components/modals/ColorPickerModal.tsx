@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -82,6 +83,7 @@ function hexToRgb(hex: string) {
 }
 
 export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalProps) {
+  const { t } = useTranslation();
   const { accentColor, setCustomAccentColor } = useThemeStore();
   const [hsv, setHsv] = useState(() => {
     const rgb = hexToRgb(accentColor.value);
@@ -153,10 +155,10 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
       setCustomAccentColor(hex);
       onColorSelected?.(hex);
-      toast.success("Color applied!");
+      toast.success(t('color_picker.toast.applied'));
       onClose();
     } else {
-      toast.error("Please enter a valid hex color");
+      toast.error(t('color_picker.toast.invalid_hex'));
     }
   };
 
@@ -164,7 +166,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
 
   return (
     <Modal
-      title="Color Picker"
+      title={t('color_picker.title')}
       onClose={onClose}
       width="lg"
     >
@@ -244,7 +246,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
         {/* Color Values */}
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">Hex</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.hex')}</label>
             <input
               type="text"
               value={hex}
@@ -254,7 +256,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">R</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.r')}</label>
             <input
               type="number"
               value={rgb.r}
@@ -268,7 +270,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">G</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.g')}</label>
             <input
               type="number"
               value={rgb.g}
@@ -282,7 +284,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">B</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.b')}</label>
             <input
               type="number"
               value={rgb.b}
@@ -306,7 +308,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
             <div>
               <h5 className="font-minecraft text-lg text-white">
-                Selected Color
+                {t('color_picker.selected_color')}
               </h5>
               <p className="text-sm text-white/70 font-minecraft-ten">
                 {hex}
@@ -319,14 +321,14 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
               onClick={onClose}
               variant="ghost"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleApply}
               variant="3d"
               icon={<Icon icon="solar:check-circle-bold" />}
             >
-              Apply
+              {t('color_picker.button.apply')}
             </Button>
           </div>
         </div>

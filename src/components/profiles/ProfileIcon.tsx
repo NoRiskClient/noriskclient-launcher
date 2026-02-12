@@ -9,6 +9,7 @@ import type {
 import { cn } from "../../lib/utils";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 // Global cache for resolved image URLs to prevent flickering on tab switches
 const imageUrlCache = new Map<string, { url: string; timestamp: number }>();
@@ -57,6 +58,7 @@ export function ProfileIcon({
   bgColorOpacity = "30",
   borderColorOpacity = "50",
 }: ProfileIconProps) {
+  const { t } = useTranslation();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -182,11 +184,11 @@ export function ProfileIcon({
           const cacheKey = getCacheKey(profileId, banner);
           imageUrlCache.delete(cacheKey);
           cacheVersion.current++;
-          toast.success("Profile icon updated!");
+          toast.success(t('profiles.icon_updated'));
           onSuccessfulUpdate();
         } catch (error) {
           console.error("Failed to upload profile icon:", error);
-          toast.error("Could not update profile icon.");
+          toast.error(t('profiles.errors.icon_update_failed'));
         } finally {
           setIsUpdating(false);
           setShowLoading(false);
@@ -197,7 +199,7 @@ export function ProfileIcon({
         // Do nothing, user cancelled.
       } else {
         console.error("Error selecting image:", error);
-        toast.error("Failed to open image dialog.");
+        toast.error(t('profiles.errors.image_dialog_failed'));
       }
     }
   }, [isEditable, isLoading, isUpdating, profileId, banner, onSuccessfulUpdate]);

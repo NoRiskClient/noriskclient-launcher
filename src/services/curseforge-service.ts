@@ -40,6 +40,8 @@ export class CurseForgeService {
    * @param fileName Name of the modpack file
    * @param downloadUrl Direct download URL for the modpack
    * @param iconUrl Optional URL for the modpack icon
+   * @param fileSize Optional file size for disk space check
+   * @param eventId Optional event ID for progress tracking
    * @returns Promise with the new profile ID as string
    */
   static async downloadAndInstallCurseForgeModpack(
@@ -48,6 +50,8 @@ export class CurseForgeService {
     fileName: string,
     downloadUrl: string,
     iconUrl?: string,
+    fileSize?: number,
+    eventId?: string,
   ): Promise<string> {
     return invoke<string>("download_and_install_curseforge_modpack_command", {
       projectId,
@@ -55,6 +59,8 @@ export class CurseForgeService {
       fileName,
       downloadUrl,
       iconUrl,
+      fileSize,
+      eventId,
     });
   }
 

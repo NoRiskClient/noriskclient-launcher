@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   ModrinthGameVersion,
   ModrinthSearchHit,
@@ -122,16 +123,17 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
   isProjectBlocked = false, // Deprecated
   projectNoRiskStatus = null,
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
 
   // Create Select options for version type
   const versionTypeOptions: SelectOption[] = [
-    { value: "all", label: "All Types" },
-    { value: "release", label: "Release" },
-    { value: "beta", label: "Beta" },
-    { value: "alpha", label: "Alpha" },
+    { value: "all", label: t('mod_detail.versions.all_types') },
+    { value: "release", label: t('mod_detail.versions.release') },
+    { value: "beta", label: t('mod_detail.versions.beta') },
+    { value: "alpha", label: t('mod_detail.versions.alpha') },
   ];
 
   // Animation for the container when it mounts
@@ -252,7 +254,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
   // Create game version options
   const gameVersionOptions = useMemo(
     () => [
-      { value: "all", label: "All Game Versions" },
+      { value: "all", label: t('mod_detail.versions.all_game_versions') },
       ...availableGameVersions.map((gv) => ({
         value: gv,
         label: gv,
@@ -266,7 +268,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
 
   const loaderOptions = useMemo(
     () => [
-      { value: "all", label: "All Loaders" },
+      { value: "all", label: t('mod_detail.versions.all_loaders') },
       ...availableLoaders.map((loader) => ({
         value: loader,
         label: loader,
@@ -364,7 +366,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
           <div className="ml-auto">
             <Checkbox
               id={`show-all-gv-${projectId}`}
-              label="Show All Versions"
+              label={t('modrinth.show_all_versions')}
               checked={uiState?.showAllGameVersions || false}
               onChange={(e) =>
                 onUiStateChange(
@@ -394,14 +396,14 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
                   onClick={handleClearAllFilters}
                 >
                   <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
-                  <span>Clear All</span>
+                  <span>{t('content.filters.clear_all')}</span>
                 </TagBadge>
 
                 {filters.versionType !== "all" && (
                   <TagBadge 
                     variant="filter"
                     className="inline-flex whitespace-nowrap">
-                    Type: {filters.versionType}
+                    {t('mod_detail.type')}: {filters.versionType}
                     <button
                       onClick={() =>
                         onFilterChange(projectId, "versionType", "all")
@@ -515,7 +517,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
               shadowDepth="short"
               className="w-full mt-2 text-xs"
             >
-              Load More ({filteredVersions.length - displayedCount} more)
+              {t('content.search.load_more', { remaining: filteredVersions.length - displayedCount })}
             </Button>
           )}
         </div>
@@ -529,7 +531,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
             backgroundColor: `${accentColor.value}15`,
           }}
         >
-          No versions match the selected filters.
+          {t('modrinth.no_versions_match_filters')}
         </div>
       )}
     </div>

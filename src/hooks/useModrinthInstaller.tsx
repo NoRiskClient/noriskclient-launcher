@@ -10,6 +10,11 @@ import {
   isContentInstalled,
 } from "../services/profile-service";
 import { ModrinthService } from "../services/modrinth-service";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { EventType, type EventPayload } from "../types/events";
+import { toast } from "react-hot-toast";
+import { ProgressToast } from "../components/ui/ProgressToast";
+import i18n from '../i18n/i18n';
 
 interface PendingInstall {
   version: ModrinthVersion;
@@ -42,7 +47,7 @@ export function useModrinthInstaller(
         const profileExists = profiles.some((p) => p.id === profileId);
         if (!profileExists) {
           throw new Error(
-            `Profile with ID ${profileId} not found. Please select a different profile.`,
+            i18n.t('modrinth_installer.errors.profile_not_found', { profileId }),
           );
         }
 
@@ -93,7 +98,7 @@ export function useModrinthInstaller(
         console.error("❌ Failed to install content:", err);
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
         setError(
-          `Failed to install: ${err instanceof Error ? err.message : String(err)}`,
+          i18n.t('modrinth_installer.errors.install_failed', { error: err instanceof Error ? err.message : String(err) }),
         );
         throw err;
       }
@@ -115,7 +120,7 @@ export function useModrinthInstaller(
         const profileExists = profiles.some((p) => p.id === profileId);
         if (!profileExists) {
           throw new Error(
-            `Profile with ID ${profileId} not found. Please select a different profile.`,
+            i18n.t('modrinth_installer.errors.profile_not_found', { profileId }),
           );
         }
 
@@ -166,7 +171,7 @@ export function useModrinthInstaller(
         console.error("❌ Failed to install content:", err);
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
         setError(
-          `Failed to install: ${err instanceof Error ? err.message : String(err)}`,
+          i18n.t('modrinth_installer.errors.install_failed', { error: err instanceof Error ? err.message : String(err) }),
         );
         throw err;
       }
@@ -273,21 +278,59 @@ export function useModrinthInstaller(
   const installModpack = useCallback(
     async (version: ModrinthVersion, file: ModrinthFile) => {
       const versionId = version.id;
+      const eventId = crypto.randomUUID();
+      const toastId = `install-${eventId}`;
+      let progressUnlisten: UnlistenFn | null = null;
+
       setInstallState((prev) => ({ ...prev, [versionId]: "adding" }));
       setError(null);
 
       try {
         const hit = version.search_hit;
         if (!hit) {
-          throw new Error("Missing search hit context");
+          throw new Error(i18n.t('modrinth_installer.errors.missing_search_hit'));
         }
+
+        const fileName = file.filename || hit.title || "modpack";
+
+        // Set up event listener for progress updates
+        progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
+          const progressPayload = progressEvent.payload;
+          if (progressPayload.event_type !== EventType.TaskProgress) return;
+          if (progressPayload.event_id !== eventId) return;
+
+          const progress = (progressPayload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+          // Update toast with progress
+          toast.custom(
+            () => <ProgressToast message={i18n.t('modrinth_installer.installing', { fileName })} progress={progress} />,
+            { id: toastId, duration: Infinity }
+          );
+        });
+
+        // Show initial progress toast
+        toast.custom(
+          () => <ProgressToast message={i18n.t('modrinth_installer.installing', { fileName })} progress={0} />,
+          { id: toastId, duration: Infinity }
+        );
 
         const newProfileId = await ModrinthService.downloadAndInstallModpack(
           version.project_id,
           version.id,
           file.filename,
           file.url,
+          undefined, // iconUrl
+          file.size,
+          eventId,
         );
+
+        // Clean up listener before showing success
+        if (progressUnlisten) {
+          progressUnlisten();
+          progressUnlisten = null;
+        }
+
+        toast.success(i18n.t('modrinth_installer.success', { fileName }), { id: toastId, duration: 3000 });
 
         setInstallState((prev) => ({ ...prev, [versionId]: "success" }));
 
@@ -302,10 +345,11 @@ export function useModrinthInstaller(
         return newProfileId;
       } catch (err) {
         console.error("❌ Failed to install modpack:", err);
-        setError(
-          `Failed to install: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setError(i18n.t('modrinth_installer.errors.install_failed', { error: errorMessage }));
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
+
+        toast.error(i18n.t('modrinth_installer.errors.install_failed', { error: errorMessage }), { id: toastId });
 
         setTimeout(() => {
           setInstallState((prev) => {
@@ -320,6 +364,11 @@ export function useModrinthInstaller(
         }, 5000);
 
         throw err;
+      } finally {
+        // Clean up listener
+        if (progressUnlisten) {
+          progressUnlisten();
+        }
       }
     },
     [onInstallSuccess],
@@ -347,7 +396,7 @@ export function useModrinthInstaller(
 
         if (!profiles || profiles.length === 0) {
           setError(
-            "Installation error: No profiles available. Please create a profile first.",
+            i18n.t('modrinth_installer.errors.no_profiles'),
           );
           return;
         }
@@ -361,7 +410,7 @@ export function useModrinthInstaller(
         setShowProfilePopup(true);
       } catch (error) {
         setError(
-          `Installation error: ${error instanceof Error ? error.message : String(error)}`,
+          i18n.t('modrinth_installer.errors.installation_error', { error: error instanceof Error ? error.message : String(error) }),
         );
       }
     },

@@ -15,6 +15,7 @@ import { ServerLaunchCard } from './ServerLaunchCard';
 import { useProfileStore } from '../../store/profile-store';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
 
@@ -50,6 +51,7 @@ export function PlayerActionsDisplay({
   className,
   displayMode = 'playerName',
 }: PlayerActionsDisplayProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
@@ -80,7 +82,7 @@ export function PlayerActionsDisplay({
   // Handle mods button for featured server
   const handleFeaturedServerMods = () => {
     if (!featuredServerProfileId) {
-      toast.error("No profile selected. Please select a profile first.");
+      toast.error(t('profiles.errors.no_profile_selected'));
       return;
     }
 

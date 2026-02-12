@@ -18,6 +18,7 @@ import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
+import { useTranslation } from "react-i18next";
 import { ThemedSurface } from "../../ui/ThemedSurface";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
@@ -198,6 +199,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     isBlocked = false, // Deprecated
     projectNoRiskStatus = null,
   }) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -335,7 +337,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                     );
                   } catch (error) {
                     console.error("Failed to open external URL:", error);
-                    toast.error("Could not open link in browser.");
+                    toast.error(t('common.open_link_failed'));
                   }
                 }}
                 target="_blank"

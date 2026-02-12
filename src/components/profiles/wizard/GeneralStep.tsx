@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import type { Profile } from "../../../types/profile";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,6 +30,7 @@ export function GeneralStep({
   updateProfile,
   systemRamMb,
 }: GeneralStepProps) {
+  const { t } = useTranslation();
   const [nameError, setNameError] = useState<string | null>(null);
   const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>(
     {},
@@ -136,7 +138,7 @@ export function GeneralStep({
           <Input
             value={profile.name || ""}
             onChange={handleNameChange}
-            placeholder="My Awesome Profile"
+            placeholder={t('placeholders.profile_name_awesome')}
             error={nameError}
             icon={<Icon icon="solar:user-bold" className="w-5 h-5" />}
           />
@@ -149,7 +151,7 @@ export function GeneralStep({
           <Input
             value={profile.group || ""}
             onChange={(e) => updateProfile({ group: e.target.value || null })}
-            placeholder="e.g. modpacks, vanilla+"
+            placeholder={t('placeholders.group_name')}
             icon={<Icon icon="solar:folder-bold" className="w-5 h-5" />}
           />
         </div>

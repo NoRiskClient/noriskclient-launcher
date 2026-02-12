@@ -13,6 +13,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { createPortal } from "react-dom";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { gsap } from "gsap";
+import { useTranslation } from "react-i18next";
 
 interface ProfileContextMenuProps {
   profile: Profile;
@@ -82,6 +83,7 @@ export const ProfileContextMenu = forwardRef<
   },
   ref: ForwardedRef<HTMLDivElement>,
 ) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
@@ -204,7 +206,7 @@ export const ProfileContextMenu = forwardRef<
         >
           <Icon icon="solar:settings-bold" className="w-5 h-5 text-white" />
           <span className="font-minecraft-ten text-base text-white/80">
-            {profile.is_standard_version ? "Settings" : "Settings"}
+            {t('profiles.settingsLabel')}
           </span>
         </li>
         <li className="px-4 py-1">
@@ -223,7 +225,7 @@ export const ProfileContextMenu = forwardRef<
         >
           <Icon icon="solar:copy-bold" className="w-5 h-5 text-white" />
           <span className="font-minecraft-ten text-base text-white/80">
-            Clone Profile
+            {t('profiles.cloneProfile')}
           </span>
         </li>
         <li
@@ -239,7 +241,7 @@ export const ProfileContextMenu = forwardRef<
             className="w-5 h-5 text-white"
           />
           <span className="font-minecraft-ten text-base text-white/80">
-            Open Profile Folder
+            {t('profiles.openProfileFolder')}
           </span>
         </li>
         <li
@@ -255,7 +257,7 @@ export const ProfileContextMenu = forwardRef<
             className="w-5 h-5 text-white"
           />
           <span className="font-minecraft-ten text-base text-white/80">
-            Export Profile
+            {t('profiles.exportProfile')}
           </span>
         </li>
 
@@ -280,7 +282,7 @@ export const ProfileContextMenu = forwardRef<
                 className="w-5 h-5 text-white"
               />
               <span className="font-minecraft-ten text-base text-white/80">
-                Repair Profile
+                {t('profiles.repairProfile')}
               </span>
             </li>
           </>
@@ -309,7 +311,7 @@ export const ProfileContextMenu = forwardRef<
                 className="w-5 h-5 text-red-400"
               />
               <span className="font-minecraft-ten text-base text-red-400">
-                Delete Profile
+                {t('profiles.deleteProfile')}
               </span>
             </li>
           </>

@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { gsap } from "gsap";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 
@@ -22,6 +23,7 @@ export function CurrentAccountDisplay({
   variant = "flat",
 }: CurrentAccountDisplayProps) {
   const { activeAccount } = useMinecraftAuthStore();
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -159,7 +161,7 @@ export function CurrentAccountDisplay({
 
         <div className="flex items-center gap-1 min-w-0">
           <span className="text-xl text-white font-minecraft lowercase">
-            Add Account
+            {t('auth.addAccount')}
           </span>
         </div>
 
@@ -172,7 +174,7 @@ export function CurrentAccountDisplay({
   }
 
   const username =
-    activeAccount.minecraft_username || activeAccount.username || "Unknown";
+    activeAccount.minecraft_username || activeAccount.username || t('auth.unknown');
 
   return (
     <div

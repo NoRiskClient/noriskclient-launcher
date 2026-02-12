@@ -12,6 +12,7 @@ import {
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { Button } from "../ui/buttons/Button";
+import { useTranslation } from "react-i18next";
 import { NebulaGrid } from "../effects/NebulaGrid";
 import { NebulaParticles } from "../effects/NebulaParticles";
 import { NebulaWaves } from "../effects/NebulaWaves";
@@ -38,7 +39,8 @@ interface UpdaterStatusPayload {
 }
 
 export default function Updater() {
-  const [statusMessage, setStatusMessage] = useState<string>("Initializing...");
+  const { t } = useTranslation();
+  const [statusMessage, setStatusMessage] = useState<string>("");
   const [progress, setProgress] = useState<number | null>(null);
   const [status, setStatus] =
     useState<UpdaterStatusPayload["status"]>("checking");
@@ -105,7 +107,7 @@ export default function Updater() {
           eventProgress <= 100
         ) {
           setProgress(eventProgress);
-          setStatusMessage(`Downloading... ${eventProgress}%`);
+          setStatusMessage(t('updater.downloading', { progress: eventProgress }));
 
           if (progressRef.current) {
             gsap.to(progressRef.current, {
@@ -213,7 +215,7 @@ export default function Updater() {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-black">
         <div className="animate-pulse text-white text-lg font-minecraft">
-          Loading theme...
+          {t('updater.loading_theme')}
         </div>
       </div>
     );
@@ -248,7 +250,7 @@ export default function Updater() {
               className="w-32 h-32 object-contain mb-1"
             />
             <p className="text-lg font-minecraft text-white/70 lowercase">
-              Updater
+              {t('updater.title')}
             </p>
           </div>
 
@@ -269,7 +271,7 @@ export default function Updater() {
                   className="w-5 h-5 text-green-400"
                 />
                 <span className="font-minecraft text-lg text-white">
-                  Update Complete
+                  {t('updater.complete')}
                 </span>
               </div>
             ) : status === "error" ? (
@@ -304,7 +306,7 @@ export default function Updater() {
               >
                 {getStatusIcon()}
                 <span className="font-minecraft text-lg text-white">
-                  {statusMessage}
+                  {statusMessage || t('updater.initializing')}
                 </span>
               </div>
             )}
@@ -338,7 +340,7 @@ export default function Updater() {
               onClick={handleManualClose}
               icon={<Icon icon="solar:close-circle-bold" className="w-4 h-4" />}
             >
-              Close
+              {t('common.close')}
             </Button>
           )}
         </div>

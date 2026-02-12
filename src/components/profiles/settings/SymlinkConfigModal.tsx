@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Button } from "../../ui/buttons/Button";
 import { Modal } from "../../ui/Modal";
@@ -17,6 +18,7 @@ export function SymlinkConfigModal({
   onConfirm,
   onCancel,
 }: SymlinkConfigModalProps) {
+  const { t } = useTranslation();
   // Extract the folder name from the external path - this stays fixed
   const getFolderName = (path: string) => {
     const parts = path.replace(/\\/g, "/").split("/");
@@ -55,7 +57,7 @@ export function SymlinkConfigModal({
         } else {
           // Selected folder is outside profile
           setTargetDirectory("");
-          alert("Please select a folder inside the profile instance folder.");
+          alert(t('symlink.select_folder_inside_profile'));
         }
       }
     } catch (error) {
@@ -82,13 +84,13 @@ export function SymlinkConfigModal({
 
   return (
     <Modal
-      title="Configure Symlink"
+      title={t('symlink.configure')}
       onClose={onCancel}
       width="md"
       footer={
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="default"
@@ -96,7 +98,7 @@ export function SymlinkConfigModal({
           >
             <span className="flex items-center gap-2">
               <Icon icon="solar:link-bold" className="w-4 h-4" />
-              <span>Create Symlink</span>
+              <span>{t('symlink.create')}</span>
             </span>
           </Button>
         </div>
@@ -111,7 +113,7 @@ export function SymlinkConfigModal({
               className="w-5 h-5 text-white/70" 
             />
             <h4 className="text-xl font-minecraft text-white">
-              External {externalPath.includes('.') && !externalPath.endsWith('/') && !externalPath.endsWith('\\') ? 'File' : 'Folder'}
+              {externalPath.includes('.') && !externalPath.endsWith('/') && !externalPath.endsWith('\\') ? t('symlink.external_file') : t('symlink.external_folder')}
             </h4>
           </div>
           <div className="p-3 bg-white/5 rounded border border-white/10">
@@ -121,7 +123,7 @@ export function SymlinkConfigModal({
           </div>
           <p className="text-xs text-white/60 mt-2 font-minecraft-ten tracking-wide select-none">
             <Icon icon="solar:refresh-bold" className="w-3 h-3 inline mr-1" />
-            Changes to this {externalPath.includes('.') && !externalPath.endsWith('/') && !externalPath.endsWith('\\') ? 'file' : 'folder'} will sync automatically with your profile
+            {externalPath.includes('.') && !externalPath.endsWith('/') && !externalPath.endsWith('\\') ? t('symlink.file_sync_hint') : t('symlink.folder_sync_hint')}
           </p>
         </div>
 
@@ -134,7 +136,7 @@ export function SymlinkConfigModal({
             <div className="flex items-center gap-2">
               <Icon icon="solar:settings-bold" className="w-4 h-4 text-white/70" />
               <span className="text-sm font-minecraft-ten text-white tracking-wide">
-                Advanced: Custom Location
+                {t('symlink.advanced_custom_location')}
               </span>
               {targetDirectory && (
                 <span className="text-xs text-accent font-minecraft-ten">

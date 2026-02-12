@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useTranslation } from "react-i18next";
 import {
   listLauncherLogs,
   listCrashReports,
@@ -15,6 +16,7 @@ import {
 type DebugTab = "launcher" | "minecraft" | "crashes";
 
 export function DebugSection() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<DebugTab>("launcher");
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,10 +61,10 @@ export function DebugSection() {
       const content = await getLogFileContent(file.path);
       const url = await uploadLogToMclogs(content);
       await writeText(url);
-      toast.success("Uploaded & copied to clipboard!");
+      toast.success(t('debug.uploaded_copied'));
     } catch (e) {
       console.error("Failed to upload:", e);
-      toast.error("Failed to upload: " + getErrorMessage(e));
+      toast.error(t('debug.upload_failed', { error: getErrorMessage(e) }));
     }
     setUploadingFile(null);
   }
@@ -71,10 +73,10 @@ export function DebugSection() {
     try {
       const content = await getLogFileContent(file.path);
       await writeText(content);
-      toast.success("Copied to clipboard!");
+      toast.success(t('debug.copied'));
     } catch (e) {
       console.error("Failed to copy:", e);
-      toast.error("Failed to copy: " + getErrorMessage(e));
+      toast.error(t('debug.copy_failed', { error: getErrorMessage(e) }));
     }
   }
 
@@ -153,7 +155,7 @@ export function DebugSection() {
                   <button
                     onClick={() => handleCopyContent(file)}
                     className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
-                    title="Copy content"
+                    title={t('debug.copy_content')}
                   >
                     <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
                   </button>
@@ -161,7 +163,7 @@ export function DebugSection() {
                     onClick={() => handleUpload(file)}
                     disabled={uploadingFile === file.path}
                     className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-                    title="Upload to mclo.gs"
+                    title={t('debug.upload_mclogs')}
                   >
                     {uploadingFile === file.path ? (
                       <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />

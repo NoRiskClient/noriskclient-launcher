@@ -14,6 +14,7 @@ import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
 import { invoke } from "@tauri-apps/api/core";
 import { NoriskModEntryDefinition, NoriskModpacksConfig } from "../../../types/noriskPacks";
+import { useTranslation } from "react-i18next";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
 const forbiddenTrailing = /[ .]$/;
@@ -52,11 +53,13 @@ export function ProfileWizardV2Step3({
     selectedLoaderVersion,
     defaultGroup
 }: ProfileWizardV2Step3Props) {
+    const { t } = useTranslation();
     const accentColor = useThemeStore((state) => state.accentColor);
     const [profileName, setProfileName] = useState("");
     const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
     const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
     const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
+    const recommendedRam = systemRamMb <= 8192 ? Math.min(2048, systemRamMb) : Math.min(4096, systemRamMb);
     const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
     const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
     const [loadingPacks, setLoadingPacks] = useState(false);
@@ -217,7 +220,7 @@ export function ProfileWizardV2Step3({
 
     const handleCreate = async () => {
         if (!profileName.trim()) {
-            setError("Profile name is required");
+            setError(t('profiles.wizard.nameRequired'));
             return;
         }
 
@@ -237,7 +240,7 @@ export function ProfileWizardV2Step3({
             });
         } catch (err) {
             console.error("Failed to create profile:", err);
-            setError(`Failed to create profile: ${err instanceof Error ? err.message : String(err)}`);
+            setError(t('profiles.wizard.createError', { error: err instanceof Error ? err.message : String(err) }));
         } finally {
             setCreating(false);
         }
@@ -271,34 +274,34 @@ export function ProfileWizardV2Step3({
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <label className="block text-base font-minecraft-ten text-white/50">
-                            Profile Name
+                            {t('profiles.wizard.profileName')}
                         </label>
                         <SearchStyleInput
                             value={profileName}
                             onChange={handleProfileNameChange}
-                            placeholder="Enter profile name..."
+                            placeholder={t('profiles.wizard.enterProfileName')}
                             required
                         />
                         {profileCharRemoved && (
                             <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                                The profile name cannot contain these characters: &lt; &gt; : " / \ | ? *
+                                {t('profiles.wizard.forbiddenChars')}
                             </p>
                         )}
                         {profileNameHasForbiddenEnding && (
                             <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                                The profile name cannot end with a space or dot.
+                                {t('profiles.wizard.forbiddenEnding')}
                             </p>
                         )}
                     </div>
 
                     <div className="space-y-2">
                         <label className="block text-base font-minecraft-ten text-white/50">
-                            Group (Optional)
+                            {t('profiles.wizard.groupOptional')}
                         </label>
                         <SearchStyleInput
                             value={profileGroup}
                             onChange={(e) => setProfileGroup(e.target.value)}
-                            placeholder="Enter group name..."
+                            placeholder={t('profiles.wizard.enterGroupName')}
                         />
                     </div>
                 </div>
@@ -307,15 +310,15 @@ export function ProfileWizardV2Step3({
                 <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1">
                         <Checkbox
-                            label="Use shared Minecraft folder"
+                            label={t('profiles.wizard.useSharedFolder')}
                             checked={useSharedMinecraftFolder}
                             onChange={(event) => setUseSharedMinecraftFolder(event.target.checked)}
-                            description="When enabled, a shared Minecraft folder will be used based on the group. Your settings, worlds, configs and resource packs will remain the same between profiles."
+                            description={t('profiles.wizard.sharedFolderDescription')}
                             descriptionClassName="font-minecraft-ten text-sm"
                             size="lg"
                         />
                         <p className="text-xs text-white/50 font-minecraft-ten ml-10 -mt-1">
-                            (you can change this anytime)
+                            {t('profiles.wizard.canChangeAnytime')}
                         </p>
                     </div>
                 </div>
@@ -323,7 +326,7 @@ export function ProfileWizardV2Step3({
                 {/* RAM Settings */}
                 <div className="space-y-3">
                     <label className="block text-base font-minecraft-ten text-white/50">
-                        Recommended RAM: 4096 mb
+                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam })}
                     </label>
                     <RangeSlider
                         value={memoryMaxMb}
@@ -347,7 +350,7 @@ export function ProfileWizardV2Step3({
                         className="flex items-center justify-between w-full p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
                     >
                         <span className="text-base font-minecraft-ten text-white/80">
-                            Advanced Settings
+                            {t('profiles.wizard.advancedSettings')}
                         </span>
                         <Icon
                             icon={showAdvancedSettings ? "solar:chevron-up-bold" : "solar:chevron-down-bold"}
@@ -360,10 +363,10 @@ export function ProfileWizardV2Step3({
                             {/* NoRisk Pack Selection */}
                             <div className="space-y-3">
                                 <label className="block text-base font-minecraft-ten text-white/50">
-                                    NoRisk Client Pack
+                                    {t('profiles.wizard.noriskClientPack')}
                                 </label>
                                 <p className="text-sm text-white/60 font-minecraft-ten">
-                                    NoRiskClient packs are predefined mod collections from NoRiskClient, including performance mods like Sodium, Fabric API, ImmediatelyFast, and mods for seamless NoRiskClient experience. You can disable this to start without NoRiskClient features.
+                                    {t('profiles.wizard.noriskPackDescription')}
                                 </p>
                                 {loadingPacks ? (
                                     <div className="flex items-center gap-2 text-white/70">
@@ -372,7 +375,7 @@ export function ProfileWizardV2Step3({
                                             className="w-4 h-4 animate-spin"
                                         />
                                         <span className="text-sm font-minecraft-ten">
-                                            Loading NoRisk packs...
+                                            {t('profiles.wizard.loadingPacks')}
                                         </span>
                                     </div>
                                 ) : (
@@ -383,10 +386,10 @@ export function ProfileWizardV2Step3({
                                                     value={selectedNoriskPackId || ""}
                                                     onChange={(value) => setSelectedNoriskPackId(value === "" ? null : value)}
                                                     options={[
-                                                        { value: "", label: "None (Optional)" },
+                                                        { value: "", label: t('profiles.wizard.noneOptional') },
                                                         ...noriskPackOptions,
                                                     ]}
-                                                    placeholder="Select a NoRisk pack..."
+                                                    placeholder={t('profiles.wizard.selectNoriskPack')}
                                                     size="md"
                                                     className="w-full"
                                                 />
@@ -395,7 +398,7 @@ export function ProfileWizardV2Step3({
                                                 <Checkbox
                                                     checked={showAllVersions}
                                                     onChange={(event) => setShowAllVersions(event.target.checked)}
-                                                    label="Show all versions"
+                                                    label={t('profiles.wizard.showAllVersions')}
                                                     size="sm"
                                                     className="text-white/70"
                                                 />
@@ -405,15 +408,13 @@ export function ProfileWizardV2Step3({
                                         {showYellowWarning ? (
                                             <div className="text-center">
                                                 <p className="text-base text-yellow-400 font-minecraft-ten">
-                                                    NoRiskClient is not currently compatible with this loader or version!<br />
-                                                    You can still create it, but you won't have the features.<br />
-                                                    This may change in the future.
+                                                    {t('profiles.wizard.nrcIncompatibleWarning')}
                                                 </p>
                                             </div>
                                         ) : selectedNoriskPackId === null || selectedNoriskPackId === "" ? (
                                             <div className="text-center">
                                                 <p className="text-sm text-amber-400 font-minecraft-ten">
-                                                    You won't have any NoRiskClient features with this selection.
+                                                    {t('profiles.wizard.noNrcFeatures')}
                                                 </p>
                                             </div>
                                         ) : (
@@ -434,7 +435,7 @@ export function ProfileWizardV2Step3({
                                                     className="w-4 h-4 animate-spin"
                                                 />
                                                 <span className="text-sm font-minecraft-ten">
-                                                    Checking compatibility...
+                                                    {t('profiles.wizard.checkingCompatibility')}
                                                 </span>
                                             </div>
                                         )}
@@ -477,7 +478,7 @@ export function ProfileWizardV2Step3({
                 icon={<Icon icon="solar:arrow-left-bold" className="w-5 h-5" />}
                 iconPosition="left"
             >
-                back
+                {t('profiles.wizard.back')}
             </Button>
 
             <Button
@@ -499,14 +500,14 @@ export function ProfileWizardV2Step3({
                 }
                 iconPosition="left"
             >
-                {creating ? "creating..." : "create profile"}
+                {creating ? t('profiles.wizard.creating') : t('profiles.wizard.createProfile')}
             </Button>
         </div>
     );
 
     return (
         <Modal
-            title="create profile - finalize"
+            title={t('profiles.wizard.step3Title')}
             onClose={onClose}
             width="lg"
             footer={renderFooter()}

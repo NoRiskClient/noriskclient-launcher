@@ -108,8 +108,7 @@ pub async fn report_referral_after_login(account_id: Uuid) -> Result<()> {
         }
     }
 
-    // TODO: Remove this after testing - force experimental for referral testing
-    let is_experimental = true; // config.is_experimental;
+    let is_experimental = config.is_experimental;
 
     // Get account with refreshed tokens
     info!("[Referral] Getting account with refreshed tokens for referral report...");

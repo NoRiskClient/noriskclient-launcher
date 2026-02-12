@@ -18,6 +18,7 @@ import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
 import { useFlags } from 'flagsmith/react';
+import { useTranslation } from "react-i18next";
 import { DesignerSettingsTab } from './settings/DesignerSettingsTab';
 import { cn } from "../../lib/utils";
 
@@ -38,6 +39,7 @@ type SettingsTab =
 const DESIGNER_FEATURE_FLAG_NAME = "show_keep_local_assets";
 
 export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
+  const { t } = useTranslation();
   const { updateProfile, deleteProfile } = useProfileStore();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [editedProfile, setEditedProfile] = useState<Profile>({ ...profile });
@@ -139,11 +141,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         clear_preferred_account: !editedProfile.preferred_account_id,
       });
 
-      toast.success("Profile saved successfully!");
+      toast.success(t('profiles.settings.saveSuccess'));
       setRefreshTrigger(prev => prev + 1);
     } catch (err) {
       console.error("Failed to save profile:", err);
-      toast.error("Failed to save profile. Please try again.");
+      toast.error(t('profiles.settings.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -156,15 +158,15 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
       toast
         .promise(deletePromise, {
-          loading: `Deleting profile '${profile.name}'...`,
+          loading: t('profiles.deletingProfile', { name: profile.name }),
           success: () => {
             onClose();
-            return `Profile '${profile.name}' deleted successfully!`;
+            return t('profiles.deleteSuccess', { name: profile.name });
           },
           error: (err) => {
             const errorMessage =
               err instanceof Error ? err.message : String(err.message);
-            return `Failed to delete profile: ${errorMessage}`;
+            return t('profiles.deleteError', { error: errorMessage });
           },
         })
         .finally(() => {
@@ -173,24 +175,24 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     } catch (err) {
       console.error("Error during delete initiation:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to initiate profile deletion: ${errorMessage}`);
+      toast.error(t('profiles.deleteInitError', { error: errorMessage }));
       setIsDeleting(false);
     }
   };
 
   const baseTabConfig = [
-    { id: "general", label: "General", icon: "solar:settings-bold" },
-    { id: "installation", label: "Installation", icon: "solar:download-bold" },
-    { id: "java", label: "JAVA & Memory", icon: "solar:code-bold" },
-    { id: "window", label: "Window", icon: "solar:widget-bold" },
-    { id: "nrc", label: "NRC", icon: "solar:gamepad-bold" },
-    { id: "symlinks", label: "Symlinks", icon: "solar:link-bold" },
+    { id: "general", label: t('profiles.settings.general'), icon: "solar:settings-bold" },
+    { id: "installation", label: t('profiles.settings.installation'), icon: "solar:download-bold" },
+    { id: "java", label: t('profiles.settings.javaMemory'), icon: "solar:code-bold" },
+    { id: "window", label: t('profiles.settings.window'), icon: "solar:widget-bold" },
+    { id: "nrc", label: t('profiles.settings.nrc'), icon: "solar:gamepad-bold" },
+    { id: "symlinks", label: t('profiles.settings.symlinks'), icon: "solar:link-bold" },
   ];
 
   const tabConfig = showDesignerTab
     ? [
         ...baseTabConfig,
-        { id: "designer", label: "Designer", icon: "solar:palette-bold" },
+        { id: "designer", label: t('profiles.settings.designer'), icon: "solar:palette-bold" },
       ]
     : baseTabConfig;
 
@@ -280,7 +282,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         size="md"
         className="text-2xl"
       >
-        cancel
+        {t('profiles.settings.cancel')}
       </Button>
       <Button
         variant="default"
@@ -295,10 +297,10 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
               icon="solar:refresh-bold"
               className="w-6 h-6 animate-spin text-white"
             />
-            <span>saving...</span>
+            <span>{t('profiles.settings.saving')}</span>
           </div>
         ) : (
-          "save changes"
+          t('profiles.settings.saveChanges')
         )}
       </Button>
     </div>
@@ -322,7 +324,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   return (
     <Modal
-      title={`profile settings: ${profile.name}`}
+      title={t('profiles.settings.title', { name: profile.name })}
       onClose={onClose}
       width="xl"
       footer={renderFooter()}

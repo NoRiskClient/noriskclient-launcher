@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types/profile"; // Adjust path as needed
 import { SearchStyleInput } from "../../ui/Input";
 import { Checkbox } from "../../ui/Checkbox";
@@ -38,6 +39,7 @@ export function ExportSettingsTab({
   onExportActionAvailable,
   isInModalContext = false, // Default to false
 }: ExportSettingsTabProps) {
+  const { t } = useTranslation();
   const [exportFilename, setExportFilename] = useState(profile.name);
   const [selectedExportPaths, setSelectedExportPaths] = useState<Set<string>>(
     new Set()
@@ -108,7 +110,7 @@ export function ExportSettingsTab({
   useEffect(() => {
     const fetchStructure = async () => {
       if (!profile.id) {
-        setDirectoryError("Profile ID is missing.");
+        setDirectoryError(t('export.profile_id_missing'));
         setIsLoadingDirectory(false);
         return;
       }
@@ -123,8 +125,8 @@ export function ExportSettingsTab({
       } catch (err) {
         console.error("Failed to fetch directory structure:", err);
         const message = err instanceof Error ? err.message : String(err.message);
-        setDirectoryError(`Failed to load file structure: ${message}`);
-        toast.error(`Failed to load file structure: ${message}`);
+        setDirectoryError(t('export.load_structure_failed', { error: message }));
+        toast.error(t('export.load_structure_failed', { error: message }));
       } finally {
         setIsLoadingDirectory(false);
       }
@@ -160,7 +162,7 @@ export function ExportSettingsTab({
 
   const handleExport = async () => {
     if (!exportFilename.trim()) {
-      toast.error("Please enter a filename for the export.");
+      toast.error(t('export.enter_filename'));
       return;
     }
 
@@ -169,7 +171,7 @@ export function ExportSettingsTab({
     // Set exporting state and reset progress
     setIsExporting(true);
     setExportProgress(0);
-    setExportMessage("Starting export...");
+    setExportMessage(t('export.starting'));
 
     const exportPromise = ProfileService.exportProfile({
       profile_id: profile.id,
@@ -182,12 +184,12 @@ export function ExportSettingsTab({
     });
 
     // Store the toast ID so we can update it with progress
-    const toastId = toast.loading(`Exporting profile '${exportFilename}'...`);
+    const toastId = toast.loading(t('export.exporting_profile', { name: exportFilename }));
     exportToastIdRef.current = toastId;
 
     try {
       const exportPath = await exportPromise;
-      toast.success(`Profile successfully exported to: ${exportPath}`, { id: toastId });
+      toast.success(t('export.export_success', { path: exportPath }), { id: toastId });
       setIsExporting(false);
       setExportProgress(null);
       setExportMessage("");
@@ -195,7 +197,7 @@ export function ExportSettingsTab({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err.message);
       console.error("Failed to export profile:", err);
-      toast.error(`Failed to export profile: ${message}`, { id: toastId });
+      toast.error(t('export.export_failed', { error: message }), { id: toastId });
       setIsExporting(false);
       setExportProgress(null);
       setExportMessage("");
@@ -242,11 +244,10 @@ export function ExportSettingsTab({
       {!isInModalContext && (
         <div>
           <h3 className="text-3xl font-minecraft text-white mb-1 lowercase">
-            Export Profile
+            {t('export.title')}
           </h3>
           <p className="text-xs text-white/70 mb-4 font-minecraft-ten tracking-wide">
-            Export your profile to share with others or as a backup. You can
-            customize which files are included.
+            {t('export.description')}
           </p>
         </div>
       )}
@@ -259,27 +260,26 @@ export function ExportSettingsTab({
             htmlFor="exportFilename"
             className="block text-2xl text-white font-minecraft mb-2 lowercase"
           >
-            Export Filename
+            {t('export.filename_label')}
           </label>
           <SearchStyleInput
             value={exportFilename}
             onChange={(e) => setExportFilename(e.target.value)}
-            placeholder="Enter filename without extension"
+            placeholder={t('placeholders.enter_filename')}
             icon="solar:document-text-bold"
             disabled={isExporting}
           />
           <p className="mt-1 text-xs text-white/50 font-minecraft-ten tracking-wide">
-            The .noriskpack extension will be added automatically.
+            {t('export.extension_added_auto')}
           </p>
         </div>
         {/* File selection section */}
         <div>
           <h4 className="text-2xl font-minecraft text-white lowercase mb-1">
-            Select Files & Folders (Optional)
+            {t('export.select_files_title')}
           </h4>
           <p className="text-xs text-white/70 mb-3 font-minecraft-ten tracking-wide">
-            Choose items to include in the export. If none selected, only
-            profile configuration is exported.
+            {t('export.select_files_description')}
           </p>
           <div className="flex gap-2 mb-3">
             <Button
@@ -297,7 +297,7 @@ export function ExportSettingsTab({
               }
               className="text-xs px-3 py-1.5"
             >
-              Select All
+              {t('common.select_all')}
             </Button>
             <Button
               variant="ghost"
@@ -309,7 +309,7 @@ export function ExportSettingsTab({
               }
               className="text-xs px-3 py-1.5"
             >
-              Deselect All
+              {t('export.deselect_all')}
             </Button>
           </div>
           <Card
@@ -366,7 +366,7 @@ export function ExportSettingsTab({
               <Checkbox
                 checked={exportOpenFolder}
                 onChange={(e) => setExportOpenFolder(e.target.checked)}
-                label="Open folder after export"
+                label={t('export.open_folder_after')}
                 className="text-xl"
                 customSize="md"
                 disabled={isExporting}
@@ -405,7 +405,7 @@ export function ExportSettingsTab({
                 size="md"
                 className="text-xl w-full md:w-auto"
               >
-                {isExporting ? "Exporting..." : "Export Profile"}
+                {isExporting ? t('export.exporting') : t('export.export_profile')}
               </Button>
             </div>
           </>

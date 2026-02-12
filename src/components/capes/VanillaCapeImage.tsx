@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 interface VanillaCapeImageProps {
@@ -16,9 +17,10 @@ const FRONT_Y = 1;
 
 export const VanillaCapeImage = React.memo(function VanillaCapeImage({
   imageUrl,
-  width = 140, 
+  width = 140,
   className,
 }: VanillaCapeImageProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -97,7 +99,7 @@ export const VanillaCapeImage = React.memo(function VanillaCapeImage({
         setErrorMessage(null);
       } catch (drawError) {
         console.error("[VanillaCapeImage] Error drawing cape:", drawError);
-        setErrorMessage("Error rendering cape.");
+        setErrorMessage(t('capes.error_rendering'));
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +107,7 @@ export const VanillaCapeImage = React.memo(function VanillaCapeImage({
 
     const onError = (error: string | Event) => {
       console.error("[VanillaCapeImage] Failed to load cape image:", imageUrl, error);
-      setErrorMessage("Failed to load cape image.");
+      setErrorMessage(t('capes.failed_to_load'));
       setIsLoading(false);
     };
     
@@ -124,11 +126,11 @@ export const VanillaCapeImage = React.memo(function VanillaCapeImage({
       style={{ width: `${width}px`, height: `${height}px` }}
     >
       {errorMessage ? (
-        <div 
+        <div
           className="error-message w-full h-full flex justify-center items-center text-center text-xs text-red-600 bg-red-100 border border-red-600 p-1 box-border"
           title={errorMessage}
         >
-          ⚠️ Error
+          ⚠️ {t('common.error')}
         </div>
       ) : (
         <canvas
@@ -140,7 +142,7 @@ export const VanillaCapeImage = React.memo(function VanillaCapeImage({
             "image-rendering-pixelated",
             isLoading && !errorMessage ? "opacity-0" : "opacity-100"
           )}
-          title="Vanilla Cape"
+          title={t('capes.vanilla_cape')}
           style={{ 
             backgroundColor: 'transparent',
             imageRendering: 'pixelated',

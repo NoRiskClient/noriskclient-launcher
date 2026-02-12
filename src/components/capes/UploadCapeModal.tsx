@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
 import { Button } from "../ui/buttons/Button";
@@ -70,6 +71,7 @@ export function UploadCapeModal({
   isWarningMessage,
   onCancelUpload
 }: UploadCapeModalProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
@@ -104,11 +106,11 @@ export function UploadCapeModal({
       // Show combined success message with resize info if applicable
       if (result.wasResized && result.originalDimensions) {
         const [origWidth, origHeight] = result.originalDimensions;
-        toast.success(`Cape uploaded successfully! (Resized from ${origWidth}x${origHeight} to 512x256)`, {
+        toast.success(t('capes.capeUploadedResized', { origWidth, origHeight }), {
           duration: 5000, // Show longer for important info
         });
       } else {
-        toast.success("Cape uploaded successfully!");
+        toast.success(t('capes.capeUploadedSuccess'));
       }
 
       onCancelUpload(); // Close modal on success
@@ -130,7 +132,7 @@ export function UploadCapeModal({
 
   return (
     <Modal
-      title="Preview & Upload Cape"
+      title={t('capes.previewAndUploadCape')}
       onClose={onCancelUpload}
       closeOnClickOutside={true}
       width="md"
@@ -138,7 +140,7 @@ export function UploadCapeModal({
     >
       <div className="p-4">
         <p className="text-white/80 mb-4 text-center font-minecraft-ten">
-          {uploadError ? "Failed to upload Cape" : uploadWarning ? "Cape submitted for review" : "Does this look correct? If so, hit upload!"}
+          {uploadError ? t('capes.failedToUploadCape') : uploadWarning ? t('capes.capeSubmittedForReview') : t('capes.doesThisLookCorrect')}
         </p>
         {uploadError && (
           <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
@@ -153,7 +155,7 @@ export function UploadCapeModal({
               {uploadWarning}
             </p>
             <p className="text-yellow-300/70 text-xs font-minecraft-ten text-center mt-2">
-              Reviews can take up to 24 hours
+              {t('capes.reviewsCanTake24Hours')}
             </p>
           </div>
         )}
@@ -179,7 +181,7 @@ export function UploadCapeModal({
                 className="w-5 h-5"
               />
             }
-            title={showElytraPreview ? "Show as Cape" : "Show as Elytra"}
+            title={showElytraPreview ? t('capes.showAsCape') : t('capes.showAsElytra')}
           />
         </div>
         <div className="flex justify-center gap-4">
@@ -189,7 +191,7 @@ export function UploadCapeModal({
             disabled={isUploading || !!uploadError || !!uploadWarning}
             size="lg"
           >
-            {isUploading ? "Uploading..." : "Upload Cape"}
+            {isUploading ? t('capes.uploading') : t('capes.uploadCape')}
           </Button>
           <Button
             onClick={onCancelUpload}
@@ -197,7 +199,7 @@ export function UploadCapeModal({
             disabled={isUploading}
             size="lg"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </div>

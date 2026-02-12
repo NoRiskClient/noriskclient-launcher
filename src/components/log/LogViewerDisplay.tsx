@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import type { LogLevel, ParsedLogLine } from "../../services/log-service";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -98,6 +99,7 @@ export function LogViewerDisplay({
   scrollToTop,
   scrollToBottom,
 }: LogViewerDisplayProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const isAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
@@ -191,7 +193,7 @@ export function LogViewerDisplay({
             ></div>
           </div>
           <div className="font-minecraft text-xl text-white/80 tracking-wide lowercase">
-            Loading logs...
+            {t('logs.loading')}
           </div>
         </div>
       </div>
@@ -228,10 +230,10 @@ export function LogViewerDisplay({
             className="w-12 h-12 text-white/30 mx-auto mb-3"
           />
           <p className="text-white/60 font-minecraft text-xl tracking-wide lowercase select-none">
-            No log content available
+            {t('logs.no_content_title')}
           </p>
           <p className="text-white/40 font-minecraft text-sm mt-2 tracking-wide lowercase select-none">
-            Select a log file to view
+            {t('logs.no_content_desc')}
           </p>
         </div>
       </div>
@@ -268,7 +270,7 @@ export function LogViewerDisplay({
           <SearchInput
             value={searchTerm}
             onChange={onSearchChange}
-            placeholder="Filter lines..."
+            placeholder={t('logs.filter_placeholder')}
             size="sm"
           />
 
@@ -305,15 +307,15 @@ export function LogViewerDisplay({
                       }
 
                       const successMessage = clipboardSuccess
-                        ? "Link copied! Click to open."
-                        : "Log uploaded (copy failed)! Click to open.";
+                        ? t('logs.upload_success_copied')
+                        : t('logs.upload_success_no_copy');
 
                       toast.success(
-                        (t) => (
+                        (toastInstance) => (
                           <span
                             onClick={() => {
                               if (url && onOpenUploadUrl) onOpenUploadUrl(url);
-                              toast.dismiss(t.id);
+                              toast.dismiss(toastInstance.id);
                             }}
                             className="cursor-pointer hover:underline"
                           >
@@ -323,7 +325,7 @@ export function LogViewerDisplay({
                         { duration: 5000 },
                       );
                     } catch (err: any) {
-                      toast.error(`Upload failed: ${err.toString()}`);
+                      toast.error(t('logs.upload_failed', { error: err.toString() }));
                     } finally {
                       setIsSubmittingUpload(false);
                     }
@@ -380,7 +382,7 @@ export function LogViewerDisplay({
                     className="w-12 h-12 text-white/30 mx-auto mb-3"
                   />
                   <p className="text-white/60 font-minecraft text-xl tracking-wide lowercase select-none">
-                    No log lines match the current filters
+                    {t('logs.no_matching_lines')}
                   </p>
                 </div>
               </div>
@@ -448,8 +450,8 @@ export function LogViewerDisplay({
       >
         <div className="text-white/70 font-minecraft-ten text-xs">
           {searchTerm || Object.values(levelFilters).some((v) => !v)
-            ? `${linesForVirtuoso.length} of ${parsedLogLinesCount} lines matching filters`
-            : `${parsedLogLinesCount} lines`}
+            ? t('logs.lines_matching', { shown: linesForVirtuoso.length, total: parsedLogLinesCount })
+            : t('logs.lines_count', { count: parsedLogLinesCount })}
         </div>
 
         <div className="flex items-center gap-3">
@@ -458,7 +460,7 @@ export function LogViewerDisplay({
               id="autoscroll-checkbox"
               checked={isAutoscrollEnabled}
               onChange={(e) => onAutoscrollChange(e.target.checked)}
-              label="Autoscroll"
+              label={t('logs.autoscroll')}
               customSize="sm"
             />
           )}
@@ -471,7 +473,7 @@ export function LogViewerDisplay({
                 options={[
                   {
                     value: "",
-                    label: "-- Select Log --",
+                    label: t('logs.select_log'),
                     // @ts-ignore
                     disabled: !!selectedLogPath,
                   },

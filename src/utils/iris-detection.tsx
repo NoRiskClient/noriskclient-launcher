@@ -8,6 +8,8 @@ import * as ContentService from '../services/content-service';
 import UnifiedService from '../services/unified-service';
 import { ModPlatform } from '../types/unified';
 import { ContentType } from '../types/content';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 
 /**
  * Checks if a profile's loader is compatible with Iris shader mod
@@ -239,9 +241,9 @@ export async function validateShaderSetup(profileId: string): Promise<{
 
   let message = '';
   if (hasIris) {
-    message = 'Iris shader mod is installed - shader packs will work optimally';
+    message = i18n.t('iris.installed_optimal');
   } else {
-    message = 'Iris shader mod is required for optimal shader pack performance';
+    message = i18n.t('iris.required_optimal');
   }
 
   console.log(`📊 [IrisDetection] validateShaderSetup result for profile ${profileId}:`, {
@@ -279,6 +281,7 @@ export function IrisRequiredModal({
   onClose: () => void;
 }) {
   const accentColor = useThemeStore((state) => state.accentColor);
+  const { t } = useTranslation();
 
   console.log(`⚠️ [ModrinthSearchV2] ${installType}: Iris NOT found in profile ${profileId}, showing modal notification`);
   console.log(`🎨 [ModrinthSearchV2] ${installType}: Showing Iris requirement modal for shader pack '${projectTitle}'`);
@@ -289,14 +292,14 @@ export function IrisRequiredModal({
         variant="secondary"
         onClick={onClose}
       >
-        Skip Shader Mod
+        {t('iris.skip_shader_mod')}
       </Button>
       {onInstallIris && (
         <Button
           onClick={onInstallIris}
           icon={<Icon icon="ph:download-simple-bold" className="w-4 h-4" />}
         >
-          Install Iris
+          {t('iris.install_iris')}
         </Button>
       )}
     </div>
@@ -304,7 +307,7 @@ export function IrisRequiredModal({
 
   return (
     <Modal
-      title="Shader Pack Setup"
+      title={t('iris.shader_pack_setup')}
       titleIcon={<Icon icon="solar:eye-bold" className="w-6 h-6" style={{ color: accentColor.value }} />}
       onClose={onClose}
       width="md"
@@ -319,11 +322,10 @@ export function IrisRequiredModal({
           </div>
           <div className="flex-1 space-y-3">
             <p className="text-white/80 font-minecraft-ten leading-relaxed">
-              You installed <span className="text-white font-medium">"{projectTitle}"</span> shader pack, but you don't have a shader mod like
-              <span style={{ color: accentColor.value }} className="font-medium"> Iris</span> installed!
+              {t('iris.warning_title', { projectTitle })}
             </p>
             <p className="text-white/70 font-minecraft-ten leading-relaxed">
-              <strong className="text-yellow-400">You need Iris (or similar)</strong> to display and use shader packs properly.
+              {t('iris.warning_need_iris')}
             </p>
           </div>
         </div>
@@ -333,8 +335,7 @@ export function IrisRequiredModal({
           <div className="flex items-center gap-3">
             <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-yellow-400 flex-shrink-0" />
             <p className="text-yellow-200 font-minecraft-ten text-sm leading-relaxed">
-              Shader mods like Iris can reduce performance
-              <strong className="text-yellow-400"> even when shaders are disabled</strong>. Keep this in mind!
+              {t('iris.performance_warning')}
             </p>
           </div>
         </div>
@@ -453,7 +454,7 @@ export async function handleIrisCheckAndShowModal(
                 console.log('🎯 [IrisModal] User clicked "Install Iris" - starting installation...');
 
                 // Show loading state or progress indication
-                toast.loading('Installing Iris shader mod...', {
+                toast.loading(i18n.t('iris.installing'), {
                   id: 'iris-install',
                   duration: 10000
                 });
@@ -462,7 +463,7 @@ export async function handleIrisCheckAndShowModal(
                 const installSuccess = await installIrisToProfile(profileId);
 
                 if (installSuccess) {
-                  toast.success('Iris successfully installed!', {
+                  toast.success(i18n.t('iris.install_success'), {
                     id: 'iris-install',
                     duration: 3000
                   });
@@ -474,7 +475,7 @@ export async function handleIrisCheckAndShowModal(
 
                   console.log('🎉 [IrisModal] Iris installation completed successfully');
                 } else {
-                  toast.error('❌ Failed to install Iris. Please try manually.', {
+                  toast.error(i18n.t('iris.install_failed'), {
                     id: 'iris-install',
                     duration: 5000
                   });
@@ -482,7 +483,7 @@ export async function handleIrisCheckAndShowModal(
                 }
               } catch (error) {
                 console.error('❌ [IrisModal] Error during Iris installation:', error);
-                toast.error('❌ Installation failed. Check console for details.', {
+                toast.error(i18n.t('iris.installation_error'), {
                   id: 'iris-install',
                   duration: 5000
                 });

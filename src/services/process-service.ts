@@ -5,6 +5,7 @@ import { getLauncherConfig } from "./launcher-config-service";
 import flagsmith from "flagsmith";
 import { toast } from "react-hot-toast";
 import { logInfo, logWarn } from "../utils/logging-utils";
+import i18n from '../i18n/i18n';
 
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
@@ -38,7 +39,7 @@ export async function launch(
       const isAllowed = flagsmith.hasFeature("show_experimental_mode", { fallback: false });
       logInfo(`[ProcessService] Feature flag check result: ${isAllowed}`);
       if (!isAllowed) {
-        toast.error("Please disable experimental mode in Settings.");
+        toast.error(i18n.t('settings.disable_experimental'));
         return; // Block launch
       }
     }
@@ -125,13 +126,15 @@ export async function getLogContentForProcess(processId: string): Promise<string
  * Manually fetches the latest crash report for a specific profile and process.
  * @param profileId - The profile UUID (to locate crash-reports folder)
  * @param processId - The process UUID (for event emission, optional)
+ * @param processStartTime - The process start time as ISO 8601 string (optional, filters out older crash reports)
  */
-export async function fetchCrashReport(profileId: string, processId?: string): Promise<string | null> {
-  console.debug(`[ProcessService] Fetching crash report for profile ${profileId}, process ${processId || 'none'}`);
+export async function fetchCrashReport(profileId: string, processId?: string, processStartTime?: string): Promise<string | null> {
+  console.debug(`[ProcessService] Fetching crash report for profile ${profileId}, process ${processId || 'none'}, startTime ${processStartTime || 'none'}`);
   try {
-    const crashContent = await invoke<string | null>("fetch_crash_report", { 
-      profileId, 
-      processId: processId || null 
+    const crashContent = await invoke<string | null>("fetch_crash_report", {
+      profileId,
+      processId: processId || null,
+      processStartTime: processStartTime || null
     });
     return crashContent || null;
   } catch (error) {

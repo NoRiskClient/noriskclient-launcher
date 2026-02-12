@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
 import type {
   GetStarlightSkinRenderPayload,
@@ -59,6 +60,7 @@ const SkinPreview = memo(
     const isBackgroundAnimationEnabled = useThemeStore(
       (state) => state.isBackgroundAnimationEnabled,
     );
+    const { t } = useTranslation();
     const isSelected = selectedLocalSkin?.id === skin.id;
     const isDisabled = loading && isSelected;
 
@@ -183,7 +185,7 @@ const SkinPreview = memo(
                 onEditSkin(skin, event);
               }}
               className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-              title="Edit skin properties"
+              title={t('skins.editProperties')}
               disabled={isDisabled}
             >
               <Icon icon="solar:pen-bold" className="w-4 h-4" />
@@ -198,7 +200,7 @@ const SkinPreview = memo(
                 onDeleteSkin(skin.id, skin.name, event);
               }}
               className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-              title="Delete skin"
+              title={t('skins.deleteSkin')}
               disabled={isDisabled}
             >
               <Icon
@@ -222,7 +224,7 @@ const SkinPreview = memo(
             {isRenderLoading && canShowSpinner ? (
               <div className="flex flex-col items-center justify-center space-y-2">
                 <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
-                <p className="font-minecraft text-xs text-white/70 lowercase">Loading...</p>
+                <p className="font-minecraft text-xs text-white/70 lowercase">{t('skins.loading')}</p>
               </div>
             ) : !isRenderLoading ? (
               <SkinViewer
@@ -242,7 +244,7 @@ const SkinPreview = memo(
                   style={{ color: accentColor.value }}
                 />
                 <span className="font-minecraft text-xs text-white lowercase">
-                  Applying
+                  {t('skins.applying')}
                 </span>
               </div>
             )}
@@ -265,7 +267,7 @@ const SkinPreview = memo(
                   icon="solar:palette-bold"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>{skin.variant === "slim" ? "Slim" : "Classic"}</span>
+                <span>{skin.variant === "slim" ? t('skins.slim') : t('skins.classic')}</span>
               </div>
 
               {isApplied && (
@@ -276,7 +278,7 @@ const SkinPreview = memo(
                       icon="solar:check-circle-bold"
                       className="w-3 h-3"
                     />
-                    <span>Applied</span>
+                    <span>{t('skins.applied')}</span>
                   </div>
                 </>
               )}
@@ -291,6 +293,7 @@ const SkinPreview = memo(
 const AddSkinCard = memo(
   ({ index, onClick }: { index: number; onClick: () => void }) => {
     const [isHovered, setIsHovered] = useState(false);
+    const { t } = useTranslation();
     const isBackgroundAnimationEnabled = useThemeStore(
       (state) => state.isBackgroundAnimationEnabled,
     );
@@ -347,9 +350,9 @@ const AddSkinCard = memo(
             {/* Skin Name */}
             <h3
               className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
-              title="Add New Skin"
+              title={t('skins.addNewSkin')}
             >
-              Add New Skin
+              {t('skins.addNewSkin')}
             </h3>
 
             {/* Description */}
@@ -359,7 +362,7 @@ const AddSkinCard = memo(
                   icon="solar:upload-bold"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>Upload or import</span>
+                <span>{t('skins.uploadOrImport')}</span>
               </div>
             </div>
           </div>
@@ -378,6 +381,7 @@ export function SkinsTab() {
     initializeAccounts,
   } = useMinecraftAuthStore();
   const { showModal, hideModal } = useGlobalModal();
+  const { t } = useTranslation();
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
   const [skinData, setSkinData] = useState<MinecraftProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -429,7 +433,7 @@ export function SkinsTab() {
             }
           } catch (e) {
             console.error("Error parsing skin textures:", e);
-            toast.error("Failed to parse skin details.");
+            toast.error(t('skins.failedToParseSkinDetails'));
           }
         }
       }
@@ -517,7 +521,7 @@ export function SkinsTab() {
         }
         hideModal('add-skin-modal');
       } else {
-        toast.error("Skin not found. It may have been deleted.");
+        toast.error(t('skins.skinNotFound'));
       }
     } catch (err) {
       console.error("Error updating skin properties:", err);
@@ -546,7 +550,7 @@ export function SkinsTab() {
       console.error("Error adding new skin:", err);
       const errorMessage =
         err instanceof Error ? err.message : String(err.message);
-      toast.error(`Failed to add skin: ${errorMessage}`);
+      toast.error(t('skins.failedToAddSkin', { error: errorMessage }));
     }
   };
 
@@ -564,7 +568,7 @@ export function SkinsTab() {
     toast.promise(
       deletePromise(),
       {
-        loading: `Deleting skin "${skinName}"...`,
+        loading: t('skins.deletingSkin', { name: skinName }),
         success: () => {
           setLocalSkins((prevSkins) =>
             prevSkins.filter((s) => s.id !== skinId),
@@ -573,7 +577,7 @@ export function SkinsTab() {
             setSelectedLocalSkin(null);
             setSelectedSkinId(null);
           }
-          return `Successfully deleted skin: ${skinName}`;
+          return t('skins.deletedSkinSuccess', { name: skinName });
         },
         error: (err) => {
           console.error("Error deleting skin:", err);
@@ -589,12 +593,12 @@ export function SkinsTab() {
 
   const applyLocalSkin = async (skin: MinecraftSkin) => {
     if (!activeAccount) {
-      toast.error("You must be logged in to apply a skin");
+      toast.error(t('skins.mustBeLoggedIn'));
       return;
     }
 
     if (isSkinApplied(skin)) {
-      toast.error(`Skin "${skin.name}" is already applied to your account`);
+      toast.error(t('skins.skinAlreadyApplied', { name: skin.name }));
       return;
     }
 
@@ -610,7 +614,7 @@ export function SkinsTab() {
       );
 
       toast.success(
-        `Successfully applied skin: ${skin.name} (${skin.variant} model)`,
+        t('skins.appliedSkinSuccess', { name: skin.name, variant: skin.variant }),
       );
       await loadSkinData();
     } catch (err) {
@@ -631,13 +635,13 @@ export function SkinsTab() {
     <button
       onClick={() => startEditSkin(null)}
       className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
-      title="Add Skin"
+      title={t('skins.addSkin')}
       disabled={!activeAccount}
     >
       <div className="w-4 h-4 flex items-center justify-center">
         <Icon icon="solar:add-circle-bold" className="w-4 h-4" />
       </div>
-      <span>add skin</span>
+      <span>{t('skins.addSkin')}</span>
     </button>
   );
 
@@ -649,7 +653,7 @@ export function SkinsTab() {
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <SearchWithFilters
-                placeholder="Search skins..."
+                placeholder={t('skins.searchPlaceholder')}
                 searchValue={search}
                 onSearchChange={setSearch}
                 onSearchEnter={() => {}} // Optional: implement instant search
@@ -667,24 +671,24 @@ export function SkinsTab() {
         <div className="space-y-8">
         {accountLoading ? (
           <p className="text-white/70 font-minecraft text-xl text-center py-4">
-            Loading account...
+            {t('skins.loadingAccount')}
           </p>
         ) : accountError ? (
           <StatusMessage
             type="error"
             className="font-minecraft text-lg"
-            message={`Account Error: ${accountError}`}
+            message={t('skins.accountError', { error: accountError })}
           />
         ) : !activeAccount ? (
           <p className="text-white/70 italic font-minecraft text-xl text-center py-10">
-            Please log in to a Minecraft account to manage skins.
+            {t('skins.pleaseLogIn')}
           </p>
         ) : (
           <>
             <div className="space-y-5 text-center">
               {localSkinsLoading ? (
                 <p className="text-white/70 font-minecraft text-xl text-center py-4">
-                  Loading skins...
+                  {t('skins.loadingSkins')}
                 </p>
               ) : localSkinsError ? (
                 <StatusMessage
@@ -697,7 +701,7 @@ export function SkinsTab() {
                 filteredSkins.length === 0 &&
                 !localSkinsError ? (
                 <p className="text-white/70 italic font-minecraft text-lg">
-                  No skins match your search. Try a different search term.
+                  {t('skins.noSkinsMatchSearch')}
                 </p>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">

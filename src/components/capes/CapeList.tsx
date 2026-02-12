@@ -8,6 +8,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
@@ -64,6 +65,7 @@ function CapeItemDisplay({
   hideModal,
   isVanilla = false,
 }: CapeItemDisplayProps) {
+  const { t } = useTranslation();
   const handleCapeClick = useCallback(() => {
     if (isCurrentlyEquipping || !showModal) return;
 
@@ -76,7 +78,7 @@ function CapeItemDisplay({
 
     showModal(`cape-preview-${capeId}`, (
       <Modal
-        title="Cape Preview"
+        title={t('capes.capePreview')}
         onClose={() => hideModal && hideModal(`cape-preview-${capeId}`)}
         width="md"
         variant="flat"
@@ -173,7 +175,7 @@ function CapeItemDisplay({
               toggleFavoriteOptimistic((cape as CosmeticCape)._id);
             }}
             className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-            title={isFavorite ? "Unfavorite" : "Favorite"}
+            title={isFavorite ? t('capes.unfavorite') : t('capes.favorite')}
             disabled={isCurrentlyEquipping}
           >
             <Icon
@@ -193,7 +195,7 @@ function CapeItemDisplay({
               onDeleteCapeClick(cape as CosmeticCape, e);
             }}
             className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-            title="Delete Cape"
+            title={t('capes.deleteCape')}
             disabled={isCurrentlyEquipping}
           >
             <Icon
@@ -234,7 +236,7 @@ function CapeItemDisplay({
           {/* Equipped badge */}
           {isEquipped && !isCurrentlyEquipping && (
             <div className="absolute top-2 right-2 z-30">
-              <Tooltip content="This cape is currently equipped">
+              <Tooltip content={t('capes.currentlyEquipped')}>
                 <Icon
                   icon="solar:check-circle-bold"
                   className="w-4 h-4"
@@ -253,7 +255,7 @@ function CapeItemDisplay({
                 style={{ color: accentColor.value }}
               />
               <span className="font-minecraft text-xs text-white lowercase">
-                Equipping
+                {t('capes.equipping')}
               </span>
             </div>
           )}
@@ -274,8 +276,8 @@ function CapeItemDisplay({
             {isVanilla
               ? (cape as VanillaCape).name
               : creatorLoading
-                ? "Loading..."
-                : creatorName || "Unknown"
+                ? t('common.loading')
+                : creatorName || t('common.unknown')
             }
           </h3>
 
@@ -287,7 +289,7 @@ function CapeItemDisplay({
                   icon="solar:download-minimalistic-outline"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>{(cape as CosmeticCape).uses.toLocaleString()} uses</span>
+                <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
               </div>
             </div>
           )}
@@ -338,6 +340,7 @@ export function CapeList({
   const accentColor = useThemeStore((state) => state.accentColor);
   const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
   const { showModal, hideModal } = useGlobalModal();
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -546,13 +549,13 @@ export function CapeList({
           message={
             isVanilla
               ? searchQuery
-                ? `No vanilla capes found for "${searchQuery}"`
-                : "You don't own any vanilla Minecraft capes yet"
+                ? t('capes.noVanillaCapesFoundForSearch', { query: searchQuery })
+                : t('capes.noVanillaCapesOwned')
               : showFavoritesOnly
-              ? "Mark some capes as favorites by clicking the heart icon!"
+              ? t('capes.markFavoritesHint')
               : searchQuery
-              ? `No capes found for "${searchQuery}"`
-              : "No capes available"
+              ? t('capes.noCapesFoundForSearch', { query: searchQuery })
+              : t('capes.noCapesAvailable')
           }
         />
       </div>
@@ -701,7 +704,7 @@ export function CapeList({
             >
               <Icon icon="ph:eye-bold" className="w-5 h-5 text-white" />
               <span className="font-minecraft-ten text-base text-white/80">
-                Preview
+                {t('capes.preview')}
               </span>
             </li>
           </ul>
@@ -716,7 +719,7 @@ function Cape3DPreviewWithToggle({
   capeUrl,
   capeId,
   onEquipCape,
-  isEquipped = false
+  isEquipped = false,
 }: {
   skinUrl?: string;
   capeUrl?: string; // Optional - falls nicht übergeben, wird CDN URL verwendet
@@ -724,6 +727,7 @@ function Cape3DPreviewWithToggle({
   onEquipCape: () => void;
   isEquipped?: boolean; // Optional - für Vanilla Capes relevant
 }) {
+  const { t } = useTranslation();
   const [showElytra, setShowElytra] = useState(false);
 
   // Verwende capeUrl falls übergeben, sonst CDN URL
@@ -743,8 +747,8 @@ function Cape3DPreviewWithToggle({
               className="w-5 h-5"
             />
           }
-          title={showElytra ? "Show as Cape" : "Show as Elytra"}
-          aria-label={showElytra ? "Show as Cape" : "Show as Elytra"}
+          title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
+          aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
         />
         <SkinView3DWrapper
           skinUrl={skinUrl}
@@ -766,7 +770,7 @@ function Cape3DPreviewWithToggle({
           size="lg"
           className="px-8"
         >
-          {isEquipped ? 'UNEQUIP CAPE' : 'SELECT CAPE'}
+          {isEquipped ? t('capes.unequipCape') : t('capes.selectCape')}
         </Button>
       </div>
     </div>

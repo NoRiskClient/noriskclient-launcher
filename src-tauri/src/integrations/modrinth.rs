@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
 
+use crate::utils::string_utils::safe_truncate;
+
 // Base URL for Modrinth API v2
 const MODRINTH_API_BASE_URL: &str = "https://api.modrinth.com/v2";
 
@@ -1046,7 +1048,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
     if response_body_text.len() > MAX_RAW_BODY_LOG_LENGTH {
         logged_response_body_display = format!(
             "{}... (body truncated, original length: {})",
-            &response_body_text[..MAX_RAW_BODY_LOG_LENGTH],
+            safe_truncate(&response_body_text, MAX_RAW_BODY_LOG_LENGTH),
             response_body_text.len()
         );
     } else {

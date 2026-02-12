@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/Card";
 import {
@@ -29,6 +30,7 @@ export function LaunchStatus({
   onAbort,
   className,
 }: LaunchStatusProps) {
+  const { t } = useTranslation();
   const logEndRef = useRef<HTMLDivElement>(null);
   const { getProfileState } = useLaunchStateStore();
   const profileState = getProfileState(profileId);
@@ -68,7 +70,7 @@ export function LaunchStatus({
     if (profileState.error) {
       return profileState.error;
     }
-    return currentStep || "Idle";
+    return currentStep || t('launch.status.idle');
   };
 
   return (
@@ -90,7 +92,7 @@ export function LaunchStatus({
           <button
             onClick={onAbort}
             className="px-3 py-2 text-red-400 hover:text-red-300 transition-colors"
-            title="Abort Launch"
+            title={t('launch.status.abort')}
           >
             <Icon icon="pixel:x-solid" className="w-4 h-4" />
           </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Profile } from "../../../types/profile";
@@ -35,6 +36,7 @@ export function LogsTab({
   isActive = false,
   onRefresh,
 }: LogsTabProps) {
+  const { t } = useTranslation();
   const [logFiles, setLogFiles] = useState<string[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [errorList, setErrorList] = useState<string | null>(null);
@@ -212,7 +214,7 @@ export function LogsTab({
 
     try {
       await writeText(filteredLogContent);
-      toast.success("Log content copied to clipboard!");
+      toast.success(t('logs.copy_success'));
       setCopied(true);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => {
@@ -220,9 +222,9 @@ export function LogsTab({
       }, 2000);
     } catch (err) {
       console.error("[LogsTab] Failed to copy log to clipboard:", err);
-      toast.error("Failed to copy log content.");
+      toast.error(t('logs.copy_failed'));
     }
-  }, [displayLines]);
+  }, [displayLines, t]);
 
   const handleUploadLog = useCallback(async (): Promise<string> => {
     if (!rawLogContentForCopy || !selectedLogPath) {

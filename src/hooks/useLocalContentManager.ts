@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-hot-toast';
+import i18n from '../i18n/i18n';
 import type { Profile, LocalContentItem as ProfileLocalContentItem, GenericModrinthInfo as ProfileGenericModrinthInfo, LoadItemsParams } from '../types/profile';
 import type { ModrinthVersion, ModrinthBulkUpdateRequestBody, ModrinthHashAlgorithm, ResourcePackModrinthInfo, ShaderPackModrinthInfo, DataPackModrinthInfo } from '../types/modrinth';
 import type { UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersion } from '../types/unified';
@@ -136,7 +137,7 @@ function createUninstallPayload<T extends LocalContentItem>(
   if (uiContentType === 'Mod') {
     if (item.source_type === "custom") {
       if (!item.path) {
-        toast.error(`Custom Mod item ${item.filename} must have a valid path for uninstallation.`);
+        toast.error(i18n.t('content_manager.errors.custom_mod_missing_path_uninstall', { filename: item.filename }));
         return null;
       }
       return { profile_id: profileId, file_path: item.path };
@@ -144,24 +145,24 @@ function createUninstallPayload<T extends LocalContentItem>(
       // For Modrinth or other non-custom mods, require SHA1 for uninstallation
       // as this is likely used to remove it from the profile's mod list as well.
       if (!item.sha1_hash) {
-        toast.error(`Mod item ${item.filename} is missing an SHA1 hash, which is required for uninstallation.`);
+        toast.error(i18n.t('content_manager.errors.mod_missing_sha1_uninstall', { filename: item.filename }));
         return null;
       }
       return { profile_id: profileId, sha1_hash: item.sha1_hash, content_type: NrContentType.Mod };
     }
   } else if (uiContentType === 'ResourcePack' || uiContentType === 'ShaderPack' || uiContentType === 'DataPack') {
     if (!item.path) {
-      toast.error(`${uiContentType} item ${item.filename} must have a valid path for uninstallation.`);
+      toast.error(i18n.t('content_manager.errors.content_missing_path_uninstall', { type: uiContentType, filename: item.filename }));
       return null;
     }
     return { profile_id: profileId, file_path: item.path };
   } else if (uiContentType === 'NoRiskMod') {
-    toast.error("Direct uninstallation of NoRiskMod items is not supported via this method. Please manage NoRisk Packs directly.");
+    toast.error(i18n.t('content_manager.errors.norisk_uninstall_not_supported'));
     console.error("[useLocalContentManager] Attempted to create uninstall payload for NoRiskMod. This is generally not supported here.");
     return null;
   }
 
-  toast.error(`Unsupported content type for uninstallation: ${uiContentType}`);
+  toast.error(i18n.t('content_manager.errors.unsupported_content_type_uninstall', { type: uiContentType }));
   return null;
 }
 
@@ -185,13 +186,13 @@ function createTogglePayload<T extends LocalContentItem>(
     if (noriskIdentifierFromItem) {
       return { ...payloadBase, norisk_mod_identifier: noriskIdentifierFromItem }; // Map to payload's norisk_mod_identifier
     } else {
-      toast.error(`NoRiskMod item ${item.filename} is missing the norisk_info. Cannot toggle.`);
+      toast.error(i18n.t('content_manager.errors.norisk_missing_info_toggle', { filename: item.filename }));
       return null;
     }
   } else if (uiContentType === 'Mod') {
     if (item.source_type === "custom") {
         if (!item.path) {
-            toast.error(`Custom Mod item ${item.filename} must have a valid path to be toggled.`);
+            toast.error(i18n.t('content_manager.errors.custom_mod_missing_path_toggle', { filename: item.filename }));
             return null;
         }
         // For custom mods with a path, prioritize using the path.
@@ -212,7 +213,7 @@ function createTogglePayload<T extends LocalContentItem>(
         } else if (item.path) {
             return { ...payloadBase, /*file_path: item.path*/ };
         } else {
-            toast.error(`Mod item ${item.filename} is missing essential identifiers (SHA1 or Path) for toggle.`);
+            toast.error(i18n.t('content_manager.errors.mod_missing_identifiers_toggle', { filename: item.filename }));
             return null;
         }
     }
@@ -221,7 +222,7 @@ function createTogglePayload<T extends LocalContentItem>(
     if (item.path) {
       return { ...payloadBase, file_path: item.path };
     } else {
-      toast.error(`Path is missing for ${uiContentType} ${item.filename}. Cannot toggle.`);
+      toast.error(i18n.t('content_manager.errors.path_missing_toggle', { type: uiContentType, filename: item.filename }));
       return null;
     }
   }
@@ -743,8 +744,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
   }, [filteredItems]);
 
   const handleToggleItemEnabled = useCallback(async (item: T) => {
-    if (!profile) { 
-      toast.error("Profile missing for toggle.");
+    if (!profile) {
+      toast.error(i18n.t('content_manager.errors.profile_missing_toggle'));
       return;
     }
     console.log(`[${contentType}] handleToggleItemEnabled: Item BEFORE toggle - Path: ${item.path}, Filename: ${item.filename}, Disabled: ${item.is_disabled}`);
@@ -781,7 +782,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     } catch (err) {
       console.error(`Failed to toggle ${getDisplayFileName(item)}:`, err);
       const errorMsg = err instanceof Error ? err.message : String(err.message);
-      toast.error(`Failed to toggle ${getDisplayFileName(item)}: ${errorMsg}`);
+      toast.error(i18n.t('content_manager.errors.toggle_failed', { name: getDisplayFileName(item), error: errorMsg }));
     } finally {
       setItemBeingToggled(null);
     }
@@ -789,7 +790,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
   const handleDeleteItem = useCallback((item: T) => {
     if (!item.path) { // Use path
-      toast.error("Item path missing, cannot delete.");
+      toast.error(i18n.t('content_manager.errors.item_path_missing_delete'));
       return;
     }
     setItemToDeleteForDialog(item);
@@ -805,7 +806,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
   const handleConfirmDeletion = useCallback(async () => {
     if (!profile) {
-      toast.error("Profile data missing, cannot complete deletion.");
+      toast.error(i18n.t('content_manager.errors.profile_missing_delete'));
       handleCloseDeleteDialog();
       return;
     }
@@ -826,7 +827,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
               successfulOperations++;
             } catch (err) {
               const errorDetail = err instanceof Error ? err.message : String(err.message);
-              errors.push(`Failed to delete ${getDisplayFileName(item)}: ${errorDetail}`);
+              errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(item), error: errorDetail }));
             }
           } else {
              // Error already toasted by createUninstallPayload
@@ -836,8 +837,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
           errors.push(`Could not find item ID ${itemId} to delete.`);
         }
       }
-      if (errors.length > 0) toast.error(`Batch delete failed for some items: ${errors.join("; ")}`);
-      if (successfulOperations > 0) toast.success(`Successfully deleted ${successfulOperations} item(s).`);
+      if (errors.length > 0) toast.error(i18n.t('content_manager.errors.batch_delete_failed', { errors: errors.join("; ") }));
+      if (successfulOperations > 0) toast.success(i18n.t('content_manager.success.batch_deleted', { count: successfulOperations }));
       setIsBatchDeleting(false);
       setSelectedItemIds(new Set());
     } else if (itemToDeleteForDialog) {
@@ -846,7 +847,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       if (payload) {
         try {
           await uninstallContentFromProfile(payload);
-          toast.success(`Deleted ${getDisplayFileName(itemToDeleteForDialog)}.`);
+          toast.success(i18n.t('content_manager.success.deleted', { name: getDisplayFileName(itemToDeleteForDialog) }));
           successfulOperations++;
           setItems(prevItems => prevItems.filter(i => i.filename !== itemToDeleteForDialog.filename));
           setSelectedItemIds(prevIds => {
@@ -856,8 +857,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
           });
         } catch (err) {
           const errorDetail = err instanceof Error ? err.message : String(err.message);
-          toast.error(`Failed to delete ${getDisplayFileName(itemToDeleteForDialog)}: ${errorDetail}`);
-          errors.push(`Failed to delete ${getDisplayFileName(itemToDeleteForDialog)}: ${errorDetail}`);
+          toast.error(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
+          errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
         }
       } else {
         // Error already toasted by createUninstallPayload
@@ -912,9 +913,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
       }
     }
     setIsBatchToggling(false);
-    if (errors.length > 0) toast.error(`Batch toggle failed for some items: ${errors.join("; ")}`);
+    if (errors.length > 0) toast.error(i18n.t('content_manager.errors.batch_toggle_failed', { errors: errors.join("; ") }));
     if (successfulOperations > 0) {
-      toast.success(`Successfully toggled ${successfulOperations} item(s).`);
+      toast.success(i18n.t('content_manager.success.batch_toggled', { count: successfulOperations }));
       if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
     }
     setSelectedItemIds(new Set());
@@ -930,7 +931,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
   const handleOpenItemFolder = useCallback(async (item: T) => {
     console.log("handleOpenItemFolder", item);
     if (!item.path) {
-      toast.error("Path not available for this item.");
+      toast.error(i18n.t('content_manager.errors.path_not_available'));
       return;
     }
     try {
@@ -945,7 +946,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       } catch (openError: any) {
         console.error(`[Opener] openPath also failed for ${item.path}:`, openError);
         const errorMsg = openError?.message || revealError?.message || "Failed to open item location.";
-        toast.error(`Failed to open location: ${errorMsg}`);
+        toast.error(i18n.t('content_manager.errors.failed_open_location', { error: errorMsg }));
       }
     }
   }, []);
@@ -1164,13 +1165,13 @@ export function useLocalContentManager<T extends LocalContentItem>({
   const handleUpdateContentItem = useCallback(async (item: T, updateVersion: UnifiedVersion, suppressOwnToast: boolean = false) => {
     // 1. Initial checks
     if (!profile) {
-      toast.error("Profile missing, cannot update.");
+      toast.error(i18n.t('content_manager.errors.profile_missing_update'));
       return;
     }
 
     // 1.5. Check if this is a modpack mod (blocked unless updates are explicitly enabled)
     if (contentType === 'Mod' && item.modpack_origin !== null && item.modpack_origin !== undefined && item.updates_enabled !== true) {
-      toast.error(`Cannot update ${getDisplayFileName(item)}. This mod comes from a modpack and must be updated through the modpack. Individual updates are disabled to prevent breaking changes.`);
+      toast.error(i18n.t('content_manager.errors.modpack_mod_update_blocked', { name: getDisplayFileName(item) }));
       return;
     }
 
@@ -1179,18 +1180,18 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
     // Basic validation for all content types
     if (!item.path && !(contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info)) {
-      toast.error(`Item path missing for ${getDisplayFileName(item)}, cannot update.`);
+      toast.error(i18n.t('content_manager.errors.item_path_missing_update', { name: getDisplayFileName(item) }));
       return;
     }
 
     // Platform-specific validation
     if (platform === 'Modrinth' && contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info && !item.modrinth_info) {
-      toast.error(`Mod ${getDisplayFileName(item)} is not recognized as a Modrinth mod. Cannot update.`);
+      toast.error(i18n.t('content_manager.errors.mod_not_modrinth', { name: getDisplayFileName(item) }));
       return;
     }
 
     if (platform === 'CurseForge' && contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info && !item.curseforge_info) {
-      toast.error(`Mod ${getDisplayFileName(item)} is not recognized as a CurseForge mod. Cannot update.`);
+      toast.error(i18n.t('content_manager.errors.mod_not_curseforge', { name: getDisplayFileName(item) }));
       return;
     }
 
@@ -1215,14 +1216,13 @@ export function useLocalContentManager<T extends LocalContentItem>({
         await toast.promise(
           promiseAction(),
           {
-        loading: `Updating ${getDisplayFileName(item)} to ${updateVersion.version_number}...`,
-        success: `Successfully updated ${getDisplayFileName(item)} to ${updateVersion.version_number}!`,
-        error: (err: any) => {
-          console.error(`Failed to update ${contentType} for ${getDisplayFileName(item)} (${platform}):`, err);
-          const displayName = getDisplayFileName(item);
-          const errorMsg = err?.message || (typeof err === 'string' ? err : "An unknown error occurred during the update.");
-          return `Failed to update ${displayName}: ${errorMsg}`;
-        }
+            loading: i18n.t('content_manager.loading.updating', { name: getDisplayFileName(item), version: updateVersion.version_number }),
+            success: i18n.t('content_manager.success.updated', { name: getDisplayFileName(item), version: updateVersion.version_number }),
+            error: (err: any) => {
+              console.error(`Failed to update ${contentType} for ${getDisplayFileName(item)} (${platform}):`, err);
+              const errorMsg = err?.message || (typeof err === 'string' ? err : "An unknown error occurred during the update.");
+              return i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg });
+            }
           },
           {
             success: {
@@ -1276,16 +1276,16 @@ export function useLocalContentManager<T extends LocalContentItem>({
     let succeededCount = 0;
     const totalCount = itemsToUpdateWithDetails.length;
     
-    const toastId = toast.loading(`Updating 0/${totalCount} ${contentType}s...`);
+    const toastId = toast.loading(i18n.t('content_manager.loading.updating_progress', { current: 0, total: totalCount, type: contentType }));
     
     for (const { item, version } of itemsToUpdateWithDetails) {
       try {
         await handleUpdateContentItem(item, version, true); // suppressOwnToast - version ist jetzt UnifiedVersion
         succeededCount++;
-        toast.loading(`Updating ${succeededCount}/${totalCount} ${contentType}s...`, { id: toastId });
+        toast.loading(i18n.t('content_manager.loading.updating_progress', { current: succeededCount, total: totalCount, type: contentType }), { id: toastId });
       } catch(err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        toast.error(`Failed to update ${getDisplayFileName(item)}: ${errorMsg}`);
+        toast.error(i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg }));
       }
     }
     
@@ -1294,7 +1294,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     const failedCount = totalCount - succeededCount;
     if (failedCount > 0) {
       if (totalCount > 1) {
-        const message = `Finished: ${succeededCount} succeeded, ${failedCount} failed.`;
+        const message = i18n.t('content_manager.update_result.finished_partial', { succeeded: succeededCount, failed: failedCount });
         if (succeededCount > 0) {
           toast.success(message, { id: toastId, duration: 700 });
         } else {
@@ -1305,7 +1305,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         toast.dismiss(toastId);
       }
     } else if (succeededCount > 0) {
-      toast.success(`Successfully updated all ${succeededCount} ${contentType}(s).`, { id: toastId, duration: 700 });
+      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentType }), { id: toastId, duration: 700 });
     } else {
       toast.dismiss(toastId);
     }
@@ -1320,7 +1320,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
   const handleSwitchContentVersion = useCallback(async (item: T, newVersion: UnifiedVersion) => {
     if (!profile) {
-      toast.error("Cannot switch version: Missing profile.");
+      toast.error(i18n.t('content_manager.errors.profile_missing_switch'));
       return;
     }
 
@@ -1333,9 +1333,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
     await toast.promise(
       promiseAction(),
       {
-        loading: `Switching to ${newVersion.name}...`,
-        success: `Switched ${getDisplayFileName(item)} to ${newVersion.name}.`,
-        error: (err) => `Failed to switch version: ${err.message.toString()}`,
+        loading: i18n.t('content_manager.loading.switching', { version: newVersion.name }),
+        success: i18n.t('content_manager.success.switched', { name: getDisplayFileName(item), version: newVersion.name }),
+        error: (err) => i18n.t('content_manager.errors.switch_failed', { error: err.message.toString() }),
       },
       {
         success: {
@@ -1362,12 +1362,12 @@ export function useLocalContentManager<T extends LocalContentItem>({
   // Toggle updates enabled for a single item
   const handleToggleItemUpdatesEnabled = useCallback(async (item: T) => {
     if (!profile) {
-      toast.error("Cannot toggle update checks: Missing profile.");
+      toast.error(i18n.t('content_manager.errors.profile_missing_toggle_updates'));
       return;
     }
 
     if (!item.id) {
-      toast.error(`Cannot toggle update checks: ${getDisplayFileName(item)} has no valid ID.`);
+      toast.error(i18n.t('content_manager.errors.no_valid_id_toggle_updates', { name: getDisplayFileName(item) }));
       return;
     }
 
@@ -1394,9 +1394,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
     await toast.promise(
       promiseAction(),
       {
-        loading: `${newUpdatesEnabled ? 'Enabling' : 'Disabling'} update checks for ${getDisplayFileName(item)}...`,
-        success: `Update checks ${newUpdatesEnabled ? 'enabled' : 'disabled'} for ${getDisplayFileName(item)}.`,
-        error: (err) => `Failed to toggle update checks: ${err.message?.toString() || 'Unknown error'}`,
+        loading: i18n.t(newUpdatesEnabled ? 'content_manager.loading.enabling_update_checks' : 'content_manager.loading.disabling_update_checks', { name: getDisplayFileName(item) }),
+        success: i18n.t(newUpdatesEnabled ? 'content_manager.success.toggle_updates_enabled' : 'content_manager.success.toggle_updates_disabled', { name: getDisplayFileName(item) }),
+        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message?.toString() || 'Unknown error' }),
       },
       {
         success: {
@@ -1410,12 +1410,12 @@ export function useLocalContentManager<T extends LocalContentItem>({
   // Bulk toggle updates enabled for selected items
   const handleBatchToggleSelectedUpdatesEnabled = useCallback(async (updatesEnabled: boolean) => {
     if (!profile) {
-      toast.error("Cannot toggle update checks: Missing profile.");
+      toast.error(i18n.t('content_manager.errors.profile_missing_toggle_updates'));
       return;
     }
 
     if (selectedItemIds.size === 0) {
-      toast.error("No items selected.");
+      toast.error(i18n.t('content_manager.errors.no_items_selected'));
       return;
     }
 
@@ -1423,9 +1423,11 @@ export function useLocalContentManager<T extends LocalContentItem>({
     const selectedItems = items.filter(item => selectedItemIds.has(item.filename));
 
     if (selectedItems.length === 0) {
-      toast.error("Selected items not found.");
+      toast.error(i18n.t('content_manager.errors.selected_items_not_found'));
       return;
     }
+
+    const itemLabel = i18n.t(selectedItems.length === 1 ? 'content_manager.update_result.item' : 'content_manager.update_result.items');
 
     const promiseAction = async () => {
       // Filter out items without valid IDs and prepare bulk update payload
@@ -1460,9 +1462,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
     await toast.promise(
       promiseAction(),
       {
-        loading: `${updatesEnabled ? 'Enabling' : 'Disabling'} update checks for ${selectedItems.length} ${selectedItems.length === 1 ? 'item' : 'items'}...`,
-        success: `Update checks ${updatesEnabled ? 'enabled' : 'disabled'} for ${selectedItems.length} ${selectedItems.length === 1 ? 'item' : 'items'}.`,
-        error: (err) => `Failed to toggle update checks: ${err.message || 'Unknown error'}`,
+        loading: i18n.t(updatesEnabled ? 'content_manager.loading.enabling_update_checks_batch' : 'content_manager.loading.disabling_update_checks_batch', { count: selectedItems.length, itemLabel }),
+        success: i18n.t(updatesEnabled ? 'content_manager.success.batch_toggle_updates_enabled' : 'content_manager.success.batch_toggle_updates_disabled', { count: selectedItems.length, itemLabel }),
+        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message || 'Unknown error' }),
       },
       {
         success: {
@@ -1472,7 +1474,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     ).catch((err) => {
       // If we get an error about valid items, show a more specific message
       if (err.message && err.message.includes('No valid items found')) {
-        toast.error('Cannot toggle update checks: Selected items do not have valid IDs');
+        toast.error(i18n.t('content_manager.errors.no_valid_ids_toggle_updates'));
       }
     });
 

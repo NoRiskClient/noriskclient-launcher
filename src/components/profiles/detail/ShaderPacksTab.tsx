@@ -15,6 +15,7 @@ import { ContentTable } from "../../ui/ContentTable";
 import { Button } from "../../ui/buttons/Button";
 import { gsap } from "gsap";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 interface ShaderPacksTabProps {
   profile: Profile;
@@ -30,6 +31,7 @@ export function ShaderPacksTab({
   isActive = false,
   searchQuery = "",
 }: ShaderPacksTabProps) {
+  const { t } = useTranslation();
   const [shaderPacks, setShaderPacks] = useState<ShaderPackInfo[]>([]);
   const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
   const [loadingShaderPacks, setLoadingShaderPacks] = useState(false);
@@ -264,7 +266,7 @@ export function ShaderPacksTab({
         enabled: shouldBeEnabled,
       });
 
-      toast.success(`Shader pack "${packFileName}" ${shouldBeEnabled ? 'enabled' : 'disabled'}.`);
+      toast.success(t('shaderpacks.toggle_success', { name: packFileName, status: shouldBeEnabled ? t('common.enabled').toLowerCase() : t('common.disabled').toLowerCase() }));
 
       setShaderPacks((packs) =>
         packs.map((p) =>
@@ -276,7 +278,7 @@ export function ShaderPacksTab({
     } catch (err) {
       const packFileName = pack?.filename || "Selected pack";
       console.error("Failed to toggle pack enabled state:", err);
-      toast.error(`Failed to toggle "${packFileName}": ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(t('shaderpacks.toggle_failed', { name: packFileName, error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setLoadingOperation(false);
     }
@@ -625,7 +627,7 @@ export function ShaderPacksTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search shader packs..."
+              placeholder={t('shaderpacks.search_placeholder')}
             />
           </div>
         )}
@@ -713,7 +715,7 @@ export function ShaderPacksTab({
         }}
       >
         {loadingShaderPacks ? (
-          <LoadingState message="loading shader packs..." />
+          <LoadingState message={t('shaderpacks.loading')} />
         ) : shaderPacksError ? (
           <div className="p-4 text-red-400 bg-red-900/20 rounded border border-red-700/30">
             <div className="flex items-center gap-2">

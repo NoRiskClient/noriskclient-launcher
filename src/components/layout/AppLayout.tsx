@@ -29,6 +29,11 @@ import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
+import { FriendsSidebar } from "../friends/FriendsSidebar";
+// TODO: Re-enable when WebSocket is stable
+// import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
+import { useFriendsStore } from "../../store/friends-store";
+import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
@@ -37,17 +42,7 @@ import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
 import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { toast } from 'react-hot-toast';
-
-const navItems = [
-  { id: "play", icon: "solar:play-bold", label: "Play" },
-  { id: "profiles", icon: "solar:user-id-bold", label: "Profiles" },
-  { id: "mods", icon: "solar:widget-bold", label: "Mods" },
-  { id: "skins", icon: "solar:emoji-funny-circle-bold", label: "Skins" },
-  { id: "capes", icon: "solar:shop-bold", label: "Capes" },
-  // DISABLED: Advent Calendar (seasonal feature)
-  // { id: "advent-calendar", icon: "solar:gift-bold", label: "Advent" },
-  { id: "settings", icon: "solar:settings-bold", label: "Settings" },
-];
+import { useTranslation } from "react-i18next";
 
 const appConfig = {
   version: "v0.5.22",
@@ -64,16 +59,48 @@ export function AppLayout({
   activeTab,
   onNavChange,
 }: AppLayoutProps) {
+  const { t } = useTranslation();
   const launcherRef = useRef<HTMLDivElement>(null);
   const backgroundPatternRef = useRef<HTMLDivElement>(null);
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
   const { currentEffect } = useBackgroundEffectStore();
+
+  const navItems = [
+    { id: "play", icon: "solar:play-bold", label: t("nav.play") },
+    { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
+    { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
+    { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
+    { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    // DISABLED: Advent Calendar (seasonal feature)
+    // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
+    { id: "settings", icon: "solar:settings-bold", label: t("nav.settings") },
+  ];
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
+  const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
+  const { loadChats } = useChatStore();
+
+  // TODO: Re-enable when WebSocket is stable
+  // useFriendsWebSocket();
+
+  useEffect(() => {
+    const initFriends = async () => {
+      try {
+        await loadCurrentUser();
+        await loadFriends();
+        await loadChats();
+        // TODO: Re-enable when WebSocket is stable
+        // await connectWebSocket();
+      } catch (e) {
+        // Silently fail - user might not be logged in yet
+      }
+    };
+    initFriends();
+  }, []);
 
   const getComplementaryBackground = () => {
     const hexToRgb = (hex: string) => {
@@ -327,6 +354,7 @@ export function AppLayout({
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
       <ProfileDuplicateModal />
+      <FriendsSidebar />
     </div>
   );
 }
@@ -369,23 +397,30 @@ interface HeaderBarProps {
 }
 
 function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdateClick = async () => {
+    if (isUpdating) return; // Prevent multiple simultaneous downloads
+
+    setIsUpdating(true);
     try {
       await toast.promise(
         downloadAndInstallUpdate(),
         {
-          loading: 'Downloading and installing update...',
-          success: 'Update installed successfully! Application will restart.',
-          error: (err) => `Update failed: ${err instanceof Error ? err.message : String(err)}`,
+          loading: t('header.update.downloading'),
+          success: t('header.update.success'),
+          error: (err) => t('header.update.failed', { error: err instanceof Error ? err.message : String(err) }),
         }
       );
     } catch (error) {
       console.error("Failed to download and install update:", error);
       // Toast error is already handled by the promise toast
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -480,11 +515,14 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               noriskclient
             </h1>
             {availableUpdate && (
-              <Tooltip content={`Click to update: ${availableUpdate.version}`}>
-                <div className="cursor-pointer mt-2.5" onClick={handleUpdateClick}>
+              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
+                <div
+                  className={`mt-2.5 ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  onClick={handleUpdateClick}
+                >
                   <Icon
-                    icon="solar:download-minimalistic-bold"
-                    className="w-6 h-6 transition-colors"
+                    icon={isUpdating ? "solar:download-minimalistic-bold" : "solar:download-minimalistic-bold"}
+                    className={`w-6 h-6 transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
                     style={{
                       color: accentColor.value,
                     }}
@@ -523,26 +561,27 @@ function WindowControls({
   maximizeRef,
   closeRef,
 }: WindowControlsProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 ml-4">
       <div
         ref={minimizeRef}
         className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
-        title="Minimize"
+        title={t('window.minimize')}
       >
         <Icon icon="pixel:minus-solid" className="w-4 h-4" />
       </div>
       <div
         ref={maximizeRef}
         className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
-        title="Maximize"
+        title={t('window.maximize')}
       >
         <Icon icon="pixel:expand-solid" className="w-4 h-4" />
       </div>
       <div
         ref={closeRef}
         className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-red-500 transition-colors cursor-pointer"
-        title="Close"
+        title={t('window.close')}
       >
         <Icon icon="pixel:window-close-solid" className="w-4 h-4" />
       </div>

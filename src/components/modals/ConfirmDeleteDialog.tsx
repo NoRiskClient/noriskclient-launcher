@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";
@@ -24,23 +25,25 @@ export function ConfirmDeleteDialog({
   title,
   message,
 }: ConfirmDeleteDialogProps) {
+  const { t } = useTranslation();
+
   if (!isOpen) {
     return null;
   }
 
-  const dialogTitle = title || `Delete '${itemName}'?`;
+  const dialogTitle = title || t('confirm_delete.title', { name: itemName });
   const dialogMessage = message || (
     <p className="text-white/80 font-minecraft-ten">
-      Are you sure you want to permanently delete <strong className="text-white">{itemName}</strong>?
+      {t('confirm_delete.message', { name: itemName })}
       <br />
-      This action cannot be undone.
+      {t('confirm_delete.cannot_undo')}
     </p>
   );
 
   const dialogFooter = (
     <div className="flex justify-end items-center gap-3">
       <Button variant="secondary" onClick={onClose} disabled={isDeleting}>
-        Cancel
+        {t('common.cancel')}
       </Button>
       <Button
         variant="destructive"
@@ -48,7 +51,7 @@ export function ConfirmDeleteDialog({
         disabled={isDeleting}
         icon={isDeleting ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : null}
       >
-        {isDeleting ? "Deleting..." : "Delete"}
+        {isDeleting ? t('confirm_delete.button.deleting') : t('confirm_delete.button.delete')}
       </Button>
     </div>
   );

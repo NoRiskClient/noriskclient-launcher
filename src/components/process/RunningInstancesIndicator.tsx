@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import * as ProcessService from "../../services/process-service";
@@ -23,6 +24,7 @@ interface RunningInstancesIndicatorProps {
 export function RunningInstancesIndicator({
   className,
 }: RunningInstancesIndicatorProps) {
+  const { t } = useTranslation();
   const [processes, setProcesses] = useState<ProcessMetadata[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function RunningInstancesIndicator({
       const fetchedProcesses = await ProcessService.getRunningProcesses();
       setProcesses(fetchedProcesses);
     } catch (err) {
-      setError("Failed to fetch processes");
+      setError(t('instances.fetch_failed'));
       console.error(err);
       setProcesses([]);
     } finally {
@@ -147,10 +149,10 @@ export function RunningInstancesIndicator({
           className="h-10"
         >
           {isLoading && instanceCount === 0
-            ? "Loading..."
+            ? t('instances.loading')
             : instanceCount === 0
-              ? "No instances"
-              : `${instanceCount} Instance${instanceCount !== 1 ? "s" : ""}`}
+              ? t('instances.no_instances')
+              : `${instanceCount} ${t('common.instance', { count: instanceCount })}`}
         </Button>
       </div>
 
@@ -160,7 +162,7 @@ export function RunningInstancesIndicator({
         triggerRef={buttonRef}
         width={350}
       >
-        <DropdownHeader title="running instances">
+        <DropdownHeader title={t('instances.running_instances')}>
           <button
             onClick={handleCloseDropdown}
             className="text-white/70 hover:text-white transition-colors"
@@ -177,7 +179,7 @@ export function RunningInstancesIndicator({
                 className="w-6 h-6 animate-spin mx-auto text-white/70 mb-2"
               />
               <p className="text-white/70 font-minecraft text-xl">
-                Loading instances...
+                {t('instances.loading_instances')}
               </p>
             </div>
           ) : error ? (
@@ -197,10 +199,10 @@ export function RunningInstancesIndicator({
                 className="w-8 h-8 mx-auto text-white/50 mb-3"
               />
               <p className="text-white/60 font-minecraft text-xl">
-                No instances running
+                {t('instances.no_running')}
               </p>
               <p className="text-white/40 font-minecraft text-lg mt-2">
-                Launch a profile to start playing
+                {t('instances.launch_to_start')}
               </p>
             </div>
           ) : (
@@ -272,7 +274,7 @@ export function RunningInstancesIndicator({
                                   size="xs"
                                   className="ml-2 h-5 text-base mt-0.5"
                                 >
-                                  Crashed
+                                  {t('instances.crashed')}
                                 </Label>
                               )}
                             {typeof process.state === "string" &&
@@ -308,7 +310,7 @@ export function RunningInstancesIndicator({
                               />
                             )
                           }
-                          aria-label="View Logs"
+                          aria-label={t('instances.view_logs')}
                         />
                       )}
                       <IconButton
@@ -327,7 +329,7 @@ export function RunningInstancesIndicator({
                             <Icon icon="solar:stop-bold" className="w-4 h-4" />
                           )
                         }
-                        aria-label="Stop Process"
+                        aria-label={t('instances.stop_process')}
                       />
                     </div>
                   </div>
@@ -347,12 +349,11 @@ export function RunningInstancesIndicator({
                   <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
                 }
               >
-                {processes.length} instance{processes.length !== 1 ? "s" : ""}{" "}
-                running
+                {t('instances.count_running', { count: processes.length })}
               </Label>
             ) : (
               <span className="text-white/40 text-xs font-minecraft">
-                no instances
+                {t('instances.none')}
               </span>
             )}
             <div className="flex items-center gap-2">
@@ -364,7 +365,7 @@ export function RunningInstancesIndicator({
                   <Icon icon="solar:monitor-bold" className="w-4 h-4" />
                 }
               >
-                logs
+                {t('instances.logs')}
               </Button>
               {processes.length > 0 && (
                 <Button
@@ -375,7 +376,7 @@ export function RunningInstancesIndicator({
                     <Icon icon="solar:stop-circle-bold" className="w-4 h-4" />
                   }
                 >
-                  stop all
+                  {t('instances.stop_all')}
                 </Button>
               )}
             </div>

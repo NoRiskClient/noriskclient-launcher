@@ -4,6 +4,7 @@ import type { MinecraftAccount } from "../types/minecraft";
 import flagsmith from 'flagsmith';
 import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../services/launcher-config-service";
+import i18n from '../i18n/i18n';
 
 // Helper function to identify the user with Flagsmith
 const identifyWithFlagsmith = (account: MinecraftAccount | null) => {
@@ -66,7 +67,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to initialize accounts:", error);
       set({
-        error: `Failed to load accounts: ${error instanceof Error ? error.message : String(error.message)}`,
+        error: i18n.t('auth.errors.load_accounts', { error: error instanceof Error ? error.message : String(error.message) }),
         isLoading: false,
       });
       identifyWithFlagsmith(null);
@@ -88,7 +89,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       const newAccount = await MinecraftAuthService.beginLogin();
       if (!newAccount) {
         // This will be caught by toast.promise and the try/catch block
-        throw new Error("Login cancelled by user.");
+        throw new Error(i18n.t('auth.errors.login_cancelled'));
       }
 
       // Step 2: Get all data needed for the state update
@@ -106,9 +107,9 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       toast.promise(
         fullProcessPromise,
         {
-          loading: "Please sign in via your browser...",
+          loading: i18n.t('auth.loading.browser_sign_in'),
           success: ({ newAccount }) =>
-            `Account '${newAccount.username}' added successfully.`,
+            i18n.t('auth.success.account_added', { username: newAccount.username }),
           error: (err) => err.message,
         },
         {
@@ -131,7 +132,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
 
       // Only show success toast if not using browser login (toast.promise already handles it)
       if (useBrowserLogin) {
-        toast.success(`Account '${newAccount.username}' added successfully.`, {
+        toast.success(i18n.t('auth.success.account_added', { username: newAccount.username }), {
           duration: 1500,
         });
       }
@@ -153,20 +154,20 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
         error instanceof Error ? error.message : String(error.message);
       
       // Only show error toast if using browser login (toast.promise already handles it)
-      if (useBrowserLogin && !errorMessage.includes("cancelled by user")) {
-        toast.error(errorMessage || "Login failed", {
+      if (useBrowserLogin && !errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
+        toast.error(errorMessage || i18n.t('auth.errors.login_failed'), {
           duration: 1500,
         });
       }
       
       // The toast handles displaying the error. We just log it and set state if it's a critical error.
-      if (!errorMessage.includes("cancelled by user")) {
+      if (!errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
         console.error("Failed to add account:", error);
-        set({ error: `Failed to add account: ${errorMessage}`, isLoading: false });
+        set({ error: i18n.t('auth.errors.add_account', { error: errorMessage }), isLoading: false });
       } else {
         // Already handled by cancel button - ensure loading state is reset
         console.log("Account add cancelled by user.");
-        set({ isLoading: false, error: "Login cancelled by user" });
+        set({ isLoading: false, error: i18n.t('auth.errors.login_cancelled') });
       }
     }
   },
@@ -197,7 +198,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to remove account:", error);
       set({
-        error: `Failed to remove account: ${error instanceof Error ? error.message : String(error.message)}`,
+        error: i18n.t('auth.errors.remove_account', { error: error instanceof Error ? error.message : String(error.message) }),
         isLoading: false,
       });
     }
@@ -225,7 +226,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to set active account:", error);
       set({
-        error: `Failed to set active account: ${error instanceof Error ? error.message : String(error.message)}`,
+        error: i18n.t('auth.errors.set_active', { error: error instanceof Error ? error.message : String(error.message) }),
         isLoading: false,
       });
     }

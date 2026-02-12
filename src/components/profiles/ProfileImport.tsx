@@ -1,17 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { StatusMessage } from "../ui/StatusMessage";
+import { ProgressToast } from "../ui/ProgressToast";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import * as ProfileService from "../../services/profile-service";
 import { useProfileStore } from "../../store/profile-store";
+import { useImportProgressStore } from "../../store/import-progress-store";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { EventType, type EventPayload } from "../../types/events";
+import { useTranslation } from "react-i18next";
 
 interface ProfileImportProps {
   onClose: () => void;
@@ -22,6 +28,7 @@ export function ProfileImport({
   onClose,
   onImportComplete,
 }: ProfileImportProps) {
+  const { t } = useTranslation();
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -31,8 +38,9 @@ export function ProfileImport({
   const navigate = useNavigate();
 
   const handleImport = async () => {
-    const operationId = `profile-import-dialog-${Date.now()}`;
-    let loadingToastId: string | undefined = undefined; // To ensure it's only used if a file is selected
+    const eventId = crypto.randomUUID();
+    const toastId = `import-${eventId}`;
+    let unlisten: UnlistenFn | null = null;
 
     try {
       const selectedPath = await openDialog({
@@ -40,32 +48,70 @@ export function ProfileImport({
         directory: false,
         filters: [
           {
-            name: "Modpack Files",
+            name: t('profiles.import.modpack_files'),
             extensions: ["noriskpack", "mrpack", "zip"],
           },
         ],
-        title: "Select Modpack to Import",
+        title: t('profiles.import.select_modpack'),
       });
 
       if (selectedPath && typeof selectedPath === "string") {
+        const { isPathImporting, addImportingPath, removeImportingPath } = useProfileStore.getState();
+
+        // Check if this file is already being imported
+        if (isPathImporting(selectedPath)) {
+          toast.error(t('profiles.errors.already_importing'));
+          return;
+        }
+
         setIsImporting(true);
         onClose();
+        addImportingPath(selectedPath);
 
-        loadingToastId = `loading-${operationId}`;
         const fileName = selectedPath.substring(selectedPath.lastIndexOf('/') + 1).substring(selectedPath.lastIndexOf('\\') + 1);
-        toast.loading(`Importing profile from ${fileName}...`, { id: loadingToastId });
 
-        const newProfileId = await ProfileService.importProfileByPath(selectedPath);
+        // Set up event listener for progress updates
+        unlisten = await listen<EventPayload>("state_event", (event) => {
+          const payload = event.payload;
+          if (payload.event_type !== EventType.TaskProgress) return;
+          if (payload.event_id !== eventId) return;
 
-        toast.success(`Profile from ${fileName} imported successfully! Opening profile...`, {
-          id: loadingToastId,
-          duration: 3000,
+          const progress = (payload.progress ?? 0) * 100; // Convert 0-1 to 0-100
+
+          // Update toast with progress
+          toast.custom(
+            () => <ProgressToast message={`Importing ${fileName}`} progress={progress} />,
+            { id: toastId, duration: Infinity }
+          );
         });
-        useProfileStore.getState().fetchProfiles();
-        onImportComplete();
 
-        // Navigate to the new profile
-        navigate(`/profilesv2/${newProfileId}`);
+        // Show initial progress toast
+        toast.custom(
+          () => <ProgressToast message={`Importing ${fileName}`} progress={0} />,
+          { id: toastId, duration: Infinity }
+        );
+
+        try {
+          const newProfileId = await ProfileService.importProfileByPath(selectedPath, eventId);
+
+          // Clean up listener before showing success
+          if (unlisten) {
+            unlisten();
+            unlisten = null;
+          }
+
+          toast.success(t('profiles.import_success', { fileName }), {
+            id: toastId,
+            duration: 3000,
+          });
+          useProfileStore.getState().fetchProfiles();
+          onImportComplete();
+
+          // Navigate to the new profile
+          navigate(`/profilesv2/${newProfileId}`);
+        } finally {
+          removeImportingPath(selectedPath);
+        }
 
       } else {
         if (selectedPath === null) {
@@ -73,18 +119,25 @@ export function ProfileImport({
           // No toast for cancellation is usually fine
         } else {
           console.warn("File selection dialog did not return a valid path or was an array:", selectedPath);
-          toast.error("Could not get selected file path. Please try again.");
+          toast.error(t('profiles.errors.file_path_failed'));
         }
       }
     } catch (err) {
       console.error("Failed to import profile:", err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (loadingToastId) {
-        toast.error(`Failed to import profile: ${errorMessage}`, { id: loadingToastId });
+      const errorMessage = parseErrorMessage(err);
+
+      // Check for disk space error and provide helpful hint
+      if (errorMessage.toLowerCase().includes("insufficient disk space")) {
+        const enhancedMessage = `${errorMessage}\n\n${t('profiles.disk_space_tip')}`;
+        toast.error(enhancedMessage, { id: toastId, duration: 8000 });
       } else {
-        toast.error(`Failed to import profile: ${errorMessage}`);
+        toast.error(t('profiles.import_failed', { error: errorMessage }), { id: toastId });
       }
     } finally {
+      // Clean up listener
+      if (unlisten) {
+        unlisten();
+      }
       setIsImporting(false);
     }
   };
@@ -104,10 +157,10 @@ export function ProfileImport({
               icon="solar:refresh-bold"
               className="w-5 h-5 animate-spin text-white"
             />
-            <span>importing...</span>
+            <span>{t('profiles.importing')}</span>
           </>
         ) : (
-          "select file to import"
+          t('profiles.select_file_to_import')
         )}
       </Button>
     </div>
@@ -115,7 +168,7 @@ export function ProfileImport({
 
   return (
     <Modal
-      title="import profile"
+      title={t('profiles.importProfile')}
       onClose={onClose}
       width="lg"
       footer={renderFooter()}
@@ -127,12 +180,12 @@ export function ProfileImport({
         <div className="space-y-6">
           <div>
             <p className="text-lg text-white/70 mb-6 font-minecraft-ten tracking-wide select-none">
-              Select a file or drag and drop a .mrpack, .noriskpack, or .zip file into the launcher to import it and create a new profile.
+              {t('profiles.import_description')}
             </p>
 
             <div className="mb-6">
               <h3 className="text-2xl text-white font-minecraft mb-4 select-none lowercase">
-                supported formats:
+                {t('profiles.supported_formats')}
               </h3>
               <ul
                 className="text-2xl text-white/80 space-y-4 select-none lowercase font-minecraft"
@@ -153,7 +206,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-blue-400"
                     />
                   </div>
-                  <span>.mrpack (Modrinth)</span>
+                  <span>{t('profiles.format_mrpack')}</span>
                 </li>
                 <li className="flex items-center">
                   <div
@@ -170,7 +223,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-green-400"
                     />
                   </div>
-                  <span>.noriskpack (NoRisk Launcher)</span>
+                  <span>{t('profiles.format_noriskpack')}</span>
                 </li>
                 <li className="flex items-center">
                   <div
@@ -187,7 +240,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-orange-400"
                     />
                   </div>
-                  <span>.zip (CurseForge)</span>
+                  <span>{t('profiles.format_zip')}</span>
                 </li>
               </ul>
             </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useProcessStore, ProcessMetrics } from "../store/useProcessStore";
+import i18n from '../i18n/i18n';
 import { EventType, ProcessMetricsPayload, MinecraftProcessExitedPayload } from "../types/events";
 import { ProcessState } from "../types/processState";
 import { useLogThrottle } from "./useLogThrottle";
@@ -135,7 +136,7 @@ export function useProcessEvents(options: {
 
             // Handle launch successful
             if (payload.event_type === EventType.LaunchSuccessful && payload.target_id) {
-              addLauncherLog(payload.target_id, "✓ Minecraft started successfully!");
+              addLauncherLog(payload.target_id, i18n.t('launch.minecraft_started'));
               // Reset tracking for this profile
               firstMcLogReceived.current.delete(payload.target_id);
               launchStartedForProfile.current.delete(payload.target_id);
@@ -145,7 +146,7 @@ export function useProcessEvents(options: {
 
             // Handle error events
             if (payload.event_type === EventType.Error && payload.target_id) {
-              addLauncherLog(payload.target_id, `✗ Error: ${payload.message || "Unknown error"}`);
+              addLauncherLog(payload.target_id, i18n.t('launch.error', { error: payload.message || i18n.t('common.unknown_error') }));
               // Reset launch tracking on error
               launchStartedForProfile.current.delete(payload.target_id);
             }

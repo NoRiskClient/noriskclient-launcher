@@ -1,7 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { I18nextProvider } from "react-i18next";
 import { SingleLogViewer } from "./components/log/SingleLogViewer";
 import { GlobalToaster } from "./components/ui/GlobalToaster";
+import i18n from "./i18n/i18n";
 import "./styles/globals.css";
 
 // Get instance info from URL params
@@ -15,7 +17,9 @@ const startTime = startTimeParam ? parseInt(startTimeParam, 10) : undefined;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <SingleLogViewer instanceId={instanceId} instanceName={instanceName} profileId={profileId} accountName={accountName} startTime={startTime} />
-    <GlobalToaster />
+    <I18nextProvider i18n={i18n}>
+      <SingleLogViewer instanceId={instanceId} instanceName={instanceName} profileId={profileId} accountName={accountName} startTime={startTime} />
+      <GlobalToaster />
+    </I18nextProvider>
   </React.StrictMode>,
 );

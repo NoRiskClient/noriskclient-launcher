@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as ProfileService from "../services/profile-service";
+import i18n from '../i18n/i18n';
 
 interface ContentState {
   mods: any[];
@@ -100,7 +101,7 @@ export const useContentStore = create<ContentState>((set) => ({
       );
       set((state) => ({
         loading: { ...state.loading, customMods: false },
-        error: { ...state.error, customMods: "Failed to load custom mods" },
+        error: { ...state.error, customMods: i18n.t('content.errors.load_custom_mods') },
       }));
     }
   },
@@ -128,7 +129,7 @@ export const useContentStore = create<ContentState>((set) => ({
         loading: { ...state.loading, resourcePacks: false },
         error: {
           ...state.error,
-          resourcePacks: "Failed to load resource packs",
+          resourcePacks: i18n.t('content.errors.load_resource_packs'),
         },
       }));
     }
@@ -154,7 +155,7 @@ export const useContentStore = create<ContentState>((set) => ({
       );
       set((state) => ({
         loading: { ...state.loading, shaderPacks: false },
-        error: { ...state.error, shaderPacks: "Failed to load shader packs" },
+        error: { ...state.error, shaderPacks: i18n.t('content.errors.load_shader_packs') },
       }));
     }
   },

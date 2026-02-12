@@ -14,6 +14,7 @@ import { Checkbox } from "../../ui/Checkbox";
 import { gsap } from "gsap";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
+import { useTranslation } from "react-i18next";
 
 interface InstallationSettingsTabProps {
   profile: Profile;
@@ -30,6 +31,7 @@ export function InstallationSettingsTab({
   updateProfile,
   refreshTrigger,
 }: InstallationSettingsTabProps) {
+  const { t } = useTranslation();
   const [selectedVersionType, setSelectedVersionType] =
     useState<VersionType>("release");
   const [minecraftVersions, setMinecraftVersions] = useState<
@@ -380,13 +382,13 @@ export function InstallationSettingsTab({
   const getReasonText = (reason: string): string => {
     switch (reason) {
       case "norisk_pack":
-        return "Forced by NoRisk Pack";
+        return t('profiles.settings.reasonNoriskPack');
       case "user_overwrite":
-        return "User Overwrite";
+        return t('profiles.settings.reasonUserOverwrite');
       case "profile_default":
-        return "Profile Default";
+        return t('profiles.settings.reasonProfileDefault');
       case "not_resolved":
-        return "Not Resolved";
+        return t('profiles.settings.reasonNotResolved');
       default:
         return reason;
     }
@@ -401,7 +403,7 @@ export function InstallationSettingsTab({
           <div className="flex items-start justify-between gap-6">
             <div className="flex-1">
               <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-                currently installed
+                {t('profiles.settings.currentlyInstalled')}
               </h3>
               <div className="flex items-center gap-3 text-sm font-minecraft-ten">
                 {/* Minecraft Version */}
@@ -447,21 +449,21 @@ export function InstallationSettingsTab({
       <div ref={versionsRef} className="space-y-4">
         <div>
           <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-            game version
+            {t('profiles.settings.gameVersion')}
           </h3>
           <div className="mb-3">
             <SearchWithFilters
               searchValue={searchQuery}
               onSearchChange={setSearchQuery}
-              placeholder="search versions..."
+              placeholder={t('profiles.settings.searchVersions')}
               className="w-full"
               showSort={false}
               showFilter={true}
               filterOptions={[
-                { value: "release", label: "Release", icon: "solar:filter-bold" },
-                { value: "snapshot", label: "Snapshot", icon: "solar:filter-bold" },
-                { value: "old-beta", label: "Old Beta", icon: "solar:filter-bold" },
-                { value: "old-alpha", label: "Old Alpha", icon: "solar:filter-bold" },
+                { value: "release", label: t('profiles.settings.release'), icon: "solar:filter-bold" },
+                { value: "snapshot", label: t('profiles.settings.snapshot'), icon: "solar:filter-bold" },
+                { value: "old-beta", label: t('profiles.settings.oldBeta'), icon: "solar:filter-bold" },
+                { value: "old-alpha", label: t('profiles.settings.oldAlpha'), icon: "solar:filter-bold" },
               ]}
               filterValue={selectedVersionType}
               onFilterChange={(value) => {
@@ -483,7 +485,7 @@ export function InstallationSettingsTab({
                     className="w-6 h-6 mr-2 animate-spin"
                   />
                   <span className="font-minecraft text-2xl">
-                    loading versions...
+                    {t('profiles.settings.loadingVersions')}
                   </span>
                 </div>
               </Card>
@@ -494,7 +496,7 @@ export function InstallationSettingsTab({
               >
                 {filteredVersions.length === 0 ? (
                   <div className="p-4 text-2xl text-white/70 text-center select-none">
-                    no versions found matching your search
+                    {t('profiles.settings.noVersionsFound')}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3">
@@ -531,7 +533,7 @@ export function InstallationSettingsTab({
       <div ref={platformsRef} className="space-y-4">
         <div>
           <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-            platform
+            {t('profiles.settings.platform')}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {[
@@ -572,7 +574,7 @@ export function InstallationSettingsTab({
                   </span>
                   {!isCompatible && (
                     <span className="text-lg text-white/50 mt-1">
-                      not compatible
+                      {t('profiles.settings.notCompatible')}
                     </span>
                   )}
                 </Card>
@@ -583,7 +585,7 @@ export function InstallationSettingsTab({
 
         {editedProfile.loader !== "vanilla" && (
           <div ref={loaderVersionRef}>
-            <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">{`${editedProfile.loader} version`}</h3>
+            <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('profiles.settings.loaderVersion', { loader: editedProfile.loader })}</h3>
             
             {resolvedLoaderVersion && (
               <Card
@@ -591,9 +593,9 @@ export function InstallationSettingsTab({
                 className="p-3 mb-4 border border-white/10 bg-black/20"
               >
                 <div className="text-xs text-white/90 font-minecraft-ten">
-                  Current Loader Version: {" "}
+                  {t('profiles.settings.currentLoaderVersion')}{" "}
                   <span className="text-white font-bold">
-                    {resolvedLoaderVersion.version || "Not Set"}
+                    {resolvedLoaderVersion.version || t('profiles.settings.notSet')}
                   </span>
                   {resolvedLoaderVersion.reason !== "profile_default" && (
                     <span className="text-white/70 ml-2">
@@ -615,7 +617,7 @@ export function InstallationSettingsTab({
                     className="w-6 h-6 mr-2 animate-spin"
                   />
                   <span className="font-minecraft text-2xl">
-                    loading {editedProfile.loader} versions...
+                    {t('profiles.settings.loadingLoaderVersions', { loader: editedProfile.loader })}
                   </span>
                 </div>
               </Card>
@@ -630,7 +632,7 @@ export function InstallationSettingsTab({
                         use_overwrite_loader_version: e.target.checked
                       }
                     })}
-                    label={`Use Custom ${editedProfile.loader.charAt(0).toUpperCase() + editedProfile.loader.slice(1)} Version`}
+                    label={t('profiles.settings.useCustomLoaderVersion', { loader: editedProfile.loader.charAt(0).toUpperCase() + editedProfile.loader.slice(1) })}
                     size="md"
                   />
                   
@@ -643,7 +645,7 @@ export function InstallationSettingsTab({
                       }
                     })}
                     options={[
-                      { value: "", label: "Select Custom Version" },
+                      { value: "", label: t('profiles.settings.selectCustomVersion') },
                       ...loaderVersions.map((version) => ({
                         value: version,
                         label: version,
@@ -660,8 +662,7 @@ export function InstallationSettingsTab({
                 variant="flat"
                 className="p-4 text-2xl text-white/70 text-center select-none border border-white/10 bg-black/20"
               >
-                no {editedProfile.loader} versions available for minecraft{" "}
-                {editedProfile.game_version}
+                {t('profiles.settings.noLoaderVersions', { loader: editedProfile.loader, version: editedProfile.game_version })}
               </Card>
             )}
           </div>

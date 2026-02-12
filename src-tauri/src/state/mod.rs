@@ -1,6 +1,7 @@
 pub mod config_state;
 pub mod discord_state;
 pub mod event_state;
+pub mod friends_state;
 pub mod norisk_packs_state;
 pub mod norisk_versions_state;
 pub mod post_init;
