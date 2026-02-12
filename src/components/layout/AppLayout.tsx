@@ -31,7 +31,7 @@ import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
 // TODO: Re-enable when WebSocket is stable
-// import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
+import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
 import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
@@ -82,8 +82,7 @@ export function AppLayout({
   const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
 
-  // TODO: Re-enable when WebSocket is stable
-  // useFriendsWebSocket();
+  useFriendsWebSocket();
 
   useEffect(() => {
     const initFriends = async () => {
@@ -91,8 +90,7 @@ export function AppLayout({
         await loadCurrentUser();
         await loadFriends();
         await loadChats();
-        // TODO: Re-enable when WebSocket is stable
-        // await connectWebSocket();
+        await connectWebSocket();
       } catch (e) {
         // Silently fail - user might not be logged in yet
       }

@@ -214,23 +214,22 @@ pub async fn update_privacy_setting(
 
 #[tauri::command]
 pub async fn connect_friends_websocket(
-    _app: tauri::AppHandle,
+    app: tauri::AppHandle,
 ) -> Result<(), CommandError> {
-    // TODO: Re-enable when WebSocket is stable
-    // let (token, uuid, username, is_experimental) = get_auth_info().await?;
-    // let state = State::get().await.map_err(|e| CommandError {
-    //     message: e.to_string(),
-    //     kind: "StateError".to_string(),
-    // })?;
-    //
-    // state
-    //     .friends_state
-    //     .connect_websocket(Arc::new(app), uuid, username, token, is_experimental)
-    //     .await
-    //     .map_err(|e| CommandError {
-    //         message: e.to_string(),
-    //         kind: "WebSocketError".to_string(),
-    //     })?;
+    let (token, uuid, username, is_experimental) = get_auth_info().await?;
+    let state = State::get().await.map_err(|e| CommandError {
+        message: e.to_string(),
+        kind: "StateError".to_string(),
+    })?;
+
+    state
+        .friends_state
+        .connect_websocket(Arc::new(app), uuid, username, token, is_experimental)
+        .await
+        .map_err(|e| CommandError {
+            message: e.to_string(),
+            kind: "WebSocketError".to_string(),
+        })?;
 
     Ok(())
 }

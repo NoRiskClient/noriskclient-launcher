@@ -77,8 +77,8 @@ impl FriendsWebSocket {
                     .replace("https://", "wss://")
                     .replace("http://", "ws://");
                 let url = format!(
-                    "{}/core/ws?uuid={}&ign={}&token={}",
-                    ws_url, uuid, username, token
+                    "{}/launcher/ws?uuid={}",
+                    ws_url, uuid
                 );
 
                 let ws_key = tokio_tungstenite::tungstenite::handshake::client::generate_key();
@@ -131,11 +131,9 @@ impl FriendsWebSocket {
                                             return;
                                         }
                                         Some(WsCommand::SendTyping { chat_id }) => {
-                                            let msg = serde_json::json!({
-                                                "channel": "messaging:user_typing",
-                                                "payload": { "chatId": chat_id }
-                                            });
-                                            let _ = write.send(Message::Text(msg.to_string().into())).await;
+                                            let json = serde_json::json!({ "chatId": chat_id }).to_string();
+                                            let msg = format!("messaging:user_typing {} {} ", json.len(), json);
+                                            let _ = write.send(Message::Text(msg.into())).await;
                                         }
                                         None => {
                                             break;
