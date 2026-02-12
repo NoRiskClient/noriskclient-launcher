@@ -343,6 +343,15 @@
   "profile_duplicate.button.duplicating": "duplicating...",
   "profile_duplicate.button.duplicate": "duplicate",
 
+  "enable_nrc.title": "enable noriskclient",
+  "enable_nrc.description": "this profile was imported without noriskclient features. would you like to enable them?",
+  "enable_nrc.hint": "you can always change this later in the profile settings under the nrc tab.",
+  "enable_nrc.enable": "enable nrc",
+  "enable_nrc.enabling": "enabling...",
+  "enable_nrc.skip": "skip",
+  "enable_nrc.toast.enabled": "NoRiskClient features enabled!",
+  "enable_nrc.toast.failed": "Failed to enable NoRiskClient features",
+
   "modpack_versions.title": "{{name}} - Versions",
   "modpack_versions.current": "Current",
   "modpack_versions.changelog": "Changelog",

@@ -343,6 +343,15 @@
   "profile_duplicate.button.duplicating": "Wird dupliziert...",
   "profile_duplicate.button.duplicate": "Duplizieren",
 
+  "enable_nrc.title": "NoRiskClient aktivieren",
+  "enable_nrc.description": "Dieses Profil wurde ohne NoRiskClient-Features importiert. Möchtest du sie aktivieren?",
+  "enable_nrc.hint": "Du kannst dies jederzeit in den Profileinstellungen unter dem NRC-Tab ändern.",
+  "enable_nrc.enable": "NRC aktivieren",
+  "enable_nrc.enabling": "Wird aktiviert...",
+  "enable_nrc.skip": "Überspringen",
+  "enable_nrc.toast.enabled": "NoRiskClient-Features aktiviert!",
+  "enable_nrc.toast.failed": "NoRiskClient-Features konnten nicht aktiviert werden",
+
   "modpack_versions.title": "{{name}} - Versionen",
   "modpack_versions.current": "Aktuell",
   "modpack_versions.changelog": "Änderungsprotokoll",

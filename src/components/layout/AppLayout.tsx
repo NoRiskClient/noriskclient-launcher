@@ -39,6 +39,7 @@ import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
+import { EnableNrcModal } from "../modals/EnableNrcModal";
 import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { toast } from 'react-hot-toast';
@@ -354,6 +355,7 @@ export function AppLayout({
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
       <ProfileDuplicateModal />
+      <EnableNrcModal />
       <FriendsSidebar />
     </div>
   );

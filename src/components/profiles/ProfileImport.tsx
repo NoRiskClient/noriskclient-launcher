@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import * as ProfileService from "../../services/profile-service";
 import { useProfileStore } from "../../store/profile-store";
+import { useEnableNrcStore } from "../../store/enable-nrc-store";
 import { useImportProgressStore } from "../../store/import-progress-store";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -107,8 +108,13 @@ export function ProfileImport({
           useProfileStore.getState().fetchProfiles();
           onImportComplete();
 
-          // Navigate to the new profile
-          navigate(`/profilesv2/${newProfileId}`);
+          // Check if foreign pack (not .noriskpack) -> show NRC enable modal
+          const isForeignPack = !selectedPath.toLowerCase().endsWith('.noriskpack');
+          if (isForeignPack) {
+            useEnableNrcStore.getState().openModal(newProfileId);
+          } else {
+            navigate(`/profilesv2/${newProfileId}`);
+          }
         } finally {
           removeImportingPath(selectedPath);
         }

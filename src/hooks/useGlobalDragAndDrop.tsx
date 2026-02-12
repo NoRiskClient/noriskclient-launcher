@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 
 import { useAppDragDropStore } from '../store/appStore'; // Use the real store
 import { useProfileStore } from '../store/profile-store'; // Import useProfileStore
+import { useEnableNrcStore } from '../store/enable-nrc-store';
 import { parseErrorMessage } from '../utils/error-utils';
 import i18n from '../i18n/i18n';
 import * as ContentService from '../services/content-service';
@@ -131,8 +132,13 @@ export function useGlobalDragAndDrop() {
                 );
                 useProfileStore.getState().fetchProfiles(); // Fetch profiles after successful import
 
-                // Navigate to the new profile
-                navigate(`/profilesv2/${newProfileId}`);
+                // Check if foreign pack (not .noriskpack) -> show NRC enable modal
+                const isForeignPack = !profilePackPath.toLowerCase().endsWith('.noriskpack');
+                if (isForeignPack) {
+                  useEnableNrcStore.getState().openModal(newProfileId);
+                } else {
+                  navigate(`/profilesv2/${newProfileId}`);
+                }
               } catch (err) {
                 console.error(`[DragDrop Hook ${instanceId}] Profile import ERROR (EventID: ${eventId}) for: ${profilePackPath} at ${new Date().toISOString()}:`, err);
                 const errorMessage = parseErrorMessage(err);
