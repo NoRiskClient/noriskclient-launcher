@@ -98,7 +98,7 @@ export interface ModrinthSearchV2Props {
   disableVirtualization?: boolean; // New prop to disable Virtuoso and use infinite div scrolling
 }
 
-const ALL_MODRINTH_PROJECT_TYPES: ModrinthProjectType[] = ['modpack', 'mod', 'resourcepack', 'shader', 'datapack'];
+const ALL_MODRINTH_PROJECT_TYPES: ModrinthProjectType[] = ['mod', 'modpack', 'resourcepack', 'shader', 'datapack'];
 
 // Define the order for known headers, others will be alphabetical
 const PREFERRED_HEADER_ORDER = ["resolutions", "performance impact", "features", "categories"];
@@ -1175,6 +1175,14 @@ export function ModrinthSearchV2({
 
       // Check for Iris shader mod if a shader pack was installed
       if (targetProject.project_type === 'shader') {
+
+        const installModalId = `install-${targetProject.project_id}-${targetVersion.id}`;
+        hideModal(installModalId);
+        setSelectedVersion(null);
+        setSelectedProject(null);
+        setCurrentInstallProject(null);
+        setCurrentInstallVersion(null);
+
         await handleIrisCheckAndShowModal(
           targetProject.title,
           profileId,
@@ -1183,7 +1191,6 @@ export function ModrinthSearchV2({
           showModal,
           hideModal,
           () => {
-            // TODO: Implement Iris installation logic
             console.log('🎯 User clicked "Install Iris Now"');
           }
         );
@@ -1775,6 +1782,11 @@ export function ModrinthSearchV2({
 
       // Check for Iris shader mod if a shader pack was installed
       if (project.project_type === 'shader') {
+
+        const quickInstallModalId = `quick-install-${project.project_id}`;
+        hideModal(quickInstallModalId);
+        setCurrentQuickInstallProject(null);
+
         await handleIrisCheckAndShowModal(
           project.title,
           profile.id,
@@ -1783,7 +1795,6 @@ export function ModrinthSearchV2({
           showModal,
           hideModal,
           () => {
-            // TODO: Implement Iris installation logic
             console.log('🎯 User clicked "Install Iris Now"');
           }
         );
@@ -1892,6 +1903,11 @@ export function ModrinthSearchV2({
 
       // Check for Iris shader mod if a shader pack was installed
       if (quickInstallProject.project_type === 'shader') {
+
+        const quickInstallModalId = `quick-install-${quickInstallProject.project_id}`;
+        hideModal(quickInstallModalId);
+        setCurrentQuickInstallProject(null);
+
         await handleIrisCheckAndShowModal(
           quickInstallProject.title,
           profileId,
@@ -1900,7 +1916,6 @@ export function ModrinthSearchV2({
           showModal,
           hideModal,
           () => {
-            // TODO: Implement Iris installation logic
             console.log('🎯 User clicked "Install Iris Now"');
           }
         );

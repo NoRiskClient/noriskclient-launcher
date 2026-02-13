@@ -1196,6 +1196,7 @@
   "iris.installation_error": "Installation failed. Check console for details.",
   "iris.installed_optimal": "Iris shader mod is installed - shader packs will work optimally",
   "iris.required_optimal": "Iris shader mod is required for optimal shader pack performance",
+  "iris.dont_show_again": "Don't show again",
 
   "app.errors.process_status": "Could not globally process Minecraft process status.",
   "app.errors.save_grouping": "Failed to save grouping preference.",

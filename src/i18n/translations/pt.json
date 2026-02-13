@@ -1223,6 +1223,7 @@
   "iris.installation_error": "Instalação falhou. Verifique o console para detalhes.",
   "iris.installed_optimal": "Mod de shader Iris está instalado - pacotes de shader funcionarão otimamente",
   "iris.required_optimal": "Mod de shader Iris é necessário para desempenho ótimo de pacotes de shader",
+  "iris.dont_show_again": "Não mostrar novamente",
 
   "app.errors.process_status": "Não foi possível processar globalmente o status do processo Minecraft.",
   "app.errors.save_grouping": "Falha ao salvar preferência de agrupamento.",

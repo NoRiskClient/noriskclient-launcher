@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import * as ProfileService from '../services/profile-service';
 import { toast } from 'react-hot-toast';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/buttons/Button';
+import { Checkbox } from '../components/ui/Checkbox';
 import { Icon } from '@iconify/react';
 import { useThemeStore } from '../store/useThemeStore';
 import * as ContentService from '../services/content-service';
@@ -11,26 +13,54 @@ import { ContentType } from '../types/content';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
 
-/**
- * Checks if a profile's loader is compatible with Iris shader mod
- * Iris only works with Fabric, Quilt, and NeoForge
- */
+const IRIS_DISMISSED_KEY = 'iris-modal-dismissed-profiles';
+
+function isDismissedForProfile(profileId: string): boolean {
+  try {
+    const dismissed = JSON.parse(localStorage.getItem(IRIS_DISMISSED_KEY) || '[]');
+    return dismissed.includes(profileId);
+  } catch {
+    return false;
+  }
+}
+
+function setDismissedForProfile(profileId: string): void {
+  try {
+    const dismissed = JSON.parse(localStorage.getItem(IRIS_DISMISSED_KEY) || '[]');
+    if (!dismissed.includes(profileId)) {
+      dismissed.push(profileId);
+      localStorage.setItem(IRIS_DISMISSED_KEY, JSON.stringify(dismissed));
+    }
+  } catch {
+    localStorage.setItem(IRIS_DISMISSED_KEY, JSON.stringify([profileId]));
+  }
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+function canAutoInstallIris(loader: string, gameVersion: string): boolean {
+  const compatibleLoaders = ['fabric', 'quilt', 'neoforge'];
+  return compatibleLoaders.includes(loader) && compareVersions(gameVersion, '1.16.5') >= 0;
+}
+
 export async function isLoaderCompatibleWithIris(profileId: string): Promise<boolean> {
   try {
     const profile = await ProfileService.getProfile(profileId);
     const loader = profile.loader;
-
-    // Iris is compatible with Fabric, Quilt, and NeoForge
     const compatibleLoaders = ['fabric', 'quilt', 'neoforge'];
-    const isCompatible = compatibleLoaders.includes(loader);
-
-    console.log(`🔧 [IrisDetection] Profile ${profileId} uses loader: ${loader}`);
-    console.log(`🔧 [IrisDetection] Loader ${loader} is ${isCompatible ? 'COMPATIBLE' : 'NOT COMPATIBLE'} with Iris`);
-
-    return isCompatible;
+    return compatibleLoaders.includes(loader);
   } catch (error) {
     console.warn(`[IrisDetection] Failed to check loader compatibility for profile ${profileId}:`, error);
-    return false; // Assume not compatible if we can't check
+    return false;
   }
 }
 
@@ -152,11 +182,11 @@ async function installIrisFromPlatform(
 }
 
 /**
- * Checks if Iris shader mod is installed in a given profile
- * Only checks for Iris if the profile's loader is compatible with Iris
+ * Checks if a shader mod (Iris or OptiFine) is installed in a given profile
+ * Only checks if the profile's loader is compatible with Iris
  */
 export async function isIrisInstalled(profileId: string): Promise<boolean> {
-  console.log(`🔍 [IrisDetection] Checking if Iris is installed in profile: ${profileId}`);
+  console.log(`🔍 [IrisDetection] Checking if Iris/OptiFine is installed in profile: ${profileId}`);
 
   try {
     // First check if the loader is compatible with Iris
@@ -168,48 +198,67 @@ export async function isIrisInstalled(profileId: string): Promise<boolean> {
 
     // Get the full profile to check installed mods
     const profile = await ProfileService.getProfile(profileId);
-    console.log(`🔍 [IrisDetection] Profile loaded, checking ${profile.mods.length} mods for Iris`);
+    console.log(`🔍 [IrisDetection] Profile loaded, checking ${profile.mods.length} mods for Iris/OptiFine`);
 
-    // Iris project IDs for different platforms
-    const irisProjectIds = {
-      modrinth: 'YL57xq9U',      // Iris on Modrinth
-      curseforge: '455508'       // Iris on CurseForge
+    // Project IDs for shader mods on different platforms
+    const shaderModProjectIds = {
+      iris: {
+        modrinth: 'YL57xq9U',
+        curseforge: '455508'
+      },
+      optifine: {
+        modrinth: '', // OptiFine is not on Modrinth
+        curseforge: '222674'
+      }
     };
 
-    // Check if any mod is Iris using multiple methods
-    const irisMod = profile.mods.find(mod => {
-      // Method 1: Check display name and filename for "iris"
+    // Check if any mod is Iris or OptiFine using multiple methods
+    const shaderMod = profile.mods.find(mod => {
       const displayName = mod.display_name?.toLowerCase() || '';
       const fileName = mod.id?.toLowerCase() || '';
-      const nameMatch = displayName.includes('iris') || fileName.includes('iris');
+      const fileNameFromSource = (() => {
+        if (mod.source?.type === 'modrinth') return mod.source.file_name?.toLowerCase() || '';
+        if (mod.source?.type === 'local') return mod.source.file_name?.toLowerCase() || '';
+        return '';
+      })();
 
-      // Method 2: Check specific project IDs for Modrinth and CurseForge
-      let projectIdMatch = false;
+      // Check for Iris by name
+      const isIrisByName = displayName.includes('iris') || fileName.includes('iris') || fileNameFromSource.includes('iris');
+
+      // Check for OptiFine by name
+      const isOptiFineByName = displayName.includes('optifine') || fileName.includes('optifine') || fileNameFromSource.includes('optifine');
+
+      // Check specific project IDs
+      let isIrisByProjectId = false;
+      let isOptiFineByProjectId = false;
       if (mod.source.type === 'modrinth') {
-        projectIdMatch = mod.source.project_id === irisProjectIds.modrinth;
+        isIrisByProjectId = mod.source.project_id === shaderModProjectIds.iris.modrinth;
       } else if (mod.source.type === 'curseforge') {
-        projectIdMatch = mod.source.project_id === irisProjectIds.curseforge;
+        isIrisByProjectId = mod.source.project_id === shaderModProjectIds.iris.curseforge;
+        isOptiFineByProjectId = mod.source.project_id === shaderModProjectIds.optifine.curseforge;
       }
 
-      const isIris = nameMatch || projectIdMatch;
+      const isShaderMod = isIrisByName || isOptiFineByName || isIrisByProjectId || isOptiFineByProjectId;
 
-      if (isIris) {
-        console.log(`🎯 [IrisDetection] Found Iris via ${nameMatch ? 'name' : 'project ID'}: ${mod.display_name || mod.id} (${mod.source.type})`);
+      if (isShaderMod) {
+        const matchType = isIrisByName || isIrisByProjectId ? 'Iris' : 'OptiFine';
+        const matchMethod = (isIrisByName || isOptiFineByName) ? 'name' : 'project ID';
+        console.log(`🎯 [IrisDetection] Found ${matchType} via ${matchMethod}: ${mod.display_name || mod.id} (${mod.source.type})`);
       }
 
-      return isIris;
+      return isShaderMod;
     });
 
-    const isInstalled = !!irisMod;
-    console.log(`✅ [IrisDetection] Iris installation status for profile ${profileId}: ${isInstalled ? 'INSTALLED' : 'NOT INSTALLED'}`);
+    const isInstalled = !!shaderMod;
+    console.log(`✅ [IrisDetection] Shader mod status for profile ${profileId}: ${isInstalled ? 'INSTALLED' : 'NOT INSTALLED'}`);
 
-    if (irisMod) {
-      console.log(`🎨 [IrisDetection] Found Iris mod: ${irisMod.display_name || irisMod.id} (${irisMod.source.type})`);
+    if (shaderMod) {
+      console.log(`🎨 [IrisDetection] Found shader mod: ${shaderMod.display_name || shaderMod.id} (${shaderMod.source.type})`);
     }
 
     return isInstalled;
   } catch (error) {
-    console.warn(`[IrisDetection] Failed to check Iris installation for profile ${profileId}:`, error);
+    console.warn(`[IrisDetection] Failed to check shader mod installation for profile ${profileId}:`, error);
     return false;
   }
 }
@@ -272,25 +321,30 @@ export function IrisRequiredModal({
   profileId,
   installType = "Installation",
   onInstallIris,
+  onDontShowAgain,
   onClose
 }: {
   projectTitle: string;
   profileId: string;
   installType?: string;
   onInstallIris?: () => void;
+  onDontShowAgain?: () => void;
   onClose: () => void;
 }) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const { t } = useTranslation();
+  const [dontShowChecked, setDontShowChecked] = useState(false);
 
-  console.log(`⚠️ [ModrinthSearchV2] ${installType}: Iris NOT found in profile ${profileId}, showing modal notification`);
-  console.log(`🎨 [ModrinthSearchV2] ${installType}: Showing Iris requirement modal for shader pack '${projectTitle}'`);
+  const handleClose = () => {
+    if (dontShowChecked && onDontShowAgain) onDontShowAgain();
+    onClose();
+  };
 
   const modalFooter = (
     <div className="flex justify-end items-center gap-3">
       <Button
         variant="secondary"
-        onClick={onClose}
+        onClick={handleClose}
       >
         {t('iris.skip_shader_mod')}
       </Button>
@@ -309,13 +363,12 @@ export function IrisRequiredModal({
     <Modal
       title={t('iris.shader_pack_setup')}
       titleIcon={<Icon icon="solar:eye-bold" className="w-6 h-6" style={{ color: accentColor.value }} />}
-      onClose={onClose}
+      onClose={handleClose}
       width="md"
       footer={modalFooter}
     >
       <div className="p-6">
         <div className="space-y-6">
-        {/* Main warning section */}
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
             <Icon icon="solar:warning-triangle-bold" className="w-8 h-8 text-yellow-400" />
@@ -330,7 +383,6 @@ export function IrisRequiredModal({
           </div>
         </div>
 
-        {/* Performance warning */}
         <div className="p-4 rounded-lg bg-yellow-500/10 border-2 border-yellow-500/30">
           <div className="flex items-center gap-3">
             <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-yellow-400 flex-shrink-0" />
@@ -339,6 +391,13 @@ export function IrisRequiredModal({
             </p>
           </div>
         </div>
+
+        <Checkbox
+          checked={dontShowChecked}
+          onChange={(e) => setDontShowChecked(e.target.checked)}
+          label={t('iris.dont_show_again')}
+          size="sm"
+        />
 
         </div>
       </div>
@@ -438,10 +497,16 @@ export async function handleIrisCheckAndShowModal(
 ): Promise<boolean> {
   showIrisCheckStartLog(projectTitle, profileId, installType);
 
+  if (isDismissedForProfile(profileId)) {
+    return true;
+  }
+
   try {
     const hasIris = await isIrisInstalled(profileId);
     if (!hasIris) {
-      // Show modal immediately to alert user quickly
+      const profile = await ProfileService.getProfile(profileId);
+      const showInstallButton = canAutoInstallIris(profile.loader, profile.game_version);
+
       const modalId = `iris-required-${projectId}-${Date.now()}`;
       showModal(
         modalId,
@@ -449,61 +514,51 @@ export async function handleIrisCheckAndShowModal(
           projectTitle={projectTitle}
           profileId={profileId}
           installType={installType}
-            onInstallIris={async () => {
-              try {
-                console.log('🎯 [IrisModal] User clicked "Install Iris" - starting installation...');
+          onInstallIris={showInstallButton ? async () => {
+            try {
+              toast.loading(i18n.t('iris.installing'), {
+                id: 'iris-install',
+                duration: 10000
+              });
 
-                // Show loading state or progress indication
-                toast.loading(i18n.t('iris.installing'), {
+              const installSuccess = await installIrisToProfile(profileId);
+
+              if (installSuccess) {
+                toast.success(i18n.t('iris.install_success'), {
                   id: 'iris-install',
-                  duration: 10000
+                  duration: 3000
                 });
-
-                // Install Iris
-                const installSuccess = await installIrisToProfile(profileId);
-
-                if (installSuccess) {
-                  toast.success(i18n.t('iris.install_success'), {
-                    id: 'iris-install',
-                    duration: 3000
-                  });
-
-                  // Call custom install callback if provided
-                  if (onInstallIris) {
-                    onInstallIris();
-                  }
-
-                  console.log('🎉 [IrisModal] Iris installation completed successfully');
-                } else {
-                  toast.error(i18n.t('iris.install_failed'), {
-                    id: 'iris-install',
-                    duration: 5000
-                  });
-                  console.error('❌ [IrisModal] Iris installation failed');
-                }
-              } catch (error) {
-                console.error('❌ [IrisModal] Error during Iris installation:', error);
-                toast.error(i18n.t('iris.installation_error'), {
+                if (onInstallIris) onInstallIris();
+              } else {
+                toast.error(i18n.t('iris.install_failed'), {
                   id: 'iris-install',
                   duration: 5000
                 });
-              } finally {
-                hideModal(modalId);
               }
-            }}
+            } catch (error) {
+              console.error('[IrisModal] Error during Iris installation:', error);
+              toast.error(i18n.t('iris.installation_error'), {
+                id: 'iris-install',
+                duration: 5000
+              });
+            } finally {
+              hideModal(modalId);
+            }
+          } : undefined}
+          onDontShowAgain={() => setDismissedForProfile(profileId)}
           onClose={() => hideModal(modalId)}
         />,
         1200
       );
 
-      return false; // Iris is not installed
+      return false;
     } else {
       showIrisAlreadyInstalledLog(profileId, installType);
-      return true; // Iris is installed
+      return true;
     }
   } catch (error) {
     showIrisCheckErrorLog(profileId, installType, error);
-    return false; // Error occurred, assume Iris is not installed
+    return false;
   }
 }
 

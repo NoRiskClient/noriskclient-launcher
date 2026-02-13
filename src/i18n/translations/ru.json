@@ -1223,6 +1223,7 @@
   "iris.installation_error": "Установка не удалась. Подробности в консоли.",
   "iris.installed_optimal": "Мод шейдеров Iris установлен — шейдерпаки будут работать оптимально",
   "iris.required_optimal": "Мод шейдеров Iris необходим для оптимальной работы шейдерпаков",
+  "iris.dont_show_again": "Больше не показывать",
 
   "app.errors.process_status": "Не удалось глобально обработать статус процесса Minecraft.",
   "app.errors.save_grouping": "Не удалось сохранить настройку группировки.",

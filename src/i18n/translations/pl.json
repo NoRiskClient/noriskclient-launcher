@@ -1193,6 +1193,7 @@
   "iris.installation_error": "Instalacja nie powiodła się. Sprawdź konsolę po szczegóły.",
   "iris.installed_optimal": "Mod shaderów Iris jest zainstalowany - paczki shaderów będą działać optymalnie",
   "iris.required_optimal": "Mod shaderów Iris jest wymagany dla optymalnej wydajności paczek shaderów",
+  "iris.dont_show_again": "Nie pokazuj ponownie",
 
   "app.errors.process_status": "Nie udało się globalnie przetworzyć statusu procesu Minecraft.",
   "app.errors.save_grouping": "Nie udało się zapisać preferencji grupowania.",

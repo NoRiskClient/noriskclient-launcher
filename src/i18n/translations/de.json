@@ -1193,6 +1193,7 @@
   "iris.installation_error": "Installation fehlgeschlagen. Überprüfe die Konsole für Details.",
   "iris.installed_optimal": "Iris Shader Mod ist installiert - Shader Packs werden optimal funktionieren",
   "iris.required_optimal": "Iris Shader Mod wird für optimale Shader Pack Leistung benötigt",
+  "iris.dont_show_again": "Nicht mehr anzeigen",
 
   "app.errors.process_status": "Minecraft-Prozessstatus konnte nicht verarbeitet werden.",
   "app.errors.save_grouping": "Gruppierungseinstellung konnte nicht gespeichert werden.",

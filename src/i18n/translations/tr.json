@@ -1193,6 +1193,7 @@
   "iris.installation_error": "Kurulum başarısız. Detaylar için konsolu kontrol edin.",
   "iris.installed_optimal": "Iris gölgelendirici modu kurulu - gölgelendirici paketleri optimal çalışacak",
   "iris.required_optimal": "Optimal gölgelendirici paketi performansı için Iris gölgelendirici modu gerekli",
+  "iris.dont_show_again": "Tekrar gösterme",
 
   "app.errors.process_status": "Minecraft işlem durumu global olarak işlenemedi.",
   "app.errors.save_grouping": "Gruplama tercihi kaydedilemedi.",
