@@ -29,7 +29,7 @@ pub struct DiscordManager {
 
 impl DiscordManager {
     pub async fn new(enabled: bool) -> Result<Self> {
-        info!(
+        debug!(
             "Initializing Discord Rich Presence Manager (enabled: {})",
             enabled
         );
@@ -58,9 +58,9 @@ impl DiscordManager {
                 error!("Failed to set initial Discord state: {}", e);
             }
         } else {
-            info!("Discord Rich Presence is disabled");
+            debug!("Discord Rich Presence is disabled");
         }
-        info!("Successfully initialized Discord Rich Presence Manager");
+        debug!("Successfully initialized Discord Rich Presence Manager");
 
         Ok(manager)
     }
@@ -86,7 +86,7 @@ impl DiscordManager {
                         AppError::DiscordError(format!("Discord connection error: {}", e))
                     }) {
                         Ok(_) => {
-                            info!("Successfully connected to Discord client");
+                            debug!("Successfully connected to Discord client");
                             *client_lock = Some(client);
                         }
                         Err(e) => {
@@ -118,7 +118,7 @@ impl DiscordManager {
                 .map_err(|e| AppError::DiscordError(format!("Discord disconnect error: {}", e)))
             {
                 Ok(_) => {
-                    info!("Successfully disconnected from Discord client");
+                    debug!("Successfully disconnected from Discord client");
                 }
                 Err(e) => {
                     warn!("Error disconnecting from Discord client: {}", e);
@@ -286,7 +286,7 @@ impl DiscordManager {
             // Clone self to move into spawned task
             let manager_clone = self.clone();
             tokio::spawn(async move {
-                info!("Discord: Starting background connection...");
+                debug!("Discord: Starting background connection...");
 
                 // Catch errors to prevent application crashes
                 if let Err(e) = manager_clone.connect().await {
@@ -300,7 +300,7 @@ impl DiscordManager {
                     return;
                 }
 
-                info!("Discord: Background connection completed successfully.");
+                debug!("Discord: Background connection completed successfully.");
             });
         } else if was_enabled && !enabled {
             // Was enabled, now disabled - disconnect

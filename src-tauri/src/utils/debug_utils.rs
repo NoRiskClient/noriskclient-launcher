@@ -1,18 +1,18 @@
 use crate::integrations::unified_mod::{search_mods_unified, get_mod_versions_unified, ModPlatform, UnifiedProjectType, UnifiedSortType, UnifiedModSearchParams, UnifiedModVersionsParams, UnifiedVersionResponse};
 use crate::state::state_manager::State;
 use crate::utils::mc_utils;
-use log::{error, info};
+use log::{error, info, debug};
 
 /// Debug function to list all worlds for all user profiles.
 /// This should only be called temporarily during development.
 pub async fn debug_print_all_profile_worlds() {
-    info!("--- [DEBUG] Starting World Check --- KAPPA");
+    debug!("--- [DEBUG] Starting World Check --- KAPPA");
     match State::get().await {
         Ok(state) => {
             match state.profile_manager.list_profiles().await {
                 Ok(profiles) => {
                     if profiles.is_empty() {
-                        info!("--- [DEBUG] No profiles found.");
+                        debug!("--- [DEBUG] No profiles found.");
                     } else {
                         info!(
                             "--- [DEBUG] Checking worlds for {} profile(s)...",
@@ -35,9 +35,9 @@ pub async fn debug_print_all_profile_worlds() {
                             match mc_utils::get_profile_worlds(profile.id).await {
                                 Ok(worlds) => {
                                     if worlds.is_empty() {
-                                        info!("    No valid worlds found in saves directory.");
+                                        debug!("    No valid worlds found in saves directory.");
                                     } else {
-                                        info!("    Found Worlds:");
+                                        debug!("    Found Worlds:");
                                         for world in worlds {
                                             // Konvertiere Timestamp zu lesbarem Datum (optional, benötigt chrono crate)
                                             let last_played_str = world
@@ -54,7 +54,7 @@ pub async fn debug_print_all_profile_worlds() {
                                                 })
                                                 .unwrap_or_else(|| "N/A".to_string());
 
-                                            info!("      - Folder: {}", world.folder_name);
+                                            debug!("      - Folder: {}", world.folder_name);
                                             info!(
                                                 "        Display Name: {}",
                                                 world.display_name.as_deref().unwrap_or("N/A")
@@ -63,7 +63,7 @@ pub async fn debug_print_all_profile_worlds() {
                                                 "        Last Played: {} ({:?})",
                                                 last_played_str, world.last_played
                                             );
-                                            info!("        Icon Path: {:?}", world.icon_path);
+                                            debug!("        Icon Path: {:?}", world.icon_path);
                                         }
                                     }
                                 }
@@ -75,7 +75,7 @@ pub async fn debug_print_all_profile_worlds() {
                                 }
                             }
                         }
-                        info!("--- [DEBUG] Finished World Check --- KAPPA");
+                        debug!("--- [DEBUG] Finished World Check --- KAPPA");
                     }
                 }
                 Err(e) => {
@@ -92,13 +92,13 @@ pub async fn debug_print_all_profile_worlds() {
 /// Debug function to list all servers for all user profiles.
 /// This should only be called temporarily during development.
 pub async fn debug_print_all_profile_servers() {
-    info!("--- [DEBUG] Starting Server Check ---");
+    debug!("--- [DEBUG] Starting Server Check ---");
     match State::get().await {
         Ok(state) => {
             match state.profile_manager.list_profiles().await {
                 Ok(profiles) => {
                     if profiles.is_empty() {
-                        info!("--- [DEBUG] No profiles found.");
+                        debug!("--- [DEBUG] No profiles found.");
                     } else {
                         info!(
                             "--- [DEBUG] Checking servers for {} profile(s)...",
@@ -125,7 +125,7 @@ pub async fn debug_print_all_profile_servers() {
                                             "    No servers found (servers.dat missing or empty)."
                                         );
                                     } else {
-                                        info!("    Found Servers:");
+                                        debug!("    Found Servers:");
                                         for server in servers {
                                             info!(
                                                 "      - Name: {}",
@@ -158,7 +158,7 @@ pub async fn debug_print_all_profile_servers() {
                                 }
                             }
                         }
-                        info!("--- [DEBUG] Finished Server Check ---");
+                        debug!("--- [DEBUG] Finished Server Check ---");
                     }
                 }
                 Err(e) => {
@@ -176,12 +176,12 @@ pub async fn debug_print_all_profile_servers() {
 /// This should only be called temporarily during development.
 pub async fn debug_print_news_and_changelogs() {
     use crate::minecraft::api::wordpress_api::WordPressApi;
-    info!("--- [DEBUG] Starting News/Changelog Check ---");
+    debug!("--- [DEBUG] Starting News/Changelog Check ---");
 
     match WordPressApi::get_news_and_changelogs().await {
         Ok(posts) => {
             if posts.is_empty() {
-                info!("--- [DEBUG] No news or changelog posts found.");
+                debug!("--- [DEBUG] No news or changelog posts found.");
             } else {
                 info!(
                     "--- [DEBUG] Fetched {} news/changelog post(s):",
@@ -198,14 +198,14 @@ pub async fn debug_print_news_and_changelogs() {
                         .map(|s| s.as_str())
                         .unwrap_or("N/A");
 
-                    //info!("    - Title: {}", title);
-                    info!("      Date: {}", date);
-                    info!("      OG Image: {}", og_image_url);
+                    //debug!("    - Title: {}", title);
+                    debug!("      Date: {}", date);
+                    debug!("      OG Image: {}", og_image_url);
                     // Optionally print more details like excerpt or link
-                    // info!("      Excerpt: {}", post.excerpt.rendered);
-                    // info!("      Link: {}", post.link);
+                    // debug!("      Excerpt: {}", post.excerpt.rendered);
+                    // debug!("      Link: {}", post.link);
                 }
-                info!("--- [DEBUG] Finished News/Changelog Check ---");
+                debug!("--- [DEBUG] Finished News/Changelog Check ---");
             }
         }
         Err(e) => {
@@ -217,7 +217,7 @@ pub async fn debug_print_news_and_changelogs() {
 /// Debug function to test unified mod search for both Modrinth and CurseForge.
 /// This should only be called temporarily during development.
 pub async fn debug_unified_mod_search() {
-    info!("--- [DEBUG] Starting Unified Mod Search Test ---");
+    debug!("--- [DEBUG] Starting Unified Mod Search Test ---");
 
     // Base parameters for testing
     let base_params = UnifiedModSearchParams {
@@ -235,15 +235,15 @@ pub async fn debug_unified_mod_search() {
     };
 
     // Test Modrinth search
-    info!("--- [DEBUG] Testing Modrinth search ---");
+    debug!("--- [DEBUG] Testing Modrinth search ---");
     let mut modrinth_params = base_params.clone();
     modrinth_params.source = ModPlatform::Modrinth;
 
     match search_mods_unified(modrinth_params).await {
         Ok(response) => {
-            info!("Modrinth search successful: {} results", response.results.len());
+            debug!("Modrinth search successful: {} results", response.results.len());
             for result in &response.results {
-                info!("  - {} ({:?}) - {} downloads", result.title, result.source, result.downloads);
+                debug!("  - {} ({:?}) - {} downloads", result.title, result.source, result.downloads);
             }
         }
         Err(e) => {
@@ -252,15 +252,15 @@ pub async fn debug_unified_mod_search() {
     }
 
     // Test CurseForge search
-    info!("--- [DEBUG] Testing CurseForge search ---");
+    debug!("--- [DEBUG] Testing CurseForge search ---");
     let mut curseforge_params = base_params.clone();
     curseforge_params.source = ModPlatform::CurseForge;
 
     match search_mods_unified(curseforge_params).await {
         Ok(response) => {
-            info!("CurseForge search successful: {} results", response.results.len());
+            debug!("CurseForge search successful: {} results", response.results.len());
             for result in &response.results {
-                info!("  - {} ({:?}) - {} downloads", result.title, result.source, result.downloads);
+                debug!("  - {} ({:?}) - {} downloads", result.title, result.source, result.downloads);
             }
         }
         Err(e) => {
@@ -268,14 +268,14 @@ pub async fn debug_unified_mod_search() {
         }
     }
 
-    info!("--- [DEBUG] Finished Unified Mod Search Test ---");
+    debug!("--- [DEBUG] Finished Unified Mod Search Test ---");
 }
 
 /// Debug function to test unified mod versions retrieval.
 /// Fetches the first mod from each platform and prints its available versions.
 /// This should only be called temporarily during development.
 pub async fn debug_unified_mod_versions() {
-    info!("--- [DEBUG] Starting Unified Mod Versions Test ---");
+    debug!("--- [DEBUG] Starting Unified Mod Versions Test ---");
 
     // Base parameters for testing
     let base_params = UnifiedModSearchParams {
@@ -293,14 +293,14 @@ pub async fn debug_unified_mod_versions() {
     };
 
     // Test Modrinth versions
-    info!("--- [DEBUG] Testing Modrinth versions ---");
+    debug!("--- [DEBUG] Testing Modrinth versions ---");
     let mut modrinth_params = base_params.clone();
     modrinth_params.source = ModPlatform::Modrinth;
 
     match search_mods_unified(modrinth_params).await {
         Ok(search_response) => {
             if let Some(first_mod) = search_response.results.first() {
-                info!("Found Modrinth mod: {} (ID: {})", first_mod.title, first_mod.project_id);
+                debug!("Found Modrinth mod: {} (ID: {})", first_mod.title, first_mod.project_id);
 
                 let modrinth_version_params = UnifiedModVersionsParams {
                     source: ModPlatform::Modrinth,
@@ -313,22 +313,22 @@ pub async fn debug_unified_mod_versions() {
 
                 match get_mod_versions_unified(modrinth_version_params).await {
                     Ok(version_response) => {
-                        info!("Found {} versions for {}", version_response.versions.len(), first_mod.title);
+                        debug!("Found {} versions for {}", version_response.versions.len(), first_mod.title);
                         for version in &version_response.versions {
-                            info!("  - Version: {} ({} downloads, {})",
+                            debug!("  - Version: {} ({} downloads, {})",
                                 version.version_number,
                                 version.downloads,
                                 version.date_published
                             );
                             if let Some(changelog) = &version.changelog {
                                 let preview: String = changelog.chars().take(50).collect();
-                                info!("    Changelog preview: {}...", preview);
+                                debug!("    Changelog preview: {}...", preview);
                             }
-                            info!("    Files: {}", version.files.len());
+                            debug!("    Files: {}", version.files.len());
                             for file in &version.files {
-                                info!("      - {} ({} bytes)", file.filename, file.size);
+                                debug!("      - {} ({} bytes)", file.filename, file.size);
                                 if !file.hashes.is_empty() {
-                                    info!("        Hashes: {:?}", file.hashes.keys().collect::<Vec<_>>());
+                                    debug!("        Hashes: {:?}", file.hashes.keys().collect::<Vec<_>>());
                                 }
                             }
                         }
@@ -338,7 +338,7 @@ pub async fn debug_unified_mod_versions() {
                     }
                 }
             } else {
-                info!("No Modrinth mods found");
+                debug!("No Modrinth mods found");
             }
         }
         Err(e) => {
@@ -347,14 +347,14 @@ pub async fn debug_unified_mod_versions() {
     }
 
     // Test CurseForge versions
-    info!("--- [DEBUG] Testing CurseForge versions ---");
+    debug!("--- [DEBUG] Testing CurseForge versions ---");
     let mut curseforge_params = base_params.clone();
     curseforge_params.source = ModPlatform::CurseForge;
 
     match search_mods_unified(curseforge_params).await {
         Ok(search_response) => {
             if let Some(first_mod) = search_response.results.first() {
-                info!("Found CurseForge mod: {} (ID: {})", first_mod.title, first_mod.project_id);
+                debug!("Found CurseForge mod: {} (ID: {})", first_mod.title, first_mod.project_id);
 
                 let curseforge_version_params = UnifiedModVersionsParams {
                     source: ModPlatform::CurseForge,
@@ -367,18 +367,18 @@ pub async fn debug_unified_mod_versions() {
 
                 match get_mod_versions_unified(curseforge_version_params).await {
                     Ok(version_response) => {
-                        info!("Found {} versions for {}", version_response.versions.len(), first_mod.title);
+                        debug!("Found {} versions for {}", version_response.versions.len(), first_mod.title);
                         for version in &version_response.versions {
-                            info!("  - Version: {} ({} downloads, {})",
+                            debug!("  - Version: {} ({} downloads, {})",
                                 version.version_number,
                                 version.downloads,
                                 version.date_published
                             );
-                            info!("    Files: {}", version.files.len());
+                            debug!("    Files: {}", version.files.len());
                             for file in &version.files {
-                                info!("      - {} ({} bytes)", file.filename, file.size);
+                                debug!("      - {} ({} bytes)", file.filename, file.size);
                                 if !file.hashes.is_empty() {
-                                    info!("        Hashes: {:?}", file.hashes.keys().collect::<Vec<_>>());
+                                    debug!("        Hashes: {:?}", file.hashes.keys().collect::<Vec<_>>());
                                 }
                             }
                         }
@@ -388,7 +388,7 @@ pub async fn debug_unified_mod_versions() {
                     }
                 }
             } else {
-                info!("No CurseForge mods found");
+                debug!("No CurseForge mods found");
             }
         }
         Err(e) => {
@@ -396,5 +396,5 @@ pub async fn debug_unified_mod_versions() {
         }
     }
 
-    info!("--- [DEBUG] Finished Unified Mod Versions Test ---");
+    debug!("--- [DEBUG] Finished Unified Mod Versions Test ---");
 }

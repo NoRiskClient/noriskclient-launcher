@@ -40,7 +40,7 @@ impl State {
     pub async fn init(app: Arc<tauri::AppHandle>) -> Result<()> {
         let initial_state_arc = LAUNCHER_STATE
             .get_or_try_init(|| async {
-                log::info!("State::init - Starting primary initialization of managers (Phase 1 - Lightweight Instantiation)...");
+                log::debug!("State::init - Starting primary initialization of managers (Phase 1 - Lightweight Instantiation)...");
                 let config_manager = ConfigManager::new()?;
                 let discord_manager = DiscordManager::new(false).await?;
                 let io_semaphore = Arc::new(Semaphore::new(10));
@@ -52,7 +52,7 @@ impl State {
                 let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
-                log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
+                log::debug!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
@@ -72,13 +72,13 @@ impl State {
             })
             .await?;
 
-        log::info!("State::init - Global state Arc created. Running post-initialization handlers (Phase 2)...");
+        log::debug!("State::init - Global state Arc created. Running post-initialization handlers (Phase 2)...");
 
         initial_state_arc
             .config_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - ConfigManager post-initialization complete.");
+        log::debug!("State::init - ConfigManager post-initialization complete.");
 
         let loaded_config = initial_state_arc.config_manager.get_config().await;
 
@@ -94,7 +94,7 @@ impl State {
             .discord_manager
             .set_enabled(loaded_config.enable_discord_presence)
             .await?;
-        log::info!(
+        log::debug!(
             "State::init - DiscordManager enabled status set based on loaded config: {}",
             loaded_config.enable_discord_presence
         );
@@ -103,31 +103,31 @@ impl State {
             .norisk_version_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - NoriskVersionManager post-initialization complete.");
+        log::debug!("State::init - NoriskVersionManager post-initialization complete.");
 
         initial_state_arc
             .norisk_pack_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - NoriskPackManager post-initialization complete.");
+        log::debug!("State::init - NoriskPackManager post-initialization complete.");
 
         initial_state_arc
             .profile_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - ProfileManager post-initialization complete.");
+        log::debug!("State::init - ProfileManager post-initialization complete.");
 
         initial_state_arc
             .process_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - ProcessManager post-initialization complete.");
+        log::debug!("State::init - ProcessManager post-initialization complete.");
 
         initial_state_arc
             .skin_manager
             .on_state_ready(app.clone())
             .await?;
-        log::info!("State::init - SkinManager post-initialization complete.");
+        log::debug!("State::init - SkinManager post-initialization complete.");
 
         initial_state_arc
             .norisk_pack_manager
@@ -139,11 +139,11 @@ impl State {
             .await;
 
         let final_config = initial_state_arc.config_manager.get_config().await;
-        tracing::info!(
+        tracing::debug!(
             "Launcher Config - Experimental mode: {}",
             final_config.is_experimental
         );
-        tracing::info!(
+        tracing::debug!(
             "Launcher Config - Discord Rich Presence: {}",
             final_config.enable_discord_presence
         );
@@ -154,7 +154,7 @@ impl State {
             // Don't fail initialization, just log the error
         }
 
-        log::info!(
+        log::debug!(
             "State::init - Full initialization, including all post-init handlers, complete."
         );
 
@@ -174,7 +174,7 @@ impl State {
                     log::warn!("Still waiting for state initialization in State::get() after {} attempts...", wait_count);
                 }
             }
-            log::info!(
+            log::debug!(
                 "State has been initialized after {} attempts. Proceeding in State::get().",
                 wait_count
             );

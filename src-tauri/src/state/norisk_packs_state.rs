@@ -35,7 +35,7 @@ impl NoriskPackManager {
     /// Creates a new NoriskPackManager instance, loading the configuration from the specified path.
     /// If the file doesn't exist, it initializes with a default empty configuration.
     pub fn new(config_path: PathBuf) -> Result<Self> {
-        info!(
+        debug!(
             "NoriskPackManager: Initializing with path: {:?} (config loading deferred)",
             config_path
         );
@@ -81,7 +81,7 @@ impl NoriskPackManager {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<()> {
-        info!("Fetching latest Norisk packs config from API...");
+        debug!("Fetching latest Norisk packs config from API...");
 
         match NoRiskApi::get_modpacks(norisk_token, is_experimental).await {
             Ok(new_config) => {
@@ -185,7 +185,7 @@ impl NoriskPackManager {
 #[async_trait]
 impl PostInitializationHandler for NoriskPackManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("NoriskPackManager: on_state_ready called. Loading configuration...");
+        debug!("NoriskPackManager: on_state_ready called. Loading configuration...");
         // Select load path based on experimental mode if accessible
         let load_path = if let Ok(state) = crate::state::state_manager::State::get().await {
             let is_exp = state.config_manager.is_experimental_mode().await;

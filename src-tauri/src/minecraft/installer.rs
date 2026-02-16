@@ -14,7 +14,7 @@ use crate::minecraft::{MinecraftLaunchParameters, MinecraftLauncher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -97,16 +97,16 @@ pub async fn install_minecraft_version(
     }; // rng goes out of scope here
 
     if should_throw_error {
-        info!("[InstallTest] Randomly decided to throw test error.");
+        debug!("[InstallTest] Randomly decided to throw test error.");
         //return Err(AppError::Unknown("Testfehler (50% Chance) für das Error-Handling!".to_string()));
     } else {
-        info!("[InstallTest] Randomly decided NOT to throw test error. Proceeding normally.");
+        debug!("[InstallTest] Randomly decided NOT to throw test error. Proceeding normally.");
     }
     // <--- END HARDCODED TEST ERROR --- >
 
     // Execute migration if provided
     if let Some(migration) = &migration_info {
-        info!("[Launch] Executing migration before installation: {:?}", migration);
+        debug!("[Launch] Executing migration before installation: {:?}", migration);
 
         // Execute the migration (detailed progress events are sent from within execute_group_migration)
         match crate::utils::profile_utils::execute_group_migration(migration.clone(), Some(profile.id)).await {
@@ -162,7 +162,7 @@ pub async fn install_minecraft_version(
 
     // Get Java version from Minecraft version manifest
     let java_version = piston_meta.java_version.major_version as u32;
-    info!("\nChecking Java {} for Minecraft...", java_version);
+    debug!("\nChecking Java {} for Minecraft...", java_version);
 
     // Emit Java installation event
     let event_id = emit_progress_event(
@@ -181,7 +181,7 @@ pub async fn install_minecraft_version(
     {
         // Try to use the custom Java path
         let custom_path = profile.settings.java_path.as_ref().unwrap();
-        info!("Using custom Java path from profile: {}", custom_path);
+        debug!("Using custom Java path from profile: {}", custom_path);
 
         // Verify that the custom Java path exists and is valid
         let path = std::path::PathBuf::from(custom_path);
@@ -238,7 +238,7 @@ pub async fn install_minecraft_version(
 
     // Download and setup Java if necessary
     let java_path = if custom_java_valid {
-        info!("Using verified custom Java path: {:?}", java_path);
+        debug!("Using verified custom Java path: {:?}", java_path);
 
         // Update progress to 100% since we're using a custom path
         emit_progress_event(
@@ -254,7 +254,7 @@ pub async fn install_minecraft_version(
         java_path
     } else {
         // Download Java since custom path is not valid or not set
-        info!("Downloading Java {}...", java_version);
+        debug!("Downloading Java {}...", java_version);
         let java_service = JavaDownloadService::new();
         let downloaded_path = java_service
             .get_or_download_java(
@@ -287,7 +287,7 @@ pub async fn install_minecraft_version(
     std::fs::create_dir_all(&game_directory)?;
 
     // --- NEW: Copy StartUpHelper data FIRST ---
-    info!("\nChecking for StartUpHelper data to import...");
+    debug!("\nChecking for StartUpHelper data to import...");
 
     // Load NoriskPackDefinition if a pack is selected
     let norisk_pack = if let Some(pack_id) = &profile.selected_norisk_pack_id {
@@ -306,7 +306,7 @@ pub async fn install_minecraft_version(
     // --- END NEW ---
 
     // --- Copy initial data from default Minecraft installation ---
-    info!("\nChecking for user data to import...");
+    debug!("\nChecking for user data to import...");
     if let Err(e) =
         mc_utils::copy_initial_data_from_default_minecraft(profile, &game_directory).await
     {
@@ -328,7 +328,7 @@ pub async fn install_minecraft_version(
     .await?;
 
     // Download all required files
-    info!("\nDownloading libraries...");
+    debug!("\nDownloading libraries...");
     let libraries_service = MinecraftLibrariesDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
     libraries_service
@@ -357,7 +357,7 @@ pub async fn install_minecraft_version(
     )
     .await?;
 
-    info!("\nExtracting natives...");
+    debug!("\nExtracting natives...");
     let natives_service = MinecraftNativesDownloadService::new();
     natives_service
         .extract_natives(&piston_meta.libraries, version_id)
@@ -374,7 +374,7 @@ pub async fn install_minecraft_version(
     )
     .await?;
 
-    info!("\nDownloading assets...");
+    debug!("\nDownloading assets...");
     let assets_service = MinecraftAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
     assets_service
@@ -383,7 +383,7 @@ pub async fn install_minecraft_version(
     info!("Asset download completed!");
 
     // Download NoRiskClient assets if profile has a selected pack
-    info!("\nDownloading NoRiskClient assets...");
+    debug!("\nDownloading NoRiskClient assets...");
 
     let norisk_assets_service = NoriskClientAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
@@ -406,7 +406,7 @@ pub async fn install_minecraft_version(
     )
     .await?;
 
-    info!("\nDownloading Minecraft client...");
+    debug!("\nDownloading Minecraft client...");
     let client_service = MinecraftClientDownloadService::new();
     client_service
         .download_client(&piston_meta.downloads.client, &piston_meta.id)
@@ -430,7 +430,7 @@ pub async fn install_minecraft_version(
         credentials.clone(),
     );
 
-    info!("\nPreparing launch parameters...");
+    debug!("\nPreparing launch parameters...");
 
     // Get memory settings (global for standard profiles, profile-specific for custom)
     let memory_max = if profile.is_standard_version {
@@ -567,7 +567,7 @@ pub async fn install_minecraft_version(
                 .get_token_for_mode(is_experimental_mode)
             {
                 Ok(norisk_token_value) => {
-                    info!("Attempting to update Norisk pack configuration using obtained token for pack '{}'...", pack_id);
+                    debug!("Attempting to update Norisk pack configuration using obtained token for pack '{}'...", pack_id);
                     if let Err(update_err) = state
                         .norisk_pack_manager
                         .fetch_and_update_config(&norisk_token_value, is_experimental_mode)
@@ -736,7 +736,7 @@ pub async fn install_minecraft_version(
     let mod_cache_dir = LAUNCHER_DIRECTORY.meta_dir().join("mod_cache");
 
     // ---> NEW: Get custom mods for this profile <---
-    info!("Listing custom mods for profile '{}'...", profile.name);
+    debug!("Listing custom mods for profile '{}'...", profile.name);
     let custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
     info!(
         "Found {} custom mods for profile '{}'",
@@ -777,7 +777,7 @@ pub async fn install_minecraft_version(
         let mut current_jvm_args = launch_params.additional_jvm_args.clone();
         current_jvm_args.push(add_mods_arg);
         launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
-        info!("Configured Fabric addMods meta file for profile '{}'", profile.name);
+        debug!("Configured Fabric addMods meta file for profile '{}'", profile.name);
     }
 
     // --- Step: Sync mods from cache to profile directory ---
@@ -827,18 +827,18 @@ pub async fn install_minecraft_version(
     // Download log4j configuration if available
     let mut log4j_arg = None;
     if let Some(logging) = &piston_meta.logging {
-        info!("\nDownloading log4j configuration...");
+        debug!("\nDownloading log4j configuration...");
         let logging_service = MinecraftLoggingDownloadService::new();
         let config_path = logging_service
             .download_logging_config(&logging.client)
             .await?;
         log4j_arg = Some(logging_service.get_jvm_argument(&config_path));
-        info!("Log4j configuration download completed!");
+        debug!("Log4j configuration download completed!");
     }
 
     // Add log4j configuration to JVM arguments if available
     if let Some(log4j_argument) = log4j_arg {
-        info!("Adding log4j configuration: {}", log4j_argument);
+        debug!("Adding log4j configuration: {}", log4j_argument);
         let mut jvm_args = launch_params.additional_jvm_args.clone();
         jvm_args.push(log4j_argument);
         launch_params = launch_params.with_additional_jvm_args(jvm_args);
@@ -847,7 +847,7 @@ pub async fn install_minecraft_version(
     // --- Execute pre-launch hooks ---
     let launcher_config = state.config_manager.get_config().await;
     if let Some(hook) = &launcher_config.hooks.pre_launch {
-        info!("Executing pre-launch hook: {}", hook);
+        debug!("Executing pre-launch hook: {}", hook);
         let hook_event_id = emit_progress_event(
             &state,
             EventType::LaunchingMinecraft,

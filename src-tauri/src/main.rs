@@ -154,7 +154,7 @@ async fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+            debug!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
 
             match app.get_webview_window("main") {
                 Some(window) => {
@@ -167,7 +167,7 @@ async fn main() {
                     if let Err(e) = window.set_focus() {
                         error!("SingleInstance: Failed to focus main window: {}", e);
                     }
-                    info!("SingleInstance: Brought existing window to front.");
+                    debug!("SingleInstance: Brought existing window to front.");
                 }
                 None => {
                     // Main window doesn't exist - first instance is a zombie
@@ -310,7 +310,7 @@ async fn main() {
                 // --- Create Updater Window (but keep hidden initially) ---
                 let updater_window = match updater_utils::create_updater_window(&state_init_app_handle).await {
                     Ok(win) => {
-                        info!("Updater window created successfully (initially hidden).");
+                        debug!("Updater window created successfully (initially hidden).");
                         Some(win)
                     }
                     Err(e) => {
@@ -320,7 +320,7 @@ async fn main() {
                 };
 
                 // --- State Initialization --- 
-                info!("Initiating state initialization...");
+                debug!("Initiating state initialization...");
                 if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
                     error!("CRITICAL: Failed to initialize state: {}. Update check and main window might not proceed correctly.", e);
                     if let Some(win) = updater_window {
@@ -334,7 +334,7 @@ async fn main() {
                 }
                 info!("State initialization finished successfully.");
 
-                info!("Attempting to retrieve launcher configuration for update check...");
+                debug!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
                         let config = state_manager_instance.config_manager.get_config().await;
@@ -348,7 +348,7 @@ async fn main() {
                         }
 
                         if auto_check_updates_enabled {
-                            info!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
+                            debug!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
                             updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
                             info!("Update check process has finished.");
                         } else {
@@ -379,7 +379,7 @@ async fn main() {
                 if let Some(main_window) = state_init_app_handle.get_webview_window("main") {
                     match main_window.show() {
                         Ok(_) => {
-                            info!("Main window shown successfully.");
+                            debug!("Main window shown successfully.");
                             if let Err(e) = main_window.set_focus() {
                                 error!("Failed to focus main window (non-critical): {}", e);
                             }

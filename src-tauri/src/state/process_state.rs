@@ -92,7 +92,7 @@ impl ProcessManager {
         processes_file_path: PathBuf,
         app_handle: Arc<tauri::AppHandle>,
     ) -> Result<Self> {
-        log::info!(
+        log::debug!(
             "Initializing ProcessManager with state file: {:?}",
             processes_file_path
         );
@@ -124,7 +124,7 @@ impl ProcessManager {
         app_handle: Arc<tauri::AppHandle>,
         mut receiver: mpsc::Receiver<CrashReportNotification>,
     ) {
-        log::info!("Starting crash report event processor task.");
+        log::debug!("Starting crash report event processor task.");
         let global_state_res = State::get().await;
 
         let event_state_clone = match global_state_res {
@@ -156,7 +156,7 @@ impl ProcessManager {
                             .process_manager
                             .crash_report_contents
                             .insert(notification.process_id, content.clone());
-                        log::info!(
+                        log::debug!(
                             "Stored crash report content for process {} in ProcessManager.",
                             notification.process_id
                         );
@@ -200,7 +200,7 @@ impl ProcessManager {
                             e
                         );
                     } else {
-                        log::info!(
+                        log::debug!(
                             "Successfully emitted crash report for process {} to UI.",
                             notification.process_id
                         );
@@ -223,20 +223,20 @@ impl ProcessManager {
     async fn load_processes_and_watchers(&self) -> Result<()> {
         let file_path = &self.processes_file_path;
         if !file_path.exists() {
-            log::info!(
+            log::warn!(
                 "Processes file not found ('{:?}'), starting fresh.",
                 file_path
             );
             return Ok(());
         }
-        log::info!("Loading processes metadata from '{:?}'...", file_path);
+        log::debug!("Loading processes metadata from '{:?}'...", file_path);
         let json_content = async_fs::read_to_string(&file_path)
             .await
             .map_err(AppError::Io)?;
 
         match serde_json::from_str::<Vec<ProcessMetadata>>(&json_content) {
             Ok(loaded_metadata) => {
-                log::info!(
+                log::debug!(
                     "Successfully deserialized {} process metadata entries.",
                     loaded_metadata.len()
                 );
@@ -266,7 +266,7 @@ impl ProcessManager {
                             );
                             metadata.state = ProcessState::Running;
                         }
-                        log::info!(
+                        log::debug!(
                             "Loading running process {} (PID: {}) metadata.",
                             metadata.id,
                             metadata.pid
@@ -282,17 +282,17 @@ impl ProcessManager {
                         );
 
                         // Watcher für diesen geladenen, laufenden Prozess starten
-                        log::info!(
+                        log::debug!(
                             "Attempting to get global state for process {} to start watcher.",
                             metadata.id
                         );
                         match State::get().await {
                             Ok(global_state) => {
-                                log::info!(
+                                log::debug!(
                                     "Successfully got global state for process {}.",
                                     metadata.id
                                 );
-                                log::info!(
+                                log::debug!(
                                     "Attempting to get instance path for profile {} (process {}).",
                                     metadata.profile_id,
                                     metadata.id
@@ -306,7 +306,7 @@ impl ProcessManager {
                                         log::info!("Successfully got instance path {:?} for profile {} (process {}).", instance_path, metadata.profile_id, metadata.id);
                                         let crash_reports_path =
                                             instance_path.join("crash-reports");
-                                        log::info!("Attempting to start crash report watcher for process {} on path {:?}.", metadata.id, crash_reports_path);
+                                        log::debug!("Attempting to start crash report watcher for process {} on path {:?}.", metadata.id, crash_reports_path);
                                         if let Err(e) = self
                                             .start_crash_report_watcher(
                                                 metadata.id,
@@ -337,7 +337,7 @@ impl ProcessManager {
                         );
                     }
                 }
-                log::info!(
+                log::debug!(
                     "Created {} active Process entries from loaded metadata.",
                     loaded_count
                 );
@@ -362,7 +362,7 @@ impl ProcessManager {
                 async_fs::create_dir_all(parent_dir)
                     .await
                     .map_err(AppError::Io)?;
-                log::info!("Created directory for processes file: {:?}", parent_dir);
+                log::debug!("Created directory for processes file: {:?}", parent_dir);
             }
         }
 
@@ -406,7 +406,7 @@ impl ProcessManager {
                 );
                 return Err(AppError::Io(e));
             }
-            log::info!(
+            log::debug!(
                 "Created directory {:?} for crash report watcher.",
                 path_to_watch
             );
@@ -660,7 +660,7 @@ impl ProcessManager {
         if let Ok(global_state) = State::get().await {
             let launcher_config = global_state.config_manager.get_config().await;
             if launcher_config.hide_on_process_start {
-                log::info!("Hiding main window as configured (hide_on_process_start = true)");
+                log::debug!("Hiding main window as configured (hide_on_process_start = true)");
                 if let Some(main_window) = self.app_handle.get_webview_window("main") {
                     if let Err(e) = main_window.hide() {
                         log::error!("Failed to hide main window: {}", e);
@@ -829,7 +829,7 @@ impl ProcessManager {
             if let Ok(global_state) = State::get().await {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
-                    log::info!("Showing main window after process exit (hide_on_process_start = true)");
+                    log::debug!("Showing main window after process exit (hide_on_process_start = true)");
                     if let Some(main_window) = app_handle_clone_for_monitor.get_webview_window("main") {
                         if let Err(e) = main_window.show() {
                             log::error!("Failed to show main window after process exit: {}", e);
@@ -847,7 +847,7 @@ impl ProcessManager {
             }
 
             // Remove process from map
-            log::info!(
+            log::debug!(
                 "Removing process entry {} from processes map post-exit.",
                 process_id
             );
@@ -897,7 +897,7 @@ impl ProcessManager {
     }
 
     pub async fn stop_process(&self, process_id: Uuid) -> Result<()> {
-        log::info!("Attempting to stop process {}", process_id);
+        log::debug!("Attempting to stop process {}", process_id);
 
         let mut kill_successful = false;
         let mut pid_for_error: u32 = 0;
@@ -909,7 +909,7 @@ impl ProcessManager {
             process.metadata.state = ProcessState::Stopping;
 
             let pid_to_kill = process.metadata.pid;
-            log::info!(
+            log::debug!(
                 "Attempting to kill process {} via PID {}",
                 process_id,
                 pid_to_kill
@@ -992,7 +992,7 @@ impl ProcessManager {
         notify_tx: mpsc::Sender<CrashReportNotification>,
     ) {
         let mut interval = interval(Duration::from_secs(10));
-        log::info!("Starting periodic process and watcher checker task.");
+        log::debug!("Starting periodic process and watcher checker task.");
 
         loop {
             interval.tick().await;
@@ -1124,7 +1124,7 @@ impl ProcessManager {
 
     async fn periodic_log_tailer(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
         let mut interval = interval(Duration::from_secs(1)); // Log-Tailing kann weiterhin häufig sein
-        log::info!("Starting periodic log tailing task (crash reports handled by notify).");
+        log::debug!("Starting periodic log tailing task (crash reports handled by notify).");
 
         loop {
             interval.tick().await;
@@ -1224,7 +1224,7 @@ impl ProcessManager {
         let mut just_skipped_initial = false;
 
         if current_size < original_last_pos {
-            log::info!("Log file {:?} seems to have rotated or shrunk (current: {}, last: {}). Resetting read position to 0.", log_path, current_size, original_last_pos);
+            log::warn!("Log file {:?} seems to have rotated or shrunk (current: {}, last: {}). Resetting read position to 0.", log_path, current_size, original_last_pos);
             read_from_pos = 0;
             // After rotation, we read the new file from the start.
         } else if original_last_pos == 0 && current_size > 0 {
@@ -1355,13 +1355,13 @@ impl ProcessManager {
     /// Emits ProcessMetricsUpdate events to the frontend.
     async fn periodic_metrics_collector(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
         let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
-        log::info!("Starting periodic metrics collector task.");
+        log::debug!("Starting periodic metrics collector task.");
 
         let mut sys = System::new_all();
 
         // Get number of CPU cores for normalizing CPU usage (sysinfo reports per-core %)
         let num_cpus = sys.cpus().len().max(1) as f32;
-        log::info!("Metrics collector: Detected {} CPU cores for normalization", num_cpus);
+        log::debug!("Metrics collector: Detected {} CPU cores for normalization", num_cpus);
 
         loop {
             interval.tick().await;
@@ -1471,7 +1471,7 @@ impl ProcessManager {
     /// Retrieves the full content of the latest.log file for a given process.
     /// Internally accesses the global state to get the ProfileManager.
     pub async fn get_full_log_content(&self, process_id: Uuid) -> Result<String> {
-        log::info!(
+        log::debug!(
             "Attempting to get full log content for process {}",
             process_id
         );
@@ -1637,20 +1637,20 @@ impl ProcessManager {
 
     /// Adds a task handle to the launching_processes map
     pub fn add_launching_process(&self, profile_id: Uuid, handle: JoinHandle<()>) {
-        log::info!("Adding launching task for profile ID: {}", profile_id);
+        log::debug!("Adding launching task for profile ID: {}", profile_id);
         self.launching_processes.insert(profile_id, handle);
     }
 
     /// Removes a task handle from the launching_processes map
     pub fn remove_launching_process(&self, profile_id: Uuid) {
-        log::info!("Removing launching task for profile ID: {}", profile_id);
+        log::debug!("Removing launching task for profile ID: {}", profile_id);
         self.launching_processes.remove(&profile_id);
     }
 
     /// Aborts an ongoing launch process for the given profile ID
     pub fn abort_launch_process(&self, profile_id: Uuid) -> Result<()> {
         if let Some((_, handle)) = self.launching_processes.remove(&profile_id) {
-            log::info!("Aborting launch task for profile ID: {}", profile_id);
+            log::debug!("Aborting launch task for profile ID: {}", profile_id);
 
             // Abort the task
             handle.abort();
@@ -1695,7 +1695,7 @@ impl ProcessManager {
             None => return, // No process metadata available
         };
 
-        log::info!(
+        log::debug!(
             "Executing post-exit hook for process {}: {}",
             process_id,
             hook
@@ -1783,7 +1783,7 @@ impl ProcessManager {
                 Ok(global_state) => {
                     let launcher_config = global_state.config_manager.get_config().await;
                     if launcher_config.open_logs_after_starting {
-                        log::info!(
+                        log::debug!(
                             "Config: Attempting to auto-open log windows for process {}",
                             process_id
                         );
@@ -1824,7 +1824,7 @@ impl ProcessManager {
 #[async_trait]
 impl PostInitializationHandler for ProcessManager {
     async fn on_state_ready(&self, app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        log::info!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
+        log::debug!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
 
         // For process_crash_report_events: The task requires the receive end of an mpsc channel.
         // The most robust way is to initialize tx and rx in `new`, store rx in `self` (e.g., Arc<Mutex<Option<Receiver>>>)
@@ -1834,7 +1834,7 @@ impl PostInitializationHandler for ProcessManager {
 
         // This was the critical call causing deadlock issues
         self.load_processes_and_watchers().await?;
-        log::info!("ProcessManager: Finished load_processes_and_watchers.");
+        log::debug!("ProcessManager: Finished load_processes_and_watchers.");
 
         let manager_clone_periodic_check_processes = Arc::clone(&self.processes);
         let manager_clone_periodic_check_watchers = Arc::clone(&self.active_watchers);
@@ -1847,15 +1847,15 @@ impl PostInitializationHandler for ProcessManager {
             manager_clone_periodic_check_watchers,
             notify_tx_for_periodic_check,
         ));
-        log::info!("ProcessManager: Spawned periodic_process_check task.");
+        log::debug!("ProcessManager: Spawned periodic_process_check task.");
 
         let tailer_processes_arc = Arc::clone(&self.processes);
         tokio::spawn(Self::periodic_log_tailer(tailer_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_log_tailer task.");
+        log::debug!("ProcessManager: Spawned periodic_log_tailer task.");
 
         let metrics_processes_arc = Arc::clone(&self.processes);
         tokio::spawn(Self::periodic_metrics_collector(metrics_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_metrics_collector task.");
+        log::debug!("ProcessManager: Spawned periodic_metrics_collector task.");
 
         log::info!("ProcessManager: Successfully completed on_state_ready.");
         Ok(())

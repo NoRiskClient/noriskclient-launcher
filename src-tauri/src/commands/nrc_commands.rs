@@ -17,7 +17,7 @@ use crate::utils::updater_utils;
 /// * `Result<Vec<BlogPost>, CommandError>` - A vector of blog posts or an error.
 #[tauri::command]
 pub async fn get_news_and_changelogs_command() -> Result<Vec<BlogPost>, CommandError> {
-    info!("Executing get_news_and_changelogs_command");
+    debug!("Executing get_news_and_changelogs_command");
     Ok(WordPressApi::get_news_and_changelogs().await?)
 }
 
@@ -402,10 +402,10 @@ pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), Comman
 pub async fn log_message_command(level: String, message: String) -> Result<(), CommandError> {
     match level.to_lowercase().as_str() {
         "debug" => debug!("[Frontend] {}", message),
-        "info" => info!("[Frontend] {}", message),
+        "info" => debug!("[Frontend] {}", message),
         "warn" => log::warn!("[Frontend] {}", message),
         "error" => error!("[Frontend] {}", message),
-        _ => info!("[Frontend] {}", message),
+        _ => debug!("[Frontend] {}", message),
     }
     Ok(())
 }

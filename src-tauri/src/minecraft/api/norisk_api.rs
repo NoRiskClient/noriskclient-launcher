@@ -188,7 +188,7 @@ impl NoRiskApi {
                     )));
                 }
 
-                info!("[NoRisk API] Server ID request successful: {}", server_id);
+                debug!("[NoRisk API] Server ID request successful: {}", server_id);
                 Ok(server_response)
             }
             Err(e) => {
@@ -363,7 +363,7 @@ impl NoRiskApi {
         force: bool,
         is_experimental: bool,
     ) -> Result<NoRiskToken> {
-        info!("[NoRisk API] Refreshing NoRisk token v3 with SystemID: {}", system_id);
+        debug!("[NoRisk API] Refreshing NoRisk token v3 with SystemID: {}", system_id);
         debug!("[NoRisk API] Username: {}", username);
         debug!("[NoRisk API] Force refresh: {}", force);
         debug!("[NoRisk API] Experimental mode: {}", is_experimental);
@@ -372,14 +372,14 @@ impl NoRiskApi {
         debug!("[NoRisk API] Step 1: Requesting server ID from NoRisk API");
         let server_response = Self::request_server_id(is_experimental).await?;
         let server_id = &server_response.server_id;
-        info!("[NoRisk API] Received server ID: {}", server_id);
+        debug!("[NoRisk API] Received server ID: {}", server_id);
 
         // Step 2: Join the Minecraft server session (client-side authentication)
         debug!("[NoRisk API] Step 2: Joining Minecraft server session with server ID: {}", server_id);
         let mc_api = crate::minecraft::api::mc_api::MinecraftApiService::new();
         match mc_api.join_server_session(access_token, selected_profile, server_id).await {
             Ok(_) => {
-                info!("[NoRisk API] Successfully joined Minecraft server session");
+                debug!("[NoRisk API] Successfully joined Minecraft server session");
             }
             Err(join_err) => {
                 // Inspect the error text for the specific InsufficientPrivilegesException coming from
@@ -462,7 +462,7 @@ impl NoRiskApi {
         debug!("[NoRisk API] Parsing v3 token refresh response body as JSON");
         match response.json::<NoRiskToken>().await {
             Ok(token) => {
-                info!("[NoRisk API] v3 token refresh successful");
+                debug!("[NoRisk API] v3 token refresh successful");
                 debug!("[NoRisk API] Token valid status: {}", token.value.len() > 0);
                 Ok(token)
             }
@@ -694,7 +694,7 @@ impl NoRiskApi {
             )));
         }
 
-        info!("[NoRisk API] Crash log submitted successfully.");
+        debug!("[NoRisk API] Crash log submitted successfully.");
         Ok(())
     }
 
@@ -707,7 +707,7 @@ impl NoRiskApi {
         let endpoint = "mcreal/user/mobileAppToken";
         let url = format!("{}/{}", base_url, endpoint);
 
-        info!("[NoRisk API] Requesting mcreal app token");
+        debug!("[NoRisk API] Requesting mcreal app token");
         debug!("[NoRisk API] Full URL: {}", url);
 
         let response = HTTP_CLIENT
@@ -754,7 +754,7 @@ impl NoRiskApi {
         let endpoint = "mcreal/user/mobileAppToken/reset";
         let url = format!("{}/{}", base_url, endpoint);
 
-        info!("[NoRisk API] Resetting mcreal app token");
+        debug!("[NoRisk API] Resetting mcreal app token");
         debug!("[NoRisk API] Full URL: {}", url);
 
         let response = HTTP_CLIENT
@@ -951,7 +951,7 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/referral/report", base_url);
 
-        info!("[NoRisk API] Reporting referral code: {} for account: {}", code, account_id);
+        debug!("[NoRisk API] Reporting referral code: {} for account: {}", code, account_id);
         debug!("[NoRisk API] Full URL: {}", url);
 
         #[derive(Serialize)]
@@ -991,7 +991,7 @@ impl NoRiskApi {
             )));
         }
 
-        info!("[NoRisk API] Successfully reported referral code");
+        debug!("[NoRisk API] Successfully reported referral code");
         Ok(())
     }
 
@@ -1001,7 +1001,7 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/referral/info", base_url);
 
-        info!("[NoRisk API] Fetching referral info for code: {}", code);
+        debug!("[NoRisk API] Fetching referral info for code: {}", code);
         debug!("[NoRisk API] Full URL: {}", url);
 
         let response = HTTP_CLIENT
@@ -1037,7 +1037,7 @@ impl NoRiskApi {
             AppError::ParseError(format!("Failed to parse referral info: {}", e))
         })?;
 
-        info!("[NoRisk API] Successfully fetched referral info for: {}", info.referrer_name);
+        debug!("[NoRisk API] Successfully fetched referral info for: {}", info.referrer_name);
         Ok(info)
     }
 

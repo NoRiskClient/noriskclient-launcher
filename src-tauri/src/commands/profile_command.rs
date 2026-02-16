@@ -29,7 +29,7 @@ use crate::utils::{
     shaderpack_utils,
 };
 use chrono::Utc;
-use log::{error, info, trace, warn};
+use log::{error, info, trace, warn, debug};
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -2258,7 +2258,7 @@ pub struct AllProfilesAndLastPlayed {
 
 #[tauri::command]
 pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlayed, CommandError> {
-    info!("Executing get_all_profiles_and_last_played command");
+    debug!("Executing get_all_profiles_and_last_played command");
     let state = State::get().await?;
 
     // Fetch User Profiles (includes editable copies of standard profiles)

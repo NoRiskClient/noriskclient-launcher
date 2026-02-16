@@ -10,7 +10,7 @@ use crate::utils::path_utils;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::{HashMap, HashSet};
@@ -326,7 +326,7 @@ pub struct ProfileManager {
 
 impl ProfileManager {
     pub fn new(profiles_path: PathBuf) -> Result<Self> {
-        info!(
+        debug!(
             "ProfileManager: Initializing with path: {:?} (profiles loading deferred)",
             profiles_path
         );
@@ -356,7 +356,7 @@ impl ProfileManager {
 
             if !path.exists() {
                 if attempt_count == 1 {
-                    info!("ProfileManager: Profiles file doesn't exist, checking for backups to restore");
+                    warn!("ProfileManager: Profiles file doesn't exist, checking for backups to restore");
                     // Try to restore from backup if file doesn't exist
                     match backup_utils::restore_from_backup(path, Some("profiles")).await {
                         Ok(restored_path) => {
@@ -377,7 +377,7 @@ impl ProfileManager {
                 Ok(data) => {
                     match serde_json::from_str::<Vec<Profile>>(&data) {
                         Ok(profiles) => {
-                            info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
+                            debug!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
                             return Ok(profiles.into_iter().map(|p| (p.id, p)).collect());
                         }
                         Err(e) => {
@@ -440,7 +440,7 @@ impl ProfileManager {
     async fn save_profiles(&self) -> Result<()> {
         let _guard = self.save_lock.lock().await;
 
-        info!("ProfileManager: Saving profiles to {:?}", self.profiles_path);
+        debug!("ProfileManager: Saving profiles to {:?}", self.profiles_path);
 
         let profiles_data = {
             let profiles_guard = self.profiles.read().await;
@@ -492,7 +492,7 @@ impl ProfileManager {
     pub async fn create_profile(&self, profile: Profile) -> Result<Uuid> {
         // The 'profile.path' field is expected to be a relative path/name for the profile directory
         // e.g., "My Profile Name" or "some_group/My Profile Name"
-        info!(
+        debug!(
             "Attempting to create profile named '{}' with relative path identifier: {:?}",
             profile.name, profile.path
         );
@@ -500,7 +500,7 @@ impl ProfileManager {
         // Calculate the absolute path for the new profile's instance directory
         let new_profile_instance_path = self.calculate_instance_path_for_profile(&profile)?;
 
-        info!(
+        debug!(
             "Calculated absolute profile instance directory: {:?}",
             new_profile_instance_path
         );
@@ -508,7 +508,7 @@ impl ProfileManager {
         // Create the specific instance directory for this new profile.
         // This will also create any necessary parent directories, including the one
         // where profiles.json (self.profiles_path) will be stored, due to the nature of create_dir_all.
-        info!(
+        debug!(
             "Creating profile instance directory at: {:?}",
             new_profile_instance_path
         );
@@ -521,7 +521,7 @@ impl ProfileManager {
             // Other functions will use calculate_instance_path_for_profile to resolve it.
             profiles.insert(id, profile);
         }
-        info!("Saving profiles metadata to: {:?}", self.profiles_path);
+        debug!("Saving profiles metadata to: {:?}", self.profiles_path);
         self.save_profiles().await?;
         Ok(id)
     }
@@ -543,7 +543,7 @@ impl ProfileManager {
                         //info!("Found standard profile '{}' for ID {}", standard_profile.name, id);
                         Ok(standard_profile)
                     } else {
-                        info!("Profile ID {} not found in standard versions either.", id);
+                        error!("Profile ID {} not found in standard versions either.", id);
                         Err(crate::error::AppError::ProfileNotFound(id))
                     }
                 }
@@ -583,7 +583,7 @@ impl ProfileManager {
             // Calculate the path for this profile and compare
             let other_path = path_calculator(profile);
             if other_path == *target_path {
-                info!(
+                warn!(
                     "Found another profile '{}' (ID: {}) using the same path: {:?}",
                     profile.name, profile_id, target_path
                 );
@@ -609,7 +609,7 @@ impl ProfileManager {
         let profile_dir_path = if let Some(profile) = &profile_to_delete {
             match self.calculate_instance_path_for_profile(&profile) {
                 Ok(path) => {
-                    info!(
+                    debug!(
                         "Profile '{}' marked for deletion. Directory path: {:?}",
                         profile.name, path
                     );
@@ -627,7 +627,7 @@ impl ProfileManager {
             }
         } else {
             // Profile not found in map, nothing to delete on filesystem
-            info!("Profile with ID {} not found for deletion.", id);
+            error!("Profile with ID {} not found for deletion.", id);
             return Err(AppError::ProfileNotFound(id)); // Return error if profile doesn't exist
         };
 
@@ -636,13 +636,13 @@ impl ProfileManager {
             if self.has_other_profile_with_same_path(id, path, |profile| {
                 self.calculate_instance_path_for_profile(profile).unwrap_or_default()
             }).await {
-                info!(
+                warn!(
                     "Another profile is using the same directory path {:?}. Skipping directory deletion.",
                     path
                 );
                 false
             } else {
-                info!(
+                debug!(
                     "No other profile uses the directory path {:?}. Safe to delete.",
                     path
                 );
@@ -656,7 +656,7 @@ impl ProfileManager {
         if should_delete_directory {
             if let Some(ref path) = profile_dir_path {
                 if path.exists() {
-                    info!("Moving profile directory to trash: {:?}", path);
+                    debug!("Moving profile directory to trash: {:?}", path);
                     match crate::utils::trash_utils::move_path_to_trash(path, Some("profiles")).await {
                         Ok(wrapper) => info!("Profile directory moved to trash wrapper: {:?}", wrapper),
                         Err(e) => {
@@ -690,7 +690,7 @@ impl ProfileManager {
                     );
                     false
                 } else {
-                    info!(
+                    debug!(
                         "No other profile uses the individual directory path {:?}. Safe to delete.",
                         individual_path
                     );
@@ -699,7 +699,7 @@ impl ProfileManager {
 
                 if should_delete_individual_directory {
                     if individual_path.exists() {
-                        info!("Moving individual profile directory to trash: {:?}", individual_path);
+                        debug!("Moving individual profile directory to trash: {:?}", individual_path);
                         match crate::utils::trash_utils::move_path_to_trash(&individual_path, Some("profiles")).await {
                             Ok(wrapper) => info!("Individual profile directory moved to trash wrapper: {:?}", wrapper),
                             Err(e) => {
@@ -744,7 +744,7 @@ impl ProfileManager {
 
     // Add a new mod to a specific profile
     pub async fn add_mod(&self, profile_id: Uuid, mod_info: Mod) -> Result<()> {
-        info!(
+        debug!(
             "Adding mod '{}' (Source: {:?}) to profile {}",
             mod_info
                 .display_name
@@ -765,10 +765,10 @@ impl ProfileManager {
                 profile.mods.push(mod_info);
                 drop(profiles);
                 self.save_profiles().await?;
-                info!("Successfully added mod to profile {}", profile_id);
+                debug!("Successfully added mod to profile {}", profile_id);
                 Ok(())
             } else {
-                info!(
+                warn!(
                     "Mod with the same source already exists in profile {}",
                     profile_id
                 );
@@ -807,14 +807,14 @@ impl ProfileManager {
         Box::pin(async move {
             let display_name_log = mod_name.as_deref().unwrap_or(&project_id);
             let version_log = version_number.as_deref().unwrap_or(&version_id);
-            info!(
+            debug!(
                 "Processing Modrinth mod {} (Version {}) for profile {}. Add dependencies: {}",
                 display_name_log, version_log, profile_id, add_dependencies
             );
 
             let mod_key = (project_id.clone(), version_id.clone());
             if visited_mods.contains(&mod_key) {
-                info!(
+                debug!(
                     "Skipping already processed mod/dependency: {} ({})",
                     display_name_log, version_log
                 );
@@ -836,7 +836,7 @@ impl ProfileManager {
                 let mut profiles = self.profiles.write().await;
                 if let Some(profile) = profiles.get_mut(&profile_id) {
                     if !profile.mods.iter().any(|m| m.source == source) {
-                        info!(
+                        debug!(
                             "Adding mod {} ({}) to profile {}",
                             display_name_log, version_log, profile_id
                         );
@@ -858,7 +858,7 @@ impl ProfileManager {
                         profile.mods.push(new_mod);
                         needs_save = true;
                     } else {
-                        info!(
+                        debug!(
                             "Mod {} ({}) already exists in profile {}. Skipping addition.",
                             display_name_log, version_log, profile_id
                         );
@@ -877,7 +877,7 @@ impl ProfileManager {
             }
 
             if add_dependencies {
-                info!(
+                debug!(
                     "Fetching dependencies for {} ({})",
                     display_name_log, version_log
                 );
@@ -891,7 +891,7 @@ impl ProfileManager {
                         if let Some(version_info) =
                             versions.into_iter().find(|v| v.id == version_id)
                         {
-                            info!(
+                            debug!(
                                 "Found {} dependencies for {} ({})",
                                 version_info.dependencies.len(),
                                 display_name_log,
@@ -900,10 +900,10 @@ impl ProfileManager {
 
                             for dependency in version_info.dependencies {
                                 if dependency.dependency_type == ModrinthDependencyType::Required {
-                                    info!("Processing required dependency: Project={:?}, Version={:?}", dependency.project_id, dependency.version_id);
+                                    debug!("Processing required dependency: Project={:?}, Version={:?}", dependency.project_id, dependency.version_id);
 
                                     if let Some(dep_project_id) = dependency.project_id {
-                                        info!("Attempting to find compatible version for dependency project '{}'", dep_project_id);
+                                        debug!("Attempting to find compatible version for dependency project '{}'", dep_project_id);
 
                                         let target_version_id = dependency.version_id;
 
@@ -955,7 +955,7 @@ impl ProfileManager {
                                                  }
 
                                                  if let Some(selected_dep_version) = best_dep_version {
-                                                     info!("Selected version '{}' ({}) for dependency '{}'", selected_dep_version.name, selected_dep_version.id, dep_project_id);
+                                                     debug!("Selected version '{}' ({}) for dependency '{}'", selected_dep_version.name, selected_dep_version.id, dep_project_id);
                                                      
                                                      if let Some(primary_file) = selected_dep_version.files.iter().find(|f| f.primary) {
                                                          match self.add_modrinth_mod_internal(
@@ -1069,7 +1069,7 @@ impl ProfileManager {
             ModPlatform::CurseForge => "CurseForge",
         };
 
-        info!(
+        debug!(
             "Adding {} mod {} to profile {} (dependencies: {})",
             platform_name, display_name_log, payload.profile_id, add_dependencies
         );
@@ -1096,7 +1096,7 @@ impl ProfileManager {
 
         if let Some(profile) = profiles.get_mut(&payload.profile_id) {
             if !profile.mods.iter().any(|m| m.source == source) {
-                info!(
+                debug!(
                     "Adding mod {} to profile {}",
                     display_name_log, payload.profile_id
                 );
@@ -1149,7 +1149,7 @@ impl ProfileManager {
     ) -> Result<()> {
         use crate::integrations::unified_mod::{ModPlatform, UnifiedModVersionsParams};
 
-        info!(
+        debug!(
             "Installing dependencies for {} mod {} (version: {})",
             platform_name, display_name_log, payload.version_number.as_deref().unwrap_or("unknown")
         );
@@ -1173,7 +1173,7 @@ impl ProfileManager {
         };
 
         if let Some(target_version) = versions_response.versions.into_iter().find(|v| v.id == payload.version_id) {
-            info!("Found {} dependencies for {} mod {}", target_version.files.len(), platform_name, display_name_log);
+            debug!("Found {} dependencies for {} mod {}", target_version.files.len(), platform_name, display_name_log);
 
             match payload.source {
                 ModPlatform::Modrinth => {
@@ -1216,7 +1216,7 @@ impl ProfileManager {
             // Only install required dependencies
             if let Some(relation_type) = CurseForgeFileRelationType::from_u32(dependency.relationType) {
                 if relation_type.should_install() {
-                    info!("Processing CurseForge dependency: ModId={}, RelationType={}", dependency.modId, relation_type.as_str());
+                    debug!("Processing CurseForge dependency: ModId={}, RelationType={}", dependency.modId, relation_type.as_str());
 
                     // Get dependency mod information
                     match crate::integrations::curseforge::get_mod_info(dependency.modId).await {
@@ -1302,7 +1302,7 @@ impl ProfileManager {
 
         for dependency in &version.dependencies {
             if dependency.dependency_type == ModrinthDependencyType::Required {
-                info!("Processing required Modrinth dependency: Project={:?}, Version={:?}", dependency.project_id, dependency.version_id);
+                debug!("Processing required Modrinth dependency: Project={:?}, Version={:?}", dependency.project_id, dependency.version_id);
 
                 if let Some(dep_project_id) = &dependency.project_id {
                     // Get compatible versions for the dependency
@@ -1433,7 +1433,7 @@ impl ProfileManager {
         mod_id: Uuid,
         enabled: bool,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Setting mod {} enabled status to {} for profile {}",
             mod_id, enabled, profile_id
         );
@@ -1475,7 +1475,7 @@ impl ProfileManager {
         mod_id: Uuid,
         updates_enabled: bool,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Setting mod {} updates_enabled status to {} for profile {}",
             mod_id, updates_enabled, profile_id
         );
@@ -1512,7 +1512,7 @@ impl ProfileManager {
 
     // Remove a specific mod from a profile
     pub async fn delete_mod(&self, profile_id: Uuid, mod_id: Uuid) -> Result<()> {
-        info!("Deleting mod {} from profile {}", mod_id, profile_id);
+        debug!("Deleting mod {} from profile {}", mod_id, profile_id);
 
         let mut profiles = self.profiles.write().await;
 
@@ -1550,7 +1550,7 @@ impl ProfileManager {
         loader: ModLoader,
         disabled: bool,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Setting disabled state for pack mod '{}' (Pack: '{}', MC: {}, Loader: {:?}) for profile {} to {}",
             mod_id, pack_id, game_version, loader, profile_id, disabled
         );
@@ -1620,7 +1620,7 @@ impl ProfileManager {
         mod_id: Uuid,
         new_version_details: &crate::integrations::curseforge::CurseForgeFile,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Attempting to update CurseForge mod instance {} in profile {} to version '{}' (ID: {})",
             mod_id, profile_id, new_version_details.displayName, new_version_details.id
         );
@@ -1635,7 +1635,7 @@ impl ProfileManager {
             AppError::ProfileNotFound(profile_id)
         })?;
 
-        info!(
+        debug!(
             "Checking required dependencies for new CurseForge version {}...",
             new_version_details.id
         );
@@ -1662,7 +1662,7 @@ impl ProfileManager {
                         );
                         missing_deps.push(dependency.modId);
                     } else {
-                        info!(
+                        debug!(
                             "Required dependency project '{}' found in profile.",
                             dependency.modId
                         );
@@ -1693,7 +1693,7 @@ impl ProfileManager {
                     )));
                 }
 
-                info!(
+                debug!(
                     "Updating CurseForge mod instance {} from version {} to {} using file '{}'",
                     mod_id,
                     mod_to_update.version.as_deref().unwrap_or("?"),
@@ -1752,7 +1752,7 @@ impl ProfileManager {
         // Now install any missing dependencies
         if !missing_deps.is_empty() {
             let display_name_log = new_version_details.displayName.as_str();
-            info!("Installing {} missing CurseForge dependencies", missing_deps.len());
+            debug!("Installing {} missing CurseForge dependencies", missing_deps.len());
             match self.install_curseforge_dependencies(profile_id, &new_version_details, display_name_log).await {
                 Ok(_) => info!("Successfully installed CurseForge dependencies for '{}'", display_name_log),
                 Err(e) => error!("Failed to install some CurseForge dependencies for '{}': {}", display_name_log, e),
@@ -1773,7 +1773,7 @@ impl ProfileManager {
         mod_id: Uuid,
         new_version_details: &ModrinthVersion,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Attempting to update Modrinth mod instance {} in profile {} to version '{}' ({})",
             mod_id, profile_id, new_version_details.name, new_version_details.id
         );
@@ -1788,7 +1788,7 @@ impl ProfileManager {
             AppError::ProfileNotFound(profile_id)
         })?;
 
-        info!(
+        debug!(
             "Checking required dependencies for new version {}...",
             new_version_details.id
         );
@@ -1814,7 +1814,7 @@ impl ProfileManager {
                         );
                         missing_deps.push((dep_project_id.clone(), dependency.version_id.clone()));
                     } else {
-                        info!(
+                        debug!(
                             "Required dependency project '{}' found in profile.",
                             dep_project_id
                         );
@@ -1852,7 +1852,7 @@ impl ProfileManager {
 
                 match new_version_details.files.iter().find(|f| f.primary) {
                     Some(primary_file) => {
-                        info!(
+                        debug!(
                             "Updating mod instance {} from version {} to {} using file '{}'",
                             mod_id,
                             mod_to_update.version.as_deref().unwrap_or("?"),
@@ -1919,7 +1919,7 @@ impl ProfileManager {
         let mut failed_deps = 0;
 
         for (dep_project_id, dep_version_id_opt) in missing_deps {
-            info!("Installing missing dependency: {}", dep_project_id);
+            debug!("Installing missing dependency: {}", dep_project_id);
 
             // Get the profile's game version and loader for compatibility check
             let profile = self.get_profile(profile_id).await?;
@@ -2212,7 +2212,7 @@ impl ProfileManager {
         // Use standard logic for standard versions or profiles without group/shared folder
         let mods_path = if profile.is_standard_version || !profile.should_use_shared_minecraft_folder() {
             let path = self.get_profile_mods_path_single(profile)?;
-            log::info!(
+            log::debug!(
                 "Calculated standard mods path for profile '{}': {:?}",
                 profile.name,
                 path
@@ -2220,7 +2220,7 @@ impl ProfileManager {
             path
         } else {
             let path = self.get_profile_mods_path_shared(profile)?;
-            log::info!(
+            log::debug!(
                 "Calculated shared mods path for profile '{}': {:?}",
                 profile.name,
                 path
@@ -2334,7 +2334,7 @@ impl ProfileManager {
             }
         }
 
-        log::info!(
+        log::debug!(
             "Found {} relevant custom mod file(s) in {:?}",
             custom_mods.len(),
             custom_mods_path
@@ -2386,7 +2386,7 @@ impl ProfileManager {
 
         // Check if the state is already the desired one
         if current_enabled == set_enabled {
-            log::info!(
+            log::debug!(
                 "Custom mod '{}' is already {}. No action needed.",
                 filename,
                 if set_enabled { "enabled" } else { "disabled" }
@@ -2397,7 +2397,7 @@ impl ProfileManager {
         // Perform the rename if the state needs changing
         if set_enabled {
             // --> Enable it: Rename file.disabled to file
-            log::info!(
+            log::debug!(
                 "Enabling custom mod: Renaming {:?} to {:?}",
                 disabled_path,
                 enabled_path
@@ -2415,7 +2415,7 @@ impl ProfileManager {
                 })?;
         } else {
             // --> Disable it: Rename file to file.disabled
-            log::info!(
+            log::debug!(
                 "Disabling custom mod: Renaming {:?} to {:?}",
                 enabled_path,
                 disabled_path
@@ -2450,7 +2450,7 @@ impl ProfileManager {
         profile_id: Uuid,
         paths_enums: Vec<FilePath>,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Processing {} selected files for import into profile {}",
             paths_enums.len(),
             profile_id
@@ -2501,7 +2501,7 @@ impl ProfileManager {
             return Ok(());
         }
 
-        info!(
+        debug!(
             "Attempting to look up {} unique hashes on Modrinth for profile {}...",
             hashes_to_check.len(),
             profile_id
@@ -2532,7 +2532,7 @@ impl ProfileManager {
 
         match versions_map_result {
             Ok(versions_map) => {
-                info!(
+                debug!(
                     "Successfully received results for {} hashes from Modrinth for profile {}.",
                     versions_map.len(),
                     profile_id
@@ -2595,7 +2595,7 @@ impl ProfileManager {
                         }
                     } else {
                         // Not found in Modrinth results -> Treat as custom mod
-                        log::info!("Mod {:?} (hash: {}) not found on Modrinth for profile {}. Importing as custom mod.", src_path_buf.file_name().unwrap_or_default(), hash, profile_id);
+                        log::debug!("Mod {:?} (hash: {}) not found on Modrinth for profile {}. Importing as custom mod.", src_path_buf.file_name().unwrap_or_default(), hash, profile_id);
                         path_utils::copy_as_custom_mod(
                             &src_path_buf,
                             &mods_dir,
@@ -2638,7 +2638,7 @@ impl ProfileManager {
     /// that doesn't already have a user copy, and updates existing copies with forced fields.
     /// Called during launcher startup.
     pub async fn sync_standard_profiles(&self) -> Result<()> {
-        info!("ProfileManager: Starting standard profiles synchronization...");
+        debug!("ProfileManager: Starting standard profiles synchronization...");
 
         // Ensure profiles are loaded before syncing to avoid race conditions
         self.ensure_profiles_loaded().await?;
@@ -2653,7 +2653,7 @@ impl ProfileManager {
         };
 
         let standard_profiles = state.norisk_version_manager.get_config().await.profiles;
-        info!("ProfileManager: Found {} standard profiles to sync", standard_profiles.len());
+        debug!("ProfileManager: Found {} standard profiles to sync", standard_profiles.len());
 
         if standard_profiles.is_empty() {
             info!("ProfileManager: No standard profiles found, skipping sync");
@@ -2679,7 +2679,7 @@ impl ProfileManager {
                 match self.update_copy_with_forced_fields(*existing_copy_id, &standard_profile).await {
                     Ok(updated) => {
                         if updated {
-                            info!("ProfileManager: Updated forced fields for copy {} of standard profile '{}'", existing_copy_id, standard_profile.name);
+                            debug!("ProfileManager: Updated forced fields for copy {} of standard profile '{}'", existing_copy_id, standard_profile.name);
                             copies_updated += 1;
                         }
                     }
@@ -2691,7 +2691,7 @@ impl ProfileManager {
                 // Create new copy
                 match self.create_editable_copy_from_standard(&standard_profile).await {
                     Ok(new_id) => {
-                        info!("ProfileManager: Created editable copy {} for standard profile '{}'", new_id, standard_profile.name);
+                        debug!("ProfileManager: Created editable copy {} for standard profile '{}'", new_id, standard_profile.name);
                         copies_created += 1;
                     }
                     Err(e) => {
@@ -2711,7 +2711,7 @@ impl ProfileManager {
         {
             let profiles_guard = self.profiles.read().await;
             if profiles_guard.is_empty() {
-                info!("ProfileManager: Profiles not loaded yet, loading them now...");
+                debug!("ProfileManager: Profiles not loaded yet, loading them now...");
                 drop(profiles_guard); // Release read lock before loading
 
                 // Load profiles from disk
@@ -2722,7 +2722,7 @@ impl ProfileManager {
 
                 // Save profiles to disk if migrations were performed
                 if migration_count > 0 {
-                    info!("ProfileManager: Saving migrated profiles to disk...");
+                    debug!("ProfileManager: Saving migrated profiles to disk...");
                     // Set profiles in memory first
                     let mut profiles_write_guard = self.profiles.write().await;
                     *profiles_write_guard = loaded_profiles;
@@ -2772,77 +2772,77 @@ impl ProfileManager {
             
             // Force update name if different
             if copy.name != standard_profile.name {
-                info!("Updating name for copy {}: '{}' -> '{}'", copy_id, copy.name, standard_profile.name);
+                debug!("Updating name for copy {}: '{}' -> '{}'", copy_id, copy.name, standard_profile.name);
                 copy.name = standard_profile.name.clone();
                 changed = true;
             }
             
             // Force update group if different
             if copy.group != standard_profile.group {
-                info!("Updating group for copy {}: {:?} -> {:?}", copy_id, copy.group, standard_profile.group);
+                debug!("Updating group for copy {}: {:?} -> {:?}", copy_id, copy.group, standard_profile.group);
                 copy.group = standard_profile.group.clone();
                 changed = true;
             }
             
             // Force update game version if different
             if copy.game_version != standard_profile.game_version {
-                info!("Updating game version for copy {}: '{}' -> '{}'", copy_id, copy.game_version, standard_profile.game_version);
+                debug!("Updating game version for copy {}: '{}' -> '{}'", copy_id, copy.game_version, standard_profile.game_version);
                 copy.game_version = standard_profile.game_version.clone();
                 changed = true;
             }
             
             // Force update loader if different
             if copy.loader != standard_profile.loader {
-                info!("Updating loader for copy {}: {:?} -> {:?}", copy_id, copy.loader, standard_profile.loader);
+                debug!("Updating loader for copy {}: {:?} -> {:?}", copy_id, copy.loader, standard_profile.loader);
                 copy.loader = standard_profile.loader.clone();
                 changed = true;
             }
             
             // Force update loader version if different
             if copy.loader_version != standard_profile.loader_version {
-                info!("Updating loader version for copy {}: {:?} -> {:?}", copy_id, copy.loader_version, standard_profile.loader_version);
+                debug!("Updating loader version for copy {}: {:?} -> {:?}", copy_id, copy.loader_version, standard_profile.loader_version);
                 copy.loader_version = standard_profile.loader_version.clone();
                 changed = true;
             }
             
             // Force update description if different
             if copy.description != standard_profile.description {
-                info!("Updating description for copy {}", copy_id);
+                debug!("Updating description for copy {}", copy_id);
                 copy.description = standard_profile.description.clone();
                 changed = true;
             }
             
             // Force update NoRisk pack selection if different
             if copy.selected_norisk_pack_id != standard_profile.selected_norisk_pack_id {
-                info!("Updating NoRisk pack for copy {}: {:?} -> {:?}", copy_id, copy.selected_norisk_pack_id, standard_profile.selected_norisk_pack_id);
+                debug!("Updating NoRisk pack for copy {}: {:?} -> {:?}", copy_id, copy.selected_norisk_pack_id, standard_profile.selected_norisk_pack_id);
                 copy.selected_norisk_pack_id = standard_profile.selected_norisk_pack_id.clone();
                 changed = true;
             }
             
             // Force update banner if different
             if copy.banner != standard_profile.banner {
-                info!("Updating banner for copy {}", copy_id);
+                debug!("Updating banner for copy {}", copy_id);
                 copy.banner = standard_profile.banner.clone();
                 changed = true;
             }
 
               // Force update banner if different
             if copy.background != standard_profile.background {
-                info!("Updating background for copy {}", copy_id);
+                debug!("Updating background for copy {}", copy_id);
                 copy.background = standard_profile.background.clone();
                 changed = true;
             }
             
             // Force update is_standard_version if different
             if copy.is_standard_version != standard_profile.is_standard_version {
-                info!("Updating is_standard_version for copy {}: {} -> {}", copy_id, copy.is_standard_version, standard_profile.is_standard_version);
+                debug!("Updating is_standard_version for copy {}: {} -> {}", copy_id, copy.is_standard_version, standard_profile.is_standard_version);
                 copy.is_standard_version = standard_profile.is_standard_version;
                 changed = true;
             }
             
             // Force update path if different
             if copy.path != standard_profile.path {
-                info!("Updating path for copy {}: '{}' -> '{}'", copy_id, copy.path, standard_profile.path);
+                debug!("Updating path for copy {}: '{}' -> '{}'", copy_id, copy.path, standard_profile.path);
                 copy.path = standard_profile.path.clone();
                 changed = true;
             }
@@ -2866,7 +2866,7 @@ impl ProfileManager {
         profile_id: Uuid,
         payload: &crate::commands::content_command::SwitchContentVersionPayload,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Updating mod in profile {} using unified version switch",
             profile_id
         );
@@ -2975,7 +2975,7 @@ impl ProfileManager {
 
         // Install missing dependencies if any
         if !payload.new_version_details.dependencies.is_empty() {
-            info!("Processing {} dependencies for updated mod", payload.new_version_details.dependencies.len());
+            debug!("Processing {} dependencies for updated mod", payload.new_version_details.dependencies.len());
             if let Err(e) = self.install_missing_dependencies(
                 profile_id,
                 &payload.new_version_details.dependencies,
@@ -3029,11 +3029,11 @@ impl ProfileManager {
             if let Some(dep_project_id) = &dependency.project_id {
                 // Check if dependency is already installed
                 if self.is_dependency_installed(&profile, dep_project_id) {
-                    info!("Dependency {} already installed, skipping", dep_project_id);
+                    debug!("Dependency {} already installed, skipping", dep_project_id);
                     continue;
                 }
 
-                info!("Installing missing dependency: {}", dep_project_id);
+                debug!("Installing missing dependency: {}", dep_project_id);
 
                 // Get the dependency version details
                 let versions_params = UnifiedModVersionsParams {
@@ -3090,7 +3090,7 @@ impl ProfileManager {
 
     /// Deletes a custom mod file (either .jar or .jar.disabled) from the profile's custom_mods directory.
     pub async fn delete_custom_mod_file(&self, profile_id: Uuid, filename: &str) -> Result<()> {
-        info!(
+        debug!(
             "Attempting to delete custom mod file '{}' for profile {}",
             filename, profile_id
         );
@@ -3144,9 +3144,9 @@ impl ProfileManager {
 #[async_trait]
 impl PostInitializationHandler for ProfileManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("ProfileManager: on_state_ready called. Loading profiles...");
+        debug!("ProfileManager: on_state_ready called. Loading profiles...");
         // PRIORITY 0: Create backup BEFORE ANYTHING else (including loading)
-        info!("ProfileManager: Creating pre-load backup of profiles.json...");
+        debug!("ProfileManager: Creating pre-load backup of profiles.json...");
         if self.profiles_path.exists() {
             match backup_utils::create_backup(&self.profiles_path, Some("profiles"), &self.backup_config).await {
                 Ok(backup_path) => {
@@ -3158,7 +3158,7 @@ impl PostInitializationHandler for ProfileManager {
                 }
             }
         } else {
-            info!("ProfileManager: profiles.json doesn't exist yet - no backup needed at this stage");
+            debug!("ProfileManager: profiles.json doesn't exist yet - no backup needed at this stage");
         }
 
         // Load profiles with migrations (backup was already created above)

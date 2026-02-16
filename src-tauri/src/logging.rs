@@ -75,7 +75,7 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
     log4rs::init_config(config)?;
 
     // Now we can use log::info!
-    log::info!("Logging initialized. Log directory: {}", log_dir.display());
+    log::debug!("Logging initialized. Log directory: {}", log_dir.display());
 
     Ok(())
 }

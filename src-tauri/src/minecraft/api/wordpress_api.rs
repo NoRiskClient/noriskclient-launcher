@@ -63,7 +63,7 @@ impl WordPressApi {
         let endpoint = "posts";
         let url = format!("{}/{}", base_url, endpoint);
 
-        info!("[WordPress API] Fetching blog posts");
+        debug!("[WordPress API] Fetching blog posts");
         debug!("[WordPress API] Full URL: {}", url);
 
         let mut query_params: HashMap<String, String> = HashMap::new();
@@ -147,7 +147,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_news_and_changelogs() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching news and changelog posts");
+        debug!("[WordPress API] Fetching news and changelog posts");
         Self::get_blog_posts(Some("21,2"), Some(10), Some(1)).await
     }
 
@@ -157,7 +157,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_news() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching news posts");
+        debug!("[WordPress API] Fetching news posts");
         Self::get_blog_posts(Some("21"), Some(10), Some(1)).await
     }
 
@@ -167,7 +167,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_changelogs() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching changelog posts");
+        debug!("[WordPress API] Fetching changelog posts");
         Self::get_blog_posts(Some("2"), Some(10), Some(1)).await
     }
 }

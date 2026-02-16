@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::state::process_state::ProcessMetadata;
 use dashmap::DashMap;
-use log::info;
+use log::{info, debug};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::Emitter;
@@ -104,12 +104,12 @@ pub struct EventState {
 
 impl EventState {
     pub fn new(app: Option<Arc<tauri::AppHandle>>) -> Self {
-        info!("Initializing EventState...");
+        debug!("Initializing EventState...");
         let state = Self {
             app,
             active_events: DashMap::new(),
         };
-        info!("Successfully initialized EventState.");
+        debug!("Successfully initialized EventState.");
         state
     }
 

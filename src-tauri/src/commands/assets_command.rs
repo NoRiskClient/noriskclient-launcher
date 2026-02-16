@@ -22,7 +22,7 @@ type Result<T> = std::result::Result<T, CommandError>;
 /// * `Result<String>` - The local file path as a string, or an error if the download fails.
 #[command]
 pub async fn get_or_download_asset_model(url: &str) -> Result<String> {
-    info!("get_or_download_asset_model called with URL: {}", url);
+    debug!("get_or_download_asset_model called with URL: {}", url);
 
     // Parse the URL to extract the path components
     let parsed_url = Url::parse(url).map_err(|e| {
@@ -106,7 +106,7 @@ pub async fn get_or_download_asset_model(url: &str) -> Result<String> {
     }
 
     // File doesn't exist, download it synchronously (blocking)
-    info!("Asset model not found locally, downloading from: {}", url);
+    debug!("Asset model not found locally, downloading from: {}", url);
 
     // Ensure parent directories exist
     if let Some(parent) = local_file_path.parent() {

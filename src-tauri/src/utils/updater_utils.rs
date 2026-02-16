@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result as AppResult};
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
@@ -205,7 +205,7 @@ pub fn emit_status(
 ///
 /// * `Result<WebviewWindow>` - The created Tauri webview window instance or an error.
 pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
-    info!("Creating updater window...");
+    debug!("Creating updater window...");
     let window = WebviewWindowBuilder::new(
         app_handle,
         "updater",                              // Unique label
@@ -221,7 +221,7 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
     .visible(false) // Start hidden, show when needed
     .build()?;
 
-    info!("Updater window created successfully (label: 'updater').");
+    debug!("Updater window created successfully (label: 'updater').");
     Ok(window)
 }
 

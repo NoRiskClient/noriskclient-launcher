@@ -52,7 +52,7 @@ pub struct SkinManager {
 impl SkinManager {
     /// Create a new skin manager
     pub fn new(skins_path: PathBuf) -> Result<Self> {
-        info!(
+        debug!(
             "SkinManager: Initializing with path: {:?} (skins loading deferred)",
             skins_path
         );
@@ -72,12 +72,12 @@ impl SkinManager {
             return Ok(());
         }
 
-        info!("Loading skins database from: {:?}", self.skins_path);
+        debug!("Loading skins database from: {:?}", self.skins_path);
         let skins_data = fs::read_to_string(&self.skins_path).await?;
 
         match serde_json::from_str::<SkinDatabase>(&skins_data) {
             Ok(loaded_skins) => {
-                info!(
+                debug!(
                     "Successfully loaded skins database with {} skins",
                     loaded_skins.skins.len()
                 );
@@ -106,7 +106,7 @@ impl SkinManager {
         if let Some(parent_dir) = self.skins_path.parent() {
             if !parent_dir.exists() {
                 fs::create_dir_all(parent_dir).await?;
-                info!(
+                debug!(
                     "Created directory for skins database file: {:?}",
                     parent_dir
                 );
@@ -156,7 +156,7 @@ impl SkinManager {
         if let Some(index) = skins.skins.iter().position(|s| s.id == skin.id) {
             // Replace the existing skin
             skins.skins[index] = skin;
-            info!("Updated existing skin with ID: {}", skins.skins[index].id);
+            debug!("Updated existing skin with ID: {}", skins.skins[index].id);
         } else {
             // Add the new skin
             skins.skins.push(skin);
@@ -180,7 +180,7 @@ impl SkinManager {
         let removed = skins.skins.len() < initial_len;
 
         if removed {
-            info!("Removed skin with ID: {}", id);
+            debug!("Removed skin with ID: {}", id);
             // Save the updated database
             drop(skins); // Release the write lock before saving
             self.save_skins().await?;
@@ -227,9 +227,9 @@ impl SkinManager {
 #[async_trait]
 impl PostInitializationHandler for SkinManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("SkinManager: on_state_ready called. Loading skins...");
+        debug!("SkinManager: on_state_ready called. Loading skins...");
         self.load_skins_internal().await?;
-        info!("SkinManager: Successfully loaded skins in on_state_ready.");
+        debug!("SkinManager: Successfully loaded skins in on_state_ready.");
         Ok(())
     }
 }
