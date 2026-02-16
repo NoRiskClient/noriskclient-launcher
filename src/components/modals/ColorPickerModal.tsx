@@ -246,7 +246,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
         {/* Color Values */}
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">Hex</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.hex')}</label>
             <input
               type="text"
               value={hex}
@@ -256,7 +256,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">R</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.r')}</label>
             <input
               type="number"
               value={rgb.r}
@@ -270,7 +270,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">G</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.g')}</label>
             <input
               type="number"
               value={rgb.g}
@@ -284,7 +284,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">B</label>
+            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.b')}</label>
             <input
               type="number"
               value={rgb.b}

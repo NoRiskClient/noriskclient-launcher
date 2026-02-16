@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ModRow } from "./ModRow";
 import type { Mod, Profile } from "../../../types/profile";
 import * as ProfileService from "../../../services/profile-service";
@@ -47,6 +48,7 @@ export function ModsTab({
   isActive = false,
   searchQuery = "",
 }: ModsTabProps) {
+  const { t } = useTranslation();
   const [mods, setMods] = useState<Mod[]>(profile.mods || []);
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -497,7 +499,7 @@ export function ModsTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search mods..."
+              placeholder={t('mods.search_placeholder')}
             />
           </div>
         )}
@@ -519,7 +521,7 @@ export function ModsTab({
                 onClick={handleUpdateAllMods}
                 disabled={checkingUpdates}
               >
-                update all ({modsWithUpdates})
+                {t('shaderpacks.update_all')} ({modsWithUpdates})
               </Button>
             )}
 
@@ -536,7 +538,7 @@ export function ModsTab({
               onClick={handleCheckUpdates}
               disabled={checkingUpdates}
             >
-              check updates
+              {t('shaderpacks.check_updates')}
             </Button>
 
             {/* Delete button only shown when mods are selected */}
@@ -547,7 +549,7 @@ export function ModsTab({
                 icon={<Icon icon="solar:trash-bin-trash-bold" />}
                 onClick={handleDeleteSelected}
               >
-                delete ({selectedMods.size})
+                {t('common.delete')} ({selectedMods.size})
               </Button>
             )}
           </div>
@@ -567,7 +569,7 @@ export function ModsTab({
             className="w-5 h-5 text-red-400"
           />
           <span className="text-white font-minecraft text-lg">
-            Error checking for updates: {updateError}
+            {t('shaderpacks.error_checking_updates', { error: updateError })}
           </span>
         </div>
       )}
@@ -580,7 +582,7 @@ export function ModsTab({
         }}
       >
         {isLoading ? (
-          <LoadingState message="loading mods..." />
+          <LoadingState message={t('mods.loading')} />
         ) : error ? (
           <ErrorMessage message={error} />
         ) : (
@@ -588,27 +590,27 @@ export function ModsTab({
             headers={[
               {
                 key: "name",
-                label: "mod name",
+                label: t('content.header.name'),
                 sortable: true,
                 width: "flex-1",
                 className: "px-3",
               },
               {
                 key: "version",
-                label: "version",
+                label: t('content.header.version'),
                 sortable: true,
                 width: "w-32",
               },
               {
                 key: "enabled",
-                label: "status",
+                label: t('content.header.status'),
                 sortable: true,
                 width: "w-16",
                 className: "text-center",
               },
               {
                 key: "actions",
-                label: "actions",
+                label: t('content.header.actions'),
                 sortable: false,
                 width: "w-24",
                 className: "text-center",

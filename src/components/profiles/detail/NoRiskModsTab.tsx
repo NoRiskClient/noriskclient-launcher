@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -48,6 +49,7 @@ export function NoRiskModsTab({
   isActive = false,
   searchQuery = "",
 }: NoRiskModsTabProps) {
+  const { t } = useTranslation();
   const [noriskMods, setNoriskMods] = useState<NoRiskMod[]>([]);
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -458,7 +460,7 @@ export function NoRiskModsTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search norisk mods..."
+              placeholder={t('content.norisk.search_placeholder')}
             />
           </div>
         )}
@@ -529,7 +531,7 @@ export function NoRiskModsTab({
             </div>
           </div>
         ) : isLoading ? (
-          <LoadingState message="loading norisk mods..." />
+          <LoadingState message={t('content.norisk.loading')} />
         ) : error ? (
           <ErrorMessage message={error} />
         ) : (

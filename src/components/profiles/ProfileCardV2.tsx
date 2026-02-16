@@ -679,7 +679,7 @@ export function ProfileCardV2({
                    <div className="text-white/60 flex items-center gap-1">
                      <img
                        src={getModLoaderIcon()}
-                       alt={profile.loader || "Vanilla"}
+                       alt={profile.loader || t('common.vanilla')}
                        className="w-3 h-3 object-contain"
                      />
                      <span>
@@ -835,13 +835,13 @@ export function ProfileCardV2({
           <div className="text-white/60 flex items-center gap-1">
             <img
               src={getModLoaderIcon()}
-              alt={profile.loader || "Vanilla"}
+              alt={profile.loader || t('common.vanilla')}
               className="w-3 h-3 object-contain"
             />
             <span>
-              {profile.loader === "vanilla" 
-                ? "Vanilla" 
-                : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`
+              {profile.loader === "vanilla"
+                ? t('common.vanilla')
+                : `${resolvedLoaderVersion?.version || profile.loader_version || t('common.unknown')}`
               }
             </span>
           </div>

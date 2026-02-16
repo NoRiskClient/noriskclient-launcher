@@ -1,17 +1,19 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { Icon } from "@iconify/react";
 import { useFriendsStore, OnlineState } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import { StatusSelector } from "./StatusSelector";
 
-const statusConfig: Record<OnlineState, { color: string; label: string; glow: string }> = {
-  ONLINE: { color: "#22c55e", label: "Online", glow: "0 0 8px rgba(34, 197, 94, 0.6)" },
-  AFK: { color: "#f97316", label: "Away", glow: "0 0 8px rgba(249, 115, 22, 0.6)" },
-  BUSY: { color: "#ef4444", label: "Busy", glow: "0 0 8px rgba(239, 68, 68, 0.6)" },
-  OFFLINE: { color: "#6b7280", label: "Offline", glow: "none" },
-  INVISIBLE: { color: "#6b7280", label: "Invisible", glow: "none" },
-};
+const getStatusConfig = (): Record<OnlineState, { color: string; label: string; glow: string }> => ({
+  ONLINE: { color: "#22c55e", label: i18n.t('friends.status.online'), glow: "0 0 8px rgba(34, 197, 94, 0.6)" },
+  AFK: { color: "#f97316", label: i18n.t('friends.status.away'), glow: "0 0 8px rgba(249, 115, 22, 0.6)" },
+  BUSY: { color: "#ef4444", label: i18n.t('friends.status.busy'), glow: "0 0 8px rgba(239, 68, 68, 0.6)" },
+  OFFLINE: { color: "#6b7280", label: i18n.t('friends.status.offline'), glow: "none" },
+  INVISIBLE: { color: "#6b7280", label: i18n.t('friends.status.invisible'), glow: "none" },
+});
 
 interface PrivacyToggleProps {
   label: string;
@@ -59,6 +61,7 @@ function PrivacyToggle({ label, description, enabled, loading, onToggle, accentC
 }
 
 export function SettingsPanel() {
+  const { t } = useTranslation();
   const { accentColor } = useThemeStore();
   const { currentUser, closeSettings, updatePrivacySetting } = useFriendsStore();
   const avatarUrl = useCrafatarAvatar({ uuid: currentUser?.uuid, size: 64 });
@@ -73,13 +76,13 @@ export function SettingsPanel() {
             className="w-6 h-6 animate-spin"
             style={{ color: accentColor.value }}
           />
-          <span className="text-white/60 text-xs">Loading...</span>
+          <span className="text-white/60 text-xs">{t('common.loading')}</span>
         </div>
       </div>
     );
   }
 
-  const status = statusConfig[currentUser.state];
+  const status = getStatusConfig()[currentUser.state];
 
   const handleToggle = async (setting: string, currentValue: boolean) => {
     setLoadingSettings((prev) => ({ ...prev, [setting]: true }));
@@ -102,7 +105,7 @@ export function SettingsPanel() {
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white font-minecraft-ten">Settings</span>
+          <span className="text-sm font-medium text-white font-minecraft-ten">{t('common.settings')}</span>
         </div>
         <button
           onClick={closeSettings}
@@ -160,42 +163,42 @@ export function SettingsPanel() {
             />
           </div>
           <div className="text-center">
-            <div className="text-white font-minecraft-ten text-sm mb-1">Your Profile</div>
+            <div className="text-white font-minecraft-ten text-sm mb-1">{t('friends.settings.your_profile')}</div>
             <div className="text-white/50 font-minecraft text-2xl">{status.label}</div>
           </div>
         </div>
 
         <div className="space-y-2">
           <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft-ten px-1">
-            Status
+            {t('friends.settings.status')}
           </div>
           <StatusSelector currentStatus={currentUser.state} />
         </div>
 
         <div className="space-y-2">
           <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft-ten px-1">
-            Privacy
+            {t('friends.settings.privacy')}
           </div>
           <div className="space-y-2">
             <PrivacyToggle
-              label="Show Server"
-              description="Friends see your server"
+              label={t('friends.settings.show_server')}
+              description={t('friends.settings.show_server_desc')}
               enabled={currentUser.privacy.showServer}
               loading={loadingSettings.showServer || false}
               onToggle={() => handleToggle("showServer", currentUser.privacy.showServer)}
               accentColor={accentColor.value}
             />
             <PrivacyToggle
-              label="Allow Requests"
-              description="Players can send requests"
+              label={t('friends.settings.allow_requests')}
+              description={t('friends.settings.allow_requests_desc')}
               enabled={currentUser.privacy.allowRequests}
               loading={loadingSettings.allowRequests || false}
               onToggle={() => handleToggle("allowRequests", currentUser.privacy.allowRequests)}
               accentColor={accentColor.value}
             />
             <PrivacyToggle
-              label="Server Invites"
-              description="Friends can invite you"
+              label={t('friends.settings.server_invites')}
+              description={t('friends.settings.server_invites_desc')}
               enabled={currentUser.privacy.allowServerInvites}
               loading={loadingSettings.allowServerInvites || false}
               onToggle={() => handleToggle("allowServerInvites", currentUser.privacy.allowServerInvites)}

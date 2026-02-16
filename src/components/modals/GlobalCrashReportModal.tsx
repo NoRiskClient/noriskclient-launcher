@@ -310,20 +310,22 @@ export function GlobalCrashReportModal() {
   }
 
   const modalFooter = (
-    <div className="flex flex-wrap justify-end gap-3">
-      <Button 
-        onClick={handlePrimaryAction} 
-        variant="secondary" 
+    <div className="flex gap-3 w-full">
+      <Button
+        onClick={handlePrimaryAction}
+        variant="secondary"
         icon={<Icon icon={mclogsUrl && noriskReportSubmitted ? "solar:copy-line-duotone" : "solar:upload-linear"} className="w-5 h-5" />}
         disabled={isProcessing || !crashData?.process_metadata}
+        className="flex-1 justify-center whitespace-nowrap"
       >
         {primaryButtonText}
       </Button>
-      <Button 
-        onClick={handleContactSupport} 
-        variant="default" 
+      <Button
+        onClick={handleContactSupport}
+        variant="default"
         icon={<Icon icon="solar:letter-linear" className="w-5 h-5" />}
         disabled={isProcessing}
+        className="flex-1 justify-center whitespace-nowrap"
       >
         {t('crash_modal.button.contact_support')}
       </Button>
@@ -342,7 +344,7 @@ export function GlobalCrashReportModal() {
       titleIcon={<Icon icon="solar:danger-bold" className="w-7 h-7 text-red-400" />}
       titleSubtitle={titleSubtitleNode}
       onClose={() => !isProcessing && closeCrashModal()}
-      width="md"
+      width="lg"
       footer={modalFooter}
     >
       <div className="p-6 space-y-4 text-white text-base text-center">

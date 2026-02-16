@@ -1,10 +1,12 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { X, UserPlus, AlertCircle, Loader2 } from "lucide-react";
 import { useReferralStore } from "../../store/referral-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 
 export function ReferralBanner() {
+  const { t } = useTranslation();
   const {
     bannerVisible,
     referrerInfo,
@@ -71,13 +73,13 @@ export function ReferralBanner() {
         <div className="flex items-center gap-3 px-4 py-2">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="font-minecraft-ten text-sm text-white/80 tracking-wide">
-            <span className="text-red-400">Error:</span> {error}
+            <span className="text-red-400">{t('common.error')}:</span> {error}
           </span>
           <button
             type="button"
             onClick={dismissBanner}
             className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
-            aria-label="Close banner"
+            aria-label={t('common.close_banner')}
           >
             <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
           </button>
@@ -101,7 +103,7 @@ export function ReferralBanner() {
         <div className="flex items-center gap-3 px-4 py-2">
           <Loader2 className="w-4 h-4 text-white/70 flex-shrink-0 animate-spin" />
           <span className="font-minecraft-ten text-sm text-white/80 tracking-wide">
-            Loading referral...
+            {t('referral.loading')}
           </span>
         </div>
       </div>
@@ -157,7 +159,7 @@ export function ReferralBanner() {
           type="button"
           onClick={dismissBanner}
           className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
-          aria-label="Close banner"
+          aria-label={t('common.close_banner')}
         >
           <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
         </button>

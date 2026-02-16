@@ -242,7 +242,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
     } catch (error: any) {
       console.error("Modpack installation failed:", error);
-      toast.error(`Failed to install modpack: ${error.message || error}`, { id: toastId });
+      toast.error(t('mod_detail.modpack_install_failed', { error: error.message || error }), { id: toastId });
     } finally {
       // Clean up listener
       if (progressUnlisten) {
@@ -281,7 +281,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       const handleProfileSelect = async (proj: any, profile: Profile) => {
         const bestVersion = findBestVersionForProfile(profile, versions);
         if (!bestVersion) {
-          toast.error(`No compatible version found for ${profile.name}`);
+          toast.error(t('mod_detail.no_compatible_version', { profile: profile.name }));
           return;
         }
 
@@ -321,7 +321,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
         } catch (error) {
           console.error("Installation failed:", error);
-          toast.error(`Failed to install: ${error}`);
+          toast.error(t('mod_detail.install_failed', { error }));
         } finally {
           setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
         }

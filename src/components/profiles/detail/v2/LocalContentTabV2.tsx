@@ -618,8 +618,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             console.error(`Failed to fetch ${platformName} versions:`, error);
             setVersionsError(
               error instanceof Error
-                ? `Failed to load versions from ${platformName}: ${error.message}`
-                : `Failed to load versions from ${platformName}.`,
+                ? t('content.version_load_failed_details', { platform: platformName, error: error.message })
+                : t('content.version_load_failed', { platform: platformName }),
             );
           }
           setIsLoadingVersions(false);
@@ -629,8 +629,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           setIsLoadingVersions(false);
           setVersionsError(
             currentItem
-              ? `Version history not available on ${getItemPlatformDisplayName(currentItem)}.`
-              : "Item not found.",
+              ? t('content.version_history_unavailable', { platform: getItemPlatformDisplayName(currentItem) })
+              : t('content.item_not_found'),
           );
         }
       }
@@ -752,10 +752,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           {iconToShow}
           {isBlockedByNoRisk && (
             <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
-              <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+              <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
                 <div>
-                  <Icon 
-                    icon="solar:danger-triangle-bold" 
+                  <Icon
+                    icon="solar:danger-triangle-bold"
                     className="w-4 h-4 text-red-500 drop-shadow-lg"
                   />
                 </div>
@@ -764,10 +764,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           )}
           {!isBlockedByNoRisk && isWarningByNoRisk && (
             <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
-              <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+              <Tooltip content={t('modrinth.warning_mod_tooltip')}>
                 <div>
-                  <Icon 
-                    icon="solar:danger-triangle-bold" 
+                  <Icon
+                    icon="solar:danger-triangle-bold"
                     className="w-4 h-4 text-yellow-500 drop-shadow-lg"
                   />
                 </div>
@@ -832,7 +832,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                           setOpenVersionDropdownId(item.filename);
                         }
                       }}
-                      title="View version options"
+                      title={t('content.view_version_options')}
                     >
                       <span
                         className={`font-minecraft-ten transition-transform duration-200 ${isItemOpen ? "rotate-90" : ""}`}

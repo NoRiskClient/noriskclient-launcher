@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import type { CheckContentParams, Profile } from "../../types/profile";
 import { ProfileGroup } from "./ProfileGroup";
@@ -24,10 +25,13 @@ export function ProfileSelectionPopup({
   profiles = [],
   onSelect,
   onCancel,
-  title = "Select Profile",
-  description = "Choose a profile to install this content to:",
+  title,
+  description,
   contentVersion,
 }: ProfileSelectionPopupProps) {
+  const { t } = useTranslation();
+  const resolvedTitle = title || t('modrinth.select_profile');
+  const resolvedDescription = description || t('modrinth.choose_profile_to_install');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     profiles && profiles.length > 0 ? profiles[0].id : null,
   );
@@ -210,12 +214,12 @@ export function ProfileSelectionPopup({
           onCancel();
         }}
       >
-        {isInstalled ? "Close" : "Cancel"}
+        {isInstalled ? t('common.close') : t('common.cancel')}
       </Button>
 
       {selectedProfileId && installedProfiles[selectedProfileId] ? (
         <Button variant="success" size="md" disabled>
-          Installed
+          {t('common.installed')}
         </Button>
       ) : (
         <Button
@@ -236,20 +240,20 @@ export function ProfileSelectionPopup({
           }
         >
           {isInstalling
-            ? "Installing..."
+            ? t('modrinth.installing')
             : isInstalled
-              ? "Installed"
-              : "Install"}
+              ? t('common.installed')
+              : t('modrinth.install')}
         </Button>
       )}
     </div>
   );
 
   return (
-    <Modal title={title} onClose={onCancel} footer={modalFooter} width="md">
+    <Modal title={resolvedTitle} onClose={onCancel} footer={modalFooter} width="md">
       <div className="p-4">
         <p className="text-white/70 font-minecraft text-sm mb-4 tracking-wide lowercase select-none">
-          {description}
+          {resolvedDescription}
         </p>
 
         {contentVersion && (
@@ -262,13 +266,13 @@ export function ProfileSelectionPopup({
             }}
           >
             <h4 className="text-white font-minecraft text-base mb-1 tracking-wide lowercase select-none">
-              Content Details:
+              {t('modrinth.content_details')}:
             </h4>
             <div className="text-white/70 font-minecraft text-xs tracking-wide lowercase select-none">
               <div className="flex items-center gap-2 mb-1">
                 <Icon icon="pixel:cube" className="w-4 h-4" />
                 <span>
-                  Type: {contentVersion.search_hit?.project_type || "Unknown"}
+                  {t('mod_detail.type')}: {contentVersion.search_hit?.project_type || t('common.unknown')}
                 </span>
               </div>
               {contentVersion.game_versions &&
@@ -276,7 +280,7 @@ export function ProfileSelectionPopup({
                   <div className="flex items-center gap-2 mb-1">
                     <Icon icon="pixel:gamepad-solid" className="w-4 h-4" />
                     <span>
-                      Game Versions: {contentVersion.game_versions.join(", ")}
+                      {t('modrinth.game_versions')}: {contentVersion.game_versions.join(", ")}
                     </span>
                   </div>
                 )}
@@ -286,7 +290,7 @@ export function ProfileSelectionPopup({
                 contentVersion.loaders.length > 0 && (
                   <div className="flex items-center gap-2">
                     <Icon icon="pixel:cog-solid" className="w-4 h-4" />
-                    <span>Loaders: {contentVersion.loaders.join(", ")}</span>
+                    <span>{t('modrinth.mod_loaders')}: {contentVersion.loaders.join(", ")}</span>
                   </div>
                 )}
             </div>
@@ -303,7 +307,7 @@ export function ProfileSelectionPopup({
               }}
             ></div>
             <span className="text-white/70 font-minecraft text-sm tracking-wide lowercase select-none">
-              Checking installation status...
+              {t('modrinth.checking_installation_status')}
             </span>
           </div>
         ) : (
@@ -339,6 +343,7 @@ export function ProfileSelectionPopup({
 }
 
 function EmptyProfilesMessage() {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   return (
@@ -357,10 +362,10 @@ function EmptyProfilesMessage() {
         />
       </div>
       <p className="text-white/60 font-minecraft text-sm tracking-wide lowercase select-none">
-        No profiles available
+        {t('profiles.no_profiles_available')}
       </p>
       <p className="text-white/40 font-minecraft text-xs mt-2 tracking-wide lowercase select-none">
-        Create a profile first to install content
+        {t('profiles.create_profile_first')}
       </p>
     </div>
   );

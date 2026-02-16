@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
 import type {
   ModrinthSearchHit,
@@ -69,6 +70,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     isBlocked = false, // Deprecated
     noRiskStatus = null,
   }) => {
+    const { t } = useTranslation();
     const isModpack = project.project_type === "modpack";
     const cardRef = useRef<HTMLDivElement>(null);
     const [isCardHovered, setIsCardHovered] = useState(false);
@@ -228,28 +230,28 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
       }
     };
 
-    let buttonText = "Install";
+    let buttonText = t('modrinth.install');
     let buttonVariant: "primary" | "secondary" = "primary";
     let buttonDisabled = false;
 
     if (project.project_type === "modpack" && isInstallingModpackVersion) {
-      buttonText = "Installing...";
+      buttonText = t('modrinth.installing');
       buttonVariant = "secondary";
       buttonDisabled = true;
     } else if (isInstalling) {
-      buttonText = "Installing...";
+      buttonText = t('modrinth.installing');
       buttonVariant = "secondary";
       buttonDisabled = true;
     } else if (versionStatus && versionStatus.is_installed) {
       if (versionStatus?.is_included_in_norisk_pack && !isModpack) {
-        buttonText = "In Pack";
+        buttonText = t('modrinth.in_pack');
         buttonVariant = "secondary";
         buttonDisabled = true;
       } else if (versionStatus?.is_installed && !isModpack) {
-        buttonText = "Installed";
+        buttonText = t('common.installed');
         buttonDisabled = true;
       } else if (isModpack && !versionStatus?.is_installed) {
-        buttonText = "Install";
+        buttonText = t('modrinth.install');
         buttonVariant = "primary";
         buttonDisabled = false;
       }
@@ -286,26 +288,26 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex-shrink min-w-0 flex items-center gap-2">
                 {noRiskStatus === 'blocked' && (
-                  <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
-                    <Icon 
-                      icon="solar:danger-triangle-bold" 
+                  <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
+                    <Icon
+                      icon="solar:danger-triangle-bold"
                       className="w-4 h-4 text-red-500 flex-shrink-0"
                     />
                   </Tooltip>
                 )}
                 {noRiskStatus === 'warning' && (
-                  <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
-                    <Icon 
-                      icon="solar:danger-triangle-bold" 
+                  <Tooltip content={t('modrinth.warning_mod_tooltip')}>
+                    <Icon
+                      icon="solar:danger-triangle-bold"
                       className="w-4 h-4 text-yellow-500 flex-shrink-0"
                     />
                   </Tooltip>
                 )}
                 {/* Fallback for deprecated isBlocked prop */}
                 {!noRiskStatus && isBlocked && (
-                  <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
-                    <Icon 
-                      icon="solar:danger-triangle-bold" 
+                  <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
+                    <Icon
+                      icon="solar:danger-triangle-bold"
                       className="w-4 h-4 text-red-500 flex-shrink-0"
                     />
                   </Tooltip>
@@ -348,7 +350,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                         icon="solar:check-circle-bold"
                         className="w-3 h-3 mr-0.5"
                       />
-                      Installed
+                      {t('common.installed')}
                     </TagBadge>
                   )}
                 {selectedProfileId &&
@@ -359,7 +361,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                         icon="solar:close-circle-bold"
                         className="w-3 h-3 mr-0.5"
                       />
-                      Disabled
+                      {t('common.disabled')}
                     </TagBadge>
                   )}
                 {selectedProfileId &&
@@ -372,7 +374,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                         icon="solar:bolt-circle-bold"
                         className="w-3 h-3 mr-0.5"
                       />
-                      In NoRisk Pack
+                      {t('modrinth.in_norisk_pack')}
                     </TagBadge>
                   )}
                 <TagBadge className="flex-shrink-0">
@@ -413,7 +415,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                       variant={
                         versionStatus.is_enabled ? "highlight" : "secondary"
                       }
-                      label={versionStatus.is_enabled ? "Active" : "Disabled"}
+                      label={versionStatus.is_enabled ? t('common.active') : t('common.disabled')}
                       className="min-w-[80px]"
                       icon="solar:settings-bold"
                     />
@@ -426,7 +428,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                       onClick={handleDeleteButtonClick}
                       size="sm"
                       variant="destructive"
-                      label="Delete"
+                      label={t('common.delete')}
                       className="min-w-[80px]"
                       icon="solar:trash-bin-minimalistic-bold"
                     />

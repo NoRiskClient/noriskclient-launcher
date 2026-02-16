@@ -132,7 +132,7 @@ export function NRCTab({
     } catch (err) {
       console.error("Failed to repair profile:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to repair profile: ${errorMessage}`);
+      toast.error(t('profiles.repair_failed', { error: errorMessage }));
     } finally {
       setIsRepairing(false);
     }
@@ -147,10 +147,10 @@ export function NRCTab({
         <div className="space-y-3">
           <div className="space-y-2">
             <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-              info
+              {t('nrc.info_title')}
             </label>
             <p className="text-sm text-white/60 font-minecraft-ten">
-              NoRiskClient packs are predefined mod collections from NoRiskClient, including performance mods like Sodium, Fabric API, ImmediatelyFast, and mods for seamless NoRiskClient experience. You can disable this to start without NoRiskClient features.
+              {t('nrc.info_description')}
             </p>
           </div>
           {loading ? (
@@ -160,7 +160,7 @@ export function NRCTab({
                 className="w-4 h-4 animate-spin"
               />
               <span className="text-sm font-minecraft-ten">
-                Loading NoRisk packs...
+                {t('nrc.loading_packs')}
               </span>
             </div>
           ) : (
@@ -168,14 +168,14 @@ export function NRCTab({
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
                   <CustomDropdown
-                    label="norisk client pack"
+                    label={t('nrc.pack_label')}
                     value={editedProfile.selected_norisk_pack_id || ""}
                     onChange={(value) =>
                       updateProfile({
                         selected_norisk_pack_id: value === "" ? null : value,
                       })
                     }
-                    options={[{ value: "", label: "None (Optional)" }, ...noriskPackOptions]}
+                    options={[{ value: "", label: t('nrc.none_optional') }, ...noriskPackOptions]}
                     variant="search"
                     className=""
                   />
@@ -184,7 +184,7 @@ export function NRCTab({
                   <Checkbox
                     checked={showAllVersions}
                     onChange={(event) => setShowAllVersions(event.target.checked)}
-                    label="Show all versions"
+                    label={t('modrinth.show_all_versions')}
                     size="sm"
                     className="text-white/70"
                   />
@@ -195,15 +195,13 @@ export function NRCTab({
               {showYellowWarning ? (
                 <div className="text-center">
                   <p className="text-base text-yellow-400 font-minecraft-ten">
-                    NoRiskClient is not currently compatible with this loader or version!
-                    You can still create it, but you won't have the features.
-                    This may change in the future.
+                    {t('nrc.incompatible_warning')}
                   </p>
                 </div>
               ) : editedProfile.selected_norisk_pack_id === null || editedProfile.selected_norisk_pack_id === "" ? (
                 <div className="text-center">
                   <p className="text-sm text-amber-400 font-minecraft-ten">
-                    You won't have any NoRiskClient features with this selection.
+                    {t('nrc.no_features_warning')}
                   </p>
                 </div>
               ) : (
@@ -224,7 +222,7 @@ export function NRCTab({
                     className="w-4 h-4 animate-spin"
                   />
                   <span className="text-sm font-minecraft-ten">
-                    Checking compatibility...
+                    {t('nrc.checking_compatibility')}
                   </span>
                 </div>
               )}
@@ -250,11 +248,11 @@ export function NRCTab({
         {/* Repair Profile Section */}
         <div className="space-y-3">
           <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-            repair profile
+            {t('nrc.repair_title')}
           </label>
           <div className="flex flex-col space-y-2 max-w-xs">
             <p className="text-xs text-white/60 font-minecraft-ten select-none leading-relaxed whitespace-normal break-words overflow-wrap-anywhere">
-              Repairs the profile installation by redownloading missing or corrupted files.
+              {t('nrc.repair_description')}
             </p>
             <Button
               onClick={handleRepair}
@@ -273,7 +271,7 @@ export function NRCTab({
               size="sm"
               className="text-xl"
             >
-              {isRepairing ? "repairing..." : "repair"}
+              {isRepairing ? t('nrc.repairing') : t('nrc.repair')}
             </Button>
           </div>
         </div>

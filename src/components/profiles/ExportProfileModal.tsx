@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Profile } from "../../types/profile";
 import { ExportSettingsTab } from "./settings/ExportSettingsTab";
 import { Modal } from "../ui/Modal";
@@ -20,6 +21,7 @@ export function ExportProfileModal({
   isOpen,
   onClose,
 }: ExportProfileModalProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const [exportAction, setExportAction] = useState<{
@@ -40,7 +42,7 @@ export function ExportProfileModal({
         <Checkbox
           checked={exportAction.exportOpenFolder}
           onChange={(e) => exportAction.setExportOpenFolder(e.target.checked)}
-          label="Open folder after export"
+          label={t('export.open_folder_after')}
           className="text-base"
           customSize="md"
           disabled={exportAction.isDisabled()}
@@ -55,7 +57,7 @@ export function ExportProfileModal({
           size="md"
           className="text-xl"
         >
-          {exportAction.isExporting ? "Exporting..." : "Export Profile"}
+          {exportAction.isExporting ? t('export.exporting') : t('export.export_profile')}
         </Button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useServerPingStore } from "../../store/server-ping-store";
@@ -24,6 +25,7 @@ export function ServerLaunchCard({
   onMods,
   className = "",
 }: ServerLaunchCardProps) {
+  const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const [serverInfo, setServerInfo] = useState<ServerPingInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +160,7 @@ export function ServerLaunchCard({
           title={serverInfo?.description || serverAddress}
         >
           {isLoading && !serverInfo ? (
-            <span className="italic text-white/50">Pinging...</span>
+            <span className="italic text-white/50">{t('server.pinging')}</span>
           ) : motdHtml ? (
             <span
               dangerouslySetInnerHTML={{ __html: motdHtml }}
@@ -172,7 +174,7 @@ export function ServerLaunchCard({
         {serverInfo && (
           <div className="flex items-center justify-center gap-3 mt-1">
             <span className="text-xs text-white/60 font-minecraft-ten">
-              {serverInfo.players_online ?? "?"}/{serverInfo.players_max ?? "?"} Players
+              {serverInfo.players_online ?? "?"}/{serverInfo.players_max ?? "?"} {t('server.players')}
             </span>
             <img
               src={`/minecraft/ping_${
@@ -255,7 +257,7 @@ export function ServerLaunchCard({
             className="w-4 h-4 text-white"
           />
           <span className="font-minecraft-ten text-xs text-white uppercase">
-            {isLaunching ? "Stop" : "Join"}
+            {isLaunching ? t('server.stop') : t('server.join')}
           </span>
         </button>
 
@@ -273,7 +275,7 @@ export function ServerLaunchCard({
           }}
         >
           <Icon icon="solar:box-bold" className="w-4 h-4 text-white" />
-          <span className="font-minecraft-ten text-xs text-white uppercase">Mods</span>
+          <span className="font-minecraft-ten text-xs text-white uppercase">{t('server.mods')}</span>
         </button>
       </div>
     </div>

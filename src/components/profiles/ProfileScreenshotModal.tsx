@@ -52,15 +52,15 @@ export function ProfileScreenshotModal({
     toast.promise(
       copyPromise,
       {
-        loading: "Copying image to clipboard...",
+        loading: t('screenshots.copying'),
         success: () => {
           setIsCopyingImage(false);
-          return "Screenshot image copied to clipboard!";
+          return t('screenshots.copy_success');
         },
         error: (err) => {
           setIsCopyingImage(false);
           console.error("Failed to copy screenshot image:", err);
-          return `Failed to copy image: ${err.toString()}`;
+          return t('screenshots.copy_failed', { error: err.toString() });
         },
       }
     );
@@ -81,17 +81,17 @@ export function ProfileScreenshotModal({
     toast.promise(
       deletePromise,
       {
-        loading: `Deleting ${screenshot.filename}...`,
+        loading: t('screenshots.deleting', { name: screenshot.filename }),
         success: () => {
           onScreenshotDeleted(screenshot.path);
           onClose();
           setIsDeleting(false);
-          return `Screenshot "${screenshot.filename}" deleted.`;
+          return t('screenshots.deleted', { name: screenshot.filename });
         },
         error: (err) => {
           setIsDeleting(false);
           console.error("Failed to delete screenshot:", err);
-          return `Failed to delete: ${err.toString()}`;
+          return t('screenshots.delete_failed', { error: err.toString() });
         },
       }
     );
@@ -143,7 +143,7 @@ export function ProfileScreenshotModal({
           <div className="absolute bottom-4 right-4 flex gap-2 z-10">
             <IconButton
               icon={isCopyingImage ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:copy-bold-duotone" />}
-              title="Copy Image"
+              title={t('screenshots.copy_image')}
               onClick={handleCopyImage}
               disabled={isCopyingImage}
               variant="flat"
@@ -152,7 +152,7 @@ export function ProfileScreenshotModal({
             />
             <IconButton
               icon={<Icon icon="solar:folder-with-files-bold-duotone" />}
-              title="Open Screenshot Location"
+              title={t('screenshots.open_location')}
               onClick={handleOpenFolder}
               variant="flat"
               size="sm"
@@ -160,7 +160,7 @@ export function ProfileScreenshotModal({
             />
             <IconButton
               icon={isDeleting ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:trash-bin-trash-bold-duotone" />}
-              title="Delete Screenshot"
+              title={t('screenshots.delete_screenshot')}
               onClick={handleDeleteScreenshot}
               disabled={isDeleting}
               variant="destructive"

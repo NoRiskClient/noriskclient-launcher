@@ -48,11 +48,11 @@ export function ProfileImport({
         directory: false,
         filters: [
           {
-            name: "Modpack Files",
+            name: t('profiles.import.modpack_files'),
             extensions: ["noriskpack", "mrpack", "zip"],
           },
         ],
-        title: "Select Modpack to Import",
+        title: t('profiles.import.select_modpack'),
       });
 
       if (selectedPath && typeof selectedPath === "string") {
@@ -100,7 +100,7 @@ export function ProfileImport({
             unlisten = null;
           }
 
-          toast.success(`Profile from ${fileName} imported successfully! Opening profile...`, {
+          toast.success(t('profiles.import_success', { fileName }), {
             id: toastId,
             duration: 3000,
           });
@@ -128,10 +128,10 @@ export function ProfileImport({
 
       // Check for disk space error and provide helpful hint
       if (errorMessage.toLowerCase().includes("insufficient disk space")) {
-        const enhancedMessage = `${errorMessage}\n\nTip: You can change the data location in Settings.`;
+        const enhancedMessage = `${errorMessage}\n\n${t('profiles.disk_space_tip')}`;
         toast.error(enhancedMessage, { id: toastId, duration: 8000 });
       } else {
-        toast.error(`Failed to import profile: ${errorMessage}`, { id: toastId });
+        toast.error(t('profiles.import_failed', { error: errorMessage }), { id: toastId });
       }
     } finally {
       // Clean up listener
@@ -157,10 +157,10 @@ export function ProfileImport({
               icon="solar:refresh-bold"
               className="w-5 h-5 animate-spin text-white"
             />
-            <span>importing...</span>
+            <span>{t('profiles.importing')}</span>
           </>
         ) : (
-          "select file to import"
+          t('profiles.select_file_to_import')
         )}
       </Button>
     </div>
@@ -168,7 +168,7 @@ export function ProfileImport({
 
   return (
     <Modal
-      title="import profile"
+      title={t('profiles.importProfile')}
       onClose={onClose}
       width="lg"
       footer={renderFooter()}
@@ -180,12 +180,12 @@ export function ProfileImport({
         <div className="space-y-6">
           <div>
             <p className="text-lg text-white/70 mb-6 font-minecraft-ten tracking-wide select-none">
-              Select a file or drag and drop a .mrpack, .noriskpack, or .zip file into the launcher to import it and create a new profile.
+              {t('profiles.import_description')}
             </p>
 
             <div className="mb-6">
               <h3 className="text-2xl text-white font-minecraft mb-4 select-none lowercase">
-                supported formats:
+                {t('profiles.supported_formats')}
               </h3>
               <ul
                 className="text-2xl text-white/80 space-y-4 select-none lowercase font-minecraft"
@@ -206,7 +206,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-blue-400"
                     />
                   </div>
-                  <span>.mrpack (Modrinth)</span>
+                  <span>{t('profiles.format_mrpack')}</span>
                 </li>
                 <li className="flex items-center">
                   <div
@@ -223,7 +223,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-green-400"
                     />
                   </div>
-                  <span>.noriskpack (NoRisk Launcher)</span>
+                  <span>{t('profiles.format_noriskpack')}</span>
                 </li>
                 <li className="flex items-center">
                   <div
@@ -240,7 +240,7 @@ export function ProfileImport({
                       className="w-5 h-5 text-orange-400"
                     />
                   </div>
-                  <span>.zip (CurseForge)</span>
+                  <span>{t('profiles.format_zip')}</span>
                 </li>
               </ul>
             </div>

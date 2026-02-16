@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
@@ -23,6 +24,7 @@ interface AdventRewardModalProps {
 }
 
 function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Reward; shopItemName?: string | null; shopItemModelUrl?: string | null }) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -78,9 +80,9 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             </div>
             <div className="text-center">
               <p className="font-minecraft-ten text-2xl text-white mb-1">
-                {reward.amount} Coins
+                {t('advent.coins_amount', { amount: reward.amount })}
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">Added to your account</p>
+              <p className="font-minecraft-ten text-white/60 text-sm">{t('advent.added_to_account')}</p>
             </div>
           </div>
         );
@@ -96,7 +98,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-white/50 text-sm font-minecraft-ten">
-                    {isLoadingModel ? "Loading model..." : "Preparing model..."}
+                    {isLoadingModel ? t('advent.loading_model') : t('advent.preparing_model')}
                   </div>
                 </div>
               )}
@@ -259,7 +261,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-16 h-16"
               style={{ color: accentColor.value }}
             />
-            <p className="font-minecraft-ten text-xl text-white">Unknown Reward</p>
+            <p className="font-minecraft-ten text-xl text-white">{t('advent.unknown_reward')}</p>
           </div>
         );
     }
@@ -393,6 +395,7 @@ export function AdventRewardModal({
   shopItemModelUrl,
   isLoading = false,
 }: AdventRewardModalProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const showCoinRain = isOpen && reward?.type === "Coins" && !isLoading;
   const [doorAnimationComplete, setDoorAnimationComplete] = useState(false);
@@ -460,7 +463,7 @@ export function AdventRewardModal({
                     icon="solar:info-circle-bold"
                     className="w-12 h-12 text-white/50"
                   />
-                  <p className="font-minecraft-ten text-white/70">No reward available</p>
+                  <p className="font-minecraft-ten text-white/70">{t('advent.no_reward_available')}</p>
                 </div>
               )}
             </motion.div>

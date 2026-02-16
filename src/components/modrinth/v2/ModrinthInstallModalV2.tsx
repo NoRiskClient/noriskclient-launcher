@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   ModrinthSearchHit,
   ModrinthVersion,
@@ -57,6 +58,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
   onUninstallClick,
   onInstallToNewProfile,
 }) => {
+  const { t } = useTranslation();
   const [showQuickProfileView, setShowQuickProfileView] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -107,25 +109,25 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
 
   const handleCreateAndInstallProfile = async () => {
     if (!quickProfileName.trim()) {
-      setQuickProfileError("Profile name cannot be empty.");
+      setQuickProfileError(t('modrinth.profile_name_empty'));
       return;
     }
     setQuickProfileError(null);
     setLastErrorMessage(null);
-    
+
     setIsCreatingProfile(true);
     try {
       await onInstallToNewProfile(
-        quickProfileName.trim(), 
-        project, 
-        version, 
+        quickProfileName.trim(),
+        project,
+        version,
         sourceProfileToCopyId // Directly pass the ID, it will be null if not copying
       );
-      setCreationResult('success'); 
+      setCreationResult('success');
     } catch (error: any) {
       console.error("Error in handleCreateAndInstallProfile:", error);
       setCreationResult('error');
-      setLastErrorMessage(error?.message || "An unknown error occurred during profile creation.");
+      setLastErrorMessage(error?.message || t('modrinth.unknown_error'));
     } finally {
       setIsCreatingProfile(false);
     }
@@ -148,11 +150,11 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
       <div className="p-4 text-center space-y-3">
         <Icon icon="solar:check-circle-bold" className="w-16 h-16 text-green-500 mx-auto" />
         <h3 className="text-xl font-semibold text-gray-100">
-          {isActuallyCopying ? 'Profile Copied' : 'Profile Created'} & Content Installed!
+          {isActuallyCopying ? t('modrinth.profile_copied') : t('modrinth.profile_created')} & {t('modrinth.content_installed')}
         </h3>
         <p className="text-sm text-gray-300 font-minecraft-ten">
-          {project.title} (v{version.version_number}) has been successfully installed into the new profile '{quickProfileName.trim()}'.
-          {isActuallyCopying && sourceProfileToCopyId && ` (Copied from ${profiles.find(p=>p.id === sourceProfileToCopyId)?.name || 'source'})`}
+          {t('modrinth.install_success_message', { title: project.title, version: version.version_number, profile: quickProfileName.trim() })}
+          {isActuallyCopying && sourceProfileToCopyId && ` (${t('modrinth.copied_from', { source: profiles.find(p=>p.id === sourceProfileToCopyId)?.name || 'source' })})`}
         </p>
       </div>
     );
@@ -160,9 +162,9 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
     modalContentLayout = (
       <div className="p-4 text-center space-y-3">
         <Icon icon="solar:close-circle-bold" className="w-16 h-16 text-red-500 mx-auto" />
-        <h3 className="text-xl font-semibold text-gray-100">Operation Failed</h3>
+        <h3 className="text-xl font-semibold text-gray-100">{t('modrinth.operation_failed')}</h3>
         <p className="text-sm text-red-400">
-          {lastErrorMessage || `An error occurred while ${isActuallyCopying ? 'copying the profile' : 'creating the profile'} or installing content.`}
+          {lastErrorMessage || t('modrinth.error_creating_profile', { action: isActuallyCopying ? t('modrinth.copying_profile') : t('modrinth.creating_profile') })}
         </p>
         {/* Optional: Add a retry button here if applicable, which might call handleCreateAndInstallProfile again */}
         {/* For now, only close is available in footer */}
@@ -189,7 +191,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
     modalContentLayout = (
       <>
         <div className="mb-1 mt-1">
-          <p className="text-gray-300 mb-2 text-base font-minecraft-ten">Select Profile(s) to install to:</p>
+          <p className="text-gray-300 mb-2 text-base font-minecraft-ten">{t('modrinth.select_profiles_to_install')}</p>
           {isLoadingStatus ? (
             <div className="flex justify-center items-center py-6">
               <svg
@@ -212,7 +214,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              <span className="ml-3 text-gray-300">Loading profiles...</span>
+              <span className="ml-3 text-gray-300">{t('profiles.loadingProfiles')}</span>
             </div>
           ) : (
             <div
@@ -251,7 +253,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
                         </div>
                         {profile.id === selectedProfileId && (
                           <span className="block mt-1 text-xs text-green-400 font-minecraft-ten">
-                            (Current Profile)
+                            ({t('modrinth.current_profile')})
                           </span>
                         )}
                       </div>
@@ -285,7 +287,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
                           iconPosition="left"
                           className="flex-shrink-0"
                         >
-                          Installing...
+                          {t('modrinth.installing')}
                         </Button>
                       ) : installStatus[profile.id] ? (
                         <Button
@@ -309,7 +311,7 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
                           className="flex-shrink-0"
                           disabled={!onUninstallClick} // Disable if handler not provided
                         >
-                          Uninstall
+                          {t('common.uninstall')}
                         </Button>
                       ) : (
                         <Button
@@ -321,21 +323,21 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
                           iconPosition="left"
                           className="flex-shrink-0"
                         >
-                          Install
+                          {t('modrinth.install')}
                         </Button>
                       )}
                     </div>
                   ))
               ) : (
                 <p className="p-4 text-center text-gray-400">
-                  No profiles available. You can create a new one.
+                  {t('modrinth.no_profiles_available')}
                 </p>
               )}
             </div>
           )}
         </div>
         <p className="text-gray-400 text-xs text-center font-minecraft-ten mt-2">
-          This will install version {version.version_number} of {project.title}.
+          {t('modrinth.will_install_version', { version: version.version_number, title: project.title })}
         </p>
       </>
     );
@@ -343,9 +345,9 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
   
   return (
     <Modal
-      title={ (showQuickProfileView && !creationResult) 
-                ? (isActuallyCopying ? `Copy & Install: ${project.title}` : `New Profile for: ${project.title}`) 
-                : `Install: ${project.title}`
+      title={ (showQuickProfileView && !creationResult)
+                ? (isActuallyCopying ? t('modrinth.copy_and_install_title', { title: project.title }) : t('modrinth.new_profile_for', { title: project.title }))
+                : t('modrinth.install_title', { title: project.title })
             }
       titleIcon={(showQuickProfileView && !creationResult && isActuallyCopying) 
                   ? <Icon icon="solar:copy-bold-duotone" className="w-5 h-5 mr-2" /> 
@@ -358,56 +360,56 @@ export const ModrinthInstallModalV2: React.FC<ModrinthInstallModalV2Props> = ({
       footer={
         <div className="flex justify-between items-center w-full">
           {creationResult ? (
-            <div className="w-full flex justify-end"> {/* Ensure close button is on the right */} 
+            <div className="w-full flex justify-end"> {/* Ensure close button is on the right */}
               <Button onClick={handleModalClose} variant="secondary" shadowDepth="short">
-                Close
+                {t('common.close')}
               </Button>
             </div>
           ) : showQuickProfileView ? (
             <>
               <Button
                 variant="secondary"
-                onClick={switchToProfileListView} 
+                onClick={switchToProfileListView}
                 disabled={isCreatingProfile}
                 shadowDepth="short"
                 size="sm"
                 icon={<Icon icon="solar:arrow-left-linear" className="w-4 h-4" />}
-                className="mr-auto" 
+                className="mr-auto"
               >
-                Back to Profiles
+                {t('modrinth.back_to_profiles')}
               </Button>
-              <Button 
+              <Button
                 variant="success"
-                onClick={handleCreateAndInstallProfile} 
+                onClick={handleCreateAndInstallProfile}
                 disabled={isCreatingProfile || !quickProfileName.trim() || (isActuallyCopying && !sourceProfileToCopyId)}
                 shadowDepth="short"
                 size="sm"
                 icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : <Icon icon="solar:disk-bold-duotone" className="w-4 h-4" />}
               >
-                {isCreatingProfile 
-                  ? (isActuallyCopying ? "Copying & Installing..." : "Creating...") 
-                  : (isActuallyCopying ? "Copy & Install" : "Create & Install")}
+                {isCreatingProfile
+                  ? (isActuallyCopying ? t('modrinth.copying_and_installing') : t('modrinth.creating'))
+                  : (isActuallyCopying ? t('modrinth.copy_and_install') : t('modrinth.create_and_install'))}
               </Button>
             </>
           ) : (
             <>
               <Button
                 variant="secondary"
-                onClick={switchToQuickProfileView} 
+                onClick={switchToQuickProfileView}
                 icon={<Icon icon="solar:add-folder-line-duotone" className="w-4 h-4 mr-1" />}
                 shadowDepth="short"
                 size="sm"
-                className="mr-auto" 
+                className="mr-auto"
               >
-                Install as New Profile
+                {t('modrinth.install_as_new_profile')}
               </Button>
-              <Button 
-                onClick={handleModalClose} 
-                variant="secondary" 
+              <Button
+                onClick={handleModalClose}
+                variant="secondary"
                 shadowDepth="short"
                 size="sm"
               >
-                Close
+                {t('common.close')}
               </Button>
             </>
           )}

@@ -412,27 +412,27 @@ export function ProfileCard({
                 className="flex items-center gap-2 text-white/60 mt-1 font-minecraft-ten text-xs whitespace-nowrap overflow-hidden text-ellipsis h-5 max-w-full"
                 title={
                   isCloning
-                    ? "Cloning profile..."
+                    ? t('profiles.cloning')
                     : isButtonLaunching
-                      ? buttonStatusMessage || "Starting..."
-                      : `${profile.loader || "Vanilla"} - ${profile.game_version}`
+                      ? buttonStatusMessage || t('profiles.starting')
+                      : `${profile.loader || t('common.vanilla')} - ${profile.game_version}`
                 }
               >
                 {isCloning ? (
-                  <span className="opacity-70">Cloning profile...</span>
+                  <span className="opacity-70">{t('profiles.cloning')}</span>
                 ) : isButtonLaunching ? (
                   <span className="opacity-70">
-                    {buttonStatusMessage || "Starting..."}
+                    {buttonStatusMessage || t('profiles.starting')}
                   </span>
                 ) : (
                   <>
                     <img
                       src={getModLoaderIcon() || "/placeholder.svg"}
-                      alt={profile.loader || "Vanilla"}
+                      alt={profile.loader || t('common.vanilla')}
                       className="w-4 h-4 object-contain"
                     />
                     <span>
-                      {profile.loader || "Vanilla"} {profile.game_version}
+                      {profile.loader || t('common.vanilla')} {profile.game_version}
                     </span>
                   </>
                 )}

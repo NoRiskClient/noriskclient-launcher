@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { InView } from 'react-intersection-observer';
@@ -40,6 +41,7 @@ export function Cape3DRenderer({
   backgroundColor = 'transparent', // Default to transparent for better card integration
   isVisible = true,
 }: Cape3DRendererProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,7 +134,7 @@ export function Cape3DRenderer({
   const loadCapeTexture = useCallback(() => {
     if (!isActuallyVisible || !sceneRef.current || !imageUrl) {
       if (!imageUrl && isActuallyVisible) {
-        setErrorMessage("No cape image URL provided");
+        setErrorMessage(t('capes.no_image_url'));
       }
       setIsLoading(false);
       return;
@@ -167,7 +169,7 @@ export function Cape3DRenderer({
       undefined,
       (errorEvent: unknown) => {
         if (!isActuallyVisible) return;
-        setErrorMessage(`Failed to load texture: ${imageUrl?.split('/').pop()}`);
+        setErrorMessage(t('capes.texture_load_failed', { filename: imageUrl?.split('/').pop() }));
         setIsLoading(false);
       }
     );
@@ -295,12 +297,12 @@ export function Cape3DRenderer({
         <div ref={ref} className="relative w-full h-full" style={{ width: `${width}px`, height: `${height}px` }}>
           {!inView && (
              <div className="w-full h-full flex items-center justify-center bg-black/5">
-                 <p className="text-xs text-white/30 font-minecraft">Loading Preview...</p> 
+                 <p className="text-xs text-white/30 font-minecraft">{t('common.loading_preview')}</p> 
              </div>
           )}
           {inView && errorMessage && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center bg-red-900/80 border border-red-700/80 text-red-300 p-2 rounded backdrop-blur-sm">
-              <p className="font-bold text-sm">⚠️ Error</p>
+              <p className="font-bold text-sm">⚠️ {t('common.error')}</p>
               <p className="text-xs mt-1">{errorMessage}</p>
             </div>
           )}
@@ -313,7 +315,7 @@ export function Cape3DRenderer({
           )}
           {inView && isLoading && !errorMessage && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/70 text-white px-3 py-1.5 rounded text-xs font-minecraft lowercase">
-              Loading 3D...
+              {t('capes.loading_3d')}
             </div>
           )}
         </div>

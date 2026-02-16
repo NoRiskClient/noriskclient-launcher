@@ -147,19 +147,19 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
 
   // Select options
   const versionTypeOptions: SelectOption[] = [
-    { value: "all", label: "All Types" },
-    { value: "release", label: "Release" },
-    { value: "beta", label: "Beta" },
-    { value: "alpha", label: "Alpha" },
+    { value: "all", label: t('mod_detail.versions.all_types') },
+    { value: "release", label: t('mod_detail.versions.release') },
+    { value: "beta", label: t('mod_detail.versions.beta') },
+    { value: "alpha", label: t('mod_detail.versions.alpha') },
   ];
 
   const gameVersionOptions: SelectOption[] = [
-    { value: "all", label: "All Game Versions" },
+    { value: "all", label: t('mod_detail.versions.all_game_versions') },
     ...availableGameVersions.map(v => ({ value: v, label: v })),
   ];
 
   const loaderOptions: SelectOption[] = [
-    { value: "all", label: "All Loaders" },
+    { value: "all", label: t('mod_detail.versions.all_loaders') },
     ...availableLoaders.map(l => ({ value: l, label: l })),
   ];
 
@@ -243,12 +243,12 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
         progressUnlisten = null;
       }
 
-      toast.success(`Successfully installed ${project.title} v${version.version_number}!`, { id: toastId, duration: 3000 });
+      toast.success(t('mod_detail.install_success', { title: project.title, version: version.version_number }), { id: toastId, duration: 3000 });
       await fetchProfiles();
       navigate(`/profilesv2/${newProfileId}`);
     } catch (error: any) {
       console.error("Modpack installation failed:", error);
-      toast.error(`Failed to install: ${error.message || error}`, { id: toastId });
+      toast.error(t('mod_detail.install_failed', { error: error.message || error }), { id: toastId });
     } finally {
       // Clean up listener
       if (progressUnlisten) {
@@ -275,7 +275,7 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
         const contentType = mapProjectTypeToContentType(project.project_type);
 
         if (!contentType) {
-          toast.error(`Cannot install project type: ${project.project_type}`);
+          toast.error(t('mod_detail.cannot_install_type', { type: project.project_type }));
           return;
         }
 
@@ -296,11 +296,11 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
         };
 
         await installContentToProfile(payload);
-        toast.success(`Installed ${project.title} v${version.version_number} to ${profile.name}`);
+        toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: version.version_number, profile: profile.name }));
         setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
-        toast.error(`Failed to install: ${error}`);
+        toast.error(t('mod_detail.install_failed', { error }));
       } finally {
         setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
       }
@@ -329,7 +329,7 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
     return (
       <div className="flex items-center justify-center py-12">
         <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white/50 animate-spin" />
-        <span className="ml-2 text-white/50 font-minecraft-ten">Loading versions...</span>
+        <span className="ml-2 text-white/50 font-minecraft-ten">{t('modrinth.loading_versions')}</span>
       </div>
     );
   }
@@ -407,12 +407,12 @@ export function ModDetailVersions({ project }: ModDetailVersionsProps) {
                   onClick={handleClearFilters}
                 >
                   <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
-                  <span>Clear All</span>
+                  <span>{t('common.clear_all')}</span>
                 </TagBadge>
 
                 {versionTypeFilter !== "all" && (
                   <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
-                    Type: {versionTypeFilter}
+                    {t('mod_detail.type')}: {versionTypeFilter}
                     <button
                       onClick={() => setVersionTypeFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import type { Profile } from "../../../types/profile";
 import type { DataPackInfo, ModrinthVersion } from "../../../types/modrinth";
@@ -29,6 +30,7 @@ export function DataPacksTab({
   isActive = false,
   searchQuery = "",
 }: DataPacksTabProps) {
+  const { t } = useTranslation();
   const [dataPacks, setDataPacks] = useState<DataPackInfo[]>([]);
   const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
   const [loadingDataPacks, setLoadingDataPacks] = useState(false);
@@ -619,7 +621,7 @@ export function DataPacksTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search data packs..."
+              placeholder={t('datapacks.search_placeholder')}
             />
           </div>
         )}
@@ -707,7 +709,7 @@ export function DataPacksTab({
         }}
       >
         {loadingDataPacks ? (
-          <LoadingState message="loading data packs..." />
+          <LoadingState message={t('datapacks.loading')} />
         ) : dataPacksError ? (
           <div className="p-4 text-red-400 bg-red-900/20 rounded border border-red-700/30">
             <div className="flex items-center gap-2">

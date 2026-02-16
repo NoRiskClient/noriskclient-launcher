@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import type { Profile } from "../../../types/profile";
 import type {
@@ -32,6 +33,7 @@ export function ResourcePacksTab({
   isActive = false,
   searchQuery = "",
 }: ResourcePacksTabProps) {
+  const { t } = useTranslation();
   const [resourcePacks, setResourcePacks] = useState<ResourcePackInfo[]>([]);
   const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
   const [loadingResourcePacks, setLoadingResourcePacks] = useState(false);
@@ -631,7 +633,7 @@ export function ResourcePacksTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search resource packs..."
+              placeholder={t('resourcepacks.search_placeholder')}
             />
           </div>
         )}
@@ -719,7 +721,7 @@ export function ResourcePacksTab({
         }}
       >
         {loadingResourcePacks ? (
-          <LoadingState message="loading resource packs..." />
+          <LoadingState message={t('resourcepacks.loading')} />
         ) : resourcePacksError ? (
           <div className="p-4 text-red-400 bg-red-900/20 rounded border border-red-700/30">
             <div className="flex items-center gap-2">

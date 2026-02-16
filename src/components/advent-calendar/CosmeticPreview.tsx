@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, Suspense, Component, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Center, Resize, Html, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
@@ -46,10 +47,11 @@ function Model({ modelPath }: { modelPath: string }) {
 }
 
 function ErrorFallback({ error }: { error: Error }) {
+  const { t } = useTranslation();
   return (
     <Html center>
       <div className="text-red-400 text-xs text-center p-2 bg-black/80 rounded border border-red-500/50">
-        <p className="font-bold mb-1">Model Error</p>
+        <p className="font-bold mb-1">{t('advent.model_error')}</p>
         <p>{error.message}</p>
       </div>
     </Html>
@@ -75,7 +77,9 @@ class ErrorBoundary extends Component<{ children: ReactNode, fallback: (props: {
 }
 
 export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
+  const { t } = useTranslation();
   const [ready, setReady] = useState(false);
+  const loadingText = t('advent.loading_model');
 
   useEffect(() => {
     // Wait for the door animation to complete before rendering the 3D scene.
@@ -101,7 +105,7 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
           <ErrorBoundary fallback={ErrorFallback}>
             <Suspense fallback={
               <Html center>
-                <div className="text-white/70 text-sm font-minecraft-ten">Loading model...</div>
+                <div className="text-white/70 text-sm font-minecraft-ten">{loadingText}</div>
               </Html>
             }>
               <group position={[0, -0.5, 0]}>
@@ -127,7 +131,7 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
         </Canvas>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-white/50 text-sm font-minecraft-ten">Loading...</div>
+          <div className="text-white/50 text-sm font-minecraft-ten">{loadingText}</div>
         </div>
       )}
     </div>

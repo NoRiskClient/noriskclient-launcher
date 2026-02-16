@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
@@ -10,6 +11,7 @@ import type { Profile } from "../../types/profile";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
 
 export function ProfileDetailViewV2Wrapper() {
+  const { t } = useTranslation();
   const { profileId } = useParams<{ profileId: string }>();
   const navigate = useNavigate();
   const { profiles, loading, fetchProfiles } = useProfileStore();
@@ -42,14 +44,14 @@ export function ProfileDetailViewV2Wrapper() {
   };
 
   if (loading) {
-    return <LoadingState message="Loading profile..." />;
+    return <LoadingState message={t('profiles.loading_profile')} />;
   }
 
   if (!profileId) {
     return (
       <EmptyState
         icon="solar:danger-triangle-bold"
-        message="No profile ID provided"
+        message={t('profiles.errors.no_profile_id')}
       />
     );
   }
@@ -58,7 +60,7 @@ export function ProfileDetailViewV2Wrapper() {
     return (
       <EmptyState
         icon="solar:widget-bold"
-        message="Profile not found"
+        message={t('profiles.errors.not_found')}
       />
     );
   }
