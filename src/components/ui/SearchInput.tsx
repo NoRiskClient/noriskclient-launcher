@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -48,6 +49,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
@@ -270,7 +272,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               style={{
                 transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
               }}
-              aria-label="Clear search"
+              aria-label={t('common.clear_search')}
             >
               <Icon icon="lucide:x" />
             </button>
@@ -338,7 +340,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                     "text-white/70 hover:text-white transition-colors duration-200",
                     sizeStyles[size].icon,
                   )}
-                  aria-label="Clear search"
+                  aria-label={t('common.clear_search')}
                 >
                   <Icon icon="lucide:x" />
                 </button>

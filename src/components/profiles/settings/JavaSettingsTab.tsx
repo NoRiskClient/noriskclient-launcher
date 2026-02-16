@@ -215,8 +215,7 @@ export function JavaSettingsTab({
   const browseForJavaPath = async () => {
     try {
       const selected = await open({
-        title:
-          "Select Java Executable (javaw.exe, java) or Installation Directory",
+        title: t('settings.java.select_java_executable'),
         directory: false,
         multiple: false,
       });
@@ -229,7 +228,7 @@ export function JavaSettingsTab({
       const errorMessage = String(
         error instanceof Error ? error.message : error,
       );
-      toast.error(`Error browsing for Java: ${errorMessage}`);
+      toast.error(t('java.browse_error', { error: errorMessage }));
     }
   };
 
@@ -258,17 +257,15 @@ export function JavaSettingsTab({
         });
       } else {
         setValidationResult("invalid");
-        toast.error(
-          "Invalid Java Path. Check the path or ensure it's a compatible Java version.",
-        );
+        toast.error(t('java.path_invalid'));
       }
     } catch (error: any) {
       console.error(`Error validating Java path ${currentPath}:`, error);
       setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
-        ? "Selected Java path does not exist."
+        ? t('java.path_not_exist')
         : error?.message || String(error);
-      toast.error(`Java Validation error: ${message}`);
+      toast.error(t('java.validation_error', { error: message }));
     } finally {
       setIsValidatingJavaPath(false);
     }
@@ -539,7 +536,7 @@ export function JavaSettingsTab({
                       />
                     }
                     className="text-2xl"
-                    aria-label="Browse for Java executable"
+                    aria-label={t('profiles.settings.browse_java')}
                   >
                     {t('profiles.settings.browse')}
                   </Button>

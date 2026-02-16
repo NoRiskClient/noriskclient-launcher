@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useProcessStore } from "../../store/useProcessStore";
@@ -17,6 +18,7 @@ interface SingleLogViewerProps {
 }
 
 export function SingleLogViewer({ instanceId, instanceName, profileId, accountName, startTime }: SingleLogViewerProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   // Get data from store
@@ -157,8 +159,8 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
           logs={logs}
           onClear={handleClear}
           noLogsIcon="solar:document-text-bold"
-          noLogsTitle="NO LOGS YET"
-          noLogsSubtitle="Waiting for log output..."
+          noLogsTitle={t('logs.no_logs_yet')}
+          noLogsSubtitle={t('logs.waiting_for_output')}
         />
       </div>
     </div>

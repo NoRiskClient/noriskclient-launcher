@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { ModrinthService } from "../../services/modrinth-service";
@@ -169,6 +170,7 @@ function getProjectTypeFromClassId(classId: number | undefined): string {
 }
 
 export function ModDetailPage() {
+  const { t } = useTranslation();
   const { source, projectId } = useParams<{ source: string; projectId: string }>();
   const navigate = useNavigate();
   const { accentColor } = useThemeStore();
@@ -181,7 +183,7 @@ export function ModDetailPage() {
   useEffect(() => {
     async function loadProject() {
       if (!source || !projectId) {
-        setError("Invalid URL parameters");
+        setError(t('mod_detail.invalid_url_params'));
         setIsLoading(false);
         return;
       }
@@ -292,12 +294,12 @@ export function ModDetailPage() {
 
             setProject(modrinthToUnified(modrinthProject, authorName, authorAvatarUrl, teamMembers, dependencies));
           } else {
-            setError("Project not found");
+            setError(t('mod_detail.project_not_found'));
           }
         } else if (source.toLowerCase() === "curseforge") {
           const modId = parseInt(projectId, 10);
           if (isNaN(modId)) {
-            setError("Invalid CurseForge mod ID");
+            setError(t('mod_detail.invalid_curseforge_id'));
             return;
           }
           const response = await CurseForgeService.getModsByIds([modId]);
@@ -315,7 +317,7 @@ export function ModDetailPage() {
 
             setProject(curseforgeToUnified(mod, fullDescription));
           } else {
-            setError("Mod not found");
+            setError(t('mod_detail.mod_not_found'));
           }
         } else {
           setError(`Unknown source: ${source}`);
@@ -344,12 +346,12 @@ export function ModDetailPage() {
           className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft-ten transition-colors"
         >
           <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
-          <span>Back</span>
+          <span>{t('common.back')}</span>
         </button>
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white/50 animate-spin" />
-            <span className="text-white/50 font-minecraft-ten">Loading project details...</span>
+            <span className="text-white/50 font-minecraft-ten">{t('mod_detail.loading_project')}</span>
           </div>
         </div>
       </div>
@@ -365,17 +367,17 @@ export function ModDetailPage() {
           className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft-ten transition-colors"
         >
           <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
-          <span>Back</span>
+          <span>{t('common.back')}</span>
         </button>
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Icon icon="solar:danger-triangle-bold" className="w-12 h-12 text-red-500" />
-            <span className="text-red-400 font-minecraft-ten">{error || "Project not found"}</span>
+            <span className="text-red-400 font-minecraft-ten">{error || t('mod_detail.project_not_found')}</span>
             <button
               onClick={handleBack}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft-ten transition-colors"
             >
-              Go Back
+              {t('mod_detail.go_back')}
             </button>
           </div>
         </div>
@@ -392,7 +394,7 @@ export function ModDetailPage() {
           className="flex items-center gap-2 text-white/70 hover:text-white font-minecraft-ten transition-colors"
         >
           <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
-          <span>Back</span>
+          <span>{t('common.back')}</span>
         </button>
       </div>
 

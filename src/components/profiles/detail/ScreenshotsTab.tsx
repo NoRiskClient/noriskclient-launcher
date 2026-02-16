@@ -333,7 +333,7 @@ export function ScreenshotsTab({
         {/* Header without border/background like WorldsTab */}
         <div className="flex items-center gap-4 mb-4 flex-shrink-0">
           <SearchWithFilters
-            placeholder="search screenshots..."
+            placeholder={t('screenshots.search_placeholder')}
             searchIcon="solar:magnifer-bold"
             sortOptions={sortOptions}
             sortValue={sortOrder}
@@ -348,7 +348,7 @@ export function ScreenshotsTab({
           {isLoading && (
             <EmptyState
               icon="solar:gallery-send-bold-duotone"
-              message="loading screenshots..."
+              message={t('screenshots.loading')}
             />
           )}
 

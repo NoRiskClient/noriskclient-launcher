@@ -297,10 +297,10 @@ export function AdventCalendarTab() {
         />,
       );
       
-      toast.success(`Day ${day} reward claimed!`);
+      toast.success(t('advent.reward_claimed', { day }));
     } catch (error) {
       console.error("Failed to claim reward:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to claim reward";
+      const errorMessage = error instanceof Error ? error.message : t('advent.claim_failed');
       toast.error(errorMessage);
       
       // Show error in modal

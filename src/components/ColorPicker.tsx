@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { ACCENT_COLORS, useThemeStore } from "../store/useThemeStore";
 import { Button } from "./ui/buttons/Button";
@@ -19,6 +20,7 @@ export function ColorPicker({
   showCustomOption = true,
   disabled = false,
 }: ColorPickerProps) {
+  const { t } = useTranslation();
   const { accentColor, setAccentColor, setCustomAccentColor, customColorHistory } = useThemeStore();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [customColor, setCustomColor] = useState("#4f8eff");
@@ -113,7 +115,7 @@ export function ColorPicker({
               bg-gradient-to-r from-purple-500 via-pink-500 to-red-500
               ${accentColor.isCustom ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
             `}
-            aria-label="Custom color"
+            aria-label={t('settings.accent_color.custom')}
           >
             <span className="absolute inset-0 flex items-center justify-center">
               <Icon

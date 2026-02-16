@@ -69,7 +69,7 @@ export function SymlinkSettingsTab({
         directory: true,
         multiple: false,
         defaultPath: profilesPath,
-        title: "Select folder to symlink into your profile",
+        title: t('symlinks.dialog_title_folder'),
       });
 
       if (selected && typeof selected === "string") {
@@ -105,7 +105,7 @@ export function SymlinkSettingsTab({
         directory: false,
         multiple: false,
         defaultPath: profilesPath,
-        title: "Select file to symlink into your profile",
+        title: t('symlinks.dialog_title_file'),
       });
 
       if (selected && typeof selected === "string") {
@@ -142,7 +142,7 @@ export function SymlinkSettingsTab({
         external_path: externalPath,
       });
 
-      toast.success(`Symlink created: ${targetPath} → ${externalPath}`);
+      toast.success(t('symlinks.created_success', { target: targetPath, external: externalPath }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error: any) {
       const errorMessage = error?.message || String(error);
@@ -157,7 +157,7 @@ export function SymlinkSettingsTab({
           { duration: 8000 }
         );
       } else {
-        toast.error(`Failed to create symlink: ${errorMessage}`);
+        toast.error(t('symlinks.create_failed', { error: errorMessage }));
       }
     }
   };
@@ -167,7 +167,7 @@ export function SymlinkSettingsTab({
       title: t('symlinks.remove_title'),
       message: t('symlinks.remove_confirm', { path }),
       confirmText: t('symlinks.remove_button'),
-      cancelText: "Cancel",
+      cancelText: t('common.cancel'),
       type: "danger",
     });
 
@@ -176,12 +176,12 @@ export function SymlinkSettingsTab({
     try {
       logInfo(`Removing symlink for profile ${editedProfile.id}: ${path}`);
       await removeProfileSymlink(editedProfile.id, path);
-      toast.success(`Symlink removed: ${path}`);
+      toast.success(t('symlinks.removed_success', { path }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error.message);
       logError(`Failed to remove symlink for profile ${editedProfile.id}: ${errorMessage}. Path: ${path}`);
-      toast.error(`Failed to remove symlink: ${errorMessage}`);
+      toast.error(t('symlinks.remove_failed', { error: errorMessage }));
     }
   };
 
@@ -205,7 +205,7 @@ export function SymlinkSettingsTab({
       const errorMessage = error instanceof Error ? error.message : String(error.message);
       logError(`Failed to open internal path for profile ${editedProfile.id}: ${errorMessage}. Path: ${relativePath}`);
       console.error("Failed to open internal path:", error);
-      toast.error(`Failed to open internal path: ${errorMessage}`);
+      toast.error(t('symlinks.open_path_failed', { error: errorMessage }));
     }
   };
 
@@ -214,9 +214,9 @@ export function SymlinkSettingsTab({
       <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
         <Icon icon="solar:lock-bold" className="w-16 h-16 text-white/40" />
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">profile is running</h3>
+          <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">{t('symlinks.profile_running')}</h3>
           <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none">
-            stop the profile to manage symlinks
+            {t('symlinks.stop_profile_to_manage')}
           </p>
         </div>
       </div>
@@ -228,20 +228,20 @@ export function SymlinkSettingsTab({
       {confirmDialog}
       <div className="space-y-6 overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">folder symlinks</h3>
+        <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">{t('symlinks.title')}</h3>
         <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none">
-          link folders or files from anywhere on your system to share content between profiles
+          {t('symlinks.description')}
         </p>
       </div>
 
       {/* Existing Symlinks */}
       <div className="overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">active symlinks</h4>
+        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('symlinks.active_symlinks')}</h4>
         <div className="space-y-2 overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {loading ? (
-            <p className="text-white/50 text-sm font-minecraft-ten">loading symlinks...</p>
+            <p className="text-white/50 text-sm font-minecraft-ten">{t('symlinks.loading')}</p>
           ) : symlinks.length === 0 ? (
-            <p className="text-white/50 text-sm font-minecraft-ten">no symlinks configured</p>
+            <p className="text-white/50 text-sm font-minecraft-ten">{t('symlinks.no_symlinks')}</p>
           ) : (
             symlinks.map((symlink) => (
               <div
@@ -301,14 +301,14 @@ export function SymlinkSettingsTab({
                     size="sm"
                     onClick={() => openInternalPath(symlink.link_path)}
                     icon={<Icon icon="solar:folder-bold" className="w-3.5 h-3.5" />}
-                    label="Open in profile"
+                    label={t('symlink.open_in_profile')}
                   />
                   <IconButton
                     variant="destructive"
                     size="sm"
                     onClick={() => removeSymlink(symlink.link_path)}
                     icon={<Icon icon="solar:trash-bin-minimalistic-bold" className="w-3.5 h-3.5" />}
-                    label="Remove symlink"
+                    label={t('symlink.remove_symlink')}
                   />
                 </div>
               </div>
@@ -319,30 +319,30 @@ export function SymlinkSettingsTab({
 
       {/* Add New Symlink */}
       <div>
-        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">add new symlink</h4>
+        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('symlink.add_new')}</h4>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Button 
-              onClick={openFolderPickerAndConfigure} 
-              variant="default" 
-              size="lg" 
+            <Button
+              onClick={openFolderPickerAndConfigure}
+              variant="default"
+              size="lg"
               className="w-full lowercase"
             >
               <span className="flex items-center gap-2">
                 <Icon icon="solar:folder-bold" className="w-5 h-5" />
-                <span>link folder</span>
+                <span>{t('symlinks.link_folder')}</span>
               </span>
             </Button>
 
-            <Button 
-              onClick={openFilePickerAndConfigure} 
-              variant="default" 
-              size="lg" 
+            <Button
+              onClick={openFilePickerAndConfigure}
+              variant="default"
+              size="lg"
               className="w-full lowercase"
             >
               <span className="flex items-center gap-2">
                 <Icon icon="solar:file-bold" className="w-5 h-5" />
-                <span>link file</span>
+                <span>{t('symlinks.link_file')}</span>
               </span>
             </Button>
           </div>
@@ -351,14 +351,14 @@ export function SymlinkSettingsTab({
             <div className="flex items-start gap-3">
               <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
               <div className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none space-y-2">
-                <p className="text-white">how it works:</p>
+                <p className="text-white">{t('symlinks.how_it_works')}</p>
                 <ol className="list-decimal list-inside space-y-1 text-white/60">
-                  <li>choose a folder or file from anywhere on your computer</li>
-                  <li>configure where it appears in your profile</li>
-                  <li>the content is linked - changes sync instantly</li>
+                  <li>{t('symlinks.step_1')}</li>
+                  <li>{t('symlinks.step_2')}</li>
+                  <li>{t('symlinks.step_3')}</li>
                 </ol>
                 <p className="text-white/50 text-xs mt-2">
-                  perfect for syncing screenshots, config files, saves, or resource packs across profiles or cloud storage.
+                  {t('symlinks.perfect_for')}
                 </p>
               </div>
             </div>

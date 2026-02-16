@@ -6,6 +6,7 @@ import { Button } from ".././ui/buttons/Button";
 import { Card } from ".././ui/Card";
 import { ToggleSwitch } from ".././ui/ToggleSwitch";
 import { Input } from ".././ui/Input";
+import { Select } from ".././ui/Select";
 import { ColorPicker } from ".././ColorPicker";
 import { RadiusPicker } from ".././RadiusPicker";
 import type { LauncherConfig } from "../../types/launcherConfig";
@@ -304,21 +305,18 @@ export function SettingsTab() {
         <p className="text-base text-white/70 font-minecraft-ten mt-2">
           {t("settings.language.description")}
         </p>
-        <div className="mt-4 flex gap-2">
-          {LANGUAGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setLanguage(opt.value as SupportedLanguage)}
-              className={cn(
-                "px-4 py-2 rounded-md border-2 font-minecraft-ten text-sm transition-all duration-200",
-                language === opt.value
-                  ? "border-[var(--accent)] bg-[var(--accent)]/20 text-white"
-                  : "border-[#ffffff20] bg-black/20 text-white/60 hover:border-[#ffffff40] hover:text-white/80"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="mt-4 max-w-xs">
+          <Select
+            value={language}
+            onChange={(value) => setLanguage(value as SupportedLanguage)}
+            options={LANGUAGE_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+              icon: <Icon icon={opt.flag} className="w-5 h-5" />,
+            }))}
+            size="sm"
+            variant="flat"
+          />
         </div>
       </div>
 

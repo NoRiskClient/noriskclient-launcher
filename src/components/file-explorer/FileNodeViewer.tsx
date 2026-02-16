@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '@iconify/react';
 import { cn } from '../../lib/utils';
 import type { FileNode } from '../../types/fileSystem'; // Adjust path as necessary
@@ -195,6 +196,7 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   defaultRootCollapsed = false,
   className,
 }) => {
+  const { t } = useTranslation();
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [initialSetupDone, setInitialSetupDone] = useState(false);
   const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
@@ -344,15 +346,15 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   };
 
   if (loading) {
-    return <div className="p-4 text-center text-white/70 font-minecraft-ten">Loading file structure...</div>;
+    return <div className="p-4 text-center text-white/70 font-minecraft-ten">{t('files.loading_structure')}</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-center text-red-400 font-minecraft-ten">Error: {error}</div>;
+    return <div className="p-4 text-center text-red-400 font-minecraft-ten">{t('common.error')}: {error}</div>;
   }
 
   if (!rootNode) {
-    return <div className="p-4 text-center text-white/70 font-minecraft-ten">No file structure available.</div>;
+    return <div className="p-4 text-center text-white/70 font-minecraft-ten">{t('files.no_structure_available')}</div>;
   }
 
   const nodesToRender = hideRootNode ? rootNode.children || [] : [rootNode];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
@@ -9,6 +10,7 @@ import { BrowseTab } from "./detail/BrowseTab";
 import type { Profile } from "../../types/profile";
 
 export function BrowseTabWrapper() {
+  const { t } = useTranslation();
   const { profileId, contentType } = useParams<{ profileId: string; contentType: string }>();
   const navigate = useNavigate();
   const { profiles, loading, fetchProfiles } = useProfileStore();
@@ -42,14 +44,14 @@ export function BrowseTabWrapper() {
   };
 
   if (loading) {
-    return <LoadingState message="Loading profile..." />;
+    return <LoadingState message={t('profiles.loading_profile')} />;
   }
 
   if (!profileId) {
     return (
       <EmptyState
         icon="solar:danger-triangle-bold"
-        message="No profile ID provided"
+        message={t('profiles.errors.no_profile_id')}
       />
     );
   }
@@ -58,7 +60,7 @@ export function BrowseTabWrapper() {
     return (
       <EmptyState
         icon="solar:widget-bold"
-        message="Profile not found"
+        message={t('profiles.errors.not_found')}
       />
     );
   }

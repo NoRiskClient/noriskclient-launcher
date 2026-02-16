@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
@@ -22,15 +23,17 @@ const sanitizeHtml = (html: string) => {
 };
 
 export function ModDetailDescription({ body, source }: ModDetailDescriptionProps) {
+  const { t } = useTranslation();
+
   if (!body || body.trim().length === 0) {
     return (
       <div className="bg-black/20 rounded-lg p-4 border border-white/10">
         <h2 className="text-lg font-minecraft-ten text-white flex items-center gap-2 mb-4 normal-case">
           <Icon icon="solar:document-text-bold" className="w-5 h-5" />
-          Description
+          {t('mod_detail.description')}
         </h2>
         <p className="text-white/50 font-minecraft-ten text-center py-8">
-          No description available.
+          {t('mod_detail.no_description')}
         </p>
       </div>
     );
@@ -40,7 +43,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
     <div className="bg-black/20 rounded-lg p-4 border border-white/10">
       <h2 className="text-lg font-minecraft-ten text-white flex items-center gap-2 mb-4 normal-case">
         <Icon icon="solar:document-text-bold" className="w-5 h-5" />
-        Description
+        {t('mod_detail.description')}
       </h2>
 
       <div>

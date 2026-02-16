@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { SearchInput } from "../../ui/SearchInput";
 import { Card } from "../../ui/Card";
@@ -25,6 +26,7 @@ export function VersionSelector({
   onVersionTypeSelect,
   versions,
 }: VersionSelectorProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
@@ -105,13 +107,13 @@ export function VersionSelector({
 
         <div>
           <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-            game version
+            {t('profiles.wizard.game_version')}
           </h3>
           <div className="mb-3">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="search versions..."
+              placeholder={t('placeholders.search_version')}
               className="w-full text-2xl py-3"
             />
           </div>

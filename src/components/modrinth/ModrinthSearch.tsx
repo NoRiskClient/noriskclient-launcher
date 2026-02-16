@@ -34,6 +34,7 @@ import { Label } from "../ui/Label";
 import { useThemeStore } from "../../store/useThemeStore";
 
 function CategoryTransitionLoader() {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   return (
@@ -46,26 +47,26 @@ function CategoryTransitionLoader() {
         ></div>
       </div>
       <div className="font-minecraft text-3xl text-white/80 tracking-wide lowercase select-none">
-        Loading content...
+        {t('modrinth.loading_content')}
       </div>
     </div>
   );
 }
 
-const PROJECT_TYPES: { type: ModrinthProjectType; label: string }[] = [
-  { type: "mod", label: "Mods" },
-  { type: "modpack", label: "Modpacks" },
-  { type: "resourcepack", label: "Resource Packs" },
-  { type: "shader", label: "Shaders" },
-  { type: "datapack", label: "Datapacks" },
+const PROJECT_TYPES: { type: ModrinthProjectType; labelKey: string }[] = [
+  { type: "mod", labelKey: "modrinth.project_types.mods" },
+  { type: "modpack", labelKey: "modrinth.project_types.modpacks" },
+  { type: "resourcepack", labelKey: "modrinth.project_types.resource_packs" },
+  { type: "shader", labelKey: "modrinth.project_types.shaders" },
+  { type: "datapack", labelKey: "modrinth.project_types.datapacks" },
 ];
 
-const SORT_OPTIONS: { type: ModrinthSortType; label: string }[] = [
-  { type: "relevance", label: "Relevance" },
-  { type: "downloads", label: "Downloads" },
-  { type: "follows", label: "Followers" },
-  { type: "newest", label: "Newest" },
-  { type: "updated", label: "Recently Updated" },
+const SORT_OPTIONS: { type: ModrinthSortType; labelKey: string }[] = [
+  { type: "relevance", labelKey: "modrinth.sort.relevance" },
+  { type: "downloads", labelKey: "modrinth.sort.downloads" },
+  { type: "follows", labelKey: "modrinth.sort.followers" },
+  { type: "newest", labelKey: "modrinth.sort.newest" },
+  { type: "updated", labelKey: "modrinth.sort.recently_updated" },
 ];
 
 interface ModrinthSearchProps {
@@ -1159,7 +1160,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
 
   const sortOptions = SORT_OPTIONS.map((option) => ({
     value: option.type,
-    label: option.label,
+    label: t(option.labelKey),
   }));
 
   return (
@@ -1202,7 +1203,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                   }
                   disabled={searchLoading}
                 >
-                  {tab.label.toLowerCase()}
+                  {t(tab.labelKey).toLowerCase()}
                 </Button>
               ))}
             </div>
@@ -1290,14 +1291,14 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                           style={{ borderColor: `${accentColor.value}30` }}
                         >
                           {versionsLoading ? (
-                            <LoadingIndicator message="Loading versions..." />
+                            <LoadingIndicator message={t('modrinth.loading_versions')} />
                           ) : versionsError ? (
                             <ErrorMessage message={versionsError} />
                           ) : filteredVersions.length > 0 ? (
                             <div>
                               <div className="flex items-center justify-between mb-3">
                                 <h4 className="text-white font-minecraft text-3xl tracking-wide lowercase select-none">
-                                  Available Versions:
+                                  {t('modrinth.available_versions')}
                                 </h4>
 
                                 {modVersions.length !==
@@ -1318,7 +1319,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                                       />
                                     }
                                   >
-                                    Show All ({modVersions.length})
+                                    {t('modrinth.show_all', { count: modVersions.length })}
                                   </Button>
                                 )}
                               </div>
@@ -1387,7 +1388,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                                                 className="w-4 h-4"
                                               />
                                             }
-                                            title="Error checking installation status"
+                                            title={t('modrinth.error_check_status')}
                                           />
                                         ) : typeof versionStatus === "object" &&
                                           versionStatus !== null ? (
@@ -1403,8 +1404,8 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                             <EmptyState
                               message={
                                 modVersions.length > 0
-                                  ? "No versions match the selected filters."
-                                  : "No versions found matching the criteria."
+                                  ? t('modrinth.no_versions_match_filters')
+                                  : t('modrinth.no_versions_criteria')
                               }
                             />
                           )}
@@ -1415,7 +1416,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                 ))}
 
                 {loadingMore && (
-                  <LoadingIndicator message="Loading more results..." />
+                  <LoadingIndicator message={t('modrinth.loading_more')} />
                 )}
 
                 {!hasMore && searchResults.length > 0 && !loadingMore && (
@@ -1427,7 +1428,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
                     }}
                   >
                     <p className="text-white/50 font-minecraft-ten text-2xl tracking-wide lowercase select-none">
-                      End of results
+                      {t('modrinth.end_of_results')}
                     </p>
                   </div>
                 )}
@@ -1456,10 +1457,8 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
             setShowProfilePopup(false);
             setPendingInstall(null);
           }}
-          title={`Install ${pendingInstall.version.search_hit?.project_type || "Content"}`}
-          description={`Choose a profile to install "${
-            pendingInstall.version.search_hit?.title || "this content"
-          }" to:`}
+          title={t('modrinth.profile_popup.title', { type: pendingInstall.version.search_hit?.project_type || "Content" })}
+          description={t('modrinth.profile_popup.description', { title: pendingInstall.version.search_hit?.title || "this content" })}
           contentVersion={pendingInstall.version}
         />
       )}

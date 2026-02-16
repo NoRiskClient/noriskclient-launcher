@@ -145,8 +145,8 @@ jobs:
       - name: Re-sign Windows EXE for Tauri Updater
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: |
           echo "Re-signing EXE for Tauri updater after EV code signing..."
           yarn tauri signer sign "${{ steps.find_exe.outputs.EXE_PATH }}"

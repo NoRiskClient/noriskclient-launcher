@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import type { UnifiedGalleryImage } from "../../types/unified";
 
@@ -17,6 +18,7 @@ export function ModDetailLightbox({
   isOpen,
   onClose,
 }: ModDetailLightboxProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -130,14 +132,14 @@ export function ModDetailLightbox({
           {/* Counter */}
           <div className="flex items-center justify-between mb-2">
             <span className="text-white/70 font-minecraft-ten text-sm">
-              {currentIndex + 1} of {images.length}
+              {t('lightbox.counter', { current: currentIndex + 1, total: images.length })}
             </span>
             <div className="flex items-center gap-2 text-white/50 text-xs font-minecraft-ten">
-              <span>Press Space to zoom</span>
+              <span>{t('lightbox.press_space_zoom')}</span>
               <span>|</span>
-              <span>Arrow keys to navigate</span>
+              <span>{t('lightbox.arrow_keys_navigate')}</span>
               <span>|</span>
-              <span>Esc to close</span>
+              <span>{t('lightbox.esc_close')}</span>
             </div>
           </div>
 

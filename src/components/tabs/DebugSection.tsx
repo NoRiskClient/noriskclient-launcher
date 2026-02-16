@@ -155,7 +155,7 @@ export function DebugSection() {
                   <button
                     onClick={() => handleCopyContent(file)}
                     className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
-                    title="Copy content"
+                    title={t('debug.copy_content')}
                   >
                     <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
                   </button>
@@ -163,7 +163,7 @@ export function DebugSection() {
                     onClick={() => handleUpload(file)}
                     disabled={uploadingFile === file.path}
                     className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-                    title="Upload to mclo.gs"
+                    title={t('debug.upload_mclogs')}
                   >
                     {uploadingFile === file.path ? (
                       <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />

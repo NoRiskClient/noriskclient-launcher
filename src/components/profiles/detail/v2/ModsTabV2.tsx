@@ -916,7 +916,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             onClick={handleAddMods}
             disabled={isLoading || isBatchToggling || isBatchDeleting || checkingUpdates || isUpdatingAll}
             size="sm"
-            title="Add Mods"
+            title={t('mods.add_mods')}
             className="!h-9 !w-9 flex-shrink-0"
         />
         {/* Check for Updates Button REMOVED */}
@@ -925,7 +925,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             onClick={refreshModsData}
             disabled={isLoading || isBatchToggling || isBatchDeleting || checkingUpdates || isUpdatingAll}
             size="sm"
-            title={isLoading ? "Refreshing..." : "Refresh Mods"}
+            title={isLoading ? t('mods.refreshing') : t('mods.refresh_mods')}
             className="!h-9 !w-9 flex-shrink-0 ml-auto"
         />
       </div>
@@ -943,7 +943,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
             icon="solar:danger-triangle-bold"
             className="w-4 h-4 text-red-400 flex-shrink-0"
           />
-          <span className="font-minecraft">Update Error: {updateError}</span>
+          <span className="font-minecraft">{t('mods.update_error')}: {updateError}</span>
         </div>
       )}
       {mods.length > 0 && (
@@ -958,8 +958,8 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
               checked={areAllFilteredSelected}
               onChange={(e) => handleSelectAllToggle(e.target.checked)}
               disabled={filteredMods.length === 0 || isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
-              label={selectedModIds.size > 0 ? `${selectedModIds.size} selected` : "Select All"}
-              title={areAllFilteredSelected ? "Deselect all visible" : "Select all visible"}
+              label={selectedModIds.size > 0 ? t('mods.count_selected', { count: selectedModIds.size }) : t('mods.select_all')}
+              title={areAllFilteredSelected ? t('mods.deselect_all_visible') : t('mods.select_all_visible')}
             />
             <div className="flex items-center gap-2"> {/* Wrapper for batch actions and Update All */}
               {selectedModIds.size > 0 && (
@@ -971,7 +971,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                     disabled={isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
                     icon={isBatchToggling ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : undefined}
                   >
-                    {isBatchToggling ? "Toggling..." : `Toggle (${selectedModIds.size})`}
+                    {isBatchToggling ? t('mods.toggling') : t('mods.toggle_count', { count: selectedModIds.size })}
                   </Button>
                   <Button
                     size="sm"
@@ -980,7 +980,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                     disabled={isBatchToggling || isBatchDeleting || isLoading || checkingUpdates || isUpdatingAll}
                     icon={isBatchDeleting ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : undefined}
                   >
-                    {isBatchDeleting ? "Deleting..." : `Delete (${selectedModIds.size})`}
+                    {isBatchDeleting ? t('mods.deleting') : t('mods.delete_count', { count: selectedModIds.size })}
                   </Button>
                 </>
               )}
@@ -993,7 +993,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
                   icon={isUpdatingAll ? <Icon icon="solar:refresh-bold" className="animate-spin mr-1.5" /> : <Icon icon="solar:double-alt-arrow-up-bold-duotone" className="mr-1.5" />}
                   className={selectedModIds.size > 0 ? "ml-2" : ""} // Add margin if batch actions are present
                 >
-                  {isUpdatingAll ? "Updating All..." : `Update All (${Object.keys(modUpdates).length})`}
+                  {isUpdatingAll ? t('mods.updating_all') : t('mods.update_all_count', { count: Object.keys(modUpdates).length })}
                 </Button>
               )}
             </div>

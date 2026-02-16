@@ -627,7 +627,7 @@ export function ShaderPacksTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search shader packs..."
+              placeholder={t('shaderpacks.search_placeholder')}
             />
           </div>
         )}
@@ -715,7 +715,7 @@ export function ShaderPacksTab({
         }}
       >
         {loadingShaderPacks ? (
-          <LoadingState message="loading shader packs..." />
+          <LoadingState message={t('shaderpacks.loading')} />
         ) : shaderPacksError ? (
           <div className="p-4 text-red-400 bg-red-900/20 rounded border border-red-700/30">
             <div className="flex items-center gap-2">

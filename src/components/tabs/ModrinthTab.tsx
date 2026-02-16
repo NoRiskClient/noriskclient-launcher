@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ModrinthSearch } from "../modrinth/ModrinthSearch";
 import type { Profile } from "../../types/profile";
 import { listProfiles } from "../../services/profile-service";
@@ -18,6 +19,7 @@ interface ModrinthTabProps {
 export function ModrinthTab({
   profiles: initialProfiles = [],
 }: ModrinthTabProps) {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
@@ -66,7 +68,7 @@ export function ModrinthTab({
       {error && <ErrorMessage message={error} />}
 
       {!profilesLoaded ? (
-        <LoadingState message="Loading profiles..." />
+        <LoadingState message={t('profiles.loadingProfiles')} />
       ) : (
         <div className="flex-1 overflow-hidden flex space-x-4">
           <div className="flex-1 overflow-hidden">

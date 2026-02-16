@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, emitTo, type UnlistenFn } from "@tauri-apps/api/event";
@@ -137,6 +138,7 @@ function InstanceItem({
   onHover,
   onOpenProfile,
 }: InstanceItemProps) {
+  const { t } = useTranslation();
   const statusColor = getStatusColor(instance.status);
 
   // Get avatar for the account
@@ -164,7 +166,7 @@ function InstanceItem({
           onOpenProfile();
         }}
         className="absolute top-2 right-2 p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors"
-        title="Open Profile"
+        title={t('logs.open_profile')}
       >
         <Icon icon="solar:settings-bold" className="w-3.5 h-3.5" />
       </button>
@@ -259,6 +261,7 @@ export function InstanceSidebar({
   selectedInstanceId,
   onSelectInstance,
 }: InstanceSidebarProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -437,7 +440,7 @@ export function InstanceSidebar({
           style={{ color: accentColor.value }}
         >
           <Icon icon="solar:monitor-bold" className="w-4 h-4" />
-          Instances
+          {t('instances.title')}
         </span>
       </div>
 
@@ -446,12 +449,12 @@ export function InstanceSidebar({
         {isLoading && instances.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft-ten">
             <Icon icon="svg-spinners:pulse-3" className="w-6 h-6 mr-2" />
-            Loading...
+            {t('instances.loading')}
           </div>
         ) : instances.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-white/50 text-sm font-minecraft-ten text-center">
             <Icon icon="solar:gamepad-no-charge-bold" className="w-8 h-8 mb-2 opacity-50" />
-            No active instances
+            {t('instances.no_active')}
           </div>
         ) : (
           instances.map((instance) => (
@@ -552,7 +555,7 @@ export function InstanceSidebar({
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
               >
                 <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
-                STOP
+                {t('instances.stop')}
               </button>
             ) : (selectedInstance.status === "crashed" || selectedInstance.status === "idle" || stoppingProcessIds.has(selectedInstance.id)) && (() => {
               const launchState = getProfileState(selectedInstance.profileId);
@@ -572,7 +575,7 @@ export function InstanceSidebar({
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
                 >
                   <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
-                  STOP
+                  {t('instances.stop')}
                 </button>
               ) : (
                 <button
@@ -580,7 +583,7 @@ export function InstanceSidebar({
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
                 >
                   <Icon icon="solar:play-bold" className="w-3.5 h-3.5" />
-                  START
+                  {t('instances.start')}
                 </button>
               );
             })()}
@@ -589,7 +592,7 @@ export function InstanceSidebar({
             <button
               onClick={() => handleOpenFolder(selectedInstance.profileId)}
               className="px-2 py-1.5 rounded text-xs font-minecraft-ten bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
-              title="Open Folder"
+              title={t('logs.open_folder')}
             >
               <Icon icon="solar:folder-bold" className="w-3.5 h-3.5" />
             </button>
@@ -609,7 +612,7 @@ export function InstanceSidebar({
                 });
               }}
               className="px-2 py-1.5 rounded text-xs font-minecraft-ten bg-white/10 hover:bg-white/20 transition-colors"
-              title="Pop Out Logs"
+              title={t('logs.pop_out')}
               style={{ color: accentColor.value }}
             >
               <Icon icon="solar:square-arrow-right-up-bold" className="w-3.5 h-3.5" />
@@ -620,7 +623,7 @@ export function InstanceSidebar({
 
       {/* Status Footer */}
       <div className="px-4 py-2 text-xs font-minecraft-ten text-white/50">
-        {instances.filter((i) => i.status === "running").length} RUNNING
+        {instances.filter((i) => i.status === "running").length} {t('instances.running')}
       </div>
     </div>
   );

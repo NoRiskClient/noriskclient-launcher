@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { OnlineState, useFriendsStore } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -10,21 +11,29 @@ interface StatusSelectorProps {
   currentStatus: OnlineState;
 }
 
-const statuses: { value: OnlineState; label: string; color: string; glow: string }[] = [
-  { value: "ONLINE", label: "Online", color: "#22c55e", glow: "0 0 8px rgba(34, 197, 94, 0.6)" },
-  { value: "AFK", label: "Away", color: "#f97316", glow: "0 0 8px rgba(249, 115, 22, 0.6)" },
-  { value: "BUSY", label: "Busy", color: "#ef4444", glow: "0 0 8px rgba(239, 68, 68, 0.6)" },
-  { value: "INVISIBLE", label: "Invisible", color: "#6b7280", glow: "none" },
+interface StatusOption {
+  value: OnlineState;
+  labelKey: string;
+  color: string;
+  glow: string;
+}
+
+const statusOptions: StatusOption[] = [
+  { value: "ONLINE", labelKey: "friends.status.online", color: "#22c55e", glow: "0 0 8px rgba(34, 197, 94, 0.6)" },
+  { value: "AFK", labelKey: "friends.status.away", color: "#f97316", glow: "0 0 8px rgba(249, 115, 22, 0.6)" },
+  { value: "BUSY", labelKey: "friends.status.busy", color: "#ef4444", glow: "0 0 8px rgba(239, 68, 68, 0.6)" },
+  { value: "INVISIBLE", labelKey: "friends.status.invisible", color: "#6b7280", glow: "none" },
 ];
 
 export function StatusSelector({ currentStatus }: StatusSelectorProps) {
+  const { t } = useTranslation();
   const { setStatus } = useFriendsStore();
   const { accentColor } = useThemeStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const current = statuses.find((s) => s.value === currentStatus) || statuses[0];
+  const current = statusOptions.find((s) => s.value === currentStatus) || statusOptions[0];
 
   const handleSelect = async (status: OnlineState) => {
     if (isChanging || status === currentStatus) {
@@ -64,7 +73,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
             boxShadow: current.glow,
           }}
         />
-        <span className="text-sm text-white font-minecraft-ten">{current.label}</span>
+        <span className="text-sm text-white font-minecraft-ten">{t(current.labelKey)}</span>
         <Icon
           icon="solar:alt-arrow-down-linear"
           className={cn(
@@ -81,7 +90,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
         triggerRef={triggerRef}
         width={200}
       >
-        {statuses.map((status) => (
+        {statusOptions.map((status) => (
           <DropdownItem
             key={status.value}
             onClick={() => handleSelect(status.value)}
@@ -96,7 +105,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
               />
             }
           >
-            {status.label}
+            {t(status.labelKey)}
           </DropdownItem>
         ))}
       </Dropdown>

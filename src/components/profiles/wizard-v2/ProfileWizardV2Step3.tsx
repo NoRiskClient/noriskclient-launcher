@@ -59,6 +59,7 @@ export function ProfileWizardV2Step3({
     const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
     const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
     const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
+    const recommendedRam = systemRamMb <= 8192 ? Math.min(2048, systemRamMb) : Math.min(4096, systemRamMb);
     const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
     const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
     const [loadingPacks, setLoadingPacks] = useState(false);
@@ -325,7 +326,7 @@ export function ProfileWizardV2Step3({
                 {/* RAM Settings */}
                 <div className="space-y-3">
                     <label className="block text-base font-minecraft-ten text-white/50">
-                        {t('profiles.wizard.recommendedRam')}
+                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam })}
                     </label>
                     <RangeSlider
                         value={memoryMaxMb}
