@@ -1,14 +1,20 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { Profile, ResolvedLoaderVersion } from "../../types/profile";
 import { ProfileIconV2 } from "./ProfileIconV2";
 import { toast } from "react-hot-toast";
-import { ProfileActionButtons, type ProfileActionButton } from "../ui/ProfileActionButtons";
-import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
+import {
+  ProfileActionButtons,
+  type ProfileActionButton,
+} from "../ui/ProfileActionButtons";
+import {
+  SettingsContextMenu,
+  type ContextMenuItem,
+} from "../ui/SettingsContextMenu";
 import { Icon } from "@iconify/react";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
@@ -31,13 +37,19 @@ function StandardVersionTooltipContent() {
     <div className="space-y-3">
       <div className="text-left">
         <div className="text-sm leading-relaxed text-white">
-          {t('profiles.card.standardVersionInfo')}
+          {t("profiles.card.standardVersionInfo")}
         </div>
       </div>
       <div className="flex items-start gap-2">
-        <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
+        <Icon
+          icon="solar:lightbulb-bold"
+          className="text-yellow-400 text-base flex-shrink-0"
+        />
         <div className="text-gray-300 text-xs leading-snug italic">
-          <span className="text-yellow-300 font-medium">{t('profiles.card.tip')}:</span> {t('profiles.card.createOwnProfiles')}
+          <span className="text-yellow-300 font-medium">
+            {t("profiles.card.tip")}:
+          </span>{" "}
+          {t("profiles.card.createOwnProfiles")}
         </div>
       </div>
     </div>
@@ -71,20 +83,23 @@ export function ProfileCardV2({
   const [modsButtonHovered, setModsButtonHovered] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
-  
+
   // Settings context menu state
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const contextMenuId = `profile-${profile.id}`;
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuPosition, setContextMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Modpack versions state for conditional rendering
   const [modpackVersions, setModpackVersions] = useState(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
-  
+
   // Profile settings store
   const { openModal } = useProfileSettingsStore();
-  
+
   // Profile duplicate store
   const { openModal: openDuplicateModal } = useProfileDuplicateStore();
 
@@ -92,14 +107,15 @@ export function ProfileCardV2({
   const { showModal, hideModal } = useGlobalModal();
 
   // Resolved loader version state
-  const [resolvedLoaderVersion, setResolvedLoaderVersion] = useState<ResolvedLoaderVersion | null>(null);
+  const [resolvedLoaderVersion, setResolvedLoaderVersion] =
+    useState<ResolvedLoaderVersion | null>(null);
 
   // Get accounts from Minecraft Auth Store
   const accounts = useMinecraftAuthStore((state) => state.accounts);
-  
+
   // Find preferred account if one is set
-  const preferredAccount = profile.preferred_account_id 
-    ? accounts.find(acc => acc.id === profile.preferred_account_id)
+  const preferredAccount = profile.preferred_account_id
+    ? accounts.find((acc) => acc.id === profile.preferred_account_id)
     : null;
 
   // Load preferred account avatar
@@ -107,12 +123,113 @@ export function ProfileCardV2({
     uuid: preferredAccount?.id,
     overlay: true,
   });
+  const estimatedContextMenuHeight =
+    profile.modpack_info?.source && modpackVersions ? 289 : 245;
+
+  const calculateContextMenuPosition = useCallback(
+    (
+      anchorClientX: number,
+      anchorClientY: number,
+      alignRight: boolean = false,
+    ) => {
+      const menuWidth = 200;
+      const maxMenuHeight = estimatedContextMenuHeight;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const spacing = 8;
+
+      const spaceBelow = viewportHeight - anchorClientY - spacing;
+      const spaceAbove = anchorClientY - spacing;
+      const openDownward =
+        spaceBelow >= maxMenuHeight || spaceBelow >= spaceAbove;
+      const menuHeight = Math.max(
+        0,
+        Math.min(maxMenuHeight, openDownward ? spaceBelow : spaceAbove),
+      );
+
+      let menuTop = openDownward
+        ? anchorClientY + 2
+        : anchorClientY - menuHeight - 2;
+      menuTop = Math.max(
+        spacing,
+        Math.min(menuTop, viewportHeight - menuHeight - spacing),
+      );
+
+      let menuLeft = alignRight ? anchorClientX - menuWidth : anchorClientX;
+      menuLeft = Math.max(
+        spacing,
+        Math.min(menuLeft, viewportWidth - menuWidth - spacing),
+      );
+
+      return {
+        x: menuLeft,
+        y: menuTop,
+      };
+    },
+    [estimatedContextMenuHeight],
+  );
+
+  const openContextMenuAtCursor = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (openContextMenuId && openContextMenuId !== contextMenuId) {
+        setOpenContextMenuId(null);
+      }
+
+      setContextMenuPosition(
+        calculateContextMenuPosition(e.clientX, e.clientY),
+      );
+      setIsContextMenuOpen(true);
+      setOpenContextMenuId(contextMenuId);
+    },
+    [
+      calculateContextMenuPosition,
+      contextMenuId,
+      openContextMenuId,
+      setOpenContextMenuId,
+    ],
+  );
+
+  const toggleContextMenuFromButton = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (openContextMenuId && openContextMenuId !== contextMenuId) {
+        setOpenContextMenuId(null);
+      }
+
+      const newState = !isContextMenuOpen;
+      setIsContextMenuOpen(newState);
+      setOpenContextMenuId(newState ? contextMenuId : null);
+
+      if (newState) {
+        const buttonRect = e.currentTarget.getBoundingClientRect();
+        setContextMenuPosition(
+          calculateContextMenuPosition(
+            buttonRect.right,
+            buttonRect.bottom,
+            true,
+          ),
+        );
+      }
+    },
+    [
+      calculateContextMenuPosition,
+      contextMenuId,
+      isContextMenuOpen,
+      openContextMenuId,
+      setOpenContextMenuId,
+    ],
+  );
 
   // Settings context menu items
   const contextMenuItems: ContextMenuItem[] = [
     {
       id: "edit",
-      label: t('profiles.editProfile'),
+      label: t("profiles.editProfile"),
       icon: "solar:settings-bold",
       onClick: (profile) => {
         console.log("Edit Profile clicked for:", profile.name);
@@ -121,7 +238,7 @@ export function ProfileCardV2({
     },
     {
       id: "duplicate",
-      label: t('profiles.duplicate'),
+      label: t("profiles.duplicate"),
       icon: "solar:copy-bold",
       onClick: (profile) => {
         console.log("Duplicate Profile clicked for:", profile.name);
@@ -130,67 +247,86 @@ export function ProfileCardV2({
     },
     {
       id: "export",
-      label: t('profiles.export'),
+      label: t("profiles.export"),
       icon: "solar:download-bold",
       onClick: (profile) => {
-        showModal(`export-profile-${profile.id}`, (
+        showModal(
+          `export-profile-${profile.id}`,
           <ExportProfileModal
             profile={profile}
             isOpen={true}
             onClose={() => hideModal(`export-profile-${profile.id}`)}
-          />
-        ));
+          />,
+        );
       },
     },
     {
       id: "open-folder",
-      label: t('profiles.openFolder'),
+      label: t("profiles.openFolder"),
       icon: "solar:folder-bold",
       onClick: (profile) => {
         if (onOpenFolder) {
           onOpenFolder(profile);
         } else {
-          toast.success(t('profiles.toast.opening_folder', { name: profile.name }));
+          toast.success(
+            t("profiles.toast.opening_folder", { name: profile.name }),
+          );
           console.log("Opening folder for profile:", profile.name);
         }
       },
     },
     // Show modpack versions only if modpack info exists and versions are loaded
-    ...(profile.modpack_info?.source && modpackVersions ? [{
-      id: "switch_modpack",
-      label: t('profiles.modpackVersions'),
-      icon: "solar:refresh-circle-bold",
-      onClick: (profile) => {
-        console.log("Switch modpack version for profile:", profile.name);
-        if (profile.modpack_info?.source) {
-          // Import ModpackVersionsModal dynamically to avoid circular imports
-          import("../modals/ModpackVersionsModal").then(({ ModpackVersionsModal }) => {
-            showModal(`modpack-versions-${profile.id}`, (
-              <ModpackVersionsModal
-                isOpen={true}
-                onClose={() => hideModal(`modpack-versions-${profile.id}`)}
-                versions={modpackVersions}
-                modpackName={profile.name}
-                profileId={profile.id}
-                onSwitchComplete={async () => {
-                  console.log("Modpack version switched successfully for:", profile.name);
-                  // Refresh profiles to ensure the profile prop is updated
-                  try {
-                    const { fetchProfiles } = useProfileStore.getState();
-                    await fetchProfiles();
-                  } catch (err) {
-                    console.error("Failed to refresh profiles after modpack switch:", err);
-                  }
-                }}
-              />
-            ));
-          });
-        }
-      },
-    }] : []),
+    ...(profile.modpack_info?.source && modpackVersions
+      ? [
+          {
+            id: "switch_modpack",
+            label: t("profiles.modpackVersions"),
+            icon: "solar:refresh-circle-bold",
+            onClick: (profile) => {
+              console.log("Switch modpack version for profile:", profile.name);
+              if (profile.modpack_info?.source) {
+                // Import ModpackVersionsModal dynamically to avoid circular imports
+                import("../modals/ModpackVersionsModal").then(
+                  ({ ModpackVersionsModal }) => {
+                    showModal(
+                      `modpack-versions-${profile.id}`,
+                      <ModpackVersionsModal
+                        isOpen={true}
+                        onClose={() =>
+                          hideModal(`modpack-versions-${profile.id}`)
+                        }
+                        versions={modpackVersions}
+                        modpackName={profile.name}
+                        profileId={profile.id}
+                        onSwitchComplete={async () => {
+                          console.log(
+                            "Modpack version switched successfully for:",
+                            profile.name,
+                          );
+                          // Refresh profiles to ensure the profile prop is updated
+                          try {
+                            const { fetchProfiles } =
+                              useProfileStore.getState();
+                            await fetchProfiles();
+                          } catch (err) {
+                            console.error(
+                              "Failed to refresh profiles after modpack switch:",
+                              err,
+                            );
+                          }
+                        }}
+                      />,
+                    );
+                  },
+                );
+              }
+            },
+          },
+        ]
+      : []),
     {
       id: "delete",
-      label: t('profiles.delete'),
+      label: t("profiles.delete"),
       icon: "solar:trash-bin-trash-bold",
       destructive: true,
       separator: true, // Trennstrich vor Delete
@@ -198,7 +334,9 @@ export function ProfileCardV2({
         if (onDelete) {
           onDelete(profile.id, profile.name);
         } else {
-          toast.error(t('profiles.toast.delete_fallback', { name: profile.name }));
+          toast.error(
+            t("profiles.toast.delete_fallback", { name: profile.name }),
+          );
           console.log("Deleting profile:", profile.name);
         }
       },
@@ -217,11 +355,13 @@ export function ProfileCardV2({
     skipLastPlayedUpdate: variant === "3d", // Skip for featured profiles in 3D mode
   });
 
-
-
   // Close this menu if another context menu opens globally
   useEffect(() => {
-    if (openContextMenuId && openContextMenuId !== contextMenuId && isContextMenuOpen) {
+    if (
+      openContextMenuId &&
+      openContextMenuId !== contextMenuId &&
+      isContextMenuOpen
+    ) {
       setIsContextMenuOpen(false);
     }
   }, [openContextMenuId, contextMenuId, isContextMenuOpen]);
@@ -232,7 +372,7 @@ export function ProfileCardV2({
       setIsLoadingVersions(true);
       UnifiedService.getModpackVersions(profile.modpack_info.source)
         .then(setModpackVersions)
-        .catch(err => {
+        .catch((err) => {
           console.error("Failed to load modpack versions:", err);
           setModpackVersions(null);
         })
@@ -241,10 +381,6 @@ export function ProfileCardV2({
       setModpackVersions(null);
     }
   }, [profile.modpack_info?.source]);
-
-
-
-
 
   // Fetch resolved loader version
   useEffect(() => {
@@ -264,11 +400,12 @@ export function ProfileCardV2({
     }
 
     fetchResolvedLoaderVersion();
-  }, [profile.id, profile.game_version, profile.loader, profile.loader_version]);
-
-
-
-
+  }, [
+    profile.id,
+    profile.game_version,
+    profile.loader,
+    profile.loader_version,
+  ]);
 
   // Get mod loader icon - reused from ProfileCard.tsx
   const getModLoaderIcon = () => {
@@ -354,7 +491,7 @@ export function ProfileCardV2({
 
   // Format last played date
   const formatLastPlayed = (lastPlayed: string | null): string => {
-    if (!lastPlayed) return t('profiles.card.neverPlayed');
+    if (!lastPlayed) return t("profiles.card.neverPlayed");
 
     const date = new Date(lastPlayed);
     const now = new Date();
@@ -366,26 +503,33 @@ export function ProfileCardV2({
     const diffInMonths = Math.floor(diffInDays / 30);
     const diffInYears = Math.floor(diffInDays / 365);
 
-    if (diffInMinutes < 1) return t('profiles.card.justNow');
-    if (diffInMinutes < 60) return t('profiles.card.minutesAgo', { count: diffInMinutes });
-    if (diffInHours < 24) return t('profiles.card.hoursAgo', { count: diffInHours });
-    if (diffInDays < 7) return t('profiles.card.daysAgo', { count: diffInDays });
-    if (diffInWeeks < 4) return t('profiles.card.weeksAgo', { count: diffInWeeks });
-    if (diffInMonths < 12) return t('profiles.card.monthsAgo', { count: diffInMonths });
+    if (diffInMinutes < 1) return t("profiles.card.justNow");
+    if (diffInMinutes < 60)
+      return t("profiles.card.minutesAgo", { count: diffInMinutes });
+    if (diffInHours < 24)
+      return t("profiles.card.hoursAgo", { count: diffInHours });
+    if (diffInDays < 7)
+      return t("profiles.card.daysAgo", { count: diffInDays });
+    if (diffInWeeks < 4)
+      return t("profiles.card.weeksAgo", { count: diffInWeeks });
+    if (diffInMonths < 12)
+      return t("profiles.card.monthsAgo", { count: diffInMonths });
 
-    return t('profiles.card.yearsAgo', { count: diffInYears });
+    return t("profiles.card.yearsAgo", { count: diffInYears });
   };
-
-
 
   // Action button configuration
   const actionButtons: ProfileActionButton[] = [
     {
       id: "play",
-      label: isLaunching ? t('profiles.stop').toUpperCase() : t('profiles.play').toUpperCase(),
+      label: isLaunching
+        ? t("profiles.stop").toUpperCase()
+        : t("profiles.play").toUpperCase(),
       icon: isLaunching ? "solar:stop-bold" : "solar:play-bold",
       variant: isLaunching ? "destructive" : "primary",
-      tooltip: isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying'),
+      tooltip: isLaunching
+        ? t("profiles.stopPlaying")
+        : t("profiles.startPlaying"),
       onClick: (profile, e) => {
         if (onPlay) {
           onPlay(profile);
@@ -399,12 +543,14 @@ export function ProfileCardV2({
       label: "MODS",
       icon: "solar:box-bold",
       variant: "secondary",
-      tooltip: t('profiles.manageMods'),
+      tooltip: t("profiles.manageMods"),
       onClick: (profile, e) => {
         if (onMods) {
           onMods(profile);
         } else {
-          toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
+          toast.success(
+            t("profiles.toast.managing_mods", { name: profile.name }),
+          );
           console.log("Managing mods for profile:", profile.name);
         }
       },
@@ -414,44 +560,20 @@ export function ProfileCardV2({
       label: "SETTINGS",
       icon: "solar:settings-bold",
       variant: "icon-only",
-      tooltip: t('profiles.profileOptions'),
-             onClick: (profile, e) => {
-         e.preventDefault();
-         e.stopPropagation();
-         
-         // Close any other open context menus first
-         if (openContextMenuId && openContextMenuId !== contextMenuId) {
-           setOpenContextMenuId(null);
-         }
-         
-         // Simple toggle like CustomDropdown
-         const newState = !isContextMenuOpen;
-         setIsContextMenuOpen(newState);
-         setOpenContextMenuId(newState ? contextMenuId : null);
-         
-         // Calculate position when opening
-         if (!isContextMenuOpen) {
-           const buttonRect = e.currentTarget.getBoundingClientRect();
-           const cardRect = e.currentTarget.closest('.relative')?.getBoundingClientRect();
-           
-           if (cardRect) {
-             setContextMenuPosition({
-               x: buttonRect.right - cardRect.left - 200, // Position menu to the left of the button
-               y: buttonRect.bottom - cardRect.top + 4,   // Position below the button
-             });
-           }
-         }
-       },
+      tooltip: t("profiles.profileOptions"),
+      onClick: (profile, e) => {
+        toggleContextMenuFromButton(e);
+      },
     },
   ];
 
-    // Grid layout (more compact, similar to ProfileCard.tsx)
+  // Grid layout (more compact, similar to ProfileCard.tsx)
   if (layoutMode === "grid" || layoutMode === "compact") {
     const isCompact = layoutMode === "compact";
     const iconSize = isCompact ? 16 : 20; // Smaller icons for compact mode
     const padding = isCompact ? "p-3" : "p-4"; // Less padding for compact mode
     const gap = isCompact ? "gap-2" : "gap-3"; // Smaller gaps for compact mode
-    
+
     return (
       <div
         className={`relative flex flex-col ${gap} ${padding} rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
@@ -461,7 +583,10 @@ export function ProfileCardV2({
         onClick={(e) => {
           // Don't trigger if clicking on action buttons or play overlay
           const target = e.target as Element;
-          if (e.target === e.currentTarget || (!target.closest('button') && !target.closest('.play-overlay'))) {
+          if (
+            e.target === e.currentTarget ||
+            (!target.closest("button") && !target.closest(".play-overlay"))
+          ) {
             if (variant === "3d") {
               // In 3D mode, launch the profile when clicking the card
               if (onPlay) {
@@ -474,79 +599,50 @@ export function ProfileCardV2({
               if (onMods) {
                 onMods(profile);
               } else {
-                toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
+                toast.success(
+                  t("profiles.toast.managing_mods", { name: profile.name }),
+                );
                 console.log("Managing mods for profile:", profile.name);
               }
             }
           }
         }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          if (openContextMenuId && openContextMenuId !== contextMenuId) {
-            setOpenContextMenuId(null);
-          }
-          setIsContextMenuOpen(true);
-          setOpenContextMenuId(contextMenuId);
-
-          const cardRect = e.currentTarget.getBoundingClientRect();
-          setContextMenuPosition({
-            x: e.clientX - cardRect.left,
-            y: e.clientY - cardRect.top,
-          });
-        }}
+        onContextMenu={openContextMenuAtCursor}
       >
         {/* Standard version badge */}
         {profile.is_standard_version && (
-          <div className={`absolute ${isCompact ? 'top-2 left-2' : 'top-3 left-3'} z-20`}>
+          <div
+            className={`absolute ${isCompact ? "top-2 left-2" : "top-3 left-3"} z-20`}
+          >
             <Tooltip content={<StandardVersionTooltipContent />}>
               <div className="flex items-center justify-center w-6 h-6 rounded-full ">
-                <Icon icon="solar:star-bold" className="w-4 h-4 text-yellow-400" />
+                <Icon
+                  icon="solar:star-bold"
+                  className="w-4 h-4 text-yellow-400"
+                />
               </div>
             </Tooltip>
           </div>
         )}
 
         {/* Action buttons - top right */}
-        <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
+        <div
+          className={`absolute ${isCompact ? "top-2 right-2" : "top-3 right-3"} z-20 flex flex-col gap-1`}
+        >
           {/* Settings button - hidden in 3D mode */}
           {variant === "default" && (
             <button
-            ref={settingsButtonRef}
-                         onClick={(e) => {
-               e.preventDefault();
-               e.stopPropagation();
-
-               // Close any other open context menus first
-               if (openContextMenuId && openContextMenuId !== contextMenuId) {
-                 setOpenContextMenuId(null);
-               }
-
-               // Simple toggle like CustomDropdown
-               const newState = !isContextMenuOpen;
-               setIsContextMenuOpen(newState);
-               setOpenContextMenuId(newState ? contextMenuId : null);
-
-               // Calculate position when opening
-               if (!isContextMenuOpen) {
-                 const buttonRect = e.currentTarget.getBoundingClientRect();
-                 const cardRect = e.currentTarget.closest('.relative')?.getBoundingClientRect();
-
-                 if (cardRect) {
-                   setContextMenuPosition({
-                     x: buttonRect.right - cardRect.left - 200, // Position menu to the left of the button
-                     y: buttonRect.bottom - cardRect.top + 4,   // Position below the button
-                   });
-                 }
-               }
-             }}
-            className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
-            title={t('profiles.profileOptions')}
-            data-action="settings"
-          >
-            <Icon icon="solar:settings-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
-          </button>
+              ref={settingsButtonRef}
+              onClick={toggleContextMenuFromButton}
+              className={`${isCompact ? "w-6 h-6" : "w-8 h-8"} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
+              title={t("profiles.profileOptions")}
+              data-action="settings"
+            >
+              <Icon
+                icon="solar:settings-bold"
+                className={isCompact ? "w-3 h-3" : "w-4 h-4"}
+              />
+            </button>
           )}
 
           {/* Mods button */}
@@ -561,73 +657,112 @@ export function ProfileCardV2({
                 navigate(`/profilesv2/${profile.id}`);
               }
             }}
-            className={`${variant === "3d" ? (isCompact ? 'w-auto px-2 h-6' : 'w-auto px-3 h-8') : (isCompact ? 'w-6 h-6' : 'w-8 h-8')} flex items-center justify-center gap-1 rounded transition-all duration-200 ${variant === "3d" ? "" : "bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20"}`}
-            style={variant === "3d" ? get3DButtonStyling(modsButtonHovered) : {}}
+            className={`${variant === "3d" ? (isCompact ? "w-auto px-2 h-6" : "w-auto px-3 h-8") : isCompact ? "w-6 h-6" : "w-8 h-8"} flex items-center justify-center gap-1 rounded transition-all duration-200 ${variant === "3d" ? "" : "bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20"}`}
+            style={
+              variant === "3d" ? get3DButtonStyling(modsButtonHovered) : {}
+            }
             onMouseEnter={() => setModsButtonHovered(true)}
             onMouseLeave={() => setModsButtonHovered(false)}
-            title={t('profiles.manageMods')}
+            title={t("profiles.manageMods")}
           >
-            <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
+            <Icon
+              icon="solar:box-bold"
+              className={isCompact ? "w-3 h-3" : "w-4 h-4"}
+            />
             {variant === "3d" && (
-              <span className={`font-minecraft-ten ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
+              <span
+                className={`font-minecraft-ten ${isCompact ? "text-xs" : "text-sm"} uppercase`}
+              >
+                MODS
+              </span>
             )}
           </button>
         </div>
 
         {/* Profile content */}
-        <div className={`flex items-center ${isCompact ? 'gap-3' : 'gap-4'} relative z-10 w-full`}>
-          <div className={`relative ${isCompact ? 'w-16 h-16' : 'w-20 h-20'} flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200`}
+        <div
+          className={`flex items-center ${isCompact ? "gap-3" : "gap-4"} relative z-10 w-full`}
+        >
+          <div
+            className={`relative ${isCompact ? "w-16 h-16" : "w-20 h-20"} flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200`}
             style={{
-              backgroundColor: isHovered ? `${accentColor.value}20` : 'transparent',
-              borderColor: isHovered ? `${accentColor.value}60` : 'transparent',
+              backgroundColor: isHovered
+                ? `${accentColor.value}20`
+                : "transparent",
+              borderColor: isHovered ? `${accentColor.value}60` : "transparent",
             }}
           >
-            <ProfileIconV2 profile={profile} size={isCompact ? "md" : "lg"} className="w-full h-full" />
-            
+            <ProfileIconV2
+              profile={profile}
+              size={isCompact ? "md" : "lg"}
+              className="w-full h-full"
+            />
+
             {/* Play button overlay - similar to ProfileCard.tsx */}
             {(isLaunching || isHovered) && (
               <div className="play-overlay absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-150 cursor-pointer rounded-lg">
                 <button
                   onClick={() => handleLaunch()}
-                  className={`${isCompact ? 'w-8 h-8' : 'w-12 h-12'} flex items-center justify-center text-white hover:text-white/80 transition-colors`}
+                  className={`${isCompact ? "w-8 h-8" : "w-12 h-12"} flex items-center justify-center text-white hover:text-white/80 transition-colors`}
                   disabled={false}
                 >
                   {isLaunching ? (
-                    <Icon icon="solar:stop-bold" className={isCompact ? 'w-6 h-6' : 'w-8 h-8'} />
+                    <Icon
+                      icon="solar:stop-bold"
+                      className={isCompact ? "w-6 h-6" : "w-8 h-8"}
+                    />
                   ) : (
-                    <Icon icon="solar:play-bold" className={isCompact ? 'w-6 h-6' : 'w-8 h-8'} />
+                    <Icon
+                      icon="solar:play-bold"
+                      className={isCompact ? "w-6 h-6" : "w-8 h-8"}
+                    />
                   )}
                 </button>
               </div>
             )}
           </div>
 
-          <div className={`flex-grow min-w-0 mr-auto pr-2 ${isCompact ? 'max-w-[calc(100%-64px)]' : 'max-w-[calc(100%-80px)]'}`}>
+          <div
+            className={`flex-grow min-w-0 mr-auto pr-2 ${isCompact ? "max-w-[calc(100%-64px)]" : "max-w-[calc(100%-80px)]"}`}
+          >
             <div className="flex items-center gap-2 mb-0.5">
               <h3
-                className={`font-minecraft-ten text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis normal-case`}
-                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
+                className={`font-minecraft-ten text-white ${isCompact ? "text-base" : "text-lg"} whitespace-nowrap overflow-hidden text-ellipsis normal-case`}
+                style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
                 title={profile.name}
               >
-                <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: parseMotdToHtml(profile.name),
+                  }}
+                />
               </h3>
-              
+
               {/* Preferred Account Indicator next to title */}
               {preferredAccount && (
-                <Tooltip content={t('profiles.launchWith', { username: preferredAccount.username })}>
+                <Tooltip
+                  content={t("profiles.launchWith", {
+                    username: preferredAccount.username,
+                  })}
+                >
                   <div className="flex items-center gap-1.5 text-white/60">
                     {preferredAccountAvatarUrl && (
                       <img
                         src={preferredAccountAvatarUrl}
                         alt={preferredAccount.username}
-                        className={`${isCompact ? 'w-4 h-4' : 'w-5 h-5'} rounded-sm pixelated flex-shrink-0`}
-                        style={{ imageRendering: 'pixelated' }}
+                        className={`${isCompact ? "w-4 h-4" : "w-5 h-5"} rounded-sm pixelated flex-shrink-0`}
+                        style={{ imageRendering: "pixelated" }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                          e.currentTarget.src =
+                            "https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true";
                         }}
                       />
                     )}
-                    <span className={`truncate max-w-[100px] ${isCompact ? 'text-base' : 'text-lg'} lowercase`}>{preferredAccount.username}</span>
+                    <span
+                      className={`truncate max-w-[100px] ${isCompact ? "text-base" : "text-lg"} lowercase`}
+                    >
+                      {preferredAccount.username}
+                    </span>
                   </div>
                 </Tooltip>
               )}
@@ -635,85 +770,90 @@ export function ProfileCardV2({
             {isLaunching ? (
               <div
                 className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
-                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
               >
-                {statusMessage || t('profiles.card.starting')}
+                {statusMessage || t("profiles.card.starting")}
+              </div>
+            ) : isCompact ? (
+              // Compact mode: Only MC version + last played
+              <div
+                className="flex items-center gap-1.5 text-xs font-minecraft-ten"
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+              >
+                {/* Minecraft Version */}
+                <div className="text-white/70 flex items-center gap-0.5">
+                  <img
+                    src="/icons/minecraft.png"
+                    alt="Minecraft"
+                    className="w-2.5 h-2.5 object-contain"
+                  />
+                  <span>{profile.game_version}</span>
+                </div>
+
+                <div className="w-px h-2.5 bg-white/30"></div>
+
+                {/* Last Played */}
+                <div className="text-white/50">
+                  {formatLastPlayed(profile.last_played)}
+                </div>
               </div>
             ) : (
-              isCompact ? (
-                 // Compact mode: Only MC version + last played
-                 <div className="flex items-center gap-1.5 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                   {/* Minecraft Version */}
-                   <div className="text-white/70 flex items-center gap-0.5">
-                     <img
-                       src="/icons/minecraft.png"
-                       alt="Minecraft"
-                       className="w-2.5 h-2.5 object-contain"
-                     />
-                     <span>{profile.game_version}</span>
-                   </div>
+              // Grid mode: Full info display
+              <div
+                className="flex items-center gap-2 text-xs font-minecraft-ten"
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+              >
+                {/* Minecraft Version */}
+                <div className="text-white/70 flex items-center gap-1">
+                  <img
+                    src="/icons/minecraft.png"
+                    alt="Minecraft"
+                    className="w-3 h-3 object-contain"
+                  />
+                  <span>{profile.game_version}</span>
+                </div>
 
-                   <div className="w-px h-2.5 bg-white/30"></div>
+                <div className="w-px h-3 bg-white/30"></div>
 
-                   {/* Last Played */}
-                   <div className="text-white/50">
-                     {formatLastPlayed(profile.last_played)}
-                   </div>
-                 </div>
-               ) : (
-                 // Grid mode: Full info display
-                 <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                   {/* Minecraft Version */}
-                   <div className="text-white/70 flex items-center gap-1">
-                     <img
-                       src="/icons/minecraft.png"
-                       alt="Minecraft"
-                       className="w-3 h-3 object-contain"
-                     />
-                     <span>{profile.game_version}</span>
-                   </div>
-                   
-                   <div className="w-px h-3 bg-white/30"></div>
-                   
-                   {/* Loader Version */}
-                   <div className="text-white/60 flex items-center gap-1">
-                     <img
-                       src={getModLoaderIcon()}
-                       alt={profile.loader || t('common.vanilla')}
-                       className="w-3 h-3 object-contain"
-                     />
-                     <span>
-                       {profile.loader === "vanilla" 
-                         ? "Vanilla" 
-                         : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`
-                       }
-                     </span>
-                   </div>
-                   
-                   <div className="w-px h-3 bg-white/30"></div>
-                   
-                   {/* Last Played */}
-                   <div className="text-white/50">
-                     {formatLastPlayed(profile.last_played)}
-                   </div>
-                 </div>
-               )
+                {/* Loader Version */}
+                <div className="text-white/60 flex items-center gap-1">
+                  <img
+                    src={getModLoaderIcon()}
+                    alt={profile.loader || t("common.vanilla")}
+                    className="w-3 h-3 object-contain"
+                  />
+                  <span>
+                    {profile.loader === "vanilla"
+                      ? "Vanilla"
+                      : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`}
+                  </span>
+                </div>
+
+                <div className="w-px h-3 bg-white/30"></div>
+
+                {/* Last Played */}
+                <div className="text-white/50">
+                  {formatLastPlayed(profile.last_played)}
+                </div>
+              </div>
             )}
           </div>
         </div>
 
         {/* Settings Context Menu */}
-                 <SettingsContextMenu
-           profile={profile}
-           isOpen={isContextMenuOpen}
-           position={contextMenuPosition}
-           items={contextMenuItems}
-           onClose={() => {
-             setIsContextMenuOpen(false);
-             setOpenContextMenuId(null);
-           }}
-           triggerButtonRef={settingsButtonRef}
-         />
+        <SettingsContextMenu
+          profile={profile}
+          isOpen={isContextMenuOpen}
+          position={contextMenuPosition}
+          items={contextMenuItems}
+          positionMode="fixed"
+          closeOnScroll={true}
+          onClose={() => {
+            setIsContextMenuOpen(false);
+            setOpenContextMenuId(null);
+          }}
+          triggerButtonRef={settingsButtonRef}
+        />
       </div>
     );
   }
@@ -728,7 +868,7 @@ export function ProfileCardV2({
       onClick={(e) => {
         // Don't trigger if clicking on action buttons
         const target = e.target as Element;
-        if (e.target === e.currentTarget || !target.closest('button')) {
+        if (e.target === e.currentTarget || !target.closest("button")) {
           if (variant === "3d") {
             // In 3D mode, launch the profile when clicking the card
             if (onPlay) {
@@ -741,28 +881,15 @@ export function ProfileCardV2({
             if (onMods) {
               onMods(profile);
             } else {
-              toast.success(t('profiles.toast.managing_mods', { name: profile.name }));
+              toast.success(
+                t("profiles.toast.managing_mods", { name: profile.name }),
+              );
               console.log("Managing mods for profile:", profile.name);
             }
           }
         }
       }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (openContextMenuId && openContextMenuId !== contextMenuId) {
-          setOpenContextMenuId(null);
-        }
-        setIsContextMenuOpen(true);
-        setOpenContextMenuId(contextMenuId);
-
-        const cardRect = e.currentTarget.getBoundingClientRect();
-        setContextMenuPosition({
-          x: e.clientX - cardRect.left,
-          y: e.clientY - cardRect.top,
-        });
-      }}
+      onContextMenu={openContextMenuAtCursor}
     >
       {/* Profile Icon */}
       <div className="relative">
@@ -771,7 +898,10 @@ export function ProfileCardV2({
           <div className="absolute -top-1 -right-1 z-10">
             <Tooltip content={<StandardVersionTooltipContent />}>
               <div className="flex items-center justify-center w-6 h-6 rounded-full ">
-                <Icon icon="solar:star-bold" className="w-4 h-4 text-yellow-400" />
+                <Icon
+                  icon="solar:star-bold"
+                  className="w-4 h-4 text-yellow-400"
+                />
               </div>
             </Tooltip>
           </div>
@@ -783,76 +913,89 @@ export function ProfileCardV2({
         <div className="flex items-center gap-2 mb-1">
           <h3
             className="text-white font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case"
-            style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
+            style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
             title={profile.name}
           >
-            <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+            <span
+              dangerouslySetInnerHTML={{
+                __html: parseMotdToHtml(profile.name),
+              }}
+            />
           </h3>
-          
+
           {/* Preferred Account Indicator next to title */}
           {preferredAccount && (
-            <Tooltip content={t('profiles.launchWith', { username: preferredAccount.username })}>
+            <Tooltip
+              content={t("profiles.launchWith", {
+                username: preferredAccount.username,
+              })}
+            >
               <div className="flex items-center gap-1.5 text-white/60">
                 {preferredAccountAvatarUrl && (
                   <img
                     src={preferredAccountAvatarUrl}
                     alt={preferredAccount.username}
                     className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
-                    style={{ imageRendering: 'pixelated' }}
+                    style={{ imageRendering: "pixelated" }}
                     onError={(e) => {
-                      e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                      e.currentTarget.src =
+                        "https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true";
                     }}
                   />
                 )}
-                <span className="truncate max-w-[100px] text-lg lowercase">{preferredAccount.username}</span>
+                <span className="truncate max-w-[100px] text-lg lowercase">
+                  {preferredAccount.username}
+                </span>
               </div>
             </Tooltip>
           )}
         </div>
-        
+
         {isLaunching ? (
           <div
             className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
-            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
           >
-            {statusMessage || t('profiles.card.starting')}
+            {statusMessage || t("profiles.card.starting")}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-          {/* Minecraft Version */}
-          <div className="text-white/70 flex items-center gap-1">
-            <img
-              src="/icons/minecraft.png"
-              alt="Minecraft"
-              className="w-3 h-3 object-contain"
-            />
-            <span>{profile.game_version}</span>
+          <div
+            className="flex items-center gap-2 text-xs font-minecraft-ten"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+          >
+            {/* Minecraft Version */}
+            <div className="text-white/70 flex items-center gap-1">
+              <img
+                src="/icons/minecraft.png"
+                alt="Minecraft"
+                className="w-3 h-3 object-contain"
+              />
+              <span>{profile.game_version}</span>
+            </div>
+
+            <div className="w-px h-3 bg-white/30"></div>
+
+            {/* Loader Version */}
+            <div className="text-white/60 flex items-center gap-1">
+              <img
+                src={getModLoaderIcon()}
+                alt={profile.loader || t("common.vanilla")}
+                className="w-3 h-3 object-contain"
+              />
+              <span>
+                {profile.loader === "vanilla"
+                  ? t("common.vanilla")
+                  : `${resolvedLoaderVersion?.version || profile.loader_version || t("common.unknown")}`}
+              </span>
+            </div>
+
+            <div className="w-px h-3 bg-white/30"></div>
+
+            {/* Last Played */}
+            <div className="text-white/50">
+              {formatLastPlayed(profile.last_played)}
+            </div>
           </div>
-          
-          <div className="w-px h-3 bg-white/30"></div>
-          
-          {/* Loader Version */}
-          <div className="text-white/60 flex items-center gap-1">
-            <img
-              src={getModLoaderIcon()}
-              alt={profile.loader || t('common.vanilla')}
-              className="w-3 h-3 object-contain"
-            />
-            <span>
-              {profile.loader === "vanilla"
-                ? t('common.vanilla')
-                : `${resolvedLoaderVersion?.version || profile.loader_version || t('common.unknown')}`
-              }
-            </span>
-          </div>
-          
-          <div className="w-px h-3 bg-white/30"></div>
-          
-          {/* Last Played */}
-          <div className="text-white/50">
-            {formatLastPlayed(profile.last_played)}
-          </div>
-        </div>
         )}
       </div>
 
@@ -864,20 +1007,20 @@ export function ProfileCardV2({
         flexSpacerAfterIndex={1}
       />
 
-             {/* Settings Context Menu */}
-       <SettingsContextMenu
-         profile={profile}
-         isOpen={isContextMenuOpen}
-         position={contextMenuPosition}
-         items={contextMenuItems}
-         onClose={() => {
-           setIsContextMenuOpen(false);
-           setOpenContextMenuId(null);
-         }}
-         triggerButtonRef={undefined} // List layout doesn't have direct button ref
-       />
-
-
+      {/* Settings Context Menu */}
+      <SettingsContextMenu
+        profile={profile}
+        isOpen={isContextMenuOpen}
+        position={contextMenuPosition}
+        items={contextMenuItems}
+        positionMode="fixed"
+        closeOnScroll={true}
+        onClose={() => {
+          setIsContextMenuOpen(false);
+          setOpenContextMenuId(null);
+        }}
+        triggerButtonRef={undefined} // List layout doesn't have direct button ref
+      />
     </div>
   );
 }
