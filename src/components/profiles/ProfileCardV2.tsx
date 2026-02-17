@@ -193,7 +193,7 @@ export function ProfileCardV2({
   );
 
   const toggleContextMenuFromButton = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
+    (e: React.MouseEvent<Element>) => {
       e.preventDefault();
       e.stopPropagation();
 

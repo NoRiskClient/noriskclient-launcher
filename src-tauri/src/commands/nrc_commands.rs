@@ -1,4 +1,5 @@
 use crate::error::{AppError, CommandError};
+use crate::logging;
 use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward, UserNotification};
 use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
 use crate::minecraft::auth::minecraft_auth::Credentials;
@@ -19,6 +20,19 @@ use crate::utils::updater_utils;
 pub async fn get_news_and_changelogs_command() -> Result<Vec<BlogPost>, CommandError> {
     debug!("Executing get_news_and_changelogs_command");
     Ok(WordPressApi::get_news_and_changelogs().await?)
+}
+
+#[tauri::command]
+pub async fn dump_debug_logs_command(reason: Option<String>) -> Result<String, CommandError> {
+    let dump_reason = reason
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "manual_hotkey".to_string());
+
+    let path = logging::dump_debug_buffer_to_file(&format!("manual: {}", dump_reason))
+        .map_err(|e| AppError::Other(format!("Failed to dump debug logs: {}", e)))?;
+
+    info!("Debug ring buffer dumped to: {}", path.display());
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

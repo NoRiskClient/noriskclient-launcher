@@ -116,7 +116,7 @@ use commands::vanilla_cape_command::{
 use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command, get_advent_calendar_command, claim_advent_calendar_day_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command, get_advent_calendar_command, claim_advent_calendar_day_command, dump_debug_logs_command};
 
 // Import Content commands
 use commands::content_command::{
@@ -146,6 +146,15 @@ async fn main() {
     if let Err(e) = logging::setup_logging().await {
         eprintln!("FEHLER: Logging konnte nicht initialisiert werden: {}", e);
     }
+
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let reason = format!("panic: {}", panic_info);
+        if let Err(e) = logging::dump_debug_buffer_to_file(&reason) {
+            eprintln!("[Panic Hook] Failed to dump debug ring buffer: {}", e);
+        }
+        default_panic_hook(panic_info);
+    }));
 
     info!("Starting NoRiskClient Launcher...");
 
@@ -626,6 +635,7 @@ async fn main() {
             commands::nrc_commands::github_auth_unlink,
             commands::nrc_commands::submit_crash_log_command,
             commands::nrc_commands::log_message_command,
+            dump_debug_logs_command,
             commands::flagsmith_commands::set_blocked_mods_config,
             commands::flagsmith_commands::get_blocked_mods_config,
             commands::flagsmith_commands::is_filename_blocked,

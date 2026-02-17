@@ -3,6 +3,7 @@ pub mod config;
 pub mod error;
 pub mod friends;
 pub mod integrations;
+pub mod logging;
 pub mod minecraft;
 pub mod state;
 pub mod utils;

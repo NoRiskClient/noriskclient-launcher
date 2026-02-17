@@ -164,7 +164,7 @@ impl State {
     // Get the current state instance
     pub async fn get() -> Result<Arc<Self>> {
         if !LAUNCHER_STATE.initialized() {
-            log::error!("Attempted to get state before initialization. Waiting...");
+            log::debug!("Attempted to get state before initialization. Waiting...");
             let mut wait_count = 0;
             while !LAUNCHER_STATE.initialized() {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;

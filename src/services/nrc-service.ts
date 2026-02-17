@@ -264,6 +264,13 @@ export const markNotificationRead = (notificationId: string): Promise<void> => {
   return invoke('mark_notification_read', { notificationId });
 };
 
+/**
+ * Dumps the in-memory debug log ring buffer to a debug file and returns the file path.
+ */
+export const dumpDebugLogs = (reason?: string): Promise<string> => {
+  return invoke('dump_debug_logs_command', { reason });
+};
+
 
 // Re-export logging utilities for backward compatibility
 export { log as logMessage, logDebug as logMessageDebug, logInfo as logMessageInfo, logWarn as logMessageWarn, logError as logMessageError } from '../utils/logging-utils';

@@ -25,7 +25,7 @@ import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
 import { useGlobalModal } from "./hooks/useGlobalModal";
 import { Modal } from "./components/ui/Modal";
-import { refreshNrcDataOnMount } from "./services/nrc-service";
+import { dumpDebugLogs, refreshNrcDataOnMount } from "./services/nrc-service";
 import {
   getLauncherConfig,
   setProfileGroupingPreference,
@@ -174,6 +174,41 @@ export function App() {
   useEffect(() => {
     refreshNrcDataOnMount();
   }, []);
+
+  useEffect(() => {
+    const handleDebugDumpHotkey = async (event: KeyboardEvent) => {
+      const isCtrlOrCmdPressed = event.ctrlKey || event.metaKey;
+      const isShiftPressed = event.shiftKey;
+      const isD = event.key.toLowerCase() === "d";
+
+      if (!isCtrlOrCmdPressed || !isShiftPressed || !isD || event.repeat) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (isTypingTarget) {
+        return;
+      }
+
+      event.preventDefault();
+      try {
+        const path = await dumpDebugLogs("hotkey_ctrl_shift_d");
+        toast.success(`Debug dump saved: ${path}`);
+      } catch (error) {
+        console.error("[App.tsx] Failed to dump debug logs via hotkey:", error);
+        toast.error(t("app.errors.unexpected"));
+      }
+    };
+
+    window.addEventListener("keydown", handleDebugDumpHotkey);
+    return () => {
+      window.removeEventListener("keydown", handleDebugDumpHotkey);
+    };
+  }, [t]);
 
   // Fetch notifications when user is logged in
   useEffect(() => {
