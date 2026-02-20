@@ -174,8 +174,6 @@ export function JavaSettingsTab({
       getGlobalMemorySettings()
         .then((settings) => {
           setGlobalMemorySettingsState(settings);
-          // Synchronize tempRamMb with global settings for standard profiles
-          setTempRamMb(settings.max);
         })
         .catch((error) => {
           console.error("Failed to load global memory settings:", error);
@@ -283,32 +281,25 @@ export function JavaSettingsTab({
     ? (globalMemorySettings || { min: 1024, max: recommendedMaxRam })
     : (editedProfile.settings?.memory || { min: 1024, max: recommendedMaxRam });
 
-  const handleMemoryChange = async (value: number) => {
+  const handleMemoryChange = (value: number) => {
     if (editedProfile.is_standard_version) {
-      // For standard profiles, save to global settings
-      const newGlobalSettings: MemorySettings = {
+      // For standard profiles, only update local UI state.
+      // Persisting happens in ProfileSettings handleSave.
+      setGlobalMemorySettingsState({
         min: memory.min,
         max: value,
-      };
-      
-      try {
-        await setGlobalMemorySettings(newGlobalSettings);
-        setGlobalMemorySettingsState(newGlobalSettings);
-      } catch (error) {
-        console.error("Failed to save global memory settings:", error);
-        toast.error(t('java.save_ram_failed'));
-      }
+      });
     } else {
-      // For custom profiles, save to profile settings
-      const newSettings = { ...editedProfile.settings };
-      if (!newSettings.memory) {
-        newSettings.memory = {
-          min: 1024,
+      // For non-standard profiles, keep memory as draft only.
+      // Persisting happens in ProfileSettings handleSave.
+      const currentMin = editedProfile.settings?.memory?.min ?? 1024;
+      const newSettings = {
+        ...editedProfile.settings,
+        memory: {
+          min: currentMin,
           max: value,
-        };
-      } else {
-        newSettings.memory.max = value;
-      }
+        },
+      };
       updateProfile({ settings: newSettings });
     }
   };
@@ -442,10 +433,7 @@ export function JavaSettingsTab({
                   value={tempRamMb}
                   onChange={(value) => {
                     setTempRamMb(value);
-                    // For standard profiles, save to global settings immediately
-                    if (editedProfile.is_standard_version) {
-                      handleMemoryChange(value);
-                    }
+                    handleMemoryChange(value);
                   }}
                   min={512}
                   max={systemRam}

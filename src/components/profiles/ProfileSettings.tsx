@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { gsap } from "gsap";
 import type { Profile } from "../../types/profile";
@@ -21,6 +21,7 @@ import { useFlags } from 'flagsmith/react';
 import { useTranslation } from "react-i18next";
 import { DesignerSettingsTab } from './settings/DesignerSettingsTab';
 import { cn } from "../../lib/utils";
+import { getGlobalMemorySettings, setGlobalMemorySettings } from "../../services/launcher-config-service";
 
 interface ProfileSettingsProps {
   profile: Profile;
@@ -38,12 +39,29 @@ type SettingsTab =
 
 const DESIGNER_FEATURE_FLAG_NAME = "show_keep_local_assets";
 
+function normalizeForCompare(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeForCompare);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, normalizeForCompare(v)] as const)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
 export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const { t } = useTranslation();
   const { updateProfile, deleteProfile } = useProfileStore();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [editedProfile, setEditedProfile] = useState<Profile>({ ...profile });
   const [currentProfile, setCurrentProfile] = useState<Profile>({ ...profile });
+  const [baselineProfile, setBaselineProfile] = useState<Profile>({ ...profile });
+  const [baselineRamMb, setBaselineRamMb] = useState(profile.settings?.memory?.max ?? 3072);
+  const [isBaselineReady, setIsBaselineReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [systemRam, setSystemRam] = useState<number>(8192);
@@ -88,18 +106,62 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   }, [isBackgroundAnimationEnabled]);
 
   useEffect(() => {
-    setTempRamMb(profile.settings?.memory?.max ?? 3072);
+    let isMounted = true;
+    const initialRamMb = profile.settings?.memory?.max ?? 3072;
+    setEditedProfile({ ...profile });
+    setCurrentProfile({ ...profile });
+    setBaselineProfile({ ...profile });
+    setIsBaselineReady(false);
+
+    const initializeMemoryBaseline = async () => {
+      if (profile.is_standard_version) {
+        try {
+          const globalMemory = await getGlobalMemorySettings();
+          if (!isMounted) return;
+          setBaselineRamMb(globalMemory.max);
+          setTempRamMb(globalMemory.max);
+        } catch {
+          if (!isMounted) return;
+          setBaselineRamMb(initialRamMb);
+          setTempRamMb(initialRamMb);
+        }
+      } else {
+        setBaselineRamMb(initialRamMb);
+        setTempRamMb(initialRamMb);
+      }
+      if (isMounted) {
+        setIsBaselineReady(true);
+      }
+    };
+
+    initializeMemoryBaseline();
+
+    return () => {
+      isMounted = false;
+    };
   }, [profile]);
 
   const updateProfileData = (updates: Partial<Profile>) => {
     setEditedProfile((prev) => ({ ...prev, ...updates }));
   };
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!isBaselineReady) return false;
+    const profileChanged =
+      JSON.stringify(normalizeForCompare(editedProfile)) !==
+      JSON.stringify(normalizeForCompare(baselineProfile));
+    const memoryChanged = tempRamMb !== baselineRamMb;
+    return profileChanged || memoryChanged;
+  }, [editedProfile, baselineProfile, tempRamMb, baselineRamMb, isBaselineReady]);
+
   const handleRefresh = async () => {
     try {
       const updatedProfile = await ProfileService.getProfile(profile.id);
       setCurrentProfile(updatedProfile);
       setEditedProfile(updatedProfile);
+      setBaselineProfile(updatedProfile);
+      setBaselineRamMb(updatedProfile.settings?.memory?.max ?? 3072);
+      setTempRamMb(updatedProfile.settings?.memory?.max ?? 3072);
       
       // Update the global store as well to sync with ProfilesTab
       useProfileStore.getState().refreshSingleProfileInStore(updatedProfile);
@@ -114,41 +176,70 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await updateProfile(profile.id, {
-        name: editedProfile.name,
-        game_version: editedProfile.game_version,
-        loader: editedProfile.loader,
-        loader_version: editedProfile.loader_version || null || undefined,
-        settings: {
-          ...editedProfile.settings,
-          // Only save memory settings for custom profiles
-          // Standard profiles save memory to global settings directly via JavaSettingsTab
-          ...(profile.is_standard_version ? {} : {
-            memory: {
-              ...editedProfile.settings?.memory,
-              max: tempRamMb,
-            },
-          }),
-        },
-        selected_norisk_pack_id: editedProfile.selected_norisk_pack_id,
-        clear_selected_norisk_pack: !editedProfile.selected_norisk_pack_id,
-        group: editedProfile.group,
-        clear_group: !editedProfile.group,
-        description: editedProfile.description,
-        norisk_information: editedProfile.norisk_information,
-        use_shared_minecraft_folder: editedProfile.use_shared_minecraft_folder,
-        preferred_account_id: editedProfile.preferred_account_id,
-        clear_preferred_account: !editedProfile.preferred_account_id,
-      });
+
+      const profileChanged =
+        JSON.stringify(normalizeForCompare(editedProfile)) !==
+        JSON.stringify(normalizeForCompare(baselineProfile));
+      const globalMemoryChanged =
+        profile.is_standard_version && tempRamMb !== baselineRamMb;
+      const profileMemoryChanged =
+        !profile.is_standard_version && tempRamMb !== baselineRamMb;
+      const shouldPersistProfile = profileChanged || profileMemoryChanged;
+
+      if (globalMemoryChanged) {
+        const currentGlobalMemory = await getGlobalMemorySettings();
+        await setGlobalMemorySettings({
+          min: Math.min(currentGlobalMemory.min, tempRamMb),
+          max: tempRamMb,
+        });
+      }
+
+      if (shouldPersistProfile) {
+        await updateProfile(profile.id, {
+          name: editedProfile.name,
+          game_version: editedProfile.game_version,
+          loader: editedProfile.loader,
+          loader_version: editedProfile.loader_version || null || undefined,
+          settings: {
+            ...editedProfile.settings,
+            // Only save memory settings for custom profiles
+            // Standard profiles save memory to global settings in this handler
+            ...(profile.is_standard_version ? {} : {
+              memory: {
+                ...editedProfile.settings?.memory,
+                max: tempRamMb,
+              },
+            }),
+          },
+          selected_norisk_pack_id: editedProfile.selected_norisk_pack_id,
+          clear_selected_norisk_pack: !editedProfile.selected_norisk_pack_id,
+          group: editedProfile.group,
+          clear_group: !editedProfile.group,
+          description: editedProfile.description,
+          norisk_information: editedProfile.norisk_information,
+          use_shared_minecraft_folder: editedProfile.use_shared_minecraft_folder,
+          preferred_account_id: editedProfile.preferred_account_id,
+          clear_preferred_account: !editedProfile.preferred_account_id,
+        });
+      }
 
       toast.success(t('profiles.settings.saveSuccess'));
       setRefreshTrigger(prev => prev + 1);
+      setBaselineProfile({ ...editedProfile });
+      setBaselineRamMb(tempRamMb);
     } catch (err) {
       console.error("Failed to save profile:", err);
       toast.error(t('profiles.settings.saveError'));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    setEditedProfile({ ...baselineProfile });
+    setCurrentProfile({ ...baselineProfile });
+    setTempRamMb(baselineRamMb);
+    onClose();
   };
 
   const handleDelete = async () => {
@@ -276,14 +367,22 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   const renderFooter = () => (
     <div className="flex justify-between">
-      <Button
-        variant="secondary"
-        onClick={onClose}
-        size="md"
-        className="text-2xl"
-      >
-        {t('profiles.settings.cancel')}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="secondary"
+          onClick={handleCancel}
+          size="md"
+          className="text-2xl"
+        >
+          {t('profiles.settings.cancel')}
+        </Button>
+        {hasUnsavedChanges && (
+          <div className="flex items-center gap-2 text-amber-300 text-xs font-minecraft-ten tracking-wide">
+            <Icon icon="solar:danger-triangle-bold" className="w-4 h-4" />
+            <span>Unsaved changes</span>
+          </div>
+        )}
+      </div>
       <Button
         variant="default"
         onClick={handleSave}
@@ -325,7 +424,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   return (
     <Modal
       title={t('profiles.settings.title', { name: profile.name })}
-      onClose={onClose}
+      onClose={handleCancel}
       width="xl"
       footer={renderFooter()}
       className="h-[650px] min-h-[550px] flex flex-col"
