@@ -7,6 +7,8 @@ export enum LaunchState {
   ERROR = "error",
 }
 
+const MAX_PROFILE_LAUNCH_LOG_ENTRIES = 200;
+
 interface ProfileLaunchState {
   launchState: LaunchState;
   currentStep: string;
@@ -122,7 +124,7 @@ export const useLaunchStateStore = create<LaunchStateStore>((set, get) => ({
       const currentProfile = state.profiles[profileId] || {
         ...DEFAULT_PROFILE_STATE,
       };
-      const updatedLogHistory = [...currentProfile.logHistory, log];
+      const updatedLogHistory = [...currentProfile.logHistory, log].slice(-MAX_PROFILE_LAUNCH_LOG_ENTRIES);
 
       return {
         ...state,

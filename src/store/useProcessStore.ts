@@ -28,6 +28,11 @@ export interface ProcessMetrics {
   timestamp: Date;
 }
 
+const MAX_PROCESS_LOG_ENTRIES = 10000;
+const MAX_LAUNCHER_LOG_ENTRIES = 300;
+const MAX_STOPPED_PROCESSES = 8;
+const METRICS_RETENTION_MS = 10 * 60 * 1000;
+
 interface ProcessStore {
   // State
   processes: ProcessMetadata[];
@@ -268,10 +273,27 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       // (it will be kept in stoppedProcesses instead)
       const newProcesses = state.processes.filter(p => p.id !== processId);
 
+      const newLogs = new Map(state.logs);
+      const newParserStates = new Map(state.parserStates);
+      const newMetrics = new Map(state.metrics);
+
+      while (newStoppedProcesses.size > MAX_STOPPED_PROCESSES) {
+        const oldestStoppedProcessId = newStoppedProcesses.keys().next().value as string | undefined;
+        if (!oldestStoppedProcessId) break;
+        newStoppedProcesses.delete(oldestStoppedProcessId);
+        newProcessEndTimes.delete(oldestStoppedProcessId);
+        newLogs.delete(oldestStoppedProcessId);
+        newParserStates.delete(oldestStoppedProcessId);
+        newMetrics.delete(oldestStoppedProcessId);
+      }
+
       return {
         stoppedProcesses: newStoppedProcesses,
         processEndTimes: newProcessEndTimes,
         processes: newProcesses,
+        logs: newLogs,
+        parserStates: newParserStates,
+        metrics: newMetrics,
       };
     });
   },
@@ -329,8 +351,8 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
 
       newParserStates.set(processId, parserState);
 
-      // Limit to last 10000 entries to prevent memory issues
-      const updatedLogs = [...processLogs, entry].slice(-10000);
+      // Limit to last N entries to prevent memory issues
+      const updatedLogs = [...processLogs, entry].slice(-MAX_PROCESS_LOG_ENTRIES);
       newLogs.set(processId, updatedLogs);
 
       return { logs: newLogs, parserStates: newParserStates };
@@ -400,7 +422,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         }
 
         newParserStates.set(processId, parserState);
-        const updatedLogs = [...processLogs, ...newEntries].slice(-10000);
+        const updatedLogs = [...processLogs, ...newEntries].slice(-MAX_PROCESS_LOG_ENTRIES);
         newLogs.set(processId, updatedLogs);
       }
 
@@ -467,8 +489,8 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         });
       }
 
-      // Limit to last 10000 entries to prevent memory issues
-      newLogs.set(processId, entries.slice(-10000));
+      // Limit to last N entries to prevent memory issues
+      newLogs.set(processId, entries.slice(-MAX_PROCESS_LOG_ENTRIES));
       newParserStates.set(processId, parserState);
 
       return { logs: newLogs, parserStates: newParserStates };
@@ -510,7 +532,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         raw: `[Launcher] ${message}`,
       };
 
-      newLauncherLogs.set(profileId, [...profileLogs, entry]);
+      newLauncherLogs.set(profileId, [...profileLogs, entry].slice(-MAX_LAUNCHER_LOG_ENTRIES));
       return { launcherLogs: newLauncherLogs };
     });
   },
@@ -532,6 +554,22 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     set((state) => {
       const newMetrics = new Map(state.metrics);
       newMetrics.set(processId, metrics);
+
+      const now = Date.now();
+      const retainedProcessIds = new Set<string>([
+        ...state.processes.map((process) => process.id),
+        ...state.stoppedProcesses.keys(),
+        processId,
+      ]);
+
+      for (const [id, metric] of newMetrics) {
+        const metricTimestamp = metric.timestamp.getTime();
+        const isExpired = Number.isFinite(metricTimestamp) && now - metricTimestamp > METRICS_RETENTION_MS;
+        if (!retainedProcessIds.has(id) || isExpired) {
+          newMetrics.delete(id);
+        }
+      }
+
       return { metrics: newMetrics };
     });
   },

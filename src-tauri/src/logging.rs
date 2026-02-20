@@ -26,6 +26,7 @@ const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} | {h({l}):5.5} | {m}{n}"; // Sl
 const LOG_FILE_SIZE_LIMIT_BYTES: u64 = 4_800_000; // ~4.8MB to fit Discord's 8MB upload limit
 const LOG_FILE_BACKUP_COUNT: u32 = 10;
 const DEBUG_RING_BUFFER_MAX_BYTES: usize = LOG_FILE_SIZE_LIMIT_BYTES as usize;
+const DEBUG_RING_BUFFER_MAX_LINE_BYTES: usize = 16 * 1024; // 16 KB per entry
 
 #[derive(Debug, Default)]
 struct DebugRingBufferState {
@@ -49,8 +50,9 @@ impl DebugRingBufferAppender {
     }
 
     fn push_line(&self, line: String) {
+        let normalized_line = truncate_line_to_limit(&line, DEBUG_RING_BUFFER_MAX_LINE_BYTES);
         if let Ok(mut state) = DEBUG_RING_BUFFER.lock() {
-            let line_bytes = line.as_bytes().len();
+            let line_bytes = normalized_line.as_bytes().len();
 
             while state.bytes + line_bytes > DEBUG_RING_BUFFER_MAX_BYTES {
                 match state.lines.pop_front() {
@@ -62,9 +64,31 @@ impl DebugRingBufferAppender {
             }
 
             state.bytes += line_bytes;
-            state.lines.push_back(line);
+            state.lines.push_back(normalized_line);
         }
     }
+}
+
+fn truncate_line_to_limit(line: &str, max_bytes: usize) -> String {
+    if line.as_bytes().len() <= max_bytes {
+        return line.to_string();
+    }
+
+    const SUFFIX: &str = " ... [truncated]\n";
+    let suffix_bytes = SUFFIX.as_bytes().len();
+    if max_bytes <= suffix_bytes {
+        return SUFFIX[..max_bytes].to_string();
+    }
+
+    let mut end = max_bytes - suffix_bytes;
+    while end > 0 && !line.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    let mut truncated = String::with_capacity(max_bytes);
+    truncated.push_str(&line[..end]);
+    truncated.push_str(SUFFIX);
+    truncated
 }
 
 impl log::Log for DebugRingBufferAppender {
@@ -131,6 +155,11 @@ pub fn dump_debug_buffer_to_file(
         "# Buffered Bytes: {} (max {})",
         current_buffer_bytes,
         DEBUG_RING_BUFFER_MAX_BYTES
+    )?;
+    writeln!(
+        file,
+        "# Max Line Bytes: {}",
+        DEBUG_RING_BUFFER_MAX_LINE_BYTES
     )?;
     writeln!(file)?;
 
