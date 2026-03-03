@@ -19,6 +19,11 @@
     },
     "singleInstance": {
       "active": true
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["norisk"]
+      }
     }
   },
   "app": {

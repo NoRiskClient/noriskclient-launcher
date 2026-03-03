@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Listener;
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 use utils::debug_utils;
 use utils::updater_utils;
 
@@ -201,6 +202,7 @@ async fn main() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
@@ -298,6 +300,37 @@ async fn main() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // --- Deep Link Setup ---
+            // Register deep link schemes (needed for dev mode on Windows/Linux)
+            if let Err(e) = app.deep_link().register_all() {
+                error!("Failed to register deep link schemes: {}", e);
+            } else {
+                info!("Deep link schemes registered successfully.");
+            }
+
+            // Handle deep links received while app is running
+            let deep_link_app_handle = app_handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                let handle = deep_link_app_handle.clone();
+                let urls = event.urls();
+                info!("Deep link received: {:?}", urls);
+                tauri::async_runtime::spawn(async move {
+                    utils::deep_link_utils::handle_deep_link(&handle, urls).await;
+                });
+            });
+
+            // Handle cold-start deep links (app was launched via deep link)
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                info!("Cold-start deep link detected: {:?}", urls);
+                let cold_start_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Small delay to ensure state initialization has started
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                    utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
+                });
+            }
+            // --- End Deep Link Setup ---
 
             // --- Handle .noriskpack file opening on initial startup (all platforms) ---
             // The single-instance plugin does not handle the *very first* launch with arguments.
@@ -684,6 +717,7 @@ async fn main() {
             send_typing_indicator,
             add_message_reaction,
             remove_message_reaction,
+            commands::deep_link_handler::confirm_auth_bridge,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

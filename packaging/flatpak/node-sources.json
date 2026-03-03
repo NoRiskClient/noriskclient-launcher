@@ -3338,6 +3338,13 @@
     },
     {
         "type": "file",
+        "url": "https://registry.yarnpkg.com/@tauri-apps/api/-/api-2.10.1.tgz#57c1bae6114ec33d977eb2b50dfefc25fa84fc93",
+        "sha512": "84a2ff8d67f6f77503494374f6b47af61ad3a3221705bf028c66960bb81f8a7be742b055be72ebd3c15e162dfc831b6e80057255c4dae7f143fd79e46f5b2207",
+        "dest-filename": "@tauri-apps-api-2.10.1.tgz",
+        "dest": "flatpak-node/yarn-mirror"
+    },
+    {
+        "type": "file",
         "url": "https://registry.yarnpkg.com/@tauri-apps/cli-darwin-arm64/-/cli-darwin-arm64-2.5.0.tgz#930ce605d5624e6a11ed9f57f17c605a4443a3f5",
         "sha512": "56e54079316af3a75fa6804335801db5054b6cfd3ed842821c822191ac637a83c0451d2c2e9147cf6cecd0f70553be9ef8a01ac6d12d00901718d51cf04d4fcd",
         "dest-filename": "@tauri-apps-cli-darwin-arm64-2.5.0.tgz",
@@ -3404,6 +3411,13 @@
         "url": "https://registry.yarnpkg.com/@tauri-apps/cli-win32-ia32-msvc/-/cli-win32-ia32-msvc-2.5.0.tgz#288fe9c6c5bb3ff94ac0a6c1d23985bf453eb873",
         "sha512": "100aefd4869196881d2c04321a52a612a66a9b945f1c250c849a1e756bbb1ad75b38c51f480cfa14c5f66e81353ed12634ee009fe835f3c7e52de544aebc442a",
         "dest-filename": "@tauri-apps-cli-win32-ia32-msvc-2.5.0.tgz",
+        "dest": "flatpak-node/yarn-mirror"
+    },
+    {
+        "type": "file",
+        "url": "https://registry.yarnpkg.com/@tauri-apps/plugin-deep-link/-/plugin-deep-link-2.4.7.tgz#6d5b60e11d1bc668ed0116a45afb7d54f2fd6226",
+        "sha512": "2b415094b33a06857b5acdb17e487e4e7c22e55655764238570ff70062d27f45efbb6cbce80301cddf70fd2a732a1c3d6a2d81e844bc762fcea060c213190ece",
+        "dest-filename": "@tauri-apps-plugin-deep-link-2.4.7.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {

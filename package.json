@@ -16,6 +16,7 @@
     "@react-three/fiber": "8.13.7",
     "@sfirew/minecraft-motd-parser": "^1.1.4",
     "@tauri-apps/plugin-clipboard-manager": "^2.2.2",
+    "@tauri-apps/plugin-deep-link": "^2.4.7",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-fs": "~2",
     "@tauri-apps/plugin-opener": "^2.2.6",

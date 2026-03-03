@@ -1665,5 +1665,12 @@
   "nrc.repair_title": "Profil reparieren",
   "nrc.repair_description": "Repariert die Profilinstallation durch Herunterladen fehlender oder beschädigter Dateien.",
   "nrc.repairing": "Repariere...",
-  "nrc.repair": "Reparieren"
+  "nrc.repair": "Reparieren",
+
+  "deep_link.auth.title": "Website-Authentifizierung",
+  "deep_link.auth.description": "Die NoRisk Website möchte sich mit deinem Account ({{username}}) verbinden. Möchtest du diese Verbindung bestätigen?",
+  "deep_link.auth.confirm": "Bestätigen",
+  "deep_link.auth.success": "Website-Authentifizierung erfolgreich!",
+  "deep_link.auth.error": "Website-Authentifizierung fehlgeschlagen.",
+  "deep_link.auth.not_logged_in": "Du musst eingeloggt sein, um die Website-Authentifizierung zu nutzen."
 }

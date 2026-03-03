@@ -27,5 +27,6 @@ pub mod api_utils; // API response parsing helpers with detailed logging
 // Füge hier ggf. andere Util-Module hinzu
 // pub mod network_utils;
 pub mod string_utils;
+pub mod deep_link_utils;
 
 // Mache server_ping verfügbar

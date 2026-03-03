@@ -1119,6 +1119,42 @@ impl NoRiskApi {
         }
         Ok(())
     }
+
+    /// Confirm an auth bridge session for website authentication.
+    /// POST /auth/bridge/confirm?sessionId=xxx
+    pub async fn confirm_auth_bridge(
+        norisk_token: &str,
+        session_id: &str,
+        is_experimental: bool,
+    ) -> Result<()> {
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/auth/bridge/confirm", base_url);
+
+        debug!("[NoRisk API] Confirming auth bridge session: {}", session_id);
+
+        let response = HTTP_CLIENT
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&[("sessionId", session_id)])
+            .send()
+            .await
+            .map_err(|e| AppError::RequestError(format!("Auth bridge request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AppError::RequestError(format!(
+                "Auth bridge failed: {} - {}",
+                status, body
+            )));
+        }
+
+        info!("[NoRisk API] Auth bridge confirmation successful");
+        Ok(())
+    }
 }
 
 // === NOTIFICATION TYPES ===

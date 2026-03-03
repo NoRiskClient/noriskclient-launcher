@@ -1681,5 +1681,12 @@
   "advent.no_reward_available": "No reward available",
   "advent.model_error": "Model Error",
   "advent.reward_claimed": "Day {{day}} reward claimed!",
-  "advent.claim_failed": "Failed to claim reward"
+  "advent.claim_failed": "Failed to claim reward",
+
+  "deep_link.auth.title": "Website Authentication",
+  "deep_link.auth.description": "The NoRisk website wants to connect with your account ({{username}}). Do you want to confirm this connection?",
+  "deep_link.auth.confirm": "Confirm",
+  "deep_link.auth.success": "Website authentication successful!",
+  "deep_link.auth.error": "Website authentication failed.",
+  "deep_link.auth.not_logged_in": "You must be logged in to use website authentication."
 }
