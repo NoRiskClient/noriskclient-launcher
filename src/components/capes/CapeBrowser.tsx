@@ -7,6 +7,7 @@ import {
   downloadTemplateAndOpenExplorer,
   equipCape,
   getPlayerCapes,
+  getOwnedCapesList,
   unequipCape,
 } from "../../services/cape-service";
 import type {
@@ -32,11 +33,13 @@ import { useVanillaCapeStore } from "../../store/useVanillaCapeStore";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { preloadIcons } from "../../lib/icon-utils";
-import { deleteCape } from "../../services/cape-service";
+import { deleteCape, checkIsModerator } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
 import { ConfirmDeletionModal } from "./ConfirmDeletionModal";
+import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
 import { translateCapeError, isCapeInReview } from "../../utils/cape-error-translations";
+import { getLauncherConfig } from "../../services/launcher-config-service";
 
 
 
@@ -66,6 +69,14 @@ export function CapeBrowser(): JSX.Element {
     showVanillaOnly: false,
   });
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isExperimental, setIsExperimental] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+
+  useEffect(() => {
+    getLauncherConfig().then(config => {
+      setIsExperimental(config.is_experimental || false);
+    }).catch(() => {});
+  }, []);
 
   // Helper functions to get correct setters based on current filter
   const getCapesSetter = (showOwnedOnly: boolean) =>
@@ -196,6 +207,11 @@ export function CapeBrowser(): JSX.Element {
   const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
+    if (!activeAccount) return;
+    checkIsModerator().then(setIsModerator).catch(() => setIsModerator(false));
+  }, [activeAccount]);
+
+  useEffect(() => {
     preloadIcons(["solar:add-square-bold-duotone"]);
   }, []);
 
@@ -225,33 +241,47 @@ export function CapeBrowser(): JSX.Element {
     loadAllCapes();
   }, []); // Only run once on mount
 
-  // Load MY capes when account becomes available
+  // Load MY capes when account becomes available (using owned/list endpoint for review states)
   useEffect(() => {
     const loadMyCapes = async () => {
       if (!activeAccount || myCapes.length > 0 || isLoadingMy) return;
 
       try {
         setIsLoadingMy(true);
-        const playerCapesOptions: GetPlayerCapesPayloadOptions = {
-          player_identifier: activeAccount.id,
-        };
-        const response = await getPlayerCapes(playerCapesOptions);
-        setMyCapes(response);
+        const response = await getOwnedCapesList();
+        const accepted = response.ACCEPTED || [];
+        const inReview = response.IN_REVIEW || [];
+        const denied = response.DENIED || [];
+        const allOwned = [...accepted, ...inReview, ...denied];
+        setMyCapes(allOwned);
         setMyPagination({
           currentPage: 0,
-          pageSize: response.length,
-          totalItems: response.length,
+          pageSize: allOwned.length,
+          totalItems: allOwned.length,
           totalPages: 1,
         });
       } catch (error) {
-        console.error("Failed to load MY capes:", error);
+        console.error("Failed to load MY capes via owned/list, falling back to getPlayerCapes:", error);
+        // Fallback to old endpoint (only returns accepted capes)
+        try {
+          const fallbackCapes = await getPlayerCapes({ player_identifier: activeAccount.id });
+          setMyCapes(fallbackCapes);
+          setMyPagination({
+            currentPage: 0,
+            pageSize: fallbackCapes.length,
+            totalItems: fallbackCapes.length,
+            totalPages: 1,
+          });
+        } catch (fallbackError) {
+          console.error("Fallback also failed:", fallbackError);
+        }
       } finally {
         setIsLoadingMy(false);
       }
     };
 
     loadMyCapes();
-  }, [activeAccount]); // Run when activeAccount changes
+  }, [activeAccount]);
 
   // Load VANILLA capes when account becomes available and vanilla tab is active
   useEffect(() => {
@@ -319,20 +349,32 @@ export function CapeBrowser(): JSX.Element {
             totalPages: 1,
           });
         } else if (currentFilters.showOwnedOnly && currentActiveAccount) {
-          // Load user's own capes
-          const playerCapesOptions: GetPlayerCapesPayloadOptions = {
-            player_identifier: currentActiveAccount.id,
-          };
-          response = await getPlayerCapes(playerCapesOptions);
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
           const setPagination = getPaginationSetter(currentFilters.showOwnedOnly);
-          setCapes(response);
-          setPagination({
-            currentPage: 0,
-            pageSize: response.length,
-            totalItems: response.length,
-            totalPages: 1,
-          });
+          try {
+            const ownedResponse = await getOwnedCapesList();
+            const accepted = ownedResponse.ACCEPTED || [];
+            const inReview = ownedResponse.IN_REVIEW || [];
+            const denied = ownedResponse.DENIED || [];
+            const allOwned = [...accepted, ...inReview, ...denied];
+            setCapes(allOwned);
+            setPagination({
+              currentPage: 0,
+              pageSize: allOwned.length,
+              totalItems: allOwned.length,
+              totalPages: 1,
+            });
+          } catch (ownedError) {
+            console.warn("owned/list failed, falling back to getPlayerCapes:", ownedError);
+            const fallbackCapes = await getPlayerCapes({ player_identifier: currentActiveAccount.id });
+            setCapes(fallbackCapes);
+            setPagination({
+              currentPage: 0,
+              pageSize: fallbackCapes.length,
+              totalItems: fallbackCapes.length,
+              totalPages: 1,
+            });
+          }
         } else {
           // Browse all capes
           const browseOptions: BrowseCapesOptions = {
@@ -635,7 +677,28 @@ export function CapeBrowser(): JSX.Element {
     ));
   };
 
-  const handleUploadClick = async () => {
+  const handleModeratorDeleteCapeClick = (cape: CosmeticCape) => {
+    showModal('mod-delete-cape-modal', (
+      <ConfirmDeletionModal
+        capeToDelete={cape}
+        showReasonInput
+        onConfirmDelete={async (reason?: string) => {
+          try {
+            await deleteCape(cape._id, undefined, undefined, reason);
+            toast.success(t('capes.capeDeletedSuccess'));
+            refreshCurrentView();
+            hideModal('mod-delete-cape-modal');
+          } catch (err: any) {
+            console.error("Error deleting cape (moderator):", err);
+            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+          }
+        }}
+        onCancelDelete={() => hideModal('mod-delete-cape-modal')}
+      />
+    ));
+  };
+
+  const openFilePickerAndUpload = async () => {
     try {
       const selectedFile = await open({
         multiple: false,
@@ -650,7 +713,6 @@ export function CapeBrowser(): JSX.Element {
         setPreviewImageUrl(imageUrl);
         setShowPreviewModal(true);
 
-        // Show modal using global modal system
         showModal('upload-cape-modal', (
           <UploadCapeModal
             previewImageUrl={imageUrl}
@@ -672,6 +734,23 @@ export function CapeBrowser(): JSX.Element {
     }
   };
 
+  const handleUploadClick = () => {
+    if (useThemeStore.getState().hasAcceptedCapeGuidelines) {
+      openFilePickerAndUpload();
+      return;
+    }
+
+    showModal('cape-guidelines-modal', (
+      <CapeGuidelinesModal
+        onAccept={() => {
+          hideModal('cape-guidelines-modal');
+          openFilePickerAndUpload();
+        }}
+        onClose={() => hideModal('cape-guidelines-modal')}
+      />
+    ));
+  };
+
   const handleCancelUpload = () => {
     hideModal('upload-cape-modal');
     setPreviewImagePath(null);
@@ -684,8 +763,23 @@ export function CapeBrowser(): JSX.Element {
   };
 
 
-  const handleDownloadTemplate = async () => {
-    const promise = downloadTemplateAndOpenExplorer();
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showTemplateMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
+        setShowTemplateMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showTemplateMenu]);
+
+  const handleDownloadTemplate = async (withElytra: boolean) => {
+    setShowTemplateMenu(false);
+    const promise = downloadTemplateAndOpenExplorer(withElytra);
     toast.promise(promise, {
       loading: t('capes.downloadingTemplate'),
       success: t('capes.templateDownloadedSuccess'),
@@ -840,16 +934,37 @@ export function CapeBrowser(): JSX.Element {
                 <div className="flex items-center gap-3">
                   {activeAccount && (
                     <>
-                      <button
-                        onClick={handleDownloadTemplate}
-                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
-                        title={t('capes.downloadTemplate')}
-                      >
-                        <div className="w-4 h-4 flex items-center justify-center">
-                          <Icon icon="solar:download-bold" className="w-4 h-4" />
-                        </div>
-                        <span>{t('capes.template')}</span>
-                      </button>
+                      <div className="relative" ref={templateMenuRef}>
+                        <button
+                          onClick={() => setShowTemplateMenu(!showTemplateMenu)}
+                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                          title={t('capes.downloadTemplate')}
+                        >
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            <Icon icon="solar:download-bold" className="w-4 h-4" />
+                          </div>
+                          <span>{t('capes.template')}</span>
+                          <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3" />
+                        </button>
+                        {showTemplateMenu && (
+                          <div className="absolute top-full left-0 mt-1 z-50 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden min-w-[180px]">
+                            <button
+                              onClick={() => handleDownloadTemplate(false)}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                            >
+                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <span>{t('capes.templateWithoutElytra')}</span>
+                            </button>
+                            <button
+                              onClick={() => handleDownloadTemplate(true)}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                            >
+                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <span>{t('capes.templateWithElytra')}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
 
                       <button
                         onClick={handleUploadClick}
@@ -881,10 +996,14 @@ export function CapeBrowser(): JSX.Element {
               hasMoreItems={hasMoreItems}
               isFetchingMore={isFetchingMore}
               onTriggerUpload={activeAccount ? handleUploadClick : undefined}
-              onDownloadTemplate={activeAccount ? handleDownloadTemplate : undefined}
+              onDownloadTemplate={activeAccount ? () => setShowTemplateMenu(true) : undefined}
               groupFavoritesInHeader={filters.showFavoritesOnly}
               showFavoritesOnly={filters.showFavoritesOnly}
               isVanilla={filters.showVanillaOnly}
+              showReviewState={filters.showOwnedOnly}
+              isExperimental={isExperimental}
+              isModerator={isModerator && !filters.showOwnedOnly && !filters.showVanillaOnly}
+              onModeratorDeleteCape={isModerator && !filters.showVanillaOnly && !filters.showOwnedOnly ? handleModeratorDeleteCapeClick : undefined}
             />
       </div>
     </div>

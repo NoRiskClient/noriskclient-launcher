@@ -500,6 +500,8 @@
   "capes.showAsElytra": "Elytra Olarak Göster",
   "capes.unequipCape": "Pelerini Çıkar",
   "capes.selectCape": "Pelerin Seç",
+  "capes.inReview": "İncelemede",
+  "capes.denied": "Reddedildi",
   "capes.byCreator": "{{creator}} tarafından",
   "capes.includesElytraTexture": "Elytra dokusu içerir",
   "capes.uses": "{{formattedCount}} kullanım",

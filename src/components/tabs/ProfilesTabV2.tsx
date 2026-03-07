@@ -21,6 +21,7 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 
 export function ProfilesTabV2() {
   const { t } = useTranslation();
@@ -33,8 +34,7 @@ export function ProfilesTabV2() {
   const navigate = useNavigate();
   const { confirm, confirmDialog } = useConfirmDialog();
   const { openModal: openWizard } = useProfileWizardStore();
-
-  // Global modal system
+  const { isPinned } = usePinnedProfilesStore();
   const { showModal, hideModal } = useGlobalModal();
   
   // Persistent filters from theme store
@@ -277,6 +277,10 @@ export function ProfilesTabV2() {
 
   // Sort filtered profiles
   const sortedProfiles = [...filteredProfiles].sort((a, b) => {
+    const aPinned = isPinned(a.id);
+    const bPinned = isPinned(b.id);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
     switch (sortBy) {
       case "name":
         return a.name.localeCompare(b.name);
@@ -284,19 +288,19 @@ export function ProfilesTabV2() {
         // Multi-level sorting: last_played -> date_created -> name
         const aTimestamp = a.last_played ? new Date(a.last_played).getTime() : 0;
         const bTimestamp = b.last_played ? new Date(b.last_played).getTime() : 0;
-        
+
         // Primary sort: by last_played (descending)
         if (bTimestamp !== aTimestamp) {
           return bTimestamp - aTimestamp;
         }
-        
-        // Secondary sort: by date_created (descending) 
+
+        // Secondary sort: by date_created (descending)
         const aCreated = new Date(a.created).getTime();
         const bCreated = new Date(b.created).getTime();
         if (bCreated !== aCreated) {
           return bCreated - aCreated;
         }
-        
+
         // Tertiary sort: by name (ascending)
         return a.name.localeCompare(b.name);
       case "date_created":

@@ -71,6 +71,7 @@ import {
 import type { ContentInstallStatus, ContentCheckRequest, BatchCheckContentParams } from '../../../types/profile'; // For the extended status
 
 import { useProfileStore } from '../../../store/profile-store'; // Hinzufügen des ProfileStore Imports
+import { useModSearchStore } from '../../../store/useModSearchStore';
 import { Virtuoso } from 'react-virtuoso'; // Import Virtuoso
 import { useNavigate } from 'react-router-dom';
 import { useGlobalModal } from '../../../hooks/useGlobalModal';
@@ -124,27 +125,42 @@ export function ModrinthSearchV2({
   const navigate = useNavigate();
   const { showModal, hideModal } = useGlobalModal();
   const searchResultsAreaRef = useRef<HTMLDivElement>(null); // Ref for the scrollable area
-  const [searchTerm, setSearchTerm] = useState('');
-  const [projectType, setProjectType] = useState<ModrinthProjectType>(() => {
-    const effectiveAllowedTypes = allowedProjectTypes || ALL_MODRINTH_PROJECT_TYPES;
-    if (initialProjectType && effectiveAllowedTypes.includes(initialProjectType)) {
-      return initialProjectType;
+
+  const {
+    searchTerm, setSearchTerm,
+    projectType, setProjectType,
+    sortOrder, setSortOrder,
+    selectedCategoriesByProjectType, setSelectedCategoriesByProjectType,
+    selectedLoadersByProjectType, setSelectedLoadersByProjectType,
+    selectedGameVersions, setSelectedGameVersions,
+    filterClientRequired, setFilterClientRequired,
+    filterServerRequired, setFilterServerRequired,
+    scrollPosition, setScrollPosition,
+    offset, setOffset,
+    searchResults, setSearchResults,
+    totalHits, setTotalHits,
+  } = useModSearchStore();
+
+  const hasInitializedProjectType = useRef(false);
+  useEffect(() => {
+    if (!hasInitializedProjectType.current) {
+      hasInitializedProjectType.current = true;
+      const effectiveAllowedTypes = allowedProjectTypes || ALL_MODRINTH_PROJECT_TYPES;
+      if (initialProjectType && effectiveAllowedTypes.includes(initialProjectType)) {
+        if (projectType !== initialProjectType) {
+          setProjectType(initialProjectType);
+        }
+      }
     }
-    return effectiveAllowedTypes[0] || 'mod'; // Default to first allowed type or 'mod'
-  });
-  const [searchResults, setSearchResults] = useState<UnifiedModSearchResult[]>([]);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [totalHits, setTotalHits] = useState(0);
   const limit = 20;
-  
+
   // State to control delayed display of "No results found" message
   const [showNoResultsMessage, setShowNoResultsMessage] = useState(false);
   const noResultsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // New state for Sort Order, now with UnifiedSortType
-  const [sortOrder, setSortOrder] = useState<UnifiedSortType>(UnifiedSortType.Relevance);
   
   const sortOptions: { value: UnifiedSortType; label: string; icon?: string }[] = [
     { value: UnifiedSortType.Relevance, label: t('content.search.sort.relevance'), icon: 'solar:sort-bold' },
@@ -161,20 +177,8 @@ export function ModrinthSearchV2({
   const [gameVersionsData, setGameVersionsData] = useState<ModrinthGameVersion[]>([]);
   const [allLoadersData, setAllLoadersData] = useState<ModrinthLoader[]>([]);
 
-  const initialCategoriesState = useMemo(() => 
-    (allowedProjectTypes || ALL_MODRINTH_PROJECT_TYPES).reduce((acc, pt) => ({ ...acc, [pt]: [] }), {} as Record<ModrinthProjectType, string[]>)
-  , [allowedProjectTypes]);
-  const [selectedCategoriesByProjectType, setSelectedCategoriesByProjectType] = useState(initialCategoriesState);
-  
-  const [selectedLoadersByProjectType, setSelectedLoadersByProjectType] = useState(initialCategoriesState);
-  
-  const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]); 
   const [showAllGameVersionsSidebar, setShowAllGameVersionsSidebar] = useState(false); // Renamed state and set default to false
   const [gameVersionSearchTerm, setGameVersionSearchTerm] = useState('');
-
-  // New states for Environment filter
-  const [filterClientRequired, setFilterClientRequired] = useState(false);
-  const [filterServerRequired, setFilterServerRequired] = useState(false);
 
   // New state for expanded versions
   const [expandedVersions, setExpandedVersions] = useState<Record<string, UnifiedVersion[] | null | 'loading'>>({});
@@ -426,7 +430,25 @@ export function ModrinthSearchV2({
     allCategoriesData, allLoadersData, gameVersionsData
   ]);
 
+  const isInitialMount = useRef(true);
+  const restoredScrollTop = useRef(searchResults.length > 0 ? scrollPosition : 0);
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (searchResults.length > 0) {
+        console.log('[ModrinthSearchV2] Restoring cached results from store, skipping initial fetch.');
+        if (disableVirtualization && searchResultsAreaRef.current && scrollPosition > 0) {
+          requestAnimationFrame(() => {
+            if (searchResultsAreaRef.current) {
+              searchResultsAreaRef.current.scrollTop = scrollPosition;
+            }
+          });
+        }
+        return;
+      }
+    }
+
     console.log('[ModrinthSearchV2] useEffect for search triggered. Calling performSearch(true). Params:', {
       searchTerm,
       projectType,
@@ -440,6 +462,7 @@ export function ModrinthSearchV2({
     if (searchResultsAreaRef.current) {
       searchResultsAreaRef.current.scrollTop = 0;
     }
+    setScrollPosition(0);
 
     // Reset expanded versions when filter changes
     setExpandedVersions({});
@@ -551,6 +574,16 @@ export function ModrinthSearchV2({
       performSearch(false);
     }
   };
+
+  const scrollSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const handleScrollSave = useCallback(() => {
+    if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+    scrollSaveTimer.current = setTimeout(() => {
+      if (searchResultsAreaRef.current) {
+        setScrollPosition(searchResultsAreaRef.current.scrollTop);
+      }
+    }, 150);
+  }, [setScrollPosition]);
 
   // Functions to remove individual filter tags
   const removeGameVersionTag = (version: string) => handleGameVersionToggle(version);
@@ -3229,7 +3262,7 @@ export function ModrinthSearchV2({
         />
 
         {/* Search Results Area (scrollable within the left content area) */}
-        <div ref={searchResultsAreaRef} className="search-results-area flex-1 overflow-y-auto"> {/* Removed p-4 */}
+        <div ref={searchResultsAreaRef} onScroll={handleScrollSave} className="search-results-area flex-1 overflow-y-auto"> {/* Removed p-4 */}
           {/* {loading && searchResults.length === 0 && <p className="p-4 text-center">Loading initial results...</p>} REMOVED */}
           {searchResults.length === 0 && !loading && error && (
             <p className="p-4 text-red-500 text-center">{t('content.search.error', { error })}</p>
@@ -3325,8 +3358,15 @@ export function ModrinthSearchV2({
               // Virtualized list (original implementation)
               <Virtuoso
                 style={{ height: '100%' }}
+                initialScrollTop={restoredScrollTop.current}
                 data={searchResults}
                 endReached={loadMoreResults}
+                onScroll={(e) => {
+                  if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+                  scrollSaveTimer.current = setTimeout(() => {
+                    setScrollPosition((e.target as HTMLElement).scrollTop);
+                  }, 150);
+                }}
                 itemContent={(index, hit) => {
                   const projectVersions = expandedVersions[hit.project_id];
                   const displayedCount = numDisplayedVersions[hit.project_id] || initialDisplayCount;

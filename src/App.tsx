@@ -195,7 +195,7 @@ export function App() {
                   {t("common.cancel")}
                 </Button>
                 <Button
-                  variant="primary"
+                  variant="default"
                   onClick={async () => {
                     hideModal("deep-link-auth");
                     try {

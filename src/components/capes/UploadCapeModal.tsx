@@ -11,6 +11,29 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { uploadCape } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 
+const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (img.naturalWidth === 512 && img.naturalHeight === 256) {
+        resolve(imageUrl);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Could not get canvas context')); return; }
+      canvas.width = 512;
+      canvas.height = 256;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = imageUrl;
+  });
+};
+
 interface UploadCapeModalProps {
   previewImageUrl: string;
   previewImagePath: string;
@@ -18,51 +41,6 @@ interface UploadCapeModalProps {
   isWarningMessage: (error: string) => boolean;
   onCancelUpload: () => void;
 }
-
-// Utility function to resize an image to 512x256 using Canvas (only if needed)
-const resizeImageToCape = (imageUrl: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      // Check if image is already the correct size
-      if (img.naturalWidth === 512 && img.naturalHeight === 256) {
-        // Image is already correct size, return original URL
-        resolve(imageUrl);
-        return;
-      }
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-
-      // Set canvas size to 512x256
-      canvas.width = 512;
-      canvas.height = 256;
-
-      // Use nearest neighbor scaling for pixel-perfect results
-      ctx.imageSmoothingEnabled = false;
-
-      // Draw the image scaled to fit 512x256
-      ctx.drawImage(img, 0, 0, 512, 256);
-
-      // Convert to data URL
-      const resizedDataUrl = canvas.toDataURL('image/png');
-      resolve(resizedDataUrl);
-    };
-
-    img.onerror = () => {
-      reject(new Error('Failed to load image'));
-    };
-
-    img.src = imageUrl;
-  });
-};
 
 export function UploadCapeModal({
   previewImageUrl,
@@ -72,28 +50,23 @@ export function UploadCapeModal({
   onCancelUpload
 }: UploadCapeModalProps) {
   const { t } = useTranslation();
+  const [paddedPreviewUrl, setPaddedPreviewUrl] = useState<string | null>(null);
+  const [isCapeOnly, setIsCapeOnly] = useState(false);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => setIsCapeOnly(img.naturalWidth !== 512 || img.naturalHeight !== 256);
+    img.src = previewImageUrl;
+    padCapeToPreviewSize(previewImageUrl)
+      .then(setPaddedPreviewUrl)
+      .catch(() => setPaddedPreviewUrl(previewImageUrl));
+  }, [previewImageUrl]);
   const accentColor = useThemeStore((state) => state.accentColor);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showElytraPreview, setShowElytraPreview] = useState(false);
-  const [resizedCapeUrl, setResizedCapeUrl] = useState<string | null>(null);
-
-  // Resize the cape for preview when component mounts
-  useEffect(() => {
-    const resizeCapeForPreview = async () => {
-      try {
-        const resizedUrl = await resizeImageToCape(previewImageUrl);
-        setResizedCapeUrl(resizedUrl);
-      } catch (error) {
-        console.error('Failed to resize cape for preview:', error);
-        // Fallback to original URL if resize fails
-        setResizedCapeUrl(previewImageUrl);
-      }
-    };
-
-    resizeCapeForPreview();
-  }, [previewImageUrl]);
 
   const handleConfirmUpload = async () => {
     setIsUploading(true);
@@ -103,15 +76,7 @@ export function UploadCapeModal({
     try {
       const result = await uploadCape(previewImagePath);
 
-      // Show combined success message with resize info if applicable
-      if (result.wasResized && result.originalDimensions) {
-        const [origWidth, origHeight] = result.originalDimensions;
-        toast.success(t('capes.capeUploadedResized', { origWidth, origHeight }), {
-          duration: 5000, // Show longer for important info
-        });
-      } else {
-        toast.success(t('capes.capeUploadedSuccess'));
-      }
+      toast.success(t('capes.capeUploadedSuccess'));
 
       onCancelUpload(); // Close modal on success
     } catch (err: any) {
@@ -161,28 +126,30 @@ export function UploadCapeModal({
         )}
         <div className="relative flex justify-center items-center mb-6 p-2 rounded-md aspect-[10/16] max-w-[200px] mx-auto">
           <SkinView3DWrapper
-            capeUrl={resizedCapeUrl || previewImageUrl}
+            capeUrl={paddedPreviewUrl || previewImageUrl}
             className="w-full h-full"
             zoom={1.5}
             displayAsElytra={showElytraPreview}
           />
-          <IconButton
-            onClick={() => setShowElytraPreview(!showElytraPreview)}
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 z-10"
-            icon={
-              <Icon
-                icon={
-                  showElytraPreview
-                    ? "ph:airplane-tilt-fill"
-                    : "ph:airplane-tilt-duotone"
-                }
-                className="w-5 h-5"
-              />
-            }
-            title={showElytraPreview ? t('capes.showAsCape') : t('capes.showAsElytra')}
-          />
+          {!isCapeOnly && (
+            <IconButton
+              onClick={() => setShowElytraPreview(!showElytraPreview)}
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 z-10"
+              icon={
+                <Icon
+                  icon={
+                    showElytraPreview
+                      ? "ph:airplane-tilt-fill"
+                      : "ph:airplane-tilt-duotone"
+                  }
+                  className="w-5 h-5"
+                />
+              }
+              title={showElytraPreview ? t('capes.showAsCape') : t('capes.showAsElytra')}
+            />
+          )}
         </div>
         <div className="flex justify-center gap-4">
           <Button

@@ -79,30 +79,16 @@ export function NavigationHistory({ className }: NavigationHistoryProps) {
   useEffect(() => {
     const currentPath = location.pathname.replace('/', '') || 'play';
 
-    // If we're currently navigating via buttons, just update the index
     if (isNavigatingRef.current) {
       isNavigatingRef.current = false;
       return;
     }
 
     setHistory(prev => {
-      const lastIndex = prev.length - 1;
-
-      // If current path is already the last item, no change needed
-      if (prev[lastIndex] === currentPath) {
+      if (prev[currentIndex] === currentPath) {
         return prev;
       }
 
-      // If current path exists in history, update index to that position
-      const existingIndex = prev.indexOf(currentPath);
-      if (existingIndex !== -1) {
-        setCurrentIndex(existingIndex);
-        return prev;
-      }
-
-      // It's a new path - truncate forward history and add new path
-      // This implements standard browser behavior: when navigating to a new page
-      // from the middle of history, all forward history is cleared
       const newHistory = [...prev.slice(0, currentIndex + 1), currentPath];
       setCurrentIndex(newHistory.length - 1);
       return newHistory;

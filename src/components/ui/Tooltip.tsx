@@ -28,26 +28,22 @@ export function Tooltip({
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const updateTooltipPosition = (clientX: number, clientY: number) => {
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
+    let x = clientX + 8;
+    let y = clientY + 8;
 
-    // Mausposition mit kleinem Offset
-    let x = clientX + scrollX + 8; // 8px rechts von der Maus
-    let y = clientY + scrollY + 8; // 8px unter der Maus
+    const tooltipWidth = tooltipRef.current?.offsetWidth || 200;
+    const tooltipHeight = tooltipRef.current?.offsetHeight || 30;
 
-    // Vereinfachte Viewport-Korrektur (schätzt Tooltip-Größe)
-    const estimatedTooltipWidth = 200; // geschätzte Breite
-    const estimatedTooltipHeight = 30; // geschätzte Höhe
-
-    // Wenn Tooltip rechts aus dem Viewport ragt
-    if (x + estimatedTooltipWidth > window.innerWidth + scrollX) {
-      x = clientX + scrollX - estimatedTooltipWidth - 8;
+    if (x + tooltipWidth > window.innerWidth) {
+      x = clientX - tooltipWidth - 8;
     }
 
-    // Wenn Tooltip unten aus dem Viewport ragt
-    if (y + estimatedTooltipHeight > window.innerHeight + scrollY) {
-      y = clientY + scrollY - estimatedTooltipHeight - 8;
+    if (y + tooltipHeight > window.innerHeight) {
+      y = clientY - tooltipHeight - 8;
     }
+
+    x = Math.max(8, x);
+    y = Math.max(8, y);
 
     setTooltipPosition({ x, y });
   };

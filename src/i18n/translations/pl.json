@@ -500,6 +500,8 @@
   "capes.showAsElytra": "Pokaż jako elytra",
   "capes.unequipCape": "Zdejmij pelerynę",
   "capes.selectCape": "Wybierz pelerynę",
+  "capes.inReview": "W trakcie przeglądu",
+  "capes.denied": "Odrzucony",
   "capes.byCreator": "autor: {{creator}}",
   "capes.includesElytraTexture": "Zawiera teksturę elytra",
   "capes.uses": "{{formattedCount}} użyć",

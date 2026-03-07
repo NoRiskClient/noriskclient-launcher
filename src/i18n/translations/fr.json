@@ -500,6 +500,8 @@
   "capes.showAsElytra": "Afficher comme Elytra",
   "capes.unequipCape": "Retirer la Cape",
   "capes.selectCape": "Sélectionner une Cape",
+  "capes.inReview": "En cours de révision",
+  "capes.denied": "Refusé",
   "capes.byCreator": "par {{creator}}",
   "capes.includesElytraTexture": "Inclut la texture elytra",
   "capes.uses": "{{formattedCount}} utilisations",

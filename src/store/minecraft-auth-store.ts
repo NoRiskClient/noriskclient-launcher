@@ -205,6 +205,8 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
   },
 
   setActiveAccount: async (accountId: string) => {
+    const previousAccount = get().activeAccount;
+    const previousAccounts = get().accounts;
     try {
       set({ isLoading: true, error: null });
 
@@ -225,10 +227,46 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       identifyWithFlagsmith(activeAccount);
     } catch (error) {
       console.error("Failed to set active account:", error);
-      set({
-        error: i18n.t('auth.errors.set_active', { error: error instanceof Error ? error.message : String(error.message) }),
-        isLoading: false,
-      });
+      const errorMsg = error instanceof Error ? error.message : String((error as any).message ?? error);
+      const isExpiredToken = errorMsg.includes("invalid_grant") || errorMsg.includes("expired");
+
+      if (isExpiredToken) {
+        try {
+          await MinecraftAuthService.removeAccount(accountId);
+          const accounts = await MinecraftAuthService.getAccounts();
+          const activeAccount = await MinecraftAuthService.getActiveAccount();
+          const updatedAccounts = accounts.map((acc) => ({
+            ...acc,
+            active: activeAccount ? acc.id === activeAccount.id : false,
+          }));
+          set({
+            accounts: updatedAccounts,
+            activeAccount,
+            isLoading: false,
+            error: null,
+          });
+          identifyWithFlagsmith(activeAccount);
+        } catch (removeErr) {
+          console.error("Failed to remove expired account:", removeErr);
+          set({ accounts: previousAccounts, activeAccount: previousAccount, isLoading: false });
+        }
+        toast.error(i18n.t('auth.errors.session_expired'), { duration: 5000 });
+      } else {
+        if (previousAccount) {
+          try {
+            await MinecraftAuthService.setActiveAccount(previousAccount.id);
+          } catch (revertErr) {
+            console.error("Failed to revert active account in backend:", revertErr);
+          }
+        }
+        set({
+          accounts: previousAccounts,
+          activeAccount: previousAccount,
+          error: i18n.t('auth.errors.set_active', { error: errorMsg }),
+          isLoading: false,
+        });
+        toast.error(i18n.t('auth.errors.switch_failed', { error: errorMsg }), { duration: 3000 });
+      }
     }
   },
 }));

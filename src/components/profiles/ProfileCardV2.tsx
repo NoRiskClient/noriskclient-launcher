@@ -29,6 +29,7 @@ import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
+import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -92,6 +93,9 @@ export function ProfileCardV2({
     y: 0,
   });
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+
+  const { isPinned, togglePin } = usePinnedProfilesStore();
+  const pinned = isPinned(profile.id);
 
   // Modpack versions state for conditional rendering
   const [modpackVersions, setModpackVersions] = useState(null);
@@ -227,6 +231,14 @@ export function ProfileCardV2({
 
   // Settings context menu items
   const contextMenuItems: ContextMenuItem[] = [
+    {
+      id: "pin",
+      label: pinned ? "Unpin" : "Pin to Top",
+      icon: pinned ? "solar:pin-bold" : "solar:pin-bold-duotone",
+      onClick: () => {
+        togglePin(profile.id);
+      },
+    },
     {
       id: "edit",
       label: t("profiles.editProfile"),
@@ -625,11 +637,7 @@ export function ProfileCardV2({
           </div>
         )}
 
-        {/* Action buttons - top right */}
-        <div
-          className={`absolute ${isCompact ? "top-2 right-2" : "top-3 right-3"} z-20 flex flex-col gap-1`}
-        >
-          {/* Settings button - hidden in 3D mode */}
+        <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
           {variant === "default" && (
             <button
               ref={settingsButtonRef}
@@ -679,12 +687,8 @@ export function ProfileCardV2({
           </button>
         </div>
 
-        {/* Profile content */}
-        <div
-          className={`flex items-center ${isCompact ? "gap-3" : "gap-4"} relative z-10 w-full`}
-        >
-          <div
-            className={`relative ${isCompact ? "w-16 h-16" : "w-20 h-20"} flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200`}
+        <div className={`flex items-center ${isCompact ? 'gap-3' : 'gap-4'} relative z-10 w-full`}>
+          <div className={`relative ${isCompact ? 'w-16 h-16' : 'w-20 h-20'} flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200`}
             style={{
               backgroundColor: isHovered
                 ? `${accentColor.value}20`
@@ -737,8 +741,16 @@ export function ProfileCardV2({
                   }}
                 />
               </h3>
-
-              {/* Preferred Account Indicator next to title */}
+              {(pinned || isHovered) && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
+                  className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                  title={pinned ? "Unpin" : "Pin to Top"}
+                  data-action="pin"
+                >
+                  <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />
+                </button>
+              )}
               {preferredAccount && (
                 <Tooltip
                   content={t("profiles.launchWith", {
@@ -922,8 +934,16 @@ export function ProfileCardV2({
               }}
             />
           </h3>
-
-          {/* Preferred Account Indicator next to title */}
+          {(pinned || isHovered) && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
+              className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
+              title={pinned ? "Unpin" : "Pin to Top"}
+              data-action="pin"
+            >
+              <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />
+            </button>
+          )}
           {preferredAccount && (
             <Tooltip
               content={t("profiles.launchWith", {

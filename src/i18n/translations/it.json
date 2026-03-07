@@ -500,6 +500,8 @@
   "capes.showAsElytra": "Mostra come elytra",
   "capes.unequipCape": "Rimuovi mantello",
   "capes.selectCape": "Seleziona mantello",
+  "capes.inReview": "In revisione",
+  "capes.denied": "Rifiutato",
   "capes.byCreator": "di {{creator}}",
   "capes.includesElytraTexture": "Include texture elytra",
   "capes.uses": "{{formattedCount}} utilizzi",

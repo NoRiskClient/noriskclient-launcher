@@ -32,6 +32,9 @@ pub struct CosmeticCape {
     /// Whether the cape has elytra
     #[serde(default = "default_true")]
     pub elytra: bool,
+    /// BlurHash for the cape image
+    #[serde(default, rename = "blurHash")]
+    pub blur_hash: Option<String>,
 }
 
 impl CosmeticCape {
@@ -84,15 +87,8 @@ pub struct CapesBrowseResponse {
 /// Response struct for cape upload operations (serializable for Tauri)
 #[derive(Serialize, Debug)]
 pub struct CapeUploadResponse {
-    /// The hash/ID of the uploaded cape
     #[serde(rename = "capeHash")]
     pub cape_hash: String,
-    /// Whether the cape was resized to 512x256
-    #[serde(rename = "wasResized")]
-    pub was_resized: bool,
-    /// Original dimensions if the cape was resized (null if already correct size)
-    #[serde(rename = "originalDimensions")]
-    pub original_dimensions: Option<(u32, u32)>,
 }
 
 pub struct CapeApi;
@@ -286,6 +282,61 @@ impl CapeApi {
         })
     }
 
+    /// Get owned capes grouped by review state
+    pub async fn get_owned_capes_list(
+        &self,
+        norisk_token: &str,
+        page: Option<u32>,
+        limit: Option<u32>,
+        is_experimental: bool,
+    ) -> Result<HashMap<String, Vec<CosmeticCape>>> {
+        let endpoint = "cape/owned/list";
+        let base_url = Self::get_api_base(is_experimental);
+        let url = format!("{}/{}", base_url, endpoint);
+
+        debug!("[Cape API] Making request to get owned capes list");
+        debug!("[Cape API] Full URL: {}", url);
+
+        let mut query_params = HashMap::new();
+        if let Some(p) = page {
+            query_params.insert("page", p.to_string());
+        }
+        if let Some(l) = limit {
+            query_params.insert("limit", l.to_string());
+        }
+
+        let response = HTTP_CLIENT
+            .get(url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .query(&query_params)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Cape API] Request failed: {}", e);
+                AppError::RequestError(format!("Failed to send get owned capes list request: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!("[Cape API] Response status: {}", status);
+
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error body".to_string());
+            error!("[Cape API] Error response: Status {}, Body: {}", status, error_body);
+            return Err(AppError::RequestError(format!(
+                "Cape API (get_owned_capes_list) returned error status: {}. Details: {}",
+                status, error_body
+            )));
+        }
+
+        response.json::<HashMap<String, Vec<CosmeticCape>>>().await.map_err(|e| {
+            error!("[Cape API] Failed to parse response: {}", e);
+            AppError::ParseError(format!("Failed to parse owned capes list response: {}", e))
+        })
+    }
+
     /// Equip a specific cape for a player
     ///
     /// Parameters:
@@ -357,18 +408,54 @@ impl CapeApi {
         }
     }
 
+    /// Check if the current user is a moderator (team member)
+    pub async fn check_is_moderator(
+        norisk_token: &str,
+        is_experimental: bool,
+    ) -> Result<bool> {
+        let base_url = if is_experimental {
+            "https://api-staging.norisk.gg/api/v1"
+        } else {
+            "https://api.norisk.gg/api/v1"
+        };
+        let url = format!("{}/core/permissions/is-moderator", base_url);
+
+        debug!("[Cape API] Checking moderator status");
+
+        let response = HTTP_CLIENT
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", norisk_token))
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Cape API] Moderator check request failed: {}", e);
+                AppError::RequestError(format!("Failed to check moderator status: {}", e))
+            })?;
+
+        let status = response.status();
+        debug!("[Cape API] Moderator check response status: {}", status);
+
+        if !status.is_success() {
+            return Ok(false);
+        }
+
+        response.json::<bool>().await.or(Ok(false))
+    }
+
     /// Delete a specific cape owned by the player
     ///
     /// Parameters:
     /// - norisk_token: Authentication token
     /// - player_uuid: UUID of the player who owns the cape
     /// - cape_hash: Hash of the cape to delete
+    /// - reason: Optional reason for deletion (used by moderators)
     /// - is_experimental: Whether to use the experimental API endpoint
     pub async fn delete_cape(
         &self,
         norisk_token: &str,
         player_uuid: &Uuid,
         cape_hash: &str,
+        reason: Option<&str>,
         is_experimental: bool,
     ) -> Result<()> {
         let endpoint = format!("cape/{}", cape_hash);
@@ -383,6 +470,9 @@ impl CapeApi {
 
         let mut query_params = HashMap::new();
         query_params.insert("uuid", player_uuid.to_string());
+        if let Some(r) = reason {
+            query_params.insert("reason", r.to_string());
+        }
 
         debug!(
             "[Cape API] Sending DELETE request with parameters: {:?}",
@@ -456,31 +546,13 @@ impl CapeApi {
         debug!("[Cape API] Image path: {:?}", image_path);
         debug!("[Cape API] Full URL: {}", url);
 
-        // Read and resize the image file to ensure it's 512x256
-        let resize_result = crate::utils::file_utils::resize_cape_to_512x256(image_path).await.map_err(|e| {
+        let image_data = fs::read(image_path).await.map_err(|e| {
             error!(
-                "[Cape API] Failed to process image file {:?}: {}",
+                "[Cape API] Failed to read image file {:?}: {}",
                 image_path, e
             );
-            e
+            AppError::ImageProcessingError(format!("Failed to read image: {}", e))
         })?;
-
-        let image_data = resize_result.image_bytes;
-
-        // Log resize information
-        if resize_result.was_resized {
-            if let Some((orig_width, orig_height)) = resize_result.original_dimensions {
-                info!(
-                    "[Cape API] Cape was resized from {}x{} to 512x256 for player {}",
-                    orig_width, orig_height, player_uuid
-                );
-            }
-        } else {
-            debug!(
-                "[Cape API] Cape already had correct dimensions 512x256 for player {}",
-                player_uuid
-            );
-        }
 
         let mut query_params = HashMap::new();
         query_params.insert("uuid", player_uuid.to_string());
@@ -518,8 +590,6 @@ impl CapeApi {
             );
             Ok(CapeUploadResponse {
                 cape_hash: response_text,
-                was_resized: resize_result.was_resized,
-                original_dimensions: resize_result.original_dimensions,
             })
         } else {
             error!(

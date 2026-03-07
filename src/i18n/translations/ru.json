@@ -500,6 +500,8 @@
   "capes.showAsElytra": "Показать как элитры",
   "capes.unequipCape": "Снять плащ",
   "capes.selectCape": "Выбрать плащ",
+  "capes.inReview": "На проверке",
+  "capes.denied": "Отклонено",
   "capes.byCreator": "от {{creator}}",
   "capes.includesElytraTexture": "Включает текстуру элитр",
   "capes.uses": "{{formattedCount}} использований",
