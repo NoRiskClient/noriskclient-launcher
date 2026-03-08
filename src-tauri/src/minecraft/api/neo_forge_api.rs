@@ -6,11 +6,15 @@ use quick_xml::de::from_str;
 use std::path::PathBuf;
 use tokio::fs as tokio_fs;
 
-const NEO_FORGE_MAVEN_METADATA_URL: &str =
-    "https://maven.neoforged.net/net/neoforged/neoforge/maven-metadata.xml";
+const NEO_FORGE_MAVEN_RELEASES_URL: &str =
+    "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
+
+const NEO_FORGE_MAVEN_SNAPSHOTS_URL: &str =
+    "https://maven.neoforged.net/snapshots/net/neoforged/neoforge/maven-metadata.xml";
 
 pub struct NeoForgeApi {
-    base_url: String,
+    releases_url: String,
+    snapshots_url: String,
     cache_dir: PathBuf,
 }
 
@@ -23,15 +27,16 @@ impl NeoForgeApi {
             });
         }
         Self {
-            base_url: NEO_FORGE_MAVEN_METADATA_URL.to_string(),
+            releases_url: NEO_FORGE_MAVEN_RELEASES_URL.to_string(),
+            snapshots_url: NEO_FORGE_MAVEN_SNAPSHOTS_URL.to_string(),
             cache_dir,
         }
     }
 
-    async fn fetch_and_cache_metadata(base_url: &str, cache_path: &PathBuf) -> Result<NeoForgeMavenMetadata> {
-        debug!("Fetching NeoForge metadata from: {}", base_url);
+    async fn fetch_and_cache_metadata(url: &str, cache_path: &PathBuf) -> Result<NeoForgeMavenMetadata> {
+        debug!("Fetching NeoForge metadata from: {}", url);
 
-        let response = HTTP_CLIENT.get(base_url)
+        let response = HTTP_CLIENT.get(url)
             .send()
             .await
             .map_err(|e| AppError::ForgeError(format!("Failed to fetch NeoForge versions: {}", e)))?;
@@ -57,48 +62,76 @@ impl NeoForgeApi {
             debug!("Cached NeoForge metadata: {:?}", cache_path);
         }
 
-        info!("Successfully fetched {} NeoForge versions", metadata.get_all_versions().len());
+        info!("Successfully fetched {} NeoForge versions from {}", metadata.get_all_versions().len(), url);
         Ok(metadata)
     }
 
-    async fn background_update(base_url: String, cache_path: PathBuf) {
-        debug!("[BG] Updating NeoForge metadata");
-        if let Err(e) = Self::fetch_and_cache_metadata(&base_url, &cache_path).await {
-            error!("[BG] Failed to update NeoForge cache: {}", e);
+    async fn load_from_cache(cache_path: &PathBuf) -> Option<NeoForgeMavenMetadata> {
+        if !cache_path.exists() {
+            return None;
+        }
+        match tokio_fs::read_to_string(cache_path).await {
+            Ok(xml) => match from_str::<NeoForgeMavenMetadata>(&xml) {
+                Ok(metadata) => Some(metadata),
+                Err(e) => {
+                    error!("Failed to parse NeoForge cache {:?}: {}", cache_path, e);
+                    None
+                }
+            },
+            Err(e) => {
+                error!("Failed to read NeoForge cache {:?}: {}", cache_path, e);
+                None
+            }
+        }
+    }
+
+    async fn background_update(
+        releases_url: String,
+        snapshots_url: String,
+        releases_cache: PathBuf,
+        snapshots_cache: PathBuf,
+    ) {
+        debug!("[BG] Updating NeoForge metadata (releases + snapshots)");
+        if let Err(e) = Self::fetch_and_cache_metadata(&releases_url, &releases_cache).await {
+            error!("[BG] Failed to update NeoForge releases cache: {}", e);
+        }
+        if let Err(e) = Self::fetch_and_cache_metadata(&snapshots_url, &snapshots_cache).await {
+            error!("[BG] Failed to update NeoForge snapshots cache: {}", e);
         }
     }
 
     pub async fn get_all_versions(&self) -> Result<NeoForgeMavenMetadata> {
-        let cache_path = self.cache_dir.join("neoforge_metadata.xml");
+        let releases_cache = self.cache_dir.join("neoforge_releases_metadata.xml");
+        let snapshots_cache = self.cache_dir.join("neoforge_snapshots_metadata.xml");
 
-        if cache_path.exists() {
-            debug!("Cache hit for NeoForge metadata: {:?}", cache_path);
-            
-            match tokio_fs::read_to_string(&cache_path).await {
-                Ok(cached_xml) => {
-                    match from_str::<NeoForgeMavenMetadata>(&cached_xml) {
-                        Ok(cached_metadata) => {
-                            let base_url = self.base_url.clone();
-                            let cache_path_clone = cache_path.clone();
-                            
-                            tokio::spawn(async move {
-                                Self::background_update(base_url, cache_path_clone).await;
-                            });
-                            
-                            return Ok(cached_metadata);
-                        }
-                        Err(e) => {
-                            error!("Failed to parse cached NeoForge metadata: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to read NeoForge cache: {}", e);
-                }
-            }
+        // Serve from cache when both files exist; refresh in the background
+        let releases_cached = Self::load_from_cache(&releases_cache).await;
+        let snapshots_cached = Self::load_from_cache(&snapshots_cache).await;
+
+        if let (Some(releases), Some(snapshots)) = (releases_cached, snapshots_cached) {
+            debug!("Cache hit for NeoForge metadata (releases + snapshots)");
+            let releases_url = self.releases_url.clone();
+            let snapshots_url = self.snapshots_url.clone();
+            let rc = releases_cache.clone();
+            let sc = snapshots_cache.clone();
+            tokio::spawn(async move {
+                Self::background_update(releases_url, snapshots_url, rc, sc).await;
+            });
+            return Ok(releases.merge_with(snapshots));
         }
 
-        debug!("Cache miss for NeoForge metadata, fetching...");
-        Self::fetch_and_cache_metadata(&self.base_url, &cache_path).await
+        // Fetch fresh — releases are required, snapshots are optional
+        debug!("Cache miss for NeoForge metadata, fetching from releases and snapshots...");
+        let releases = Self::fetch_and_cache_metadata(&self.releases_url, &releases_cache).await?;
+        let snapshots_result =
+            Self::fetch_and_cache_metadata(&self.snapshots_url, &snapshots_cache).await;
+
+        match snapshots_result {
+            Ok(snapshots) => Ok(releases.merge_with(snapshots)),
+            Err(e) => {
+                error!("Failed to fetch NeoForge snapshots metadata (continuing with releases only): {}", e);
+                Ok(releases)
+            }
+        }
     }
 }

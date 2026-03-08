@@ -23,6 +23,17 @@ pub struct Versions {
 }
 
 impl NeoForgeMavenMetadata {
+    /// Merges the version list from `other` into `self`, deduplicating entries.
+    /// `self` (releases) fields are kept for `latest` and `release`.
+    pub fn merge_with(mut self, other: Self) -> Self {
+        for v in other.versioning.versions.versions {
+            if !self.versioning.versions.versions.contains(&v) {
+                self.versioning.versions.versions.push(v);
+            }
+        }
+        self
+    }
+
     pub fn get_latest_version(&self) -> &str {
         &self.versioning.latest
     }

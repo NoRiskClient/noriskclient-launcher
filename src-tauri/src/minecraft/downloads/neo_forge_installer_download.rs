@@ -11,6 +11,14 @@ use tokio::io::{AsyncWriteExt, BufReader};
 
 const LIBRARIES_DIR: &str = "libraries";
 
+fn get_maven_base_url(version: &str) -> &'static str {
+    if version.contains('-') {
+        "https://maven.neoforged.net/snapshots"
+    } else {
+        "https://maven.neoforged.net/releases"
+    }
+}
+
 pub struct NeoForgeInstallerDownloadService {
     base_path: PathBuf,
 }
@@ -34,7 +42,7 @@ impl NeoForgeInstallerDownloadService {
         let jar_path = self.base_path.join(&maven_path);
 
         // Konstruiere die Download-URL
-        let url = format!("https://maven.neoforged.net/{}", maven_path);
+        let url = format!("{}/{}", get_maven_base_url(version), maven_path);
 
         info!("Downloading from: {}", url);
 
