@@ -4,6 +4,7 @@ import type React from "react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { VerticalNavbar } from ".././navigation/VerticalNavbar";
 import { UserProfileBar } from ".././header/UserProfileBar";
@@ -43,6 +44,7 @@ import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { toast } from 'react-hot-toast';
 import { useTranslation } from "react-i18next";
+import { useGlobalModalStore } from "../../hooks/useGlobalModal";
 
 const appConfig = {
   version: "v0.5.22",
@@ -65,7 +67,12 @@ export function AppLayout({
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
-  const { currentEffect } = useBackgroundEffectStore();
+  const {
+    currentEffect,
+    customBackgroundPath,
+    customBackgroundBlur,
+    customBackgroundSize,
+  } = useBackgroundEffectStore();
 
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
@@ -80,6 +87,7 @@ export function AppLayout({
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
+  const modalCount = useGlobalModalStore((state) => state.modals.length);
   const { selectedTheme, isThemeActive } = useLauncherTheme();
   const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
@@ -141,6 +149,8 @@ export function AppLayout({
   };
 
   const qualityParams = getQualityParams();
+  const hasOpenModal = modalCount > 0;
+  const effectiveCustomBlur = hasOpenModal ? 0 : customBackgroundBlur;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -300,6 +310,25 @@ export function AppLayout({
         );
       case BACKGROUND_EFFECTS.PLAIN_BACKGROUND:
         return <PlainBackground accentColorValue={themeAccentColor.value} />;
+      case BACKGROUND_EFFECTS.CUSTOM_MEDIA:
+        if (!customBackgroundPath) {
+          return <PlainBackground accentColorValue={themeAccentColor.value} />;
+        }
+
+        return (
+          <div
+            className="absolute inset-0 overflow-hidden"
+          >
+            <div
+              className="absolute inset-0 bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url("${convertFileSrc(customBackgroundPath)}")`,
+                backgroundSize: `${customBackgroundSize}%`,
+                filter: `blur(${effectiveCustomBlur}px)`,
+              }}
+            />
+          </div>
+        );
       default:
         return (
           <div className="absolute inset-0 bg-red-500/20">

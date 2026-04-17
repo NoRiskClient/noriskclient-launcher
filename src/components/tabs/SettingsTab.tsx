@@ -44,6 +44,7 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGE_OPTIONS } from "../../i18n";
 import type { SupportedLanguage } from "../../i18n";
 import { setDiscordState } from "../../utils/discordRpc";
+import { type DialogFilter, open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export function SettingsTab() {
   const { t } = useTranslation();
@@ -105,7 +106,17 @@ export function SettingsTab() {
     toggleStaticBackground,
     toggleBackgroundAnimation,
   } = useThemeStore();
-  const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
+  const {
+    currentEffect,
+    setCurrentEffect,
+    customBackgroundPath,
+    setCustomBackgroundPath,
+    clearCustomBackgroundPath,
+    customBackgroundBlur,
+    setCustomBackgroundBlur,
+    customBackgroundSize,
+    setCustomBackgroundSize,
+  } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
   const { borderRadius, setBorderRadius, setAnalyticsConsent } = useThemeStore();
 
@@ -170,6 +181,11 @@ export function SettingsTab() {
       id: BACKGROUND_EFFECTS.PLAIN_BACKGROUND,
       name: t("settings.background.plain_color"),
       icon: "solar:palette-bold",
+    },
+    {
+      id: BACKGROUND_EFFECTS.CUSTOM_MEDIA,
+      name: "custom media",
+      icon: "solar:gallery-wide-bold",
     },
   ];
 
@@ -619,6 +635,101 @@ export function SettingsTab() {
             />
           ))}
         </div>
+
+        {currentEffect === BACKGROUND_EFFECTS.CUSTOM_MEDIA && (
+          <div className="mt-6 p-4 rounded-lg border border-[#ffffff20] bg-black/20">
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-white/70 font-minecraft-ten">
+                Unterstützte Formate: GIF, PNG, JPG, JPEG
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={saving}
+                  onClick={async () => {
+                    try {
+                      const imageFilters: DialogFilter[] = [
+                        {
+                          name: "Images",
+                          extensions: ["gif", "png", "jpg", "jpeg"],
+                        },
+                      ];
+
+                      const selected = await openDialog({
+                        multiple: false,
+                        directory: false,
+                        filters: imageFilters,
+                      });
+
+                      if (typeof selected === "string" && selected.trim().length > 0) {
+                        setCustomBackgroundPath(selected);
+                        toast.success("Custom Background gesetzt");
+                      }
+                    } catch (err) {
+                      console.error("Failed to pick custom background:", err);
+                      toast.error("Datei konnte nicht ausgewählt werden");
+                    }
+                  }}
+                  icon={<Icon icon="solar:folder-open-bold" className="w-4 h-4" />}
+                >
+                  Datei auswählen
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving || !customBackgroundPath}
+                  onClick={() => {
+                    clearCustomBackgroundPath();
+                    toast.success("Custom Background entfernt");
+                  }}
+                  icon={<Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />}
+                >
+                  Entfernen
+                </Button>
+              </div>
+              <p className="text-xs text-white/60 font-minecraft-ten break-all">
+                {customBackgroundPath || "Keine Datei ausgewählt"}
+              </p>
+
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-white/70 font-minecraft-ten">Blur</span>
+                    <span className="text-xs text-white/60 font-minecraft-ten">{customBackgroundBlur}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="40"
+                    step="1"
+                    value={customBackgroundBlur}
+                    onChange={(e) => setCustomBackgroundBlur(Number(e.target.value))}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-white/70 font-minecraft-ten">Size</span>
+                    <span className="text-xs text-white/60 font-minecraft-ten">{customBackgroundSize}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="200"
+                    step="1"
+                    value={customBackgroundSize}
+                    onChange={(e) => setCustomBackgroundSize(Number(e.target.value))}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

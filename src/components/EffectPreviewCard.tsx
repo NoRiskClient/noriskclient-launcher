@@ -99,6 +99,10 @@ export default function EffectPreviewCard({
             {...previewProps}
           />
         );
+      case BACKGROUND_EFFECTS.CUSTOM_MEDIA:
+        return (
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent" />
+        );
       default:
         return null;
     }
