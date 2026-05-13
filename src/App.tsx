@@ -68,7 +68,6 @@ export function App() {
   const {
     hasAcceptedTermsOfService,
     analyticsConsent,
-    language,
     setAnalyticsConsent,
     shouldShowAnalyticsBanner,
     incrementLaunchCount,
@@ -273,30 +272,45 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (analyticsConsent.decision !== 'accepted' || launcherStartTracked) return;
-    launcherStartTracked = true;
+    if (analyticsConsent.decision !== 'accepted') return;
 
-    (async () => {
+    let cancelled = false;
+    const themePersist = useThemeStore.persist;
+
+    const sendLauncherStarted = async () => {
+      if (cancelled || launcherStartTracked || !themePersist.hasHydrated()) return;
+
+      launcherStartTracked = true;
       try {
         const launcherVersion = await invoke<string>('get_app_version').catch(() => 'unknown');
         const javaInfo: any = await invoke('get_java_info_command').catch(() => null);
         const osInfo = await invoke<{ os: string; os_version: string; arch: string }>(
           'get_system_os_info',
         ).catch(() => ({ os: 'unknown', os_version: 'unknown', arch: 'unknown' }));
+        const resolvedLanguage = useThemeStore.getState().language;
         await trackEvent('launcher_started', {
           launcher_version: launcherVersion,
           java_version: javaInfo?.version ?? 'unknown',
           os: osInfo.os,
           os_version: osInfo.os_version,
           arch: osInfo.arch,
-          language,
+          language: resolvedLanguage,
         });
       } catch (error) {
         launcherStartTracked = false;
         console.error('[App] launcher_started tracking failed:', error);
       }
-    })();
-  }, [analyticsConsent.decision, language]);
+    };
+
+    void sendLauncherStarted();
+    const unsub = themePersist.onFinishHydration(() => {
+      void sendLauncherStarted();
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [analyticsConsent.decision]);
 
   // Fetch notifications when user is logged in
   useEffect(() => {
