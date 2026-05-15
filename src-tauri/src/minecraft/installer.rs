@@ -763,14 +763,18 @@ pub async fn install_minecraft_version(
 
     // --- Step: Sync mods from cache to profile directory ---
     let profile_mods_path = state.profile_manager.get_profile_mods_path(profile)?;
-    async_fs::create_dir_all(&profile_mods_path).await?;
 
     timed_step(&state, EventType::SyncingMods, profile.id, "Syncing mods", || async {
-        if modloader_enum == ModLoader::Fabric || modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
-            info!("Cleaning managed mods from mods/ folder (all mods loaded via meta file from cache).");
-            mod_downloader_service.clean_managed_mods(&target_mods, &profile_mods_path).await?;
+        if modloader_enum == ModLoader::Vanilla {
+            info!("Vanilla loader: skipping mod sync — vanilla does not load mods from mods/.");
         } else {
-            mod_downloader_service.sync_mods_to_profile(&target_mods, &profile_mods_path).await?;
+            async_fs::create_dir_all(&profile_mods_path).await?;
+            if modloader_enum == ModLoader::Fabric || modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
+                info!("Cleaning managed mods from mods/ folder (all mods loaded via meta file from cache).");
+                mod_downloader_service.clean_managed_mods(&target_mods, &profile_mods_path).await?;
+            } else {
+                mod_downloader_service.sync_mods_to_profile(&target_mods, &profile_mods_path).await?;
+            }
         }
         Ok(())
     }).await?;
