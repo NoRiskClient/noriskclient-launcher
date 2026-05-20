@@ -81,6 +81,7 @@ pub async fn install_minecraft_version(
     quick_play_singleplayer: Option<String>,
     quick_play_multiplayer: Option<String>,
     migration_info: Option<crate::utils::profile_utils::MigrationInfo>,
+    extra_local_mods: Vec<std::path::PathBuf>,
 ) -> Result<()> {
     // Convert string modloader to ModLoader enum
     let modloader_enum = match modloader_str {
@@ -674,13 +675,34 @@ pub async fn install_minecraft_version(
 
     // ---> NEW: Get custom mods for this profile <---
     info!("Listing custom mods for profile '{}'...", profile.name);
-    let custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
+    let mut custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
     info!(
         "Found {} custom mods for profile '{}'",
         custom_mod_infos.len(),
         profile.name
     );
     // ---> END NEW <---
+
+    // CLI temp launch: extra local mod jars referenced in place (not copied).
+    // Fed through the custom-mod path so the resolver writes their absolute path
+    // into the addMods meta file. Fabric + Forge/NeoForge only (vanilla has no
+    // meta file).
+    for path in &extra_local_mods {
+        match path.file_name() {
+            Some(name) => {
+                info!("[Local Mods] Adding CLI local mod in-place: {}", path.display());
+                custom_mod_infos.push(crate::state::profile_state::CustomModInfo {
+                    filename: name.to_string_lossy().into_owned(),
+                    is_enabled: true,
+                    path: path.clone(),
+                });
+            }
+            None => warn!(
+                "[Local Mods] Skipping --mods path without filename: {}",
+                path.display()
+            ),
+        }
+    }
 
     // Call the resolver function using the already loaded config (or None)
     let resolve_start = Instant::now();

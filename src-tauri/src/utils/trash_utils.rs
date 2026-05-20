@@ -194,6 +194,37 @@ pub async fn purge_expired(max_age_seconds: u64) -> Result<u64> {
     Ok(removed)
 }
 
+/// Sweeps every entry under `<profiles>/noriskclient/temp/` into the trash
+/// (category `temp-profiles`). Called once at launcher startup.
+///
+/// Throwaway CLI instances (`nrc-launcher temp …`) write their game dir there
+/// and — by design — have no immediate cleanup on MC exit. This sweep clears
+/// last session's leftovers; the trash's own [`purge_expired`] retention then
+/// deletes them for good. Best-effort: every failure is logged, never escalated.
+pub async fn reap_temp_profiles() {
+    let temp_root = crate::state::profile_state::default_profile_path()
+        .join("noriskclient")
+        .join("temp");
+
+    let mut entries = match fs::read_dir(&temp_root).await {
+        Ok(rd) => rd,
+        Err(_) => return, // dir doesn't exist yet → nothing to reap
+    };
+
+    let mut swept: u32 = 0;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        match move_path_to_trash(&path, Some("temp-profiles")).await {
+            Ok(_) => swept += 1,
+            Err(e) => warn!("[temp-reap] failed to trash {}: {}", path.display(), e),
+        }
+    }
+
+    if swept > 0 {
+        info!("[temp-reap] swept {} temp profile(s) into trash", swept);
+    }
+}
+
 async fn read_trashed_at(wrapper_dir: &Path) -> Result<u64> {
     let now = Utc::now();
     let trashed_at_path = wrapper_dir.join(".trashed_at");

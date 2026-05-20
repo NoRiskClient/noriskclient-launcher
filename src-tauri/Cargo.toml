@@ -102,4 +102,5 @@ tauri-plugin-updater = "2.9.0"
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2.3.7", features = ["deep-link"] }
 tauri-plugin-deep-link = "2"
+tauri-plugin-cli = "2"
 tauri = { version = "2.9.5", features = [ "tray-icon" ] }

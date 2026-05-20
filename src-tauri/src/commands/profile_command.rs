@@ -5,6 +5,7 @@ use crate::integrations::modrinth::ModrinthVersion;
 use crate::integrations::mrpack;
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
 use crate::integrations::norisk_versions::NoriskVersionsConfig;
+use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
@@ -275,59 +276,7 @@ pub async fn launch_profile(
         is_experimental
     );
     
-    // Helper function to get active account with proper error handling
-    let get_active_account = || async {
-        match state
-            .minecraft_account_manager_v2
-            .get_active_account()
-            .await
-        {
-            Ok(Some(creds)) => Ok(Some(creds)),
-            Ok(None) => Err(CommandError::from(AppError::NoCredentialsError)),
-            Err(e) => {
-                log::info!("Error getting active account: {}", e);
-                Err(CommandError::from(AppError::NoCredentialsError))
-            }
-        }
-    };
-    
-    // Determine which account to use: preferred account or global active account
-    let credentials = if let Some(preferred_account_id) = profile.preferred_account_id {
-        log::info!(
-            "[Command] Profile has preferred account set: {}. Attempting to use it.",
-            preferred_account_id
-        );
-        match state
-            .minecraft_account_manager_v2
-            .get_account_by_id_with_refresh(preferred_account_id, is_experimental)
-            .await
-        {
-            Ok(Some(creds)) => {
-                log::info!(
-                    "[Command] Successfully retrieved and refreshed preferred account: {}",
-                    creds.username
-                );
-                Some(creds)
-            }
-            Ok(None) => {
-                log::warn!(
-                    "[Command] Preferred account {} not found. Falling back to global active account.",
-                    preferred_account_id
-                );
-                get_active_account().await?
-            }
-            Err(e) => {
-                log::warn!(
-                    "[Command] Error getting/refreshing preferred account: {}. Falling back to global active account.",
-                    e
-                );
-                get_active_account().await?
-            }
-        }
-    } else {
-        log::info!("[Command] No preferred account set. Using global active account.");
-        get_active_account().await?
-    };
+    let credentials = resolve_credentials_for_profile(&state, &profile, is_experimental).await?;
 
     // Fallback: Try to report pending referral code before launch (in case login report failed)
     if let Some(ref creds) = credentials {
@@ -391,6 +340,7 @@ pub async fn launch_profile(
             quick_play_sp_clone,
             quick_play_mp_clone,
             migration_info_clone,
+            Vec::new(),
         )
             .await;
 
@@ -2648,4 +2598,455 @@ pub async fn get_profile_folders(profile_id: Uuid) -> Result<Vec<String>, Comman
     }
 
     Ok(folders)
+}
+
+// ---------------------------------------------------------------------------
+// CLI / runtime-override launch
+// ---------------------------------------------------------------------------
+
+/// Runtime-only overrides applied to a cloned Profile right before launch.
+/// None fields fall through to the persisted profile values.
+#[derive(Deserialize, Debug, Default, Clone)]
+pub struct LaunchOverrides {
+    pub game_version: Option<String>,
+    pub loader: Option<String>,
+    pub loader_version: Option<String>,
+    pub pack: Option<String>,
+}
+
+/// Resolve `--mods` CLI entries to a flat list of existing `.jar` files: a file
+/// entry → that jar; a directory entry → all top-level `*.jar` inside. Missing
+/// paths and non-jar files are warned and skipped. Jars are referenced in place
+/// (never copied) — the absolute path lands in the addMods meta file.
+async fn resolve_local_mod_paths(entries: &[String]) -> Result<Vec<PathBuf>, AppError> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for entry in entries {
+        let p = PathBuf::from(entry);
+        if !p.exists() {
+            log::warn!("[CLI --mods] path not found, skipping: {}", entry);
+            continue;
+        }
+        if p.is_dir() {
+            let mut rd = tokio::fs::read_dir(&p).await.map_err(AppError::Io)?;
+            while let Some(de) = rd.next_entry().await.map_err(AppError::Io)? {
+                let f = de.path();
+                if f.is_file()
+                    && f.extension().map_or(false, |e| e.eq_ignore_ascii_case("jar"))
+                {
+                    paths.push(f);
+                }
+            }
+        } else if p.extension().map_or(false, |e| e.eq_ignore_ascii_case("jar")) {
+            paths.push(p);
+        } else {
+            log::warn!("[CLI --mods] entry is not a .jar, skipping: {}", entry);
+        }
+    }
+    if !paths.is_empty() {
+        log::info!(
+            "[CLI --mods] {} local mod(s) referenced: {:?}",
+            paths.len(),
+            paths
+        );
+    }
+    Ok(paths)
+}
+
+/// Launch a profile with optional runtime overrides. Does NOT mutate
+/// profiles.json — the override values live only in the clone passed to the
+/// installer. Used primarily by the CLI dispatcher (see `crate::cli`).
+#[tauri::command]
+pub async fn launch_profile_with_overrides(
+    profile_ref: String,
+    overrides: LaunchOverrides,
+    quick_play_singleplayer: Option<String>,
+    quick_play_multiplayer: Option<String>,
+    local_mods: Vec<String>,
+    account: Option<String>,
+) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    let mut profile = resolve_profile_ref(&state, &profile_ref).await?;
+    apply_overrides(&mut profile, overrides)?;
+
+    // Quick-play: explicit CLI value wins; otherwise fall back to the profile's
+    // saved quick_play_path (mirrors launch_profile's heuristic — a value with
+    // a dot looks like a server address, otherwise a world name).
+    let (qp_sp, qp_mp) = if quick_play_singleplayer.is_none() && quick_play_multiplayer.is_none() {
+        match &profile.settings.quick_play_path {
+            Some(p) if p.contains('.') => (None, Some(p.clone())),
+            Some(p) => (Some(p.clone()), None),
+            None => (None, None),
+        }
+    } else {
+        (quick_play_singleplayer, quick_play_multiplayer)
+    };
+
+    log::info!(
+        "[CLI launch] profile='{}' id={} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        profile.name,
+        profile.id,
+        profile.game_version,
+        profile.loader.as_str(),
+        profile.loader_version,
+        profile.selected_norisk_pack_id,
+        qp_sp,
+        qp_mp,
+    );
+
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    let credentials = match &account {
+        Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
+        None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
+    };
+
+    // Runtime-only local mods (referenced in place, never persisted to the profile).
+    let local_mod_paths = resolve_local_mod_paths(&local_mods).await?;
+
+    // Mirror launch_profile's install spawn — minus the persistence side-effects
+    // (no update_profile, no last_played_profile, no add_launching_process).
+    let version = profile.game_version.clone();
+    let modloader = profile.loader.clone();
+    let profile_id = profile.id;
+    let profile_clone = profile.clone();
+
+    tokio::spawn(async move {
+        match installer::install_minecraft_version(
+            &version,
+            &modloader.as_str(),
+            &profile_clone,
+            credentials,
+            qp_sp,
+            qp_mp,
+            None,
+            local_mod_paths,
+        )
+        .await
+        {
+            Ok(_) => log::info!(
+                "[CLI launch] Profile {} started ({} {}).",
+                profile_id,
+                version,
+                modloader.as_str()
+            ),
+            Err(e) => log::error!(
+                "[CLI launch] install_minecraft_version failed for {}: {}",
+                profile_id,
+                e
+            ),
+        }
+    });
+
+    Ok(())
+}
+
+/// Resolve a profile reference (UUID-string OR exact profile name) to a Profile.
+/// Errors on unknown profiles and on ambiguous name matches (multiple profiles
+/// share the same name) — in that case the user must supply the UUID instead.
+async fn resolve_profile_ref(state: &State, profile_ref: &str) -> Result<Profile, CommandError> {
+    if let Ok(uuid) = Uuid::parse_str(profile_ref) {
+        return Ok(state.profile_manager.get_profile(uuid).await?);
+    }
+
+    let matches: Vec<Profile> = state
+        .profile_manager
+        .list_profiles()
+        .await?
+        .into_iter()
+        .filter(|p| p.name == profile_ref)
+        .collect();
+
+    match matches.len() {
+        1 => Ok(matches.into_iter().next().unwrap()),
+        0 => Err(CommandError::from(AppError::Other(format!(
+            "No profile matches '{}' (try the UUID)",
+            profile_ref
+        )))),
+        _ => {
+            let ids: Vec<String> = matches
+                .iter()
+                .map(|p| {
+                    let group = p.group.as_deref().unwrap_or("<no group>");
+                    format!("  {} (group: {})", p.id, group)
+                })
+                .collect();
+            Err(CommandError::from(AppError::Other(format!(
+                "Profile name '{}' is ambiguous ({} matches). Use the UUID instead:\n{}",
+                profile_ref,
+                matches.len(),
+                ids.join("\n")
+            ))))
+        }
+    }
+}
+
+/// Apply runtime overrides to a (cloned) profile struct.
+fn apply_overrides(profile: &mut Profile, ov: LaunchOverrides) -> Result<(), CommandError> {
+    if let Some(v) = ov.game_version {
+        profile.game_version = v;
+    }
+    if let Some(l) = ov.loader {
+        profile.loader = ModLoader::from_str(&l)
+            .map_err(|_| AppError::Other(format!("Invalid loader: '{}'", l)))?;
+    }
+    if let Some(lv) = ov.loader_version {
+        profile.loader_version = Some(lv);
+    }
+    if let Some(p) = ov.pack {
+        profile.selected_norisk_pack_id = Some(p);
+    }
+    Ok(())
+}
+
+/// Credential resolution for a profile (preferred account → fallback to active).
+/// Extracted from `launch_profile`; both launch paths share this helper.
+async fn resolve_credentials_for_profile(
+    state: &State,
+    profile: &Profile,
+    is_experimental: bool,
+) -> Result<Option<Credentials>, CommandError> {
+    let get_active_account = || async {
+        match state.minecraft_account_manager_v2.get_active_account().await {
+            Ok(Some(creds)) => Ok(Some(creds)),
+            Ok(None) => Err(CommandError::from(AppError::NoCredentialsError)),
+            Err(e) => {
+                log::info!("Error getting active account: {}", e);
+                Err(CommandError::from(AppError::NoCredentialsError))
+            }
+        }
+    };
+
+    let Some(preferred_account_id) = profile.preferred_account_id else {
+        log::info!("[Command] No preferred account set. Using global active account.");
+        return get_active_account().await;
+    };
+
+    log::info!(
+        "[Command] Profile has preferred account set: {}. Attempting to use it.",
+        preferred_account_id
+    );
+
+    match state
+        .minecraft_account_manager_v2
+        .get_account_by_id_with_refresh(preferred_account_id, is_experimental)
+        .await
+    {
+        Ok(Some(creds)) => {
+            log::info!(
+                "[Command] Successfully retrieved and refreshed preferred account: {}",
+                creds.username
+            );
+            Ok(Some(creds))
+        }
+        Ok(None) => {
+            log::warn!(
+                "[Command] Preferred account {} not found. Falling back to global active account.",
+                preferred_account_id
+            );
+            get_active_account().await
+        }
+        Err(e) => {
+            log::warn!(
+                "[Command] Error getting/refreshing preferred account: {}. Falling back to global active account.",
+                e
+            );
+            get_active_account().await
+        }
+    }
+}
+
+/// Resolve credentials for an explicitly requested account — by username
+/// (case-insensitive) or by UUID. Refreshes tokens via the account manager.
+/// Hard error if no such account exists (the user asked for it explicitly).
+/// Runtime-only: does NOT change the globally active account.
+async fn resolve_credentials_for_account(
+    state: &State,
+    account_ref: &str,
+    is_experimental: bool,
+) -> Result<Credentials, CommandError> {
+    let mgr = &state.minecraft_account_manager_v2;
+
+    let creds = if let Ok(uuid) = Uuid::parse_str(account_ref) {
+        mgr.get_account_by_id_with_refresh(uuid, is_experimental)
+            .await?
+            .ok_or_else(|| {
+                CommandError::from(AppError::Other(format!(
+                    "No account with UUID '{}'",
+                    account_ref
+                )))
+            })?
+    } else {
+        let accounts = mgr.get_all_accounts().await?;
+        let id = accounts
+            .iter()
+            .find(|c| c.username.eq_ignore_ascii_case(account_ref))
+            .map(|c| c.id)
+            .ok_or_else(|| {
+                let names: Vec<&str> = accounts.iter().map(|c| c.username.as_str()).collect();
+                CommandError::from(AppError::Other(format!(
+                    "No account named '{}'. Available: {}",
+                    account_ref,
+                    if names.is_empty() {
+                        "<none>".to_string()
+                    } else {
+                        names.join(", ")
+                    }
+                )))
+            })?;
+        mgr.get_account_by_id_with_refresh(id, is_experimental)
+            .await?
+            .ok_or_else(|| {
+                CommandError::from(AppError::Other(format!(
+                    "Account '{}' vanished during refresh",
+                    account_ref
+                )))
+            })?
+    };
+
+    log::info!(
+        "[CLI --account] launching as '{}' ({})",
+        creds.username,
+        creds.id
+    );
+    Ok(creds)
+}
+
+// ---------------------------------------------------------------------------
+// CLI / throwaway launch (no profiles.json entry)
+// ---------------------------------------------------------------------------
+
+/// Args for `launch_temp_profile`. Wired by `cli.rs` from the `temp` subcommand
+/// (or callable from the frontend later if needed).
+#[derive(Deserialize, Debug, Clone)]
+pub struct TempLaunchArgs {
+    pub game_version: String,
+    pub loader: String,
+    pub loader_version: Option<String>,
+    pub pack: Option<String>,
+    pub name: Option<String>,
+    pub quick_play_singleplayer: Option<String>,
+    pub quick_play_multiplayer: Option<String>,
+    /// CLI `--mods`: local jar paths to load in-place (not copied).
+    #[serde(default)]
+    pub local_mods: Vec<String>,
+    /// CLI `--account`: launch with this account (username or UUID).
+    pub account: Option<String>,
+}
+
+/// Spin up a throwaway MC instance with the given overrides. Builds an
+/// in-memory Profile, never touches profiles.json. Instance directory lives
+/// at `<root>/profiles/noriskclient/temp/<uuid>/` and is swept into the trash
+/// on the next launcher start by `utils::trash_utils::reap_temp_profiles`; the
+/// trash's own 30-day retention then deletes it for good.
+#[tauri::command]
+pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    let id = Uuid::new_v4();
+    let short: String = id.to_string().chars().take(8).collect();
+    let display_name = args
+        .name
+        .clone()
+        .unwrap_or_else(|| format!("temp-{}", short));
+
+    let loader = ModLoader::from_str(&args.loader)
+        .map_err(|_| AppError::Other(format!("Invalid loader: '{}'", args.loader)))?;
+
+    let profile = Profile {
+        id,
+        name: display_name.clone(),
+        // Relative segment. calculate_instance_path_for_profile resolves this to
+        // <root>/profiles/noriskclient/temp/<uuid>/. The `noriskclient/` prefix
+        // is a reserved namespace (also used for grouped profiles) so it can't
+        // collide with a user profile literally named "temp".
+        path: format!("noriskclient/temp/{}", id),
+        game_version: args.game_version.clone(),
+        loader: loader.clone(),
+        loader_version: args.loader_version.clone(),
+        created: Utc::now(),
+        last_played: None,
+        settings: ProfileSettings::default(),
+        state: ProfileState::NotInstalled,
+        mods: Vec::new(),
+        selected_norisk_pack_id: args.pack.clone(),
+        disabled_norisk_mods_detailed: HashSet::new(),
+        source_standard_profile_id: None,
+        use_shared_minecraft_folder: false,
+        group: None,
+        description: Some("Temporary throwaway instance (CLI)".into()),
+        banner: None,
+        background: None,
+        is_standard_version: false,
+        norisk_information: None,
+        modpack_info: None,
+        preferred_account_id: None,
+        playtime_seconds: 0,
+    };
+
+    let game_dir = state
+        .profile_manager
+        .calculate_instance_path_for_profile(&profile)?;
+
+    log::info!(
+        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        profile.id,
+        display_name,
+        game_dir,
+        profile.game_version,
+        profile.loader.as_str(),
+        profile.loader_version,
+        profile.selected_norisk_pack_id,
+        args.quick_play_singleplayer,
+        args.quick_play_multiplayer,
+    );
+
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    let credentials = match &args.account {
+        Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
+        None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
+    };
+
+    // Register in the in-memory profile map so by-id lookups during the install
+    // (custom mods, instance path, ProcessManager) resolve. Never persisted —
+    // save_profiles() filters out `temp/`-path profiles.
+    state
+        .profile_manager
+        .register_transient_profile(profile.clone())
+        .await;
+
+    let local_mod_paths = resolve_local_mod_paths(&args.local_mods).await?;
+
+    let version = profile.game_version.clone();
+    let modloader = profile.loader.clone();
+    let profile_id = profile.id;
+    let profile_clone = profile.clone();
+    let qp_sp = args.quick_play_singleplayer.clone();
+    let qp_mp = args.quick_play_multiplayer.clone();
+
+    tokio::spawn(async move {
+        match installer::install_minecraft_version(
+            &version,
+            &modloader.as_str(),
+            &profile_clone,
+            credentials,
+            qp_sp,
+            qp_mp,
+            None,
+            local_mod_paths,
+        )
+        .await
+        {
+            Ok(_) => log::info!(
+                "[CLI temp] Temp profile {} started ({} {}).",
+                profile_id,
+                version,
+                modloader.as_str()
+            ),
+            Err(e) => log::error!(
+                "[CLI temp] install_minecraft_version failed for {}: {}",
+                profile_id,
+                e
+            ),
+        }
+    });
+
+    Ok(())
 }

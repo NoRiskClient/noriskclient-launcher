@@ -448,23 +448,28 @@ impl MinecraftLauncher {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
         }
 
-        // Add Fabric specific mods folder argument if loader is Fabric
-        // Note: When using -Dfabric.addMods (prototype), this is still harmless and allows user mods in mods/.
+        // Add per-loader mods-folder JVM argument so the loader picks up jars from the
+        // launcher-managed per-version directory (analogous to fabric.modsFolder, mirrored
+        // for Forge/NeoForge via nrc-forgeloader's -Dnrc.modsFolder).
+        // Note: complementary to addMods=@<meta>, both sources are merged by the loader.
         if let Some(p_ref) = &profile {
-            if p_ref.loader == crate::state::profile_state::ModLoader::Fabric {
+            let prop: Option<&str> = match p_ref.loader {
+                crate::state::profile_state::ModLoader::Fabric => Some("fabric.modsFolder"),
+                crate::state::profile_state::ModLoader::Forge
+                | crate::state::profile_state::ModLoader::NeoForge => Some("nrc.modsFolder"),
+                _ => None,
+            };
+            if let Some(prop) = prop {
                 match state.profile_manager.get_profile_mods_path(p_ref) {
                     Ok(mods_path) => {
                         let mods_path_str = mods_path.to_string_lossy().replace("\\", "/");
-                        let fabric_mods_arg = format!("-Dfabric.modsFolder={}", mods_path_str);
-                        info!(
-                            "Adding Fabric mods folder JVM argument: {}",
-                            fabric_mods_arg
-                        );
-                        command.arg(fabric_mods_arg);
+                        let mods_arg = format!("-D{}={}", prop, mods_path_str);
+                        info!("Adding mods folder JVM argument: {}", mods_arg);
+                        command.arg(mods_arg);
                     }
                     Err(e) => {
                         warn!(
-                            "Could not get Fabric mods path for profile '{}' (ID: {}): {}. Fabric mods folder argument will not be set.",
+                            "Could not get mods path for profile '{}' (ID: {}): {}. Mods folder argument will not be set.",
                             p_ref.name, p_ref.id, e
                         );
                     }

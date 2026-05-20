@@ -6,6 +6,7 @@
 
 #[macro_use]
 mod utils;
+mod cli;
 mod commands;
 mod config;
 mod error;
@@ -157,8 +158,15 @@ async fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+
+            // If the second invocation carried a CLI subcommand we recognize,
+            // service it instead of bringing the window to the front.
+            if cli::dispatch_hot_start(app, argv.clone()) {
+                return;
+            }
 
             match app.get_webview_window("main") {
                 Some(window) => {
@@ -184,6 +192,12 @@ async fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // CLI cold-start: handle subcommands (version short-circuits GUI;
+            // launch fires asynchronously after State::init completes).
+            if cli::dispatch_cold_start(&app_handle) {
+                return Ok(());
+            }
 
             // --- Initialize System Tray (Tauri 2.0) ---
             let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
@@ -352,6 +366,13 @@ async fn main() {
                     return;
                 }
                 info!("State initialization finished successfully.");
+
+                // Sweep last session's throwaway temp profiles into the trash
+                // (non-blocking, best-effort). The trash's purge_expired retention
+                // then deletes them for good. See utils::trash_utils.
+                tauri::async_runtime::spawn(async {
+                    utils::trash_utils::reap_temp_profiles().await;
+                });
 
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
@@ -683,6 +704,8 @@ async fn main() {
             refresh_vanilla_cape_data,
             track_analytics_event,
             commands::analytics_command::get_system_os_info,
+            commands::profile_command::launch_profile_with_overrides,
+            commands::profile_command::launch_temp_profile,
             commands::profile_command::add_profile_symlink,
             commands::profile_command::remove_profile_symlink,
             commands::profile_command::get_profile_symlinks,
