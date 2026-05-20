@@ -21,6 +21,19 @@ const ASSETS_DIR: &str = "assets";
 const NORISK_ASSETS_DIR: &str = "noriskclient";
 const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
 
+/// Packs whose in-game NRC client owns regular asset management. For these the
+/// launcher skips its own download/copy/cleanup of non-override entries and
+/// passes `-Dnrc.assets.{dir,bucket}` so the client takes over. Every other
+/// pack runs the legacy launcher-side asset pipeline.
+const CLIENT_MANAGED_PACKS: &[&str] = &["nrc-nightly", "nrc-standalone", "nrc-mini"];
+
+/// `true` when the given (effective) pack id is client-managed — see
+/// `CLIENT_MANAGED_PACKS`. `overrides/` entries are always kept regardless,
+/// they land in the profile game dir which the client doesn't manage.
+pub fn client_managed_assets(pack_id: &str) -> bool {
+    CLIENT_MANAGED_PACKS.contains(&pack_id)
+}
+
 pub struct NoriskClientAssetsDownloadService {
     base_path: PathBuf,
     concurrent_downloads: usize,
@@ -84,6 +97,12 @@ impl NoriskClientAssetsDownloadService {
                 return Ok(());
             }
         };
+
+        let client_managed = client_managed_assets(&main_pack_id);
+        info!(
+            "[NRC Assets Download] Pack '{}' client-managed assets: {}",
+            main_pack_id, client_managed
+        );
 
         let creds = match credentials {
             Some(c) => c,
@@ -190,6 +209,7 @@ impl NoriskClientAssetsDownloadService {
                     &request_uuid,
                     is_experimental,
                     keep_local_assets,
+                    client_managed,
                     &game_directory,
                     group_progress_start,
                     group_progress_end,
@@ -221,8 +241,14 @@ impl NoriskClientAssetsDownloadService {
             }
         }
 
-        // --- Cleanup Orphan Assets (only if keep_local_assets is false) ---
-        if !keep_local_assets {
+        // --- Cleanup Orphan Assets ---
+        // Cleanup wipes anything in `target_base_dir` (= <gameDir>/NoRiskClient/assets/)
+        // not in `all_expected_target_paths`. In client-managed mode the launcher
+        // doesn't populate that dir anymore, so cleanup would mass-delete on every
+        // launch — skip entirely.
+        if client_managed {
+            info!("[NRC Assets Cleanup] Skipping orphan cleanup (client-managed mode).");
+        } else if !keep_local_assets {
             info!(
                 "[NRC Assets Cleanup] Cleaning up orphan files in target directory: {}",
                 target_base_dir.display()
@@ -286,6 +312,7 @@ impl NoriskClientAssetsDownloadService {
         request_uuid: &str,
         is_experimental: bool,
         keep_local_assets: bool,
+        client_managed: bool,
         game_directory: &PathBuf,
         progress_start: f64,
         progress_end: f64,
@@ -356,6 +383,34 @@ impl NoriskClientAssetsDownloadService {
                     )));
                 }
             };
+
+        // Client-managed mode: in-game client owns the regular asset cache, we
+        // only keep `overrides/` entries (those land in the profile game dir).
+        let assets = if client_managed {
+            let total = assets.objects.len();
+            let mut filtered = assets;
+            filtered.objects.retain(|name, _| name.starts_with("overrides/"));
+            info!(
+                "[NRC Assets Group '{}'] client-managed mode: kept {} override entries (of {}); regular assets handled by in-game client",
+                asset_id,
+                filtered.objects.len(),
+                total,
+            );
+            if filtered.objects.is_empty() {
+                self.emit_progress_event(
+                    state,
+                    profile_id,
+                    &format!("Group '{}' fully client-managed — no overrides", asset_id),
+                    progress_end,
+                    None,
+                )
+                .await?;
+                return Ok(HashSet::new());
+            }
+            filtered
+        } else {
+            assets
+        };
 
         // --- Calculate Expected Paths Before Download/Copy ---
         let mut expected_paths_for_group: HashSet<PathBuf> = HashSet::new();
