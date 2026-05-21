@@ -12,9 +12,12 @@ import { RangeSlider } from "../../ui/RangeSlider";
 import { Select } from "../../ui/Select";
 import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { NoriskModEntryDefinition, NoriskModpacksConfig } from "../../../types/noriskPacks";
 import { useTranslation } from "react-i18next";
+import { useGlobalModal } from "../../../hooks/useGlobalModal";
+import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
+import { getRandomBlockIcon } from "../../../data/block-icons";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
 const forbiddenTrailing = /[ .]$/;
@@ -37,6 +40,7 @@ interface ProfileWizardV2Step3Props {
         memoryMaxMb: number;
         selectedNoriskPackId: string | null;
         use_shared_minecraft_folder?: boolean;
+        chosenIcon: ChosenIcon;
     }) => void;
     selectedMinecraftVersion: string;
     selectedLoader: ModLoader;
@@ -55,6 +59,8 @@ export function ProfileWizardV2Step3({
 }: ProfileWizardV2Step3Props) {
     const { t } = useTranslation();
     const accentColor = useThemeStore((state) => state.accentColor);
+    const { showModal, hideModal } = useGlobalModal();
+    const [chosenIcon, setChosenIcon] = useState<ChosenIcon>(() => ({ url: getRandomBlockIcon().url }));
     const [profileName, setProfileName] = useState("");
     const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
     const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
@@ -218,6 +224,16 @@ export function ProfileWizardV2Step3({
         setProfileName(generateProfileName());
     }, [selectedLoader, selectedMinecraftVersion]);
 
+    const openIconPicker = () => {
+        showModal("profile-icon-picker", (
+            <IconPicker
+                selected={chosenIcon}
+                onSelect={setChosenIcon}
+                onClose={() => hideModal("profile-icon-picker")}
+            />
+        ), 1100);
+    };
+
     const handleCreate = async () => {
         if (!profileName.trim()) {
             setError(t('profiles.wizard.nameRequired'));
@@ -236,7 +252,8 @@ export function ProfileWizardV2Step3({
                 loaderVersion: selectedLoaderVersion,
                 memoryMaxMb: memoryMaxMb,
                 selectedNoriskPackId: selectedNoriskPackId,
-                use_shared_minecraft_folder: useSharedMinecraftFolder
+                use_shared_minecraft_folder: useSharedMinecraftFolder,
+                chosenIcon: chosenIcon
             });
         } catch (err) {
             console.error("Failed to create profile:", err);
@@ -268,10 +285,28 @@ export function ProfileWizardV2Step3({
             return <StatusMessage type="error" message={error} />;
         }
 
+        const iconPreviewSrc = "url" in chosenIcon ? chosenIcon.url : convertFileSrc(chosenIcon.path);
+
         return (
             <div className="space-y-8">
                 {/* Profile Details */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex gap-4 items-end">
+                    {/* Profile Icon — no label so it doesn't add a row that offsets the inputs */}
+                    <button
+                        type="button"
+                        onClick={openIconPicker}
+                        title={t('profiles.wizard.profileIcon')}
+                        className="w-[52px] h-[52px] flex-shrink-0 rounded-lg border-2 overflow-hidden flex items-center justify-center bg-black/30 hover:scale-105 transition-transform"
+                        style={{ borderColor: `${accentColor.value}80` }}
+                    >
+                        <img
+                            src={iconPreviewSrc}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onLoad={handleIconImgLoad}
+                        />
+                    </button>
+                    <div className="grid grid-cols-2 gap-4 flex-1">
                     <div className="space-y-2">
                         <label className="block text-base font-minecraft-ten text-white/50">
                             {t('profiles.wizard.profileName')}
@@ -303,6 +338,7 @@ export function ProfileWizardV2Step3({
                             onChange={(e) => setProfileGroup(e.target.value)}
                             placeholder={t('profiles.wizard.enterGroupName')}
                         />
+                    </div>
                     </div>
                 </div>
 

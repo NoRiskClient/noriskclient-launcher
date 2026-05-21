@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Icon } from "@iconify/react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type {
   ProfileBanner,
@@ -10,6 +9,8 @@ import { cn } from "../../lib/utils";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { useGlobalModal } from "../../hooks/useGlobalModal";
+import { IconPicker, handleIconImgLoad, type ChosenIcon } from "./IconPicker";
 
 // Global cache for resolved image URLs to prevent flickering on tab switches
 const imageUrlCache = new Map<string, { url: string; timestamp: number }>();
@@ -59,6 +60,7 @@ export function ProfileIcon({
   borderColorOpacity = "50",
 }: ProfileIconProps) {
   const { t } = useTranslation();
+  const { showModal, hideModal } = useGlobalModal();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -154,55 +156,49 @@ export function ProfileIcon({
     resolveImageUrlWithService();
   }, [banner, profileId]);
 
-  const handleIconClick = useCallback(async () => {
+  const applyIcon = useCallback(
+    async (chosen: ChosenIcon) => {
+      setIsUpdating(true);
+      setShowLoading(true);
+      setHasLoadedImage(false); // Reset während Upload
+      setImageOpacity(0);
+      try {
+        await ProfileService.uploadProfileImages({
+          profileId: profileId,
+          imageType: "icon",
+          ...("url" in chosen ? { iconUrl: chosen.url } : { path: chosen.path }),
+        });
+        // Invalidate cache for this profile so the new image gets loaded
+        const cacheKey = getCacheKey(profileId, banner);
+        imageUrlCache.delete(cacheKey);
+        cacheVersion.current++;
+        toast.success(t('profiles.icon_updated'));
+        onSuccessfulUpdate();
+      } catch (error) {
+        console.error("Failed to upload profile icon:", error);
+        toast.error(t('profiles.errors.icon_update_failed'));
+      } finally {
+        setIsUpdating(false);
+        setShowLoading(false);
+      }
+    },
+    [profileId, banner, onSuccessfulUpdate, t],
+  );
+
+  const handleIconClick = useCallback(() => {
     if (!isEditable || isLoading || isUpdating) {
       return;
     }
-
-    try {
-      const selectedPath = await open({
-        title: "Select Profile Icon",
-        multiple: false,
-        directory: false,
-        filters: [
-          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
-        ],
-      });
-
-      if (typeof selectedPath === "string" && selectedPath) {
-        setIsUpdating(true);
-        setShowLoading(true);
-        setHasLoadedImage(false); // Reset während Upload
-        setImageOpacity(0);
-        try {
-          await ProfileService.uploadProfileImages({
-            profileId: profileId,
-            path: selectedPath,
-            imageType: "icon",
-          });
-          // Invalidate cache for this profile so the new image gets loaded
-          const cacheKey = getCacheKey(profileId, banner);
-          imageUrlCache.delete(cacheKey);
-          cacheVersion.current++;
-          toast.success(t('profiles.icon_updated'));
-          onSuccessfulUpdate();
-        } catch (error) {
-          console.error("Failed to upload profile icon:", error);
-          toast.error(t('profiles.errors.icon_update_failed'));
-        } finally {
-          setIsUpdating(false);
-          setShowLoading(false);
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Dialog cancelled by user")) {
-        // Do nothing, user cancelled.
-      } else {
-        console.error("Error selecting image:", error);
-        toast.error(t('profiles.errors.image_dialog_failed'));
-      }
-    }
-  }, [isEditable, isLoading, isUpdating, profileId, banner, onSuccessfulUpdate]);
+    const modalId = `profile-icon-picker-${profileId}`;
+    showModal(
+      modalId,
+      <IconPicker
+        onClose={() => hideModal(modalId)}
+        onSelect={(chosen) => applyIcon(chosen)}
+      />,
+      1100,
+    );
+  }, [isEditable, isLoading, isUpdating, profileId, showModal, hideModal, applyIcon]);
 
   const canBeClicked = isEditable && !isLoading && !isUpdating;
   const displaySpinner = showLoading || isUpdating;
@@ -261,6 +257,7 @@ export function ProfileIcon({
                 canBeClicked && "group-hover:opacity-60"
             )}
             style={{ opacity: imageOpacity }}
+            onLoad={handleIconImgLoad}
           />
           {canBeClicked && (
              <div className={cn(
