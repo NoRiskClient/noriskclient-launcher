@@ -317,10 +317,6 @@ export async function refreshStandardVersions(): Promise<void> {
   return invoke<void>("refresh_standard_versions");
 }
 
-export async function getProfileLatestLogContent(profileId: string): Promise<string> {
-  return invoke<string>("get_profile_latest_log_content", { profileId });
-}
-
 export async function getAllProfilesAndLastPlayed(): Promise<AllProfilesAndLastPlayed> {
   return invoke<AllProfilesAndLastPlayed>("get_all_profiles_and_last_played");
 }

@@ -308,3 +308,7 @@ export async function listCrashReports(): Promise<FileInfo[]> {
 export async function listAllMcLogs(): Promise<FileInfo[]> {
   return await invoke<FileInfo[]>('list_all_mc_logs');
 }
+
+export async function listProcessLogs(): Promise<FileInfo[]> {
+  return await invoke<FileInfo[]>('list_process_logs');
+}
