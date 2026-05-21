@@ -29,8 +29,8 @@ use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::process_command::{
-    fetch_crash_report, focus_main_window, get_full_log, get_process, get_processes,
-    get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
+    fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
+    get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
     set_discord_state, stop_process,
 };
 use commands::minecraft_auth_command::{
@@ -65,7 +65,8 @@ use commands::profile_command::{
     export_profile, get_all_profiles_and_last_played, get_custom_mods, get_local_content,
     get_local_datapacks, get_local_resourcepacks, get_local_shaderpacks, get_log_file_content,
     get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_structure,
-    get_profile_latest_log_content, get_profile_log_files, get_servers_for_profile,
+    get_profile_log_files,
+    get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
@@ -90,7 +91,8 @@ use commands::modrinth_commands::{
 
 use commands::file_command::{
     delete_file, get_icons_for_archives, get_icons_for_norisk_mods, list_all_mc_logs,
-    list_crash_reports, list_launcher_logs, open_file, open_file_directory, read_file_bytes,
+    list_crash_reports, list_launcher_logs, list_process_logs, open_file, open_file_directory,
+    read_file_bytes,
     set_file_enabled,
 };
 
@@ -553,7 +555,7 @@ async fn main() {
             set_norisk_mod_status,
             update_modrinth_mod_version,
             get_all_modrinth_versions_for_contexts,
-            get_full_log,
+            get_process_log_cursor,
             fetch_crash_report,
             get_custom_mods,
             get_local_resourcepacks,
@@ -614,7 +616,6 @@ async fn main() {
             batch_check_content_installed,
             check_for_group_migration_command,
             open_profile_latest_log,
-            get_profile_latest_log_content,
             detect_java_installations_command,
             get_java_info_command,
             find_best_java_for_minecraft_command,
@@ -633,6 +634,7 @@ async fn main() {
             list_launcher_logs,
             list_crash_reports,
             list_all_mc_logs,
+            list_process_logs,
             open_file,
             read_file_bytes,
             get_app_version,

@@ -17,6 +17,7 @@ pub mod download_utils; // Central download utility for robust file downloads
 pub mod file_utils; // Utilities for file operations like reading archives
 pub mod hash_utils;
 pub mod java_detector; // Java detector to find Java installations
+pub mod log_archive; // Archives per-session game logs centrally
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
 pub mod path_utils; // Deklariert das neue Modul und macht seinen Inhalt (wenn `pub`) nutzbar
