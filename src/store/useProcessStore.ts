@@ -37,6 +37,7 @@ interface ProcessStore {
   launcherLogs: Map<string, LogEntry[]>; // Launcher status logs by profileId
   metrics: Map<string, ProcessMetrics>;
   parserStates: Map<string, ParserState>; // Track parser state per process
+  cursors: Map<string, number>;
   selectedProcessId: string | null;
   isLoading: boolean;
   error: string | null;
@@ -54,6 +55,7 @@ interface ProcessStore {
   addLogEntriesBatch: (entries: Array<{ processId: string; rawMessage: string }>) => void;
   loadLogsFromContent: (processId: string, content: string) => void;
   clearLogs: (processId: string) => void;
+  setCursor: (processId: string, cursor: number) => void;
   getLogsForProcess: (processId: string) => LogEntry[];
   hasLogsForProcess: (processId: string) => boolean;
 
@@ -157,6 +159,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
   launcherLogs: new Map(),
   metrics: new Map(),
   parserStates: new Map(),
+  cursors: new Map(),
   selectedProcessId: null,
   isLoading: false,
   error: null,
@@ -482,6 +485,14 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       newLogs.delete(processId);
       newParserStates.delete(processId);
       return { logs: newLogs, parserStates: newParserStates };
+    });
+  },
+
+  setCursor: (processId, cursor) => {
+    set((state) => {
+      const newCursors = new Map(state.cursors);
+      newCursors.set(processId, cursor);
+      return { cursors: newCursors };
     });
   },
 

@@ -6,9 +6,8 @@ import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { InstanceSidebar } from "./InstanceSidebar";
 import { LogViewerCore } from "./LogViewerCore";
 import { useProcessEvents, useProcessLogs } from "../../hooks/useProcessEvents";
+import { useProcessLogCursor } from "../../hooks/useProcessLogCursor";
 import { useProcessStore } from "../../store/useProcessStore";
-import { getLogContentForProcess } from "../../services/process-service";
-import { getProfileLatestLogContent } from "../../services/profile-service";
 import type { ProcessMetadata } from "../../types/processState";
 
 interface MinecraftLogWindowProps {
@@ -20,13 +19,9 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
   const accentColor = useThemeStore((state) => state.accentColor);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
 
-  // Subscribe to process events
   const { processes } = useProcessEvents({ autoFetch: true });
-
-  // Get logs for selected process
   const { logs: rawLogs } = useProcessLogs(selectedInstanceId);
 
-  // Get stopped processes, launcher logs, and selectedProcessId from store for sync
   const {
     stoppedProcesses,
     launcherLogs: launcherLogsMap,
@@ -34,37 +29,30 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     selectProcess,
     clearLogs,
     clearLauncherLogs,
-    loadLogsFromContent,
-    hasLogsForProcess,
-    markProcessStopped
+    markProcessStopped,
   } = useProcessStore();
 
-  // Handle crashed process passed via URL - add to store and select it
   const crashedProcessHandledRef = useRef(false);
   useEffect(() => {
     if (crashedProcess && !crashedProcessHandledRef.current) {
       crashedProcessHandledRef.current = true;
-      console.log("[MinecraftLogWindow] Adding crashed process to store:", crashedProcess.id);
       markProcessStopped(crashedProcess.id, crashedProcess);
       setSelectedInstanceId(crashedProcess.id);
     }
   }, [crashedProcess, markProcessStopped]);
 
-  // Apply theme on mount
   useEffect(() => {
     const themeStore = useThemeStore.getState();
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
   }, []);
 
-  // Sync with store selection
   useEffect(() => {
     if (selectedProcessId && selectedProcessId !== selectedInstanceId) {
       setSelectedInstanceId(selectedProcessId);
     }
   }, [selectedProcessId, selectedInstanceId]);
 
-  // Auto-select first process if none selected
   useEffect(() => {
     if (!selectedInstanceId && processes.length > 0) {
       const runningProcess = processes.find(p => p.state === "Running");
@@ -76,71 +64,32 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     }
   }, [processes, selectedInstanceId]);
 
-  // Find the profile ID and start time for the selected instance
-  const { selectedProfileId, selectedStartTime } = useMemo(() => {
-    if (!selectedInstanceId) return { selectedProfileId: null, selectedStartTime: null };
+  const { selectedProfileId, selectedSessionId } = useMemo(() => {
+    if (!selectedInstanceId) return { selectedProfileId: null, selectedSessionId: null };
     const runningProcess = processes.find(p => p.id === selectedInstanceId);
     if (runningProcess) {
       return {
         selectedProfileId: runningProcess.profile_id,
-        selectedStartTime: new Date(runningProcess.start_time).getTime()
+        selectedSessionId: runningProcess.log_session_id ?? null,
       };
     }
     const stoppedProcess = stoppedProcesses.get(selectedInstanceId);
     if (stoppedProcess) {
       return {
         selectedProfileId: stoppedProcess.profile_id,
-        selectedStartTime: new Date(stoppedProcess.start_time).getTime()
+        selectedSessionId: stoppedProcess.log_session_id ?? null,
       };
     }
-    return { selectedProfileId: null, selectedStartTime: null };
+    return { selectedProfileId: null, selectedSessionId: null };
   }, [selectedInstanceId, processes, stoppedProcesses]);
 
-  // Get launcher logs for the selected profile
+  useProcessLogCursor(selectedSessionId, selectedInstanceId);
+
   const launcherLogs = useMemo(() => {
     if (!selectedProfileId) return [];
     return launcherLogsMap.get(selectedProfileId) || [];
   }, [selectedProfileId, launcherLogsMap]);
 
-  // Track if we're currently fetching logs
-  const isFetchingLogsRef = useRef<string | null>(null);
-
-  // Fetch logs from backend if store is empty
-  useEffect(() => {
-    if (!selectedInstanceId || !selectedProfileId) return;
-    if (hasLogsForProcess(selectedInstanceId)) return;
-    if (isFetchingLogsRef.current === selectedInstanceId) return;
-
-    const fetchLogs = async () => {
-      isFetchingLogsRef.current = selectedInstanceId;
-
-      try {
-        // Always try to get current process logs first
-        let logContent = await getLogContentForProcess(selectedInstanceId);
-
-        // Only fall back to latest.log if process is older than 5 seconds
-        // This prevents loading OLD logs from a previous session for newly started processes
-        if (!logContent || logContent.trim() === "") {
-          const isRecentProcess = selectedStartTime && (Date.now() - selectedStartTime) < 5000;
-          if (!isRecentProcess) {
-            logContent = await getProfileLatestLogContent(selectedProfileId);
-          }
-        }
-
-        if (logContent && logContent.trim() !== "") {
-          loadLogsFromContent(selectedInstanceId, logContent);
-        }
-      } catch (error) {
-        console.error("[MinecraftLogWindow] Failed to fetch logs:", error);
-      } finally {
-        isFetchingLogsRef.current = null;
-      }
-    };
-
-    fetchLogs();
-  }, [selectedInstanceId, selectedProfileId, selectedStartTime, hasLogsForProcess, loadLogsFromContent]);
-
-  // Combine logs: show MC logs if available, otherwise show launcher logs
   const displayLogs = useMemo(() => {
     if (rawLogs.length > 0) {
       return rawLogs;
@@ -156,7 +105,6 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     }
   };
 
-  // Handle instance selection
   const handleSelectInstance = useCallback((id: string) => {
     setSelectedInstanceId(id);
     selectProcess(id);
@@ -169,12 +117,9 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
         background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
       }}
     >
-      {/* Custom Titlebar */}
       <LogWindowTitlebar />
 
-      {/* Main Content */}
       <div className="flex-1 flex min-h-0 p-3 gap-3">
-        {/* Log Viewer (Left - 70%) */}
         <div className="flex-[7] flex flex-col min-w-0">
           {!selectedInstanceId ? (
             <div className="flex-1 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white/30">
@@ -195,7 +140,6 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
           )}
         </div>
 
-        {/* Instance Sidebar (Right - 30%) */}
         <div className="flex-[3] min-w-[280px] max-w-[350px]">
           <InstanceSidebar
             selectedInstanceId={selectedInstanceId || undefined}
