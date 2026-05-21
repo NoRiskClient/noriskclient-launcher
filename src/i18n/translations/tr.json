@@ -573,6 +573,8 @@
   "profiles.sort.dateCreated": "Oluşturulma Tarihi",
   "profiles.sort.mcVersion": "MC Sürümü",
   "profiles.sort.loader": "Loader",
+  "profiles.sort.versionNewest": "En Yeni Sürüm",
+  "profiles.sort.versionOldest": "En Eski Sürüm",
   "profiles.filter.allVersions": "Tüm Sürümler",
   "profiles.layout.switchToGrid": "Izgara görünümüne geç",
   "profiles.layout.switchToCompact": "Kompakt görünüme geç",

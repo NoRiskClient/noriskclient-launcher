@@ -573,6 +573,8 @@
   "profiles.sort.dateCreated": "Data utworzenia",
   "profiles.sort.mcVersion": "Wersja MC",
   "profiles.sort.loader": "Loader",
+  "profiles.sort.versionNewest": "Najnowsza wersja",
+  "profiles.sort.versionOldest": "Najstarsza wersja",
   "profiles.filter.allVersions": "Wszystkie wersje",
   "profiles.layout.switchToGrid": "Przełącz na widok siatki",
   "profiles.layout.switchToCompact": "Przełącz na widok kompaktowy",

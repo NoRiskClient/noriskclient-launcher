@@ -582,6 +582,8 @@
   "profiles.sort.dateCreated": "निर्माण तिथि",
   "profiles.sort.mcVersion": "MC संस्करण",
   "profiles.sort.loader": "लोडर",
+  "profiles.sort.versionNewest": "नवीनतम संस्करण",
+  "profiles.sort.versionOldest": "सबसे पुराना संस्करण",
   "profiles.filter.allVersions": "सभी संस्करण",
   "profiles.layout.switchToGrid": "ग्रिड दृश्य पर स्विच करें",
   "profiles.layout.switchToCompact": "कॉम्पैक्ट दृश्य पर स्विच करें",

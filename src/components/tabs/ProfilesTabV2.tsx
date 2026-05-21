@@ -311,6 +311,18 @@ export function ProfilesTabV2() {
         const aCreatedTimestamp = new Date(a.created).getTime();
         const bCreatedTimestamp = new Date(b.created).getTime();
         return bCreatedTimestamp - aCreatedTimestamp;
+      case "version_newest":
+        // Sort by Minecraft version descending (newest first), name as tiebreaker
+        return (
+          (b.game_version || "").localeCompare(a.game_version || "", undefined, { numeric: true }) ||
+          a.name.localeCompare(b.name)
+        );
+      case "version_oldest":
+        // Sort by Minecraft version ascending (oldest first), name as tiebreaker
+        return (
+          (a.game_version || "").localeCompare(b.game_version || "", undefined, { numeric: true }) ||
+          a.name.localeCompare(b.name)
+        );
       default:
         return a.name.localeCompare(b.name);
     }
@@ -339,6 +351,8 @@ export function ProfilesTabV2() {
                 { value: "name", label: t('profiles.sort.name'), icon: "solar:text-bold" },
                 { value: "last_played", label: t('profiles.sort.lastPlayed'), icon: "solar:clock-circle-bold" },
                 { value: "date_created", label: t('profiles.sort.dateCreated'), icon: "solar:calendar-add-bold" },
+                { value: "version_newest", label: t('profiles.sort.versionNewest'), icon: "solar:arrow-down-bold" },
+                { value: "version_oldest", label: t('profiles.sort.versionOldest'), icon: "solar:arrow-up-bold" },
               ]}
               sortValue={sortBy}
               onSortChange={setProfilesTabSortBy}
@@ -350,6 +364,7 @@ export function ProfilesTabV2() {
               ]}
               filterValue={versionFilter}
               onFilterChange={setProfilesTabVersionFilter}
+              dropdownSize="sm"
             />
             
                          {/* Layout Toggle Button - Right next to SearchWithFilters */}

@@ -635,6 +635,8 @@
   "profiles.sort.dateCreated": "Date Created",
   "profiles.sort.mcVersion": "MC Version",
   "profiles.sort.loader": "Loader",
+  "profiles.sort.versionNewest": "Newest Version",
+  "profiles.sort.versionOldest": "Oldest Version",
   "profiles.filter.allVersions": "All Versions",
   "profiles.layout.switchToGrid": "Switch to grid view",
   "profiles.layout.switchToCompact": "Switch to compact view",
