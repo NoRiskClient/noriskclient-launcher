@@ -39,6 +39,9 @@ impl MinecraftLoggingDownloadService {
         DownloadUtils::download_file(&logging.file.url, &target_path, config).await?;
 
         info!("[Logging Config Download] Successfully downloaded logging config to: {}", target_path.display());
+
+        Self::patch_console_to_plain(&target_path).await;
+
         Ok(target_path)
     }
 
@@ -47,5 +50,42 @@ impl MinecraftLoggingDownloadService {
             "-Dlog4j.configurationFile={}",
             logging_config_path.to_string_lossy()
         )
+    }
+
+    async fn patch_console_to_plain(config_path: &PathBuf) {
+        match fs::read_to_string(config_path).await {
+            Ok(content) => {
+                let patched = Self::rewrite_console_layout(&content);
+                if patched != content {
+                    if let Err(e) = fs::write(config_path, &patched).await {
+                        log::warn!(
+                            "[Logging Config] Could not write patched config {}: {}",
+                            config_path.display(),
+                            e
+                        );
+                    } else {
+                        info!(
+                            "[Logging Config] Patched console appender to plain-text layout: {}",
+                            config_path.display()
+                        );
+                    }
+                }
+            }
+            Err(e) => log::warn!(
+                "[Logging Config] Could not read config for patching {}: {}",
+                config_path.display(),
+                e
+            ),
+        }
+    }
+
+    fn rewrite_console_layout(content: &str) -> String {
+        const PATTERN_LAYOUT: &str =
+            "<PatternLayout pattern=\"[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n\" />";
+        content
+            .replace("<LegacyXMLLayout />", PATTERN_LAYOUT)
+            .replace("<LegacyXMLLayout/>", PATTERN_LAYOUT)
+            .replace("<XMLLayout />", PATTERN_LAYOUT)
+            .replace("<XMLLayout/>", PATTERN_LAYOUT)
     }
 }
