@@ -13,6 +13,8 @@ import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
 import type { MinecraftAccount } from "../../../types/minecraft";
 import { cn } from "../../../lib/utils";
 import { useTranslation } from "react-i18next";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { toast } from "react-hot-toast";
 
 interface GeneralSettingsTabProps {
   profile: Profile;
@@ -99,6 +101,15 @@ export function GeneralSettingsTab({
 
   const handleAccountSelect = (accountId: string | null) => {
     updateProfile({ preferred_account_id: accountId });
+  };
+
+  const handleCopyProfileId = async () => {
+    try {
+      await writeText(profile.id);
+      toast.success(t('profiles.settings.profileIdCopied'));
+    } catch (e) {
+      console.error("Failed to copy profile ID:", e);
+    }
   };
 
   return (
@@ -260,6 +271,21 @@ export function GeneralSettingsTab({
               {t('profiles.settings.noAccountsFound')}
             </div>
           )}
+        </div>
+
+        {/* Profile ID — discreet, click to copy */}
+        <div className="pt-4 mt-2 border-t border-white/10">
+          <button
+            type="button"
+            onClick={handleCopyProfileId}
+            title={t('profiles.settings.copyProfileId')}
+            className="group flex items-center gap-1.5 text-white/30 hover:text-white/55 transition-colors"
+          >
+            <Icon icon="solar:copy-linear" className="w-3.5 h-3.5" />
+            <span className="font-minecraft-ten text-xs tracking-wide">
+              {profile.id}
+            </span>
+          </button>
         </div>
 
       </div>

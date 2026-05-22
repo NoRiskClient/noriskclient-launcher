@@ -639,6 +639,8 @@
   "profiles.settings.quickPlayDescription": "Caminho para funcionalidade de quick play",
   "profiles.settings.preferredAccount": "Conta Preferida",
   "profiles.settings.noAccountsFound": "Nenhuma conta encontrada",
+  "profiles.settings.copyProfileId": "Copiar ID do perfil",
+  "profiles.settings.profileIdCopied": "ID do perfil copiado para a área de transferência!",
   "profiles.settings.globalMemoryAllocated": "Memória Global Alocada",
   "profiles.settings.memoryAllocated": "Memória Alocada",
   "profiles.settings.loadingSettings": "Carregando configurações...",

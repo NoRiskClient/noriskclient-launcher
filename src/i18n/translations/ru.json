@@ -639,6 +639,8 @@
   "profiles.settings.quickPlayDescription": "Путь для функции быстрого запуска",
   "profiles.settings.preferredAccount": "Предпочитаемый аккаунт",
   "profiles.settings.noAccountsFound": "Аккаунты не найдены",
+  "profiles.settings.copyProfileId": "Копировать ID профиля",
+  "profiles.settings.profileIdCopied": "ID профиля скопирован в буфер обмена!",
   "profiles.settings.globalMemoryAllocated": "Выделенная глобальная память",
   "profiles.settings.memoryAllocated": "Выделенная память",
   "profiles.settings.loadingSettings": "Загрузка настроек...",

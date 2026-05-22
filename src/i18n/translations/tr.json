@@ -639,6 +639,8 @@
   "profiles.settings.quickPlayDescription": "Hızlı oynatma işlevi için yol",
   "profiles.settings.preferredAccount": "Tercih Edilen Hesap",
   "profiles.settings.noAccountsFound": "Hesap bulunamadı",
+  "profiles.settings.copyProfileId": "Profil kimliğini kopyala",
+  "profiles.settings.profileIdCopied": "Profil kimliği panoya kopyalandı!",
   "profiles.settings.globalMemoryAllocated": "Global Ayrılan Bellek",
   "profiles.settings.memoryAllocated": "Ayrılan Bellek",
   "profiles.settings.loadingSettings": "Ayarlar yükleniyor...",

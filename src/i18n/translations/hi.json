@@ -648,6 +648,8 @@
   "profiles.settings.quickPlayDescription": "Quick Play कार्यक्षमता के लिए पथ",
   "profiles.settings.preferredAccount": "पसंदीदा खाता",
   "profiles.settings.noAccountsFound": "कोई खाता नहीं मिला",
+  "profiles.settings.copyProfileId": "प्रोफ़ाइल आईडी कॉपी करें",
+  "profiles.settings.profileIdCopied": "प्रोफ़ाइल आईडी क्लिपबोर्ड पर कॉपी की गई!",
   "profiles.settings.globalMemoryAllocated": "ग्लोबल मेमोरी आवंटित",
   "profiles.settings.memoryAllocated": "मेमोरी आवंटित",
   "profiles.settings.loadingSettings": "सेटिंग्स लोड हो रही हैं...",

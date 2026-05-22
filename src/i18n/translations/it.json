@@ -639,6 +639,8 @@
   "profiles.settings.quickPlayDescription": "Percorso per la funzionalità avvio rapido",
   "profiles.settings.preferredAccount": "Account preferito",
   "profiles.settings.noAccountsFound": "Nessun account trovato",
+  "profiles.settings.copyProfileId": "Copia ID del profilo",
+  "profiles.settings.profileIdCopied": "ID del profilo copiato negli appunti!",
   "profiles.settings.globalMemoryAllocated": "Memoria globale allocata",
   "profiles.settings.memoryAllocated": "Memoria allocata",
   "profiles.settings.loadingSettings": "Caricamento impostazioni...",

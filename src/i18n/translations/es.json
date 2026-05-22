@@ -639,6 +639,8 @@
   "profiles.settings.quickPlayDescription": "Ruta para funcionalidad de inicio rápido",
   "profiles.settings.preferredAccount": "Cuenta Preferida",
   "profiles.settings.noAccountsFound": "No se encontraron cuentas",
+  "profiles.settings.copyProfileId": "Copiar ID del perfil",
+  "profiles.settings.profileIdCopied": "¡ID del perfil copiado al portapapeles!",
   "profiles.settings.globalMemoryAllocated": "Memoria Global Asignada",
   "profiles.settings.memoryAllocated": "Memoria Asignada",
   "profiles.settings.loadingSettings": "Cargando ajustes...",

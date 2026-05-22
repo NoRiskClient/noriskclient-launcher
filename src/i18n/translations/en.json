@@ -701,6 +701,8 @@
   "profiles.settings.quickPlayDescription": "Path for quick play functionality",
   "profiles.settings.preferredAccount": "Preferred Account",
   "profiles.settings.noAccountsFound": "No accounts found",
+  "profiles.settings.copyProfileId": "Copy profile ID",
+  "profiles.settings.profileIdCopied": "Profile ID copied to clipboard!",
   "profiles.settings.globalMemoryAllocated": "Global Memory Allocated",
   "profiles.settings.memoryAllocated": "Memory Allocated",
   "profiles.settings.loadingSettings": "Loading settings...",

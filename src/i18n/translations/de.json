@@ -701,6 +701,8 @@
   "profiles.settings.quickPlayDescription": "Pfad für die Schnellstart-Funktion",
   "profiles.settings.preferredAccount": "Bevorzugtes Konto",
   "profiles.settings.noAccountsFound": "Keine Konten gefunden",
+  "profiles.settings.copyProfileId": "Profil-ID kopieren",
+  "profiles.settings.profileIdCopied": "Profil-ID in die Zwischenablage kopiert!",
   "profiles.settings.globalMemoryAllocated": "Globaler zugewiesener Speicher",
   "profiles.settings.memoryAllocated": "Zugewiesener Speicher",
   "profiles.settings.loadingSettings": "Einstellungen werden geladen...",
