@@ -376,6 +376,11 @@ async fn main() {
                     utils::trash_utils::reap_temp_profiles().await;
                 });
 
+                // Issue #130: recover disk from pre-fix runaway logs.
+                tauri::async_runtime::spawn(async {
+                    utils::log_archive::cleanup_oversized_logs().await;
+                });
+
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {

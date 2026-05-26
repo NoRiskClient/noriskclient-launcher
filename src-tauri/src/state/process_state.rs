@@ -549,6 +549,9 @@ impl ProcessManager {
         let session_start = Utc::now();
 
         let mut log_session_id: Option<String> = None;
+        let mut log_writer_handle: Option<
+            Arc<Mutex<crate::utils::bounded_log_writer::BoundedLogWriter>>,
+        > = None;
         {
             let session = crate::utils::log_archive::SessionInfo {
                 process_id,
@@ -562,30 +565,30 @@ impl ProcessManager {
                 start_time: session_start,
             };
             match crate::utils::log_archive::create_session(&session) {
-                Ok((session_id, log_path)) => match std::fs::OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(&log_path)
-                {
-                    Ok(stdout_file) => match stdout_file.try_clone() {
-                        Ok(stderr_file) => {
-                            command.stdout(std::process::Stdio::from(stdout_file));
-                            command.stderr(std::process::Stdio::from(stderr_file));
+                Ok((session_id, log_path)) => {
+                    match crate::utils::bounded_log_writer::BoundedLogWriter::create(
+                        log_path.clone(),
+                    )
+                    .await
+                    {
+                        Ok(writer) => {
+                            command.stdout(std::process::Stdio::piped());
+                            command.stderr(std::process::Stdio::piped());
                             log_session_id = Some(session_id);
-                            log::info!("Capturing game stdout/stderr to {:?}", log_path);
+                            log_writer_handle = Some(Arc::new(Mutex::new(writer)));
+                            log::info!(
+                                "Capturing game stdout/stderr to {:?} (capped at {} MB, rotates to .N.gz)",
+                                log_path,
+                                crate::utils::bounded_log_writer::MAX_LOG_BYTES / (1024 * 1024)
+                            );
                         }
                         Err(e) => log::warn!(
-                            "Could not clone log handle for stderr capture: {}",
+                            "Could not open {:?} for bounded stdout/stderr capture: {}",
+                            log_path,
                             e
                         ),
-                    },
-                    Err(e) => log::warn!(
-                        "Could not open {:?} for stdout/stderr capture: {}",
-                        log_path,
-                        e
-                    ),
-                },
+                    }
+                }
                 Err(e) => log::warn!("Could not create log session dir: {}", e),
             }
         }
@@ -598,6 +601,21 @@ impl ProcessManager {
             );
             AppError::ProcessSpawnFailed(e.to_string())
         })?;
+
+        if let Some(writer) = log_writer_handle.as_ref() {
+            if let Some(stdout) = child.stdout.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stdout, writer, "stdout").await;
+                });
+            }
+            if let Some(stderr) = child.stderr.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stderr, writer, "stderr").await;
+                });
+            }
+        }
 
         let pid = child.id().ok_or_else(|| {
             log::error!("Failed to get PID immediately after spawning process.");
