@@ -62,7 +62,7 @@ export function ColorPicker({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 p-1">
         {Object.values(ACCENT_COLORS).map((color) => (
           <button
             key={color.name}
@@ -76,7 +76,7 @@ export function ColorPicker({
                 ? "opacity-40 cursor-not-allowed" 
                 : "cursor-pointer shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
               }
-              ${accentColor.value === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
+              ${accentColor.value === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-black/50 shadow-[0_0_0_2px_rgba(0,0,0,0.65)_inset]" : ""}
             `}
             style={{ backgroundColor: color.value }}
             aria-label={`Set accent color to ${color.name}`}
