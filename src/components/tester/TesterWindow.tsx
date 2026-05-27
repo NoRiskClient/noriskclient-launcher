@@ -17,7 +17,7 @@ import type {
   TesterIssue,
 } from "../../types/tester";
 
-const WEBSITE_BASE = "https://staging.norisk.gg";
+const WEBSITE_BASE = "https://norisk.gg";
 
 function buildIssueUrl(issue: TesterIssue): string {
   const slug = issue.header.slug || issue.header.number || issue.id;
