@@ -16,12 +16,12 @@ IÂ´m using this version myself rather than the original, so hopefully there wonÂ
 
 All links point to the newest GitHub release.
 
-| OS                  | Support                   | Download                                                                                                                                                                                                                                                                    |
-| ------------------- | :-----------------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows 10/11       | :green_heart:             | [Installer (.exe)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Windows-Setup.exe)                                                                                                                                        |
-| Linux x64           | :green_heart:             | [AppImage](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.AppImage) / [Debian package (.deb)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.deb)              |
-| macOS Apple Silicon | :green_heart:             | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-arm64.dmg)                                                                                                                                         |
-| macOS Intel         | :green_heart:             | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-x86_64.dmg)                                                                                                                                        |
+| OS                  |    Support    | Download                                                                                                                                                                                                                                                        |
+| ------------------- | :-----------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 10/11       | :green_heart: | [Installer (.exe)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Windows-Setup.exe)                                                                                                                           |
+| Linux x64           | :green_heart: | [AppImage](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.AppImage) / [Debian package (.deb)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.deb) |
+| macOS Apple Silicon | :green_heart: | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-arm64.dmg)                                                                                                                            |
+| macOS Intel         | :green_heart: | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-x86_64.dmg)                                                                                                                           |
 
 ## Compile it yourself!
 
@@ -56,6 +56,25 @@ All links point to the newest GitHub release.
    ```bash
    yarn tauri build
    ```
+
+### Optional Linux packaging
+
+- Flatpak:
+  ```bash
+  yarn tauri build
+  flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/gg.norisk.NoRiskClientLauncherV3.yaml
+  flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
+  ```
+- Snap:
+  ```bash
+  yarn tauri build
+  cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/snap/
+  cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
+  cd packaging/snap
+  snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
+  ```
+- AUR package metadata is available in `packaging/aur/PKGBUILD`.
+- RPM spec metadata is available in `packaging/rpm/FullriskLauncher.spec`.
 
 ## Disclaimer
 
