@@ -1,0 +1,27 @@
+pkgname=fullrisk-launcher
+pkgver=0.6.21
+pkgrel=1
+pkgdesc="FullRiskClient Launcher"
+arch=('x86_64')
+url="https://github.com/SirKnubble/fullriskclient-launcher"
+license=('MIT')
+depends=('bash')
+makedepends=('git' 'nodejs' 'yarn' 'rust' 'cargo' 'libwebkit2gtk' 'libayatana-appindicator3' 'librsvg' 'patchelf')
+source=("https://github.com/SirKnubble/fullriskclient-launcher/archive/refs/tags/v${pkgver}.tar.gz")
+sha512sums=('SKIP')
+
+build() {
+  cd "${srcdir}/fullriskclient-launcher-${pkgver}"
+  yarn install --immutable
+  yarn tauri build --release
+}
+
+package() {
+  cd "${srcdir}/fullriskclient-launcher-${pkgver}"
+  install -dm755 "${pkgdir}/opt/fullrisk-launcher"
+  cp -r src-tauri/target/release/bundle/* "${pkgdir}/opt/fullrisk-launcher/"
+
+  install -Dm755 "${pkgdir}/opt/fullrisk-launcher/appimage/FullriskLauncher-Linux.AppImage" "${pkgdir}/usr/bin/fullrisk-launcher"
+  install -Dm644 gg.norisk.NoRiskClientLauncherV3.desktop "${pkgdir}/usr/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop"
+  install -Dm644 src-tauri/icons/128x128.png "${pkgdir}/usr/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png"
+}

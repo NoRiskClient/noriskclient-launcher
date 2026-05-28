@@ -1,0 +1,25 @@
+name: fullrisk-launcher
+base: core24
+version: "0.6.21"
+summary: FullRiskClient Launcher
+description: |
+  FullRiskClient Launcher built from the NoRiskClient/FullRiskClient launcher repository.
+grade: stable
+confinement: strict
+
+apps:
+  fullrisk-launcher:
+    command: bin/fullrisk-launcher
+    plugs: [desktop, desktop-legacy, x11, wayland, network, network-bind, home]
+    desktop: gg.norisk.NoRiskClientLauncherV3.desktop
+
+parts:
+  fullrisk-launcher:
+    plugin: dump
+    source: .
+    organize:
+      FullriskLauncher-Linux.AppImage: bin/fullrisk-launcher
+      gg.norisk.NoRiskClientLauncherV3.desktop: meta/gui/gg.norisk.NoRiskClientLauncherV3.desktop
+    override-build: |
+      snapcraftctl build
+      chmod +x "$SNAPCRAFT_PART_INSTALL/bin/fullrisk-launcher"

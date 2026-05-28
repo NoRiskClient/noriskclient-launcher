@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           windows='{"name":"windows","os":"windows-latest","target":"","args":"","artifact_name":"NoRiskClient-Windows","artifact_paths":"src-tauri/target/release/bundle/nsis/*.exe\nsrc-tauri/target/release/bundle/nsis/*.exe.sig"}'
-          linux='{"name":"linux","os":"ubuntu-22.04","target":"","args":"","artifact_name":"NoRiskClient-Linux","artifact_paths":"src-tauri/target/release/bundle/appimage/*.AppImage\nsrc-tauri/target/release/bundle/appimage/*.AppImage.sig\nsrc-tauri/target/release/bundle/appimage/*.AppImage.tar.gz\nsrc-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig\nsrc-tauri/target/release/bundle/deb/*.deb\nsrc-tauri/target/release/bundle/deb/*.deb.sig\nsrc-tauri/target/release/bundle/deb/*.deb.tar.gz\nsrc-tauri/target/release/bundle/deb/*.deb.tar.gz.sig"}'
+          linux='{"name":"linux","os":"ubuntu-22.04","target":"","args":"","artifact_name":"NoRiskClient-Linux","artifact_paths":"src-tauri/target/release/bundle/appimage/*.AppImage\nsrc-tauri/target/release/bundle/appimage/*.AppImage.sig\nsrc-tauri/target/release/bundle/appimage/*.AppImage.tar.gz\nsrc-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig\nsrc-tauri/target/release/bundle/deb/*.deb\nsrc-tauri/target/release/bundle/deb/*.deb.sig\nsrc-tauri/target/release/bundle/deb/*.deb.tar.gz\nsrc-tauri/target/release/bundle/deb/*.deb.tar.gz.sig\nsrc-tauri/target/release/bundle/rpm/*.rpm\nsrc-tauri/target/release/bundle/rpm/*.rpm.sig\nsrc-tauri/target/release/bundle/rpm/*.rpm.tar.gz\nsrc-tauri/target/release/bundle/rpm/*.rpm.tar.gz.sig\nsrc-tauri/target/release/bundle/snap/*.snap\nsrc-tauri/target/release/bundle/flatpak/*.flatpak\nsrc-tauri/target/release/bundle/aur/*.pkg.tar.*"}'
           macos_arm64='{"name":"macos-arm64","os":"macos-latest","target":"aarch64-apple-darwin","args":"--target aarch64-apple-darwin","artifact_name":"NoRiskClient-MacOS-arm64","artifact_paths":"src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg\nsrc-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg.sig\nsrc-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz\nsrc-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig"}'
           macos_x86_64='{"name":"macos-x86_64","os":"macos-latest","target":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin","artifact_name":"NoRiskClient-MacOS-x86_64","artifact_paths":"src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg\nsrc-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg.sig\nsrc-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz\nsrc-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig"}'
 
@@ -87,7 +87,8 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm flatpak flatpak-builder
+          sudo snap install snapcraft --classic
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -151,6 +152,38 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: yarn tauri build --verbose ${{ matrix.args }}
 
+      - name: Build Flatpak bundle
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p src-tauri/target/release/bundle/flatpak
+          cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/flatpak/
+          flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
+
+      - name: Build Snap package
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p src-tauri/target/release/bundle/snap
+          cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/snap/
+          cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
+          cd packaging/snap
+          snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
+
+      - name: Build RPM package
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
+          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.21/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.21.tar.gz
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
+          mkdir -p src-tauri/target/release/bundle/rpm
+          cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
+
+      - name: Build AUR package
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p src-tauri/target/release/bundle/aur
+          docker run --rm -v "$PWD:/work" -w /work archlinux:latest /bin/bash -lc "pacman -Sy --noconfirm archlinux-keyring base-devel git nodejs npm yarn rust cargo && useradd -m builder && chown -R builder:builder /work && su builder -c 'cd /work/packaging/aur && makepkg -s --noconfirm && cp *.pkg.tar.* /work/src-tauri/target/release/bundle/aur/'"
+
       - name: Rename artifacts
         shell: bash
         run: |
@@ -179,6 +212,19 @@ jobs:
                   ;;
                 linux:*.deb)
                   renamed="FullriskLauncher-Linux.deb"
+                  ;;
+                linux:*.rpm)
+                  renamed="FullriskLauncher-Linux.rpm"
+                  ;;
+                linux:*.snap)
+                  renamed="FullriskLauncher-Linux.snap"
+                  ;;
+                linux:*.flatpak)
+                  renamed="FullriskLauncher-Linux.flatpak"
+                  ;;
+                linux:*.pkg.tar.*)
+                  suffix="${name##*.pkg.tar.}"
+                  renamed="FullriskLauncher-Linux.pkg.tar.${suffix}"
                   ;;
                 macos-arm64:*.dmg)
                   renamed="FullriskLauncher-macOS-arm64.dmg"
