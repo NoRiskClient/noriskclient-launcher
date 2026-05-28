@@ -1,0 +1,8 @@
+{
+  "settings": {
+    "blur": {
+      "title": "Disable Blur Effect",
+      "description": "Removes the backdrop blur from the launcher window for clearer visibility while playing"
+    }
+  }
+}
