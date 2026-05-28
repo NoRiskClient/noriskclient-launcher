@@ -156,7 +156,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p src-tauri/target/release/bundle/flatpak
-          cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/flatpak/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/flatpak/
           flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
           flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
 
@@ -164,7 +164,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p src-tauri/target/release/bundle/snap
-          cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/snap/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/snap/
           cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
           cd packaging/snap
           snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
