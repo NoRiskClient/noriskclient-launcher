@@ -161,6 +161,12 @@ jobs:
             org.freedesktop.Platform//24.08 \
             org.freedesktop.Sdk//24.08
 
+      - name: Prepare Flatpak input
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p packaging/flatpak/sources
+          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/flatpak/sources/app.AppImage
+
       - name: Build Flatpak bundle
         if: matrix.os == 'ubuntu-22.04'
         run: |

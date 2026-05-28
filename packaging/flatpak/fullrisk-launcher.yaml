@@ -2,7 +2,9 @@ app-id: gg.norisk.NoRiskClientLauncherV3
 runtime: org.freedesktop.Platform
 runtime-version: "24.08"
 sdk: org.freedesktop.Sdk
+
 command: fullrisk-launcher
+
 finish-args:
   - --share=network
   - --share=home
@@ -10,14 +12,15 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
-  - --talk-name=org.freedesktop.Flatpak
+
 modules:
   - name: fullrisk-launcher
     buildsystem: simple
+
     build-commands:
-      - install -Dm755 NoRiskClient-Linux.AppImage /app/bin/fullrisk-launcher
-      - install -Dm644 ../../gg.norisk.NoRiskClientLauncherV3.desktop /app/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop
-      - install -Dm644 ../../src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png
+      - install -D sources/app.AppImage /app/bin/fullrisk-launcher.AppImage
+      - chmod +x /app/bin/fullrisk-launcher.AppImage
+
     sources:
       - type: file
-        path: NoRiskClient-Linux.AppImage
+        path: sources/app.AppImage
