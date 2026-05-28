@@ -69,7 +69,7 @@ All links point to the newest GitHub release.
 - Snap:
   ```bash
   yarn tauri build
-  cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/snap/
+  cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/snap/
   cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
   cd packaging/snap
   snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap

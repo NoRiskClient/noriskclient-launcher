@@ -22,7 +22,7 @@ mkdir -p %{buildroot}/opt/fullrisk-launcher
 cp -r src-tauri/target/release/bundle/* %{buildroot}/opt/fullrisk-launcher/
 cat > %{buildroot}/usr/bin/fullrisk-launcher <<'EOF'
 #!/bin/sh
-exec /opt/fullrisk-launcher/FullriskLauncher-Linux.AppImage "$@"
+exec /opt/fullrisk-launcher/NoRiskClient-Linux.AppImage "$@"
 EOF
 chmod +x %{buildroot}/usr/bin/fullrisk-launcher
 install -Dm644 gg.norisk.NoRiskClientLauncherV3.desktop %{buildroot}/usr/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop

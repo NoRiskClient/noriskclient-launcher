@@ -18,7 +18,7 @@ parts:
     plugin: dump
     source: .
     organize:
-      FullriskLauncher-Linux.AppImage: bin/fullrisk-launcher
+      NoRiskClient-Linux.AppImage: bin/fullrisk-launcher
       gg.norisk.NoRiskClientLauncherV3.desktop: meta/gui/gg.norisk.NoRiskClientLauncherV3.desktop
     override-build: |
       snapcraftctl build

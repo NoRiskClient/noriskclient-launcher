@@ -21,7 +21,7 @@ package() {
   install -dm755 "${pkgdir}/opt/fullrisk-launcher"
   cp -r src-tauri/target/release/bundle/* "${pkgdir}/opt/fullrisk-launcher/"
 
-  install -Dm755 "${pkgdir}/opt/fullrisk-launcher/appimage/FullriskLauncher-Linux.AppImage" "${pkgdir}/usr/bin/fullrisk-launcher"
+  install -Dm755 "${pkgdir}/opt/fullrisk-launcher/appimage/NoRiskClient-Linux.AppImage" "${pkgdir}/usr/bin/fullrisk-launcher"
   install -Dm644 gg.norisk.NoRiskClientLauncherV3.desktop "${pkgdir}/usr/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop"
   install -Dm644 src-tauri/icons/128x128.png "${pkgdir}/usr/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png"
 }
