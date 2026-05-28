@@ -7,7 +7,6 @@ use crate::state::profile_state::ModSource;
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
 use crate::utils::download_utils::DownloadUtils;
-use crate::utils::file_utils;
 use crate::utils::{datapack_utils, hash_utils, resourcepack_utils, shaderpack_utils};
 use async_zip::tokio::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
@@ -788,37 +787,6 @@ pub async fn open_latest_log_for_profile<R: tauri::Runtime>(
             Err(AppError::Other(format!("Failed to open log file: {}", e)))
         }
     }
-}
-
-/// Gets the content of the `latest.log` file for a given profile.
-///
-/// # Arguments
-///
-/// * `profile_id` - The UUID of the profile whose log content is needed.
-///
-/// # Returns
-///
-/// Returns `Ok(String)` containing the log content on success.
-/// Returns an empty string in `Ok` if the log file is not found.
-/// Returns an `AppError` if the profile instance path cannot be determined or reading fails.
-pub async fn get_latest_log_content(profile_id: Uuid) -> Result<String> {
-    info!(
-        "Attempting to get latest.log content for profile {}",
-        profile_id
-    );
-
-    // Get the profile instance path
-    let state = State::get().await?;
-    let instance_path = state
-        .profile_manager
-        .get_profile_instance_path(profile_id)
-        .await?;
-
-    // Construct the path to the log file
-    let log_path = instance_path.join("logs").join("latest.log");
-
-    // Use the new utility function to read the log file content
-    file_utils::read_log_file_content(&log_path).await
 }
 
 /// Lists all log files (`.log` and `.log.gz`) for a given profile.

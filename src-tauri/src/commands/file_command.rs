@@ -916,3 +916,51 @@ pub async fn list_all_mc_logs() -> Result<Vec<FileInfo>, CommandError> {
     info!("Found {} MC log files across all profiles", all_files.len());
     Ok(all_files)
 }
+
+/// Lists archived game-session process logs from {launcher_root}/logs/game/
+#[tauri::command]
+pub async fn list_process_logs() -> Result<Vec<FileInfo>, CommandError> {
+    let archive_dir = crate::utils::log_archive::archive_root();
+    info!("Listing archived process logs from: {:?}", archive_dir);
+
+    if !archive_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut all_files = Vec::new();
+    let mut sessions = fs::read_dir(&archive_dir)
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?;
+
+    while let Ok(Some(session)) = sessions.next_entry().await {
+        let session_path = session.path();
+        if !session_path.is_dir() {
+            continue;
+        }
+        let session_name = session.file_name().to_string_lossy().to_string();
+        let process_log = session_path.join("nrc-process.log");
+        if !process_log.is_file() {
+            continue;
+        }
+        if let Ok(metadata) = fs::metadata(&process_log).await {
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            all_files.push(FileInfo {
+                path: process_log.to_string_lossy().to_string(),
+                name: session_name,
+                size: metadata.len(),
+                modified,
+            });
+        }
+    }
+
+    all_files.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    info!("Found {} archived process logs", all_files.len());
+    Ok(all_files)
+}

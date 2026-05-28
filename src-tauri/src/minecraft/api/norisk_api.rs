@@ -564,7 +564,7 @@ impl NoRiskApi {
             "[NoRisk API] Fetching standard version profiles. Experimental: {}",
             is_experimental
         );
-        Self::get_from_norisk_endpoint("launcher/versions", norisk_token, None, is_experimental)
+        Self::get_from_norisk_endpoint("launcher/versions-v3", norisk_token, None, is_experimental)
             .await
     }
 

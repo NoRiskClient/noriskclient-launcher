@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::event_state::{
-    EventPayload, EventState, EventType, MinecraftProcessExitedPayload,
+    EventPayload, EventType, MinecraftProcessExitedPayload,
 };
 use crate::state::{self, post_init::PostInitializationHandler, State};
 use async_trait::async_trait;
@@ -16,8 +16,7 @@ use std::process::ExitStatus;
 use std::sync::Arc;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System};
 use tauri::Manager;
-use tokio::fs::{self as async_fs, File};
-use tokio::io::{AsyncBufReadExt, AsyncSeekExt, BufReader};
+use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -63,6 +62,8 @@ pub struct ProcessMetadata {
     pub profile_image_url: Option<String>,
     pub post_exit_hook: Option<String>,
     pub memory_max_mb: u32,
+    #[serde(default)]
+    pub log_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -77,7 +78,6 @@ pub enum ProcessState {
 #[derive(Debug)]
 struct Process {
     metadata: ProcessMetadata,
-    last_log_position: Arc<Mutex<u64>>,
 }
 
 // Kapselt die Nachricht, die vom notify event handler zum ProcessManager geschickt wird
@@ -273,7 +273,6 @@ impl ProcessManager {
                         );
                         let process_entry = Process {
                             metadata: metadata.clone(), // metadata hier klonen
-                            last_log_position: Arc::new(Mutex::new(0)),
                         };
                         processes_map_writer.insert(process_entry.metadata.id, process_entry);
                         log::debug!(
@@ -546,6 +545,54 @@ impl ProcessManager {
             command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         }
 
+        let process_id = Uuid::new_v4();
+        let session_start = Utc::now();
+
+        let mut log_session_id: Option<String> = None;
+        let mut log_writer_handle: Option<
+            Arc<Mutex<crate::utils::bounded_log_writer::BoundedLogWriter>>,
+        > = None;
+        {
+            let session = crate::utils::log_archive::SessionInfo {
+                process_id,
+                profile_id,
+                profile_name: profile_name.as_deref(),
+                minecraft_version: minecraft_version.as_deref(),
+                modloader: modloader.as_deref(),
+                modloader_version: modloader_version.as_deref(),
+                norisk_pack: norisk_pack.as_deref(),
+                account_name: account_name.as_deref(),
+                start_time: session_start,
+            };
+            match crate::utils::log_archive::create_session(&session) {
+                Ok((session_id, log_path)) => {
+                    match crate::utils::bounded_log_writer::BoundedLogWriter::create(
+                        log_path.clone(),
+                    )
+                    .await
+                    {
+                        Ok(writer) => {
+                            command.stdout(std::process::Stdio::piped());
+                            command.stderr(std::process::Stdio::piped());
+                            log_session_id = Some(session_id);
+                            log_writer_handle = Some(Arc::new(Mutex::new(writer)));
+                            log::info!(
+                                "Capturing game stdout/stderr to {:?} (capped at {} MB, rotates to .N.gz)",
+                                log_path,
+                                crate::utils::bounded_log_writer::MAX_LOG_BYTES / (1024 * 1024)
+                            );
+                        }
+                        Err(e) => log::warn!(
+                            "Could not open {:?} for bounded stdout/stderr capture: {}",
+                            log_path,
+                            e
+                        ),
+                    }
+                }
+                Err(e) => log::warn!("Could not create log session dir: {}", e),
+            }
+        }
+
         let mut tokio_command = tokio::process::Command::from(command);
         let mut child = tokio_command.spawn().map_err(|e| {
             log::error!(
@@ -555,16 +602,30 @@ impl ProcessManager {
             AppError::ProcessSpawnFailed(e.to_string())
         })?;
 
+        if let Some(writer) = log_writer_handle.as_ref() {
+            if let Some(stdout) = child.stdout.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stdout, writer, "stdout").await;
+                });
+            }
+            if let Some(stderr) = child.stderr.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stderr, writer, "stderr").await;
+                });
+            }
+        }
+
         let pid = child.id().ok_or_else(|| {
             log::error!("Failed to get PID immediately after spawning process.");
             AppError::ProcessSpawnFailed("Could not get PID".to_string())
         })?;
-        let process_id = Uuid::new_v4();
 
         let metadata = ProcessMetadata {
             id: process_id,
             profile_id,
-            start_time: Utc::now(),
+            start_time: session_start,
             state: ProcessState::Running,
             pid,
             account_uuid,
@@ -577,6 +638,7 @@ impl ProcessManager {
             profile_image_url,
             post_exit_hook,
             memory_max_mb,
+            log_session_id,
         };
 
         log::info!(
@@ -587,7 +649,6 @@ impl ProcessManager {
 
         let process_entry = Process {
             metadata: metadata.clone(),
-            last_log_position: Arc::new(Mutex::new(0)),
         };
 
         {
@@ -798,6 +859,17 @@ impl ProcessManager {
                             }
                         }
                     }
+                }
+            }
+
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                if let Some(session_id) = &metadata.log_session_id {
+                    crate::utils::log_archive::finalize_game_session(
+                        session_id,
+                        exit_code,
+                        success,
+                    )
+                    .await;
                 }
             }
 
@@ -1168,235 +1240,6 @@ impl ProcessManager {
         }
     }
 
-    async fn periodic_log_tailer(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
-        let mut interval = interval(Duration::from_secs(1)); // Log-Tailing kann weiterhin häufig sein
-        log::info!("Starting periodic log tailing task (crash reports handled by notify).");
-
-        loop {
-            interval.tick().await;
-            log::trace!("Running periodic log tail check...");
-
-            let app_state_res = state::State::get().await; // Holen des globalen Zustands
-            let app_state = match app_state_res {
-                Ok(state) => state,
-                Err(e) => {
-                    log::error!(
-                        "Log tailer failed to get global state: {}. Skipping cycle.",
-                        e
-                    );
-                    continue;
-                }
-            };
-
-            let processes_map_reader = processes_arc.read().await;
-            if processes_map_reader.is_empty() {
-                log::trace!("No processes to tail logs for.");
-                drop(processes_map_reader);
-                continue;
-            }
-
-            let processes_to_tail: Vec<(Uuid, Uuid, Arc<Mutex<u64>>)> = processes_map_reader
-                .iter()
-                .filter(|(_, process_entry)| {
-                    process_entry.metadata.state == ProcessState::Running
-                        || process_entry.metadata.state == ProcessState::Starting
-                })
-                .map(|(id, process_entry)| {
-                    (
-                        *id,
-                        process_entry.metadata.profile_id,
-                        Arc::clone(&process_entry.last_log_position),
-                    )
-                })
-                .collect();
-
-            drop(processes_map_reader);
-
-            for (process_id, profile_id, last_pos_mutex) in processes_to_tail {
-                let instance_path = match app_state // Verwende app_state Variable
-                    .profile_manager
-                    .get_profile_instance_path(profile_id)
-                    .await
-                {
-                    Ok(path) => path,
-                    Err(e) => {
-                        log::warn!("Could not get instance path for profile {} (process {}): {}. Skipping log tail.", profile_id, process_id, e);
-                        continue;
-                    }
-                };
-
-                let latest_log_path = instance_path.join("logs").join("latest.log");
-                if !latest_log_path.exists() {
-                    log::trace!(
-                        "Log file {:?} for process {} does not exist yet.",
-                        latest_log_path,
-                        process_id
-                    );
-                } else {
-                    if let Err(e) = Self::tail_log_file(
-                        &latest_log_path,
-                        process_id,
-                        &last_pos_mutex,
-                        &app_state.event_state, // Verwende app_state Variable
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "Error tailing log file {:?} for process {}: {}",
-                            latest_log_path,
-                            process_id,
-                            e
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-
-    async fn tail_log_file(
-        log_path: &PathBuf,
-        process_id: Uuid,
-        last_pos_mutex: &Arc<Mutex<u64>>,
-        event_state: &EventState,
-    ) -> Result<()> {
-        let current_metadata = tokio::fs::metadata(log_path).await.map_err(AppError::Io)?;
-        let current_size = current_metadata.len();
-
-        let mut last_pos_guard = last_pos_mutex.lock().await;
-        let original_last_pos = *last_pos_guard; // Store the original value from the mutex
-
-        let mut read_from_pos = original_last_pos;
-        let mut just_skipped_initial = false;
-
-        if current_size < original_last_pos {
-            log::info!("Log file {:?} seems to have rotated or shrunk (current: {}, last: {}). Resetting read position to 0.", log_path, current_size, original_last_pos);
-            read_from_pos = 0;
-            // After rotation, we read the new file from the start.
-        } else if original_last_pos == 0 && current_size > 0 {
-            // If last_pos was 0 (fresh process) and there's content,
-            // set read_from_pos to current_size to skip existing lines.
-            log::info!(
-                "Initial tail for process {} on log {:?}. Setting read position to end of file ({}) to capture only new lines.",
-                process_id,
-                log_path,
-                current_size
-            );
-            read_from_pos = current_size;
-            just_skipped_initial = true;
-        }
-
-        let mut bytes_actually_read: u64 = 0;
-
-        if current_size > read_from_pos {
-            log::trace!(
-                "Reading new logs from {:?} for process {} (from byte {} up to {})",
-                log_path,
-                process_id,
-                read_from_pos,
-                current_size
-            );
-            let file = File::open(log_path).await.map_err(AppError::Io)?;
-            let mut reader = BufReader::new(file);
-
-            reader
-                .seek(std::io::SeekFrom::Start(read_from_pos))
-                .await
-                .map_err(AppError::Io)?;
-
-            let mut byte_buffer = Vec::new();
-            loop {
-                let current_stream_pos = read_from_pos + bytes_actually_read;
-                if current_stream_pos >= current_size {
-                    break;
-                }
-                byte_buffer.clear();
-
-                match reader.read_until(b'\n', &mut byte_buffer).await {
-                    Ok(0) => break, // EOF
-                    Ok(bytes) => {
-                        let bytes_u64 = bytes as u64;
-
-                        //TODO ö,ä... richtig parsen
-                        let line_string = String::from_utf8_lossy(&byte_buffer);
-                        let trimmed_line = line_string.trim_end();
-
-                        if !trimmed_line.is_empty() {
-                            // Mask sensitive information before sending to UI
-                            let safe_line = crate::utils::security_utils::mask_sensitive_data(trimmed_line);
-
-                            log::trace!("Sending line for {}: {}", process_id, safe_line);
-                            let log_event_payload = EventPayload {
-                                event_id: Uuid::new_v4(),
-                                event_type: EventType::MinecraftOutput,
-                                target_id: Some(process_id),
-                                message: safe_line.to_string(),
-                                progress: None,
-                                error: None,
-                            };
-                            if let Err(e) = event_state.emit(log_event_payload).await {
-                                log::error!("Failed to emit log update via EventState: {}", e);
-                            }
-                        }
-
-                        bytes_actually_read += bytes_u64;
-
-                        if read_from_pos + bytes_actually_read > current_size {
-                            log::warn!(
-                                "Read beyond expected size in log tailer for {:?}. Correcting bytes_actually_read.",
-                                log_path
-                            );
-                            bytes_actually_read = current_size - read_from_pos; // Cap it
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Error reading bytes from log file {:?}: {}", log_path, e);
-                        if current_size > read_from_pos {
-                            bytes_actually_read = current_size - read_from_pos;
-                        } else {
-                            bytes_actually_read = 0; // No bytes could be read or determined
-                            log::warn!("Attempting to advance log position to end of current file size due to read error and unclear progress.");
-                        }
-                        break;
-                    }
-                }
-            }
-        } else {
-            if just_skipped_initial {
-                log::trace!(
-                    "Skipped reading initial content for process {} in {:?}. Log position will be set to {}.",
-                    process_id,
-                    log_path,
-                    current_size
-                );
-            } else {
-                log::trace!(
-                    "No new logs found for process {} in {:?}",
-                    process_id,
-                    log_path
-                );
-            }
-        }
-
-        // Update the stored last_log_position.
-        if just_skipped_initial {
-            // If we skipped, the new "last position" is the end of the file we skipped to.
-            *last_pos_guard = current_size;
-        } else {
-            // If we read (or attempted to read), the new position is where we started plus what we read.
-            *last_pos_guard = read_from_pos + bytes_actually_read;
-        }
-
-        log::trace!(
-            "Updated log position for process {} to {}",
-            process_id,
-            *last_pos_guard
-        );
-
-        Ok(())
-    }
-
     /// Periodically collects CPU and memory metrics for running processes.
     /// Emits ProcessMetricsUpdate events to the frontend.
     async fn periodic_metrics_collector(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
@@ -1512,57 +1355,6 @@ impl ProcessManager {
                 }
             }
         }
-    }
-
-    /// Retrieves the full content of the latest.log file for a given process.
-    /// Internally accesses the global state to get the ProfileManager.
-    pub async fn get_full_log_content(&self, process_id: Uuid) -> Result<String> {
-        log::info!(
-            "Attempting to get full log content for process {}",
-            process_id
-        );
-
-        // 1. Get profile_id from this ProcessManager's state
-        let process_metadata = self.get_process_metadata(process_id).await.ok_or_else(|| {
-            log::warn!(
-                "Process {} not found in ProcessManager when getting full log.",
-                process_id
-            );
-            AppError::ProcessNotFound(process_id)
-        })?;
-        let profile_id = process_metadata.profile_id;
-        log::debug!("Found profile_id {} for process {}", profile_id, process_id);
-
-        // 2. Get instance_path using the global state
-        let app_state = state::State::get().await?; // Get global state
-        let instance_path = app_state
-            .profile_manager
-            .get_profile_instance_path(profile_id)
-            .await?; // Access profile manager
-        let log_path = instance_path.join("logs").join("latest.log");
-        log::debug!("Constructed log path for full read: {:?}", log_path);
-
-        // 3. Read the log file content
-        if !log_path.exists() {
-            log::warn!("Log file not found at path: {:?}", log_path);
-            return Ok("".to_string());
-        }
-
-        // Read file as bytes first to handle potential invalid UTF-8
-        let log_bytes = async_fs::read(&log_path).await.map_err(|e| {
-            log::error!("Failed to read log file bytes {:?}: {}", log_path, e);
-            AppError::Io(e)
-        })?;
-
-        // Convert bytes to string, replacing invalid sequences
-        let log_content = String::from_utf8_lossy(&log_bytes).to_string();
-
-        log::info!(
-            "Successfully read {} bytes (lossy converted to string) from log file for process {}",
-            log_bytes.len(),
-            process_id
-        );
-        Ok(log_content)
     }
 
     /// Fetches the latest crash report for a given profile.
@@ -1894,10 +1686,6 @@ impl PostInitializationHandler for ProcessManager {
             notify_tx_for_periodic_check,
         ));
         log::info!("ProcessManager: Spawned periodic_process_check task.");
-
-        let tailer_processes_arc = Arc::clone(&self.processes);
-        tokio::spawn(Self::periodic_log_tailer(tailer_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_log_tailer task.");
 
         let metrics_processes_arc = Arc::clone(&self.processes);
         tokio::spawn(Self::periodic_metrics_collector(metrics_processes_arc));

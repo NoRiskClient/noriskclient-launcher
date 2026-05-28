@@ -295,6 +295,7 @@ export interface ExportProfileParams {
 export interface UploadProfileIconPayload {
   path?: string;      // Source path of the image file (optional)
   profileId: string; // UUID of the profile (as string)
+  iconUrl?: string;  // Optional URL to download the image from
   imageType: string; // "icon" or "background"
 }
 

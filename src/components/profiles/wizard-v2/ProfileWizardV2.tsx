@@ -15,6 +15,8 @@ import { ProfileWizardV2Step2 } from "./ProfileWizardV2Step2";
 import { ProfileWizardV2Step3 } from "./ProfileWizardV2Step3";
 import { useProfileStore } from "../../../store/profile-store";
 import type { CreateProfileParams } from "../../../types/profile";
+import type { ChosenIcon } from "../IconPicker";
+import { uploadProfileImages } from "../../../services/profile-service";
 import { toast } from "react-hot-toast";
 import { Tooltip } from "../../ui/Tooltip";
 import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
@@ -159,6 +161,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     memoryMaxMb: number;
     selectedNoriskPackId: string | null;
     use_shared_minecraft_folder?: boolean;
+    chosenIcon: ChosenIcon;
   }) => {
     const { createProfile } = useProfileStore.getState();
 
@@ -191,6 +194,18 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
       if (Object.keys(updateData).length > 0) {
         await useProfileStore.getState().updateProfile(profileId, updateData);
+      }
+
+      // Apply the chosen profile icon (best-effort — a download failure must not abort creation)
+      try {
+        const icon = profileData.chosenIcon;
+        await uploadProfileImages({
+          profileId,
+          imageType: "icon",
+          ...("url" in icon ? { iconUrl: icon.url } : { path: icon.path }),
+        });
+      } catch (iconErr) {
+        console.warn("Failed to apply profile icon:", iconErr);
       }
 
       const createdProfile = await useProfileStore.getState().getProfile(profileId);

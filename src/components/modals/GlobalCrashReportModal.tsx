@@ -5,10 +5,10 @@ import { useCrashModalStore } from '../../store/crash-modal-store';
 import { Button } from '../ui/buttons/Button';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { getProfile, getProfileLatestLogContent } from '../../services/profile-service';
+import { getProfile } from '../../services/profile-service';
 import { uploadLogToMclogs } from '../../services/log-service';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { submitCrashLog, fetchCrashReport } from '../../services/process-service';
+import { submitCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
 import type { CrashlogDto } from '../../types/processState';
 import { openExternalUrl } from '../../services/tauri-service';
 import { Window } from '@tauri-apps/api/window';
@@ -229,11 +229,14 @@ export function GlobalCrashReportModal() {
 
       if (!currentMclogsUrl) {
         toast.loading(t('crash_modal.toast.fetching_log'), { id: mainToastId });
-        const logContent = await getProfileLatestLogContent(crashData.profile_id);
-        
+        const sessionId = crashData.process_metadata?.log_session_id;
+        const logContent = sessionId
+          ? (await getProcessLogCursor(sessionId, 0)).output
+          : "";
+
         let combinedLogContent = logContent;
         if (displayedCrashReportContent && displayedCrashReportContent.trim() !== "") {
-          combinedLogContent = `--- CRASH REPORT ---\n${displayedCrashReportContent}\n\n--- LATEST LOG ---\n${logContent}`;
+          combinedLogContent = `--- CRASH REPORT ---\n${displayedCrashReportContent}\n\n--- GAME LOG ---\n${logContent}`;
           toast.loading(t('crash_modal.toast.preparing_combined'), { id: mainToastId });
         }
 

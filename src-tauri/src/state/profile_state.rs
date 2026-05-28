@@ -474,7 +474,14 @@ impl ProfileManager {
 
         let profiles_data = {
             let profiles_guard = self.profiles.read().await;
-            let profiles_vec: Vec<&Profile> = profiles_guard.values().collect();
+            // Transient/temp profiles (CLI `temp` subcommand) live only in the
+            // in-memory map — their `path` starts with "noriskclient/temp/".
+            // They must never be persisted, even if an unrelated save fires
+            // while one is active.
+            let profiles_vec: Vec<&Profile> = profiles_guard
+                .values()
+                .filter(|p| !p.path.starts_with("noriskclient/temp/"))
+                .collect();
 
             // Validate that we have profiles to save
             if profiles_vec.is_empty() {
@@ -516,6 +523,21 @@ impl ProfileManager {
 
         info!("ProfileManager: Successfully saved {} profiles", self.profiles.read().await.len());
         Ok(())
+    }
+
+    /// Inserts a profile into the in-memory map WITHOUT persisting to
+    /// `profiles.json`. Used for throwaway temp profiles (CLI `temp` subcommand)
+    /// so that by-id lookups during launch — `get_profile`,
+    /// `get_profile_instance_path`, `list_custom_mods`, ProcessManager
+    /// playtime/crash handling — all succeed. `save_profiles()` filters these
+    /// out by their `temp/` path prefix, so they never reach disk.
+    pub async fn register_transient_profile(&self, profile: Profile) {
+        let id = profile.id;
+        self.profiles.write().await.insert(id, profile);
+        log::info!(
+            "[ProfileManager] Registered transient (temp) profile {} (in-memory only)",
+            id
+        );
     }
 
     // CRUD Operationen
@@ -2230,10 +2252,15 @@ impl ProfileManager {
     pub fn get_profile_mods_path_single(&self, profile: &Profile) -> Result<PathBuf> {
         let instance_path = self.calculate_instance_path_for_profile(profile)?;
         let mods_path = match profile.loader {
-            ModLoader::Fabric => {
-                let fabric_version_folder = format!("{}-{}-{}", "nrc", profile.game_version, "fabric");
-                instance_path.join("mods").join(fabric_version_folder)
-            }
+            ModLoader::Fabric => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-fabric", profile.game_version)),
+            ModLoader::Forge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-forge", profile.game_version)),
+            ModLoader::NeoForge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-neoforge", profile.game_version)),
             _ => instance_path.join("mods"),
         };
         log::debug!(
@@ -2258,10 +2285,15 @@ impl ProfileManager {
         };
         
         let mods_path = match profile.loader {
-            ModLoader::Fabric => {
-                let fabric_version_folder = format!("nrc-{}-fabric-{}", profile.game_version, uuid_short);
-                instance_path.join("mods").join(fabric_version_folder)
-            }
+            ModLoader::Fabric => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-fabric-{}", profile.game_version, uuid_short)),
+            ModLoader::Forge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-forge-{}", profile.game_version, uuid_short)),
+            ModLoader::NeoForge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-neoforge-{}", profile.game_version, uuid_short)),
             _ => instance_path.join("mods"),
         };
         log::debug!(

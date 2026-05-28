@@ -8,6 +8,7 @@ import {
   listLauncherLogs,
   listCrashReports,
   listAllMcLogs,
+  listProcessLogs,
   getLogFileContent,
   uploadLogToMclogs,
   type FileInfo,
@@ -22,7 +23,7 @@ import {
   openTesterWindow,
 } from "../../services/tester-service";
 
-type DebugTab = "launcher" | "minecraft" | "crashes" | "permissions";
+type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions";
 
 export function DebugSection() {
   const { t } = useTranslation();
@@ -50,6 +51,9 @@ export function DebugSection() {
         setFiles(logs);
       } else if (activeTab === "minecraft") {
         const logs = await listAllMcLogs();
+        setFiles(logs);
+      } else if (activeTab === "process") {
+        const logs = await listProcessLogs();
         setFiles(logs);
       } else if (activeTab === "crashes") {
         const crashes = await listCrashReports();
@@ -112,6 +116,7 @@ export function DebugSection() {
   const groups: GroupTab[] = [
     { id: "launcher", name: "Launcher Logs", count: 0 },
     { id: "minecraft", name: "MC Logs", count: 0 },
+    { id: "process", name: "Process Logs", count: 0 },
     { id: "crashes", name: "Crash Reports", count: 0 },
     { id: "permissions", name: t('debug.permissions.tab'), count: permissions?.nodes.length ?? 0 },
   ];

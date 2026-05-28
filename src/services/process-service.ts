@@ -107,20 +107,26 @@ export async function openLogWindow(processId: string): Promise<void> {
   }
 }
 
-/**
- * Fetches the full log content for a specific process ID (Uuid).
- */
-export async function getLogContentForProcess(processId: string): Promise<string> {
-  console.debug(`[ProcessService] Fetching full log for process ID: ${processId}`);
+export async function getProcess(processId: string): Promise<ProcessMetadata | null> {
   try {
-    const logContent = await invoke<string>("get_full_log", { processId });
-    return logContent || ""; // Return empty string if null/undefined
+    return await invoke<ProcessMetadata | null>("get_process", { processId });
   } catch (error) {
-    console.error(`[ProcessService] Failed to get full log for process ID ${processId}:`, error);
-    // Return an empty string or re-throw based on how errors should be handled downstream
-    return ""; 
-    // throw error; 
+    console.error(`[ProcessService] Failed to get process ${processId}:`, error);
+    return null;
   }
+}
+
+export interface ProcessLogCursor {
+  cursor: number;
+  output: string;
+  new_file: boolean;
+}
+
+export async function getProcessLogCursor(
+  sessionId: string,
+  cursor: number,
+): Promise<ProcessLogCursor> {
+  return invoke<ProcessLogCursor>("get_process_log_cursor", { sessionId, cursor });
 }
 
 /**

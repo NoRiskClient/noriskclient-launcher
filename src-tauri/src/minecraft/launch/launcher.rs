@@ -369,6 +369,45 @@ impl MinecraftLauncher {
         // Pass meta dir to game client for shared Discord state file
         command.arg(format!("-Dnorisk.meta.dir={}", crate::config::LAUNCHER_DIRECTORY.meta_dir().display()));
 
+        // Hand off asset management to the in-game client only for packs whose
+        // client owns asset management (see `client_managed_assets`). Every
+        // other pack runs the legacy launcher-side asset pipeline — passing the
+        // props there would double-write the cache alongside it.
+        let effective_pack = match &profile {
+            Some(p) => p.effective_norisk_pack_id().await,
+            None => None,
+        };
+        if effective_pack
+            .as_deref()
+            .map(crate::minecraft::downloads::client_managed_assets)
+            .unwrap_or(false)
+        {
+            let pack_id = effective_pack.as_deref().unwrap();
+
+            // Layout matches norisk_assets_download.rs
+            // (`<meta>/assets/noriskclient/<bucket>/objects/...`) so any blob
+            // we've already downloaded is reusable as-is.
+            let assets_root = crate::config::LAUNCHER_DIRECTORY
+                .meta_dir()
+                .join("assets")
+                .join("noriskclient");
+            command.arg(format!("-Dnrc.assets.dir={}", assets_root.display()));
+
+            // Bucket list comes from the resolved pack's `assets` field
+            // (norisk_modpacks.json). Order is base→priority — client overlays
+            // the last entry on top, falling back per-asset.
+            let packs_config = state.norisk_pack_manager.get_config().await;
+            match packs_config.get_resolved_pack_definition(pack_id) {
+                Ok(pack_def) if !pack_def.assets.is_empty() => {
+                    command.arg(format!("-Dnrc.assets.bucket={}", pack_def.assets.join(",")));
+                }
+                Ok(_) => {}
+                Err(e) => log::warn!("[launcher] Resolving pack '{}' for nrc.assets.bucket failed: {}", pack_id, e),
+            }
+        } else {
+            info!("[launcher] pack not client-managed — running legacy asset pipeline, omitting -Dnrc.assets.* JVM args");
+        }
+
         if let Some(creds) = &self.credentials {
             if has_norisk_pack {
                 // Get the appropriate NoRisk token based on experimental mode setting
@@ -409,23 +448,28 @@ impl MinecraftLauncher {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
         }
 
-        // Add Fabric specific mods folder argument if loader is Fabric
-        // Note: When using -Dfabric.addMods (prototype), this is still harmless and allows user mods in mods/.
+        // Add per-loader mods-folder JVM argument so the loader picks up jars from the
+        // launcher-managed per-version directory (analogous to fabric.modsFolder, mirrored
+        // for Forge/NeoForge via nrc-forgeloader's -Dnrc.modsFolder).
+        // Note: complementary to addMods=@<meta>, both sources are merged by the loader.
         if let Some(p_ref) = &profile {
-            if p_ref.loader == crate::state::profile_state::ModLoader::Fabric {
+            let prop: Option<&str> = match p_ref.loader {
+                crate::state::profile_state::ModLoader::Fabric => Some("fabric.modsFolder"),
+                crate::state::profile_state::ModLoader::Forge
+                | crate::state::profile_state::ModLoader::NeoForge => Some("nrc.modsFolder"),
+                _ => None,
+            };
+            if let Some(prop) = prop {
                 match state.profile_manager.get_profile_mods_path(p_ref) {
                     Ok(mods_path) => {
                         let mods_path_str = mods_path.to_string_lossy().replace("\\", "/");
-                        let fabric_mods_arg = format!("-Dfabric.modsFolder={}", mods_path_str);
-                        info!(
-                            "Adding Fabric mods folder JVM argument: {}",
-                            fabric_mods_arg
-                        );
-                        command.arg(fabric_mods_arg);
+                        let mods_arg = format!("-D{}={}", prop, mods_path_str);
+                        info!("Adding mods folder JVM argument: {}", mods_arg);
+                        command.arg(mods_arg);
                     }
                     Err(e) => {
                         warn!(
-                            "Could not get Fabric mods path for profile '{}' (ID: {}): {}. Fabric mods folder argument will not be set.",
+                            "Could not get mods path for profile '{}' (ID: {}): {}. Mods folder argument will not be set.",
                             p_ref.name, p_ref.id, e
                         );
                     }

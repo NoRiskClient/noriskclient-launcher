@@ -26,6 +26,42 @@
       "desktop": {
         "schemes": ["norisk"]
       }
+    },
+    "cli": {
+      "description": "NoRisk Launcher",
+      "subcommands": {
+        "launch": {
+          "description": "Launch a profile with runtime-only overrides (does not persist)",
+          "args": [
+            { "name": "profile",        "short": "p", "takesValue": true, "required": true, "description": "Profile UUID or exact name" },
+            { "name": "mc",                           "takesValue": true,                   "description": "Override game version, e.g. 1.21.11" },
+            { "name": "loader",                       "takesValue": true,                   "description": "Override loader (vanilla|fabric|forge|neoforge|quilt)" },
+            { "name": "loader-version",               "takesValue": true,                   "description": "Override loader version, e.g. 21.1.203" },
+            { "name": "pack",                         "takesValue": true,                   "description": "Override NoRisk pack id" },
+            { "name": "world",          "short": "w", "takesValue": true,                   "description": "Quick-play: join this singleplayer world on launch" },
+            { "name": "server",         "short": "s", "takesValue": true,                   "description": "Quick-play: connect to this server address on launch" },
+            { "name": "mods",                         "takesValue": true,                   "description": "Local mod jar(s) to load in-place (runtime-only): comma-separated paths, each a .jar file or a directory of jars" },
+            { "name": "account",       "short": "a", "takesValue": true,                   "description": "Launch with this Minecraft account (username or UUID); defaults to the active account" }
+          ]
+        },
+        "version": {
+          "description": "Print launcher version and exit"
+        },
+        "temp": {
+          "description": "Launch a throwaway MC instance (in-memory profile, no profiles.json entry; instance dir swept to trash on next launcher start)",
+          "args": [
+            { "name": "mc",             "short": "m", "takesValue": true, "required": true,  "description": "MC version, e.g. 26.1 or 1.21.11" },
+            { "name": "loader",         "short": "l", "takesValue": true, "required": true,  "description": "vanilla|fabric|forge|neoforge|quilt" },
+            { "name": "loader-version",               "takesValue": true,                    "description": "Optional explicit loader version (auto-resolved if omitted)" },
+            { "name": "pack",                         "takesValue": true,                    "description": "Optional NoRisk pack id" },
+            { "name": "name",                         "takesValue": true,                    "description": "Optional display name (default: temp-<short-uuid>)" },
+            { "name": "world",          "short": "w", "takesValue": true,                    "description": "Quick-play: join this singleplayer world on launch" },
+            { "name": "server",         "short": "s", "takesValue": true,                    "description": "Quick-play: connect to this server address on launch" },
+            { "name": "mods",                         "takesValue": true,                    "description": "Local mod jar(s) to load in-place: comma-separated paths, each a .jar file or a directory of jars" },
+            { "name": "account",       "short": "a", "takesValue": true,                    "description": "Launch with this Minecraft account (username or UUID); defaults to the active account" }
+          ]
+        }
+      }
     }
   },
   "app": {

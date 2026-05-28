@@ -6,6 +6,7 @@
 
 #[macro_use]
 mod utils;
+mod cli;
 mod commands;
 mod config;
 mod error;
@@ -28,8 +29,8 @@ use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::process_command::{
-    fetch_crash_report, focus_main_window, get_full_log, get_process, get_processes,
-    get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
+    fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
+    get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
     set_discord_state, stop_process,
 };
 use commands::minecraft_auth_command::{
@@ -65,7 +66,8 @@ use commands::profile_command::{
     export_profile, get_all_profiles_and_last_played, get_custom_mods, get_local_content,
     get_local_datapacks, get_local_resourcepacks, get_local_shaderpacks, get_log_file_content,
     get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_structure,
-    get_profile_latest_log_content, get_profile_log_files, get_servers_for_profile,
+    get_profile_log_files,
+    get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
@@ -106,7 +108,8 @@ use commands::modrinth_commands::{
 
 use commands::file_command::{
     delete_file, get_icons_for_archives, get_icons_for_norisk_mods, list_all_mc_logs,
-    list_crash_reports, list_launcher_logs, open_file, open_file_directory, read_file_bytes,
+    list_crash_reports, list_launcher_logs, list_process_logs, open_file, open_file_directory,
+    read_file_bytes,
     set_file_enabled,
 };
 
@@ -182,8 +185,15 @@ let default_panic_hook = std::panic::take_hook();
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+
+            // If the second invocation carried a CLI subcommand we recognize,
+            // service it instead of bringing the window to the front.
+            if cli::dispatch_hot_start(app, argv.clone()) {
+                return;
+            }
 
             match app.get_webview_window("main") {
                 Some(window) => {
@@ -209,6 +219,12 @@ let default_panic_hook = std::panic::take_hook();
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // CLI cold-start: handle subcommands (version short-circuits GUI;
+            // launch fires asynchronously after State::init completes).
+            if cli::dispatch_cold_start(&app_handle) {
+                return Ok(());
+            }
 
             // --- Initialize System Tray (Tauri 2.0) ---
             let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
@@ -377,6 +393,18 @@ let default_panic_hook = std::panic::take_hook();
                     return;
                 }
                 info!("State initialization finished successfully.");
+
+                // Sweep last session's throwaway temp profiles into the trash
+                // (non-blocking, best-effort). The trash's purge_expired retention
+                // then deletes them for good. See utils::trash_utils.
+                tauri::async_runtime::spawn(async {
+                    utils::trash_utils::reap_temp_profiles().await;
+                });
+
+                // Issue #130: recover disk from pre-fix runaway logs.
+                tauri::async_runtime::spawn(async {
+                    utils::log_archive::cleanup_oversized_logs().await;
+                });
 
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
@@ -590,7 +618,7 @@ let default_panic_hook = std::panic::take_hook();
             set_norisk_mod_status,
             update_modrinth_mod_version,
             get_all_modrinth_versions_for_contexts,
-            get_full_log,
+            get_process_log_cursor,
             fetch_crash_report,
             get_custom_mods,
             get_local_resourcepacks,
@@ -651,7 +679,6 @@ let default_panic_hook = std::panic::take_hook();
             batch_check_content_installed,
             check_for_group_migration_command,
             open_profile_latest_log,
-            get_profile_latest_log_content,
             detect_java_installations_command,
             get_java_info_command,
             find_best_java_for_minecraft_command,
@@ -670,6 +697,7 @@ let default_panic_hook = std::panic::take_hook();
             list_launcher_logs,
             list_crash_reports,
             list_all_mc_logs,
+            list_process_logs,
             open_file,
             read_file_bytes,
             get_app_version,
@@ -747,6 +775,8 @@ let default_panic_hook = std::panic::take_hook();
             refresh_vanilla_cape_data,
             track_analytics_event,
             commands::analytics_command::get_system_os_info,
+            commands::profile_command::launch_profile_with_overrides,
+            commands::profile_command::launch_temp_profile,
             commands::profile_command::add_profile_symlink,
             commands::profile_command::remove_profile_symlink,
             commands::profile_command::get_profile_symlinks,
