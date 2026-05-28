@@ -156,7 +156,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p src-tauri/target/release/bundle/flatpak
-          cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/flatpak/
+          cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/flatpak/
           flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
           flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
 
@@ -164,7 +164,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p src-tauri/target/release/bundle/snap
-          cp src-tauri/target/release/bundle/appimage/FullriskLauncher-Linux.AppImage packaging/snap/
+          cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/snap/
           cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
           cd packaging/snap
           snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
@@ -173,7 +173,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
-          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.21/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.21.tar.gz
+          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
           rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
           mkdir -p src-tauri/target/release/bundle/rpm
           cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
