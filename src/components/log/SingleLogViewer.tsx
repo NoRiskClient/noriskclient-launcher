@@ -15,7 +15,12 @@ interface SingleLogViewerProps {
   startTime?: number;
 }
 
-export function SingleLogViewer({ instanceId, instanceName, profileId, accountName }: SingleLogViewerProps) {
+export function SingleLogViewer({
+  instanceId,
+  instanceName,
+  profileId,
+  accountName,
+}: SingleLogViewerProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
@@ -43,7 +48,7 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
 
   useProcessLogCursor(sessionId, instanceId);
 
-  const mcLogs = instanceId ? (logsMap.get(instanceId) || []) : [];
+  const mcLogs = instanceId ? logsMap.get(instanceId) || [] : [];
 
   const launcherLogs = useMemo(() => {
     if (!profileId) return [];
@@ -74,15 +79,21 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
         background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
       }}
     >
-      <LogWindowTitlebar title={accountName ? `${instanceName} - ${accountName}` : (instanceName || "Logs")} />
+      <LogWindowTitlebar
+        title={
+          accountName
+            ? `${instanceName} - ${accountName}`
+            : instanceName || "Logs"
+        }
+      />
 
       <div className="flex-1 flex flex-col min-h-0 p-3">
         <LogViewerCore
           logs={logs}
           onClear={handleClear}
           noLogsIcon="solar:document-text-bold"
-          noLogsTitle={t('logs.no_logs_yet')}
-          noLogsSubtitle={t('logs.waiting_for_output')}
+          noLogsTitle={t("logs.no_logs_yet")}
+          noLogsSubtitle={t("logs.waiting_for_output")}
         />
       </div>
     </div>

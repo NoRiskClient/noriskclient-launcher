@@ -252,6 +252,18 @@ export function ProfileWizardV2Step3({
     setProfileName(generateProfileName());
   }, [selectedLoader, selectedMinecraftVersion]);
 
+  const openIconPicker = () => {
+    showModal(
+      "profile-icon-picker",
+      <IconPicker
+        selected={chosenIcon}
+        onSelect={setChosenIcon}
+        onClose={() => hideModal("profile-icon-picker")}
+      />,
+      1100,
+    );
+  };
+
   const handleCreate = async () => {
     if (!profileName.trim()) {
       setError(t("profiles.wizard.nameRequired"));
@@ -271,6 +283,7 @@ export function ProfileWizardV2Step3({
         memoryMaxMb: memoryMaxMb,
         selectedNoriskPackId: selectedNoriskPackId,
         use_shared_minecraft_folder: useSharedMinecraftFolder,
+        chosenIcon: chosenIcon,
       });
     } catch (err) {
       console.error("Failed to create profile:", err);
@@ -307,41 +320,61 @@ export function ProfileWizardV2Step3({
       return <StatusMessage type="error" message={error} />;
     }
 
+    const iconPreviewSrc =
+      "url" in chosenIcon ? chosenIcon.url : convertFileSrc(chosenIcon.path);
+
     return (
       <div className="space-y-8">
         {/* Profile Details */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-base font-minecraft-ten text-white/50">
-              {t("profiles.wizard.profileName")}
-            </label>
-            <SearchStyleInput
-              value={profileName}
-              onChange={handleProfileNameChange}
-              placeholder={t("profiles.wizard.enterProfileName")}
-              required
+        <div className="flex gap-4 items-end">
+          {/* Profile Icon — no label so it doesn't add a row that offsets the inputs */}
+          <button
+            type="button"
+            onClick={openIconPicker}
+            title={t("profiles.wizard.profileIcon")}
+            className="w-[52px] h-[52px] flex-shrink-0 rounded-lg border-2 overflow-hidden flex items-center justify-center bg-black/30 hover:scale-105 transition-transform"
+            style={{ borderColor: `${accentColor.value}80` }}
+          >
+            <img
+              src={iconPreviewSrc}
+              alt=""
+              className="w-full h-full object-cover"
+              onLoad={handleIconImgLoad}
             />
-            {profileCharRemoved && (
-              <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                {t("profiles.wizard.forbiddenChars")}
-              </p>
-            )}
-            {profileNameHasForbiddenEnding && (
-              <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                {t("profiles.wizard.forbiddenEnding")}
-              </p>
-            )}
-          </div>
+          </button>
+          <div className="grid grid-cols-2 gap-4 flex-1">
+            <div className="space-y-2">
+              <label className="block text-base font-minecraft-ten text-white/50">
+                {t("profiles.wizard.profileName")}
+              </label>
+              <SearchStyleInput
+                value={profileName}
+                onChange={handleProfileNameChange}
+                placeholder={t("profiles.wizard.enterProfileName")}
+                required
+              />
+              {profileCharRemoved && (
+                <p className="text-xs text-red-400 font-minecraft-ten mt-1">
+                  {t("profiles.wizard.forbiddenChars")}
+                </p>
+              )}
+              {profileNameHasForbiddenEnding && (
+                <p className="text-xs text-red-400 font-minecraft-ten mt-1">
+                  {t("profiles.wizard.forbiddenEnding")}
+                </p>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <label className="block text-base font-minecraft-ten text-white/50">
-              {t("profiles.wizard.groupOptional")}
-            </label>
-            <SearchStyleInput
-              value={profileGroup}
-              onChange={(e) => setProfileGroup(e.target.value)}
-              placeholder={t("profiles.wizard.enterGroupName")}
-            />
+            <div className="space-y-2">
+              <label className="block text-base font-minecraft-ten text-white/50">
+                {t("profiles.wizard.groupOptional")}
+              </label>
+              <SearchStyleInput
+                value={profileGroup}
+                onChange={(e) => setProfileGroup(e.target.value)}
+                placeholder={t("profiles.wizard.enterGroupName")}
+              />
+            </div>
           </div>
         </div>
 
