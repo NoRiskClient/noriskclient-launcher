@@ -48,6 +48,12 @@ import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { ColorPicker } from "../ColorPicker";
+import { RangeSlider } from ".././ui/RangeSlider";
+import { Button } from "../ui/buttons/Button";
+import { ThemeSelector } from "../ThemeSelector";
 
 const appConfig = {
   version: "v0.5.22",
@@ -78,6 +84,9 @@ export function AppLayout({
     accentColor: themeAccentColor,
     accentColor,
     uiStylePreset,
+    customLauncherBackground,
+    customLauncherBackgroundType,
+    hasCompletedFirstInstallSetupWizard,
   } = useThemeStore();
   const isFullRiskStyle = uiStylePreset === "fullrisk";
   const navItems = isFullRiskStyle
@@ -245,7 +254,32 @@ export function AppLayout({
     return () => ctx.revert();
   }, []);
 
+  const resolvedCustomBackground =
+    customLauncherBackground && customLauncherBackgroundType === "absolutePath"
+      ? convertFileSrc(customLauncherBackground)
+      : customLauncherBackground;
+
+  const renderCustomBackground = () => {
+    if (!resolvedCustomBackground || qualityLevel === "potato") {
+      return null;
+    }
+
+    return (
+      <>
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${resolvedCustomBackground})` }}
+        />
+        <div className="absolute inset-0 bg-black/70" />
+      </>
+    );
+  };
+
   const renderBackgroundEffect = () => {
+    if (qualityLevel === "potato") {
+      return null;
+    }
+
     // Show theme background image only on play screen - override all other effects
     if (
       isThemeActive &&
@@ -376,7 +410,9 @@ export function AppLayout({
           : `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
       }}
     >
-      <BorderGlowEffects accentColor={themeAccentColor.value} />
+      {qualityLevel !== "potato" && (
+        <BorderGlowEffects accentColor={themeAccentColor.value} />
+      )}
 
       {!isFullRiskStyle && (
         <VerticalNavbar
@@ -403,9 +439,10 @@ export function AppLayout({
         )}
 
         <div className="flex-1 relative overflow-hidden">
+          {renderCustomBackground()}
           {renderBackgroundEffect()}
           {/* Snow overlay - independent of theme/background */}
-          {isSnowEnabled && <Snowfall />}
+          {isSnowEnabled && qualityLevel !== "potato" && <Snowfall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
             {children}
@@ -418,10 +455,190 @@ export function AppLayout({
       <ProfileSettingsModal />
       <ProfileDuplicateModal />
       <FriendsSidebar />
+      {!hasCompletedFirstInstallSetupWizard && <FirstInstallSetupWizard />}
     </div>
   );
 }
 
+function FirstInstallSetupWizard() {
+  const {
+    accentColor,
+    borderRadius,
+    setBorderRadius,
+    setCustomLauncherBackground,
+    completeFirstInstallSetupWizard,
+  } = useThemeStore();
+  const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
+  const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
+  const [step, setStep] = useState(0);
+  const [removeDefaults, setRemoveDefaults] = useState(true);
+  const [backgroundUrl, setBackgroundUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const steps = ["profiles", "performance", "theme", "background"];
+  const isLastStep = step === steps.length - 1;
+
+  const applyPerformancePreset = (mode: typeof qualityLevel) => {
+    setQualityLevel(mode);
+    if (mode === "potato") {
+      setCurrentEffect(BACKGROUND_EFFECTS.NONE);
+    } else if (mode === "low" && currentEffect === BACKGROUND_EFFECTS.NONE) {
+      setCurrentEffect(BACKGROUND_EFFECTS.PLAIN_BACKGROUND);
+    }
+  };
+
+  const pickBackground = async () => {
+    const selected = await openDialog({
+      multiple: false,
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+    });
+    if (typeof selected === "string") {
+      setCustomLauncherBackground(selected, "absolutePath");
+      setBackgroundUrl("");
+    }
+  };
+
+  const finish = async () => {
+    setBusy(true);
+    try {
+      if (backgroundUrl.trim()) {
+        setCustomLauncherBackground(backgroundUrl.trim(), "url");
+      }
+      if (removeDefaults) {
+        await invoke("dismiss_standard_profiles");
+      }
+      completeFirstInstallSetupWizard();
+      toast.success("Setup saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const renderStep = () => {
+    if (steps[step] === "profiles") {
+      return (
+        <div className="space-y-4">
+          <h3 className="font-minecraft text-3xl lowercase">Profiles</h3>
+          <label className="flex items-center justify-between border border-white/10 bg-white/5 p-4 font-minecraft-ten">
+            <span>Remove default profiles after setup</span>
+            <input
+              type="checkbox"
+              checked={removeDefaults}
+              onChange={(event) => setRemoveDefaults(event.target.checked)}
+            />
+          </label>
+          <p className="font-minecraft-ten text-white/55">
+            You can restore them later from the DEFAULT tab in profile creation.
+          </p>
+        </div>
+      );
+    }
+
+    if (steps[step] === "performance") {
+      return (
+        <div className="space-y-4">
+          <h3 className="font-minecraft text-3xl lowercase">Performance</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {(["potato", "low", "medium", "high"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => applyPerformancePreset(mode)}
+                className="border border-white/10 px-4 py-5 text-left font-minecraft-ten transition-colors"
+                style={{
+                  backgroundColor: qualityLevel === mode ? `${accentColor.value}70` : "rgba(255,255,255,0.05)",
+                }}
+              >
+                <div className="text-lg text-white">{mode === "low" ? "performance" : mode === "medium" ? "normal" : mode === "high" ? "quality" : "potato"}</div>
+                <div className="mt-1 text-xs text-white/55">
+                  {mode === "potato" ? "no effects, minimum work" : mode === "low" ? "simple visuals" : mode === "medium" ? "balanced" : "full visuals"}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (steps[step] === "theme") {
+      return (
+        <div className="space-y-5">
+          <h3 className="font-minecraft text-3xl lowercase">Theme</h3>
+          <ThemeSelector />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="border border-white/10 bg-white/5 p-4">
+              <div className="mb-3 font-minecraft-ten text-white/70">Accent color</div>
+              <ColorPicker size="sm" />
+            </div>
+            <div className="border border-white/10 bg-white/5 p-4">
+              <div className="mb-3 font-minecraft-ten text-white/70">Border roundness</div>
+              <RangeSlider min={0} max={32} value={borderRadius} onChange={setBorderRadius} unit="px" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <h3 className="font-minecraft text-3xl lowercase">Background</h3>
+        <p className="font-minecraft-ten text-white/55">
+          Images and GIFs are darkened automatically so the launcher stays readable and effects can still sit above them.
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={backgroundUrl}
+            onChange={(event) => setBackgroundUrl(event.target.value)}
+            placeholder="https://... image or gif"
+            className="min-w-0 flex-1 border border-white/10 bg-black/40 px-3 py-3 font-minecraft-ten text-white outline-none"
+          />
+          <Button variant="ghost" onClick={pickBackground}>File</Button>
+        </div>
+        <Button variant="ghost" onClick={() => setCustomLauncherBackground(null, null)}>Clear custom background</Button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-6">
+      <div
+        className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden border-2 border-b-4 bg-black/92 text-white shadow-2xl backdrop-blur-md"
+        style={{ borderColor: accentColor.value, borderRadius: Math.max(borderRadius, 8) }}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 p-5">
+          <div>
+            <h2 className="font-minecraft text-4xl lowercase">First install setup</h2>
+            <p className="font-minecraft-ten text-white/55">step {step + 1} of {steps.length}</p>
+          </div>
+          <div className="flex gap-2">
+            {steps.map((name, index) => (
+              <button
+                key={name}
+                onClick={() => setStep(index)}
+                className="h-2.5 w-10 transition-colors"
+                style={{ backgroundColor: index <= step ? accentColor.value : "rgba(255,255,255,0.18)" }}
+                aria-label={name}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-6 custom-scrollbar">{renderStep()}</div>
+
+        <div className="flex justify-between border-t border-white/10 p-5">
+          <Button variant="ghost" onClick={completeFirstInstallSetupWizard}>Skip</Button>
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>Back</Button>
+            <Button onClick={isLastStep ? finish : () => setStep(step + 1)} disabled={busy}>
+              {busy ? "Saving..." : isLastStep ? "Save" : "Next"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function BorderGlowEffects({ accentColor }: { accentColor: string }) {
   return (
     <>

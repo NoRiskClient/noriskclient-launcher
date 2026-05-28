@@ -32,6 +32,7 @@ import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { resolveImagePath } from "../../services/profile-service";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { shareProfile } from "../../services/profile-share-service";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -341,6 +342,19 @@ export function ProfileCardV2({
           },
         ]
       : []),
+    {
+      id: "share",
+      label: "Share",
+      icon: "solar:share-bold",
+      onClick: async (profile) => {
+        const result = await toast.promise(shareProfile(profile, 24), {
+          loading: "Creating share code...",
+          success: (share) => `Share code: ${share.code}`,
+          error: (err) => err instanceof Error ? err.message : String(err),
+        });
+        await navigator.clipboard?.writeText(result.code).catch(() => undefined);
+      },
+    },
     {
       id: "delete",
       label: t("profiles.delete"),

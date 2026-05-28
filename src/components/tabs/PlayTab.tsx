@@ -33,7 +33,9 @@ export function PlayTab() {
   const { currentEffect } = useBackgroundEffectStore();
   const { isThemeActive, selectedTheme } = useLauncherTheme();
 
-  useEffect(() => { setDiscordState("Idling"); }, []);
+  useEffect(() => {
+    setDiscordState("Idling");
+  }, []);
 
   useEffect(() => {
     if (!storeSelectedProfile && profiles.length > 0) {
@@ -73,16 +75,23 @@ export function PlayTab() {
         }
       >
         {/* Only show RetroGrid effect if no theme background is active */}
-        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && !(isThemeActive && selectedTheme?.backgroundImage) && (
-          <RetroGridEffect
-            renderMode="both"
-            isAnimationEnabled={!staticBackground}
-            customGridLineColor={`${accentColor.value}80`}
-          />
-        )}
+        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID &&
+          !(isThemeActive && selectedTheme?.backgroundImage) && (
+            <RetroGridEffect
+              renderMode="both"
+              isAnimationEnabled={!staticBackground}
+              customGridLineColor={`${accentColor.value}80`}
+            />
+          )}
 
         {/* Referral Banner - Top Left */}
-        <div className={isFullRiskStyle ? "absolute top-6 left-6 z-20" : "absolute top-3 left-3 z-20"}>
+        <div
+          className={
+            isFullRiskStyle
+              ? "absolute top-6 left-6 z-20"
+              : "absolute top-3 left-3 z-20"
+          }
+        >
           <ReferralBanner />
         </div>
 
@@ -97,7 +106,13 @@ export function PlayTab() {
           className="absolute top-6 left-6 z-10"
         /> */}
 
-        <div className={isFullRiskStyle ? "relative z-10 w-full h-full flex items-center justify-center" : "relative z-10"}>
+        <div
+          className={
+            isFullRiskStyle
+              ? "relative z-10 w-full h-full flex items-center justify-center"
+              : "relative z-10"
+          }
+        >
           {profilesError && !loading && (
             <ErrorMessage
               message={profilesError || "An unknown error occurred"}

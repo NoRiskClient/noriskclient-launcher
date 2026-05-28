@@ -288,7 +288,7 @@ export const ProfileContextMenu = forwardRef<
           </>
         )}
 
-        {!profile.is_standard_version && (
+        {(
           <>
             <li className="px-4 py-1">
               <div

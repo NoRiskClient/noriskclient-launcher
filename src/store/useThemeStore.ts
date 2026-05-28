@@ -225,7 +225,16 @@ interface ThemeState {
   profileGroupingCriterion: string;
   setProfileGroupingCriterion: (criterion: string) => Promise<void>;
   staticBackground: boolean;
+  customLauncherBackground: string | null;
+  customLauncherBackgroundType: "url" | "absolutePath" | null;
+  hasCompletedFirstInstallSetupWizard: boolean;
   toggleStaticBackground: () => void;
+  setCustomLauncherBackground: (
+    value: string | null,
+    type?: "url" | "absolutePath" | null,
+  ) => void;
+  completeFirstInstallSetupWizard: () => void;
+  resetFirstInstallSetupWizard: () => void;
   toggleBackgroundAnimation: () => void;
   hasAcceptedTermsOfService: boolean;
   acceptTermsOfService: () => void;
@@ -286,6 +295,9 @@ export const useThemeStore = create<ThemeState>()(
       isDetailViewSidebarOnLeft: true,
       profileGroupingCriterion: "group",
       staticBackground: true,
+      customLauncherBackground: null,
+      customLauncherBackgroundType: null,
+      hasCompletedFirstInstallSetupWizard: false,
       hasAcceptedTermsOfService: false,
       hasAcceptedCapeGuidelines: false,
       customColorHistory: [],
@@ -416,6 +428,18 @@ export const useThemeStore = create<ThemeState>()(
 
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
+      },
+      setCustomLauncherBackground: (value, type = null) => {
+        set({
+          customLauncherBackground: value,
+          customLauncherBackgroundType: value ? type : null,
+        });
+      },
+      completeFirstInstallSetupWizard: () => {
+        set({ hasCompletedFirstInstallSetupWizard: true });
+      },
+      resetFirstInstallSetupWizard: () => {
+        set({ hasCompletedFirstInstallSetupWizard: false });
       },
       acceptTermsOfService: () => {
         set({ hasAcceptedTermsOfService: true });
@@ -548,7 +572,9 @@ export const useThemeStore = create<ThemeState>()(
         set({ language: lang });
         import("../i18n/i18n").then((mod) => mod.default.changeLanguage(lang));
         void import("../services/analytics-service").then(({ trackEvent }) => {
-          trackEvent("language_changed", { language: lang }).catch(console.error);
+          trackEvent("language_changed", { language: lang }).catch(
+            console.error,
+          );
         });
       },
 

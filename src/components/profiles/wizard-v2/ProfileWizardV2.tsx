@@ -20,6 +20,7 @@ import { Tooltip } from "../../ui/Tooltip";
 import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
 import { extractNrcCompatibility, type NrcCompatibilityData } from "../../../utils/nrc-compatibility";
 import { useTranslation } from "react-i18next";
+import * as ProfileService from "../../../services/profile-service";
 
 function NrcCompatibleTooltipContent() {
   const { t } = useTranslation();
@@ -54,7 +55,8 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
   const [minecraftVersions, setMinecraftVersions] = useState<MinecraftVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedVersionType, setSelectedVersionType] = useState<"release" | "snapshot">("release");
+  const [selectedVersionType, setSelectedVersionType] = useState<"release" | "snapshot" | "default">("release");
+  const [defaultProfiles, setDefaultProfiles] = useState<any[]>([]);
   
   // Step 2 data
   const [selectedLoader, setSelectedLoader] = useState<ModLoader>("fabric");
@@ -97,6 +99,13 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     loadMinecraftVersions();
   }, []);
 
+  useEffect(() => {
+    if (selectedVersionType !== "default") return;
+    ProfileService.getStandardProfiles()
+      .then((config) => setDefaultProfiles(config.profiles || []))
+      .catch((err) => console.error("Failed to load default profiles:", err));
+  }, [selectedVersionType]);
+
   // Load NRC compatibility data in parallel
   useEffect(() => {
     const loadNrcCompatibility = async () => {
@@ -114,6 +123,9 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     .filter(version => {
       // Release shows all non-snapshot versions (release, alpha, etc.)
       // Snapshot shows only snapshot versions
+      if (selectedVersionType === "default") {
+        return false;
+      }
       if (selectedVersionType === "release" && version.type === "snapshot") {
         return false;
       }
@@ -211,6 +223,53 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
       );
     }
 
+    if (selectedVersionType === "default") {
+      return (
+        <div className="space-y-4">
+          <div className="flex justify-end gap-2">
+            {[
+              { key: "release", label: t('profiles.wizard.release'), icon: "solar:star-bold" },
+              { key: "snapshot", label: t('profiles.wizard.snapshot'), icon: "solar:test-tube-bold" },
+              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" }
+            ].map(type => (
+              <Button
+                key={type.key}
+                variant={selectedVersionType === type.key ? "flat" : "ghost"}
+                size="sm"
+                onClick={() => setSelectedVersionType(type.key as any)}
+                icon={<Icon icon={type.icon} className="w-4 h-4" />}
+              >
+                {type.label}
+              </Button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {defaultProfiles.map((profile) => (
+              <Card
+                key={profile.id}
+                className="p-4 cursor-pointer hover:bg-white/10"
+                onClick={async () => {
+                  await toast.promise(ProfileService.restoreDefaultProfiles(), {
+                    loading: "Restoring default profiles...",
+                    success: "Default profiles restored",
+                    error: (err) => err instanceof Error ? err.message : String(err),
+                  });
+                  await useProfileStore.getState().fetchProfiles();
+                  onClose();
+                }}
+              >
+                <div className="font-minecraft text-2xl text-white lowercase">{profile.name}</div>
+                <div className="font-minecraft-ten text-white/60">{profile.game_version} · {profile.loader}</div>
+              </Card>
+            ))}
+          </div>
+          {defaultProfiles.length === 0 && (
+            <StatusMessage type="info" message="No default profiles found." />
+          )}
+        </div>
+      );
+    }
+
     if (error) {
       return <StatusMessage type="error" message={error} />;
     }
@@ -231,7 +290,8 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
           <div className="flex gap-2">
             {[
               { key: "release", label: t('profiles.wizard.release'), icon: "solar:star-bold" },
-              { key: "snapshot", label: t('profiles.wizard.snapshot'), icon: "solar:test-tube-bold" }
+              { key: "snapshot", label: t('profiles.wizard.snapshot'), icon: "solar:test-tube-bold" },
+              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" }
             ].map(type => (
               <Button
                 key={type.key}

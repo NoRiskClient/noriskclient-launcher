@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type QualityLevel = "low" | "medium" | "high";
+export type QualityLevel = "potato" | "low" | "medium" | "high";
 
 interface QualitySettingsState {
   qualityLevel: QualityLevel;

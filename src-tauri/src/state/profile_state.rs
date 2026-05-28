@@ -2727,6 +2727,9 @@ impl ProfileManager {
             }
         };
 
+        let launcher_config = state.config_manager.get_config().await;
+        let dismissed_standard_profile_ids: std::collections::HashSet<Uuid> =
+            launcher_config.dismissed_standard_profile_ids.iter().copied().collect();
         let standard_profiles = state.norisk_version_manager.get_config().await.profiles;
         info!("ProfileManager: Found {} standard profiles to sync", standard_profiles.len());
 
@@ -2749,6 +2752,14 @@ impl ProfileManager {
         let mut copies_updated = 0;
 
         for standard_profile in standard_profiles {
+            if dismissed_standard_profile_ids.contains(&standard_profile.id) {
+                info!(
+                    "ProfileManager: Skipping dismissed standard profile '{}'",
+                    standard_profile.name
+                );
+                continue;
+            }
+
             if let Some(existing_copy_id) = existing_copies_by_source_id.get(&standard_profile.id) {
                 // Update existing copy with forced fields
                 match self.update_copy_with_forced_fields(*existing_copy_id, &standard_profile).await {

@@ -15,6 +15,8 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "./ExportProfileModal";
 import { useTranslation } from "react-i18next";
+import { toast } from "react-hot-toast";
+import { shareProfile } from "../../services/profile-share-service";
 
 interface FullRiskProfileCardProps {
   profile: Profile;
@@ -206,6 +208,19 @@ export function FullRiskProfileCard({
             onClose={() => hideModal(`export-profile-${profile.id}`)}
           />,
         );
+      },
+    },
+    {
+      id: "share",
+      label: "Share",
+      icon: "solar:share-bold",
+      onClick: async () => {
+        const result = await toast.promise(shareProfile(profile, 24), {
+          loading: "Creating share code...",
+          success: (share) => `Share code: ${share.code}`,
+          error: (err) => err instanceof Error ? err.message : String(err),
+        });
+        await navigator.clipboard?.writeText(result.code).catch(() => undefined);
       },
     },
     {

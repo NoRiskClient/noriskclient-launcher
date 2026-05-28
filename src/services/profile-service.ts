@@ -55,6 +55,14 @@ export async function deleteProfile(id: string): Promise<void> {
   return invoke<void>("delete_profile", { id });
 }
 
+export async function dismissStandardProfiles(): Promise<void> {
+  return invoke<void>("dismiss_standard_profiles");
+}
+
+export async function restoreDefaultProfiles(): Promise<void> {
+  return invoke<void>("restore_default_profiles");
+}
+
 export async function repairProfile(id: string): Promise<void> {
   return invoke<void>("repair_profile", { id });
 }

@@ -314,7 +314,8 @@ function parseServerPerformanceSettings() {
       Object.entries(parsed).map(([serverId, value]) => [
         serverId,
         clampServerPerformance({
-          memoryMb: Number(value.memoryMb) || DEFAULT_SERVER_PERFORMANCE.memoryMb,
+          memoryMb:
+            Number(value.memoryMb) || DEFAULT_SERVER_PERFORMANCE.memoryMb,
           cpuPercent:
             Number(value.cpuPercent) || DEFAULT_SERVER_PERFORMANCE.cpuPercent,
         }),
@@ -1870,7 +1871,9 @@ function CustomServerDetails({
                 onScroll={(event) => {
                   const target = event.currentTarget;
                   const distanceFromBottom =
-                    target.scrollHeight - target.scrollTop - target.clientHeight;
+                    target.scrollHeight -
+                    target.scrollTop -
+                    target.clientHeight;
                   if (distanceFromBottom > 48) {
                     setAutoScrollLogs(false);
                   }
@@ -3113,132 +3116,267 @@ function ServerWorldPanel({ server }: { server: CustomServer }) {
 
   return (
     <>
-    <div className="grid h-full gap-3 overflow-y-auto pr-1 custom-scrollbar xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
-      <div
-        className={cn(
-          "border border-white/10 bg-black/30 p-4 transition",
-          dragActive && "border-[var(--panel-highlight)] bg-white/10",
-        )}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
-      >
-        <h2 className="font-minecraft text-3xl lowercase text-white">world</h2>
-        <p className="mt-2 font-minecraft-ten text-lg text-white/60">
-          Drop a world folder here or import one with the picker. Existing
-          server world data is backed up before replacing it.
-        </p>
-        <div className="mt-4 break-all border border-white/10 bg-black/35 p-3 font-mono text-xs text-white/70">
-          {folder || "loading folder..."}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            variant="3d"
-            size="sm"
-            icon={<Icon icon="solar:folder-open-bold" className="h-5 w-5" />}
-            onClick={openFolder}
-          >
-            open folder
-          </Button>
-          <Button
-            variant="flat-secondary"
-            size="sm"
-            disabled={importing}
-            icon={<Icon icon="solar:upload-bold" className="h-5 w-5" />}
-            onClick={pickWorldFolder}
-          >
-            {importing ? "importing" : "import world"}
-          </Button>
-        </div>
-        <div className="mt-4 flex min-h-24 items-center justify-center border border-dashed border-white/15 bg-black/20 px-4 text-center font-minecraft-ten text-base text-white/45">
-          drag and drop a world folder
+      <div className="grid h-full gap-3 overflow-y-auto pr-1 custom-scrollbar xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+        <div
+          className={cn(
+            "border border-white/10 bg-black/30 p-4 transition",
+            dragActive && "border-[var(--panel-highlight)] bg-white/10",
+          )}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+        >
+          <h2 className="font-minecraft text-3xl lowercase text-white">
+            world
+          </h2>
+          <p className="mt-2 font-minecraft-ten text-lg text-white/60">
+            Drop a world folder here or import one with the picker. Existing
+            server world data is backed up before replacing it.
+          </p>
+          <div className="mt-4 break-all border border-white/10 bg-black/35 p-3 font-mono text-xs text-white/70">
+            {folder || "loading folder..."}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              variant="3d"
+              size="sm"
+              icon={<Icon icon="solar:folder-open-bold" className="h-5 w-5" />}
+              onClick={openFolder}
+            >
+              open folder
+            </Button>
+            <Button
+              variant="flat-secondary"
+              size="sm"
+              disabled={importing}
+              icon={<Icon icon="solar:upload-bold" className="h-5 w-5" />}
+              onClick={pickWorldFolder}
+            >
+              {importing ? "importing" : "import world"}
+            </Button>
+          </div>
+          <div className="mt-4 flex min-h-24 items-center justify-center border border-dashed border-white/15 bg-black/20 px-4 text-center font-minecraft-ten text-base text-white/45">
+            drag and drop a world folder
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <h3 className="font-minecraft text-2xl lowercase text-white/80">
+              worlds
+            </h3>
+            {worlds.length > 0 ? (
+              worlds.map((world) => (
+                <div
+                  key={world.path}
+                  className={cn(
+                    "border bg-black/25 p-3",
+                    world.isCurrent
+                      ? "border-emerald-300/45 bg-emerald-500/10"
+                      : "border-white/10",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full min-w-0 items-center gap-2 text-left"
+                    onClick={() => openServerPath(world.path)}
+                  >
+                    <Icon
+                      icon="solar:map-point-wave-bold"
+                      className="h-5 w-5 shrink-0 text-[var(--panel-highlight)]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-minecraft-ten text-base text-white">
+                        {world.displayName}
+                      </p>
+                      <p className="truncate font-minecraft-ten text-sm text-white/45">
+                        {formatBytes(world.sizeBytes)}
+                        {world.gameDay != null ? ` · day ${world.gameDay}` : ""}
+                        {world.versionName ? ` · ${world.versionName}` : ""}
+                      </p>
+                    </div>
+                    {world.isCurrent && (
+                      <span className="shrink-0 border border-emerald-300/45 bg-emerald-500/15 px-2 py-1 font-minecraft-ten text-sm lowercase text-emerald-100">
+                        current
+                      </span>
+                    )}
+                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!world.isCurrent && (
+                      <Button
+                        variant="3d"
+                        size="xs"
+                        disabled={worldAction === `switch-${world.folderName}`}
+                        onClick={() => switchWorld(world)}
+                      >
+                        switch
+                      </Button>
+                    )}
+                    <Button
+                      variant="flat-secondary"
+                      size="xs"
+                      disabled={worldAction === `backup-${world.folderName}`}
+                      onClick={() => backupWorld(world)}
+                    >
+                      backup
+                    </Button>
+                    <Button
+                      variant="flat-secondary"
+                      size="xs"
+                      disabled={worldAction === `export-${world.folderName}`}
+                      onClick={() => setWorldToExport(world)}
+                    >
+                      export to profile
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="font-minecraft-ten text-base text-white/45">
+                no imported world yet
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-3 border border-white/10 bg-black/25 p-3 md:grid-cols-2">
+            <Field label="profile">
+              <Select
+                value={selectedProfileId}
+                onChange={setSelectedProfileId}
+                variant="3d"
+                options={profiles.map((profile) => ({
+                  value: profile.id,
+                  label: profile.name,
+                }))}
+              />
+            </Field>
+            <Field label="profile world">
+              <Select
+                value={selectedWorldFolder}
+                onChange={setSelectedWorldFolder}
+                variant="3d"
+                options={profileWorlds.map((world) => ({
+                  value: world.folder_name,
+                  label: world.display_name || world.folder_name,
+                }))}
+              />
+            </Field>
+            <div className="md:col-span-2">
+              <Button
+                variant="3d"
+                size="sm"
+                disabled={
+                  !selectedProfileId ||
+                  !selectedWorldFolder ||
+                  worldAction === "import-profile"
+                }
+                icon={<Icon icon="solar:download-bold" className="h-5 w-5" />}
+                onClick={importFromProfile}
+              >
+                import from profile
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="min-h-0 overflow-y-auto border border-white/10 bg-black/30 p-4 custom-scrollbar">
           <h3 className="font-minecraft text-2xl lowercase text-white/80">
-            worlds
+            backups
           </h3>
-          {worlds.length > 0 ? (
-            worlds.map((world) => (
-              <div
-                key={world.path}
-                className={cn(
-                  "border bg-black/25 p-3",
-                  world.isCurrent
-                    ? "border-emerald-300/45 bg-emerald-500/10"
-                    : "border-white/10",
-                )}
-              >
-                <button
-                  type="button"
-                  className="flex w-full min-w-0 items-center gap-2 text-left"
-                  onClick={() => openServerPath(world.path)}
+          <div className="mt-3 space-y-2">
+            {backups.length > 0 ? (
+              backups.map((backup) => (
+                <div
+                  key={backup.path}
+                  className="border border-white/10 bg-black/25 p-3"
                 >
-                  <Icon
-                    icon="solar:map-point-wave-bold"
-                    className="h-5 w-5 shrink-0 text-[var(--panel-highlight)]"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-minecraft-ten text-base text-white">
-                      {world.displayName}
-                    </p>
-                    <p className="truncate font-minecraft-ten text-sm text-white/45">
-                      {formatBytes(world.sizeBytes)}
-                      {world.gameDay != null ? ` · day ${world.gameDay}` : ""}
-                      {world.versionName ? ` · ${world.versionName}` : ""}
-                    </p>
-                  </div>
-                  {world.isCurrent && (
-                    <span className="shrink-0 border border-emerald-300/45 bg-emerald-500/15 px-2 py-1 font-minecraft-ten text-sm lowercase text-emerald-100">
-                      current
-                    </span>
-                  )}
-                </button>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {!world.isCurrent && (
+                  <button
+                    type="button"
+                    className="flex w-full min-w-0 items-center gap-2 text-left"
+                    onClick={() => openBackupPath(backup.path)}
+                  >
+                    <Icon
+                      icon="solar:archive-bold"
+                      className="h-5 w-5 shrink-0 text-amber-200"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-minecraft-ten text-base text-white">
+                        {backup.sourceWorld || backup.displayName}
+                      </p>
+                      <p className="truncate font-minecraft-ten text-sm text-white/45">
+                        {formatBytes(backup.sizeBytes)}
+                        {backup.createdAt
+                          ? ` - ${formatAdminDateTime(backup.createdAt)}`
+                          : ""}
+                      </p>
+                    </div>
+                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       variant="3d"
                       size="xs"
-                      disabled={worldAction === `switch-${world.folderName}`}
-                      onClick={() => switchWorld(world)}
+                      disabled={worldAction === `restore-${backup.folderName}`}
+                      onClick={() => restoreBackup(backup)}
                     >
-                      switch
+                      load
                     </Button>
-                  )}
-                  <Button
-                    variant="flat-secondary"
-                    size="xs"
-                    disabled={worldAction === `backup-${world.folderName}`}
-                    onClick={() => backupWorld(world)}
-                  >
-                    backup
-                  </Button>
-                  <Button
-                    variant="flat-secondary"
-                    size="xs"
-                    disabled={worldAction === `export-${world.folderName}`}
-                    onClick={() => setWorldToExport(world)}
-                  >
-                    export to profile
-                  </Button>
+                    <Button
+                      variant="flat-secondary"
+                      size="xs"
+                      className="!border-red-400/40 !bg-red-500/15 !text-red-100"
+                      disabled={
+                        worldAction === `delete-backup-${backup.folderName}`
+                      }
+                      onClick={() => deleteBackup(backup)}
+                    >
+                      delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <p className="font-minecraft-ten text-base text-white/45">
-              no imported world yet
-            </p>
-          )}
-        </div>
+              ))
+            ) : (
+              <p className="font-minecraft-ten text-base text-white/45">
+                no backups yet
+              </p>
+            )}
+          </div>
 
-        <div className="mt-4 grid gap-3 border border-white/10 bg-black/25 p-3 md:grid-cols-2">
-          <Field label="profile">
+          <h3 className="mt-5 font-minecraft text-2xl lowercase text-white/80">
+            files
+          </h3>
+          <div className="mt-3 font-minecraft-ten text-base text-white/65">
+            {files.length > 0 ? (
+              files.map((entry) => (
+                <FileTreeEntry
+                  key={entry.path}
+                  entry={entry}
+                  onOpen={openServerPath}
+                />
+              ))
+            ) : (
+              <p className="text-white/45">folder is empty</p>
+            )}
+          </div>
+        </div>
+      </div>
+      {worldToExport && (
+        <Modal
+          title="export world"
+          onClose={() => setWorldToExport(null)}
+          width="md"
+          contentClassName="space-y-4 px-6 py-5"
+        >
+          <div className="border border-white/10 bg-black/25 p-3">
+            <p className="font-minecraft-ten text-base text-white/45">world</p>
+            <p className="mt-1 truncate font-minecraft text-2xl lowercase text-white">
+              {worldToExport.displayName || worldToExport.folderName}
+            </p>
+          </div>
+          <Field label="target profile">
             <Select
-              value={selectedProfileId}
-              onChange={setSelectedProfileId}
+              value={selectedExportProfileId}
+              onChange={setSelectedExportProfileId}
               variant="3d"
               options={profiles.map((profile) => ({
                 value: profile.id,
@@ -3246,163 +3384,29 @@ function ServerWorldPanel({ server }: { server: CustomServer }) {
               }))}
             />
           </Field>
-          <Field label="profile world">
-            <Select
-              value={selectedWorldFolder}
-              onChange={setSelectedWorldFolder}
-              variant="3d"
-              options={profileWorlds.map((world) => ({
-                value: world.folder_name,
-                label: world.display_name || world.folder_name,
-              }))}
-            />
-          </Field>
-          <div className="md:col-span-2">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="flat-secondary"
+              size="sm"
+              onClick={() => setWorldToExport(null)}
+            >
+              cancel
+            </Button>
             <Button
               variant="3d"
               size="sm"
               disabled={
-                !selectedProfileId ||
-                !selectedWorldFolder ||
-                worldAction === "import-profile"
+                !selectedExportProfileId ||
+                worldAction === `export-${worldToExport.folderName}`
               }
-              icon={<Icon icon="solar:download-bold" className="h-5 w-5" />}
-              onClick={importFromProfile}
+              icon={<Icon icon="solar:archive-up-bold" className="h-5 w-5" />}
+              onClick={exportToProfile}
             >
-              import from profile
+              export
             </Button>
           </div>
-        </div>
-
-      </div>
-
-      <div className="min-h-0 overflow-y-auto border border-white/10 bg-black/30 p-4 custom-scrollbar">
-        <h3 className="font-minecraft text-2xl lowercase text-white/80">
-          backups
-        </h3>
-        <div className="mt-3 space-y-2">
-          {backups.length > 0 ? (
-            backups.map((backup) => (
-              <div
-                key={backup.path}
-                className="border border-white/10 bg-black/25 p-3"
-              >
-                <button
-                  type="button"
-                  className="flex w-full min-w-0 items-center gap-2 text-left"
-                  onClick={() => openBackupPath(backup.path)}
-                >
-                  <Icon
-                    icon="solar:archive-bold"
-                    className="h-5 w-5 shrink-0 text-amber-200"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-minecraft-ten text-base text-white">
-                      {backup.sourceWorld || backup.displayName}
-                    </p>
-                    <p className="truncate font-minecraft-ten text-sm text-white/45">
-                      {formatBytes(backup.sizeBytes)}
-                      {backup.createdAt
-                        ? ` - ${formatAdminDateTime(backup.createdAt)}`
-                        : ""}
-                    </p>
-                  </div>
-                </button>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    variant="3d"
-                    size="xs"
-                    disabled={worldAction === `restore-${backup.folderName}`}
-                    onClick={() => restoreBackup(backup)}
-                  >
-                    load
-                  </Button>
-                  <Button
-                    variant="flat-secondary"
-                    size="xs"
-                    className="!border-red-400/40 !bg-red-500/15 !text-red-100"
-                    disabled={
-                      worldAction === `delete-backup-${backup.folderName}`
-                    }
-                    onClick={() => deleteBackup(backup)}
-                  >
-                    delete
-                  </Button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="font-minecraft-ten text-base text-white/45">
-              no backups yet
-            </p>
-          )}
-        </div>
-
-        <h3 className="mt-5 font-minecraft text-2xl lowercase text-white/80">
-          files
-        </h3>
-        <div className="mt-3 font-minecraft-ten text-base text-white/65">
-          {files.length > 0 ? (
-            files.map((entry) => (
-              <FileTreeEntry
-                key={entry.path}
-                entry={entry}
-                onOpen={openServerPath}
-              />
-            ))
-          ) : (
-            <p className="text-white/45">folder is empty</p>
-          )}
-        </div>
-      </div>
-    </div>
-    {worldToExport && (
-      <Modal
-        title="export world"
-        onClose={() => setWorldToExport(null)}
-        width="md"
-        contentClassName="space-y-4 px-6 py-5"
-      >
-        <div className="border border-white/10 bg-black/25 p-3">
-          <p className="font-minecraft-ten text-base text-white/45">world</p>
-          <p className="mt-1 truncate font-minecraft text-2xl lowercase text-white">
-            {worldToExport.displayName || worldToExport.folderName}
-          </p>
-        </div>
-        <Field label="target profile">
-          <Select
-            value={selectedExportProfileId}
-            onChange={setSelectedExportProfileId}
-            variant="3d"
-            options={profiles.map((profile) => ({
-              value: profile.id,
-              label: profile.name,
-            }))}
-          />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="flat-secondary"
-            size="sm"
-            onClick={() => setWorldToExport(null)}
-          >
-            cancel
-          </Button>
-          <Button
-            variant="3d"
-            size="sm"
-            disabled={
-              !selectedExportProfileId ||
-              worldAction === `export-${worldToExport.folderName}`
-            }
-            icon={<Icon icon="solar:archive-up-bold" className="h-5 w-5" />}
-            onClick={exportToProfile}
-          >
-            export
-          </Button>
-        </div>
-      </Modal>
-    )}
+        </Modal>
+      )}
     </>
   );
 }
@@ -3680,7 +3684,8 @@ function ServerAddonsPanel({
                                   {version.name}
                                 </p>
                                 <p className="font-minecraft-ten text-sm text-white/45">
-                                  {version.version_number} - {server.mcVersion} - {loader}
+                                  {version.version_number} - {server.mcVersion}{" "}
+                                  - {loader}
                                   {server.loaderVersion
                                     ? ` ${server.loaderVersion}`
                                     : " latest"}
@@ -3738,7 +3743,6 @@ function ServerAddonsPanel({
           </div>
         </div>
       )}
-
     </div>
   );
 }

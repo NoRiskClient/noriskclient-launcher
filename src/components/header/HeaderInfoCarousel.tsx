@@ -7,7 +7,7 @@ import {
   getUniquePlayers24h,
   type UniquePlayersResponse,
 } from "../../services/nrc-service";
-import { parseErrorMessage } from "../../utils/error-utils";
+import { useQualitySettingsStore } from "../../store/quality-settings-store";
 
 interface HeaderInfoCarouselProps {
   version: string | null;
@@ -22,6 +22,7 @@ const TEXT_CLASSES =
 export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
   const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<UniquePlayersResponse | null>(null);
+  const qualityLevel = useQualitySettingsStore((state) => state.qualityLevel);
   const [showPlayers, setShowPlayers] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHoveringRef = useRef(false);
@@ -49,7 +50,7 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
   const startAutoSwitch = () => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
-      if (!isHoveringRef.current) {
+      if (!isHoveringRef.current && qualityLevel !== "potato") {
         setShowPlayers((prev) => !prev);
       }
     }, SLIDE_INTERVAL_MS);
@@ -70,7 +71,7 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
     }
     startAutoSwitch();
     return stopAutoSwitch;
-  }, [stats]);
+  }, [stats, qualityLevel]);
 
   const handleMouseEnter = () => {
     isHoveringRef.current = true;
@@ -86,37 +87,26 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
     : null;
   const playerSlideActive = showPlayers && playersAvailable;
 
+  const content = playerSlideActive ? (
+    <Tooltip content={t("header.stats.players_24h_tooltip")}>
+      <span className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}>
+        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
+        {formattedCount}
+      </span>
+    </Tooltip>
+  ) : (
+    <span className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}>
+      {versionText}
+    </span>
+  );
+
   return (
     <div
-      className="relative inline-flex items-center -mt-2.5 h-3 min-w-[3.5rem]"
+      className="inline-flex -mt-2.5 h-3 min-w-[3.5rem] items-center overflow-hidden"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <span
-        className={`${TEXT_CLASSES} absolute inset-0 flex items-center whitespace-nowrap transition-opacity duration-300 ease-out ${
-          playerSlideActive ? "opacity-0" : "opacity-100"
-        }`}
-        aria-hidden={playerSlideActive}
-      >
-        {versionText}
-      </span>
-
-      {playersAvailable && (
-        <Tooltip content={t("header.stats.players_24h_tooltip")}>
-          <span
-            className={`${TEXT_CLASSES} absolute inset-0 flex items-center whitespace-nowrap transition-opacity duration-300 ease-out ${
-              playerSlideActive ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-            aria-hidden={!playerSlideActive}
-          >
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 align-middle"
-              style={{ boxShadow: "0 0 4px rgba(74, 222, 128, 0.7)" }}
-            />
-            {formattedCount}
-          </span>
-        </Tooltip>
-      )}
+      {content}
     </div>
   );
 }

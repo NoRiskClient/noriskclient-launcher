@@ -823,7 +823,68 @@ async fn try_update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(),
 #[tauri::command]
 pub async fn delete_profile(id: Uuid) -> Result<(), CommandError> {
     let state = State::get().await?;
+    if let Ok(profile) = state.profile_manager.get_profile(id).await {
+        if let Some(source_standard_profile_id) = profile.source_standard_profile_id {
+            let mut config = state.config_manager.get_config().await;
+            if !config
+                .dismissed_standard_profile_ids
+                .contains(&source_standard_profile_id)
+            {
+                config
+                    .dismissed_standard_profile_ids
+                    .push(source_standard_profile_id);
+                state.config_manager.set_config(config).await?;
+                info!(
+                    "Marked standard profile {} as dismissed via deleted copy {}",
+                    source_standard_profile_id, id
+                );
+            }
+        }
+    }
     state.profile_manager.delete_profile(id).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn dismiss_standard_profiles() -> Result<(), CommandError> {
+    let state = State::get().await?;
+    let standard_profiles = state.norisk_version_manager.get_config().await.profiles;
+    let standard_ids: HashSet<Uuid> = standard_profiles.iter().map(|profile| profile.id).collect();
+    let user_profiles = state.profile_manager.list_profiles().await?;
+
+    let mut config = state.config_manager.get_config().await;
+    for standard_id in &standard_ids {
+        if !config.dismissed_standard_profile_ids.contains(standard_id) {
+            config.dismissed_standard_profile_ids.push(*standard_id);
+        }
+    }
+    state.config_manager.set_config(config).await?;
+
+    for profile in user_profiles {
+        if profile
+            .source_standard_profile_id
+            .map(|source_id| standard_ids.contains(&source_id))
+            .unwrap_or(false)
+        {
+            if let Err(error) = state.profile_manager.delete_profile(profile.id).await {
+                warn!(
+                    "Failed to delete dismissed standard profile copy {}: {}",
+                    profile.id, error
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn restore_default_profiles() -> Result<(), CommandError> {
+    let state = State::get().await?;
+    let mut config = state.config_manager.get_config().await;
+    config.dismissed_standard_profile_ids.clear();
+    state.config_manager.set_config(config).await?;
+    state.profile_manager.sync_standard_profiles().await?;
     Ok(())
 }
 

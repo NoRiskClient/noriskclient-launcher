@@ -48,7 +48,8 @@ import { setDiscordState } from "../../utils/discordRpc";
 
 export function SettingsTab() {
   const { t } = useTranslation();
-  const { language, setLanguage } = useThemeStore();
+  const { language, setLanguage, resetFirstInstallSetupWizard } =
+    useThemeStore();
   const [config, setConfig] = useState<LauncherConfig | null>(null);
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -111,8 +112,11 @@ export function SettingsTab() {
     customColorHistory,
     isBackgroundAnimationEnabled,
     staticBackground,
+    customLauncherBackground,
+    customLauncherBackgroundType,
     toggleStaticBackground,
     toggleBackgroundAnimation,
+    setCustomLauncherBackground,
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
@@ -185,6 +189,11 @@ export function SettingsTab() {
 
   const qualityOptions: { value: QualityLevel; label: string; icon: string }[] =
     [
+      {
+        value: "potato",
+        label: "Potato",
+        icon: "solar:battery-low-bold",
+      },
       {
         value: "low",
         label: t("settings.quality.low"),
@@ -721,30 +730,40 @@ export function SettingsTab() {
               <SnowEffectToggle showLabel={true} size="sm" disabled={saving} />
               <div className="flex items-center gap-3">
                 <span className="text-xs text-white/60 font-minecraft-ten">
-                  Quality: Low
+                  Potato
                 </span>
                 <input
                   type="range"
                   min="0"
-                  max="2"
+                  max="3"
                   step="1"
                   value={
-                    qualityLevel === "low"
+                    qualityLevel === "potato"
                       ? 0
-                      : qualityLevel === "medium"
+                      : qualityLevel === "low"
                         ? 1
-                        : 2
+                        : qualityLevel === "medium"
+                          ? 2
+                          : 3
                   }
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
-                    const levels = ["low", "medium", "high"] as const;
-                    setQualityLevel(levels[value] || "medium");
+                    const levels = ["potato", "low", "medium", "high"] as const;
+                    const selectedQuality = levels[value] || "medium";
+
+                    setQualityLevel(selectedQuality);
+
+                    if (selectedQuality === "potato") {
+                      setCurrentEffect(BACKGROUND_EFFECTS.NONE);
+                    } else if (currentEffect === BACKGROUND_EFFECTS.NONE) {
+                      setCurrentEffect(BACKGROUND_EFFECTS.PLAIN_BACKGROUND);
+                    }
                   }}
                   className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
                   disabled={saving}
                 />
                 <span className="text-xs text-white/60 font-minecraft-ten">
-                  High
+                  Quality
                 </span>
               </div>
             </div>
@@ -765,6 +784,52 @@ export function SettingsTab() {
               onClick={() => setCurrentEffect(option.id)}
             />
           ))}
+        </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+          <Input
+            value={
+              customLauncherBackgroundType === "url"
+                ? customLauncherBackground || ""
+                : ""
+            }
+            onChange={(event) =>
+              setCustomLauncherBackground(
+                event.target.value.trim() || null,
+                event.target.value.trim() ? "url" : null,
+              )
+            }
+            placeholder="https://... custom launcher background"
+            disabled={saving}
+          />
+          <Button
+            variant="ghost"
+            onClick={async () => {
+              const { open } = await import("@tauri-apps/plugin-dialog");
+              const selected = await open({
+                multiple: false,
+                filters: [
+                  {
+                    name: "Images",
+                    extensions: ["png", "jpg", "jpeg", "webp", "gif"],
+                  },
+                ],
+              });
+              if (typeof selected === "string") {
+                setCustomLauncherBackground(selected, "absolutePath");
+              }
+            }}
+            disabled={saving}
+          >
+            File
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setCustomLauncherBackground(null, null)}
+            disabled={saving || !customLauncherBackground}
+          >
+            Clear
+          </Button>
         </div>
       </div>
     </div>
@@ -1333,10 +1398,19 @@ export function SettingsTab() {
 
         {/* Header Actions */}
         <div
+          className="flex items-center gap-2"
           style={{
             transform: isFullRiskStyle ? "translateY(0px)" : "translateY(-3px)",
           }}
         >
+          <ActionButton
+            id="reopen-wizard"
+            icon="solar:magic-wand-bold"
+            variant="icon-only"
+            tooltip="First install wizard erneut öffnen"
+            size="sm"
+            onClick={() => resetFirstInstallSetupWizard()}
+          />
           <ActionButton
             id="open-directory"
             label={t("settings.open_directory")}

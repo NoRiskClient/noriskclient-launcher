@@ -45,6 +45,7 @@ export interface LauncherConfig {
   referral_state: ReferralState | null; // Referral tracking state
   last_played_profile: string | null; // Option<Uuid>
   pack_rollout_override: "auto" | "off" | "on";
+  dismissed_standard_profile_ids: string[];
 }
 
 export interface ReferralInfo {
