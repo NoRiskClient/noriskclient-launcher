@@ -670,12 +670,9 @@ export function CapeList({
   const handleSaveCapeEdit = useCallback(async (capeId: string, title: string) => {
     try {
       // TODO: Implement API call to save cape title (requires staff approval)
-      // For now, just log and close the modal
-      console.log('Saving cape title:', { capeId, title });
       toast.success(t('capes.titleSaved'));
       setEditingCape(null);
     } catch (error) {
-      console.error('Failed to save cape title:', error);
       toast.error(t('capes.failedToSaveTitle'));
     }
   }, [t]);
@@ -699,7 +696,7 @@ export function CapeList({
           setInfoCapeCreatorName(profile.name);
         }
       } catch (error) {
-        console.error('Failed to fetch creator name:', error);
+        // Silent fail - just show "Unknown" if fetch fails
       }
     }
   }, []);
