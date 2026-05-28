@@ -14,6 +14,7 @@ import {
   useBackgroundEffectStore,
 } from "../../store/background-effect-store";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";
+import { useBlurSettingsStore } from "../../store/blur-settings-store";
 import { MatrixRainEffect } from ".././effects/MatrixRainEffect";
 import { EnchantmentParticlesEffect } from ".././effects/EnchantmentParticlesEffect";
 import { NebulaWaves } from ".././effects/NebulaWaves";
@@ -67,6 +68,7 @@ export function AppLayout({
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
   const { currentEffect } = useBackgroundEffectStore();
+  const { disableBlurInGame } = useBlurSettingsStore();
 
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
@@ -310,10 +312,12 @@ export function AppLayout({
     }
   };
 
+  const blurClass = disableBlurInGame ? '' : 'backdrop-blur-lg';
+
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]"
+      className={`h-screen w-full bg-black/50 ${blurClass} border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]`}
       style={{
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
