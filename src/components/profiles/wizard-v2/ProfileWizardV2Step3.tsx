@@ -13,7 +13,10 @@ import { Select } from "../../ui/Select";
 import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { NoriskModEntryDefinition, NoriskModpacksConfig } from "../../../types/noriskPacks";
+import {
+  NoriskModEntryDefinition,
+  NoriskModpacksConfig,
+} from "../../../types/noriskPacks";
 import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
@@ -29,23 +32,23 @@ interface NoriskPack {
 }
 
 interface ProfileWizardV2Step3Props {
-    onClose: () => void;
-    onBack: () => void;
-    onCreate: (profileData: {
-        name: string;
-        group: string | null;
-        minecraftVersion: string;
-        loader: ModLoader;
-        loaderVersion: string | null;
-        memoryMaxMb: number;
-        selectedNoriskPackId: string | null;
-        use_shared_minecraft_folder?: boolean;
-        chosenIcon: ChosenIcon;
-    }) => void;
-    selectedMinecraftVersion: string;
-    selectedLoader: ModLoader;
-    selectedLoaderVersion: string | null;
-    defaultGroup?: string | null;
+  onClose: () => void;
+  onBack: () => void;
+  onCreate: (profileData: {
+    name: string;
+    group: string | null;
+    minecraftVersion: string;
+    loader: ModLoader;
+    loaderVersion: string | null;
+    memoryMaxMb: number;
+    selectedNoriskPackId: string | null;
+    use_shared_minecraft_folder?: boolean;
+    chosenIcon: ChosenIcon;
+  }) => void;
+  selectedMinecraftVersion: string;
+  selectedLoader: ModLoader;
+  selectedLoaderVersion: string | null;
+  defaultGroup?: string | null;
 }
 
 export function ProfileWizardV2Step3({
@@ -57,32 +60,67 @@ export function ProfileWizardV2Step3({
   selectedLoaderVersion,
   defaultGroup,
 }: ProfileWizardV2Step3Props) {
-    const { t } = useTranslation();
-    const accentColor = useThemeStore((state) => state.accentColor);
-    const { showModal, hideModal } = useGlobalModal();
-    const [chosenIcon, setChosenIcon] = useState<ChosenIcon>(() => ({ url: getRandomBlockIcon().url }));
-    const [profileName, setProfileName] = useState("");
-    const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
-    const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
-    const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
-    const recommendedRam = systemRamMb <= 8192 ? Math.min(2048, systemRamMb) : Math.min(4096, systemRamMb);
-    const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
-    const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
-    const [loadingPacks, setLoadingPacks] = useState(false);
-    const [packCompatibilityWarning, setPackCompatibilityWarning] = useState<string | null>(null);
-    const [showYellowWarning, setShowYellowWarning] = useState(false);
-    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-    const [useSharedMinecraftFolder, setUseSharedMinecraftFolder] = useState(
-        defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
-    ); // Default to true when group exists and is not "modpacks"
-    const [showAllVersions, setShowAllVersions] = useState(false); // Default to false to show only curated versions
+  const { t } = useTranslation();
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const { showModal, hideModal } = useGlobalModal();
+  const [chosenIcon, setChosenIcon] = useState<ChosenIcon>(() => ({
+    url: getRandomBlockIcon().url,
+  }));
+  const [profileName, setProfileName] = useState("");
+  const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
+  const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
+  const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
+  const recommendedRam =
+    systemRamMb <= 8192
+      ? Math.min(2048, systemRamMb)
+      : Math.min(4096, systemRamMb);
+  const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<
+    string | null
+  >(null);
+  const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>(
+    {},
+  );
+  const [loadingPacks, setLoadingPacks] = useState(false);
+  const [packCompatibilityWarning, setPackCompatibilityWarning] = useState<
+    string | null
+  >(null);
+  const [showYellowWarning, setShowYellowWarning] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [useSharedMinecraftFolder, setUseSharedMinecraftFolder] = useState(
+    defaultGroup && defaultGroup.toLowerCase() !== "modpacks",
+  ); // Default to true when group exists and is not "modpacks"
+  const [showAllVersions, setShowAllVersions] = useState(false); // Default to false to show only curated versions
 
-    // Update profile group when defaultGroup changes
-    useEffect(() => {
-        if (defaultGroup && !profileGroup) {
-            setProfileGroup(defaultGroup);
-        }
-    }, [defaultGroup]);
+  // Update profile group when defaultGroup changes
+  useEffect(() => {
+    if (defaultGroup && !profileGroup) {
+      setProfileGroup(defaultGroup);
+    }
+  }, [defaultGroup]);
+
+  // Update shared Minecraft folder setting when defaultGroup changes
+  useEffect(() => {
+    setUseSharedMinecraftFolder(
+      defaultGroup && defaultGroup.toLowerCase() !== "modpacks",
+    );
+  }, [defaultGroup]);
+
+  const [checkingCompatibility, setCheckingCompatibility] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load NoRisk packs on component mount
+  useEffect(() => {
+    const loadNoriskPacks = async () => {
+      try {
+        setLoadingPacks(true);
+        const packsData = await invoke<{ packs: Record<string, NoriskPack> }>(
+          "get_norisk_packs_resolved",
+        ).catch(() => ({
+          packs: {},
+        }));
+        console.log("PACKS", packsData);
+        setNoriskPacks(packsData.packs);
 
         // Auto-select "norisk-prod" if available
         if (packsData.packs["norisk-prod"]) {
@@ -176,36 +214,9 @@ export function ProfileWizardV2Step3({
               });
               return !!loaderCompat; // Returns true if compatibility exists
             }
-        };
-
-        checkPackCompatibility();
-    }, [selectedNoriskPackId, selectedMinecraftVersion, selectedLoader]);
-
-    // Auto-generate profile name based on loader and minecraft version
-    useEffect(() => {
-        const generateProfileName = () => {
-            const loaderName = getLoaderDisplayName(selectedLoader);
-            return `${loaderName} ${selectedMinecraftVersion}`;
-        };
-
-        setProfileName(generateProfileName());
-    }, [selectedLoader, selectedMinecraftVersion]);
-
-    const openIconPicker = () => {
-        showModal("profile-icon-picker", (
-            <IconPicker
-                selected={chosenIcon}
-                onSelect={setChosenIcon}
-                onClose={() => hideModal("profile-icon-picker")}
-            />
-        ), 1100);
-    };
-
-    const handleCreate = async () => {
-        if (!profileName.trim()) {
-            setError(t('profiles.wizard.nameRequired'));
-            return;
-        }
+            return false;
+          },
+        );
 
         console.log(
           "Pack mods for",
@@ -217,23 +228,8 @@ export function ProfileWizardV2Step3({
         );
         console.log("Has compatible NoRisk Client:", hasCompatibleNoRiskClient);
 
-        try {
-            await onCreate({
-                name: profileName.trim(),
-                group: profileGroup.trim() || null,
-                minecraftVersion: selectedMinecraftVersion,
-                loader: selectedLoader,
-                loaderVersion: selectedLoaderVersion,
-                memoryMaxMb: memoryMaxMb,
-                selectedNoriskPackId: selectedNoriskPackId,
-                use_shared_minecraft_folder: useSharedMinecraftFolder,
-                chosenIcon: chosenIcon
-            });
-        } catch (err) {
-            console.error("Failed to create profile:", err);
-            setError(t('profiles.wizard.createError', { error: err instanceof Error ? err.message : String(err) }));
-        } finally {
-            setCreating(false);
+        if (!hasCompatibleNoRiskClient) {
+          setShowYellowWarning(true);
         }
       } catch (err) {
         console.warn("Failed to check pack compatibility:", err);
@@ -368,49 +364,6 @@ export function ProfileWizardV2Step3({
           </div>
         </div>
 
-        const iconPreviewSrc = "url" in chosenIcon ? chosenIcon.url : convertFileSrc(chosenIcon.path);
-
-        return (
-            <div className="space-y-8">
-                {/* Profile Details */}
-                <div className="flex gap-4 items-end">
-                    {/* Profile Icon — no label so it doesn't add a row that offsets the inputs */}
-                    <button
-                        type="button"
-                        onClick={openIconPicker}
-                        title={t('profiles.wizard.profileIcon')}
-                        className="w-[52px] h-[52px] flex-shrink-0 rounded-lg border-2 overflow-hidden flex items-center justify-center bg-black/30 hover:scale-105 transition-transform"
-                        style={{ borderColor: `${accentColor.value}80` }}
-                    >
-                        <img
-                            src={iconPreviewSrc}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onLoad={handleIconImgLoad}
-                        />
-                    </button>
-                    <div className="grid grid-cols-2 gap-4 flex-1">
-                    <div className="space-y-2">
-                        <label className="block text-base font-minecraft-ten text-white/50">
-                            {t('profiles.wizard.profileName')}
-                        </label>
-                        <SearchStyleInput
-                            value={profileName}
-                            onChange={handleProfileNameChange}
-                            placeholder={t('profiles.wizard.enterProfileName')}
-                            required
-                        />
-                        {profileCharRemoved && (
-                            <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                                {t('profiles.wizard.forbiddenChars')}
-                            </p>
-                        )}
-                        {profileNameHasForbiddenEnding && (
-                            <p className="text-xs text-red-400 font-minecraft-ten mt-1">
-                                {t('profiles.wizard.forbiddenEnding')}
-                            </p>
-                        )}
-                    </div>
         {/* RAM Settings */}
         <div className="space-y-3">
           <label className="block text-base font-minecraft-ten text-white/50">
@@ -490,13 +443,8 @@ export function ProfileWizardV2Step3({
                           size="md"
                           className="w-full"
                         />
-                    </div>
-                    </div>
-                </div>
-
-                {/* Checkbox Options */}
-                <div className="grid grid-cols-1 gap-3">
-                    <div className="space-y-1">
+                      </div>
+                      <div className="flex items-center">
                         <Checkbox
                           checked={showAllVersions}
                           onChange={(event) =>
