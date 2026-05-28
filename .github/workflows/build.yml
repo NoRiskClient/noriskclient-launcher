@@ -166,8 +166,10 @@ jobs:
         run: |
           mkdir -p src-tauri/target/release/bundle/flatpak
           cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/flatpak/
-          flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
-          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
+              
+          flatpak-builder --user --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
+              
+          flatpak build-bundle packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
 
       - name: Build Snap package
         if: matrix.os == 'ubuntu-22.04'
