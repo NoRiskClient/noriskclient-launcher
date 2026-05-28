@@ -11,6 +11,9 @@ export interface CosmeticCape {
   creationDate: number; // i64 in Rust, renamed from "creationDate" in JSON
   elytra: boolean; // bool in Rust
   blurHash?: string; // Optional blur hash for the cape image
+  title?: string; // Optional title for the cape (requires staff approval)
+  titleApproved?: boolean; // Whether the title has been approved by staff
+  uploader?: string; // Username of the uploader
 }
 
 export type CapeReviewState = 'ACCEPTED' | 'IN_REVIEW' | 'DENIED';

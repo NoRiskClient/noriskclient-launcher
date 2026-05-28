@@ -39,6 +39,13 @@ pub async fn check_update_available_detailed(
     app_handle: &AppHandle,
     is_beta_channel: bool,
 ) -> AppResult<Option<UpdateCheckResult>> {
+    // Skip update checks in debug/dev mode
+    #[cfg(debug_assertions)]
+    {
+        info!("Running in debug mode - skipping detailed update checks");
+        return Ok(None);
+    }
+
     let current_version = app_handle.package_info().version.to_string();
     let channel = if is_beta_channel { "Beta" } else { "Stable" };
 
@@ -240,6 +247,13 @@ pub async fn download_and_install_update(
     app_handle: &AppHandle,
     is_beta_channel: bool,
 ) -> AppResult<()> {
+    // Skip update downloads in debug/dev mode
+    #[cfg(debug_assertions)]
+    {
+        info!("Running in debug mode - skipping update download and installation");
+        return Err(AppError::Other("Updates disabled in debug mode".to_string()));
+    }
+
     info!("Starting manual update download and installation process...");
 
     // Check for available updates with detailed information
@@ -405,6 +419,20 @@ pub async fn check_for_updates(
     is_beta_channel: bool,
     updater_window: Option<WebviewWindow>,
 ) {
+    // Skip update checks in debug/dev mode
+    #[cfg(debug_assertions)]
+    {
+        info!("Running in debug mode - skipping update checks to prevent dev mode interruption");
+        emit_status(
+            &app_handle,
+            "uptodate",
+            "Debug mode - updates disabled".to_string(),
+            None,
+        );
+        emit_status(&app_handle, "close", "Debug mode - updates disabled".to_string(), None);
+        return;
+    }
+
     let current_version = app_handle.package_info().version.to_string();
     let channel = if is_beta_channel { "Beta" } else { "Stable" };
     let mut final_status: String = "unknown".to_string();

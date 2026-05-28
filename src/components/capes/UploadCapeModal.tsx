@@ -67,6 +67,7 @@ export function UploadCapeModal({
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showElytraPreview, setShowElytraPreview] = useState(false);
+  const [capeTitle, setCapeTitle] = useState("");
 
   const handleConfirmUpload = async () => {
     setIsUploading(true);
@@ -74,7 +75,7 @@ export function UploadCapeModal({
     setUploadWarning(null);
 
     try {
-      const result = await uploadCape(previewImagePath);
+      const result = await uploadCape(previewImagePath, capeTitle || undefined);
 
       toast.success(t('capes.capeUploadedSuccess'));
 
@@ -107,6 +108,21 @@ export function UploadCapeModal({
         <p className="text-white/80 mb-4 text-center font-minecraft-ten">
           {uploadError ? t('capes.failedToUploadCape') : uploadWarning ? t('capes.capeSubmittedForReview') : t('capes.doesThisLookCorrect')}
         </p>
+        
+        {/* Title Input */}
+        <div className="mb-4">
+          <label className="text-xs text-white/50 mb-1 block font-minecraft-ten">{t('capes.title')}</label>
+          <input
+            type="text"
+            value={capeTitle}
+            onChange={(e) => setCapeTitle(e.target.value)}
+            placeholder={t('capes.titlePlaceholder')}
+            className="w-full px-3 py-2 bg-black/30 border border-white/10 rounded-md text-white/90 text-sm font-minecraft-ten focus:outline-none focus:border-white/30"
+            maxLength={15}
+          />
+          <p className="text-xs text-white/40 mt-1 font-minecraft-ten">{t('capes.titleApprovalInfo')}</p>
+        </div>
+
         {uploadError && (
           <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
             <p className="text-red-400 text-sm font-minecraft-ten text-center">

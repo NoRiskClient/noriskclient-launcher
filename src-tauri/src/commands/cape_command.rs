@@ -636,17 +636,21 @@ pub async fn delete_cape(
 ///
 /// Parameters:
 /// - image_path: Path to the cape image file (PNG)
+/// - title: Optional title for the cape (requires staff approval)
+/// - temporary: If true, skip approval for testing purposes
 /// - norisk_token: Optional NoRisk token
 /// - player_uuid: Optional UUID of the player (defaults to active account)
 #[tauri::command]
 pub async fn upload_cape(
     image_path: String,
+    title: Option<String>,
+    temporary: Option<bool>,
     norisk_token: Option<String>,
     player_uuid: Option<Uuid>,
 ) -> Result<CapeUploadResponse, CommandError> {
     debug!(
-        "Command called: upload_cape with image_path: {}, player_uuid: {:?}",
-        image_path, player_uuid
+        "Command called: upload_cape with image_path: {}, title: {:?}, temporary: {:?}, player_uuid: {:?}",
+        image_path, title, temporary, player_uuid
     );
 
     // Get the state manager
@@ -697,11 +701,16 @@ pub async fn upload_cape(
     // Convert image_path string to PathBuf
     let image_path_buf = PathBuf::from(image_path);
 
+    let title_ref = title.as_deref();
+    let temporary_flag = temporary.unwrap_or(false);
+
     let response = cape_api
         .upload_cape(
             &token_to_use,
             &uuid_to_use,
             &image_path_buf,
+            title_ref,
+            temporary_flag,
             is_experimental,
         )
         .await

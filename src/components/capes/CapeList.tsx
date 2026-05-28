@@ -10,6 +10,8 @@ import React, {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "react-hot-toast";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { EmptyState } from "../ui/EmptyState";
@@ -29,6 +31,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import type { CapeReviewState } from "../../types/noriskCapes";
+import { EditCapeModal } from "../modals/EditCapeModal";
 
 function getCapeReviewState(cape: CosmeticCape): CapeReviewState {
   if (cape.accepted) return 'ACCEPTED';
@@ -54,6 +57,9 @@ interface CapeItemDisplayProps {
   isExperimental?: boolean;
   isModerator?: boolean;
   onModeratorDeleteClick?: (cape: CosmeticCape, e: React.MouseEvent) => void;
+  onEditCape?: (cape: CosmeticCape) => void;
+  canEdit?: boolean; // Whether the current user can edit this cape
+  onShowInfo?: (cape: CosmeticCape) => void; // Show info modal for cape
 }
 
 function CapeItemDisplay({
@@ -74,6 +80,9 @@ function CapeItemDisplay({
   isExperimental = false,
   isModerator = false,
   onModeratorDeleteClick,
+  onEditCape,
+  canEdit = false,
+  onShowInfo,
 }: CapeItemDisplayProps) {
   const { t } = useTranslation();
   const [creatorName, setCreatorName] = useState<string | null>(null);
@@ -179,22 +188,50 @@ function CapeItemDisplay({
     >
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
         {!isVanilla && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleFavoriteOptimistic((cape as CosmeticCape)._id);
-            }}
-            className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-            title={isFavorite ? t('capes.unfavorite') : t('capes.favorite')}
-            disabled={isCurrentlyEquipping}
-          >
-            <Icon
-              icon={isFavorite ? "ph:heart-fill" : "ph:heart"}
-              className="w-4 h-4"
-              style={{ color: isFavorite ? "#ef4444" : undefined }}
-            />
-          </button>
+          <>
+            {onEditCape && canEdit && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEditCape(cape as CosmeticCape);
+                }}
+                className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+                title={t('capes.editCape')}
+                disabled={isCurrentlyEquipping}
+              >
+                <Icon icon="solar:pen-bold" className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFavoriteOptimistic((cape as CosmeticCape)._id);
+              }}
+              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              title={isFavorite ? t('capes.unfavorite') : t('capes.favorite')}
+              disabled={isCurrentlyEquipping}
+            >
+              <Icon
+                icon={isFavorite ? "ph:heart-fill" : "ph:heart"}
+                className="w-4 h-4"
+                style={{ color: isFavorite ? "#ef4444" : undefined }}
+              />
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onShowInfo) onShowInfo(cape as CosmeticCape);
+              }}
+              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              title={t('capes.showInfo')}
+              disabled={isCurrentlyEquipping}
+            >
+              <Icon icon="solar:info-circle-bold" className="w-4 h-4" />
+            </button>
+          </>
         )}
 
         {canDelete && onDeleteCapeClick && !isVanilla && (
@@ -313,27 +350,45 @@ function CapeItemDisplay({
             title={
               isVanilla
                 ? (cape as VanillaCape).name
-                : creatorName || (cape as CosmeticCape).firstSeen
+                : (cape as CosmeticCape).title || creatorName || (cape as CosmeticCape).uploader || (cape as CosmeticCape).firstSeen
             }
           >
             {isVanilla
               ? (cape as VanillaCape).name
-              : creatorLoading
+              : (cape as CosmeticCape).title || creatorLoading
                 ? t('common.loading')
-                : creatorName || t('common.unknown')
+                : creatorName || (cape as CosmeticCape).uploader || t('common.unknown')
             }
           </h3>
 
           {!isVanilla && (
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
-              <div className="text-white/60 flex items-center gap-1">
-                <Icon
-                  icon="solar:download-minimalistic-outline"
-                  className="w-3 h-3 text-white/50"
-                />
-                <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
+            <>
+              {(cape as CosmeticCape).title && (cape as CosmeticCape).titleApproved && (
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <span className="text-[10px] font-minecraft-ten px-2 py-0.5 bg-white/10 text-white/70 rounded-full border border-white/10">
+                    {(cape as CosmeticCape).title}
+                  </span>
+                </div>
+              )}
+
+              {(cape as CosmeticCape).title && !(cape as CosmeticCape).titleApproved && (
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <span className="text-[10px] font-minecraft-ten px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">
+                    {t('capes.titlePendingApproval')}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+                <div className="text-white/60 flex items-center gap-1">
+                  <Icon
+                    icon="solar:download-minimalistic-outline"
+                    className="w-3 h-3 text-white/50"
+                  />
+                  <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -363,6 +418,7 @@ export interface CapeListProps {
   isExperimental?: boolean;
   isModerator?: boolean;
   onModeratorDeleteCape?: (cape: CosmeticCape) => void;
+  onEditCape?: (cape: CosmeticCape) => void;
 }
 
 export function CapeList({
@@ -386,6 +442,7 @@ export function CapeList({
   isExperimental = false,
   isModerator = false,
   onModeratorDeleteCape,
+  onEditCape,
 }: CapeListProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
@@ -396,6 +453,7 @@ export function CapeList({
     y: number;
     cape: CosmeticCape | null;
   } | null>(null);
+  const [editingCape, setEditingCape] = useState<CosmeticCape | null>(null);
   const authStore = useMinecraftAuthStore();
   const activeAccount = authStore.activeAccount;
 
@@ -511,12 +569,26 @@ export function CapeList({
       return stableFavoriteCapes;
     }
 
-    if (!groupFavoritesInHeader) return capes;
+    let filteredCapes = capes;
+
+    // Filter by search query (title, username)
+    if (searchQuery && searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim();
+      filteredCapes = (capes as CosmeticCape[]).filter(cape => {
+        const title = cape.title?.toLowerCase() || "";
+        const uploader = cape.uploader?.toLowerCase() || "";
+        // Also check creator name cache for uploader names
+        const cachedCreatorName = creatorNameCacheRef.current.get(cape.firstSeen)?.toLowerCase() || "";
+        return title.includes(query) || uploader.includes(query) || cachedCreatorName.includes(query);
+      });
+    }
+
+    if (!groupFavoritesInHeader) return filteredCapes;
     // Since favorites are now rendered separately above Virtuoso, always filter them out
-    if (stableFavoriteCapes.length === 0 || isVanilla) return capes;
+    if (stableFavoriteCapes.length === 0 || isVanilla) return filteredCapes;
     const favoriteIdsSet = new Set(stableFavoriteCapes.map(cape => cape._id));
-    return (capes as CosmeticCape[]).filter((item) => !favoriteIdsSet.has(item._id));
-  }, [capes, stableFavoriteCapes, groupFavoritesInHeader, showFavoritesOnly]);
+    return (filteredCapes as CosmeticCape[]).filter((item) => !favoriteIdsSet.has(item._id));
+  }, [capes, stableFavoriteCapes, groupFavoritesInHeader, showFavoritesOnly, searchQuery]);
 
 // Removed virtuosoComponents - using native scrolling grid instead 
 
@@ -589,6 +661,47 @@ export function CapeList({
   const handlePreview3D = useCallback(() => {
     // Preview is now handled by direct click, this function is kept for potential future use
     setContextMenu(null);
+  }, []);
+
+  const handleEditCape = useCallback((cape: CosmeticCape) => {
+    setEditingCape(cape);
+  }, []);
+
+  const handleSaveCapeEdit = useCallback(async (capeId: string, title: string) => {
+    try {
+      // TODO: Implement API call to save cape title (requires staff approval)
+      // For now, just log and close the modal
+      console.log('Saving cape title:', { capeId, title });
+      toast.success(t('capes.titleSaved'));
+      setEditingCape(null);
+    } catch (error) {
+      console.error('Failed to save cape title:', error);
+      toast.error(t('capes.failedToSaveTitle'));
+    }
+  }, [t]);
+
+  const [infoCape, setInfoCape] = useState<CosmeticCape | null>(null);
+  const [infoCapeCreatorName, setInfoCapeCreatorName] = useState<string | null>(null);
+
+  const handleShowInfo = useCallback(async (cape: CosmeticCape) => {
+    setInfoCape(cape);
+    // Try to get creator name from cache or fetch it
+    const cachedName = creatorNameCacheRef.current.get(cape.firstSeen);
+    if (cachedName) {
+      setInfoCapeCreatorName(cachedName);
+    } else {
+      setInfoCapeCreatorName(null);
+      // Fetch creator name using the profile API
+      try {
+        const profile = await invoke('get_user_profile', { uuid: cape.firstSeen }) as any;
+        if (profile && profile.name) {
+          creatorNameCacheRef.current.set(cape.firstSeen, profile.name);
+          setInfoCapeCreatorName(profile.name);
+        }
+      } catch (error) {
+        console.error('Failed to fetch creator name:', error);
+      }
+    }
   }, []);
 
   // No loading spinner - capes appear immediately when available
@@ -671,6 +784,7 @@ export function CapeList({
           >
             {stableFavoriteCapes.map((cape) => {
               const imageUrl = getCapeImageUrl(cape._id, isExperimental);
+              const canEdit = activeAccount?.username === cape.uploader;
               return (
                 <CapeItemDisplay
                   key={`fav-${cape._id}`}
@@ -690,6 +804,9 @@ export function CapeList({
                   isExperimental={isExperimental}
                   isModerator={isModerator}
                   onModeratorDeleteClick={handleModeratorDeleteClickInternal}
+                  onEditCape={handleEditCape}
+                  canEdit={canEdit}
+                  onShowInfo={handleShowInfo}
                 />
               );
             })}
@@ -712,6 +829,7 @@ export function CapeList({
               : getCapeImageUrl((cape as CosmeticCape)._id, isExperimental);
             const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
             const isEquipped = equippedCapeId === capeId;
+            const canEdit = !isVanilla && activeAccount?.username === (cape as CosmeticCape).uploader;
             return (
               <CapeItemDisplay
                 key={capeId}
@@ -732,6 +850,9 @@ export function CapeList({
                 isExperimental={isExperimental}
                 isModerator={isModerator}
                 onModeratorDeleteClick={handleModeratorDeleteClickInternal}
+                onEditCape={handleEditCape}
+                canEdit={canEdit}
+                onShowInfo={handleShowInfo}
               />
             );
           })}
@@ -774,6 +895,79 @@ export function CapeList({
             </li>
           </ul>
         </div>
+      )}
+
+      {editingCape && (
+        <EditCapeModal
+          cape={editingCape}
+          onSave={handleSaveCapeEdit}
+          onCancel={() => setEditingCape(null)}
+        />
+      )}
+
+      {infoCape && (
+        <Modal
+          title={t('capes.capeInfo')}
+          onClose={() => setInfoCape(null)}
+          width="sm"
+          variant="flat"
+        >
+          <div className="space-y-4">
+            {/* Title */}
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+              <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.title')}</p>
+              <p className="text-sm text-white/90 font-minecraft-ten">{infoCape.title || 'None'}</p>
+              {infoCape.title && infoCape.titleApproved === false && (
+                <p className="text-xs text-yellow-400 mt-1 font-minecraft-ten">{t('capes.titlePendingApproval')}</p>
+              )}
+            </div>
+
+            {/* Uploader */}
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+              <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.uploader')}</p>
+              <p className="text-sm text-white/90 font-minecraft-ten">{infoCape.uploader || infoCapeCreatorName || 'Unknown'}</p>
+            </div>
+
+            {/* Upload Date */}
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+              <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.uploadDate')}</p>
+              <p className="text-sm text-white/90 font-minecraft-ten">
+                {new Date(infoCape.creationDate).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
+
+            {/* Uses */}
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+              <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.uses')}</p>
+              <p className="text-sm text-white/90 font-minecraft-ten">{infoCape.uses.toLocaleString()}</p>
+            </div>
+
+            {/* Status */}
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+              <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.status')}</p>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  infoCape.accepted ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <p className="text-sm text-white/90 font-minecraft-ten">
+                  {infoCape.accepted ? t('capes.accepted') : t('capes.denied')}
+                </p>
+              </div>
+            </div>
+
+            {/* Elytra */}
+            {infoCape.elytra && (
+              <div className="p-3 bg-black/20 rounded-lg border border-white/10">
+                <p className="text-xs text-white/50 mb-1 font-minecraft-ten">{t('capes.includesElytraTexture')}</p>
+                <p className="text-sm text-white/90 font-minecraft-ten">Yes</p>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

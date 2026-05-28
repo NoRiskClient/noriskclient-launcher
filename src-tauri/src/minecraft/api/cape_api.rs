@@ -524,6 +524,8 @@ impl CapeApi {
     /// - norisk_token: Authentication token
     /// - player_uuid: UUID of the player uploading the cape
     /// - image_path: Path to the cape image file (PNG)
+    /// - title: Optional title for the cape (requires staff approval)
+    /// - temporary: If true, skip approval for testing purposes
     /// - is_experimental: Whether to use the experimental API endpoint
     ///
     /// Returns:
@@ -533,6 +535,8 @@ impl CapeApi {
         norisk_token: &str,
         player_uuid: &Uuid,
         image_path: &PathBuf,
+        title: Option<&str>,
+        temporary: bool,
         is_experimental: bool,
     ) -> Result<CapeUploadResponse> {
         let endpoint = "cape";
@@ -556,6 +560,12 @@ impl CapeApi {
 
         let mut query_params = HashMap::new();
         query_params.insert("uuid", player_uuid.to_string());
+        if let Some(t) = title {
+            query_params.insert("title", t.to_string());
+        }
+        if temporary {
+            query_params.insert("temporary", "true".to_string());
+        }
 
         debug!(
             "[Cape API] Sending POST request with image data ({} bytes) and parameters: {:?}",

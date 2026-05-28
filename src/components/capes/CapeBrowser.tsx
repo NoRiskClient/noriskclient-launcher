@@ -669,7 +669,13 @@ export function CapeBrowser(): JSX.Element {
             hideModal('delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape:", err);
-            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+            const errorMessage = err.message || t('common.unknownError');
+            // Check if the error is related to denied capes
+            if (errorMessage.includes('denied') || errorMessage.includes('rejected') || errorMessage.includes('403')) {
+              toast.error(t('capes.errors.denied_cape_delete'));
+            } else {
+              toast.error(t('capes.failedToDeleteCape', { error: errorMessage }));
+            }
           }
         }}
         onCancelDelete={() => hideModal('delete-cape-modal')}

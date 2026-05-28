@@ -100,17 +100,23 @@ export interface CapeUploadResponse {
  * Upload a new cape image for the active player
  *
  * @param imagePath Path to the cape image file (PNG)
+ * @param title Optional title for the cape (requires staff approval)
+ * @param temporary If true, skip approval for testing purposes
  * @param noriskToken Optional NoRisk token
  * @param playerUuid Optional UUID of the player (defaults to active account)
  * @returns A promise that resolves to the cape upload response with hash
  */
 export const uploadCape = (
   imagePath: string,
+  title?: string,
+  temporary?: boolean,
   noriskToken?: string,
   playerUuid?: string
 ): Promise<CapeUploadResponse> => {
   return invoke('upload_cape', {
     imagePath,
+    title,
+    temporary,
     noriskToken,
     playerUuid
   });
