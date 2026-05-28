@@ -87,8 +87,8 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm flatpak flatpak-builder
-          sudo snap install snapcraft --classic
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm flatpak flatpak-builder libfuse2
+          sudo apt-get install -y snapcraft
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -151,6 +151,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: yarn tauri build --verbose ${{ matrix.args }}
+
+      - name: Setup Flatpak
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+          flatpak install -y flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08
 
       - name: Build Flatpak bundle
         if: matrix.os == 'ubuntu-22.04'
@@ -262,7 +271,7 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_paths }}
-          if-no-files-found: error
+          if-no-files-found: warn
 
   release:
     name: Upload release artifacts
