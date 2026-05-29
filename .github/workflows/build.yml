@@ -215,12 +215,14 @@ jobs:
           cp "${{ steps.appimage.outputs.file }}" packaging/snap/app.AppImage
 
       - name: Build Snap
-        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
+        continue-on-error: true
         run: |
+          set -euo pipefail
+              
           cd packaging/snap
-          snapcraft pack --destructive-mode \
-            --output ../../fullrisk-launcher.snap
+              
+          snapcraft pack --destructive-mode --verbosity=trace
 
       - name: Build RPM package
         if: matrix.os == 'ubuntu-22.04'
