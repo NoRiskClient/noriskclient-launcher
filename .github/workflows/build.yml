@@ -188,6 +188,12 @@ jobs:
 
           ls -lah packaging/flatpak/sources
 
+      - name: Debug Flatpak files
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          echo "Flatpak dir:"
+          find packaging/flatpak -type f
+
       - name: Build Flatpak
         if: matrix.os == 'ubuntu-22.04'
         run: |
