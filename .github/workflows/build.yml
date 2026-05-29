@@ -161,17 +161,17 @@ jobs:
             org.freedesktop.Platform//24.08 \
             org.freedesktop.Sdk//24.08
 
-      - name: Detect AppImage
+      - name: Detect AppImage (Linux only)
+        if: matrix.os == 'ubuntu-22.04'
         id: appimage
         shell: bash
         run: |
           set -e
               
-          FILE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -n 1)
+          FILE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -n 1 || true)
               
           if [[ -z "$FILE" ]]; then
-            echo "No AppImage found"
-            ls -R src-tauri/target/release/bundle
+            echo "No AppImage (expected on Linux only)"
             exit 1
           fi
               
