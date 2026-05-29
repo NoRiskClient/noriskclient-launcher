@@ -1,32 +1,57 @@
-Name: fullrisk-launcher
-Version: 0.6.22-beta.2
-Release: 1%{?dist}
-Summary: FullRiskClient Launcher
-License: MIT
-URL: https://github.com/SirKnubble/fullriskclient-launcher
-Source0: %{name}-%{version}.tar.gz
-BuildRequires: cargo nodejs yarn rpm-build libwebkit2gtk-devel libayatana-appindicator3-devel librsvg2-dev patchelf
-Requires: libwebkit2gtk libayatana-appindicator3 librsvg
+Name:           fullrisk-launcher
+Version:        0.6.22
+Release:        1.beta.2%{?dist}
+Summary:        FullRiskClient Launcher
+
+License:        MIT
+URL:            https://github.com/SirKnubble/fullriskclient-launcher
+Source0:        %{name}-%{version}.tar.gz
+
+BuildRequires:  cargo
+BuildRequires:  nodejs
+BuildRequires:  yarnpkg
+BuildRequires:  rpm-build
+BuildRequires:  webkit2gtk4.1-devel
+BuildRequires:  libayatana-appindicator3-devel
+BuildRequires:  librsvg2-devel
+BuildRequires:  patchelf
+
+Requires:       webkit2gtk4.1
+Requires:       libayatana-appindicator3
+Requires:       librsvg2
+
 %description
-FullRiskClient Launcher is a Tauri-based launcher for Minecraft clients with full Norisk integration.
+FullRiskClient Launcher is a fork of the Tauri-based launcher for Minecraft clients "NoRiskClient" with additional features.
 
 %prep
 %autosetup
 
 %build
 yarn install --immutable
-yarn tauri build --release
+yarn tauri build --bundles appimage
 
 %install
 mkdir -p %{buildroot}/opt/fullrisk-launcher
-cp -r src-tauri/target/release/bundle/* %{buildroot}/opt/fullrisk-launcher/
-cat > %{buildroot}/usr/bin/fullrisk-launcher <<'EOF'
+
+cp -r src-tauri/target/release/bundle/appimage 
+%{buildroot}/opt/fullrisk-launcher/
+
+APPIMAGE=$(find %{buildroot}/opt/fullrisk-launcher/appimage -name "*.AppImage" | head -n 1)
+
+mkdir -p %{buildroot}/usr/bin
+
+cat > %{buildroot}/usr/bin/fullrisk-launcher <<EOF
 #!/bin/sh
-exec /opt/fullrisk-launcher/NoRiskClient-Linux.AppImage "$@"
+exec "$APPIMAGE" "$@"
 EOF
+
 chmod +x %{buildroot}/usr/bin/fullrisk-launcher
-install -Dm644 gg.norisk.NoRiskClientLauncherV3.desktop %{buildroot}/usr/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop
-install -Dm644 src-tauri/icons/128x128.png %{buildroot}/usr/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png
+
+install -Dm644 gg.norisk.NoRiskClientLauncherV3.desktop 
+%{buildroot}/usr/share/applications/gg.norisk.NoRiskClientLauncherV3.desktop
+
+install -Dm644 src-tauri/icons/128x128.png 
+%{buildroot}/usr/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png
 
 %files
 /opt/fullrisk-launcher
@@ -35,3 +60,7 @@ install -Dm644 src-tauri/icons/128x128.png %{buildroot}/usr/share/icons/hicolor/
 /usr/share/icons/hicolor/128x128/apps/gg.norisk.NoRiskClientLauncherV3.png
 
 %changelog
+
+* Thu May 29 2026 FullRisk CI
+
+- Automated RPM build

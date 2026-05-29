@@ -223,14 +223,34 @@ jobs:
             --output ../../fullrisk-launcher.snap
 
       - name: Build RPM package
-        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
+        continue-on-error: true
         run: |
           mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
-          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
-          rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
+
+          VERSION="${{ steps.rpm_version.outputs.base }}"
+          RELEASE="${{ steps.rpm_version.outputs.release }}"
+
+          sed \
+            -e "s/@VERSION@/$VERSION/g" \
+            -e "s/@RELEASE@/$RELEASE/g" \
+            packaging/rpm/FullriskLauncher.spec.template \
+            > packaging/rpm/FullriskLauncher.spec
+
+          git archive \
+            --format=tar.gz \
+            --prefix=fullrisk-launcher-${VERSION}/ \
+            HEAD \
+            > rpmbuild/SOURCES/fullrisk-launcher-${VERSION}.tar.gz
+
+          rpmbuild \
+            --define "_topdir $(pwd)/rpmbuild" \
+            -ba packaging/rpm/FullriskLauncher.spec
+
           mkdir -p src-tauri/target/release/bundle/rpm
-          cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
+
+          cp rpmbuild/RPMS/*/*.rpm \
+             src-tauri/target/release/bundle/rpm/
 
       - name: Build AUR package
         continue-on-error: true
@@ -341,9 +361,9 @@ jobs:
               fi
 
               if [[ "$name" != "$renamed" ]]; then
-                mv -f "$file" "$dir/$renamed"
+                cp "$file" "$dir/$renamed"
                 if [[ -f "$file.sig" ]]; then
-                  mv "$file.sig" "$dir/$renamed.sig"
+                  cp "$file.sig" "$dir/$renamed.sig"
                 fi
               fi
             done
