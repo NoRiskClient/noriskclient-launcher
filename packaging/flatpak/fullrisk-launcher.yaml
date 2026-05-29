@@ -8,10 +8,10 @@ command: fullrisk-launcher
 
 finish-args:
   - --share=network
-  - --share=home
   - --socket=x11
   - --socket=wayland
   - --device=dri
+  - --filesystem=home
   - --talk-name=org.freedesktop.Notifications
 
 modules:
