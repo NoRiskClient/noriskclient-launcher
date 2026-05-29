@@ -222,22 +222,36 @@ jobs:
           snapcraft pack --destructive-mode \
             --output ../../fullrisk-launcher.snap
 
-            - name: Build RPM package
-              continue-on-error: true
-              if: matrix.os == 'ubuntu-22.04'
-              run: |
-                mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
-                git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
-                rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
-                mkdir -p src-tauri/target/release/bundle/rpm
-                cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
-
-      - name: Build AUR package
+      - name: Build RPM package
         continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
+          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
+          mkdir -p src-tauri/target/release/bundle/rpm
+          cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
+
+      - name: Build AUR package
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          SAFE_VERSION="${VERSION//-/_}"
+              
           mkdir -p src-tauri/target/release/bundle/aur
-          docker run --rm -v "$PWD:/work" -w /work archlinux:latest /bin/bash -lc "pacman -Sy --noconfirm archlinux-keyring base-devel git nodejs npm yarn rust cargo && useradd -m builder && chown -R builder:builder /work && su builder -c 'cd /work/packaging/aur && makepkg -s --noconfirm && cp *.pkg.tar.* /work/src-tauri/target/release/bundle/aur/'"
+              
+          docker run --rm -v "$PWD:/work" -w /work archlinux:latest /bin/bash -lc "
+            pacman -Sy --noconfirm archlinux-keyring base-devel git nodejs npm yarn rust cargo &&
+            useradd -m builder &&
+            chown -R builder:builder /work &&
+            su builder -c '
+              cd /work/packaging/aur &&
+              sed -i \"s/pkgver=.*/pkgver=${SAFE_VERSION}/\" PKGBUILD &&
+              makepkg -s --noconfirm &&
+              cp *.pkg.tar.* /work/src-tauri/target/release/bundle/aur/
+            '
+          "
 
       - name: Rename artifacts
         shell: bash
@@ -304,7 +318,7 @@ jobs:
               fi
 
               if [[ "$name" != "$renamed" ]]; then
-                mv "$file" "$dir/$renamed"
+                mv -f "$file" "$dir/$renamed"
                 if [[ -f "$file.sig" ]]; then
                   mv "$file.sig" "$dir/$renamed.sig"
                 fi
