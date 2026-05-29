@@ -161,21 +161,40 @@ jobs:
             org.freedesktop.Platform//24.08 \
             org.freedesktop.Sdk//24.08
 
+      - name: Detect AppImage
+        id: appimage
+        shell: bash
+        run: |
+          set -e
+              
+          FILE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -n 1)
+              
+          if [[ -z "$FILE" ]]; then
+            echo "No AppImage found"
+            ls -R src-tauri/target/release/bundle
+            exit 1
+          fi
+              
+          echo "file=$FILE" >> $GITHUB_OUTPUT
       - name: Prepare Flatpak input
-        if: matrix.os == 'ubuntu-22.04'
         run: |
-          mkdir -p packaging/flatpak/sources
-          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/flatpak/sources/app.AppImage
+          set -e
 
-      - name: Build Flatpak bundle
-        if: matrix.os == 'ubuntu-22.04'
+          mkdir -p packaging/flatpak/sources
+
+          cp "${{ steps.appimage.outputs.file }}" \
+             packaging/flatpak/sources/app.AppImage
+
+          ls -lah packaging/flatpak/sources
+
+      - name: Build Flatpak
         run: |
-          mkdir -p src-tauri/target/release/bundle/flatpak
-          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/flatpak/
+          set -e
               
-          flatpak-builder --user --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
-              
-          flatpak build-bundle packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
+          flatpak-builder --user --force-clean \
+            --repo=packaging/flatpak/repo \
+            packaging/flatpak/build-dir \
+            packaging/flatpak/fullrisk-launcher.yaml
 
       - name: Build Snap package
         if: matrix.os == 'ubuntu-22.04'
