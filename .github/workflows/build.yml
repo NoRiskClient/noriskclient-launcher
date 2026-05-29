@@ -177,6 +177,7 @@ jobs:
               
           echo "file=$FILE" >> $GITHUB_OUTPUT
       - name: Prepare Flatpak input
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           set -e
 
@@ -188,6 +189,7 @@ jobs:
           ls -lah packaging/flatpak/sources
 
       - name: Build Flatpak
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           set -e
               
