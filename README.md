@@ -16,13 +16,13 @@ I´m using this version myself rather than the original, so hopefully there won�
 
 All links point to the newest GitHub release.
 
-| OS                         |    Support    | Download                                                                                                                                                                                                                                                        |
-| -------------------------- | :-----------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows 10/11              | :green_heart: | [Installer (.exe)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Windows-Setup.exe)                                                                                                                           |
-| Linux x64                  | :green_heart: | [AppImage](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.AppImage) / [Debian package (.deb)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.deb) |
-| macOS Apple Silicon        | :green_heart: | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-arm64.dmg)                                                                                                                            |
-| macOS Intel                | :green_heart: | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-x86_64.dmg)                                                                                                                           |
-| Linux (Snap, Flatpak, AUR) |    Soon...    |                                                                                                                                                                                                                                                                 |
+| OS                   |    Support     | Download                                                                                                                                                                                                                                                        |
+| -------------------- | :------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| Windows 10/11        | :green_heart:  | [Installer (.exe)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Windows-Setup.exe)                                                                                                                           |
+| Linux x64            | :green_heart:  | [AppImage](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.AppImage) / [Debian package (.deb)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.deb) |
+| macOS Apple Silicon  | :green_heart:  | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-arm64.dmg)                                                                                                                            |
+| macOS Intel          | :green_heart:  | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-x86_64.dmg)                                                                                                                           |
+| Other Linux Packages | :broken_heart: | [Flatpak]() / [Snap package]() / [RPM package (.rpm)]() / [AUR package (arch)]()                                                                                                                                                                                |     |
 
 ## Compile it yourself!
 
@@ -57,59 +57,6 @@ All links point to the newest GitHub release.
    ```bash
    yarn tauri build
    ```
-
-### Optional Linux packaging
-
-- Flatpak:
-  ```bash
-  yarn tauri build
-  flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
-  flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo src-tauri/target/release/bundle/flatpak/fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
-  ```
-- Snap:
-  ```bash
-  yarn tauri build
-  cp src-tauri/target/release/bundle/appimage/NoRiskClient-Linux.AppImage packaging/snap/
-  cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
-  cd packaging/snap
-  snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
-  ```
-- AUR package metadata is available in `packaging/aur/PKGBUILD`.
-- RPM spec metadata is available in `packaging/rpm/FullriskLauncher.spec`.
-
-## Publish to Flathub, AUR and RPM
-
-### Flathub
-
-1. Test the Flatpak locally first:
-   ```bash
-   flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build-dir packaging/flatpak/fullrisk-launcher.yaml
-   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo packaging/flatpak/repo fullrisk-launcher.flatpak gg.norisk.NoRiskClientLauncherV3
-   ```
-2. Fork the `flathub` repository and add a new app manifest under `apps/gg.norisk/NoRiskClientLauncherV3/`.
-3. Include a `metadata.json` and the `fullrisk-launcher.yaml` manifest there.
-4. Open a pull request gegen das Flathub-Repo. Flathub prüft und merged PRs manuell.
-
-> Flathub kann man also weitgehend automatisieren: Build, Manifest-Generierung und PR-Erstellung lassen sich per GitHub Actions machen. Das finale Merge/Release muss aber von Flathub-Maintainern bestätigt werden.
-
-### AUR
-
-- Das Paket ist in `packaging/aur/PKGBUILD` vorbereitet.
-- Zum lokalen Test:
-  ```bash
-  cd packaging/aur
-  makepkg -si
-  ```
-- Für eine automatische Veröffentlichung ist in der Regel ein AUR-SSH-Schlüssel oder `aurpublish` nötig. Alternativ kannst du den PKGBUILD manuell in dein AUR-Projekt hochladen.
-
-### RPM
-
-- Das RPM-Specfile steht in `packaging/rpm/FullriskLauncher.spec`.
-- Zum lokalen Test/build:
-  ```bash
-  rpmbuild -ba packaging/rpm/FullriskLauncher.spec
-  ```
-- Für eine RPM-Release-Automatisierung kannst du das Artefakt in GitHub Releases hochladen oder einen Build-Job in einem Fedora COPR-Repository einrichten.
 
 ## Disclaimer
 
