@@ -17,12 +17,12 @@ IÂ´m using this version myself rather than the original, so hopefully there wonÂ
 All links point to the newest GitHub release.
 
 | OS                   |    Support     | Download                                                                                                                                                                                                                                                        |
-| -------------------- | :------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| -------------------- | :------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows 10/11        | :green_heart:  | [Installer (.exe)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Windows-Setup.exe)                                                                                                                           |
 | Linux x64            | :green_heart:  | [AppImage](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.AppImage) / [Debian package (.deb)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-Linux.deb) |
 | macOS Apple Silicon  | :green_heart:  | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-arm64.dmg)                                                                                                                            |
 | macOS Intel          | :green_heart:  | [Disk image (.dmg)](https://github.com/SirKnubble/fullriskclient-launcher/releases/latest/download/FullriskLauncher-macOS-x86_64.dmg)                                                                                                                           |
-| Other Linux Packages | :broken_heart: | [Flatpak]() / [Snap package]() / [RPM package (.rpm)]() / [AUR package (arch)]()                                                                                                                                                                                |     |
+| Other Linux Packages | :broken_heart: | [Flatpak]() / [Snap package]() / [RPM package (.rpm)]() / [AUR package (arch)]()                                                                                                                                                                                |
 
 ## Compile it yourself!
 
