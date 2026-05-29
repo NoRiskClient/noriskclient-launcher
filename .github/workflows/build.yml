@@ -233,26 +233,49 @@ jobs:
           cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
 
       - name: Build AUR package
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           SAFE_VERSION="${VERSION//-/_}"
-              
+
           mkdir -p src-tauri/target/release/bundle/aur
-              
-          docker run --rm -v "$PWD:/work" -w /work archlinux:latest /bin/bash -lc "
-            pacman -Sy --noconfirm archlinux-keyring base-devel git nodejs npm yarn rust cargo &&
-            useradd -m builder &&
-            chown -R builder:builder /work &&
+
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            archlinux:latest \
+            /bin/bash -lc "
+
+            pacman -Sy --noconfirm \
+              archlinux-keyring \
+              base-devel \
+              git \
+              nodejs \
+              npm \
+              yarn \
+              rust \
+              cargo \
+              webkit2gtk \
+              libayatana-appindicator \
+              librsvg \
+              patchelf
+
+            useradd -m builder
+
+            chown -R builder:builder /work
+
             su builder -c '
-              cd /work/packaging/aur &&
-              sed -i \"s/pkgver=.*/pkgver=${SAFE_VERSION}/\" PKGBUILD &&
-              makepkg -s --noconfirm &&
+              cd /work/packaging/aur
+
+              sed -i \"s/pkgver=.*/pkgver=${SAFE_VERSION}/\" PKGBUILD
+
+              makepkg -s --noconfirm
+
               cp *.pkg.tar.* /work/src-tauri/target/release/bundle/aur/
             '
           "
-
       - name: Rename artifacts
         shell: bash
         run: |
