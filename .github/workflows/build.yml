@@ -204,34 +204,33 @@ jobs:
             packaging/flatpak/build-dir \
             packaging/flatpak/fullrisk-launcher.yaml
 
+      - name: Prepare Snap
+        continue-on-error: true
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          set -e
+
+          mkdir -p packaging/snap
+
+          cp "${{ steps.appimage.outputs.file }}" packaging/snap/app.AppImage
+
       - name: Build Snap
         continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          mkdir -p packaging/snap
-
-          cat > packaging/snap/fullrisk-launcher.desktop <<EOF
-          [Desktop Entry]
-          Name=NoRiskLauncher
-          Exec=fullrisk-launcher
-          Type=Application
-          Categories=Game;
-          EOF
-
-          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/snap/app.AppImage
-
           cd packaging/snap
-          snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
+          snapcraft pack --destructive-mode \
+            --output ../../fullrisk-launcher.snap
 
-      - name: Build RPM package
-        continue-on-error: true
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
-          git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
-          rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
-          mkdir -p src-tauri/target/release/bundle/rpm
-          cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
+            - name: Build RPM package
+              continue-on-error: true
+              if: matrix.os == 'ubuntu-22.04'
+              run: |
+                mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
+                git archive --format=tar.gz --prefix=fullrisk-launcher-0.6.22-beta.2/ HEAD > rpmbuild/SOURCES/fullrisk-launcher-0.6.22-beta.2.tar.gz
+                rpmbuild --define "_topdir $(pwd)/rpmbuild" -ba packaging/rpm/FullriskLauncher.spec
+                mkdir -p src-tauri/target/release/bundle/rpm
+                cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
 
       - name: Build AUR package
         continue-on-error: true
