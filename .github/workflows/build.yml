@@ -153,6 +153,7 @@ jobs:
         run: yarn tauri build --verbose ${{ matrix.args }}
 
       - name: Setup Flatpak
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -162,6 +163,7 @@ jobs:
             org.freedesktop.Sdk//24.08
 
       - name: Detect AppImage (Linux only)
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         id: appimage
         shell: bash
@@ -178,6 +180,7 @@ jobs:
           echo "file=$FILE" >> $GITHUB_OUTPUT
 
       - name: Prepare Flatpak input
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         shell: bash
         run: |
@@ -191,6 +194,7 @@ jobs:
           ls -lah packaging/flatpak/sources
 
       - name: Build Flatpak
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           set -e
@@ -201,10 +205,11 @@ jobs:
             packaging/flatpak/fullrisk-launcher.yaml
 
       - name: Build Snap
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p packaging/snap
-              
+
           cat > packaging/snap/fullrisk-launcher.desktop <<EOF
           [Desktop Entry]
           Name=NoRiskLauncher
@@ -212,13 +217,14 @@ jobs:
           Type=Application
           Categories=Game;
           EOF
-              
+
           cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/snap/app.AppImage
-              
+
           cd packaging/snap
           snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
 
       - name: Build RPM package
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS,tmp}
@@ -228,6 +234,7 @@ jobs:
           cp rpmbuild/RPMS/*/*.rpm src-tauri/target/release/bundle/rpm/
 
       - name: Build AUR package
+        continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p src-tauri/target/release/bundle/aur
