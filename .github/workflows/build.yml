@@ -190,12 +190,6 @@ jobs:
           echo "Flatpak sources:"
           ls -lah packaging/flatpak/sources
 
-      - name: Debug Flatpak files
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          echo "Flatpak dir:"
-          find packaging/flatpak -type f
-
       - name: Build Flatpak
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -206,12 +200,21 @@ jobs:
             packaging/flatpak/build-dir \
             packaging/flatpak/fullrisk-launcher.yaml
 
-      - name: Build Snap package
+      - name: Build Snap
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          mkdir -p src-tauri/target/release/bundle/snap
-          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/snap/
-          cp gg.norisk.NoRiskClientLauncherV3.desktop packaging/snap/
+          mkdir -p packaging/snap
+              
+          cat > packaging/snap/fullrisk-launcher.desktop <<EOF
+          [Desktop Entry]
+          Name=NoRiskLauncher
+          Exec=fullrisk-launcher
+          Type=Application
+          Categories=Game;
+          EOF
+              
+          cp src-tauri/target/release/bundle/appimage/*.AppImage packaging/snap/app.AppImage
+              
           cd packaging/snap
           snapcraft --output ../../src-tauri/target/release/bundle/snap/fullrisk-launcher.snap
 
