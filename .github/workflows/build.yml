@@ -214,14 +214,19 @@ jobs:
 
           cp "${{ steps.appimage.outputs.file }}" packaging/snap/app.AppImage
 
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools
+
+          sudo systemctl restart snapd || true
+
       - name: Build Snap
         if: matrix.os == 'ubuntu-22.04'
         continue-on-error: true
         run: |
           set -euo pipefail
-              
+
           cd packaging/snap
-              
+
           snapcraft pack --destructive-mode --verbosity=trace
 
       - name: Build RPM package
