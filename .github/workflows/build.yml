@@ -176,16 +176,18 @@ jobs:
           fi
               
           echo "file=$FILE" >> $GITHUB_OUTPUT
+
       - name: Prepare Flatpak input
         if: matrix.os == 'ubuntu-22.04'
+        shell: bash
         run: |
           set -e
-
           mkdir -p packaging/flatpak/sources
-
-          cp "${{ steps.appimage.outputs.file }}" \
-             packaging/flatpak/sources/app.AppImage
-
+          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -n 1)
+          echo "Detected:"
+          echo "$APPIMAGE"
+          cp "$APPIMAGE" packaging/flatpak/sources/app.AppImage
+          echo "Flatpak sources:"
           ls -lah packaging/flatpak/sources
 
       - name: Debug Flatpak files
