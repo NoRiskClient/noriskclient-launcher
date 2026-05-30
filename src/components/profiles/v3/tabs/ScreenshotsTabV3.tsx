@@ -25,6 +25,7 @@ import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface ScreenshotsTabV3Props {
   profile: Profile;
@@ -87,7 +88,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       });
     } catch (err) {
       console.error("[V3 Screenshots] Failed to load:", err);
-      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(parseErrorMessage(err));
     } finally {
       if (mountedRef.current) setLoading(false);
     }

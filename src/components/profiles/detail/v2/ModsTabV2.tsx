@@ -26,6 +26,7 @@ import { toast } from 'react-hot-toast'; // Import toast
 import { useTranslation } from 'react-i18next';
 import { toggleContentFromProfile } from "../../../../services/content-service"; // Import toggleContentFromProfile
 import type { ToggleContentPayload } from "../../../../types/content"; // Import ToggleContentPayload
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 // Icons specific to ModsTabV2
 const MODS_TAB_ICONS_TO_PRELOAD = [
@@ -244,7 +245,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
       );
     } catch (err) {
       console.error(`Failed to ${actionKey} ${modDisplayName}:`, err);
-      toast.error(t('mods.toggle_failed', { action: actionKey, name: modDisplayName, error: err instanceof Error ? err.message : String(err) }));
+      toast.error(t('mods.toggle_failed', { action: actionKey, name: modDisplayName, error: parseErrorMessage(err) }));
     } finally {
       setModBeingToggled(null);
     }
@@ -540,7 +541,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
       checkForModUpdates(updatedProfile); 
     } catch (err) {
       console.error("Failed to refresh mods data:", err);
-      setError(`Failed to refresh mods: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`Failed to refresh mods: ${parseErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -683,7 +684,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
       console.error("Failed to update mod:", err);
       const displayName = mod.display_name || getModFileNameFromSource(mod) || mod.id;
       setError(
-        `Failed to update ${displayName}: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update ${displayName}: ${parseErrorMessage(err)}`,
       );
     } finally {
       setUpdatingMods((prev) => {
@@ -820,7 +821,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         } catch (err) {
           const modBeingProcessed = mods.find(m => m.id === modId);
           const modDisplayName = modBeingProcessed?.display_name || getModFileNameFromSource(modBeingProcessed!) || modId;
-          errors.push(`Failed to delete ${modDisplayName}: ${err instanceof Error ? err.message : String(err)}`);
+          errors.push(`Failed to delete ${modDisplayName}: ${parseErrorMessage(err)}`);
           console.error(`Failed to delete mod ${modId} during batch:`, err);
         }
       }
@@ -847,7 +848,7 @@ export function ModsTabV2({ profile, onRefreshRequired }: ModsTabV2Props) {
         });
         // toast.success(`Mod '${modDisplayName}' deleted.`); // Example toast
       } catch (err) {
-        setError(`Failed to delete ${modDisplayName}: ${err instanceof Error ? err.message : String(err)}`);
+        setError(`Failed to delete ${modDisplayName}: ${parseErrorMessage(err)}`);
         console.error(`Failed to delete mod ${modToDelete.id}:`, err);
       } finally {
         setModBeingDeleted(null); // Reset row button state

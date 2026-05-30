@@ -17,6 +17,7 @@ import { cn } from "../../../lib/utils";
 import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalCustomJvmArgs, setGlobalCustomJvmArgs } from "../../../services/launcher-config-service";
 import type { MemorySettings } from "../../../types/launcherConfig";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface JavaSettingsTabProps {
   editedProfile: Profile;
@@ -147,7 +148,7 @@ export function JavaSettingsTab({
     } catch (error) {
       console.error("Error detecting Java installations:", error);
       const errorMessage =
-        error instanceof Error ? error.message : String(error);
+        parseErrorMessage(error);
       setJavaDetectionError(errorMessage); // Store for internal reference if needed
       toast.error(t('java.detect_failed', { error: errorMessage }));
       setDetectedJavaInstallations([]);
@@ -264,7 +265,7 @@ export function JavaSettingsTab({
       setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
         ? t('java.path_not_exist')
-        : error?.message || String(error);
+        : error?.message || parseErrorMessage(error);
       toast.error(t('java.validation_error', { error: message }));
     } finally {
       setIsValidatingJavaPath(false);

@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../services/launcher-config-service";
 import { refreshPermissions } from "../services/permission-service";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
 const setMojangTraits = (account: MinecraftAccount | null) => {
   const uuid = account?.id ?? null;
@@ -71,7 +72,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to initialize accounts:", error);
       set({
-        error: i18n.t('auth.errors.load_accounts', { error: error instanceof Error ? error.message : String(error.message) }),
+        error: i18n.t('auth.errors.load_accounts', { error: parseErrorMessage(error) }),
         isLoading: false,
       });
       setMojangTraits(null);
@@ -155,7 +156,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       });
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : String(error.message);
+        parseErrorMessage(error);
       
       // Only show error toast if using browser login (toast.promise already handles it)
       if (useBrowserLogin && !errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
@@ -202,7 +203,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to remove account:", error);
       set({
-        error: i18n.t('auth.errors.remove_account', { error: error instanceof Error ? error.message : String(error.message) }),
+        error: i18n.t('auth.errors.remove_account', { error: parseErrorMessage(error) }),
         isLoading: false,
       });
     }

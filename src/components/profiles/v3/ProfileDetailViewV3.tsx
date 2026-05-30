@@ -68,6 +68,7 @@ import { WorldsTabV3 } from "./tabs/WorldsTabV3";
 import { ScreenshotsTabV3 } from "./tabs/ScreenshotsTabV3";
 import { LogsTabV3 } from "./tabs/LogsTabV3";
 import type { LocalContentItem } from "../../../hooks/useLocalContentManager";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 const mainTabFor = (k: NavKey): string =>
   CONTENT_NAV_KEYS.includes(k) ? "content" : k;
@@ -192,7 +193,7 @@ export function ProfileDetailViewV3({
           return t('profiles.deleteSuccess', { name: currentProfile.name });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: parseErrorMessage(err) }),
       });
     } catch (error) {
       console.error("[V3] Delete failed:", error);
@@ -221,7 +222,7 @@ export function ProfileDetailViewV3({
       loading: t('profiles.openingFolder', { name: currentProfile.name }),
       success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         return t('profiles.openFolderError', { error: message });
       },
     });

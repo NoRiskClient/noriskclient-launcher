@@ -23,6 +23,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function ProfilesTabV2() {
   const { t } = useTranslation();
@@ -201,7 +202,7 @@ export function ProfilesTabV2() {
           return t('profiles.deleteSuccess', { name: profileName });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: parseErrorMessage(err) }),
       });
     }
   };
@@ -213,7 +214,7 @@ export function ProfilesTabV2() {
       loading: t('profiles.openingFolder', { name: profile.name }),
       success: t('profiles.openFolderSuccess', { name: profile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         console.error(`Failed to open folder for ${profile.name}:`, err);
         return t('profiles.openFolderError', { error: message });
       },

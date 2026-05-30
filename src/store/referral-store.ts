@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ReferralInfo } from "../types/launcherConfig";
 import { getReferralInfo } from "../services/referral-service";
+import { translateApiError } from "../utils/nrc-error-translations";
 
 const DISMISSED_KEY = "referral_banner_dismissed_code";
 
@@ -63,7 +64,7 @@ export const useReferralStore = create<ReferralStoreState>((set, get) => ({
         referrerInfo: null,
         bannerVisible: false,
         isLoading: false,
-        error: error instanceof Error ? error.message : "Failed to fetch referral info",
+        error: translateApiError(error, "Failed to fetch referral info"),
       });
     }
   },

@@ -18,6 +18,7 @@ import {
   removeProfileSymlink,
   getProfileSymlinks, getDefaultProfilePath
 } from "../../../services/profile-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface SymlinkSettingsTabProps {
   editedProfile: Profile;
@@ -52,7 +53,7 @@ export function SymlinkSettingsTab({
       const links = await getProfileSymlinks(editedProfile.id);
       setSymlinks(links);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to load symlinks for profile ${editedProfile.id}: ${errorMessage}`);
       console.error("Failed to load symlinks:", error);
       toast.error(t('symlinks.load_failed'));
@@ -145,7 +146,7 @@ export function SymlinkSettingsTab({
       toast.success(t('symlinks.created_success', { target: targetPath, external: externalPath }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error: any) {
-      const errorMessage = error?.message || String(error);
+      const errorMessage = error?.message || parseErrorMessage(error);
       logError(`Symlink creation failed for profile ${editedProfile.id}: ${errorMessage}. Target: ${targetPath}, External: ${externalPath}`);
       console.error("Symlink creation failed:", error);
       
@@ -179,7 +180,7 @@ export function SymlinkSettingsTab({
       toast.success(t('symlinks.removed_success', { path }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to remove symlink for profile ${editedProfile.id}: ${errorMessage}. Path: ${path}`);
       toast.error(t('symlinks.remove_failed', { error: errorMessage }));
     }
@@ -202,7 +203,7 @@ export function SymlinkSettingsTab({
       
       await openPath(fullPath);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to open internal path for profile ${editedProfile.id}: ${errorMessage}. Path: ${relativePath}`);
       console.error("Failed to open internal path:", error);
       toast.error(t('symlinks.open_path_failed', { error: errorMessage }));
