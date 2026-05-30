@@ -96,6 +96,49 @@ export const getPackRolloutConfig = async (): Promise<PackRolloutConfig> => {
   return packRolloutFetchPromise;
 };
 
+export interface PackFallbackConfig {
+  fallback_pack_id: string;
+}
+
+let cachedPackFallback: PackFallbackConfig | null = null;
+let packFallbackFetchPromise: Promise<PackFallbackConfig | null> | null = null;
+
+export const getPackFallbackConfig = async (): Promise<PackFallbackConfig | null> => {
+  if (cachedPackFallback) return cachedPackFallback;
+  if (packFallbackFetchPromise) return packFallbackFetchPromise;
+
+  packFallbackFetchPromise = (async () => {
+    try {
+      if (!flagsmithInitialized) await initPromise;
+
+      const flagValue = flagsmith.getValue('pack_fallback_id');
+      // Flag unset → leave the backend default ("norisk-stable") untouched.
+      if (!flagValue || typeof flagValue !== 'string' || !flagValue.trim()) {
+        log('info', 'No pack_fallback_id flag set; keeping backend default');
+        return null;
+      }
+
+      const config: PackFallbackConfig = { fallback_pack_id: flagValue.trim() };
+      log('info', `Pack fallback config: ${JSON.stringify(config)}`);
+      cachedPackFallback = config;
+
+      try {
+        await invoke('set_pack_fallback_config', { config });
+      } catch (error) {
+        log('error', `Failed to push pack fallback config to backend: ${error}`);
+      }
+
+      return config;
+    } catch (error) {
+      log('error', `Failed to fetch pack fallback config from Flagsmith: ${error}`);
+      packFallbackFetchPromise = null;
+      throw error;
+    }
+  })();
+
+  return packFallbackFetchPromise;
+};
+
 /**
  * Fetches the blocked mods configuration from Flagsmith.
  *

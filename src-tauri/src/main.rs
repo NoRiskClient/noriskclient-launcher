@@ -687,6 +687,8 @@ async fn main() {
             commands::pack_rollout_commands::get_effective_pack_id,
             commands::pack_rollout_commands::is_pack_rollout_active,
             commands::pack_rollout_commands::is_pack_aliased,
+            commands::pack_fallback_commands::set_pack_fallback_config,
+            commands::pack_fallback_commands::get_pack_fallback_config,
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,
             commands::permission_commands::has_permission,

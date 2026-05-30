@@ -617,6 +617,53 @@ impl ProfileManager {
         Ok(())
     }
 
+    pub async fn resolve_and_migrate_pack_id(&self, profile_id: Uuid) -> Result<Option<String>> {
+        let mut profile = self.get_profile(profile_id).await?;
+        // Empty string is the "no pack / vanilla" sentinel — never migrate it.
+        let Some(original) = profile
+            .selected_norisk_pack_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+        else {
+            return Ok(None);
+        };
+
+        let aliased =
+            crate::commands::pack_rollout_commands::resolve_effective_pack_id(&original).await;
+
+        let state = crate::state::state_manager::State::get().await?;
+        let config = state.norisk_pack_manager.get_config().await;
+
+        // Skip migration before pack config has loaded — would otherwise nuke every profile on first boot.
+        if config.packs.is_empty() {
+            return Ok(Some(aliased));
+        }
+
+        if config.packs.contains_key(&aliased) {
+            return Ok(Some(aliased));
+        }
+
+        let fallback = crate::commands::pack_fallback_commands::get_fallback_pack_id().await;
+        warn!(
+            "[PackFallback] Profile '{}' references missing pack '{}' (from '{}'). Falling back to '{}'.",
+            profile.name, aliased, original, fallback
+        );
+
+        if !config.packs.contains_key(&fallback) {
+            error!(
+                "[PackFallback] Fallback pack '{}' also missing. Clearing selection for profile '{}'.",
+                fallback, profile.name
+            );
+            profile.selected_norisk_pack_id = None;
+            self.update_profile(profile_id, profile).await?;
+            return Ok(None);
+        }
+
+        profile.selected_norisk_pack_id = Some(fallback.clone());
+        self.update_profile(profile_id, profile).await?;
+        Ok(Some(fallback))
+    }
+
     /// Helper function to check if any other profile uses the same path
     /// This is used before deleting a profile directory to ensure we don't delete
     /// files that are still needed by other profiles
