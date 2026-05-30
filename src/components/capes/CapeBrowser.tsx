@@ -38,9 +38,8 @@ import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
 import { ConfirmDeletionModal } from "./ConfirmDeletionModal";
 import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
-import { isCapeInReview, translateCapeError } from "../../utils/cape-error-translations";
+import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
-import { parseErrorMessage } from "../../utils/error-utils";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 
 
@@ -195,10 +194,7 @@ export function CapeBrowser(): JSX.Element {
 
   // Helper function to format and translate error messages
   const formatErrorMessage = (error: unknown): string => {
-    if ((error as any)?.translatable_key) {
-      return translateApiError(error, t('common.unknownError'));
-    }
-    return translateCapeError(parseErrorMessage(error));
+    return translateApiError(error, t('common.unknownError'));
   };
 
   // Helper function to determine if error is a warning (cape in review)
