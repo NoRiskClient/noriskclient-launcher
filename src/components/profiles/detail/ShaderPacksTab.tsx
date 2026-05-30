@@ -16,6 +16,7 @@ import { Button } from "../../ui/buttons/Button";
 import { gsap } from "gsap";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface ShaderPacksTabProps {
   profile: Profile;
@@ -110,7 +111,7 @@ export function ShaderPacksTab({
     } catch (error) {
       console.error("Failed to load shader packs:", error);
       setShaderPacksError(
-        `Failed to load shader packs: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load shader packs: ${parseErrorMessage(error)}`,
       );
     } finally {
       setLoadingShaderPacks(false);
@@ -278,7 +279,7 @@ export function ShaderPacksTab({
     } catch (err) {
       const packFileName = pack?.filename || "Selected pack";
       console.error("Failed to toggle pack enabled state:", err);
-      toast.error(t('shaderpacks.toggle_failed', { name: packFileName, error: err instanceof Error ? err.message : String(err) }));
+      toast.error(t('shaderpacks.toggle_failed', { name: packFileName, error: parseErrorMessage(err) }));
     } finally {
       setLoadingOperation(false);
     }
@@ -325,7 +326,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to update pack:", err);
       setShaderPacksError(
-        `Failed to update pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update pack: ${parseErrorMessage(err)}`,
       );
 
       setShaderPackUpdates({ ...shaderPackUpdates });
@@ -388,7 +389,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to update all packs:", err);
       setShaderPacksError(
-        `Failed to update all packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update all packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -428,7 +429,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to delete pack:", err);
       setShaderPacksError(
-        `Failed to delete pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete pack: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -446,7 +447,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to open directory:", err);
       setShaderPacksError(
-        `Failed to open directory: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to open directory: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -474,7 +475,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to enable selected packs:", err);
       setShaderPacksError(
-        `Failed to enable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to enable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -502,7 +503,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to disable selected packs:", err);
       setShaderPacksError(
-        `Failed to disable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to disable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -545,7 +546,7 @@ export function ShaderPacksTab({
     } catch (err) {
       console.error("Failed to delete selected packs:", err);
       setShaderPacksError(
-        `Failed to delete selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);

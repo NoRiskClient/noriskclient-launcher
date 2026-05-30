@@ -22,6 +22,7 @@ import { PERMISSION } from '../../constants/permissions';
 import { useTranslation } from "react-i18next";
 import { DesignerSettingsTab } from './settings/DesignerSettingsTab';
 import { cn } from "../../lib/utils";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ProfileSettingsProps {
   profile: Profile;
@@ -163,7 +164,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
           },
           error: (err) => {
             const errorMessage =
-              err instanceof Error ? err.message : String(err.message);
+              parseErrorMessage(err);
             return t('profiles.deleteError', { error: errorMessage });
           },
         })
@@ -172,7 +173,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         });
     } catch (err) {
       console.error("Error during delete initiation:", err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = parseErrorMessage(err);
       toast.error(t('profiles.deleteInitError', { error: errorMessage }));
       setIsDeleting(false);
     }

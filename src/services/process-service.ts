@@ -7,6 +7,7 @@ import { PERMISSION } from "../constants/permissions";
 import { toast } from "react-hot-toast";
 import { logInfo, logWarn } from "../utils/logging-utils";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
@@ -46,7 +47,7 @@ export async function launch(
     }
   } catch (e) {
     logWarn(
-      `[ProcessService] Failed to check experimental permission: ${e instanceof Error ? e.message : String(e)}`,
+      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
     );
   }
 

@@ -37,8 +37,8 @@ const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
 interface UploadCapeModalProps {
   previewImageUrl: string;
   previewImagePath: string;
-  formatErrorMessage: (error: string) => string;
-  isWarningMessage: (error: string) => boolean;
+  formatErrorMessage: (error: unknown) => string;
+  isWarningMessage: (error: unknown) => boolean;
   onCancelUpload: () => void;
 }
 
@@ -81,9 +81,9 @@ export function UploadCapeModal({
       onCancelUpload(); // Close modal on success
     } catch (err: any) {
       console.error("Error uploading cape:", err);
-      const formattedError = formatErrorMessage(err.message || "Unknown error");
+      const formattedError = formatErrorMessage(err);
 
-      if (isWarningMessage(formattedError)) {
+      if (isWarningMessage(err)) {
         setUploadWarning(formattedError);
         setUploadError(null);
       } else {

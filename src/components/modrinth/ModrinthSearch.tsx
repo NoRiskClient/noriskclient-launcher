@@ -32,6 +32,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { Select } from "../ui/Select";
 import { Label } from "../ui/Label";
 import { useThemeStore } from "../../store/useThemeStore";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 function CategoryTransitionLoader() {
   const { t } = useTranslation();
@@ -197,7 +198,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
       setModpackInstallState((prev) => ({ ...prev, [versionId]: "error" }));
 
       console.error(
-        `Failed to install modpack: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to install modpack: ${parseErrorMessage(error)}`,
       );
 
       setTimeout(() => {
@@ -469,7 +470,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
       } catch (err) {
         console.error("Failed to load featured content:", err);
         setSearchError(
-          `Failed to load content: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to load content: ${parseErrorMessage(err)}`,
         );
         setSearchResults([]);
         setSearchResponse(null);
@@ -553,7 +554,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
       } catch (err) {
         console.error("Modrinth search failed:", err);
         setSearchError(
-          `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+          `Search failed: ${parseErrorMessage(err)}`,
         );
         if (resetResults) {
           setSearchResults([]);
@@ -638,7 +639,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
         } catch (error) {
           console.error("Failed to load project:", error);
           setSearchError(
-            `Failed to load project: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to load project: ${parseErrorMessage(error)}`,
           );
         }
       };
@@ -703,7 +704,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
     } catch (err) {
       console.error(`Failed to fetch versions for ${projectId}:`, err);
       setVersionsError(
-        `Failed to load versions: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to load versions: ${parseErrorMessage(err)}`,
       );
       setModVersions([]);
       setFilteredVersions([]);
@@ -798,7 +799,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
         } catch (err) {
           console.error("Modrinth filtered search (active filters) failed:", err);
           setSearchError(
-            `Search failed: ${err instanceof Error ? err.message : String(err)}`
+            `Search failed: ${parseErrorMessage(err)}`
           );
           setSearchResults([]);
           setSearchResponse(null);
@@ -867,7 +868,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
         } catch (err) {
           console.error("Modrinth search (filters cleared) failed:", err);
           setSearchError(
-            `Search failed: ${err instanceof Error ? err.message : String(err)}`
+            `Search failed: ${parseErrorMessage(err)}`
           );
           setSearchResults([]);
           setSearchResponse(null);
@@ -1034,7 +1035,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
           } catch (err) {
             console.error("Modrinth search failed:", err);
             setSearchError(
-              `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+              `Search failed: ${parseErrorMessage(err)}`,
             );
             setSearchResults([]);
             setSearchResponse(null);
@@ -1110,7 +1111,7 @@ export const ModrinthSearch: React.FC<ModrinthSearchProps> = ({
         } catch (err) {
           console.error("Modrinth search failed:", err);
           setSearchError(
-            `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+            `Search failed: ${parseErrorMessage(err)}`,
           );
           setSearchResults([]);
           setSearchResponse(null);

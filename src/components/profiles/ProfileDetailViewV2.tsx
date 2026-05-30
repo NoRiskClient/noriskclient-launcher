@@ -39,6 +39,7 @@ import { Tooltip } from "../ui/Tooltip";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 type MainTabType = "content" | "worlds" | "logs" | "screenshots";
 type ContentTabType = "mods" | "resourcepacks" | "datapacks" | "shaderpacks" | "nrc";
@@ -231,7 +232,7 @@ export function ProfileDetailViewV2({
           return t('profiles.deleteSuccess', { name: currentProfile.name });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: parseErrorMessage(err) }),
       });
     } catch (error) {
       console.error("Delete failed:", error);
@@ -266,7 +267,7 @@ export function ProfileDetailViewV2({
       loading: t('profiles.openingFolder', { name: currentProfile.name }),
       success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         console.error(`Failed to open folder for ${currentProfile.name}:`, err);
         return t('profiles.openFolderError', { error: message });
       },

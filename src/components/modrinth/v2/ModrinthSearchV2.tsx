@@ -78,6 +78,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGlobalModal } from '../../../hooks/useGlobalModal';
 import { useThemeStore } from '../../../store/useThemeStore';
 import { handleIrisCheckAndShowModal, IrisRequiredModal } from '../../../utils/iris-detection.tsx';
+import { parseErrorMessage } from "../../../utils/error-utils";
 import { useTranslation } from "react-i18next";
 
 // Remove any other stray imports of uninstallContentFromProfile below this point
@@ -1270,7 +1271,7 @@ export function ModrinthSearchV2({
       }
       
     } catch (error) {
-      toast.error(t('content.install.failed', { error: error instanceof Error ? error.message : String(error) }));
+      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
       console.error("Install error in installToProfile:", error);
     } finally {
       setInstalling(prev => ({ ...prev, [profileId]: false }));
@@ -1335,7 +1336,7 @@ export function ModrinthSearchV2({
         {
           loading: `Installing ${project.title} (${version.version_number}) to ${profileName}...`,
           success: t('content.install.success', { title: project.title, version: version.version_number, profile: profileName }),
-          error: (err) => t('content.install.failed', { error: err.message || String(err) }),
+          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
       );
 
@@ -1616,7 +1617,7 @@ export function ModrinthSearchV2({
         {
           loading: `Installing ${project.title} (${bestVersion.version_number}) to ${selectedProfile.name}...`,
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: selectedProfile.name }),
-          error: (err) => t('content.install.failed', { error: err.message || String(err) }),
+          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
       );
 
@@ -1821,7 +1822,7 @@ export function ModrinthSearchV2({
         {
           loading: `Installing ${project.title} (${bestVersion.version_number}) to ${profile.name}...`,
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: profile.name }),
-          error: (err) => t('content.install.failed', { error: err.message || String(err) }),
+          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
       );
 
@@ -1988,7 +1989,7 @@ export function ModrinthSearchV2({
       }
       
     } catch (error) {
-      toast.error(t('content.install.failed', { error: error instanceof Error ? error.message : String(error) }));
+      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
       console.error("Install error in quickInstallToProfile:", error);
     } finally {
       setInstalling(prev => ({ ...prev, [profileId]: false }));
@@ -3006,7 +3007,7 @@ export function ModrinthSearchV2({
             delete newState[profileId];
             return newState;
           });
-          return `Failed to remove: ${err.message || String(err)}`;
+          return `Failed to remove: ${err.message || parseErrorMessage(err)}`;
         },
       }
     ).finally(() => {
@@ -3121,7 +3122,7 @@ export function ModrinthSearchV2({
         {
           loading: `${toastMessage} NoRisk Pack item: ${project.title} (${version.version_number})...`,
           success: ({ versionName }) => `Successfully ${successMessage} NoRisk Pack item: ${project.title} (${versionName})`,
-          error: (err) => `Failed to ${toastMessage.toLowerCase()} NoRisk Pack item: ${err.message || String(err)}`
+          error: (err) => `Failed to ${toastMessage.toLowerCase()} NoRisk Pack item: ${err.message || parseErrorMessage(err)}`
         }
       ).catch(err => {
         console.error(`Error ${toastMessage.toLowerCase()} NoRisk Pack item:`, err);
@@ -3188,7 +3189,7 @@ export function ModrinthSearchV2({
       {
         loading: `${toastMessage} ${project.title} (${version.version_number})...`,
         success: ({ versionName }) => `Successfully ${successMessage} ${project.title} (${versionName})`,
-        error: (err) => `Failed to ${toastMessage.toLowerCase()}: ${err.message || String(err)}`
+        error: (err) => `Failed to ${toastMessage.toLowerCase()}: ${err.message || parseErrorMessage(err)}`
       }
     ).catch(err => {
       console.error(`Error ${toastMessage.toLowerCase()} content:`, err);

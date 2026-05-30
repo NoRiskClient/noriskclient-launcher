@@ -11,6 +11,7 @@ import { getAdventCalendar, claimAdventCalendarDay } from "../../services/nrc-se
 import type { Reward, AdventCalendarDay, AdventCalendarDayStatus } from "../../types/advent";
 import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { translateApiError } from "../../utils/nrc-error-translations";
 
 interface AdventDoorProps {
   day: number;
@@ -201,7 +202,7 @@ export function AdventCalendarTab() {
         setCalendarData(data);
       } catch (err) {
         console.error("Failed to load advent calendar:", err);
-        setError(err.message);
+        setError(translateApiError(err, t('advent.load_failed')));
         toast.error(t('advent.load_failed'));
       } finally {
         setLoading(false);
@@ -300,7 +301,7 @@ export function AdventCalendarTab() {
       toast.success(t('advent.reward_claimed', { day }));
     } catch (error) {
       console.error("Failed to claim reward:", error);
-      const errorMessage = error instanceof Error ? error.message : t('advent.claim_failed');
+      const errorMessage = translateApiError(error, t('advent.claim_failed'));
       toast.error(errorMessage);
       
       // Show error in modal

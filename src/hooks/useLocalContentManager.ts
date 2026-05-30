@@ -16,6 +16,7 @@ import { toggleContentFromProfile, uninstallContentFromProfile, switchContentVer
 import { openPath } from '@tauri-apps/plugin-opener';
 import { revealItemInDir } from '../utils/opener-utils';
 import { getUpdateIdentifier, getContentPlatform } from '../utils/update-identifier-utils';
+import { parseErrorMessage } from "../utils/error-utils";
 
 // Base type for content items managed by this hook - maps to ProfileLocalContentItem
 // We'll use ProfileLocalContentItem directly or ensure T extends it.
@@ -384,7 +385,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
     } catch (err) {
       console.error(`[${contentType}] Phase 1: Error fetching basic info:`, err);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(parseErrorMessage(err));
     } finally {
       setIsInitialLoadingState(false);
     }
@@ -440,7 +441,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       }
     } catch (err) {
       console.error(`[${contentType}] Phase 2: Error fetching hashes:`, err);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(parseErrorMessage(err));
     } finally {
       setIsFetchingHashesState(false);
     }
@@ -505,7 +506,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         } catch (modrinthError) {
           if (!isMounted) return;
           console.warn(`[${contentType}] Phase 3: Failed to fetch Modrinth details by hashes:`, modrinthError);
-          const errorMsg = modrinthError instanceof Error ? modrinthError.message : String(modrinthError);
+          const errorMsg = parseErrorMessage(modrinthError);
           setError(prevError => prevError ? `${prevError}; Failed to fetch Modrinth details (${errorMsg})` : `Failed to fetch Modrinth details (${errorMsg})`);
         } finally {
           if (isMounted) { // Ensure component is still mounted before setting state
@@ -787,7 +788,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       }
     } catch (err) {
       console.error(`Failed to toggle ${getDisplayFileName(item)}:`, err);
-      const errorMsg = err instanceof Error ? err.message : String(err.message);
+      const errorMsg = parseErrorMessage(err);
       toast.error(i18n.t('content_manager.errors.toggle_failed', { name: getDisplayFileName(item), error: errorMsg }));
     } finally {
       setItemBeingToggled(null);
@@ -832,7 +833,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
               await uninstallContentFromProfile(payload);
               successfulOperations++;
             } catch (err) {
-              const errorDetail = err instanceof Error ? err.message : String(err.message);
+              const errorDetail = parseErrorMessage(err);
               errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(item), error: errorDetail }));
             }
           } else {
@@ -862,7 +863,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
             return newSet;
           });
         } catch (err) {
-          const errorDetail = err instanceof Error ? err.message : String(err.message);
+          const errorDetail = parseErrorMessage(err);
           toast.error(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
           errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
         }
@@ -907,7 +908,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
             ));
             successfulOperations++;
           } catch (err) {
-            const errorDetail = err instanceof Error ? err.message : String(err.message);
+            const errorDetail = parseErrorMessage(err);
             errors.push(`Failed to toggle ${getDisplayFileName(item)}: ${errorDetail}`);
           }
         } else {
@@ -1071,7 +1072,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       console.log("Filtered updates:", filteredUpdates);
       setContentUpdates(filteredUpdates);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = parseErrorMessage(error);
       console.error(`Error checking for ${contentType} updates:`, errorMsg);
       setContentUpdateError(`Error checking for ${contentType} updates: ${errorMsg}`);
       setContentUpdates({});
@@ -1285,7 +1286,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         succeededCount++;
         toast.loading(i18n.t('content_manager.loading.updating_progress', { current: succeededCount, total: totalCount, type: contentType }), { id: toastId });
       } catch(err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = parseErrorMessage(err);
         toast.error(i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg }));
       }
     }
