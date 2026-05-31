@@ -1,3 +1,4 @@
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, CommandError};
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;
@@ -848,4 +849,27 @@ pub async fn get_crafatar_avatar(
             Err(CommandError::from(e))
         }
     }
+}
+
+#[tauri::command]
+pub async fn clear_skin_caches() -> Result<(), CommandError> {
+    debug!("[CMD] clear_skin_caches: Clearing skin caches");
+
+    let cache_dirs = [
+        LAUNCHER_DIRECTORY.meta_dir().join("starlight_cache"),
+        LAUNCHER_DIRECTORY.meta_dir().join("crafatar_cache"),
+    ];
+
+    for dir in &cache_dirs {
+        if dir.exists() {
+            debug!("[CMD] clear_skin_caches: Removing directory {:?}", dir);
+            tokio::fs::remove_dir_all(dir).await.map_err(|e| {
+                error!("[CMD] clear_skin_caches: Failed to remove {:?}: {}", dir, e);
+                AppError::Io(e)
+            })?;
+        }
+    }
+
+    info!("[CMD] clear_skin_caches: Skin caches cleared successfully");
+    Ok(())
 }

@@ -667,6 +667,7 @@ async fn main() {
             switch_content_version,
             commands::minecraft_command::get_starlight_skin_render,
             commands::minecraft_command::get_crafatar_avatar,
+            commands::minecraft_command::clear_skin_caches,
             commands::nrc_commands::discord_auth_link,
             commands::nrc_commands::discord_auth_status,
             commands::nrc_commands::discord_auth_unlink,

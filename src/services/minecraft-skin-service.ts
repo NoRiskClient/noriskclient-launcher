@@ -201,4 +201,13 @@ export class MinecraftSkinService {
         // The Rust command returns a PathBuf, which will be serialized as a string (the path).
         return await invoke<string>("get_crafatar_avatar", { payload });
     }
+
+    /**
+     * Clears the cached skin renders (Starlight cache) and avatar images (Crafatar cache).
+     * This forces the launcher to re-fetch and re-cache fresh data from the APIs on the next request.
+     * @returns A promise that resolves when the caches have been cleared.
+     */
+    static async clearSkinCaches(): Promise<void> {
+        return await invoke<void>("clear_skin_caches");
+    }
 }

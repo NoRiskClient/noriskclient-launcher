@@ -1,14 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
-import { SkinViewer } from './SkinViewer';
+import { SkinView3DWrapper } from '../common/SkinView3DWrapper';
 import { MainLaunchButton } from './MainLaunchButton';
 import { useThemeStore } from '../../store/useThemeStore';
 import { MinecraftSkinService } from '../../services/minecraft-skin-service';
-import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { Icon } from '@iconify/react';
 // DISABLED: ProfileCardV2 was used for featured profile mode
 // import { ProfileCardV2 } from '../profiles/ProfileCardV2';
 import { ServerLaunchCard } from './ServerLaunchCard';
@@ -16,8 +13,10 @@ import { useProfileStore } from '../../store/profile-store';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { Icon } from "@iconify/react";
 
-const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
+const IDENTICRAFT_SKIN_BASE_URL = "https://identicraft.js.org/skin";
+const DEFAULT_PLAYER_NAME = "Steve";
 
 // Featured server configuration
 // Option A: profileId = null → uses currently selected profile from MainLaunchButton
@@ -55,10 +54,16 @@ export function PlayerActionsDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
-  const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
   const navigate = useNavigate();
 
   const { profiles } = useProfileStore();
+  const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string | null>(null);
+  const [isRefreshingSkin, setIsRefreshingSkin] = useState(false);
+  const [skinRefreshKey, setSkinRefreshKey] = useState(0);
+  const skinFileUrl = useMemo(() => {
+    const skinName = playerName || DEFAULT_PLAYER_NAME;
+    return `${IDENTICRAFT_SKIN_BASE_URL}/${encodeURIComponent(skinName)}`;
+  }, [playerName]);
 
   // Determine if we're still loading profiles (no profiles loaded yet)
   const isLoadingProfiles = profiles.length === 0;
@@ -91,35 +96,81 @@ export function PlayerActionsDisplay({
   };
 
   useEffect(() => {
-    const fetchAndSetSkin = async () => {
-      if (playerName) {
-        try {
-          const payload: GetStarlightSkinRenderPayload = {
-            player_name: playerName,
-            render_type: "default", 
-            render_view: "full",    
-          };
-          console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "Payload:", payload);
-          const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
-          console.log("[PlayerActionsDisplay] Fetched local path:", localPath);
-          if (localPath) { // Check if path is not empty or null
-            setResolvedSkinUrl(convertFileSrc(localPath));
-          } else {
-            console.warn("[PlayerActionsDisplay] Received empty path from service, using fallback.");
-            setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-          }
-        } catch (error) {
-          console.error("[PlayerActionsDisplay] Failed to fetch starlight skin render:", error);
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL); // Fallback on error
+    let isMounted = true;
+
+    const fetchSkin = async () => {
+      const skinName = playerName || DEFAULT_PLAYER_NAME;
+
+      try {
+        const base64Data = await MinecraftSkinService.getBase64FromSkinSource({
+          type: "Profile",
+          details: { query: skinName },
+        });
+
+        if (isMounted) {
+          setResolvedSkinUrl(`data:image/png;base64,${base64Data}`);
         }
-      } else {
-        console.log("[PlayerActionsDisplay] No player name, using default fallback skin.");
-        setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
+      } catch (error) {
+        console.error("[PlayerActionsDisplay] Failed to fetch Mojang profile skin:", error);
+
+        try {
+          const base64Data = await MinecraftSkinService.getBase64FromSkinSource({
+            type: "Url",
+            details: { url: skinFileUrl },
+          });
+
+          if (isMounted) {
+            setResolvedSkinUrl(`data:image/png;base64,${base64Data}`);
+          }
+        } catch (fallbackError) {
+          console.error("[PlayerActionsDisplay] Failed to fetch Identicraft skin fallback:", fallbackError);
+          if (isMounted) {
+            setResolvedSkinUrl(null);
+          }
+        }
       }
     };
 
-    fetchAndSetSkin();
-  }, [playerName]);
+    setResolvedSkinUrl(null);
+    fetchSkin();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [skinFileUrl]);
+
+  const refreshSkin = async () => {
+    setIsRefreshingSkin(true);
+    setResolvedSkinUrl(null);
+    setSkinRefreshKey(k => k + 1);
+    const skinName = playerName || DEFAULT_PLAYER_NAME;
+    const url = `${IDENTICRAFT_SKIN_BASE_URL}/${encodeURIComponent(skinName)}`;
+
+    try {
+      await MinecraftSkinService.clearSkinCaches();
+    } catch (e) {
+      console.warn("[PlayerActionsDisplay] Failed to clear skin caches:", e);
+    }
+
+    try {
+      const base64Data = await MinecraftSkinService.getBase64FromSkinSource({
+        type: "Profile",
+        details: { query: skinName },
+      });
+      setResolvedSkinUrl(`data:image/png;base64,${base64Data}`);
+    } catch {
+      try {
+        const base64Data = await MinecraftSkinService.getBase64FromSkinSource({
+          type: "Url",
+          details: { url },
+        });
+        setResolvedSkinUrl(`data:image/png;base64,${base64Data}`);
+      } catch {
+        setResolvedSkinUrl(null);
+      }
+    }
+    setIsRefreshingSkin(false);
+  };
 
   const dropShadowX = '2px';
   const dropShadowY = '4px';
@@ -162,14 +213,31 @@ export function PlayerActionsDisplay({
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <SkinViewer
-          skinUrl={resolvedSkinUrl} 
-          playerName={playerName?.toString()} 
-          width={skinViewerMaxDisplayWidth} 
-          height={skinViewerDisplayHeight} 
-          className="bg-transparent flex-shrink-0"
-          style={skinViewerStyles}
-        />
+        <div className="relative" style={skinViewerStyles}>
+          <SkinView3DWrapper
+            key={skinRefreshKey}
+            skinUrl={resolvedSkinUrl}
+            width={skinViewerMaxDisplayWidth}
+            height={skinViewerDisplayHeight}
+            zoom={0.75}
+            rotationY={0.2}
+            animationType="none"
+            spreadLegs={true}
+            className="bg-transparent flex-shrink-0"
+          />
+          <button
+            onClick={refreshSkin}
+            disabled={isRefreshingSkin}
+            className="absolute top-4 right-4 z-20 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all duration-200 cursor-pointer border-none"
+            title="Refresh Skin"
+          >
+            <Icon
+              icon={isRefreshingSkin ? "svg-spinners:180-ring" : "solar:refresh-bold"}
+              width="18"
+              height="18"
+            />
+          </button>
+        </div>
 
         {/* Don't render launch button while profiles are still loading to prevent flicker */}
         {!isLoadingProfiles && (
