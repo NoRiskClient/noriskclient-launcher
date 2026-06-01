@@ -1346,7 +1346,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
       },
     );
 
-  }, [profile, contentType, getDisplayFileName, performContentVersionSwitch]);
+    // the switch may have installed new dependency mods on the backend — re-fetch so they show up
+    await fetchData(true);
+  }, [profile, contentType, getDisplayFileName, performContentVersionSwitch, fetchData]);
 
   useEffect(() => {
     // Check for updates only after the initial full loading process for the current profile is complete,

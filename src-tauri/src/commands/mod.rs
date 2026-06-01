@@ -3,6 +3,7 @@ pub mod deep_link_handler;
 pub mod cape_command;
 pub mod config_commands;
 pub mod content_command;
+pub mod crash_fix_command;
 pub mod curseforge_commands;
 pub mod file_command;
 pub mod flagsmith_commands;

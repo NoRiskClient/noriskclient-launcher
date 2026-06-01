@@ -552,24 +552,23 @@ impl NoRiskApi {
             .await
     }
 
-    /// Submits a crash log to the NoRisk API.
-    pub async fn submit_crash_log(
+    /// Analyze a crash log; returns the launcher verdict (CrashCheckResult JSON). Served by the
+    /// discord-bot API (same route also lives in core-backend; base can be switched later).
+    pub async fn check_crash_log(
         norisk_token: &str,
         crash_log_data: &CrashlogDto,
         request_uuid: &str,
         is_experimental: bool,
-    ) -> Result<()> {
-        let base_url = Self::get_api_base(is_experimental);
-        let endpoint = "core/crashlog";
+    ) -> Result<serde_json::Value> {
+        let base_url = if is_experimental {
+            "https://discord-api-staging.norisk.gg/api/v1/discord"
+        } else {
+            "https://discord-api.norisk.gg/api/v1/discord"
+        };
+        let endpoint = "crashlog/check";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!(
-            "[NoRisk API] Submitting crash log to endpoint: {}",
-            endpoint
-        );
-        debug!("[NoRisk API] Full URL: {}", url);
-        debug!("[NoRisk API] With request UUID: {}", request_uuid);
-        debug!("[NoRisk API] Crash log data: {:?}", crash_log_data);
+        debug!("[NoRisk API] Checking crash log at: {}", url);
 
         let response = HTTP_CLIENT
             .post(url)
@@ -579,11 +578,11 @@ impl NoRiskApi {
             .send()
             .await
             .map_err(|e| {
-                error!("[NoRisk API] Crash log submission request failed: {}", e);
-                AppError::RequestError(format!("Failed to send crash log to NoRisk API: {}", e))
+                error!("[NoRisk API] Crash log check request failed: {}", e);
+                AppError::RequestError(format!("Failed to send crash log check to NoRisk API: {}", e))
             })?;
 
-        crate::utils::api_utils::expect_success_with_logging(response, "Crash log submission").await
+        crate::utils::api_utils::parse_response_with_logging::<serde_json::Value>(response, endpoint).await
     }
 
     pub async fn get_mcreal_app_token(
