@@ -14,6 +14,9 @@ export type Look = {
 export function look(r: CrashCheckResult): Look {
   if (r.status === "investigating")
     return { color: "#f59e0b", icon: "solar:hammer-bold", headlineKey: "crash_analysis.headline.investigating", btn: "warning" };
+  // our bug, not yet in the wiki -> a genuinely new find. Celebrate + thank the reporter.
+  if (r.classification === "nrc-own" && !r.known)
+    return { color: "#fbbf24", icon: "solar:cup-star-bold", headlineKey: "crash_analysis.headline.new_bug", btn: "warning" };
   if (r.source === "wiki")
     return { color: "#10b981", icon: "solar:check-circle-bold", headlineKey: "crash_analysis.headline.known", btn: "success" };
   if (r.source === "auto")
@@ -54,6 +57,7 @@ export function actionLabel(a: CrashAction, t: TFunction): string {
 export function statusMessageText(r: CrashCheckResult, t: TFunction): string | null {
   if (r.actions.length > 0) return null;
   if (r.status === "investigating") return t("crash_analysis.status.investigating");
+  if (r.classification === "nrc-own" && !r.known) return t("crash_analysis.status.new_nrc_bug");
   if (r.classification === "nrc-own") return t("crash_analysis.status.nrc_own");
   return t("crash_analysis.status.logged");
 }

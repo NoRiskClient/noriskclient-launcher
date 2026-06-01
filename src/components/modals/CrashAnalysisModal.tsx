@@ -236,8 +236,23 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
           </div>
         )}
 
-        {statusMsg && (
-          <p className="text-base font-minecraft-ten text-gray-300 px-1">{statusMsg}</p>
+        {(statusMsg || result.issueUrl) && (
+          <p className="text-base font-minecraft-ten text-gray-300 px-1">
+            {statusMsg}
+            {result.issueUrl && (
+              <>
+                {statusMsg ? " " : null}
+                <button
+                  onClick={() => openExternalUrl(result.issueUrl!).catch(() => {})}
+                  className="inline font-minecraft-ten hover:underline underline-offset-2 whitespace-nowrap"
+                  style={{ color: l.color }}
+                >
+                  {t("crash_analysis.view_issue")}
+                  <Icon icon="solar:arrow-right-up-linear" className="inline-block w-3.5 h-3.5 ml-0.5 align-[-0.15em]" />
+                </button>
+              </>
+            )}
+          </p>
         )}
 
         {!hasActions && (

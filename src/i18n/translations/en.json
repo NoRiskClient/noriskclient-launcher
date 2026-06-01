@@ -1987,6 +1987,7 @@
 
   "crash_analysis.title": "Crash Analysis",
   "crash_analysis.headline.investigating": "Known bug, we're on it",
+  "crash_analysis.headline.new_bug": "You found a new bug!",
   "crash_analysis.headline.known": "Known problem, here's the fix",
   "crash_analysis.headline.suggested": "We found a likely fix",
   "crash_analysis.headline.logged": "Crash reported",
@@ -1994,6 +1995,7 @@
   "crash_analysis.technical_details": "Technical details",
   "crash_analysis.status.investigating": "We're working on a fix. You don't need to do anything.",
   "crash_analysis.status.nrc_own": "Our bug, logged. We're looking at it.",
+  "crash_analysis.status.new_nrc_bug": "Nice catch! This is an NRC bug we hadn't seen yet. Thanks for the report, we're on it and a fix is coming.",
   "crash_analysis.status.logged": "Logged. Thanks for reporting, nothing known yet.",
   "crash_analysis.affected_feature": "Affected feature",
   "crash_analysis.fact.feature": "Feature",
@@ -2003,6 +2005,7 @@
   "crash_analysis.fact.type": "Type",
   "crash_analysis.open_log": "Open log",
   "crash_analysis.wiki_entry": "Wiki entry",
+  "crash_analysis.view_issue": "Track progress",
   "crash_analysis.applies_note": "Applies to this profile only · reversible",
   "crash_analysis.apply": "Apply",
   "crash_analysis.upgrade": "Upgrade",

@@ -1969,6 +1969,7 @@
 
   "crash_analysis.title": "Crash-Analyse",
   "crash_analysis.headline.investigating": "Bekannter Bug, wir sind dran",
+  "crash_analysis.headline.new_bug": "Du hast einen neuen Bug gefunden!",
   "crash_analysis.headline.known": "Bekanntes Problem, hier ist der Fix",
   "crash_analysis.headline.suggested": "Wir haben einen wahrscheinlichen Fix gefunden",
   "crash_analysis.headline.logged": "Crash gemeldet",
@@ -1976,6 +1977,7 @@
   "crash_analysis.technical_details": "Technische Details",
   "crash_analysis.status.investigating": "Wir arbeiten an einem Fix. Du musst nichts tun.",
   "crash_analysis.status.nrc_own": "Unser Bug, protokolliert. Wir schauen uns das an.",
+  "crash_analysis.status.new_nrc_bug": "Guter Fund! Das ist ein NRC-Bug, den wir noch nicht kannten. Danke fürs Melden, wir kümmern uns drum und ein Fix kommt.",
   "crash_analysis.status.logged": "Protokolliert. Danke fürs Melden, noch nichts bekannt.",
   "crash_analysis.affected_feature": "Betroffenes Feature",
   "crash_analysis.fact.feature": "Feature",
@@ -1985,6 +1987,7 @@
   "crash_analysis.fact.type": "Typ",
   "crash_analysis.open_log": "Log öffnen",
   "crash_analysis.wiki_entry": "Wiki-Eintrag",
+  "crash_analysis.view_issue": "Fortschritt verfolgen",
   "crash_analysis.applies_note": "Gilt nur für dieses Profil · umkehrbar",
   "crash_analysis.apply": "Anwenden",
   "crash_analysis.upgrade": "Upgrade",
