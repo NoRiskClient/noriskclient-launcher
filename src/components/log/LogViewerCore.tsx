@@ -252,9 +252,12 @@ export function LogViewerCore({
     const text = buildLogCopyText(filteredLogsRef.current, range, showThreadPrefix);
     if (!text) return false;
 
-    void writeText(text);
+    void writeText(text).catch((error) => {
+      console.error("Failed to copy selected logs:", error);
+      toast.error(t("logs.copy_failed", { defaultValue: "Failed to copy logs" }));
+    });
     return true;
-  }, [showThreadPrefix]);
+  }, [showThreadPrefix, t]);
 
   useEffect(() => {
     selectionAnchorIndexRef.current = null;
@@ -289,11 +292,28 @@ export function LogViewerCore({
       return 0;
     };
 
-    const updateSelectionFromPointer = (clientX: number, clientY: number) => {
+        const getVisibleBoundaryIndex = (direction: "up" | "down"): number | null => {
+      const rows = Array.from(container.querySelectorAll<HTMLElement>("[data-log-index]"));
+      if (rows.length === 0) return null;
+
+      const boundaryRow = direction === "up" ? rows[0] : rows[rows.length - 1];
+      const index = Number.parseInt(boundaryRow.getAttribute("data-log-index") ?? "", 10);
+      return Number.isNaN(index) ? null : index;
+    };
+
+    const updateSelectionFromPointer = (
+      clientX: number,
+      clientY: number,
+      fallbackDirection?: "up" | "down",
+    ) => {
       const anchorIndex = selectionAnchorIndexRef.current;
       if (anchorIndex === null) return;
 
-      const hitIndex = getLogIndexFromPoint(clientX, clientY);
+      let hitIndex = getLogIndexFromPoint(clientX, clientY);
+      if (hitIndex === null && fallbackDirection) {
+        hitIndex = getVisibleBoundaryIndex(fallbackDirection);
+      }
+
       if (hitIndex !== null) {
         commitSelectionIndices(anchorIndex, hitIndex);
       }
@@ -318,7 +338,11 @@ export function LogViewerCore({
         if (scroller) {
           scroller.scrollTop += scrollDelta;
         }
-        updateSelectionFromPointer(lastPointer.x, lastPointer.y);
+        updateSelectionFromPointer(
+          lastPointer.x,
+          lastPointer.y,
+          scrollDelta < 0 ? "up" : "down",
+        );
       }
 
       if (getEdgeScrollDelta(lastPointer.y) !== 0) {
@@ -727,6 +751,7 @@ export function LogViewerCore({
           {filteredLogs.length > 0 && (
             <button
               onClick={toggleSelectionMode}
+              aria-pressed={isSelectionModeEnabled}
               className="flex items-center gap-1.5 hover:text-white/70 transition-colors"
               style={{ color: isSelectionModeEnabled ? accentColor.value : undefined }}
             >
