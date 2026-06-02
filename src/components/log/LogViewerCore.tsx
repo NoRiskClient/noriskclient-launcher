@@ -257,6 +257,13 @@ export function LogViewerCore({
   }, [showThreadPrefix]);
 
   useEffect(() => {
+    selectionAnchorIndexRef.current = null;
+    selectionFocusIndexRef.current = null;
+    setSelectionRange(null);
+    window.getSelection()?.removeAllRanges();
+  }, [searchTerm, levelFilters, selectedLogPath]);
+
+  useEffect(() => {
     const container = logContainerRef.current;
     if (!container) return;
 
@@ -333,6 +340,7 @@ export function LogViewerCore({
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
+      if (!isSelectionModeEnabled) return;
 
       const anchorIndex = getLogIndexFromNode(event.target as Node);
       if (anchorIndex === null) return;
@@ -415,7 +423,7 @@ export function LogViewerCore({
       container.removeEventListener("pointercancel", onPointerUp);
       container.removeEventListener("keydown", onKeyDown);
     };
-  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs]);
+  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs, isSelectionModeEnabled]);
 
   const handleLogCopy = useCallback(
     (event: React.ClipboardEvent) => {
