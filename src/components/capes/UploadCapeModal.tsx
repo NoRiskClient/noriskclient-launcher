@@ -11,6 +11,44 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { uploadCape } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 
+// Temporary fix: replace raw ban-expiry timestamps with a human-readable form.
+// Backend messages can embed a Unix-ms timestamp (13 digits), Unix-s timestamp (10 digits),
+// or an ISO 8601 string — all become e.g. "until Jul 15, 2026, 12:34 PM (2h 30m left)".
+function formatBanTimestamp(message: string): string {
+  const TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})|\b\d{13,14}\b|\b1\d{9}\b/g;
+
+  return message.replace(TIMESTAMP, (match) => {
+    let date: Date;
+    if (/^\d{13,14}$/.test(match))   date = new Date(Number(match));
+    else if (/^\d{10}$/.test(match)) date = new Date(Number(match) * 1000);
+    else                             date = new Date(match);
+
+    if (isNaN(date.getTime())) return match;
+
+    const now = Date.now();
+    const diff = date.getTime() - now;
+
+    // Reject numbers that resolve to more than 1 year in the past (not a ban timestamp).
+    if (diff < -365 * 86_400_000) return match;
+
+    if (diff > 100 * 365 * 86_400_000) return 'permanently';
+
+    const dateStr = date.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+
+    if (diff <= 0) return `until ${dateStr} (expired)`;
+
+    const days    = Math.floor(diff / 86_400_000);
+    const hours   = Math.floor((diff % 86_400_000) / 3_600_000);
+    const minutes = Math.floor((diff % 3_600_000)  / 60_000);
+
+    const timeLeft = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    return `until ${dateStr} (${timeLeft} left)`;
+  });
+}
+
 const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -81,7 +119,7 @@ export function UploadCapeModal({
       onCancelUpload(); // Close modal on success
     } catch (err: any) {
       console.error("Error uploading cape:", err);
-      const formattedError = formatErrorMessage(err);
+      const formattedError = formatBanTimestamp(formatErrorMessage(err));
 
       if (isWarningMessage(err)) {
         setUploadWarning(formattedError);
