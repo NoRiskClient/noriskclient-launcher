@@ -292,7 +292,7 @@ export function LogViewerCore({
       return 0;
     };
 
-      const getVisibleBoundaryIndex = (direction: "up" | "down"): number | null => {
+    const getVisibleBoundaryIndex = (direction: "up" | "down"): number | null => {
       const rows = Array.from(container.querySelectorAll<HTMLElement>("[data-log-index]"));
       if (rows.length === 0) return null;
 
