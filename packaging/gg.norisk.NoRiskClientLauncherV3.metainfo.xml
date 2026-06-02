@@ -22,7 +22,7 @@
 
   <url type="homepage">https://norisk.gg/</url>
   <url type="contribute">https://github.com/NoRiskClient/noriskclient-launcher</url>
-  <url type="bugtracker">https://github.com/NoRiskClient/issues</url>
+  <url type="bugtracker">https://norisk.gg/issues</url>
   <screenshots>
     <screenshot type="default">
       <image>
