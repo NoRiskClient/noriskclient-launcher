@@ -138,6 +138,7 @@ export function OnboardingModal({
 
   useEffect(() => {
     if (isOpen) {
+      setCurrentStepIndex(0);
       setIsClosing(false);
       setIsDocked(false);
     }
@@ -339,7 +340,6 @@ export function OnboardingModal({
             <div className="flex h-full flex-col">
               {currentStep.key === "welcome" ? (
                 <div className="flex h-full flex-col items-center justify-center text-center py-2 space-y-4">
-                  {/* Glowing Logo Container */}
                   <div className="relative group">
                     <div
                       className="absolute -inset-3 rounded-full opacity-20 blur-lg transition-all duration-1000 group-hover:opacity-40"
