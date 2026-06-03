@@ -177,5 +177,8 @@ export async function completeOnboarding(): Promise<LauncherConfig> {
 }
 
 export async function resetOnboarding(): Promise<LauncherConfig> {
-  return setOnboardingCompletedVersion(null);
+  // Replay from Settings should be a local UI action. Persisting `null` here can
+  // make onboarding auto-open again on next launch if the app exits before the
+  // replay is completed.
+  return getLauncherConfig();
 }
