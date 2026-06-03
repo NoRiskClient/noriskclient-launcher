@@ -2,8 +2,12 @@ use crate::error::{AppError, CommandError};
 use crate::state::process_state::ProcessMetadata;
 use crate::state::state_manager::State;
 use chrono::{DateTime, Utc};
+use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
+
+const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
+const MAX_LOG_RANGE_BYTES: u64 = 512 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -45,13 +49,16 @@ pub struct ProcessLogCursor {
     pub new_file: bool,
 }
 
-#[tauri::command]
-pub async fn get_process_log_cursor(
-    session_id: String,
-    cursor: u64,
-) -> Result<ProcessLogCursor, CommandError> {
-    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+#[derive(serde::Serialize)]
+pub struct ProcessLogRange {
+    pub start: u64,
+    pub cursor: u64,
+    pub total_bytes: u64,
+    pub output: String,
+    pub truncated: bool,
+}
 
+fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
     if session_id.is_empty()
         || session_id.contains('/')
         || session_id.contains('\\')
@@ -62,9 +69,28 @@ pub async fn get_process_log_cursor(
         ))));
     }
 
-    let path = crate::utils::log_archive::archive_root()
-        .join(&session_id)
-        .join("nrc-process.log");
+    Ok(())
+}
+
+fn process_log_path(session_id: &str) -> PathBuf {
+    crate::utils::log_archive::archive_root()
+        .join(session_id)
+        .join(PROCESS_LOG_FILE_NAME)
+}
+
+fn clamp_log_read_len(requested: u64) -> u64 {
+    requested.clamp(1, MAX_LOG_RANGE_BYTES)
+}
+
+#[tauri::command]
+pub async fn get_process_log_cursor(
+    session_id: String,
+    cursor: u64,
+) -> Result<ProcessLogCursor, CommandError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
 
     if !path.exists() {
         return Ok(ProcessLogCursor {
@@ -98,6 +124,79 @@ pub async fn get_process_log_cursor(
         output,
         new_file,
     })
+}
+
+#[tauri::command]
+pub async fn get_process_log_range(
+    session_id: String,
+    start: u64,
+    max_bytes: Option<u64>,
+) -> Result<ProcessLogRange, CommandError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
+
+    if !path.exists() {
+        return Ok(ProcessLogRange {
+            start: 0,
+            cursor: 0,
+            total_bytes: 0,
+            output: String::new(),
+            truncated: false,
+        });
+    }
+
+    let mut file = tokio::fs::File::open(&path).await.map_err(AppError::Io)?;
+    let total_bytes = file.metadata().await.map_err(AppError::Io)?.len();
+    let read_start = start.min(total_bytes);
+    let read_len = clamp_log_read_len(max_bytes.unwrap_or(MAX_LOG_RANGE_BYTES));
+    let available = total_bytes.saturating_sub(read_start);
+    let bounded_read_len = read_len.min(available);
+
+    file.seek(std::io::SeekFrom::Start(read_start))
+        .await
+        .map_err(AppError::Io)?;
+
+    let mut buf = Vec::with_capacity(bounded_read_len as usize);
+    let mut reader = file.take(bounded_read_len);
+    let read = reader.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+    let cursor = read_start + read as u64;
+    let output =
+        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf));
+
+    Ok(ProcessLogRange {
+        start: read_start,
+        cursor,
+        total_bytes,
+        output,
+        truncated: cursor < total_bytes,
+    })
+}
+
+#[tauri::command]
+pub async fn get_process_log_tail(
+    session_id: String,
+    max_bytes: Option<u64>,
+) -> Result<ProcessLogRange, CommandError> {
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
+
+    if !path.exists() {
+        return Ok(ProcessLogRange {
+            start: 0,
+            cursor: 0,
+            total_bytes: 0,
+            output: String::new(),
+            truncated: false,
+        });
+    }
+
+    let total_bytes = tokio::fs::metadata(&path).await.map_err(AppError::Io)?.len();
+    let read_len = clamp_log_read_len(max_bytes.unwrap_or(MAX_LOG_RANGE_BYTES));
+    let start = total_bytes.saturating_sub(read_len);
+
+    get_process_log_range(session_id, start, Some(read_len)).await
 }
 
 #[tauri::command]
