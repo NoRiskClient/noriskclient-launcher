@@ -2017,5 +2017,11 @@
   "crash_analysis.summary.disable_one": "Diese Mods funktionieren nicht zusammen — deaktiviere eine: {{mods}}.",
   "crash_analysis.summary.enable_norisk_mod": "Aktiviere {{mod}} — der Crash braucht dieses NoRisk-Feature.",
   "crash_analysis.summary.enable_mod": "Aktiviere \"{{mod}}\", der Crash braucht sie.",
-  "crash_analysis.summary.multi": "{{count}} Fixes können das lösen. Wende sie unten an."
+  "crash_analysis.summary.multi": "{{count}} Fixes können das lösen. Wende sie unten an.",
+  "time.permanent": "dauerhaft",
+  "time.until_expired": "bis {{date}} (abgelaufen)",
+  "time.until_remaining": "bis {{date}} (noch {{remaining}})",
+  "time.remaining_days_hours": "{{days}}T {{hours}}Std",
+  "time.remaining_hours_minutes": "{{hours}}Std {{minutes}}Min",
+  "time.remaining_minutes": "{{minutes}}Min"
 }

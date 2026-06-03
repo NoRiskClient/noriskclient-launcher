@@ -1852,5 +1852,11 @@
   "crash_analysis.summary.disable_one": "Bu modlar birlikte çalışmıyor — birini devre dışı bırak: {{mods}}.",
   "crash_analysis.summary.enable_norisk_mod": "{{mod}} modunu etkinleştir — çökme bu NoRisk özelliğine ihtiyaç duyuyor.",
   "crash_analysis.summary.enable_mod": "\"{{mod}}\" modunu etkinleştir, çökme buna ihtiyaç duyuyor.",
-  "crash_analysis.summary.multi": "{{count}} çözüm bunu giderebilir. Aşağıdan uygula."
+  "crash_analysis.summary.multi": "{{count}} çözüm bunu giderebilir. Aşağıdan uygula.",
+  "time.permanent": "kalıcı olarak",
+  "time.until_expired": "{{date}} tarihine kadar (süresi doldu)",
+  "time.until_remaining": "{{date}} tarihine kadar ({{remaining}} kaldı)",
+  "time.remaining_days_hours": "{{days}}g {{hours}}sa",
+  "time.remaining_hours_minutes": "{{hours}}sa {{minutes}}dk",
+  "time.remaining_minutes": "{{minutes}}dk"
 }

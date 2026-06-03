@@ -1852,5 +1852,11 @@
   "crash_analysis.summary.disable_one": "Estes mods não funcionam juntos — desative um: {{mods}}.",
   "crash_analysis.summary.enable_norisk_mod": "Ative {{mod}} — o crash precisa deste recurso do NoRisk.",
   "crash_analysis.summary.enable_mod": "Ative \"{{mod}}\", o crash precisa dela.",
-  "crash_analysis.summary.multi": "{{count}} soluções podem resolver isto. Aplique-as abaixo."
+  "crash_analysis.summary.multi": "{{count}} soluções podem resolver isto. Aplique-as abaixo.",
+  "time.permanent": "permanentemente",
+  "time.until_expired": "até {{date}} (expirado)",
+  "time.until_remaining": "até {{date}} ({{remaining}} restantes)",
+  "time.remaining_days_hours": "{{days}}d {{hours}}h",
+  "time.remaining_hours_minutes": "{{hours}}h {{minutes}}min",
+  "time.remaining_minutes": "{{minutes}}min"
 }
