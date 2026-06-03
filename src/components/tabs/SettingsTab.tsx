@@ -288,6 +288,20 @@ export function SettingsTab() {
     }
   };
 
+  const handleShowOnboarding = async () => {
+    try {
+      await ConfigService.resetOnboarding();
+      window.dispatchEvent(new CustomEvent("norisk-show-onboarding"));
+    } catch (err) {
+      console.error("Failed to reopen onboarding:", err);
+      toast.error(
+        t("onboarding.toast.failed", {
+          defaultValue: "Failed to save onboarding state. Please try again.",
+        }),
+      );
+    }
+  };
+
   const hasChanges =
     config &&
     tempConfig &&
@@ -320,6 +334,31 @@ export function SettingsTab() {
             size="sm"
             variant="flat"
           />
+        </div>
+      </div>
+
+      <div className="border border-white/10 bg-black/20 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Icon icon="solar:compass-bold" className="mt-1 h-6 w-6 flex-shrink-0 text-white" />
+            <div className="min-w-0">
+              <h3 className="text-3xl font-minecraft text-white">
+                {t("settings.onboarding.title")}
+              </h3>
+              <p className="mt-2 text-base text-white/70 font-minecraft-ten">
+                {t("settings.onboarding.description")}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="flat"
+            size="sm"
+            onClick={handleShowOnboarding}
+            icon={<Icon icon="solar:map-arrow-right-bold" className="w-5 h-5" />}
+            disabled={saving}
+          >
+            {t("settings.onboarding.button")}
+          </Button>
         </div>
       </div>
 

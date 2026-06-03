@@ -18,6 +18,10 @@
   "settings.language": "Language",
   "settings.language.description": "Choose the display language for the launcher",
 
+  "settings.onboarding.title": "Onboarding",
+  "settings.onboarding.description": "Replay the launcher introduction whenever you want a quick orientation.",
+  "settings.onboarding.button": "Show onboarding",
+
   "settings.accent_color.title": "Accent Color",
   "settings.accent_color.description": "Choose your preferred accent color for the launcher",
   "settings.accent_color.disabled_theme": "(Disabled while a theme is active)",

@@ -14,6 +14,10 @@
   "settings.tabs.debug": "Отладка",
   "settings.language": "Язык",
   "settings.language.description": "Выберите язык отображения лаунчера",
+
+  "settings.onboarding.title": "Onboarding",
+  "settings.onboarding.description": "Replay the launcher introduction whenever you want a quick orientation.",
+  "settings.onboarding.button": "Show onboarding",
   "settings.accent_color.title": "Цвет акцента",
   "settings.accent_color.description": "Выберите предпочитаемый цвет акцента для лаунчера",
   "settings.accent_color.disabled_theme": "(Отключено при активной теме)",

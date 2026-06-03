@@ -14,6 +14,10 @@
   "settings.tabs.debug": "Hata Ayıklama",
   "settings.language": "Dil",
   "settings.language.description": "Başlatıcı için görüntüleme dilini seçin",
+
+  "settings.onboarding.title": "Onboarding",
+  "settings.onboarding.description": "Replay the launcher introduction whenever you want a quick orientation.",
+  "settings.onboarding.button": "Show onboarding",
   "settings.accent_color.title": "Vurgu Rengi",
   "settings.accent_color.description": "Başlatıcı için tercih ettiğiniz vurgu rengini seçin",
   "settings.accent_color.disabled_theme": "(Tema etkinken devre dışı)",

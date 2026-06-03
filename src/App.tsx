@@ -21,6 +21,7 @@ import {
 } from "./types/events";
 import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportModal";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { OnboardingModal } from "./components/modals/OnboardingModal";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
@@ -29,6 +30,7 @@ import { Modal } from "./components/ui/Modal";
 import { refreshNrcDataOnMount } from "./services/nrc-service";
 import {
   getLauncherConfig,
+  ONBOARDING_VERSION,
   setProfileGroupingPreference,
 } from "./services/launcher-config-service";
 import * as ConfigService from "./services/launcher-config-service";
@@ -82,6 +84,8 @@ export function App() {
 
   const [currentGroupingCriterion, setCurrentGroupingCriterion] =
       useState<string>("none");
+  const [onboardingCompletedVersion, setOnboardingCompletedVersion] =
+      useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -384,6 +388,7 @@ export function App() {
           } else {
             setCurrentGroupingCriterion("none");
           }
+          setOnboardingCompletedVersion(config.onboarding_completed_version);
         })
         .catch((err) => {
           console.error(
@@ -391,7 +396,19 @@ export function App() {
               err,
           );
           setCurrentGroupingCriterion("none");
+          setOnboardingCompletedVersion(ONBOARDING_VERSION);
         });
+  }, []);
+
+  useEffect(() => {
+    const handleShowOnboarding = () => {
+      setOnboardingCompletedVersion(null);
+    };
+
+    window.addEventListener("norisk-show-onboarding", handleShowOnboarding);
+    return () => {
+      window.removeEventListener("norisk-show-onboarding", handleShowOnboarding);
+    };
   }, []);
 
   const handleProfileGroupingChange = async (newCriterion: string) => {
@@ -511,6 +528,16 @@ export function App() {
     }
   };
 
+  const handleOnboardingClose = async () => {
+    await ConfigService.completeOnboarding();
+    setOnboardingCompletedVersion(ONBOARDING_VERSION);
+  };
+
+  const shouldShowOnboarding =
+    hasAcceptedTermsOfService &&
+    onboardingCompletedVersion !== undefined &&
+    onboardingCompletedVersion !== ONBOARDING_VERSION;
+
   const profilesTabContext: ProfilesTabContext = {
     currentGroupingCriterion,
     onGroupingChange: handleProfileGroupingChange,
@@ -532,6 +559,11 @@ export function App() {
         <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
           <Outlet context={profilesTabContext} />
         </AppLayout>
+        <OnboardingModal
+          isOpen={shouldShowOnboarding}
+          onClose={handleOnboardingClose}
+          onNavigate={handleNavChange}
+        />
         {shouldShowAnalyticsBanner() && (
           <AnalyticsConsentBanner
             onAccept={handleAnalyticsAccept}

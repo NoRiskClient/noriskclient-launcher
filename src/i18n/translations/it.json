@@ -14,6 +14,10 @@
   "settings.tabs.debug": "Debug",
   "settings.language": "Lingua",
   "settings.language.description": "Scegli la lingua di visualizzazione del launcher",
+
+  "settings.onboarding.title": "Onboarding",
+  "settings.onboarding.description": "Replay the launcher introduction whenever you want a quick orientation.",
+  "settings.onboarding.button": "Show onboarding",
   "settings.accent_color.title": "Colore accento",
   "settings.accent_color.description": "Scegli il colore accento preferito per il launcher",
   "settings.accent_color.disabled_theme": "(Disabilitato mentre un tema è attivo)",

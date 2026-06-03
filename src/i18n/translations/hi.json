@@ -14,6 +14,10 @@
   "settings.tabs.debug": "डीबग",
   "settings.language": "भाषा",
   "settings.language.description": "लॉन्चर के लिए प्रदर्शन भाषा चुनें",
+
+  "settings.onboarding.title": "Onboarding",
+  "settings.onboarding.description": "Replay the launcher introduction whenever you want a quick orientation.",
+  "settings.onboarding.button": "Show onboarding",
   "settings.accent_color.title": "एक्सेंट रंग",
   "settings.accent_color.description": "लॉन्चर के लिए अपना पसंदीदा एक्सेंट रंग चुनें",
   "settings.accent_color.disabled_theme": "(थीम सक्रिय रहने पर अक्षम)",

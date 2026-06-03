@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LauncherConfig, MemorySettings } from "../types/launcherConfig";
 
+export const ONBOARDING_VERSION = "launcher-onboarding-v1";
+
 /**
  * Fetches the current launcher configuration from the backend.
  * @returns A promise that resolves with the LauncherConfig.
@@ -153,4 +155,27 @@ export async function setGlobalCustomJvmArgs(jvmArgs: string | null): Promise<vo
     console.error("[LauncherConfigService] Failed to set global custom JVM args:", error);
     throw error;
   }
+}
+
+export async function setOnboardingCompletedVersion(
+  version: string | null,
+): Promise<LauncherConfig> {
+  console.log(
+    "[LauncherConfigService] Setting onboarding completed version:",
+    version,
+  );
+
+  const currentConfig = await getLauncherConfig();
+  return setLauncherConfig({
+    ...currentConfig,
+    onboarding_completed_version: version,
+  });
+}
+
+export async function completeOnboarding(): Promise<LauncherConfig> {
+  return setOnboardingCompletedVersion(ONBOARDING_VERSION);
+}
+
+export async function resetOnboarding(): Promise<LauncherConfig> {
+  return setOnboardingCompletedVersion(null);
 }

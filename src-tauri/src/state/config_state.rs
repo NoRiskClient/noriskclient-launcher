@@ -83,6 +83,9 @@ pub struct LauncherConfig {
     /// Pack rollout override: "auto" | "off" | "on"
     #[serde(default = "default_pack_rollout_override")]
     pub pack_rollout_override: String,
+    /// Version of the onboarding tutorial completed by the user.
+    #[serde(default)]
+    pub onboarding_completed_version: Option<String>,
 }
 
 fn default_config_version() -> u32 {
@@ -159,6 +162,7 @@ impl Default for LauncherConfig {
             cache_natives_extraction: default_cache_natives_extraction(),
             referral_state: None,
             pack_rollout_override: default_pack_rollout_override(),
+            onboarding_completed_version: None,
         }
     }
 }
@@ -396,6 +400,7 @@ impl ConfigManager {
                 && current.cache_natives_extraction == new_config.cache_natives_extraction
                 && current.referral_state == new_config.referral_state
                 && current.pack_rollout_override == new_config.pack_rollout_override
+                && current.onboarding_completed_version == new_config.onboarding_completed_version
             {
                 debug!("No config changes detected, skipping save");
                 false
@@ -506,6 +511,12 @@ impl ConfigManager {
                         current.use_browser_based_login, new_config.use_browser_based_login
                     );
                 }
+                if current.onboarding_completed_version != new_config.onboarding_completed_version {
+                    info!(
+                        "Changing onboarding completed version: {:?} -> {:?}",
+                        current.onboarding_completed_version, new_config.onboarding_completed_version
+                    );
+                }
 
                 // Update config while preserving version
                 *config = LauncherConfig {
@@ -529,6 +540,7 @@ impl ConfigManager {
                     cache_natives_extraction: new_config.cache_natives_extraction,
                     referral_state: new_config.referral_state.clone(),
                     pack_rollout_override: new_config.pack_rollout_override.clone(),
+                    onboarding_completed_version: new_config.onboarding_completed_version.clone(),
                 };
 
                 true

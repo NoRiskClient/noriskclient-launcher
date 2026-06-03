@@ -18,6 +18,10 @@
   "settings.language": "Sprache",
   "settings.language.description": "Wähle die Anzeigesprache für den Launcher",
 
+  "settings.onboarding.title": "Einführung",
+  "settings.onboarding.description": "Starte die Launcher-Einführung jederzeit erneut, wenn du eine kurze Orientierung möchtest.",
+  "settings.onboarding.button": "Einführung anzeigen",
+
   "settings.accent_color.title": "Akzentfarbe",
   "settings.accent_color.description": "Wähle deine bevorzugte Akzentfarbe für den Launcher",
   "settings.accent_color.disabled_theme": "(Deaktiviert während ein Theme aktiv ist)",
