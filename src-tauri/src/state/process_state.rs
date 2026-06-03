@@ -64,6 +64,98 @@ pub struct ProcessMetadata {
     pub memory_max_mb: u32,
     #[serde(default)]
     pub log_session_id: Option<String>,
+    #[serde(default)]
+    pub mods: Vec<CrashModInfo>,
+}
+
+/// Mod from the launch manifest (incl. disabled). Mirrors backend `CrashModInfo`. `norisk` = pack module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrashModInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub source: Option<String>,
+    pub enabled: bool,
+    pub norisk: bool,
+}
+
+fn mod_source_kind(source: &crate::state::profile_state::ModSource) -> &'static str {
+    use crate::state::profile_state::ModSource;
+    match source {
+        ModSource::Local { .. } => "local",
+        ModSource::Url { .. } => "url",
+        ModSource::Maven { .. } => "maven",
+        ModSource::Embedded { .. } => "embedded",
+        ModSource::Modrinth { .. } => "modrinth",
+        ModSource::CurseForge { .. } => "curseforge",
+    }
+}
+
+fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
+    use crate::state::profile_state::ModSource;
+    let file = m.file_name_override.clone().or_else(|| match &m.source {
+        ModSource::Local { file_name } => Some(file_name.clone()),
+        ModSource::Url { file_name, .. } => file_name.clone(),
+        ModSource::Modrinth { file_name, .. } => Some(file_name.clone()),
+        ModSource::CurseForge { file_name, .. } => Some(file_name.clone()),
+        ModSource::Maven { coordinates, .. } => Some(coordinates.clone()),
+        ModSource::Embedded { name } => Some(name.clone()),
+    });
+    file.map(|f| f.trim_end_matches(".disabled").trim_end_matches(".jar").to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| m.display_name.clone())
+        .unwrap_or_else(|| m.id.to_string())
+}
+
+/// Snapshot custom + NoRisk-pack mods (incl. disabled) for the crash payload.
+pub async fn build_crash_mod_manifest(
+    profile: &crate::state::profile_state::Profile,
+    state: &State,
+) -> Vec<CrashModInfo> {
+    use crate::state::profile_state::NoriskModIdentifier;
+    let mut out: Vec<CrashModInfo> = Vec::new();
+
+    for m in &profile.mods {
+        out.push(CrashModInfo {
+            id: custom_mod_id(m),
+            name: m.display_name.clone(),
+            version: m.version.clone(),
+            source: Some(mod_source_kind(&m.source).to_string()),
+            enabled: m.enabled,
+            norisk: false,
+        });
+    }
+
+    if let Some(pack_id) = profile.effective_norisk_pack_id().await {
+        let config = state.norisk_pack_manager.get_config().await;
+        match config.get_resolved_pack_definition(&pack_id) {
+            Ok(def) => {
+                for entry in &def.mods {
+                    let identifier = NoriskModIdentifier {
+                        pack_id: pack_id.clone(),
+                        mod_id: entry.id.clone(),
+                        game_version: profile.game_version.clone(),
+                        loader: profile.loader.clone(),
+                    };
+                    out.push(CrashModInfo {
+                        id: entry.id.clone(),
+                        name: entry.display_name.clone(),
+                        version: None,
+                        source: Some("norisk".to_string()),
+                        enabled: !profile.disabled_norisk_mods_detailed.contains(&identifier),
+                        norisk: true,
+                    });
+                }
+            }
+            Err(e) => log::warn!(
+                "[CrashManifest] Could not resolve pack '{}' for crash manifest: {}",
+                pack_id,
+                e
+            ),
+        }
+    }
+
+    out
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -524,6 +616,7 @@ impl ProcessManager {
         profile_image_url: Option<String>,
         post_exit_hook: Option<String>,
         memory_max_mb: u32,
+        mods: Vec<CrashModInfo>,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -563,6 +656,7 @@ impl ProcessManager {
                 norisk_pack: norisk_pack.as_deref(),
                 account_name: account_name.as_deref(),
                 start_time: session_start,
+                mods: &mods,
             };
             match crate::utils::log_archive::create_session(&session) {
                 Ok((session_id, log_path)) => {
@@ -639,6 +733,7 @@ impl ProcessManager {
             post_exit_hook,
             memory_max_mb,
             log_session_id,
+            mods,
         };
 
         log::info!(

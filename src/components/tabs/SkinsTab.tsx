@@ -413,10 +413,7 @@ export function SkinsTab() {
     setLoading(true);
 
     try {
-      const data = await MinecraftSkinService.getUserSkinData(
-        activeAccount.id,
-        activeAccount.access_token,
-      );
+      const data = await MinecraftSkinService.getUserSkinData();
       setSkinData(data);
 
       if (data?.properties) {
@@ -611,8 +608,6 @@ export function SkinsTab() {
 
     try {
       await MinecraftSkinService.applySkinFromBase64(
-        activeAccount.id,
-        activeAccount.access_token,
         skin.base64_data,
         skin.variant,
         skin.name,

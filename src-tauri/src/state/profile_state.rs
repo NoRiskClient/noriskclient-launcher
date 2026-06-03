@@ -125,9 +125,11 @@ pub struct Profile {
     pub path: String,                   // Dateipfad
     pub game_version: String,           // Minecraft Version
     pub loader: ModLoader,              // Modloader Typ
+    #[serde(default)]
     pub loader_version: Option<String>, // Modloader Version
     #[serde(default)]
     pub created: DateTime<Utc>, // Erstellungsdatum
+    #[serde(default)]
     pub last_played: Option<DateTime<Utc>>, // Letzter Start
     #[serde(default)]
     pub settings: ProfileSettings, // Profil Einstellungen
@@ -151,11 +153,13 @@ pub struct Profile {
     /// True if this is a standard profile template, false if it's a user profile.
     #[serde(default)] // Defaults to false for existing user profiles
     pub is_standard_version: bool,
+    #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
     pub banner: Option<ProfileBanner>, // Banner/background image for the profile
     #[serde(default)]
     pub background: Option<ProfileBanner>,
+    #[serde(default)]
     pub norisk_information: Option<NoriskInformation>,
     /// Information about this profile's modpack origin (if it was created from a modpack)
     #[serde(default)]
@@ -456,10 +460,48 @@ impl ProfileManager {
 
             match fs::read_to_string(path).await {
                 Ok(data) => {
-                    match serde_json::from_str::<Vec<Profile>>(&data) {
-                        Ok(profiles) => {
-                            info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
-                            return Ok(profiles.into_iter().map(|p| (p.id, p)).collect());
+                    match serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                        Ok(raw_entries) => {
+                            // Parse each profile independently so a single
+                            // malformed entry can't wipe the entire list. A
+                            // skipped entry is logged with its name/id; every
+                            // other profile still loads.
+                            let total = raw_entries.len();
+                            let mut profiles: HashMap<Uuid, Profile> = HashMap::new();
+                            let mut failed = 0;
+                            for (idx, raw) in raw_entries.into_iter().enumerate() {
+                                match serde_json::from_value::<Profile>(raw.clone()) {
+                                    Ok(p) => {
+                                        profiles.insert(p.id, p);
+                                    }
+                                    Err(parse_err) => {
+                                        failed += 1;
+                                        let name = raw
+                                            .get("name")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("<unknown>");
+                                        let id = raw
+                                            .get("id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("<unknown>");
+                                        error!(
+                                            "ProfileManager: Skipping unparseable profile at index {} (name='{}', id={}): {}",
+                                            idx, name, id, parse_err
+                                        );
+                                    }
+                                }
+                            }
+                            if failed > 0 {
+                                warn!(
+                                    "ProfileManager: Loaded {}/{} profiles, {} skipped due to parse errors",
+                                    profiles.len(),
+                                    total,
+                                    failed
+                                );
+                            } else {
+                                info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
+                            }
+                            return Ok(profiles);
                         }
                         Err(e) => {
                             if attempt_count < max_attempts {

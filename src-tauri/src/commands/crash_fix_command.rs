@@ -178,6 +178,15 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
             None => Ok(skip(&action.target)),
         },
 
+        "enable_mod" => match find_installed_mod(&profile, &action.target) {
+            Some(m) if !m.enabled => {
+                let mod_id = m.id;
+                pm.set_mod_enabled(profile_id, mod_id, true).await?;
+                Ok(ApplyOutcome::Applied { fix: AppliedFix::Enable { profile_id, mod_id } })
+            }
+            _ => Ok(skip(&action.target)),
+        },
+
         "update_loader" => {
             let target = match &action.target_version {
                 Some(v) => v.clone(),
