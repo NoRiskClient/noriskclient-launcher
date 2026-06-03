@@ -748,20 +748,6 @@ export function LogViewerCore({
             />
             {isAutoscrollEnabled ? "FOLLOWING" : "PAUSED"}
           </button>
-          {filteredLogs.length > 0 && (
-            <button
-              onClick={toggleSelectionMode}
-              aria-pressed={isSelectionModeEnabled}
-              className="flex items-center gap-1.5 hover:text-white/70 transition-colors"
-              style={{ color: isSelectionModeEnabled ? accentColor.value : undefined }}
-            >
-              <Icon
-                icon={isSelectionModeEnabled ? "solar:check-square-bold" : "solar:copy-bold"}
-                className="w-4 h-4"
-              />
-              {isSelectionModeEnabled ? "SELECTING" : "SELECT"}
-            </button>
-          )}
           {!isAutoscrollEnabled && (
             <button
               onClick={scrollToBottom}
@@ -812,6 +798,20 @@ export function LogViewerCore({
             )}
             {isUploading ? "UPLOADING..." : "UPLOAD"}
           </button>
+          {filteredLogs.length > 0 && (
+            <button
+              onClick={toggleSelectionMode}
+              aria-pressed={isSelectionModeEnabled}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
+              style={{ color: isSelectionModeEnabled ? accentColor.value : undefined }}
+            >
+              <Icon
+                icon={isSelectionModeEnabled ? "solar:check-square-bold" : "solar:copy-bold"}
+                className="w-4 h-4"
+              />
+              {isSelectionModeEnabled ? "SELECTING" : "SELECT"}
+            </button>
+          )}
         </div>
       </div>
 
