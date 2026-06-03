@@ -1839,6 +1839,7 @@
   "crash_analysis.workaround_label": "Solución temporal actual",
   "crash_analysis.action.enable_norisk_mod": "Activar {{mod}} (pack NoRisk)",
   "crash_analysis.action.disable_norisk_mod": "Desactivar {{mod}} (pack NoRisk)",
+  "crash_analysis.action.enable_mod": "Activar {{mod}}",
   "crash_analysis.action.resolve_conflict": "Incompatible: {{mods}}",
   "crash_analysis.summary.conflict": "{{mods}} son incompatibles. Actualiza ambos a la última versión, o degrádalos.",
   "crash_analysis.action.update_mod": "Actualizar {{mod}} → {{version}}",
@@ -1848,5 +1849,8 @@
   "crash_analysis.summary.loader_update": "Actualiza {{mod}} a {{target}}.",
   "crash_analysis.summary.install": "Instala {{mod}} {{target}}, un mod lo necesita.",
   "crash_analysis.summary.disable_mod": "Desactiva \"{{mod}}\", es el mod que falla.",
+  "crash_analysis.summary.disable_one": "Estos mods no funcionan juntos: desactiva uno: {{mods}}.",
+  "crash_analysis.summary.enable_norisk_mod": "Activa {{mod}}: el cierre necesita esta función de NoRisk.",
+  "crash_analysis.summary.enable_mod": "Activa \"{{mod}}\", el cierre lo necesita.",
   "crash_analysis.summary.multi": "{{count}} soluciones pueden resolver esto. Aplícalas abajo."
 }

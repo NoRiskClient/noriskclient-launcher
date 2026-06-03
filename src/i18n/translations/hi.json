@@ -1854,6 +1854,7 @@
   "crash_analysis.workaround_label": "वर्तमान वर्कअराउंड",
   "crash_analysis.action.enable_norisk_mod": "{{mod}} सक्षम करें (NoRisk पैक)",
   "crash_analysis.action.disable_norisk_mod": "{{mod}} अक्षम करें (NoRisk पैक)",
+  "crash_analysis.action.enable_mod": "{{mod}} सक्षम करें",
   "crash_analysis.action.resolve_conflict": "असंगत: {{mods}}",
   "crash_analysis.summary.conflict": "{{mods}} असंगत हैं। दोनों को नवीनतम पर अपग्रेड करें, या डाउनग्रेड करें।",
   "crash_analysis.action.update_mod": "{{mod}} को अपडेट करें → {{version}}",
@@ -1863,5 +1864,8 @@
   "crash_analysis.summary.loader_update": "{{mod}} को {{target}} पर अपडेट करें।",
   "crash_analysis.summary.install": "{{mod}} {{target}} इंस्टॉल करें, एक मॉड को इसकी ज़रूरत है।",
   "crash_analysis.summary.disable_mod": "\"{{mod}}\" अक्षम करें, यही विफल होने वाला मॉड है।",
+  "crash_analysis.summary.disable_one": "ये मॉड एक साथ काम नहीं करते — एक को अक्षम करें: {{mods}}।",
+  "crash_analysis.summary.enable_norisk_mod": "{{mod}} सक्षम करें — क्रैश को इस NoRisk फ़ीचर की ज़रूरत है।",
+  "crash_analysis.summary.enable_mod": "\"{{mod}}\" सक्षम करें, क्रैश को इसकी ज़रूरत है।",
   "crash_analysis.summary.multi": "{{count}} समाधान इसे ठीक कर सकते हैं। उन्हें नीचे लागू करें।"
 }

@@ -1839,6 +1839,7 @@
   "crash_analysis.workaround_label": "Текущее временное решение",
   "crash_analysis.action.enable_norisk_mod": "Включить {{mod}} (пак NoRisk)",
   "crash_analysis.action.disable_norisk_mod": "Отключить {{mod}} (пак NoRisk)",
+  "crash_analysis.action.enable_mod": "Включить {{mod}}",
   "crash_analysis.action.resolve_conflict": "Несовместимо: {{mods}}",
   "crash_analysis.summary.conflict": "{{mods}} несовместимы. Обновите оба до последней версии или откатите.",
   "crash_analysis.action.update_mod": "Обновить {{mod}} → {{version}}",
@@ -1848,5 +1849,8 @@
   "crash_analysis.summary.loader_update": "Обновите {{mod}} до {{target}}.",
   "crash_analysis.summary.install": "Установите {{mod}} {{target}}, он нужен моду.",
   "crash_analysis.summary.disable_mod": "Отключите \"{{mod}}\", это сбойный мод.",
+  "crash_analysis.summary.disable_one": "Эти моды не работают вместе — отключите один: {{mods}}.",
+  "crash_analysis.summary.enable_norisk_mod": "Включите {{mod}} — для краша нужна эта функция NoRisk.",
+  "crash_analysis.summary.enable_mod": "Включите \"{{mod}}\", для краша это нужно.",
   "crash_analysis.summary.multi": "{{count}} исправлений могут решить это. Примените их ниже."
 }
