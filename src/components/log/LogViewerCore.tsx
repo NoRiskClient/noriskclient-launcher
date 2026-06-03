@@ -140,7 +140,6 @@ export function LogViewerCore({
     UNKNOWN: true,
   });
   const [isAutoscrollEnabled, setIsAutoscrollEnabled] = useState(true);
-  const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsPopupRef = useRef<HTMLDivElement>(null);
@@ -364,7 +363,6 @@ export function LogViewerCore({
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
-      if (!isSelectionModeEnabled) return;
 
       const anchorIndex = getLogIndexFromNode(event.target as Node);
       if (anchorIndex === null) return;
@@ -447,7 +445,7 @@ export function LogViewerCore({
       container.removeEventListener("pointercancel", onPointerUp);
       container.removeEventListener("keydown", onKeyDown);
     };
-  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs, isSelectionModeEnabled]);
+  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs]);
 
   const handleLogCopy = useCallback(
     (event: React.ClipboardEvent) => {
@@ -539,15 +537,7 @@ export function LogViewerCore({
     setIsAutoscrollEnabled(true);
   };
 
-  const toggleSelectionMode = () => {
-    setIsSelectionModeEnabled((enabled) => {
-      const nextEnabled = !enabled;
-      if (nextEnabled) {
-        setIsAutoscrollEnabled(false);
-      }
-      return nextEnabled;
-    });
-  };
+
 
   const renderLogLine = (index: number, log: DisplayLogLine) => {
     const isSelected =
@@ -800,16 +790,19 @@ export function LogViewerCore({
           </button>
           {filteredLogs.length > 0 && (
             <button
-              onClick={toggleSelectionMode}
-              aria-pressed={isSelectionModeEnabled}
+              onClick={selectionRange ? () => {
+                selectionAnchorIndexRef.current = null;
+                selectionFocusIndexRef.current = null;
+                setSelectionRange(null);
+                window.getSelection()?.removeAllRanges();
+              } : selectAllFilteredLogs}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
-              style={{ color: isSelectionModeEnabled ? accentColor.value : undefined }}
             >
               <Icon
-                icon={isSelectionModeEnabled ? "solar:check-square-bold" : "solar:copy-bold"}
+                icon={selectionRange ? "solar:close-circle-bold" : "solar:check-square-bold"}
                 className="w-4 h-4"
               />
-              {isSelectionModeEnabled ? "SELECTING" : "SELECT"}
+              {selectionRange ? "CLEAR SELECTION" : "SELECT ALL"}
             </button>
           )}
         </div>
