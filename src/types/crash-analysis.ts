@@ -5,7 +5,7 @@ export type CrashSource = "wiki" | "auto" | "none";
 export type CrashStatus = "solved" | "investigating" | null;
 
 export interface CrashAction {
-  type: "disable_mod" | "update_loader" | "update_mod" | "install_mod" | "resolve_conflict" | "enable_norisk_mod" | "disable_norisk_mod" | string;
+  type: "disable_mod" | "enable_mod" | "update_loader" | "update_mod" | "install_mod" | "resolve_conflict" | "enable_norisk_mod" | "disable_norisk_mod" | string;
   target: string; // mod id / loader name (resolve_conflict: first of targets)
   label?: string | null; // optional fallback prose; launcher builds localized label from fields below
   scope: "profile" | "global";
@@ -33,4 +33,5 @@ export interface CrashCheckResult {
   rootCause: string | null;
   culpritMods: string[];
   workaround?: string | null; // temporary remedy text from the wiki entry (authored)
+  loaderGenerationMismatch?: boolean; // mods built for a different MC/Forge generation (e.g. Polyfrost on 1.7.10)
 }

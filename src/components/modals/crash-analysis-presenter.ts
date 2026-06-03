@@ -29,7 +29,7 @@ export const actionVariant = (_a: CrashAction): "success" => "success";
 
 export const actionIcon = (a: CrashAction): string =>
   a.type === "resolve_conflict" ? "solar:link-broken-minimalistic-bold"
-    : a.type === "enable_norisk_mod" ? "solar:bolt-circle-bold"
+    : a.type === "enable_norisk_mod" || a.type === "enable_mod" ? "solar:bolt-circle-bold"
       : a.type === "disable_mod" || a.type === "disable_norisk_mod" ? "solar:power-bold"
         : a.type === "install_mod" ? "solar:download-minimalistic-bold"
           : "solar:refresh-bold";
@@ -45,6 +45,7 @@ export function actionLabel(a: CrashAction, t: TFunction): string {
   if (a.type === "resolve_conflict") return t("crash_analysis.action.resolve_conflict", { mods: conflictMods(a) });
   if (a.type === "enable_norisk_mod") return t("crash_analysis.action.enable_norisk_mod", { mod: a.target });
   if (a.type === "disable_norisk_mod") return t("crash_analysis.action.disable_norisk_mod", { mod: a.target });
+  if (a.type === "enable_mod") return t("crash_analysis.action.enable_mod", { mod: a.target });
   const version = a.targetVersion ?? "latest";
   if (a.type === "update_loader" || a.type === "update_mod")
     return t("crash_analysis.action.update_mod", { mod: a.target, version });
@@ -66,6 +67,8 @@ export function statusMessageText(r: CrashCheckResult, t: TFunction): string | n
 export function summaryText(r: CrashCheckResult, t: TFunction): string | null {
   const primary = r.actions[0];
   if (primary?.type === "resolve_conflict") return t("crash_analysis.summary.conflict", { mods: conflictMods(primary) });
+  if (r.actions.length > 1 && r.actions.every((a) => a.type === "disable_mod"))
+    return t("crash_analysis.summary.disable_one", { mods: r.actions.map((a) => a.target).join(" / ") });
   if (r.actions.length > 1) return t("crash_analysis.summary.multi", { count: r.actions.length });
   if (primary?.type === "update_loader" || primary?.type === "update_mod") {
     return primary.currentVersion
@@ -75,5 +78,7 @@ export function summaryText(r: CrashCheckResult, t: TFunction): string | null {
   if (primary?.type === "install_mod")
     return t("crash_analysis.summary.install", { mod: primary.target, target: primary.targetVersion ?? "latest" });
   if (primary?.type === "disable_mod") return t("crash_analysis.summary.disable_mod", { mod: primary.target });
+  if (primary?.type === "enable_norisk_mod") return t("crash_analysis.summary.enable_norisk_mod", { mod: primary.target });
+  if (primary?.type === "enable_mod") return t("crash_analysis.summary.enable_mod", { mod: primary.target });
   return r.summary;
 }
