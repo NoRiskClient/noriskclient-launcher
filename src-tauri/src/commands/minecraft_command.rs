@@ -144,12 +144,21 @@ pub async fn get_profile_by_name_or_uuid(
     }
 }
 
+/// Active account UUID + freshly refreshed access token (never the UI's stale copy).
+async fn active_skin_credentials() -> Result<(String, String), CommandError> {
+    let state = State::get().await?;
+    let account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+    Ok((account.id.to_string(), account.access_token))
+}
+
 /// Get the current user skin data
 #[tauri::command]
-pub async fn get_user_skin_data(
-    uuid: String,
-    access_token: Option<String>,
-) -> Result<MinecraftProfile, CommandError> {
+pub async fn get_user_skin_data() -> Result<MinecraftProfile, CommandError> {
+    let (uuid, _token) = active_skin_credentials().await?;
     debug!("Command called: get_user_skin_data for UUID: {}", uuid);
     let api_service = MinecraftApiService::new();
 
@@ -171,15 +180,10 @@ pub async fn get_user_skin_data(
 /// Upload a new skin
 #[tauri::command]
 pub async fn upload_skin<R: tauri::Runtime>(
-    uuid: String,
-    access_token: String,
     skin_variant: String,
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
-    debug!(
-        "Command called: upload_skin for UUID: {} with variant: {}",
-        uuid, skin_variant
-    );
+    debug!("Command called: upload_skin with variant: {}", skin_variant);
 
     // Validate skin variant
     if skin_variant != "classic" && skin_variant != "slim" {
@@ -257,6 +261,8 @@ pub async fn upload_skin<R: tauri::Runtime>(
     };
     debug!("Using skin name: {}", skin_name);
 
+    let (uuid, access_token) = active_skin_credentials().await?;
+
     // Create a new API service instance
     let api_service = MinecraftApiService::new();
 
@@ -332,7 +338,8 @@ pub async fn upload_skin<R: tauri::Runtime>(
 
 /// Reset skin to default
 #[tauri::command]
-pub async fn reset_skin(uuid: String, access_token: String) -> Result<(), CommandError> {
+pub async fn reset_skin() -> Result<(), CommandError> {
+    let (uuid, access_token) = active_skin_credentials().await?;
     debug!("Command called: reset_skin for UUID: {}", uuid);
 
     // Create a new API service instance
@@ -496,15 +503,13 @@ pub async fn remove_skin(id: String) -> Result<bool, CommandError> {
 /// Apply a skin from base64 data
 #[tauri::command]
 pub async fn apply_skin_from_base64(
-    uuid: String,
-    access_token: String,
     skin_name: String,
     base64_data: String,
     skin_variant: String,
 ) -> Result<(), CommandError> {
     debug!(
-        "Command called: apply_skin_from_base64 for UUID: {} skin_name: {} variant: {}",
-        uuid, skin_name, skin_variant
+        "Command called: apply_skin_from_base64 for skin_name: {} variant: {}",
+        skin_name, skin_variant
     );
     debug!("Base64 data length: {} characters", base64_data.len());
 
@@ -515,6 +520,8 @@ pub async fn apply_skin_from_base64(
             "Invalid skin variant. Must be 'classic' or 'slim'"
         ))));
     }
+
+    let (_uuid, access_token) = active_skin_credentials().await?;
 
     // Create a new API service instance
     let api_service = MinecraftApiService::new();
