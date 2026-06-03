@@ -306,3 +306,28 @@ pub async fn focus_main_window<R: tauri::Runtime>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_log_session_id() {
+        assert!(validate_log_session_id("valid-session-123").is_ok());
+        assert!(validate_log_session_id("abc_def-123").is_ok());
+
+        assert!(validate_log_session_id("").is_err());
+        assert!(validate_log_session_id("session/id").is_err());
+        assert!(validate_log_session_id("session\\id").is_err());
+        assert!(validate_log_session_id("session..id").is_err());
+    }
+
+    #[test]
+    fn test_clamp_log_read_len() {
+        assert_eq!(clamp_log_read_len(None), MAX_LOG_CURSOR_BYTES);
+        assert_eq!(clamp_log_read_len(Some(100)), 100);
+        assert_eq!(clamp_log_read_len(Some(0)), 1);
+        assert_eq!(clamp_log_read_len(Some(MAX_LOG_CURSOR_BYTES + 100)), MAX_LOG_CURSOR_BYTES);
+    }
+}
+
