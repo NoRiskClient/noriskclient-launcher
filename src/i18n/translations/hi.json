@@ -1863,5 +1863,11 @@
   "crash_analysis.summary.loader_update": "{{mod}} को {{target}} पर अपडेट करें।",
   "crash_analysis.summary.install": "{{mod}} {{target}} इंस्टॉल करें, एक मॉड को इसकी ज़रूरत है।",
   "crash_analysis.summary.disable_mod": "\"{{mod}}\" अक्षम करें, यही विफल होने वाला मॉड है।",
-  "crash_analysis.summary.multi": "{{count}} समाधान इसे ठीक कर सकते हैं। उन्हें नीचे लागू करें।"
+  "crash_analysis.summary.multi": "{{count}} समाधान इसे ठीक कर सकते हैं। उन्हें नीचे लागू करें।",
+  "time.permanent": "स्थायी रूप से",
+  "time.until_expired": "{{date}} तक (समाप्त)",
+  "time.until_remaining": "{{date}} तक ({{remaining}} शेष)",
+  "time.remaining_days_hours": "{{days}}दि {{hours}}घं",
+  "time.remaining_hours_minutes": "{{hours}}घं {{minutes}}मि",
+  "time.remaining_minutes": "{{minutes}}मि"
 }

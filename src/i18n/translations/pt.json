@@ -1848,5 +1848,11 @@
   "crash_analysis.summary.loader_update": "Atualize {{mod}} para {{target}}.",
   "crash_analysis.summary.install": "Instale {{mod}} {{target}}, uma mod precisa dele.",
   "crash_analysis.summary.disable_mod": "Desative \"{{mod}}\", é a mod que está falhando.",
-  "crash_analysis.summary.multi": "{{count}} soluções podem resolver isto. Aplique-as abaixo."
+  "crash_analysis.summary.multi": "{{count}} soluções podem resolver isto. Aplique-as abaixo.",
+  "time.permanent": "permanentemente",
+  "time.until_expired": "até {{date}} (expirado)",
+  "time.until_remaining": "até {{date}} ({{remaining}} restantes)",
+  "time.remaining_days_hours": "{{days}}d {{hours}}h",
+  "time.remaining_hours_minutes": "{{hours}}h {{minutes}}min",
+  "time.remaining_minutes": "{{minutes}}min"
 }

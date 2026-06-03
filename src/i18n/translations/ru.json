@@ -1848,5 +1848,11 @@
   "crash_analysis.summary.loader_update": "Обновите {{mod}} до {{target}}.",
   "crash_analysis.summary.install": "Установите {{mod}} {{target}}, он нужен моду.",
   "crash_analysis.summary.disable_mod": "Отключите \"{{mod}}\", это сбойный мод.",
-  "crash_analysis.summary.multi": "{{count}} исправлений могут решить это. Примените их ниже."
+  "crash_analysis.summary.multi": "{{count}} исправлений могут решить это. Примените их ниже.",
+  "time.permanent": "навсегда",
+  "time.until_expired": "до {{date}} (истёк)",
+  "time.until_remaining": "до {{date}} (осталось {{remaining}})",
+  "time.remaining_days_hours": "{{days}}д {{hours}}ч",
+  "time.remaining_hours_minutes": "{{hours}}ч {{minutes}}м",
+  "time.remaining_minutes": "{{minutes}}м"
 }
