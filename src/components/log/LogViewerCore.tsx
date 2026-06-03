@@ -69,6 +69,40 @@ function logEntryToDisplayLine(entry: LogEntry): DisplayLogLine {
   };
 }
 
+function formatLogLineForCopy(log: DisplayLogLine, showThreadPrefix: boolean): string {
+  if (log.timestamp) {
+    if (showThreadPrefix) {
+      return `[${log.timestamp}] [${log.thread || "main"}/${log.level}] ${log.message}`;
+    }
+    return `[${log.timestamp}] ${log.message}`;
+  }
+  return `    ${log.message}`;
+}
+
+function getLogIndexFromNode(node: Node | null): number | null {
+  if (!node) return null;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  const row = element?.closest("[data-log-index]");
+  if (!row) return null;
+  const index = Number.parseInt(row.getAttribute("data-log-index") ?? "", 10);
+  return Number.isNaN(index) ? null : index;
+}
+
+function getLogIndexFromPoint(clientX: number, clientY: number): number | null {
+  return getLogIndexFromNode(document.elementFromPoint(clientX, clientY));
+}
+
+function buildLogCopyText(
+  logs: DisplayLogLine[],
+  range: { start: number; end: number },
+  showThreadPrefix: boolean,
+): string {
+  return logs
+    .slice(range.start, range.end + 1)
+    .map((log) => formatLogLineForCopy(log, showThreadPrefix))
+    .join("\n");
+}
+
 export interface LogViewerCoreProps {
   logs: LogEntry[];
   onClear?: () => void;
@@ -107,6 +141,7 @@ export function LogViewerCore({
     UNKNOWN: true,
   });
   const [isAutoscrollEnabled, setIsAutoscrollEnabled] = useState(true);
+  const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsPopupRef = useRef<HTMLDivElement>(null);
@@ -116,7 +151,13 @@ export function LogViewerCore({
   const logContainerRef = useRef<HTMLDivElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const isUserScrollingRef = useRef(false);
-
+  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
+  const [isPointerSelecting, setIsPointerSelecting] = useState(false);
+  const selectionAnchorIndexRef = useRef<number | null>(null);
+  const selectionFocusIndexRef = useRef<number | null>(null);
+  const isMouseSelectingRef = useRef(false);
+  const isAutoscrollEnabledRef = useRef(isAutoscrollEnabled);
+  isAutoscrollEnabledRef.current = isAutoscrollEnabled;
   // State for delayed "NO LOGS YET" display
   const [showNoLogs, setShowNoLogs] = useState(false);
 
@@ -140,6 +181,11 @@ export function LogViewerCore({
       return true;
     });
   }, [displayLogs, levelFilters, searchTerm]);
+
+  const filteredLogsRef = useRef(filteredLogs);
+  filteredLogsRef.current = filteredLogs;
+  const selectionRangeRef = useRef(selectionRange);
+  selectionRangeRef.current = selectionRange;
 
   // Delay showing "NO LOGS YET" by 1 second to avoid flicker
   useEffect(() => {
@@ -176,36 +222,267 @@ export function LogViewerCore({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isSettingsOpen, isFileDropdownOpen]);
 
-  // Check if scrolled to bottom
-  const isAtBottom = useCallback(() => {
-    if (!logContainerRef.current) return true;
-    const { scrollTop, scrollHeight, clientHeight } = logContainerRef.current;
-    return scrollHeight - scrollTop - clientHeight < 20;
+  const commitSelectionIndices = useCallback((anchorIndex: number, focusIndex: number) => {
+    selectionFocusIndexRef.current = focusIndex;
+    setSelectionRange({
+      start: Math.min(anchorIndex, focusIndex),
+      end: Math.max(anchorIndex, focusIndex),
+    });
   }, []);
 
-  // Handle scroll events
-  const handleScroll = useCallback(() => {
-    if (!logContainerRef.current) return;
+  const selectAllFilteredLogs = useCallback(() => {
+    const logs = filteredLogsRef.current;
+    if (logs.length === 0) {
+      selectionAnchorIndexRef.current = null;
+      selectionFocusIndexRef.current = null;
+      setSelectionRange(null);
+      return;
+    }
 
-    if (isAtBottom()) {
-      if (!isAutoscrollEnabled) {
-        setIsAutoscrollEnabled(true);
+    const lastIndex = logs.length - 1;
+    selectionAnchorIndexRef.current = 0;
+    selectionFocusIndexRef.current = lastIndex;
+    setSelectionRange({ start: 0, end: lastIndex });
+    window.getSelection()?.removeAllRanges();
+  }, []);
+
+  const copySelectedLogs = useCallback(() => {
+    const range = selectionRangeRef.current;
+    if (!range) return false;
+
+    const text = buildLogCopyText(filteredLogsRef.current, range, showThreadPrefix);
+    if (!text) return false;
+
+    void writeText(text).catch((error) => {
+      console.error("Failed to copy selected logs:", error);
+      toast.error(t("logs.copy_failed", { defaultValue: "Failed to copy logs" }));
+    });
+    return true;
+  }, [showThreadPrefix, t]);
+
+  useEffect(() => {
+    selectionAnchorIndexRef.current = null;
+    selectionFocusIndexRef.current = null;
+    setSelectionRange(null);
+    window.getSelection()?.removeAllRanges();
+  }, [searchTerm, levelFilters, selectedLogPath]);
+
+  useEffect(() => {
+    const container = logContainerRef.current;
+    if (!container) return;
+
+    const lastPointer = { x: 0, y: 0 };
+    let edgeScrollRaf: number | null = null;
+
+    const getScroller = () =>
+      container.querySelector("[data-virtuoso-scroller]") as HTMLElement | null;
+
+    const getEdgeScrollDelta = (clientY: number) => {
+      const rect = container.getBoundingClientRect();
+      const edgeThreshold = 56;
+      const maxSpeed = 9;
+
+      if (clientY >= rect.bottom - edgeThreshold) {
+        const intensity = Math.min(1, (clientY - (rect.bottom - edgeThreshold)) / edgeThreshold);
+        return maxSpeed * (0.2 + intensity * 0.8);
       }
-    } else {
-      if (isAutoscrollEnabled && !isUserScrollingRef.current) {
+      if (clientY <= rect.top + edgeThreshold) {
+        const intensity = Math.min(1, (rect.top + edgeThreshold - clientY) / edgeThreshold);
+        return -maxSpeed * (0.2 + intensity * 0.8);
+      }
+      return 0;
+    };
+
+    const getVisibleBoundaryIndex = (direction: "up" | "down"): number | null => {
+      const rows = Array.from(container.querySelectorAll<HTMLElement>("[data-log-index]"));
+      if (rows.length === 0) return null;
+
+      const boundaryRow = direction === "up" ? rows[0] : rows[rows.length - 1];
+      const index = Number.parseInt(boundaryRow.getAttribute("data-log-index") ?? "", 10);
+      return Number.isNaN(index) ? null : index;
+    };
+
+    const updateSelectionFromPointer = (
+      clientX: number,
+      clientY: number,
+      fallbackDirection?: "up" | "down",
+    ) => {
+      const anchorIndex = selectionAnchorIndexRef.current;
+      if (anchorIndex === null) return;
+
+      let hitIndex = getLogIndexFromPoint(clientX, clientY);
+      if (hitIndex === null && fallbackDirection) {
+        hitIndex = getVisibleBoundaryIndex(fallbackDirection);
+      }
+
+      if (hitIndex !== null) {
+        commitSelectionIndices(anchorIndex, hitIndex);
+      }
+    };
+
+    const stopEdgeScroll = () => {
+      if (edgeScrollRaf !== null) {
+        cancelAnimationFrame(edgeScrollRaf);
+        edgeScrollRaf = null;
+      }
+    };
+
+    const tickEdgeScroll = () => {
+      if (!isMouseSelectingRef.current) {
+        stopEdgeScroll();
+        return;
+      }
+
+      const scrollDelta = getEdgeScrollDelta(lastPointer.y);
+      if (scrollDelta !== 0) {
+        const scroller = getScroller();
+        if (scroller) {
+          scroller.scrollTop += scrollDelta;
+        }
+        updateSelectionFromPointer(
+          lastPointer.x,
+          lastPointer.y,
+          scrollDelta < 0 ? "up" : "down",
+        );
+      }
+
+      if (getEdgeScrollDelta(lastPointer.y) !== 0) {
+        edgeScrollRaf = requestAnimationFrame(tickEdgeScroll);
+      } else {
+        edgeScrollRaf = null;
+      }
+    };
+
+    const syncEdgeScroll = (clientY: number) => {
+      if (getEdgeScrollDelta(clientY) === 0) {
+        stopEdgeScroll();
+        return;
+      }
+      if (edgeScrollRaf === null) {
+        edgeScrollRaf = requestAnimationFrame(tickEdgeScroll);
+      }
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      if (!isSelectionModeEnabled) return;
+
+      const anchorIndex = getLogIndexFromNode(event.target as Node);
+      if (anchorIndex === null) return;
+
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      container.focus({ preventScroll: true });
+
+      isMouseSelectingRef.current = true;
+      setIsPointerSelecting(true);
+      selectionAnchorIndexRef.current = anchorIndex;
+      commitSelectionIndices(anchorIndex, anchorIndex);
+
+      container.setPointerCapture(event.pointerId);
+
+      if (isAutoscrollEnabledRef.current) {
         setIsAutoscrollEnabled(false);
       }
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!isMouseSelectingRef.current) return;
+      lastPointer.x = event.clientX;
+      lastPointer.y = event.clientY;
+      updateSelectionFromPointer(event.clientX, event.clientY);
+      syncEdgeScroll(event.clientY);
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (!isMouseSelectingRef.current) return;
+
+      stopEdgeScroll();
+      lastPointer.x = event.clientX;
+      lastPointer.y = event.clientY;
+      updateSelectionFromPointer(event.clientX, event.clientY);
+      isMouseSelectingRef.current = false;
+      setIsPointerSelecting(false);
+
+      if (container.hasPointerCapture(event.pointerId)) {
+        container.releasePointerCapture(event.pointerId);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+
+      if (key === "escape") {
+        selectionAnchorIndexRef.current = null;
+        selectionFocusIndexRef.current = null;
+        setSelectionRange(null);
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+
+      if (mod && key === "a") {
+        event.preventDefault();
+        selectAllFilteredLogs();
+        return;
+      }
+
+      if (mod && key === "c") {
+        if (!selectionRangeRef.current) return;
+        event.preventDefault();
+        copySelectedLogs();
+      }
+    };
+
+    container.addEventListener("pointerdown", onPointerDown);
+    container.addEventListener("pointermove", onPointerMove);
+    container.addEventListener("pointerup", onPointerUp);
+    container.addEventListener("pointercancel", onPointerUp);
+    container.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      stopEdgeScroll();
+      container.removeEventListener("pointerdown", onPointerDown);
+      container.removeEventListener("pointermove", onPointerMove);
+      container.removeEventListener("pointerup", onPointerUp);
+      container.removeEventListener("pointercancel", onPointerUp);
+      container.removeEventListener("keydown", onKeyDown);
+    };
+  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs, isSelectionModeEnabled]);
+
+  const handleLogCopy = useCallback(
+    (event: React.ClipboardEvent) => {
+      const range = selectionRange;
+      if (!range) return;
+
+      const text = buildLogCopyText(filteredLogsRef.current, range, showThreadPrefix);
+      if (!text) return;
+
+      event.preventDefault();
+      event.clipboardData.setData("text/plain", text);
+    },
+    [selectionRange, showThreadPrefix],
+  );
+
+  const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
+    if (isMouseSelectingRef.current) return;
+    if (atBottom) {
+      setIsAutoscrollEnabled(true);
+    } else if (!isUserScrollingRef.current) {
+      setIsAutoscrollEnabled(false);
     }
-  }, [isAtBottom, isAutoscrollEnabled]);
+  }, []);
 
   // Auto-scroll effect — use Virtuoso's API
   useEffect(() => {
+    if (isMouseSelectingRef.current) return;
     if (isAutoscrollEnabled && virtuosoRef.current && filteredLogs.length > 0) {
       isUserScrollingRef.current = true;
       virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, behavior: "auto" });
-      setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         isUserScrollingRef.current = false;
       }, 50);
+      return () => window.clearTimeout(timeout);
     }
   }, [filteredLogs, isAutoscrollEnabled]);
 
@@ -254,9 +531,73 @@ export function LogViewerCore({
 
   const scrollToBottom = () => {
     if (virtuosoRef.current && filteredLogs.length > 0) {
+      isUserScrollingRef.current = true;
       virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, behavior: "auto" });
+      window.setTimeout(() => {
+        isUserScrollingRef.current = false;
+      }, 50);
     }
     setIsAutoscrollEnabled(true);
+  };
+
+  const toggleSelectionMode = () => {
+    setIsSelectionModeEnabled((enabled) => {
+      const nextEnabled = !enabled;
+      if (nextEnabled) {
+        setIsAutoscrollEnabled(false);
+      }
+      return nextEnabled;
+    });
+  };
+
+  const renderLogLine = (index: number, log: DisplayLogLine) => {
+    const isSelected =
+      selectionRange !== null && index >= selectionRange.start && index <= selectionRange.end;
+
+    return (
+    <div
+      key={log.id}
+      data-log-id={log.id}
+      data-log-index={index}
+      className={`flex flex-nowrap items-start py-0.5 px-2 -mx-2 rounded ${
+        isSelected ? "bg-sky-500/25" : "hover:bg-white/5"
+      }`}
+    >
+      {log.timestamp ? (
+        <>
+          <span
+            className={`pr-2 select-none ${getLevelColorClass(log.level)}`}
+          >
+            <span className="opacity-80">[{log.timestamp}]</span>
+            {showThreadPrefix && (
+              <span className="opacity-80 ml-1">
+                [{log.thread}/{log.level}]
+              </span>
+            )}
+          </span>
+          <span
+            className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
+              log.level === "ERROR" || log.level === "WARN"
+                ? getLevelColorClass(log.level)
+                : "text-white/90"
+            }`}
+          >
+            {log.message}
+          </span>
+        </>
+      ) : (
+        <span
+          className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
+            log.level === "ERROR" || log.level === "WARN"
+              ? getLevelColorClass(log.level)
+              : "text-white/90"
+          }`}
+        >
+          {log.message}
+        </span>
+      )}
+    </div>
+    );
   };
 
   return (
@@ -353,7 +694,12 @@ export function LogViewerCore({
       {/* Log Content */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-hidden p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm"
+        tabIndex={0}
+        role="region"
+        aria-label={t("logs.viewer_region", { defaultValue: "Log output" })}
+        onCopy={handleLogCopy}
+        onMouseDown={() => logContainerRef.current?.focus({ preventScroll: true })}
+        className="flex-1 overflow-hidden p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
         {filteredLogs.length === 0 ? (
@@ -369,46 +715,15 @@ export function LogViewerCore({
         ) : (
           <Virtuoso
             ref={virtuosoRef}
-            className="custom-scrollbar"
+            className={`custom-scrollbar ${isPointerSelecting ? "select-none" : "select-text"}`}
             style={{ height: "100%" }}
             data={filteredLogs}
-            followOutput={() => isAutoscrollEnabled ? "auto" : false}
+            computeItemKey={(_index, log) => log.id}
+            increaseViewportBy={{ top: 400, bottom: 400 }}
+            atBottomStateChange={handleAtBottomStateChange}
+            followOutput={() => (isAutoscrollEnabled && !isMouseSelectingRef.current ? "auto" : false)}
             initialTopMostItemIndex={filteredLogs.length > 0 ? filteredLogs.length - 1 : 0}
-            itemContent={(_index, log) => (
-              <div className="flex flex-nowrap items-start py-0.5 hover:bg-white/5 px-2 -mx-2 rounded">
-                {log.timestamp ? (
-                  <>
-                    <span className={`pr-2 select-none ${getLevelColorClass(log.level)}`}>
-                      <span className="opacity-80">[{log.timestamp}]</span>
-                      {showThreadPrefix && (
-                        <span className="opacity-80 ml-1">
-                          [{log.thread}/{log.level}]
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
-                        log.level === "ERROR" || log.level === "WARN"
-                          ? getLevelColorClass(log.level)
-                          : "text-white/90"
-                      }`}
-                    >
-                      {log.message}
-                    </span>
-                  </>
-                ) : (
-                  <span
-                    className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
-                      log.level === "ERROR" || log.level === "WARN"
-                        ? getLevelColorClass(log.level)
-                        : "text-white/90"
-                    }`}
-                  >
-                    {log.message}
-                  </span>
-                )}
-              </div>
-            )}
+            itemContent={(index, log) => renderLogLine(index, log)}
           />
         )}
       </div>
@@ -484,6 +799,20 @@ export function LogViewerCore({
             )}
             {isUploading ? "UPLOADING..." : "UPLOAD"}
           </button>
+          {filteredLogs.length > 0 && (
+            <button
+              onClick={toggleSelectionMode}
+              aria-pressed={isSelectionModeEnabled}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
+              style={{ color: isSelectionModeEnabled ? accentColor.value : undefined }}
+            >
+              <Icon
+                icon={isSelectionModeEnabled ? "solar:check-square-bold" : "solar:copy-bold"}
+                className="w-4 h-4"
+              />
+              {isSelectionModeEnabled ? "SELECTING" : "SELECT"}
+            </button>
+          )}
         </div>
       </div>
 
