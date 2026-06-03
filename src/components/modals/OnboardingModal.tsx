@@ -338,53 +338,55 @@ export function OnboardingModal({
           <div className="min-h-[360px] border border-white/10 bg-black/25 p-6">
             <div className="flex h-full flex-col">
               {currentStep.key === "welcome" ? (
-                <div className="flex h-full flex-col items-center justify-center text-center py-6">
+                <div className="flex h-full flex-col items-center justify-center text-center py-2 space-y-4">
                   {/* Glowing Logo Container */}
-                  <div className="relative mb-6 group">
+                  <div className="relative group">
                     <div
-                      className="absolute -inset-4 rounded-full opacity-20 blur-xl transition-all duration-1000 group-hover:opacity-45"
+                      className="absolute -inset-3 rounded-full opacity-20 blur-lg transition-all duration-1000 group-hover:opacity-40"
                       style={{
                         background: `radial-gradient(circle, ${accentColor.value} 0%, transparent 70%)`,
                       }}
                     />
                     <Logo
-                      size="lg"
+                      size="md"
                       className="relative transform hover:scale-105 transition-transform duration-300 mx-auto"
                     />
                   </div>
 
-                  <h3 className="font-minecraft text-5xl tracking-wide text-white lowercase">
-                    norisk client
-                  </h3>
-                  <p className="mt-2 font-minecraft-ten text-base text-white/50 uppercase tracking-widest">
-                    {t(`onboarding.steps.${currentStep.key}.subtitle`, {
-                      defaultValue: currentStep.subtitle,
-                    })}
-                  </p>
+                  <div>
+                    <h3 className="font-minecraft text-4xl tracking-wide text-white lowercase">
+                      norisk client
+                    </h3>
+                    <p className="mt-0.5 font-minecraft-ten text-[13px] text-white/50 uppercase tracking-widest">
+                      {t(`onboarding.steps.${currentStep.key}.subtitle`, {
+                        defaultValue: currentStep.subtitle,
+                      })}
+                    </p>
+                  </div>
 
-                  <div className="mt-6 max-w-lg border border-white/10 bg-white/[0.02] p-5 backdrop-blur-sm">
-                    <p className="font-minecraft-ten text-lg leading-relaxed text-white/80">
+                  <div className="max-w-lg border border-white/10 bg-white/[0.02] p-3.5 backdrop-blur-sm">
+                    <p className="font-minecraft-ten text-sm leading-relaxed text-white/80">
                       {t(`onboarding.steps.${currentStep.key}.description`, {
                         defaultValue: currentStep.description,
                       })}
                     </p>
                   </div>
 
-                  <div className="mt-8 grid gap-4 md:grid-cols-2 w-full">
+                  <div className="grid gap-3 md:grid-cols-2 w-full">
                     {[0, 1].map((tipIndex) => (
                       <div
                         key={tipIndex}
-                        className="border border-white/10 bg-white/[0.04] p-4 text-left flex items-start gap-3 transition-colors hover:bg-white/[0.06]"
+                        className="border border-white/10 bg-white/[0.04] p-3 text-left flex items-start gap-2.5 transition-colors hover:bg-white/[0.06]"
                       >
                         <Icon
                           icon="solar:check-circle-bold"
-                          className="h-5 w-5 text-emerald-300 mt-0.5 flex-shrink-0"
+                          className="h-4 w-4 text-emerald-300 mt-0.5 flex-shrink-0"
                         />
                         <div>
-                          <span className="block font-minecraft-ten text-[11px] uppercase text-white/40 mb-1">
+                          <span className="block font-minecraft-ten text-[10px] uppercase text-white/40">
                             {t("onboarding.tip_label", { defaultValue: "Tip" })}
                           </span>
-                          <p className="font-minecraft-ten text-sm leading-relaxed text-white/75">
+                          <p className="font-minecraft-ten text-xs leading-normal text-white/70">
                             {t(`onboarding.steps.${currentStep.key}.tips.${tipIndex}`, {
                               defaultValue: currentStep.tips[tipIndex],
                             })}
