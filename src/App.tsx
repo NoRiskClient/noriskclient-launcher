@@ -44,6 +44,7 @@ import { Button } from "./components/ui/buttons/Button";
 import { openExternalUrl } from "./services/tauri-service";
 import { ExternalLink } from "lucide-react";
 import { MinecraftAuthService } from "./services/minecraft-auth-service";
+import { LauncherNoticeBanner } from "./components/ui/LauncherNoticeBanner";
 import ChildProtectionModal from "./components/modals/ChildProtectionModal";
 import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
@@ -524,6 +525,7 @@ export function App() {
         <ThemeInitializer />
         <ScrollbarProvider />
         <GlobalToaster />
+        <LauncherNoticeBanner />
         <GlobalCrashReportModal />
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
         <GlobalModalPortal />

@@ -139,6 +139,72 @@ export const getPackFallbackConfig = async (): Promise<PackFallbackConfig | null
   return packFallbackFetchPromise;
 };
 
+export type LauncherNoticeSeverity = 'info' | 'warning' | 'error';
+
+/**
+ * A single remote-controlled notice banner shown in the launcher.
+ * Filled via the `launcher_notice` Flagsmith flag (array of these).
+ */
+export interface LauncherNotice {
+  id: string;
+  enabled?: boolean;
+  severity?: LauncherNoticeSeverity;
+  title: string;
+  message: string;
+  link_url?: string;
+  link_label?: string;
+}
+
+let cachedLauncherNotices: LauncherNotice[] | null = null;
+let launcherNoticesFetchPromise: Promise<LauncherNotice[]> | null = null;
+
+/**
+ * Fetches the launcher notice banners from the `launcher_notice` Flagsmith flag.
+ *
+ * The flag value is a JSON array of notices; a single object is also accepted
+ * and wrapped into an array for convenience. Notices with `enabled === false`
+ * are filtered out. Returns an empty array when the flag is unset, empty, or
+ * unparseable — the banner simply renders nothing in that case.
+ */
+export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
+  if (cachedLauncherNotices) return cachedLauncherNotices;
+  if (launcherNoticesFetchPromise) return launcherNoticesFetchPromise;
+
+  launcherNoticesFetchPromise = (async () => {
+    try {
+      if (!flagsmithInitialized) await initPromise;
+
+      const flagValue = flagsmith.getValue('launcher_notice');
+      if (!flagValue || typeof flagValue !== 'string' || !flagValue.trim()) {
+        log('info', 'No launcher_notice flag set');
+        cachedLauncherNotices = [];
+        return cachedLauncherNotices;
+      }
+
+      const parsed = JSON.parse(flagValue);
+      const rawList: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+
+      const notices = rawList
+        .filter((n): n is LauncherNotice =>
+          !!n && typeof n === 'object' &&
+          typeof (n as LauncherNotice).id === 'string' &&
+          typeof (n as LauncherNotice).message === 'string')
+        .filter((n) => n.enabled !== false);
+
+      log('info', `Launcher notices: ${notices.length} active`);
+      cachedLauncherNotices = notices;
+      return notices;
+    } catch (error) {
+      log('error', `Failed to fetch launcher notices from Flagsmith: ${error}`);
+      launcherNoticesFetchPromise = null;
+      cachedLauncherNotices = [];
+      return [];
+    }
+  })();
+
+  return launcherNoticesFetchPromise;
+};
+
 /**
  * Fetches the blocked mods configuration from Flagsmith.
  *
