@@ -2,8 +2,12 @@ use crate::error::{AppError, CommandError};
 use crate::state::process_state::ProcessMetadata;
 use crate::state::state_manager::State;
 use chrono::{DateTime, Utc};
+use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
+
+const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
+const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -43,15 +47,11 @@ pub struct ProcessLogCursor {
     pub cursor: u64,
     pub output: String,
     pub new_file: bool,
+    pub total_bytes: u64,
+    pub truncated: bool,
 }
 
-#[tauri::command]
-pub async fn get_process_log_cursor(
-    session_id: String,
-    cursor: u64,
-) -> Result<ProcessLogCursor, CommandError> {
-    use tokio::io::{AsyncReadExt, AsyncSeekExt};
-
+fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
     if session_id.is_empty()
         || session_id.contains('/')
         || session_id.contains('\\')
@@ -62,41 +62,74 @@ pub async fn get_process_log_cursor(
         ))));
     }
 
-    let path = crate::utils::log_archive::archive_root()
-        .join(&session_id)
-        .join("nrc-process.log");
+    Ok(())
+}
+
+fn process_log_path(session_id: &str) -> PathBuf {
+    crate::utils::log_archive::archive_root()
+        .join(session_id)
+        .join(PROCESS_LOG_FILE_NAME)
+}
+
+fn clamp_log_read_len(requested: Option<u64>) -> u64 {
+    requested
+        .unwrap_or(MAX_LOG_CURSOR_BYTES)
+        .clamp(1, MAX_LOG_CURSOR_BYTES)
+}
+
+#[tauri::command]
+pub async fn get_process_log_cursor(
+    session_id: String,
+    cursor: u64,
+    max_bytes: Option<u64>,
+) -> Result<ProcessLogCursor, CommandError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
 
     if !path.exists() {
         return Ok(ProcessLogCursor {
             cursor: 0,
             output: String::new(),
             new_file: false,
+            total_bytes: 0,
+            truncated: false,
         });
     }
 
     let mut file = tokio::fs::File::open(&path).await.map_err(AppError::Io)?;
-    let len = file.metadata().await.map_err(AppError::Io)?.len();
+    let total_bytes = file.metadata().await.map_err(AppError::Io)?.len();
 
-    let mut cursor = cursor;
+    let mut read_start = cursor;
     let mut new_file = false;
-    if cursor > len {
-        cursor = 0;
+    if read_start > total_bytes {
+        read_start = 0;
         new_file = true;
     }
 
-    file.seek(std::io::SeekFrom::Start(cursor))
+    let read_len = clamp_log_read_len(max_bytes);
+    let available = total_bytes.saturating_sub(read_start);
+    let bounded_read_len = read_len.min(available);
+
+    file.seek(std::io::SeekFrom::Start(read_start))
         .await
         .map_err(AppError::Io)?;
-    let mut buf = Vec::new();
-    let read = file.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+
+    let mut buf = Vec::with_capacity(bounded_read_len as usize);
+    let mut reader = file.take(bounded_read_len);
+    let read = reader.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+    let next_cursor = read_start + read as u64;
 
     let output =
         crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf));
 
     Ok(ProcessLogCursor {
-        cursor: cursor + read as u64,
+        cursor: next_cursor,
         output,
         new_file,
+        total_bytes,
+        truncated: next_cursor < total_bytes,
     })
 }
 
@@ -273,3 +306,28 @@ pub async fn focus_main_window<R: tauri::Runtime>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_log_session_id() {
+        assert!(validate_log_session_id("valid-session-123").is_ok());
+        assert!(validate_log_session_id("abc_def-123").is_ok());
+
+        assert!(validate_log_session_id("").is_err());
+        assert!(validate_log_session_id("session/id").is_err());
+        assert!(validate_log_session_id("session\\id").is_err());
+        assert!(validate_log_session_id("session..id").is_err());
+    }
+
+    #[test]
+    fn test_clamp_log_read_len() {
+        assert_eq!(clamp_log_read_len(None), MAX_LOG_CURSOR_BYTES);
+        assert_eq!(clamp_log_read_len(Some(100)), 100);
+        assert_eq!(clamp_log_read_len(Some(0)), 1);
+        assert_eq!(clamp_log_read_len(Some(MAX_LOG_CURSOR_BYTES + 100)), MAX_LOG_CURSOR_BYTES);
+    }
+}
+
