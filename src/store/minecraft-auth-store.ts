@@ -56,7 +56,24 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
 
       const accounts = await MinecraftAuthService.getAccounts();
 
-      const activeAccount = await MinecraftAuthService.getActiveAccount();
+      // Commit the (cached) account list first so a failing active-account
+      // refresh — e.g. a Mojang auth outage / HTTP 429 — can never wipe the
+      // whole list. The cached `active` flag gives us a fallback selection.
+      const fallbackActive = accounts.find((a) => a.active) ?? null;
+      set({
+        accounts,
+        activeAccount: fallbackActive,
+      });
+
+      let activeAccount = fallbackActive;
+      try {
+        activeAccount = await MinecraftAuthService.getActiveAccount();
+      } catch (refreshError) {
+        console.warn(
+          "Active account refresh failed, keeping cached account:",
+          refreshError,
+        );
+      }
 
       const updatedAccounts = accounts.map((account) => ({
         ...account,
