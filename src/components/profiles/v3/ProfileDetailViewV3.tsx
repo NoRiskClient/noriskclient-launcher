@@ -46,7 +46,7 @@ import { useProfileDuplicateStore } from "../../../store/profile-duplicate-store
 import { useProfileLaunch } from "../../../hooks/useProfileLaunch.tsx";
 import { useAppDragDropStore } from "../../../store/appStore";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
 import { useResolvedLoaderVersion } from "../../../hooks/useResolvedLoaderVersion";
 
 import { Button } from "../../ui/buttons/Button";
@@ -139,7 +139,7 @@ export function ProfileDetailViewV3({
   const preferredAccount = currentProfile.preferred_account_id
     ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)
     : null;
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });

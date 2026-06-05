@@ -2,13 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import type { 
     MinecraftProfile 
 } from "../types/minecraft"; // Relative path
-import type { 
-    MinecraftSkin, 
-    SkinVariant, 
-    AddLocalSkinCommandPayload, 
+import type {
+    MinecraftSkin,
+    SkinVariant,
+    AddLocalSkinCommandPayload,
     GetStarlightSkinRenderPayload, // Added new payload type
-    GetCrafatarAvatarPayload, // Added Crafatar payload type
-    SkinSourceDetails // Keep this for internal construction
+    SkinSourceDetails, // Keep this for internal construction
+    ActiveSkin // Local source of truth for the active account's applied skin
 } from "../types/localSkin"; // Relative path
 
 // Regex for basic Minecraft username validation (could also be a global constant)
@@ -181,8 +181,11 @@ export class MinecraftSkinService {
      * @param payload - The parameters for the avatar (UUID, optional size, optional overlay).
      * @returns A promise resolving to the local file path (string) of the cached avatar image.
      */
-    static async getCrafatarAvatar(payload: GetCrafatarAvatarPayload): Promise<string> {
-        // The Rust command returns a PathBuf, which will be serialized as a string (the path).
-        return await invoke<string>("get_crafatar_avatar", { payload });
+    static async getActiveSkin(): Promise<ActiveSkin | null> {
+        return await invoke<ActiveSkin | null>("get_active_skin");
+    }
+
+    static async getFaceAvatar(uuid: string, size?: number, overlay: boolean = true): Promise<string> {
+        return await invoke<string>("get_face_avatar", { uuid, size, overlay });
     }
 }

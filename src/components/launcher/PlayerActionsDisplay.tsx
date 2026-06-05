@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { SkinViewer } from './SkinViewer';
 import { MainLaunchButton } from './MainLaunchButton';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useSkinStore } from '../../store/useSkinStore';
 import { MinecraftSkinService } from '../../services/minecraft-skin-service';
 import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -56,6 +57,7 @@ export function PlayerActionsDisplay({
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
   const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
+  const skinRevision = useSkinStore((state) => state.skinRevision);
   const navigate = useNavigate();
 
   const { profiles } = useProfileStore();
@@ -94,12 +96,14 @@ export function PlayerActionsDisplay({
     const fetchAndSetSkin = async () => {
       if (playerName) {
         try {
+          const activeSkin = await MinecraftSkinService.getActiveSkin().catch(() => null);
           const payload: GetStarlightSkinRenderPayload = {
             player_name: playerName,
-            render_type: "default", 
-            render_view: "full",    
+            render_type: "default",
+            render_view: "full",
+            base64_skin_data: activeSkin?.base64_data ?? null,
           };
-          console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "Payload:", payload);
+          console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "custom:", !!activeSkin);
           const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
           console.log("[PlayerActionsDisplay] Fetched local path:", localPath);
           if (localPath) { // Check if path is not empty or null
@@ -119,7 +123,7 @@ export function PlayerActionsDisplay({
     };
 
     fetchAndSetSkin();
-  }, [playerName]);
+  }, [playerName, skinRevision]);
 
   const dropShadowX = '2px';
   const dropShadowY = '4px';

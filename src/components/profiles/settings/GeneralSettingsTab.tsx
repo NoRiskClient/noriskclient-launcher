@@ -9,7 +9,7 @@ import { Checkbox } from "../../ui/Checkbox";
 import { gsap } from "gsap";
 import { ProfileIcon } from "../ProfileIcon";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
 import type { MinecraftAccount } from "../../../types/minecraft";
 import { cn } from "../../../lib/utils";
 import { useTranslation } from "react-i18next";
@@ -76,7 +76,7 @@ export function GeneralSettingsTab({
 
   // Component for account avatar with caching
   function AccountAvatar({ account }: { account: MinecraftAccount }) {
-    const avatarUrl = useCrafatarAvatar({
+    const avatarUrl = usePlayerAvatar({
       uuid: account.id,
       overlay: true,
     });
@@ -92,8 +92,7 @@ export function GeneralSettingsTab({
         className="w-full h-full object-cover pixelated"
         style={{ imageRendering: 'pixelated' }}
         onError={(e) => {
-          // Fallback to default Steve head
-          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+          e.currentTarget.style.display = 'none';
         }}
       />
     );

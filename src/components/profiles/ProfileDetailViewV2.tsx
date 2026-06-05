@@ -36,7 +36,7 @@ import type { LocalContentItem } from "../../hooks/useLocalContentManager";
 import { ModpackDebugInfo } from "../../debug";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { Tooltip } from "../ui/Tooltip";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -103,7 +103,7 @@ export function ProfileDetailViewV2({
     : null;
 
   // Load preferred account avatar
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });
@@ -477,7 +477,7 @@ export function ProfileDetailViewV2({
                           className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
                           style={{ imageRendering: 'pixelated' }}
                           onError={(e) => {
-                            e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
                       )}

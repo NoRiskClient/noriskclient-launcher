@@ -5,7 +5,6 @@ use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::api::mclogs_api::upload_log_to_mclogs;
 use crate::minecraft::api::neo_forge_api::NeoForgeApi;
 use crate::minecraft::api::quilt_api::QuiltApi;
-use crate::minecraft::api::crafatar_api::{CrafatarApiService, GetCrafatarAvatarPayload};
 use crate::minecraft::api::starlight_api::{GetSkinRenderPayload, StarlightApiService};
 use crate::minecraft::dto::fabric_meta::FabricVersionInfo;
 use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
@@ -24,7 +23,7 @@ use uuid::Uuid;
 use crate::minecraft::dto::skin_payloads::{
     AddLocalSkinCommandPayload, SkinSource,
 };
-use crate::utils::mc_utils::{extract_skin_info_from_profile, get_base64_from_skin_source};
+use crate::utils::mc_utils::{atomic_write, extract_skin_info_from_profile, fetch_skin_base64_for_uuid, get_base64_from_skin_source, normalize_uuid};
 use chrono::Utc;
 // --- End New Imports ---
 
@@ -153,6 +152,41 @@ async fn active_skin_credentials() -> Result<(String, String), CommandError> {
         .await?
         .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
     Ok((account.id.to_string(), account.access_token))
+}
+
+async fn update_active_skin(uuid: &str, base64_data: String, variant: String, source: &str) {
+    if let Ok(state) = State::get().await {
+        if let Err(e) = state
+            .active_skin_manager
+            .set(uuid, base64_data, variant, source)
+            .await
+        {
+            error!("Failed to store active skin after change: {}", e);
+            return;
+        }
+        if let Ok(account_uuid) = Uuid::parse_str(uuid) {
+            let _ = state.event_state.skin_changed(Some(account_uuid)).await;
+        }
+    }
+}
+
+async fn clear_active_skin(uuid: &str) {
+    if let Ok(state) = State::get().await {
+        if let Err(e) = state.active_skin_manager.clear(uuid).await {
+            error!("Failed to clear active skin: {}", e);
+        }
+        if let Ok(account_uuid) = Uuid::parse_str(uuid) {
+            let _ = state.event_state.skin_changed(Some(account_uuid)).await;
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_active_skin(
+) -> Result<Option<crate::state::active_skin_state::ActiveSkin>, CommandError> {
+    let (uuid, _token) = active_skin_credentials().await?;
+    let state = State::get().await?;
+    Ok(state.active_skin_manager.get(&uuid).await)
 }
 
 /// Get the current user skin data
@@ -290,6 +324,7 @@ pub async fn upload_skin<R: tauri::Runtime>(
         "Converted skin to base64 ({} characters)",
         base64_data.len()
     );
+    let active_skin_base64 = base64_data.clone();
 
     debug!("Saving skin to local database");
     // Save the skin to the local database
@@ -317,6 +352,7 @@ pub async fn upload_skin<R: tauri::Runtime>(
     // Add the skin to the database
     let track_name = skin.name.clone();
     let track_variant = skin.variant.clone();
+    let active_skin_variant = track_variant.clone();
 
     match state.skin_manager.add_skin(skin).await {
         Ok(_) => debug!("Successfully added skin to local database"),
@@ -331,6 +367,8 @@ pub async fn upload_skin<R: tauri::Runtime>(
     props.insert("skin_variant".to_string(), serde_json::Value::String(track_variant.clone()));
     props.insert("skin_type".to_string(), serde_json::Value::String(track_variant));
     crate::commands::analytics_command::track_event("skin_selected", props);
+
+    update_active_skin(&uuid, active_skin_base64, active_skin_variant, "applied").await;
 
     debug!("Command completed: upload_skin");
     Ok(())
@@ -354,6 +392,8 @@ pub async fn reset_skin() -> Result<(), CommandError> {
             return Err(CommandError::from(e));
         }
     }
+
+    clear_active_skin(&uuid).await;
 
     debug!("Command completed: reset_skin");
     Ok(())
@@ -521,7 +561,7 @@ pub async fn apply_skin_from_base64(
         ))));
     }
 
-    let (_uuid, access_token) = active_skin_credentials().await?;
+    let (uuid, access_token) = active_skin_credentials().await?;
 
     // Create a new API service instance
     let api_service = MinecraftApiService::new();
@@ -546,6 +586,8 @@ pub async fn apply_skin_from_base64(
             return Err(CommandError::from(e));
         }
     }
+
+    update_active_skin(&uuid, base64_data, skin_variant, "applied").await;
 
     debug!("Command completed: apply_skin_from_base64");
     Ok(())
@@ -819,40 +861,116 @@ pub async fn get_starlight_skin_render(
     }
 }
 
-#[tauri::command]
-pub async fn get_crafatar_avatar(
-    payload: GetCrafatarAvatarPayload,
-) -> Result<PathBuf, CommandError> {
-    debug!(
-        "Command called: get_crafatar_avatar with payload: {:?}",
-        payload
+const FACE_REFRESH_TTL_SECS: u64 = 24 * 60 * 60;
+
+fn write_face_avatar(
+    path: &std::path::Path,
+    base64_data: &str,
+    overlay: bool,
+    out_size: u32,
+) -> Result<(), AppError> {
+    let skin_bytes = base64::decode(base64_data)
+        .map_err(|e| AppError::Other(format!("Failed to decode skin base64: {}", e)))?;
+    let img = image::load_from_memory(&skin_bytes)
+        .map_err(|e| AppError::Other(format!("Failed to decode skin PNG: {}", e)))?
+        .to_rgba8();
+
+    if img.width() < 48 || img.height() < 16 {
+        return Err(AppError::Other(format!(
+            "Skin image too small for face crop: {}x{}",
+            img.width(),
+            img.height()
+        )));
+    }
+
+    let mut face = image::imageops::crop_imm(&img, 8, 8, 8, 8).to_image();
+    if overlay {
+        let hat = image::imageops::crop_imm(&img, 40, 8, 8, 8).to_image();
+        image::imageops::overlay(&mut face, &hat, 0, 0);
+    }
+
+    let scaled = image::imageops::resize(
+        &face,
+        out_size,
+        out_size,
+        image::imageops::FilterType::Nearest,
     );
 
-    let crafatar_service = match CrafatarApiService::new() {
-        Ok(service) => service,
-        Err(e) => {
-            error!(
-                "[CMD] get_crafatar_avatar: Failed to create CrafatarApiService: {:?}",
-                e
-            );
-            return Err(CommandError::from(e));
-        }
-    };
+    let mut buf = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(scaled)
+        .write_to(&mut buf, image::ImageFormat::Png)
+        .map_err(|e| AppError::Other(format!("Failed to encode face avatar: {}", e)))?;
 
-    match crafatar_service
-        .get_avatar(&payload.uuid, payload.size, payload.overlay)
+    atomic_write(path, &buf.into_inner())
+        .map_err(|e| AppError::Other(format!("Failed to write face avatar: {}", e)))
+}
+
+#[tauri::command]
+pub async fn get_face_avatar(
+    uuid: String,
+    size: Option<u32>,
+    overlay: Option<bool>,
+) -> Result<PathBuf, CommandError> {
+    use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+    use crate::utils::hash_utils::calculate_sha1_from_bytes;
+
+    let overlay = overlay.unwrap_or(true);
+    let out_size = size.unwrap_or(64).max(8);
+    let norm = normalize_uuid(&uuid);
+
+    let state = State::get().await?;
+
+    let cache_dir = LAUNCHER_DIRECTORY.meta_dir().join("face_cache");
+    if !cache_dir.exists() {
+        std::fs::create_dir_all(&cache_dir)
+            .map_err(|e| AppError::Other(format!("Failed to create face cache dir: {}", e)))?;
+    }
+
+    let active_id = state
+        .minecraft_account_manager_v2
+        .get_active_account()
         .await
-    {
-        Ok(path_buf) => {
-            debug!(
-                "Command completed: get_crafatar_avatar, path: {:?}",
-                path_buf
-            );
-            Ok(path_buf)
-        }
-        Err(e) => {
-            error!("Command failed: get_crafatar_avatar: {:?}", e);
-            Err(CommandError::from(e))
+        .ok()
+        .flatten()
+        .map(|a| normalize_uuid(&a.id.to_string()));
+    let is_self = active_id.as_deref() == Some(norm.as_str());
+
+    if is_self {
+        if let Some(active) = state.active_skin_manager.get(&norm).await {
+            let hash = calculate_sha1_from_bytes(active.base64_data.as_bytes());
+            let short_hash = &hash[0..std::cmp::min(8, hash.len())];
+            let path = cache_dir.join(format!(
+                "{}_{}_{}_{}.png",
+                norm, short_hash, out_size, overlay
+            ));
+            if !path.exists() {
+                write_face_avatar(&path, &active.base64_data, overlay, out_size)?;
+            }
+            return Ok(path);
         }
     }
+
+    let path = cache_dir.join(format!("{}_{}_{}.png", norm, out_size, overlay));
+    if path.exists() {
+        let stale = std::fs::metadata(&path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .map_or(true, |age| age.as_secs() >= FACE_REFRESH_TTL_SECS);
+        if stale {
+            let refresh_uuid = norm.clone();
+            let refresh_path = path.clone();
+            tokio::spawn(async move {
+                if let Ok((base64, _)) = fetch_skin_base64_for_uuid(&refresh_uuid).await {
+                    let _ = write_face_avatar(&refresh_path, &base64, overlay, out_size);
+                }
+            });
+        }
+        return Ok(path);
+    }
+
+    let (base64, _) = fetch_skin_base64_for_uuid(&norm).await?;
+    write_face_avatar(&path, &base64, overlay, out_size)?;
+    debug!("Command completed: get_face_avatar, path: {:?}", path);
+    Ok(path)
 }

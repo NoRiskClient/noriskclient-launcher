@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::minecraft_auth::MinecraftAuthStore;
+use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManager};
 use crate::state::config_state::ConfigManager;
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
@@ -29,6 +30,7 @@ pub struct State {
     pub norisk_version_manager: NoriskVersionManager,
     pub config_manager: ConfigManager,
     pub skin_manager: SkinManager,
+    pub active_skin_manager: ActiveSkinManager,
     pub discord_manager: DiscordManager,
     pub friends_state: FriendsState,
     pub io_semaphore: Arc<Semaphore>,
@@ -49,6 +51,7 @@ impl State {
                 let norisk_pack_manager = NoriskPackManager::new(default_norisk_packs_path())?;
                 let norisk_version_manager = NoriskVersionManager::new(default_norisk_versions_path())?;
                 let skin_manager = SkinManager::new(default_skins_path())?;
+                let active_skin_manager = ActiveSkinManager::new(default_active_skins_path())?;
                 let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
@@ -64,6 +67,7 @@ impl State {
                     norisk_version_manager,
                     config_manager,
                     skin_manager,
+                    active_skin_manager,
                     discord_manager,
                     friends_state,
                     io_semaphore,
@@ -128,6 +132,42 @@ impl State {
             .on_state_ready(app.clone())
             .await?;
         log::info!("State::init - SkinManager post-initialization complete.");
+
+        initial_state_arc
+            .active_skin_manager
+            .on_state_ready(app.clone())
+            .await?;
+        log::info!("State::init - ActiveSkinManager post-initialization complete.");
+
+        let reconcile_state = initial_state_arc.clone();
+        tokio::spawn(async move {
+            match reconcile_state
+                .minecraft_account_manager_v2
+                .get_active_account()
+                .await
+            {
+                Ok(Some(account)) => {
+                    let uuid = account.id.to_string();
+                    match reconcile_state.active_skin_manager.reconcile(&uuid).await {
+                        Ok(changed) => {
+                            if changed {
+                                let _ = reconcile_state
+                                    .event_state
+                                    .skin_changed(Some(account.id))
+                                    .await;
+                            }
+                        }
+                        Err(e) => log::warn!(
+                            "State::init - Startup skin reconcile failed for {}: {}",
+                            uuid,
+                            e
+                        ),
+                    }
+                }
+                Ok(None) => log::debug!("State::init - No active account, skipping skin reconcile."),
+                Err(e) => log::warn!("State::init - Could not get active account for skin reconcile: {}", e),
+            }
+        });
 
         initial_state_arc
             .norisk_pack_manager

@@ -1,5 +1,5 @@
 import { Icon } from "@iconify/react";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 interface MessageReaction {
   emoji: string;
@@ -35,7 +35,7 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, isOwn, friendUuid, friendName, currentUserUuid, currentUserName, accentColor, showHeader }: ChatMessageProps) {
   const avatarUuid = isOwn ? currentUserUuid : friendUuid;
-  const avatarUrl = useCrafatarAvatar({ uuid: avatarUuid, size: 32 });
+  const avatarUrl = usePlayerAvatar({ uuid: avatarUuid, size: 32 });
 
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return "";
