@@ -234,6 +234,7 @@ jobs:
 
       - name: Determine RPM version
         id: rpm_version
+        if: matrix.os == 'ubuntu-22.04'
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
