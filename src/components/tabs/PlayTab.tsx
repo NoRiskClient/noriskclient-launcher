@@ -1,6 +1,5 @@
 "use client";
-import { getVersion } from "@tauri-apps/api/app";
-console.log(await getVersion());
+
 import { useEffect } from "react";
 import { NewsSection } from "../news/NewsSection";
 import { ErrorMessage } from "../ui/ErrorMessage";
