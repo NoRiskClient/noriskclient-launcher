@@ -110,7 +110,8 @@ use commands::path_commands::{get_launcher_directory, resolve_image_path};
 use commands::cape_command::{
     browse_capes, check_is_moderator, delete_cape, download_template_and_open_explorer, equip_cape,
     get_player_capes, unequip_cape, upload_cape, add_favorite_cape, remove_favorite_cape,
-    get_capes_by_hashes, get_owned_capes_list,
+    get_capes_by_hashes, get_owned_capes_list, get_player_outfit, get_cosmetic_products,
+    fetch_cms_media, get_local_cosmetics, get_player_icon, get_active_creator_code,
 };
 
 // Import vanilla cape commands
@@ -608,6 +609,12 @@ async fn main() {
             set_discord_state,
             browse_capes,
             get_player_capes,
+            get_player_outfit,
+            get_cosmetic_products,
+            fetch_cms_media,
+            get_local_cosmetics,
+            get_player_icon,
+            get_active_creator_code,
             get_owned_capes_list,
             equip_cape,
             delete_cape,

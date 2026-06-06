@@ -89,6 +89,55 @@ impl PayloadCmsApi {
         })
     }
 
+    pub async fn fetch_products_by_cosmetic_ids(
+        cosmetic_ids: &[String],
+        is_experimental: bool,
+    ) -> Result<Value> {
+        let base = Self::get_cms_base(is_experimental);
+        let url = format!("{}/api/products", base);
+        let ids = cosmetic_ids.join(",");
+        let limit = cosmetic_ids.len().max(1).to_string();
+
+        debug!(
+            "[Payload CMS] Fetching {} products by cosmeticId",
+            cosmetic_ids.len()
+        );
+
+        let response = HTTP_CLIENT
+            .get(&url)
+            .query(&[
+                ("where[cosmeticId][in]", ids.as_str()),
+                ("depth", "1"),
+                ("limit", limit.as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[Payload CMS] products request failed: {}", e);
+                AppError::RequestError(format!("Payload CMS products request failed: {}", e))
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<failed to read body>".to_string());
+            return Err(AppError::RequestError(format!(
+                "Payload CMS products returned {}: {}",
+                status, body
+            )));
+        }
+
+        response.json::<Value>().await.map_err(|e| {
+            error!("[Payload CMS] Failed to parse products response: {}", e);
+            AppError::ParseError(format!(
+                "Failed to parse Payload CMS products response: {}",
+                e
+            ))
+        })
+    }
+
     pub async fn submit_test_vote(
         body: SubmitTestVoteRequest,
         token: &str,

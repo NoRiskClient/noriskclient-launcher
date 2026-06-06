@@ -14,6 +14,11 @@ import { Icon } from '@iconify/react';
 // import { ProfileCardV2 } from '../profiles/ProfileCardV2';
 import { ServerLaunchCard } from './ServerLaunchCard';
 import { useProfileStore } from '../../store/profile-store';
+import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
+import { PlayerCosmeticRig } from './PlayerCosmeticRig';
+import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
+import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
+import { useSelectedIcon } from '../../hooks/useSelectedIcon';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -133,6 +138,9 @@ export function PlayerActionsDisplay({
   const skinViewerDisplayHeight = 450;
   const skinViewerMaxDisplayWidth = 225;
 
+  const rigDisplayWidth = 1040;
+  const rigDisplayHeight = 860;
+
   const skinViewerStyles: React.CSSProperties = {
     filter: 'drop-shadow(5px 10px 5px rgba(0,0,0,0.75))',
     WebkitBoxReflect: 'below 0px linear-gradient(to bottom, transparent, rgba(0,0,0,0.05))',
@@ -142,6 +150,11 @@ export function PlayerActionsDisplay({
   };
 
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
+
+  const activeAccount = useMinecraftAuthStore((state) => state.activeAccount);
+  const { textureUrl: rigTextureUrl, variant: rigVariant } = useActiveSkinTexture();
+  const { cosmetics: equippedCosmetics } = useEquippedCosmetics(activeAccount?.id);
+  const selectedIcon = useSelectedIcon(activeAccount?.id);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -156,7 +169,7 @@ export function PlayerActionsDisplay({
             filter: commonDropShadowStyle
           }}
         />
-      ) : (
+      ) : rigTextureUrl ? null : (
         <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
           {playerName || "no account"}
         </h2>
@@ -166,14 +179,44 @@ export function PlayerActionsDisplay({
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <SkinViewer
-          skinUrl={resolvedSkinUrl} 
-          playerName={playerName?.toString()} 
-          width={skinViewerMaxDisplayWidth} 
-          height={skinViewerDisplayHeight} 
-          className="bg-transparent flex-shrink-0"
-          style={skinViewerStyles}
-        />
+        {rigTextureUrl ? (
+          <div
+            className="relative flex-shrink-0"
+            style={{
+              width: `${skinViewerMaxDisplayWidth}px`,
+              height: `${skinViewerDisplayHeight}px`,
+            }}
+          >
+            <PlayerCosmeticRig
+              textureUrl={rigTextureUrl}
+              variant={rigVariant}
+              cosmetics={equippedCosmetics}
+              playerName={playerName}
+              iconUrl={selectedIcon.url}
+              iconPlus={selectedIcon.plus}
+              className="bg-transparent"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                width: `${rigDisplayWidth}px`,
+                height: `${rigDisplayHeight}px`,
+                pointerEvents: "none",
+                filter: skinViewerStyles.filter,
+              }}
+            />
+          </div>
+        ) : (
+          <SkinViewer
+            skinUrl={resolvedSkinUrl}
+            playerName={playerName?.toString()}
+            width={skinViewerMaxDisplayWidth}
+            height={skinViewerDisplayHeight}
+            className="bg-transparent flex-shrink-0"
+            style={skinViewerStyles}
+          />
+        )}
 
         {/* Don't render launch button while profiles are still loading to prevent flicker */}
         {!isLoadingProfiles && (
