@@ -1405,9 +1405,9 @@ export function SettingsTab() {
         >
           <ActionButton
             id="reopen-wizard"
-            icon="solar:magic-wand-bold"
+            icon="solar:magic-stick-bold"
             variant="icon-only"
-            tooltip="First install wizard erneut öffnen"
+            tooltip="Run First Install Setup Wizard again"
             size="sm"
             onClick={() => resetFirstInstallSetupWizard()}
           />

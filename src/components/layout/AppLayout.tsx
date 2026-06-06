@@ -490,7 +490,9 @@ function FirstInstallSetupWizard() {
   const pickBackground = async () => {
     const selected = await openDialog({
       multiple: false,
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
+      ],
     });
     if (typeof selected === "string") {
       setCustomLauncherBackground(selected, "absolutePath");
@@ -547,12 +549,29 @@ function FirstInstallSetupWizard() {
                 onClick={() => applyPerformancePreset(mode)}
                 className="border border-white/10 px-4 py-5 text-left font-minecraft-ten transition-colors"
                 style={{
-                  backgroundColor: qualityLevel === mode ? `${accentColor.value}70` : "rgba(255,255,255,0.05)",
+                  backgroundColor:
+                    qualityLevel === mode
+                      ? `${accentColor.value}70`
+                      : "rgba(255,255,255,0.05)",
                 }}
               >
-                <div className="text-lg text-white">{mode === "low" ? "performance" : mode === "medium" ? "normal" : mode === "high" ? "quality" : "potato"}</div>
+                <div className="text-lg text-white">
+                  {mode === "low"
+                    ? "performance"
+                    : mode === "medium"
+                      ? "normal"
+                      : mode === "high"
+                        ? "quality"
+                        : "potato"}
+                </div>
                 <div className="mt-1 text-xs text-white/55">
-                  {mode === "potato" ? "no effects, minimum work" : mode === "low" ? "simple visuals" : mode === "medium" ? "balanced" : "full visuals"}
+                  {mode === "potato"
+                    ? "no effects, minimum work"
+                    : mode === "low"
+                      ? "simple visuals"
+                      : mode === "medium"
+                        ? "balanced"
+                        : "full visuals"}
                 </div>
               </button>
             ))}
@@ -568,12 +587,22 @@ function FirstInstallSetupWizard() {
           <ThemeSelector />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="border border-white/10 bg-white/5 p-4">
-              <div className="mb-3 font-minecraft-ten text-white/70">Accent color</div>
+              <div className="mb-3 font-minecraft-ten text-white/70">
+                Accent color
+              </div>
               <ColorPicker size="sm" />
             </div>
             <div className="border border-white/10 bg-white/5 p-4">
-              <div className="mb-3 font-minecraft-ten text-white/70">Border roundness</div>
-              <RangeSlider min={0} max={32} value={borderRadius} onChange={setBorderRadius} unit="px" />
+              <div className="mb-3 font-minecraft-ten text-white/70">
+                Border roundness
+              </div>
+              <RangeSlider
+                min={0}
+                max={32}
+                value={borderRadius}
+                onChange={setBorderRadius}
+                unit="px"
+              />
             </div>
           </div>
         </div>
@@ -584,18 +613,26 @@ function FirstInstallSetupWizard() {
       <div className="space-y-4">
         <h3 className="font-minecraft text-3xl lowercase">Background</h3>
         <p className="font-minecraft-ten text-white/55">
-          Images and GIFs are darkened automatically so the launcher stays readable and effects can still sit above them.
+          Images and GIFs are darkened automatically so the launcher stays
+          readable and effects can still sit above them.
         </p>
         <div className="flex gap-2">
           <input
             value={backgroundUrl}
             onChange={(event) => setBackgroundUrl(event.target.value)}
-            placeholder="https://... image or gif"
+            placeholder="https://... image or gif, or select from FILE ->"
             className="min-w-0 flex-1 border border-white/10 bg-black/40 px-3 py-3 font-minecraft-ten text-white outline-none"
           />
-          <Button variant="ghost" onClick={pickBackground}>File</Button>
+          <Button variant="ghost" onClick={pickBackground}>
+            File
+          </Button>
         </div>
-        <Button variant="ghost" onClick={() => setCustomLauncherBackground(null, null)}>Clear custom background</Button>
+        <Button
+          variant="ghost"
+          onClick={() => setCustomLauncherBackground(null, null)}
+        >
+          Clear custom background
+        </Button>
       </div>
     );
   };
@@ -604,12 +641,19 @@ function FirstInstallSetupWizard() {
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-6">
       <div
         className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden border-2 border-b-4 bg-black/92 text-white shadow-2xl backdrop-blur-md"
-        style={{ borderColor: accentColor.value, borderRadius: Math.max(borderRadius, 8) }}
+        style={{
+          borderColor: accentColor.value,
+          borderRadius: Math.max(borderRadius, 8),
+        }}
       >
         <div className="flex items-center justify-between border-b border-white/10 p-5">
           <div>
-            <h2 className="font-minecraft text-4xl lowercase">First install setup</h2>
-            <p className="font-minecraft-ten text-white/55">step {step + 1} of {steps.length}</p>
+            <h2 className="font-minecraft text-4xl lowercase">
+              First install setup
+            </h2>
+            <p className="font-minecraft-ten text-white/55">
+              step {step + 1} of {steps.length}
+            </p>
           </div>
           <div className="flex gap-2">
             {steps.map((name, index) => (
@@ -617,20 +661,38 @@ function FirstInstallSetupWizard() {
                 key={name}
                 onClick={() => setStep(index)}
                 className="h-2.5 w-10 transition-colors"
-                style={{ backgroundColor: index <= step ? accentColor.value : "rgba(255,255,255,0.18)" }}
+                style={{
+                  backgroundColor:
+                    index <= step
+                      ? accentColor.value
+                      : "rgba(255,255,255,0.18)",
+                }}
                 aria-label={name}
               />
             ))}
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-6 custom-scrollbar">{renderStep()}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {renderStep()}
+        </div>
 
         <div className="flex justify-between border-t border-white/10 p-5">
-          <Button variant="ghost" onClick={completeFirstInstallSetupWizard}>Skip</Button>
+          <Button variant="ghost" onClick={completeFirstInstallSetupWizard}>
+            Skip
+          </Button>
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>Back</Button>
-            <Button onClick={isLastStep ? finish : () => setStep(step + 1)} disabled={busy}>
+            <Button
+              variant="ghost"
+              onClick={() => setStep(Math.max(0, step - 1))}
+              disabled={step === 0}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={isLastStep ? finish : () => setStep(step + 1)}
+              disabled={busy}
+            >
               {busy ? "Saving..." : isLastStep ? "Save" : "Next"}
             </Button>
           </div>

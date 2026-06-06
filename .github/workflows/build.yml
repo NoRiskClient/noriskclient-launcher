@@ -152,16 +152,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: yarn tauri build --verbose ${{ matrix.args }}
 
-      - name: Setup Flatpak
-        continue-on-error: true
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-          flatpak --user install -y flathub \
-            org.freedesktop.Platform//24.08 \
-            org.freedesktop.Sdk//24.08
-
       - name: Detect AppImage (Linux only)
         continue-on-error: true
         if: matrix.os == 'ubuntu-22.04'
@@ -178,6 +168,15 @@ jobs:
           fi
               
           echo "file=$FILE" >> $GITHUB_OUTPUT
+      - name: Setup Flatpak
+        continue-on-error: true
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+          flatpak --user install -y flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08
 
       - name: Prepare Flatpak input
         continue-on-error: true
@@ -223,12 +222,32 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         continue-on-error: true
         run: |
-          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            ubuntu:24.04 \
+            bash -c "
+              apt update
+              apt install -y snapcraft
+              cd /workspace/packaging/snap
+              snapcraft pack --destructive-mode
+            "
 
-          cd packaging/snap
-
-          snapcraft pack --destructive-mode --verbosity=trace
-
+      - name: Determine RPM version
+        id: rpm_version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+              
+          BASE="${VERSION%%-*}"
+              
+          RELEASE="1"
+              
+          if [[ "$VERSION" == *-* ]]; then
+            RELEASE="${GITHUB_RUN_NUMBER}"
+          fi
+              
+          echo "base=$BASE" >> $GITHUB_OUTPUT
+          echo "release=$RELEASE" >> $GITHUB_OUTPUT
       - name: Build RPM package
         if: matrix.os == 'ubuntu-22.04'
         continue-on-error: true
@@ -284,10 +303,12 @@ jobs:
               yarn \
               rust \
               cargo \
-              webkit2gtk \
+              webkit2gtk-4.1 \
               libayatana-appindicator \
               librsvg \
-              patchelf
+              patchelf \
+              fakeroot \
+              debugedit
 
             useradd -m builder
 
@@ -303,6 +324,11 @@ jobs:
               cp *.pkg.tar.* /work/src-tauri/target/release/bundle/aur/
             '
           "
+      - name: Fix Linux artifact permissions
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo chown -R $USER:$USER src-tauri/target || true
+          chmod -R u+rw src-tauri/target || true
       - name: Rename artifacts
         shell: bash
         run: |
@@ -368,9 +394,9 @@ jobs:
               fi
 
               if [[ "$name" != "$renamed" ]]; then
-                cp "$file" "$dir/$renamed"
+                mv "$file" "$dir/$renamed"
                 if [[ -f "$file.sig" ]]; then
-                  cp "$file.sig" "$dir/$renamed.sig"
+                  mv "$file.sig" "$dir/$renamed.sig"
                 fi
               fi
             done
