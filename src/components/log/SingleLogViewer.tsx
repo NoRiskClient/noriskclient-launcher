@@ -73,12 +73,7 @@ export function SingleLogViewer({
   };
 
   return (
-    <div
-      className="h-screen flex flex-col"
-      style={{
-        background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
-      }}
-    >
+    <div className="h-screen flex flex-col bg-black/92 text-white">
       <LogWindowTitlebar
         title={
           accountName

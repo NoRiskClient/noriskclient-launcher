@@ -7,6 +7,7 @@ import { GlobalToaster } from "./components/ui/GlobalToaster";
 import i18n from "./i18n/i18n";
 import "./styles/globals.css";
 import type { ProcessMetadata } from "./types/processState";
+import { useThemeStore } from "./store/useThemeStore";
 
 // Parse URL params for crashed process info
 const urlParams = new URLSearchParams(window.location.search);
@@ -16,9 +17,15 @@ let crashedProcess: ProcessMetadata | undefined;
 if (crashedProcessParam) {
   try {
     crashedProcess = JSON.parse(crashedProcessParam) as ProcessMetadata;
-    console.log("[MinecraftLogWindowEntry] Parsed crashed process:", crashedProcess);
+    console.log(
+      "[MinecraftLogWindowEntry] Parsed crashed process:",
+      crashedProcess,
+    );
   } catch (e) {
-    console.error("[MinecraftLogWindowEntry] Failed to parse crashed process:", e);
+    console.error(
+      "[MinecraftLogWindowEntry] Failed to parse crashed process:",
+      e,
+    );
   }
 }
 
@@ -34,6 +41,18 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 // Reveal the window only after the first paint to avoid the white flash.
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    getCurrentWindow().show().catch(() => {});
+    // Ensure theme CSS variables and border radius are applied before showing
+    try {
+      const themeStore = useThemeStore.getState();
+      themeStore.applyAccentColorToDOM();
+      themeStore.applyBorderRadiusToDOM();
+      themeStore.applyUIStylePresetToDOM?.();
+    } catch (e) {
+      // ignore
+    }
+
+    getCurrentWindow()
+      .show()
+      .catch(() => {});
   });
 });

@@ -25,13 +25,12 @@ export function GlobalModalPortal() {
         createPortal(
           <div
             key={modal.id}
-            style={{ zIndex: modal.zIndex }}
-            className="fixed inset-0"
+            style={{ zIndex: modal.zIndex, position: "relative" }}
           >
             {modal.component}
           </div>,
-          portalRoot
-        )
+          portalRoot,
+        ),
       )}
     </>
   );
