@@ -1,5 +1,5 @@
 pkgname=fullrisk-launcher
-pkgver=0.6.23
+pkgver=0.6.22
 pkgrel=1
 pkgdesc="FullRiskClient Launcher"
 arch=('x86_64')
