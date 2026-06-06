@@ -264,6 +264,12 @@ interface ThemeState {
   // News section width
   newsSectionWidth: number;
   setNewsSectionWidth: (width: number) => void;
+  // News section height
+  newsSectionHeight: number;
+  setNewsSectionHeight: (height: number) => void;
+  // News section collapsed state
+  newsSectionCollapsed: boolean;
+  setNewsSectionCollapsed: (collapsed: boolean) => void;
   // Featured profile mode
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
@@ -314,6 +320,10 @@ export const useThemeStore = create<ThemeState>()(
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
       newsSectionWidth: 375,
+      // News section height - defaults
+      newsSectionHeight: 520,
+      // News section collapsed state - defaults
+      newsSectionCollapsed: false,
       // Featured profile mode - defaults
       featureMode: false,
       // Language - defaults
@@ -560,6 +570,14 @@ export const useThemeStore = create<ThemeState>()(
       // News section width
       setNewsSectionWidth: (width: number) => {
         set({ newsSectionWidth: width });
+      },
+      // News section height
+      setNewsSectionHeight: (height: number) => {
+        set({ newsSectionHeight: height });
+      },
+      // News section collapsed state
+      setNewsSectionCollapsed: (collapsed: boolean) => {
+        set({ newsSectionCollapsed: collapsed });
       },
 
       // Featured profile mode

@@ -27,11 +27,23 @@ export function NewsSection({ className }: NewsSectionProps) {
   const setNewsSectionWidth = useThemeStore(
     (state) => state.setNewsSectionWidth,
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // persisted collapsed state in theme store
+  const isCollapsed = useThemeStore((state) => state.newsSectionCollapsed);
+  const setIsCollapsed = useThemeStore(
+    (state) => state.setNewsSectionCollapsed,
+  );
   const [isCollapsedHovered, setIsCollapsedHovered] = useState(false);
   const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
   const collapsedSize = isFullRiskStyle ? 58 : 46;
   const effectiveCollapsed = isCollapsed;
+
+  const newsSectionHeight = useThemeStore((state) => state.newsSectionHeight);
+  const setNewsSectionHeight = useThemeStore(
+    (state) => state.setNewsSectionHeight,
+  );
+  const [isVResizing, setIsVResizing] = useState(false);
+  const [startY, setStartY] = useState(0);
+  const [startHeight, setStartHeight] = useState(0);
 
   const { posts, error, setPosts, setError, isCacheValid } = useNewsStore();
 
@@ -61,6 +73,16 @@ export function NewsSection({ className }: NewsSectionProps) {
       e.preventDefault();
     },
     [newsSectionWidth],
+  );
+
+  const handleVResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      setIsVResizing(true);
+      setStartY(e.clientY);
+      setStartHeight(newsSectionHeight);
+      e.preventDefault();
+    },
+    [newsSectionHeight],
   );
 
   const handleResizeEnd = useCallback(() => {
@@ -99,11 +121,43 @@ export function NewsSection({ className }: NewsSectionProps) {
       document.addEventListener("mouseup", handleResizeEnd);
     }
 
+    if (isVResizing) {
+      const handleVMove = (e: MouseEvent) => {
+        if (!isVResizing) return;
+        const deltaY = e.clientY - startY;
+        const newHeight = Math.max(
+          160,
+          Math.min(window.innerHeight - 120, startHeight - deltaY),
+        );
+        setNewsSectionHeight(newHeight);
+      };
+
+      const handleVEnd = () => setIsVResizing(false);
+
+      document.addEventListener("mousemove", handleVMove);
+      document.addEventListener("mouseup", handleVEnd);
+
+      return () => {
+        document.removeEventListener("mousemove", handleResizeMove);
+        document.removeEventListener("mouseup", handleResizeEnd);
+        document.removeEventListener("mousemove", handleVMove);
+        document.removeEventListener("mouseup", handleVEnd);
+      };
+    }
+
     return () => {
       document.removeEventListener("mousemove", handleResizeMove);
       document.removeEventListener("mouseup", handleResizeEnd);
     };
-  }, [handleResizeEnd, handleResizeMove, isResizing]);
+  }, [
+    handleResizeEnd,
+    handleResizeMove,
+    isResizing,
+    isVResizing,
+    startY,
+    startHeight,
+    setNewsSectionHeight,
+  ]);
 
   useEffect(() => {
     if (!isFullRiskStyle) {
@@ -217,11 +271,11 @@ export function NewsSection({ className }: NewsSectionProps) {
         height: effectiveCollapsed
           ? `${collapsedSize}px`
           : isFullRiskStyle
-            ? "min(68vh, 720px)"
+            ? `${newsSectionHeight}px`
             : undefined,
         minHeight: effectiveCollapsed ? `${collapsedSize}px` : undefined,
         maxHeight: effectiveCollapsed ? `${collapsedSize}px` : undefined,
-        borderColor: isFullRiskStyle ? `${accentColor.value}45` : undefined,
+        borderColor: `${accentColor.value}45`,
         borderLeft: undefined,
         borderRight: undefined,
         background: isFullRiskStyle
@@ -240,7 +294,13 @@ export function NewsSection({ className }: NewsSectionProps) {
             ? "width 0.26s ease, height 0.26s ease, transform 0.26s ease, background 0.26s ease, border-color 0.26s ease, opacity 0.26s ease"
             : "width 0.2s ease",
         transformOrigin: isFullRiskStyle ? "bottom right" : undefined,
-        opacity: isFullRiskStyle ? (isThemeTransitioning ? 0.84 : 1) : 1,
+        opacity: effectiveCollapsed
+          ? 0.68
+          : isFullRiskStyle
+            ? isThemeTransitioning
+              ? 0.84
+              : 1
+            : 1,
         transform: isFullRiskStyle
           ? isThemeTransitioning
             ? `${isCollapsed ? "scale(0.98)" : "scale(0.995)"} translateY(2px)`
@@ -250,6 +310,13 @@ export function NewsSection({ className }: NewsSectionProps) {
       onMouseEnter={() => effectiveCollapsed && setIsCollapsedHovered(true)}
       onMouseLeave={() => setIsCollapsedHovered(false)}
     >
+      {/* vertical resize handle (fullrisk only) */}
+      {!effectiveCollapsed && isFullRiskStyle && (
+        <div
+          className="absolute left-0 right-0 top-0 h-2 cursor-ns-resize z-20"
+          onMouseDown={handleVResizeStart}
+        />
+      )}
       {!effectiveCollapsed ? (
         <div
           className={cn(
