@@ -168,9 +168,9 @@ function computeRestPoses(geo: ParsedGeo, negateX: boolean): Map<string, Vec3> {
 
 /**
  * Sample a parsed animation channel at time `t` (seconds), returning the
- * interpolated `[x, y, z]` value. Linear lerp between neighbouring keyframes,
- * clamped at the endpoints. Molang strings are evaluated with `t` substituted
- * into `query.anim_time`.
+ * interpolated `[x, y, z]` value. Honours the per-keyframe lerp mode (linear,
+ * catmullrom, step) between neighbouring keyframes, clamped at the endpoints.
+ * Molang strings are evaluated with `t` substituted into `query.anim_time`.
  *
  * Exposed for `EmotePlayer.getCombinedSnapshots()` so emotes can sample bones
  * without re-implementing the same keyframe walk.
@@ -199,8 +199,24 @@ function sampleVec3(
     if (t >= k0.time && t <= k1.time) {
       const span = k1.time - k0.time;
       const u = span === 0 ? 0 : (t - k0.time) / span;
+
+      if (k0.lerp === "step") {
+        return evalVec3(k0.post, expressionTime);
+      }
+
       const a = evalVec3(k0.post, expressionTime);
       const b = evalVec3(k1.pre, expressionTime);
+
+      if (k0.lerp === "catmullrom" || k1.lerp === "catmullrom") {
+        const p0 = i > 0 ? evalVec3(kf[i - 1].post, expressionTime) : a;
+        const p3 = i + 2 < kf.length ? evalVec3(kf[i + 2].pre, expressionTime) : b;
+        return [
+          catmullRom(p0[0], a[0], b[0], p3[0], u),
+          catmullRom(p0[1], a[1], b[1], p3[1], u),
+          catmullRom(p0[2], a[2], b[2], p3[2], u),
+        ];
+      }
+
       return [
         a[0] + (b[0] - a[0]) * u,
         a[1] + (b[1] - a[1]) * u,
@@ -209,6 +225,24 @@ function sampleVec3(
     }
   }
   return evalVec3(kf[kf.length - 1].post, expressionTime);
+}
+
+function catmullRom(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  u: number
+): number {
+  const u2 = u * u;
+  const u3 = u2 * u;
+  return (
+    0.5 *
+    (2 * p1 +
+      (-p0 + p2) * u +
+      (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 +
+      (-p0 + 3 * p1 - 3 * p2 + p3) * u3)
+  );
 }
 
 function evalVec3(v: Vec3Expr, t: number): Vec3 {
