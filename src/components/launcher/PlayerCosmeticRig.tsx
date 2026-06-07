@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -33,7 +33,7 @@ import {
   useEmote,
 } from "../../lib/cosmetic-renderer/react";
 import type { ResolvedCosmetic } from "../../lib/cosmetics/cosmeticRendererAssets";
-import { useRandomEmote } from "../../hooks/useRandomEmote";
+import { useIdleEmote } from "../../hooks/useIdleEmote";
 
 const STEVE_CENTER_PX = STEVE_HEIGHT_PX / 2;
 const DOWN_SHIFT = 0.18;
@@ -268,7 +268,7 @@ function MountedCosmetic({
     if (state.status !== "ready") return;
     applyCosmeticTransform(state.data);
 
-    const moved: Array<{ parent: THREE.Group; child: THREE.Group }> = [];
+    const moved: Array<{ parent: THREE.Group; child: THREE.Object3D }> = [];
     for (const [name, cosBone] of state.data.tree.bones) {
       if (!name.toLowerCase().startsWith("armor")) continue;
       if (cosBone.children.length === 0) continue;
@@ -342,7 +342,7 @@ interface RigContentProps {
 
 function RigContent({ textureUrl, variant, cosmetics, spinSpeed, dragRef, playerName, iconUrl, iconPlus }: RigContentProps) {
   const spinRef = useRef<THREE.Group>(null);
-  const emoteUrls = useRandomEmote(true);
+  const emoteUrls = useIdleEmote();
 
   const steve = useMemo<Steve>(() => {
     const material = new THREE.MeshStandardMaterial({
@@ -410,6 +410,117 @@ function RigContent({ textureUrl, variant, cosmetics, spinSpeed, dragRef, player
   );
 }
 
+function makeShimmerMaterial(color: THREE.Color): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uRes: { value: new THREE.Vector2(1, 1) },
+      uColor: { value: color.clone() },
+      uOpacity: { value: 1 },
+    },
+    vertexShader: `
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec2 uRes;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      void main() {
+        vec2 p = gl_FragCoord.xy / uRes;
+        float diag = (p.x + p.y) * 0.5;
+        float sweep = fract(uTime * 1.2) * 2.0 - 0.5;
+        float band = smoothstep(0.22, 0.0, abs(diag - sweep));
+        vec3 base = uColor * 0.18;
+        vec3 hi = uColor;
+        gl_FragColor = vec4(mix(base, hi, band), uOpacity);
+      }
+    `,
+    side: THREE.DoubleSide,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+}
+
+const SKELETON_FADE_S = 0.4;
+
+function SkeletonContent({
+  variant,
+  dragRef,
+  hasName,
+  accentColor,
+  fadeOut,
+}: {
+  variant: SteveModelVariant;
+  dragRef: React.MutableRefObject<number>;
+  hasName: boolean;
+  accentColor?: string;
+  fadeOut: boolean;
+}) {
+  const spinRef = useRef<THREE.Group>(null);
+  const dbSize = useRef(new THREE.Vector2());
+  const fadeStart = useRef<number | null>(null);
+
+  const { steve, nametag, material } = useMemo(() => {
+    const color = new THREE.Color().setStyle(accentColor || "#a78bfa");
+    const mat = makeShimmerMaterial(color);
+    const tree = buildBoneTree(steveGeoForVariant(variant), mat, {
+      armorOnly: false,
+    });
+    tree.root.traverse((o) => {
+      o.renderOrder = 998;
+    });
+    const tag = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+    tag.rotation.y = Math.PI;
+    tag.layers.set(NAMETAG_LAYER);
+    tag.scale.set(22, 5, 1);
+    tag.renderOrder = 999;
+    return { steve: { tree }, nametag: { mesh: tag }, material: mat };
+  }, [variant, accentColor]);
+
+  useEffect(() => {
+    return () => {
+      steve.tree.root.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.geometry.dispose();
+      });
+      nametag.mesh.geometry.dispose();
+      material.dispose();
+    };
+  }, [steve, nametag, material]);
+
+  useFrame((st) => {
+    const t = st.clock.elapsedTime;
+    st.gl.getDrawingBufferSize(dbSize.current);
+    material.uniforms.uTime.value = t;
+    material.uniforms.uRes.value.copy(dbSize.current);
+    if (fadeOut) {
+      if (fadeStart.current === null) fadeStart.current = t;
+      material.uniforms.uOpacity.value = Math.max(
+        0,
+        1 - (t - fadeStart.current) / SKELETON_FADE_S
+      );
+    }
+    if (spinRef.current) {
+      spinRef.current.rotation.y = POSE_ROTATION_Y + dragRef.current;
+    }
+  });
+
+  return (
+    <group
+      scale={STEVE_WORLD_SCALE}
+      position={[0, -STEVE_CENTER_PX * STEVE_WORLD_SCALE - DOWN_SHIFT, 0]}
+    >
+      <group ref={spinRef} rotation={[0, POSE_ROTATION_Y, 0]}>
+        <primitive object={steve.tree.root} />
+        {hasName && <primitive object={nametag.mesh} position={[0, NAMETAG_PX_Y, 0]} />}
+      </group>
+    </group>
+  );
+}
+
 function PromoOutline(config: Partial<PromoOutlineConfig>) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -458,6 +569,8 @@ export interface PlayerCosmeticRigProps {
   playerName?: string | null;
   iconUrl?: string | null;
   iconPlus?: boolean;
+  loading?: boolean;
+  accentColor?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -470,6 +583,8 @@ export function PlayerCosmeticRig({
   playerName,
   iconUrl,
   iconPlus,
+  loading = false,
+  accentColor,
   className,
   style,
 }: PlayerCosmeticRigProps) {
@@ -477,6 +592,16 @@ export function PlayerCosmeticRig({
   const dragging = useRef(false);
   const startX = useRef(0);
   const startRot = useRef(0);
+
+  const [skeletonMounted, setSkeletonMounted] = useState(true);
+  useEffect(() => {
+    if (loading) {
+      setSkeletonMounted(true);
+      return;
+    }
+    const id = setTimeout(() => setSkeletonMounted(false), SKELETON_FADE_S * 1000 + 60);
+    return () => clearTimeout(id);
+  }, [loading]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -509,16 +634,27 @@ export function PlayerCosmeticRig({
         <ambientLight intensity={0.85} />
         <hemisphereLight intensity={0.35} />
         <directionalLight position={[3, 3, 2]} intensity={1.1} />
-        <RigContent
-          textureUrl={textureUrl}
-          variant={variant}
-          cosmetics={cosmetics}
-          spinSpeed={spinSpeed}
-          dragRef={dragRef}
-          playerName={playerName}
-          iconUrl={iconUrl}
-          iconPlus={iconPlus}
-        />
+        {!loading && (
+          <RigContent
+            textureUrl={textureUrl}
+            variant={variant}
+            cosmetics={cosmetics}
+            spinSpeed={spinSpeed}
+            dragRef={dragRef}
+            playerName={playerName}
+            iconUrl={iconUrl}
+            iconPlus={iconPlus}
+          />
+        )}
+        {skeletonMounted && (
+          <SkeletonContent
+            variant={variant}
+            dragRef={dragRef}
+            hasName={!!playerName}
+            accentColor={accentColor}
+            fadeOut={!loading}
+          />
+        )}
         <PromoOutline />
       </Canvas>
       <div

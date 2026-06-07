@@ -1,14 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
-import { SkinViewer } from './SkinViewer';
 import { MainLaunchButton } from './MainLaunchButton';
 import { useThemeStore } from '../../store/useThemeStore';
-import { useSkinStore } from '../../store/useSkinStore';
-import { MinecraftSkinService } from '../../services/minecraft-skin-service';
-import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/react';
 // DISABLED: ProfileCardV2 was used for featured profile mode
 // import { ProfileCardV2 } from '../profiles/ProfileCardV2';
@@ -22,8 +17,6 @@ import { useSelectedIcon } from '../../hooks/useSelectedIcon';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-
-const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
 
 // Featured server configuration
 // Option A: profileId = null → uses currently selected profile from MainLaunchButton
@@ -49,6 +42,18 @@ interface PlayerActionsDisplayProps {
   displayMode?: 'playerName' | 'logo';
 }
 
+function useMinLoading(active: boolean, minMs: number): boolean {
+  const [done, setDone] = useState(false);
+  const startRef = useRef(Date.now());
+  useEffect(() => {
+    if (active) return;
+    const remaining = Math.max(0, minMs - (Date.now() - startRef.current));
+    const id = setTimeout(() => setDone(true), remaining);
+    return () => clearTimeout(id);
+  }, [active, minMs]);
+  return active || !done;
+}
+
 export function PlayerActionsDisplay({
   playerName,
   launchButtonDefaultVersion,
@@ -61,8 +66,6 @@ export function PlayerActionsDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
-  const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
-  const skinRevision = useSkinStore((state) => state.skinRevision);
   const navigate = useNavigate();
 
   const { profiles } = useProfileStore();
@@ -97,39 +100,6 @@ export function PlayerActionsDisplay({
     navigate(`/profilesv2/${featuredServerProfileId}`);
   };
 
-  useEffect(() => {
-    const fetchAndSetSkin = async () => {
-      if (playerName) {
-        try {
-          const activeSkin = await MinecraftSkinService.getActiveSkin().catch(() => null);
-          const payload: GetStarlightSkinRenderPayload = {
-            player_name: playerName,
-            render_type: "default",
-            render_view: "full",
-            base64_skin_data: activeSkin?.base64_data ?? null,
-          };
-          console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "custom:", !!activeSkin);
-          const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
-          console.log("[PlayerActionsDisplay] Fetched local path:", localPath);
-          if (localPath) { // Check if path is not empty or null
-            setResolvedSkinUrl(convertFileSrc(localPath));
-          } else {
-            console.warn("[PlayerActionsDisplay] Received empty path from service, using fallback.");
-            setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-          }
-        } catch (error) {
-          console.error("[PlayerActionsDisplay] Failed to fetch starlight skin render:", error);
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL); // Fallback on error
-        }
-      } else {
-        console.log("[PlayerActionsDisplay] No player name, using default fallback skin.");
-        setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-      }
-    };
-
-    fetchAndSetSkin();
-  }, [playerName, skinRevision]);
-
   const dropShadowX = '2px';
   const dropShadowY = '4px';
   const dropShadowBlur = '6px';
@@ -152,9 +122,10 @@ export function PlayerActionsDisplay({
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
 
   const activeAccount = useMinecraftAuthStore((state) => state.activeAccount);
-  const { textureUrl: rigTextureUrl, variant: rigVariant } = useActiveSkinTexture();
-  const { cosmetics: equippedCosmetics } = useEquippedCosmetics(activeAccount?.id);
+  const { textureUrl: rigTextureUrl, variant: rigVariant, loading: skinLoading } = useActiveSkinTexture();
+  const { cosmetics: equippedCosmetics, loading: cosmeticsLoading } = useEquippedCosmetics(activeAccount?.id);
   const selectedIcon = useSelectedIcon(activeAccount?.id);
+  const rigLoading = useMinLoading(skinLoading || cosmeticsLoading, 450);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -169,54 +140,41 @@ export function PlayerActionsDisplay({
             filter: commonDropShadowStyle
           }}
         />
-      ) : rigTextureUrl ? null : (
-        <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
-          {playerName || "no account"}
-        </h2>
-      )}
+      ) : null}
 
       <div className={cn(
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        {rigTextureUrl ? (
-          <div
-            className="relative flex-shrink-0"
+        <div
+          className="relative flex-shrink-0"
+          style={{
+            width: `${skinViewerMaxDisplayWidth}px`,
+            height: `${skinViewerDisplayHeight}px`,
+          }}
+        >
+          <PlayerCosmeticRig
+            textureUrl={rigTextureUrl}
+            variant={rigVariant}
+            cosmetics={equippedCosmetics}
+            playerName={playerName}
+            iconUrl={selectedIcon.url}
+            iconPlus={selectedIcon.plus}
+            loading={rigLoading}
+            accentColor={accentColor.value}
+            className="bg-transparent"
             style={{
-              width: `${skinViewerMaxDisplayWidth}px`,
-              height: `${skinViewerDisplayHeight}px`,
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: `${rigDisplayWidth}px`,
+              height: `${rigDisplayHeight}px`,
+              pointerEvents: "none",
+              filter: skinViewerStyles.filter,
             }}
-          >
-            <PlayerCosmeticRig
-              textureUrl={rigTextureUrl}
-              variant={rigVariant}
-              cosmetics={equippedCosmetics}
-              playerName={playerName}
-              iconUrl={selectedIcon.url}
-              iconPlus={selectedIcon.plus}
-              className="bg-transparent"
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                width: `${rigDisplayWidth}px`,
-                height: `${rigDisplayHeight}px`,
-                pointerEvents: "none",
-                filter: skinViewerStyles.filter,
-              }}
-            />
-          </div>
-        ) : (
-          <SkinViewer
-            skinUrl={resolvedSkinUrl}
-            playerName={playerName?.toString()}
-            width={skinViewerMaxDisplayWidth}
-            height={skinViewerDisplayHeight}
-            className="bg-transparent flex-shrink-0"
-            style={skinViewerStyles}
           />
-        )}
+        </div>
 
         {/* Don't render launch button while profiles are still loading to prevent flicker */}
         {!isLoadingProfiles && (

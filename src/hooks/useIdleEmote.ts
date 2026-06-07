@@ -1,24 +1,28 @@
 import { useEffect, useState } from "react";
 
-import { resolveRandomEmote } from "../lib/cosmetics/cosmeticPack";
+import { resolveEmoteBySlug } from "../lib/cosmetics/cosmeticPack";
 import type { EmoteAssetUrls } from "../lib/cosmetic-renderer/core";
 
-export function useRandomEmote(enabled: boolean): EmoteAssetUrls | null {
+export const IDLE_EMOTE_SLUGS: string[] = [];
+
+export function useIdleEmote(): EmoteAssetUrls | null {
   const [urls, setUrls] = useState<EmoteAssetUrls | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
+    if (IDLE_EMOTE_SLUGS.length === 0) {
       setUrls(null);
       return;
     }
+    const slug =
+      IDLE_EMOTE_SLUGS[Math.floor(Math.random() * IDLE_EMOTE_SLUGS.length)];
     let alive = true;
-    resolveRandomEmote().then((u) => {
+    resolveEmoteBySlug(slug).then((u) => {
       if (alive) setUrls(u);
     });
     return () => {
       alive = false;
     };
-  }, [enabled]);
+  }, []);
 
   return urls;
 }

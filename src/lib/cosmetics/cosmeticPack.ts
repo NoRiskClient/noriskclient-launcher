@@ -92,14 +92,21 @@ function mergeSettings(
   return { ...meta, defaultSettings: ds };
 }
 
-export async function resolveRandomEmote(): Promise<EmoteAssetUrls | null> {
+export async function resolveEmoteBySlug(
+  slug: string
+): Promise<EmoteAssetUrls | null> {
   const { paths } = await loadPackIndex();
-  const animPaths = [...paths].filter((p) =>
-    /\/emotes\/.+\.animation\.json$/.test(p)
-  );
-  if (animPaths.length === 0) return null;
+  const suffix = `/emotes/${slug}.animation.json`;
+  const nestedSuffix = `/emotes/${slug}/${slug}.animation.json`;
+  let pick: string | undefined;
+  for (const p of paths) {
+    if (p.endsWith(suffix) || p.endsWith(nestedSuffix)) {
+      pick = p;
+      break;
+    }
+  }
+  if (!pick) return null;
 
-  const pick = animPaths[Math.floor(Math.random() * animPaths.length)];
   const dir = pick.slice(0, pick.lastIndexOf("/") + 1);
   const base = pick.slice(dir.length, pick.length - ".animation.json".length);
 
