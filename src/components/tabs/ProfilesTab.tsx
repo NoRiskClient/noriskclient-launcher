@@ -23,6 +23,7 @@ import { TabLayout } from "../ui/TabLayout";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ProfileScreenshotModal } from "../profiles/ProfileScreenshotModal";
 import type { ScreenshotInfo as ActualScreenshotInfo } from "../../types/profile";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function ProfilesTab() {
   const { t } = useTranslation();
@@ -344,7 +345,7 @@ export function ProfilesTab() {
         return t('profiles.deleteSuccess');
       },
       error: (err) =>
-        t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+        t('profiles.deleteError', { error: parseErrorMessage(err) }),
     });
   };
 

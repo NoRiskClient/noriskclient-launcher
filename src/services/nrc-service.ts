@@ -8,6 +8,7 @@ import { useProfileStore } from "../store/profile-store";
 import {
   getBlockedModsConfig,
   getPackRolloutConfig,
+  getPackFallbackConfig,
 } from "./flagsmith-service";
 import { refreshPermissions } from "./permission-service";
 import { logInfo, logError } from "../utils/logging-utils";
@@ -76,6 +77,15 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
       })
       .catch((error) => {
         logError(`Failed to load pack rollout config: ${error}`);
+      });
+
+    // Fire and forget: Load pack fallback id from Flagsmith
+    getPackFallbackConfig()
+      .then((config) => {
+        logInfo(`Pack fallback config loaded: ${JSON.stringify(config)}`);
+      })
+      .catch((error) => {
+        logError(`Failed to load pack fallback config: ${error}`);
       });
 
     // Fire and forget: Refresh user permissions from NoRisk backend

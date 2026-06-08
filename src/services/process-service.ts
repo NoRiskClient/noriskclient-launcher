@@ -1,12 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 // Import the actual type with corrected path
 import type { ProcessMetadata, CrashlogDto } from "../types/processState";
+import type { CrashCheckResult } from "../types/crash-analysis";
 import { getLauncherConfig } from "./launcher-config-service";
 import { hasPermission } from "./permission-service";
 import { PERMISSION } from "../constants/permissions";
 import { toast } from "react-hot-toast";
 import { logInfo, logWarn } from "../utils/logging-utils";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
@@ -46,7 +48,7 @@ export async function launch(
     }
   } catch (e) {
     logWarn(
-      `[ProcessService] Failed to check experimental permission: ${e instanceof Error ? e.message : String(e)}`,
+      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
     );
   }
 
@@ -151,15 +153,10 @@ export async function fetchCrashReport(profileId: string, processId?: string, pr
 }
 
 /**
- * Submits a crash log to the backend.
+ * Analyzes a crash log via the backend and returns the launcher-facing verdict.
+ * The backend reports the crash to staff and returns a CrashCheckResult (see types/crash-analysis).
  */
-export async function submitCrashLog(payload: CrashlogDto): Promise<void> {
-  console.debug("[ProcessService] Submitting crash log:", payload);
-  try {
-    await invoke<void>("submit_crash_log_command", { payload });
-    console.log("[ProcessService] Crash log submitted successfully.");
-  } catch (error) {
-    console.error("[ProcessService] Failed to submit crash log:", error);
-    throw error; // Re-throw or handle as needed
-  }
+export async function checkCrashLog(payload: CrashlogDto): Promise<CrashCheckResult> {
+  logInfo(`[ProcessService] Checking crash log: ${payload.mcLogsUrl}`);
+  return invoke<CrashCheckResult>("check_crash_log_command", { payload });
 }

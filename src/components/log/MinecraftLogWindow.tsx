@@ -119,7 +119,12 @@ export function MinecraftLogWindow({
   );
 
   return (
-    <div className="h-screen flex flex-col bg-black/92 text-white">
+    <div
+      className="h-screen flex flex-col"
+      style={{
+        background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
+      }}
+    >
       <LogWindowTitlebar />
 
       <div className="flex-1 flex min-h-0 p-3 gap-3">

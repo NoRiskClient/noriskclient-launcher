@@ -18,6 +18,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
 import { useTranslation } from "react-i18next";
 import { useLaunchStateStore } from "../../store/launch-state-store";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ProfileCardProps {
   profile: Profile;
@@ -168,7 +169,7 @@ export function ProfileCard({
               return `Profile '${newName}' cloned successfully!`;
             },
             error: (err) =>
-              `Failed to clone profile: ${err instanceof Error ? err.message : String(err.message)}`,
+              `Failed to clone profile: ${parseErrorMessage(err)}`,
           })
           .finally(() => {
             setIsCloning(false);
@@ -205,7 +206,7 @@ export function ProfileCard({
       loading: `Opening folder for '${profile.name}'...`,
       success: `Successfully opened folder for '${profile.name}'!`,
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         if (
           message.toLowerCase().includes("not found") ||
           message.toLowerCase().includes("does not exist")
@@ -279,7 +280,7 @@ export function ProfileCard({
       loading: `Repairing profile '${profile.name}'...`,
       success: `Profile '${profile.name}' repaired successfully!`,
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         return `Failed to repair profile: ${message}`;
       },
     });

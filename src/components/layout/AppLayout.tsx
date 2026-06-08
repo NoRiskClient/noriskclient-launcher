@@ -54,6 +54,7 @@ import { ColorPicker } from "../ColorPicker";
 import { RangeSlider } from ".././ui/RangeSlider";
 import { Button } from "../ui/buttons/Button";
 import { ThemeSelector } from "../ThemeSelector";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 const appConfig = {
   version: "v0.5.22",
@@ -758,9 +759,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
         loading: t("header.update.downloading"),
         success: t("header.update.success"),
         error: (err) =>
-          t("header.update.failed", {
-            error: err instanceof Error ? err.message : String(err),
-          }),
+          t("header.update.failed", { error: parseErrorMessage(err) }),
       });
     } catch (error) {
       console.error("Failed to download and install update:", error);

@@ -7,7 +7,7 @@ import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { gsap } from "gsap";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { PlayerHead } from "../common/PlayerHead";
 
 interface CurrentAccountDisplayProps {
   onClick?: () => void;
@@ -27,12 +27,6 @@ export function CurrentAccountDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const avatarUrl = useCrafatarAvatar({
-    uuid: activeAccount?.id,
-    size: 28,
-    overlay: true,
-  });
-
   useEffect(() => {
     if (buttonRef.current) {
       gsap.fromTo(
@@ -227,27 +221,13 @@ export function CurrentAccountDisplay({
           backgroundColor: `${accentColor.value}20`,
         }}
       >
-        {avatarUrl ? (
-          <img
-            src={avatarUrl || "/placeholder.svg"}
-            alt={`${username}'s avatar`}
-            className="w-full h-full object-cover pixelated"
-            style={{ imageRendering: 'pixelated' }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-              const fallback = target.nextElementSibling as HTMLElement;
-              if (fallback) fallback.style.display = "flex";
-            }}
-          />
-        ) : null}
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-white font-minecraft text-xs ${
-            avatarUrl ? "hidden" : ""
-          }`}
-        >
-          {username.charAt(0).toUpperCase()}
-        </span>
+        <PlayerHead
+          uuid={activeAccount.id}
+          username={username}
+          size={64}
+          fill
+          className="text-xs"
+        />
       </div>
 
       {!compact && (

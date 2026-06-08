@@ -109,6 +109,16 @@ pub async fn install_minecraft_version(
     let is_experimental_mode = state.config_manager.is_experimental_mode().await;
     let launcher_config = state.config_manager.get_config().await;
 
+    if let Err(e) = state
+        .profile_manager
+        .resolve_and_migrate_pack_id(profile.id)
+        .await
+    {
+        warn!("[PackFallback] Pack migration check failed for profile {}: {}.", profile.id, e);
+    }
+    let profile_owned = state.profile_manager.get_profile(profile.id).await?;
+    let profile = &profile_owned;
+
     info!(
         "[Launch] Setting experimental mode: {}",
         is_experimental_mode

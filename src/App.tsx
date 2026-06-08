@@ -47,10 +47,12 @@ import { Button } from "./components/ui/buttons/Button";
 import { openExternalUrl } from "./services/tauri-service";
 import { ExternalLink } from "lucide-react";
 import { MinecraftAuthService } from "./services/minecraft-auth-service";
+import { LauncherNoticeBanner } from "./components/ui/LauncherNoticeBanner";
 import ChildProtectionModal from "./components/modals/ChildProtectionModal";
 import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
+import { useSkinStore } from "./store/useSkinStore";
 import {
   hasPermission,
   refreshPermissions,
@@ -153,6 +155,13 @@ export function App() {
     const unlisten = listen<FrontendEventPayload>(
       "state_event",
       (event: TauriEvent<FrontendEventPayload>) => {
+        if (
+          event.payload.event_type === FrontendEventType.MinecraftSkinChanged
+        ) {
+          console.log("[App.tsx] Global MinecraftSkinChanged event");
+          useSkinStore.getState().bumpSkinRevision();
+          return;
+        }
         if (
           event.payload.event_type === FrontendEventType.MinecraftProcessExited
         ) {
@@ -598,6 +607,7 @@ export function App() {
         <ThemeInitializer />
         <ScrollbarProvider />
         <GlobalToaster />
+        <LauncherNoticeBanner />
         <GlobalCrashReportModal />
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
         <GlobalModalPortal />

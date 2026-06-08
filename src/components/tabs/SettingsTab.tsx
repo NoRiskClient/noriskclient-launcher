@@ -45,6 +45,7 @@ import { useTranslation } from "react-i18next";
 import { LANGUAGE_OPTIONS } from "../../i18n";
 import type { SupportedLanguage } from "../../i18n";
 import { setDiscordState } from "../../utils/discordRpc";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function SettingsTab() {
   const { t } = useTranslation();
@@ -228,7 +229,7 @@ export function SettingsTab() {
       setTempConfig({ ...configWithHooks });
     } catch (err) {
       console.error("Failed to load launcher config:", err);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(parseErrorMessage(err));
       setConfig(null);
       setTempConfig(null);
     } finally {
@@ -257,7 +258,7 @@ export function SettingsTab() {
         });
       } catch (err) {
         console.error("Failed to auto-save configuration:", err);
-        const errorMessage = err instanceof Error ? err.message : String(err);
+        const errorMessage = parseErrorMessage(err);
         toast.error(
           t("settings.toast.auto_save_failed", { error: errorMessage }),
         );
@@ -1424,7 +1425,9 @@ export function SettingsTab() {
               } catch (err) {
                 console.error("Failed to open launcher directory:", err);
                 toast.error(
-                  t("settings.open_directory.error", { error: String(err) }),
+                  t("settings.open_directory.error", {
+                    error: parseErrorMessage(err),
+                  }),
                 );
               }
             }}

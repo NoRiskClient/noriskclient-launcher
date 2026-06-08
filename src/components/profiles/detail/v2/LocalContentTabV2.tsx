@@ -61,6 +61,7 @@ import { ActionButton } from "../../../ui/ActionButton"; // Added for custom upd
 import { ModUpdateText, useModUpdateText } from "../../../ui/ModUpdateText"; // Added for formatted update text
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
 import { parseMotdToHtml } from "../../../../utils/motd-utils";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 /**
  * Determines if a given version is the currently installed version for an item
@@ -430,7 +431,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       } catch (err) {
         console.error("Failed to update selected NoRisk pack:", err);
         toast.error(
-          `Failed to switch NoRisk pack: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to switch NoRisk pack: ${parseErrorMessage(err)}`,
         );
       }
     },
@@ -515,7 +516,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             importError,
           );
           toast.error(
-            t('content.toast.import_failed', { itemType: itemTypeNamePlural.toLowerCase(), error: importError instanceof Error ? importError.message : String(importError) }),
+            t('content.toast.import_failed', { itemType: itemTypeNamePlural.toLowerCase(), error: parseErrorMessage(importError) }),
             { id: toastId },
           );
         }
@@ -525,7 +526,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
     } catch (dialogError) {
       console.error("Error opening file dialog:", dialogError);
       toast.error(
-        t('content.toast.dialog_error', { error: dialogError instanceof Error ? dialogError.message : String(dialogError) }),
+        t('content.toast.dialog_error', { error: parseErrorMessage(dialogError) }),
       );
     }
   };
@@ -1648,7 +1649,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
               return t('content.toast.clone_success', { name: newName }); // Toast for cloning success
             },
             error: (err) =>
-              t('content.toast.clone_failed', { error: err instanceof Error ? err.message : String(err.message) }),
+              t('content.toast.clone_failed', { error: parseErrorMessage(err) }),
           });
         }
       } catch (err) {

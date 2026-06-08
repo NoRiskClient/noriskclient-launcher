@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
-import type { MinecraftVersion, VersionManifest } from "../../../types/minecraft";
+import type {
+  MinecraftVersion,
+  VersionManifest,
+} from "../../../types/minecraft";
 import type { ModLoader } from "../../../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 import { Modal } from "../../ui/Modal";
@@ -20,19 +23,28 @@ import { uploadProfileImages } from "../../../services/profile-service";
 import { toast } from "react-hot-toast";
 import { Tooltip } from "../../ui/Tooltip";
 import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
-import { extractNrcCompatibility, type NrcCompatibilityData } from "../../../utils/nrc-compatibility";
+import {
+  extractNrcCompatibility,
+  type NrcCompatibilityData,
+} from "../../../utils/nrc-compatibility";
 import { useTranslation } from "react-i18next";
 import * as ProfileService from "../../../services/profile-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 function NrcCompatibleTooltipContent() {
   const { t } = useTranslation();
   return (
     <div className="space-y-2">
-      <div className="text-sm text-white">{t('profiles.wizard.nrcCompatible')}</div>
+      <div className="text-sm text-white">
+        {t("profiles.wizard.nrcCompatible")}
+      </div>
       <div className="flex items-start gap-2">
-        <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
+        <Icon
+          icon="solar:lightbulb-bold"
+          className="text-yellow-400 text-base flex-shrink-0"
+        />
         <div className="text-gray-300 text-xs italic">
-          {t('profiles.wizard.nrcFeaturesAvailable')}
+          {t("profiles.wizard.nrcFeaturesAvailable")}
         </div>
       </div>
     </div>
@@ -45,33 +57,44 @@ interface ProfileWizardV2Props {
   defaultGroup?: string | null;
 }
 
-export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizardV2Props) {
+export function ProfileWizardV2({
+  onClose,
+  onSave,
+  defaultGroup,
+}: ProfileWizardV2Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Step 1 data
-  const [minecraftVersions, setMinecraftVersions] = useState<MinecraftVersion[]>([]);
+  const [minecraftVersions, setMinecraftVersions] = useState<
+    MinecraftVersion[]
+  >([]);
   const [selectedVersion, setSelectedVersion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedVersionType, setSelectedVersionType] = useState<"release" | "snapshot" | "default">("release");
+  const [selectedVersionType, setSelectedVersionType] = useState<
+    "release" | "snapshot" | "default"
+  >("release");
   const [defaultProfiles, setDefaultProfiles] = useState<any[]>([]);
-  
+
   // Step 2 data
   const [selectedLoader, setSelectedLoader] = useState<ModLoader>("fabric");
-  const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<string | null>(null);
+  const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<
+    string | null
+  >(null);
 
   // NRC compatibility data
-  const [nrcCompatibility, setNrcCompatibility] = useState<NrcCompatibilityData | null>(null);
+  const [nrcCompatibility, setNrcCompatibility] =
+    useState<NrcCompatibilityData | null>(null);
 
   useEffect(() => {
     const loadMinecraftVersions = async () => {
       setLoading(true);
       setShowLoadingIndicator(false);
-      
+
       // Show loading indicator only after 800ms delay
       const loadingTimeout = setTimeout(() => {
         if (loading) {
@@ -80,16 +103,20 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
       }, 800);
 
       try {
-        const manifest = await invoke<VersionManifest>("get_minecraft_versions");
+        const manifest = await invoke<VersionManifest>(
+          "get_minecraft_versions",
+        );
         setMinecraftVersions(manifest.versions);
-        
+
         // Auto-select latest release
-        const latestRelease = manifest.versions.find(v => v.type === "release");
+        const latestRelease = manifest.versions.find(
+          (v) => v.type === "release",
+        );
         if (latestRelease) {
           setSelectedVersion(latestRelease.id);
         }
       } catch (err) {
-        setError(t('profiles.wizard.loadVersionsError'));
+        setError(t("profiles.wizard.loadVersionsError"));
         console.error("Failed to load Minecraft versions:", err);
       } finally {
         clearTimeout(loadingTimeout);
@@ -112,7 +139,9 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
   useEffect(() => {
     const loadNrcCompatibility = async () => {
       try {
-        const packsConfig = await invoke<NoriskModpacksConfig>("get_norisk_packs_resolved");
+        const packsConfig = await invoke<NoriskModpacksConfig>(
+          "get_norisk_packs_resolved",
+        );
         setNrcCompatibility(extractNrcCompatibility(packsConfig));
       } catch (err) {
         console.error("Failed to load NRC compatibility:", err);
@@ -121,24 +150,23 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     loadNrcCompatibility();
   }, []);
 
-  const filteredVersions = minecraftVersions
-    .filter(version => {
-      // Release shows all non-snapshot versions (release, alpha, etc.)
-      // Snapshot shows only snapshot versions
-      if (selectedVersionType === "default") {
-        return false;
-      }
-      if (selectedVersionType === "release" && version.type === "snapshot") {
-        return false;
-      }
-      if (selectedVersionType === "snapshot" && version.type !== "snapshot") {
-        return false;
-      }
-      if (searchQuery) {
-        return version.id.toLowerCase().includes(searchQuery.toLowerCase());
-      }
-      return true;
-    });
+  const filteredVersions = minecraftVersions.filter((version) => {
+    // Release shows all non-snapshot versions (release, alpha, etc.)
+    // Snapshot shows only snapshot versions
+    if (selectedVersionType === "default") {
+      return false;
+    }
+    if (selectedVersionType === "release" && version.type === "snapshot") {
+      return false;
+    }
+    if (selectedVersionType === "snapshot" && version.type !== "snapshot") {
+      return false;
+    }
+    if (searchQuery) {
+      return version.id.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
 
   const handleStep1Next = () => {
     if (selectedVersion) {
@@ -179,7 +207,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
       // Update profile with additional settings
       const updateData: any = {};
-      
+
       if (profileData.group) {
         updateData.group = profileData.group;
       }
@@ -188,8 +216,8 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
       updateData.settings = {
         memory: {
           min: 1024, // Default minimum
-          max: profileData.memoryMaxMb
-        }
+          max: profileData.memoryMaxMb,
+        },
       };
 
       if (Object.keys(updateData).length > 0) {
@@ -208,15 +236,19 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         console.warn("Failed to apply profile icon:", iconErr);
       }
 
-      const createdProfile = await useProfileStore.getState().getProfile(profileId);
+      const createdProfile = await useProfileStore
+        .getState()
+        .getProfile(profileId);
       onSave(createdProfile);
       return createdProfile;
     };
 
     return toast.promise(creationPromise(), {
-      loading: t('profiles.wizard.creatingProfile'),
-      success: (createdProfile) => t('profiles.wizard.createSuccess', { name: createdProfile.name }),
-      error: (err) => t('profiles.wizard.createError', { error: err instanceof Error ? err.message : String(err) }),
+      loading: t("profiles.wizard.creatingProfile"),
+      success: (createdProfile) =>
+        t("profiles.wizard.createSuccess", { name: createdProfile.name }),
+      error: (err) =>
+        t("profiles.wizard.createError", { error: parseErrorMessage(err) }),
     });
   };
 
@@ -232,8 +264,13 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     if (showLoadingIndicator) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white animate-spin mb-4" />
-          <p className="text-xl font-minecraft text-white lowercase">{t('profiles.wizard.loadingVersions')}</p>
+          <Icon
+            icon="solar:refresh-bold"
+            className="w-12 h-12 text-white animate-spin mb-4"
+          />
+          <p className="text-xl font-minecraft text-white lowercase">
+            {t("profiles.wizard.loadingVersions")}
+          </p>
         </div>
       );
     }
@@ -243,10 +280,18 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         <div className="space-y-4">
           <div className="flex justify-end gap-2">
             {[
-              { key: "release", label: t('profiles.wizard.release'), icon: "solar:star-bold" },
-              { key: "snapshot", label: t('profiles.wizard.snapshot'), icon: "solar:test-tube-bold" },
-              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" }
-            ].map(type => (
+              {
+                key: "release",
+                label: t("profiles.wizard.release"),
+                icon: "solar:star-bold",
+              },
+              {
+                key: "snapshot",
+                label: t("profiles.wizard.snapshot"),
+                icon: "solar:test-tube-bold",
+              },
+              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" },
+            ].map((type) => (
               <Button
                 key={type.key}
                 variant={selectedVersionType === type.key ? "flat" : "ghost"}
@@ -267,14 +312,19 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
                   await toast.promise(ProfileService.restoreDefaultProfiles(), {
                     loading: "Restoring default profiles...",
                     success: "Default profiles restored",
-                    error: (err) => err instanceof Error ? err.message : String(err),
+                    error: (err) =>
+                      err instanceof Error ? err.message : String(err),
                   });
                   await useProfileStore.getState().fetchProfiles();
                   onClose();
                 }}
               >
-                <div className="font-minecraft text-2xl text-white lowercase">{profile.name}</div>
-                <div className="font-minecraft-ten text-white/60">{profile.game_version} · {profile.loader}</div>
+                <div className="font-minecraft text-2xl text-white lowercase">
+                  {profile.name}
+                </div>
+                <div className="font-minecraft-ten text-white/60">
+                  {profile.game_version} · {profile.loader}
+                </div>
               </Card>
             ))}
           </div>
@@ -296,7 +346,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
           <SearchWithFilters
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
-            placeholder={t('profiles.wizard.searchVersions')}
+            placeholder={t("profiles.wizard.searchVersions")}
             showSort={false}
             showFilter={false}
             className="flex-1"
@@ -304,10 +354,18 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
           <div className="flex gap-2">
             {[
-              { key: "release", label: t('profiles.wizard.release'), icon: "solar:star-bold" },
-              { key: "snapshot", label: t('profiles.wizard.snapshot'), icon: "solar:test-tube-bold" },
-              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" }
-            ].map(type => (
+              {
+                key: "release",
+                label: t("profiles.wizard.release"),
+                icon: "solar:star-bold",
+              },
+              {
+                key: "snapshot",
+                label: t("profiles.wizard.snapshot"),
+                icon: "solar:test-tube-bold",
+              },
+              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" },
+            ].map((type) => (
               <Button
                 key={type.key}
                 variant={selectedVersionType === type.key ? "flat" : "ghost"}
@@ -323,8 +381,10 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
         {/* Version List */}
         <div className="max-h-96 overflow-y-auto overflow-x-hidden scrollbar-hide grid grid-cols-3 gap-3">
-          {filteredVersions.map(version => {
-            const isNrcCompatible = nrcCompatibility?.compatibleVersions.has(version.id);
+          {filteredVersions.map((version) => {
+            const isNrcCompatible = nrcCompatibility?.compatibleVersions.has(
+              version.id,
+            );
 
             return (
               <div
@@ -334,10 +394,14 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
                     ? "border-current bg-current/10 hover:bg-current/15"
                     : "border-transparent bg-black/20 hover:bg-black/30"
                 }`}
-                style={selectedVersion === version.id ? {
-                  borderColor: accentColor.value,
-                  color: accentColor.value
-                } : {}}
+                style={
+                  selectedVersion === version.id
+                    ? {
+                        borderColor: accentColor.value,
+                        color: accentColor.value,
+                      }
+                    : {}
+                }
                 onClick={() => setSelectedVersion(version.id)}
               >
                 {/* NRC Compatibility Star */}
@@ -345,7 +409,10 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
                   <div className="absolute top-2 right-2 z-10">
                     <Tooltip content={<NrcCompatibleTooltipContent />}>
                       <div className="flex items-center justify-center w-6 h-6 rounded-full">
-                        <Icon icon="solar:star-bold" className="w-4 h-4 text-yellow-400" />
+                        <Icon
+                          icon="solar:star-bold"
+                          className="w-4 h-4 text-yellow-400"
+                        />
                       </div>
                     </Tooltip>
                   </div>
@@ -365,8 +432,13 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
 
         {filteredVersions.length === 0 && !loading && (
           <div className="col-span-3 text-center py-8">
-            <Icon icon="solar:magnifer-bold" className="w-12 h-12 text-white/50 mx-auto mb-2" />
-            <p className="text-lg font-minecraft text-white/70 lowercase">{t('profiles.wizard.noVersionsFound')}</p>
+            <Icon
+              icon="solar:magnifer-bold"
+              className="w-12 h-12 text-white/50 mx-auto mb-2"
+            />
+            <p className="text-lg font-minecraft text-white/70 lowercase">
+              {t("profiles.wizard.noVersionsFound")}
+            </p>
           </div>
         )}
       </div>
@@ -384,7 +456,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
         iconPosition="right"
       >
-        {t('profiles.wizard.next')}
+        {t("profiles.wizard.next")}
       </Button>
     </div>
   );
@@ -420,14 +492,12 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
   // Default: Show Step 1
   return (
     <Modal
-      title={t('profiles.wizard.step1Title')}
+      title={t("profiles.wizard.step1Title")}
       onClose={onClose}
       width="lg"
       footer={renderFooter()}
     >
-      <div className="min-h-[500px] p-6">
-        {renderContent()}
-      </div>
+      <div className="min-h-[500px] p-6">{renderContent()}</div>
     </Modal>
   );
-} 
+}

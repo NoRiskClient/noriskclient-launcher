@@ -378,9 +378,11 @@ pub async fn github_auth_unlink() -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), CommandError> {
+pub async fn check_crash_log_command(
+    payload: CrashlogDto,
+) -> Result<serde_json::Value, CommandError> {
     debug!(
-        "Executing submit_crash_log_command with payload: {:?}",
+        "Executing check_crash_log_command with payload: {:?}",
         payload
     );
     let state = State::get().await?;
@@ -391,25 +393,20 @@ pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), Comman
         .get_active_account()
         .await?
         .ok_or(AppError::AccountError(
-            "No active account found for submitting crash log.".to_string(),
+            "No active account found for checking crash log.".to_string(),
         ))?;
 
     let norisk_creds = &selected_account_arc.norisk_credentials;
     let token = norisk_creds.get_token_for_mode(is_experimental)?;
 
-    debug!(
-        "Submitting crash log for account {} (experimental: {}).",
-        selected_account_arc.id, is_experimental
-    );
-
-    NoRiskApi::submit_crash_log(
+    let result = NoRiskApi::check_crash_log(
         &token,
         &payload,
         &selected_account_arc.id.to_string(),
         is_experimental,
     )
     .await?;
-    Ok(())
+    Ok(result)
 }
 
 #[tauri::command]

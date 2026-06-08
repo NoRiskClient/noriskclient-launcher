@@ -7,10 +7,10 @@
  * Note: The 'Crashed' state includes an error message.
  */
 export type ProcessState =
-  | 'Starting'
-  | 'Running'
-  | 'Stopping'
-  | 'Stopped'
+  | "Starting"
+  | "Running"
+  | "Stopping"
+  | "Stopped"
   | { Crashed: string };
 
 /**
@@ -33,6 +33,16 @@ export interface ProcessMetadata {
   profile_image_url?: string | null;
   memory_max_mb: number; // u32 - Max RAM allocated for the process
   log_session_id?: string | null;
+  mods?: CrashModInfo[];
+}
+
+export interface CrashModInfo {
+  id: string;
+  name?: string | null;
+  version?: string | null;
+  source?: string | null;
+  enabled: boolean;
+  norisk: boolean;
 }
 
 /**

@@ -26,7 +26,7 @@ import { Tooltip } from "../ui/Tooltip";
 import UnifiedService from "../../services/unified-service";
 import { useProfileStore } from "../../store/profile-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
@@ -129,7 +129,7 @@ export function ProfileCardV2({
     : null;
 
   // Load preferred account avatar
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });
@@ -350,9 +350,11 @@ export function ProfileCardV2({
         const result = await toast.promise(shareProfile(profile, 24), {
           loading: "Creating share code...",
           success: (share) => `Share code: ${share.code}`,
-          error: (err) => err instanceof Error ? err.message : String(err),
+          error: (err) => (err instanceof Error ? err.message : String(err)),
         });
-        await navigator.clipboard?.writeText(result.code).catch(() => undefined);
+        await navigator.clipboard
+          ?.writeText(result.code)
+          .catch(() => undefined);
       },
     },
     {
@@ -860,8 +862,7 @@ export function ProfileCardV2({
                         className={`${isCompact ? "w-4 h-4" : "w-5 h-5"} rounded-sm pixelated flex-shrink-0`}
                         style={{ imageRendering: "pixelated" }}
                         onError={(e) => {
-                          e.currentTarget.src =
-                            "https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true";
+                          e.currentTarget.style.display = "none";
                         }}
                       />
                     )}
@@ -1076,8 +1077,7 @@ export function ProfileCardV2({
                     className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
                     style={{ imageRendering: "pixelated" }}
                     onError={(e) => {
-                      e.currentTarget.src =
-                        "https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true";
+                      e.currentTarget.style.display = "none";
                     }}
                   />
                 )}

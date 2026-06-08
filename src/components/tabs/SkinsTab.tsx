@@ -26,6 +26,7 @@ import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 const SkinPreview = memo(
   ({
@@ -413,10 +414,7 @@ export function SkinsTab() {
     setLoading(true);
 
     try {
-      const data = await MinecraftSkinService.getUserSkinData(
-        activeAccount.id,
-        activeAccount.access_token,
-      );
+      const data = await MinecraftSkinService.getUserSkinData();
       setSkinData(data);
 
       if (data?.properties) {
@@ -443,7 +441,7 @@ export function SkinsTab() {
       }
     } catch (err) {
       console.error("Error loading skin data:", err);
-      toast.error(err instanceof Error ? err.message : String(err.message));
+      toast.error(parseErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -468,7 +466,7 @@ export function SkinsTab() {
       setLocalSkinsLoading(false);
     } catch (err) {
       console.error("Error loading local skins:", err);
-      setLocalSkinsError(err instanceof Error ? err.message : String(err));
+      setLocalSkinsError(parseErrorMessage(err));
       setLocalSkinsLoading(false);
     }
   }, [selectedSkinId]);
@@ -530,7 +528,7 @@ export function SkinsTab() {
       }
     } catch (err) {
       console.error("Error updating skin properties:", err);
-      toast.error(err instanceof Error ? err.message : String(err.message));
+      toast.error(parseErrorMessage(err));
     }
   };
 
@@ -553,8 +551,7 @@ export function SkinsTab() {
       hideModal("add-skin-modal");
     } catch (err) {
       console.error("Error adding new skin:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : String(err.message);
+      const errorMessage = parseErrorMessage(err);
       toast.error(t("skins.failedToAddSkin", { error: errorMessage }));
     }
   };
@@ -586,7 +583,7 @@ export function SkinsTab() {
         },
         error: (err) => {
           console.error("Error deleting skin:", err);
-          return err instanceof Error ? err.message : String(err.message);
+          return parseErrorMessage(err);
         },
       },
       {
@@ -612,8 +609,6 @@ export function SkinsTab() {
 
     try {
       await MinecraftSkinService.applySkinFromBase64(
-        activeAccount.id,
-        activeAccount.access_token,
         skin.base64_data,
         skin.variant,
         skin.name,
@@ -628,7 +623,7 @@ export function SkinsTab() {
       await loadSkinData();
     } catch (err) {
       console.error("Error applying local skin:", err);
-      toast.error(err instanceof Error ? err.message : String(err.message));
+      toast.error(parseErrorMessage(err));
     } finally {
       setLoading(false);
     }
