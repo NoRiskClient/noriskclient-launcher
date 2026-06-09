@@ -381,6 +381,11 @@ async fn main() {
                     utils::log_archive::cleanup_oversized_logs().await;
                 });
 
+                // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
+                tauri::async_runtime::spawn(async {
+                    utils::mod_cache_cleanup::run_startup_cleanup().await;
+                });
+
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
@@ -509,6 +514,8 @@ async fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
+            utils::mod_cache_cleanup::clean_mod_cache_command,
             create_profile,
             get_profile,
             update_profile,
