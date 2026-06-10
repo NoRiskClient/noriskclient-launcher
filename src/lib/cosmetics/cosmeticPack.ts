@@ -3,7 +3,7 @@ import type { ResolvedCosmetic } from "./cosmeticRendererAssets";
 import type {
   ParticleAssetEntry,
   EmoteAssetUrls,
-} from "../cosmetic-renderer/core";
+} from "nrc-skin-renderer/core";
 
 const PACK = "norisk-prod";
 const INDEX_URL = `https://api.norisk.gg/api/v1/launcher/pack/${PACK}`;

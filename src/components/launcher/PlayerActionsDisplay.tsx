@@ -10,10 +10,11 @@ import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
 import { useProfileStore } from '../../store/profile-store';
 import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
-import { PlayerCosmeticRig } from './PlayerCosmeticRig';
+import { SkinRenderer } from 'nrc-skin-renderer/react';
 import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useSelectedIcon } from '../../hooks/useSelectedIcon';
+import { useIdleEmote } from '../../hooks/useIdleEmote';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -125,7 +126,17 @@ export function PlayerActionsDisplay({
   const { textureUrl: rigTextureUrl, variant: rigVariant, loading: skinLoading } = useActiveSkinTexture();
   const { cosmetics: equippedCosmetics, loading: cosmeticsLoading } = useEquippedCosmetics(activeAccount?.id);
   const selectedIcon = useSelectedIcon(activeAccount?.id);
+  const idleEmote = useIdleEmote();
   const rigLoading = useMinLoading(skinLoading || cosmeticsLoading, 450);
+  const rigCosmetics = React.useMemo(
+    () =>
+      equippedCosmetics.map((c) => ({
+        id: c.cosmeticId,
+        type: c.type,
+        urls: c.urls,
+      })),
+    [equippedCosmetics],
+  );
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -153,15 +164,14 @@ export function PlayerActionsDisplay({
             height: `${skinViewerDisplayHeight}px`,
           }}
         >
-          <PlayerCosmeticRig
+          <SkinRenderer
             textureUrl={rigTextureUrl}
             variant={rigVariant}
-            cosmetics={equippedCosmetics}
-            playerName={playerName}
-            iconUrl={selectedIcon.url}
-            iconPlus={selectedIcon.plus}
+            cosmetics={rigCosmetics}
+            emote={idleEmote}
+            nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
             loading={rigLoading}
-            accentColor={accentColor.value}
+            skeletonColor={accentColor.value}
             className="bg-transparent"
             style={{
               position: "absolute",
