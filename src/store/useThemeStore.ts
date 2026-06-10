@@ -235,11 +235,12 @@ interface ThemeState {
   // ProfilesTabV2 persistent filters
   profilesTabActiveGroup: string;
   profilesTabSortBy: string;
-  profilesTabVersionFilter: string;
+  profilesTabVersionFilters: string[];
   profilesTabLayoutMode: "list" | "grid" | "compact";
   setProfilesTabActiveGroup: (group: string) => void;
   setProfilesTabSortBy: (sortBy: string) => void;
-  setProfilesTabVersionFilter: (filter: string) => void;
+  setProfilesTabVersionFilters: (filters: string[]) => void;
+  toggleProfilesTabVersionFilter: (version: string) => void;
   setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => void;
   // Global context menu management
   openContextMenuId: string | null;
@@ -286,7 +287,7 @@ export const useThemeStore = create<ThemeState>()(
       // ProfilesTabV2 persistent filters - defaults
       profilesTabActiveGroup: "all",
       profilesTabSortBy: "last_played",
-      profilesTabVersionFilter: "all",
+      profilesTabVersionFilters: [],
       profilesTabLayoutMode: "list",
       // Global context menu management - defaults
       openContextMenuId: null,
@@ -469,8 +470,20 @@ export const useThemeStore = create<ThemeState>()(
         set({ profilesTabSortBy: sortBy });
       },
 
-      setProfilesTabVersionFilter: (filter: string) => {
-        set({ profilesTabVersionFilter: filter });
+      setProfilesTabVersionFilters: (filters: string[]) => {
+        set({ profilesTabVersionFilters: filters });
+      },
+
+      toggleProfilesTabVersionFilter: (version: string) => {
+        set((state) => {
+          const current = Array.isArray(state.profilesTabVersionFilters)
+            ? state.profilesTabVersionFilters
+            : [];
+          const next = current.includes(version)
+            ? current.filter((v) => v !== version)
+            : [...current, version];
+          return { profilesTabVersionFilters: next };
+        });
       },
 
       setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => {
@@ -554,6 +567,11 @@ export const useThemeStore = create<ThemeState>()(
           // Ensure collapsedProfileGroups exists after rehydrate
           if (!Array.isArray(state.collapsedProfileGroups)) {
             state.collapsedProfileGroups = [];
+          }
+
+          // Migration: version filter went from single string to multi-select array
+          if (!Array.isArray(state.profilesTabVersionFilters)) {
+            state.profilesTabVersionFilters = [];
           }
 
           // Ensure analytics consent state exists for existing users
