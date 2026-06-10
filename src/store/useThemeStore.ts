@@ -251,7 +251,7 @@ interface ThemeState {
   // News section width
   newsSectionWidth: number;
   setNewsSectionWidth: (width: number) => void;
-  // Featured profile mode
+  // Featured HugoSMP card on Play tab
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
   // Language
@@ -295,7 +295,7 @@ export const useThemeStore = create<ThemeState>()(
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
       newsSectionWidth: 375,
-      // Featured profile mode - defaults
+      // Featured HugoSMP card - defaults
       featureMode: false,
       // Language - defaults
       language: "en" as SupportedLanguage,
@@ -505,7 +505,7 @@ export const useThemeStore = create<ThemeState>()(
         set({ newsSectionWidth: width });
       },
 
-      // Featured profile mode
+      // Featured HugoSMP card
       setFeatureMode: (enabled: boolean) => {
         set({ featureMode: enabled });
       },
@@ -573,6 +573,14 @@ export const useThemeStore = create<ThemeState>()(
           if (!Array.isArray(state.profilesTabVersionFilters)) {
             state.profilesTabVersionFilters = [];
           }
+
+          const legacyFeaturedLaunchMode = (state as { featuredLaunchMode?: string }).featuredLaunchMode;
+          if (legacyFeaturedLaunchMode === "hugo") {
+            state.featureMode = true;
+          } else if (legacyFeaturedLaunchMode) {
+            state.featureMode = false;
+          }
+          delete (state as { featuredLaunchMode?: string }).featuredLaunchMode;
 
           // Ensure analytics consent state exists for existing users
           if (!state.analyticsConsent) {

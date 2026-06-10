@@ -10,23 +10,28 @@ import { MinecraftSkinService } from '../../services/minecraft-skin-service';
 import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/react';
-// DISABLED: ProfileCardV2 was used for featured profile mode
-// import { ProfileCardV2 } from '../profiles/ProfileCardV2';
 import { ServerLaunchCard } from './ServerLaunchCard';
-import { useProfileStore } from '../../store/profile-store';
+import { useProfileLaunch } from '../../hooks/useProfileLaunch';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { StaticTooltip } from '../ui/Tooltip';
+import { toast } from 'sonner';
+import { isWorldCupEventActive } from '../../data/worldcup-event';
 
-const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
+const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
 
-// Featured server configuration
-// Option A: profileId = null → uses currently selected profile from MainLaunchButton
-// Option B: profileId = "uuid" → uses dedicated profile for this server
 const FEATURED_SERVER = {
   address: "hugosmp.net",
   name: "HUGOSMP.net",
-  profileId: null as string | null, // TODO: Set dedicated profile ID for Option B
+  profileId: null as string | null,
+};
+
+const WM_PUBLIC_VIEWING = {
+  address: FEATURED_SERVER.address,
+  iconSrc: "/worldcup/football.png",
+  gameVersion: "1.21.11",
+  pack: "norisk-prod",
+  loader: "fabric",
 };
 
 interface PlayerActionsDisplayProps {
@@ -42,6 +47,26 @@ interface PlayerActionsDisplayProps {
   }>;
   className?: string;
   displayMode?: 'playerName' | 'logo';
+}
+
+function FeaturedPromoIcon({ src, alt, size = "md" }: { src: string; alt: string; size?: "sm" | "md" | "lg" }) {
+  const [failed, setFailed] = useState(false);
+  const sizeClass =
+    size === "lg" ? "w-7 h-7" : size === "sm" ? "w-4 h-4" : "w-5 h-5";
+
+  if (failed) {
+    return <Icon icon="noto:soccer-ball" className={cn(sizeClass, "shrink-0")} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn(sizeClass, "shrink-0 object-contain")}
+      style={{ imageRendering: "pixelated" }}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 export function PlayerActionsDisplay({
@@ -60,36 +85,55 @@ export function PlayerActionsDisplay({
   const skinRevision = useSkinStore((state) => state.skinRevision);
   const navigate = useNavigate();
 
-  const { profiles } = useProfileStore();
+  const isLoadingProfiles = launchButtonVersions.length === 0;
+  const isFeaturedMode = featureMode;
 
-  // Determine if we're still loading profiles (no profiles loaded yet)
-  const isLoadingProfiles = profiles.length === 0;
-
-  // Get the profile ID to use for featured server launch
-  // Option A: Use currently selected profile from MainLaunchButton
-  // Option B: Use dedicated profile ID if configured
   const getFeaturedServerProfileId = (): string | null => {
-    // Option B: If dedicated profile ID is set, use it
     if (FEATURED_SERVER.profileId) {
       return FEATURED_SERVER.profileId;
     }
 
-    // Option A: Use currently selected profile from MainLaunchButton
     const selectedVersion = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion);
     return selectedVersion?.profileId || null;
   };
 
   const featuredServerProfileId = getFeaturedServerProfileId();
 
-  // Handle mods button for featured server
+  const {
+    isLaunching: isWmLaunching,
+    handleQuickPlayLaunch,
+  } = useProfileLaunch({
+    profileId: featuredServerProfileId || "",
+  });
+
   const handleFeaturedServerMods = () => {
     if (!featuredServerProfileId) {
       toast.error(t('profiles.errors.no_profile_selected'));
       return;
     }
 
-    // Navigate to profile detail view (which has mods tab)
     navigate(`/profilesv2/${featuredServerProfileId}`);
+  };
+
+  const handleTopToggle = () => {
+    setFeatureMode(!featureMode);
+  };
+
+  const handleWmLaunch = () => {
+    if (!featuredServerProfileId) {
+      toast.error(t('profiles.errors.no_profile_selected'));
+      return;
+    }
+
+    handleQuickPlayLaunch(
+      undefined,
+      WM_PUBLIC_VIEWING.address,
+      {
+        game_version: WM_PUBLIC_VIEWING.gameVersion,
+        loader: WM_PUBLIC_VIEWING.loader,
+        pack: WM_PUBLIC_VIEWING.pack,
+      },
+    );
   };
 
   useEffect(() => {
@@ -103,21 +147,17 @@ export function PlayerActionsDisplay({
             render_view: "full",
             base64_skin_data: activeSkin?.base64_data ?? null,
           };
-          console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "custom:", !!activeSkin);
           const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
-          console.log("[PlayerActionsDisplay] Fetched local path:", localPath);
-          if (localPath) { // Check if path is not empty or null
+          if (localPath) {
             setResolvedSkinUrl(convertFileSrc(localPath));
           } else {
-            console.warn("[PlayerActionsDisplay] Received empty path from service, using fallback.");
             setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
           }
         } catch (error) {
           console.error("[PlayerActionsDisplay] Failed to fetch starlight skin render:", error);
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL); // Fallback on error
+          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
         }
       } else {
-        console.log("[PlayerActionsDisplay] No player name, using default fallback skin.");
         setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
       }
     };
@@ -142,6 +182,13 @@ export function PlayerActionsDisplay({
   };
 
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
+
+  const topToggleLabel = featureMode
+    ? t('wm.switch_to_main')
+    : FEATURED_SERVER.name.toLowerCase();
+
+  const isWmDisabled = !featuredServerProfileId;
+  const showWorldCupPromo = isWorldCupEventActive();
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -175,24 +222,29 @@ export function PlayerActionsDisplay({
           style={skinViewerStyles}
         />
 
-        {/* Don't render launch button while profiles are still loading to prevent flicker */}
         {!isLoadingProfiles && (
-          <>
-            {/* Featured Server Toggle - above the launch button */}
-            <div
-              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
-            >
+          <div
+            className={cn(
+              "absolute left-0 right-0 flex flex-col items-center px-4 z-30 transition-all duration-300",
+              isFeaturedMode ? "bottom-2" : "bottom-0"
+            )}
+          >
+            <div className="mb-3">
               <button
-                onClick={() => setFeatureMode(!featureMode)}
+                onClick={handleTopToggle}
                 className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
-                title={featureMode ? "Switch to Main Launch" : `Switch to ${FEATURED_SERVER.name}`}
+                title={
+                  featureMode
+                    ? t('wm.switch_to_main')
+                    : t('wm.switch_to_hugo', { server: FEATURED_SERVER.name })
+                }
               >
-                {featureMode ? "switch to main launch" : FEATURED_SERVER.name.toLowerCase()}
+                {topToggleLabel}
               </button>
             </div>
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
+
+            <div className="flex flex-col items-center gap-3">
               {featureMode ? (
-                // Show featured server card with MOTD
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}
                   serverName={FEATURED_SERVER.name}
@@ -212,10 +264,57 @@ export function PlayerActionsDisplay({
                   />
                 </div>
               )}
+
+              {!featureMode && showWorldCupPromo && (
+                <StaticTooltip
+                  content={t('wm.tooltip', {
+                    version: WM_PUBLIC_VIEWING.gameVersion,
+                    server: FEATURED_SERVER.address,
+                  })}
+                  delay={200}
+                >
+                  <button
+                    type="button"
+                    onClick={handleWmLaunch}
+                    disabled={isWmDisabled || isWmLaunching}
+                    className={cn(
+                      "group flex items-center gap-3 px-5 py-2.5 rounded-md backdrop-blur-md transition-all duration-200 border hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]",
+                      isWmDisabled || isWmLaunching
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer",
+                    )}
+                    style={{
+                      backgroundColor: isWmLaunching ? '#ef444430' : `${accentColor.value}30`,
+                      borderColor: isWmLaunching ? '#ef444480' : `${accentColor.value}80`,
+                      boxShadow: `0 3px 0 rgba(0,0,0,0.3), 0 0 12px ${accentColor.value}30`,
+                    }}
+                  >
+                    {isWmLaunching ? (
+                      <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white/80 animate-spin shrink-0" />
+                    ) : (
+                      <FeaturedPromoIcon
+                        src={WM_PUBLIC_VIEWING.iconSrc}
+                        alt=""
+                        size="lg"
+                      />
+                    )}
+                    <span
+                      className="font-minecraft text-2xl lowercase text-white/90 tracking-wide group-hover:text-white"
+                      style={{
+                        textShadow: `1px 1px 0 rgba(0,0,0,0.5), 0 0 8px ${accentColor.value}60`,
+                      }}
+                    >
+                      {isWmLaunching
+                        ? t('server.stop').toLowerCase()
+                        : t('wm.public_viewing').toLowerCase()}
+                    </span>
+                  </button>
+                </StaticTooltip>
+              )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
   );
-} 
+}

@@ -837,6 +837,11 @@
   "server.join": "Join",
   "server.mods": "Mods",
 
+  "wm.public_viewing": "WM Public Viewing",
+  "wm.tooltip": "Experience the World Cup public viewing on HugoSMP! Play Minecraft {{version}} and join {{server}}.",
+  "wm.switch_to_main": "switch to main launch",
+  "wm.switch_to_hugo": "Switch to {{server}}",
+
   "radius.title": "Border Radius",
   "radius.square": "Square",
   "radius.minimal": "Minimal",
