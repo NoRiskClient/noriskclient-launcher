@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { EmoteAssetUrls } from "../lib/cosmetic-renderer/core";
+import type { EmoteAssetUrls } from "nrc-skin-renderer/core";
 
 const CALM_IDLES = [
   "/emotes/launcheridle.animation.json",
