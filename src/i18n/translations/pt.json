@@ -892,6 +892,12 @@
   "server.stop": "Parar",
   "server.join": "Entrar",
   "server.mods": "Mods",
+
+  "wm.public_viewing": "Public Viewing da Copa",
+  "wm.tooltip": "Public viewing da Copa do Mundo no HugoSMP.net! Você precisa da {{version}}!",
+  "wm.switch_to_main": "voltar ao início principal",
+  "wm.switch_to_hugo": "Mudar para {{server}}",
+
   "radius.title": "Raio da Borda",
   "radius.square": "Quadrado",
   "radius.minimal": "Mínimo",

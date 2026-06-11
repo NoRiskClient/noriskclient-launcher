@@ -781,6 +781,12 @@
   "server.stop": "रोकें",
   "server.join": "जुड़ें",
   "server.mods": "Mods",
+
+  "wm.public_viewing": "वर्ल्ड कप पब्लिक व्यूइंग",
+  "wm.tooltip": "HugoSMP.net पर वर्ल्ड कप पब्लिक व्यूइंग! आपको {{version}} चाहिए!",
+  "wm.switch_to_main": "मुख्य लॉन्च पर लौटें",
+  "wm.switch_to_hugo": "{{server}} पर जाएं",
+
   "radius.title": "बॉर्डर रेडियस",
   "radius.square": "वर्गाकार",
   "radius.minimal": "न्यूनतम",

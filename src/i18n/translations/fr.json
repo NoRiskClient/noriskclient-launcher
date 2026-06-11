@@ -772,6 +772,12 @@
   "server.stop": "Arrêter",
   "server.join": "Rejoindre",
   "server.mods": "Mods",
+
+  "wm.public_viewing": "Public Viewing Coupe du Monde",
+  "wm.tooltip": "Public viewing de la Coupe du Monde sur HugoSMP.net ! Tu as besoin de la {{version}} !",
+  "wm.switch_to_main": "revenir au lancement principal",
+  "wm.switch_to_hugo": "Passer à {{server}}",
+
   "radius.title": "Rayon des Bordures",
   "radius.square": "Carré",
   "radius.minimal": "Minimal",
