@@ -892,6 +892,12 @@
   "server.stop": "Стоп",
   "server.join": "Войти",
   "server.mods": "Моды",
+
+  "wm.public_viewing": "Просмотр ЧМ",
+  "wm.tooltip": "Совместный просмотр ЧМ на HugoSMP.net! Нужна {{version}}!",
+  "wm.switch_to_main": "вернуться к обычному запуску",
+  "wm.switch_to_hugo": "Переключиться на {{server}}",
+
   "radius.title": "Радиус скругления",
   "radius.square": "Квадратный",
   "radius.minimal": "Минимальный",

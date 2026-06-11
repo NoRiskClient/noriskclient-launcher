@@ -838,7 +838,7 @@
   "server.mods": "Mods",
 
   "wm.public_viewing": "WM Public Viewing",
-  "wm.tooltip": "Experience the World Cup public viewing on HugoSMP! Play Minecraft {{version}} and join {{server}}.",
+  "wm.tooltip": "World Cup public viewing on HugoSMP.net! You need {{version}}!",
   "wm.switch_to_main": "switch to main launch",
   "wm.switch_to_hugo": "Switch to {{server}}",
 

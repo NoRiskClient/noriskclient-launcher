@@ -11,18 +11,18 @@ import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
-import { useProfileLaunch } from '../../hooks/useProfileLaunch';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StaticTooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 import { isWorldCupEventActive } from '../../data/worldcup-event';
+import type { LaunchOverrides } from '../../services/process-service';
 
 const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
 
 const FEATURED_SERVER = {
   address: "hugosmp.net",
-  name: "HUGOSMP.net",
+  name: "HugoSMP.net",
   profileId: null as string | null,
 };
 
@@ -86,7 +86,6 @@ export function PlayerActionsDisplay({
   const navigate = useNavigate();
 
   const isLoadingProfiles = launchButtonVersions.length === 0;
-  const isFeaturedMode = featureMode;
 
   const getFeaturedServerProfileId = (): string | null => {
     if (FEATURED_SERVER.profileId) {
@@ -99,13 +98,6 @@ export function PlayerActionsDisplay({
 
   const featuredServerProfileId = getFeaturedServerProfileId();
 
-  const {
-    isLaunching: isWmLaunching,
-    handleQuickPlayLaunch,
-  } = useProfileLaunch({
-    profileId: featuredServerProfileId || "",
-  });
-
   const handleFeaturedServerMods = () => {
     if (!featuredServerProfileId) {
       toast.error(t('profiles.errors.no_profile_selected'));
@@ -117,23 +109,6 @@ export function PlayerActionsDisplay({
 
   const handleTopToggle = () => {
     setFeatureMode(!featureMode);
-  };
-
-  const handleWmLaunch = () => {
-    if (!featuredServerProfileId) {
-      toast.error(t('profiles.errors.no_profile_selected'));
-      return;
-    }
-
-    handleQuickPlayLaunch(
-      undefined,
-      WM_PUBLIC_VIEWING.address,
-      {
-        game_version: WM_PUBLIC_VIEWING.gameVersion,
-        loader: WM_PUBLIC_VIEWING.loader,
-        pack: WM_PUBLIC_VIEWING.pack,
-      },
-    );
   };
 
   useEffect(() => {
@@ -183,12 +158,14 @@ export function PlayerActionsDisplay({
 
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
 
-  const topToggleLabel = featureMode
-    ? t('wm.switch_to_main')
-    : FEATURED_SERVER.name.toLowerCase();
-
-  const isWmDisabled = !featuredServerProfileId;
-  const showWorldCupPromo = isWorldCupEventActive();
+  const worldCupActive = isWorldCupEventActive();
+  const featuredLaunchOverrides: LaunchOverrides | undefined = worldCupActive
+    ? {
+        game_version: WM_PUBLIC_VIEWING.gameVersion,
+        loader: WM_PUBLIC_VIEWING.loader,
+        pack: WM_PUBLIC_VIEWING.pack,
+      }
+    : undefined;
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -223,33 +200,53 @@ export function PlayerActionsDisplay({
         />
 
         {!isLoadingProfiles && (
-          <div
-            className={cn(
-              "absolute left-0 right-0 flex flex-col items-center px-4 z-30 transition-all duration-300",
-              isFeaturedMode ? "bottom-2" : "bottom-0"
-            )}
-          >
-            <div className="mb-3">
-              <button
-                onClick={handleTopToggle}
-                className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
-                title={
-                  featureMode
+          <>
+            {/* Featured Server Toggle - above the launch button */}
+            <div
+              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
+            >
+              {!featureMode && worldCupActive ? (
+                <StaticTooltip
+                  content={t('wm.tooltip', {
+                    version: WM_PUBLIC_VIEWING.gameVersion,
+                    server: FEATURED_SERVER.address,
+                  })}
+                  delay={200}
+                >
+                  <button
+                    onClick={handleTopToggle}
+                    className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FeaturedPromoIcon src={WM_PUBLIC_VIEWING.iconSrc} alt="" size="md" />
+                      {t('wm.public_viewing').toLowerCase()}
+                    </span>
+                  </button>
+                </StaticTooltip>
+              ) : (
+                <button
+                  onClick={handleTopToggle}
+                  className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  title={
+                    featureMode
+                      ? t('wm.switch_to_main')
+                      : t('wm.switch_to_hugo', { server: FEATURED_SERVER.name })
+                  }
+                >
+                  {featureMode
                     ? t('wm.switch_to_main')
-                    : t('wm.switch_to_hugo', { server: FEATURED_SERVER.name })
-                }
-              >
-                {topToggleLabel}
-              </button>
+                    : FEATURED_SERVER.name.toLowerCase()}
+                </button>
+              )}
             </div>
-
-            <div className="flex flex-col items-center gap-3">
+            <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
               {featureMode ? (
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}
                   serverName={FEATURED_SERVER.name}
                   profileId={featuredServerProfileId}
                   onMods={handleFeaturedServerMods}
+                  launchOverrides={featuredLaunchOverrides}
                 />
               ) : (
                 <div className="max-w-xs sm:max-w-sm">
@@ -264,55 +261,8 @@ export function PlayerActionsDisplay({
                   />
                 </div>
               )}
-
-              {!featureMode && showWorldCupPromo && (
-                <StaticTooltip
-                  content={t('wm.tooltip', {
-                    version: WM_PUBLIC_VIEWING.gameVersion,
-                    server: FEATURED_SERVER.address,
-                  })}
-                  delay={200}
-                >
-                  <button
-                    type="button"
-                    onClick={handleWmLaunch}
-                    disabled={isWmDisabled || isWmLaunching}
-                    className={cn(
-                      "group flex items-center gap-3 px-5 py-2.5 rounded-md backdrop-blur-md transition-all duration-200 border hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]",
-                      isWmDisabled || isWmLaunching
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer",
-                    )}
-                    style={{
-                      backgroundColor: isWmLaunching ? '#ef444430' : `${accentColor.value}30`,
-                      borderColor: isWmLaunching ? '#ef444480' : `${accentColor.value}80`,
-                      boxShadow: `0 3px 0 rgba(0,0,0,0.3), 0 0 12px ${accentColor.value}30`,
-                    }}
-                  >
-                    {isWmLaunching ? (
-                      <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white/80 animate-spin shrink-0" />
-                    ) : (
-                      <FeaturedPromoIcon
-                        src={WM_PUBLIC_VIEWING.iconSrc}
-                        alt=""
-                        size="lg"
-                      />
-                    )}
-                    <span
-                      className="font-minecraft text-2xl lowercase text-white/90 tracking-wide group-hover:text-white"
-                      style={{
-                        textShadow: `1px 1px 0 rgba(0,0,0,0.5), 0 0 8px ${accentColor.value}60`,
-                      }}
-                    >
-                      {isWmLaunching
-                        ? t('server.stop').toLowerCase()
-                        : t('wm.public_viewing').toLowerCase()}
-                    </span>
-                  </button>
-                </StaticTooltip>
-              )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

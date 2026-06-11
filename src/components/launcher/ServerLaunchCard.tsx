@@ -9,6 +9,7 @@ import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 import { LaunchState } from "../../store/launch-state-store";
 import type { ServerPingInfo } from "../../types/minecraft";
+import type { LaunchOverrides } from "../../services/process-service";
 
 interface ServerLaunchCardProps {
   serverAddress: string;
@@ -16,6 +17,8 @@ interface ServerLaunchCardProps {
   profileId: string | null;
   onMods?: () => void;
   className?: string;
+  /** Runtime launch overrides (version/loader/pack), not persisted. */
+  launchOverrides?: LaunchOverrides;
 }
 
 export function ServerLaunchCard({
@@ -24,6 +27,7 @@ export function ServerLaunchCard({
   profileId,
   onMods,
   className = "",
+  launchOverrides,
 }: ServerLaunchCardProps) {
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
@@ -100,7 +104,7 @@ export function ServerLaunchCard({
 
   const handleClick = () => {
     if (!profileId) return;
-    handleQuickPlayLaunch(undefined, serverAddress);
+    handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
   };
 
   const motdHtml = serverInfo?.description_json
@@ -143,7 +147,7 @@ export function ServerLaunchCard({
     return (
       <>
         <div
-          className="text-sm motd-container font-minecraft-ten w-full whitespace-pre-wrap"
+          className="text-xs leading-tight motd-container font-minecraft-ten w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
           style={{ textShadow: '2px 2px 0px rgba(0, 0, 0, 0.4)' }}
           title={serverInfo?.description || serverAddress}
         >
@@ -226,7 +230,7 @@ export function ServerLaunchCard({
           onClick={(e) => {
             e.stopPropagation();
             if (isDisabled) return;
-            handleQuickPlayLaunch(undefined, serverAddress);
+            handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
           }}
           disabled={isDisabled}
           className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95"

@@ -772,6 +772,12 @@
   "server.stop": "Ferma",
   "server.join": "Unisciti",
   "server.mods": "Mod",
+
+  "wm.public_viewing": "Public Viewing Mondiali",
+  "wm.tooltip": "Public viewing dei Mondiali su HugoSMP.net! Ti serve la {{version}}!",
+  "wm.switch_to_main": "torna all'avvio principale",
+  "wm.switch_to_hugo": "Passa a {{server}}",
+
   "radius.title": "Raggio bordi",
   "radius.square": "Quadrato",
   "radius.minimal": "Minimo",
