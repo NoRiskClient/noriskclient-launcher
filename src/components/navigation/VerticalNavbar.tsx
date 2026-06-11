@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 interface NavItem {
   id: string;
   icon: string;
+  imageSrc?: string;
   label: string;
   action?: () => void;
 }
@@ -118,6 +119,38 @@ export function VerticalNavbar({
     setShowTooltip(null);
   };
 
+  const mainItems = items.filter((item) => item.id !== "settings");
+  const bottomItems = items.filter((item) => item.id === "settings");
+  const renderNavItem = (item: NavItem) => (
+    <div
+      key={item.id}
+      className="relative group nav-item"
+      ref={(el) => (buttonRefs.current[item.id] = el)}
+    >
+      <NavButton
+        icon={
+          item.imageSrc ? (
+            <span className="w-9 h-9 overflow-hidden rounded-lg flex items-center justify-center">
+              <img
+                src={item.imageSrc}
+                alt=""
+                className={`w-9 h-9 object-cover ${item.id === "ai" ? "scale-[3]" : ""}`}
+                draggable={false}
+              />
+            </span>
+          ) : (
+            <Icon icon={item.icon} className="w-8 h-8" />
+          )
+        }
+        isActive={active === item.id}
+        onClick={() => handleItemClick(item.id)}
+        onMouseEnter={() => handleMouseEnter(item.id)}
+        onMouseLeave={handleMouseLeave}
+        aria-label={item.label}
+      />
+    </div>
+  );
+
   return (
     <>
       <div
@@ -137,22 +170,11 @@ export function VerticalNavbar({
         </div>
 
         <div className="flex-1 flex flex-col items-center space-y-4 min-h-[400px]">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="relative group nav-item"
-              ref={(el) => (buttonRefs.current[item.id] = el)}
-            >
-              <NavButton
-                icon={<Icon icon={item.icon} className="w-8 h-8" />}
-                isActive={active === item.id}
-                onClick={() => handleItemClick(item.id)}
-                onMouseEnter={() => handleMouseEnter(item.id)}
-                onMouseLeave={handleMouseLeave}
-                aria-label={item.label}
-              />
-            </div>
-          ))}
+          {mainItems.map(renderNavItem)}
+        </div>
+
+        <div className="mt-auto flex flex-col items-center space-y-4 pt-4">
+          {bottomItems.map(renderNavItem)}
         </div>
       </div>      {isMounted &&
         showTooltip &&

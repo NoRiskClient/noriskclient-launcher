@@ -16,6 +16,8 @@ import { DropdownHeader } from "../ui/./dropdown/DropdownHeader";
 import { DropdownFooter } from "../ui/./dropdown/DropdownFooter";
 import { useThemeStore } from "../../store/useThemeStore";
 import { invoke } from "@tauri-apps/api/core";
+import { LocalServerService } from "../../services/local-server-service";
+import type { BedrockInstance } from "../../types/localServer";
 
 interface RunningInstancesIndicatorProps {
   className?: string;
@@ -26,6 +28,7 @@ export function RunningInstancesIndicator({
 }: RunningInstancesIndicatorProps) {
   const { t } = useTranslation();
   const [processes, setProcesses] = useState<ProcessMetadata[]>([]);
+  const [bedrockInstances, setBedrockInstances] = useState<BedrockInstance[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -40,12 +43,17 @@ export function RunningInstancesIndicator({
   const fetchProcesses = useCallback(async () => {
     setError(null);
     try {
-      const fetchedProcesses = await ProcessService.getRunningProcesses();
+      const [fetchedProcesses, fetchedBedrockInstances] = await Promise.all([
+        ProcessService.getRunningProcesses(),
+        LocalServerService.listBedrockInstances().catch(() => []),
+      ]);
       setProcesses(fetchedProcesses);
+      setBedrockInstances(fetchedBedrockInstances);
     } catch (err) {
       setError(t('instances.fetch_failed'));
       console.error(err);
       setProcesses([]);
+      setBedrockInstances([]);
     } finally {
       if (isLoading) setIsLoading(false);
     }
@@ -55,9 +63,12 @@ export function RunningInstancesIndicator({
     fetchProcesses();
 
     const intervalId = setInterval(fetchProcesses, 5000);
+    const refreshBedrock = () => void fetchProcesses();
+    window.addEventListener("nrc-bedrock-instance-changed", refreshBedrock);
 
     return () => {
       clearInterval(intervalId);
+      window.removeEventListener("nrc-bedrock-instance-changed", refreshBedrock);
     };
   }, [fetchProcesses]);
 
@@ -113,10 +124,14 @@ export function RunningInstancesIndicator({
       for (const process of processes) {
         await ProcessService.stopProcess(process.id);
       }
+      for (const instance of bedrockInstances) {
+        await LocalServerService.stopBedrockInstance(instance.pid);
+      }
       console.log("[RunningInstancesIndicator] Stop all processes initiated.");
       setProcesses((prevProcesses) =>
         prevProcesses.filter((p) => !idsToStop.includes(p.id)),
       );
+      setBedrockInstances([]);
       handleCloseDropdown();
     } catch (err) {
       console.error(
@@ -135,7 +150,19 @@ export function RunningInstancesIndicator({
     }
   };
 
-  const instanceCount = processes.length;
+  const handleStopBedrock = async (instance: BedrockInstance, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStoppingId(instance.id);
+    try {
+      await LocalServerService.stopBedrockInstance(instance.pid);
+      setBedrockInstances((current) => current.filter((item) => item.id !== instance.id));
+    } finally {
+      setStoppingId(null);
+      setTimeout(() => void fetchProcesses(), 500);
+    }
+  };
+
+  const instanceCount = processes.length + bedrockInstances.length;
   const hasInstances = instanceCount > 0;
 
   return (
@@ -144,7 +171,7 @@ export function RunningInstancesIndicator({
         <Button
           variant={hasInstances ? "success" : "flat"}
           size="sm"
-          onClick={handleOpenLogWindow}
+          onClick={handleToggleDropdown}
           icon={<Icon icon="solar:monitor-bold" className="w-4 h-4" />}
           className="h-10"
         >
@@ -172,7 +199,7 @@ export function RunningInstancesIndicator({
         </DropdownHeader>
 
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-          {isLoading && processes.length === 0 ? (
+          {isLoading && instanceCount === 0 ? (
             <div className="p-6 text-center">
               <Icon
                 icon="solar:spinner-bold"
@@ -192,7 +219,7 @@ export function RunningInstancesIndicator({
                 Error: {error}
               </p>
             </div>
-          ) : processes.length === 0 ? (
+          ) : instanceCount === 0 ? (
             <div className="p-6 text-center">
               <Icon
                 icon="solar:monitor-slash-bold"
@@ -335,13 +362,32 @@ export function RunningInstancesIndicator({
                   </div>
                 </div>
               ))}
+              {bedrockInstances.map((instance) => (
+                <div key={instance.id} className="px-4 py-3 hover:bg-white/10 transition-colors duration-200 border-t border-white/5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center text-white/65 shrink-0">
+                        <Icon icon="solar:box-bold" className="w-7 h-7" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xl font-minecraft text-white truncate leading-none">{instance.name}</p>
+                        <div className="mt-1 flex items-center gap-2 font-minecraft-ten text-[9px] text-white/45">
+                          <span>{instance.target === "preview" ? "Preview" : "Release"}</span>
+                          <span>{timeAgo(instance.startedAt * 1000)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <IconButton onClick={(event) => void handleStopBedrock(instance, event)} disabled={stoppingId === instance.id} variant="destructive" size="xs" className="h-8 w-8 p-1.5 bg-white/10 hover:bg-white/20 hover:text-red-400 ring-1 ring-red-500" icon={<Icon icon={stoppingId === instance.id ? "solar:spinner-bold" : "solar:stop-bold"} className={`w-4 h-4 ${stoppingId === instance.id ? "animate-spin" : ""}`} />} aria-label={t('instances.stop_process')} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         <DropdownFooter>
           <div className="flex items-center justify-between w-full">
-            {processes.length > 0 ? (
+            {instanceCount > 0 ? (
               <Label
                 variant="success"
                 size="xs"
@@ -349,7 +395,7 @@ export function RunningInstancesIndicator({
                   <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
                 }
               >
-                {t('instances.count_running', { count: processes.length })}
+                {t('instances.count_running', { count: instanceCount })}
               </Label>
             ) : (
               <span className="text-white/40 text-xs font-minecraft">
@@ -367,7 +413,7 @@ export function RunningInstancesIndicator({
               >
                 {t('instances.logs')}
               </Button>
-              {processes.length > 0 && (
+              {instanceCount > 0 && (
                 <Button
                   variant="destructive"
                   size="xs"

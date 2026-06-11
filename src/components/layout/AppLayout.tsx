@@ -71,9 +71,11 @@ export function AppLayout({
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
-    { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
+    { id: "servers", icon: "solar:server-square-bold", label: t("nav.servers") },
+    { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    { id: "ai", icon: "solar:robot-bold", imageSrc: "/NRclientaisymbol.png", label: t("nav.ai") },
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings") },
@@ -338,6 +340,7 @@ export function AppLayout({
           minimizeRef={minimizeRef}
           maximizeRef={maximizeRef}
           closeRef={closeRef}
+          onNavChange={onNavChange}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -395,9 +398,10 @@ interface HeaderBarProps {
   minimizeRef: React.RefObject<HTMLDivElement>;
   maximizeRef: React.RefObject<HTMLDivElement>;
   closeRef: React.RefObject<HTMLDivElement>;
+  onNavChange: (tabId: string) => void;
 }
 
-function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
+function HeaderBar({ minimizeRef, maximizeRef, closeRef, onNavChange }: HeaderBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -537,7 +541,15 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <UserProfileBar />
+        <UserProfileBar
+          onOpenServers={(serverId) => {
+            if (serverId) {
+              localStorage.setItem("nrc-open-server-id", serverId);
+              window.dispatchEvent(new CustomEvent("nrc-open-server", { detail: serverId }));
+            }
+            onNavChange("servers");
+          }}
+        />
 
         <WindowControls
           minimizeRef={minimizeRef}

@@ -466,6 +466,11 @@ pub async fn reset_mobile_app_token() -> Result<String, CommandError> {
 pub async fn check_update_available_command(app: AppHandle) -> Result<Option<crate::utils::updater_utils::UpdateInfo>, CommandError> {
     debug!("Executing check_update_available_command");
 
+    if custom_update_lock_exists() {
+        info!("Skipping official update check because nrc-disable-updates.flag exists next to the app executable.");
+        return Ok(None);
+    }
+
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;
     let is_beta_channel = config.check_beta_channel;
@@ -478,6 +483,12 @@ pub async fn check_update_available_command(app: AppHandle) -> Result<Option<cra
 pub async fn download_and_install_update_command(app: AppHandle) -> Result<(), CommandError> {
     debug!("Executing download_and_install_update_command");
 
+    if custom_update_lock_exists() {
+        return Err(CommandError::from(AppError::Other(
+            "Offizielle Updates sind für diesen Custom-Build deaktiviert, damit die Server-Features nicht überschrieben werden.".to_string(),
+        )));
+    }
+
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;
     let is_beta_channel = config.check_beta_channel;
@@ -485,6 +496,13 @@ pub async fn download_and_install_update_command(app: AppHandle) -> Result<(), C
     debug!("Using beta channel setting from config: {}", is_beta_channel);
     updater_utils::download_and_install_update(&app, is_beta_channel).await?;
     Ok(())
+}
+
+fn custom_update_lock_exists() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.join("nrc-disable-updates.flag")))
+        .is_some_and(|path| path.exists())
 }
 
 #[tauri::command]

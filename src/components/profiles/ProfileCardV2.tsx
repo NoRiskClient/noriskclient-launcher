@@ -25,6 +25,7 @@ import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { useResolvedLoaderVersion } from "../../hooks/useResolvedLoaderVersion";
+import { LocalServerService } from "../../services/local-server-service";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -71,6 +72,7 @@ export function ProfileCardV2({
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
   const [modsButtonHovered, setModsButtonHovered] = useState(false);
+  const [serverButtonHovered, setServerButtonHovered] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
   
@@ -97,6 +99,24 @@ export function ProfileCardV2({
   const { showModal, hideModal } = useGlobalModal();
 
   const resolvedLoaderVersion = useResolvedLoaderVersion(profile);
+
+  const createServerFromProfile = async (event?: React.MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    const created = await toast.promise(
+      LocalServerService.createServerFromProfile(profile.id),
+      {
+        loading: "Server wird aus Profil erstellt...",
+        success: "Server mit Profil-Inhalten erstellt",
+        error: (error) => error.message ?? String(error),
+      },
+    );
+
+    localStorage.setItem("nrc-open-server-id", created.id);
+    window.dispatchEvent(new CustomEvent("nrc-open-server", { detail: created.id }));
+    navigate("/servers");
+  };
 
   // Get accounts from Minecraft Auth Store
   const accounts = useMinecraftAuthStore((state) => state.accounts);
@@ -399,6 +419,14 @@ export function ProfileCardV2({
       },
     },
     {
+      id: "server",
+      label: "SERVER",
+      icon: "solar:server-square-bold",
+      variant: "icon-only",
+      tooltip: "Als lokalen Server erstellen",
+      onClick: (_profile, e) => createServerFromProfile(e),
+    },
+    {
       id: "settings",
       label: "SETTINGS",
       icon: "solar:settings-bold",
@@ -497,7 +525,7 @@ export function ProfileCardV2({
           </div>
         )}
 
-        <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
+        <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur-sm`}>
           {variant === "default" && (
             <button
             ref={settingsButtonRef}
@@ -528,7 +556,7 @@ export function ProfileCardV2({
                  }
                }
              }}
-            className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
+            className={`${isCompact ? 'w-7 h-7' : 'w-8 h-8'} flex items-center justify-center rounded-full transition-all duration-200 bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
             title={t('profiles.profileOptions')}
             data-action="settings"
           >
@@ -548,16 +576,24 @@ export function ProfileCardV2({
                 navigate(`/profilesv2/${profile.id}`);
               }
             }}
-            className={`${variant === "3d" ? (isCompact ? 'w-auto px-2 h-6' : 'w-auto px-3 h-8') : (isCompact ? 'w-6 h-6' : 'w-8 h-8')} flex items-center justify-center gap-1 rounded transition-all duration-200 ${variant === "3d" ? "" : "bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20"}`}
+            className={`${isCompact ? 'w-7 h-7' : 'w-8 h-8'} flex items-center justify-center gap-1 rounded-full transition-all duration-200 bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
             style={variant === "3d" ? get3DButtonStyling(modsButtonHovered) : {}}
             onMouseEnter={() => setModsButtonHovered(true)}
             onMouseLeave={() => setModsButtonHovered(false)}
             title={t('profiles.manageMods')}
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
-            {variant === "3d" && (
-              <span className={`font-minecraft-ten ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
-            )}
+          </button>
+
+          <button
+            onClick={createServerFromProfile}
+            className={`${isCompact ? 'w-7 h-7' : 'w-8 h-8'} flex items-center justify-center gap-1 rounded-full transition-all duration-200 bg-white/5 hover:bg-emerald-500/20 text-white/70 hover:text-white border border-white/10 hover:border-emerald-300/35`}
+            style={variant === "3d" ? get3DButtonStyling(serverButtonHovered) : {}}
+            onMouseEnter={() => setServerButtonHovered(true)}
+            onMouseLeave={() => setServerButtonHovered(false)}
+            title="Als lokalen Server erstellen"
+          >
+            <Icon icon="solar:server-square-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
           </button>
         </div>
 

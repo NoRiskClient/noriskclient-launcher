@@ -8,6 +8,7 @@ pub mod file_command;
 pub mod flagsmith_commands;
 pub mod friends_command;
 pub mod java_command;
+pub mod local_server_command;
 pub mod minecraft_auth_command;
 pub mod minecraft_command;
 pub mod modrinth_commands;

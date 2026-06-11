@@ -8,6 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+nrc-local-servers
+src-tauri/nrc-local-servers
 dist
 dist-ssr
 *.local
@@ -35,3 +37,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .idea
 examples
+.playwright-cli/
+installed-app-backups/
+output/

@@ -41,6 +41,10 @@ interface PlayerActionsDisplayProps {
   }>;
   className?: string;
   displayMode?: 'playerName' | 'logo';
+  skinBase64?: string | null;
+  onLaunchOverride?: () => Promise<void>;
+  disableFeaturedServer?: boolean;
+  pickerRoute?: string;
 }
 
 export function PlayerActionsDisplay({
@@ -50,6 +54,10 @@ export function PlayerActionsDisplay({
   launchButtonVersions,
   className,
   displayMode = 'playerName',
+  skinBase64,
+  onLaunchOverride,
+  disableFeaturedServer = false,
+  pickerRoute,
 }: PlayerActionsDisplayProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -61,7 +69,7 @@ export function PlayerActionsDisplay({
   const { profiles } = useProfileStore();
 
   // Determine if we're still loading profiles (no profiles loaded yet)
-  const isLoadingProfiles = profiles.length === 0;
+  const isLoadingProfiles = onLaunchOverride ? launchButtonVersions.length === 0 : profiles.length === 0;
 
   // Get the profile ID to use for featured server launch
   // Option A: Use currently selected profile from MainLaunchButton
@@ -98,6 +106,7 @@ export function PlayerActionsDisplay({
             player_name: playerName,
             render_type: "default", 
             render_view: "full",    
+            base64_skin_data: skinBase64 || undefined,
           };
           console.log("[PlayerActionsDisplay] Fetching skin for:", playerName, "Payload:", payload);
           const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
@@ -119,7 +128,7 @@ export function PlayerActionsDisplay({
     };
 
     fetchAndSetSkin();
-  }, [playerName]);
+  }, [playerName, skinBase64]);
 
   const dropShadowX = '2px';
   const dropShadowY = '4px';
@@ -175,19 +184,21 @@ export function PlayerActionsDisplay({
         {!isLoadingProfiles && (
           <>
             {/* Featured Server Toggle - above the launch button */}
-            <div
-              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
-            >
-              <button
-                onClick={() => setFeatureMode(!featureMode)}
-                className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
-                title={featureMode ? "Switch to Main Launch" : `Switch to ${FEATURED_SERVER.name}`}
+            {!disableFeaturedServer && (
+              <div
+                className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
               >
-                {featureMode ? "switch to main launch" : FEATURED_SERVER.name.toLowerCase()}
-              </button>
-            </div>
+                <button
+                  onClick={() => setFeatureMode(!featureMode)}
+                  className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  title={featureMode ? "Switch to Main Launch" : `Switch to ${FEATURED_SERVER.name}`}
+                >
+                  {featureMode ? "switch to main launch" : FEATURED_SERVER.name.toLowerCase()}
+                </button>
+              </div>
+            )}
             <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
-              {featureMode ? (
+              {featureMode && !disableFeaturedServer ? (
                 // Show featured server card with MOTD
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}
@@ -205,6 +216,8 @@ export function PlayerActionsDisplay({
                     mainButtonWidth="w-80"
                     maxWidth="400px"
                     mainButtonHeight="h-20"
+                    onLaunchOverride={onLaunchOverride}
+                    pickerRoute={pickerRoute}
                   />
                 </div>
               )}
@@ -214,4 +227,4 @@ export function PlayerActionsDisplay({
       </div>
     </div>
   );
-} 
+}

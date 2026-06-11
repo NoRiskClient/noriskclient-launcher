@@ -27,6 +27,12 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use utils::debug_utils;
 use utils::updater_utils;
 
+fn local_update_disable_marker() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe_path| exe_path.parent().map(|dir| dir.join("nrc-disable-updates.flag")))
+}
+
 use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::process_command::{
     fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
@@ -394,6 +400,16 @@ async fn main() {
                             auto_check_updates_enabled = false;
                         }
 
+                        if let Some(marker_path) = local_update_disable_marker() {
+                            if marker_path.exists() {
+                                info!(
+                                    "Local custom launcher marker found at {:?}; disabling automatic update check for this run.",
+                                    marker_path
+                                );
+                                auto_check_updates_enabled = false;
+                            }
+                        }
+
                         if auto_check_updates_enabled {
                             info!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
                             updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
@@ -626,6 +642,49 @@ async fn main() {
             find_best_java_for_minecraft_command,
             invalidate_java_cache_command,
             validate_java_path_command,
+            commands::local_server_command::list_local_servers,
+            commands::local_server_command::list_local_server_minecraft_versions,
+            commands::local_server_command::list_local_server_fabric_loader_versions,
+            commands::local_server_command::create_local_server,
+            commands::local_server_command::create_local_server_from_profile,
+            commands::local_server_command::import_local_server,
+            commands::local_server_command::duplicate_local_server,
+            commands::local_server_command::delete_local_server,
+            commands::local_server_command::is_minecraft_bedrock_installed,
+            commands::local_server_command::open_minecraft_bedrock,
+            commands::local_server_command::open_minecraft_bedrock_preview,
+            commands::local_server_command::list_bedrock_profiles,
+            commands::local_server_command::create_bedrock_profile,
+            commands::local_server_command::update_bedrock_profile,
+            commands::local_server_command::delete_bedrock_profile,
+            commands::local_server_command::launch_bedrock_profile,
+            commands::local_server_command::list_bedrock_instances,
+            commands::local_server_command::stop_bedrock_instance,
+            commands::local_server_command::import_bedrock_profile_content,
+            commands::local_server_command::install_bedrock_skin_pack,
+            commands::local_server_command::search_bedrock_catalog,
+            commands::local_server_command::install_bedrock_catalog_project,
+            commands::local_server_command::update_local_server_settings,
+            commands::local_server_command::start_local_server,
+            commands::local_server_command::stop_local_server,
+            commands::local_server_command::restart_local_server,
+            commands::local_server_command::send_local_server_command,
+            commands::local_server_command::read_local_server_log,
+            commands::local_server_command::get_local_server_path,
+            commands::local_server_command::list_local_server_files,
+            commands::local_server_command::read_local_server_file,
+            commands::local_server_command::write_local_server_file,
+            commands::local_server_command::read_local_server_properties,
+            commands::local_server_command::write_local_server_properties,
+            commands::local_server_command::list_local_server_backups,
+            commands::local_server_command::create_local_server_backup,
+            commands::local_server_command::invite_local_server_user,
+            commands::local_server_command::create_local_server_database,
+            commands::local_server_command::install_local_server_file,
+            commands::local_server_command::search_local_server_catalog,
+            commands::local_server_command::install_local_server_catalog_project,
+            commands::local_server_command::set_local_server_content_enabled,
+            commands::local_server_command::delete_local_server_content,
             get_worlds_for_profile,
             get_servers_for_profile,
             copy_world,

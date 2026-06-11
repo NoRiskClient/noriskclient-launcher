@@ -5,6 +5,8 @@ import { PlayTab } from "../components/tabs/PlayTab";
 import { ProfilesTab } from "../components/tabs/ProfilesTab";
 import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
 import { SkinsTab } from "../components/tabs/SkinsTab";
+import { ServersTab } from "../components/tabs/ServersTab";
+import { AiTab } from "../components/tabs/AiTab";
 import { StoreTab } from "../components/tabs/StoreTab";
 import { SettingsTab } from "../components/tabs/SettingsTab";
 import { BrowseTab } from "../components/profiles/detail/BrowseTab";
@@ -54,6 +56,10 @@ export const router = createHashRouter([
         element: <ModrinthTabV2 />,
       },
       {
+        path: "servers",
+        element: <ServersTab />,
+      },
+      {
         path: "mods/:source/:projectId",
         element: <ModDetailPage />,
       },
@@ -64,6 +70,10 @@ export const router = createHashRouter([
       {
         path: "capes",
         element: <StoreTab />,
+      },
+      {
+        path: "ai",
+        element: <AiTab />,
       },
       {
         path: "settings",

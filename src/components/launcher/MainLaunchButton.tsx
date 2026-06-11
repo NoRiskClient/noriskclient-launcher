@@ -32,6 +32,8 @@ interface MainLaunchButtonProps {
   selectedVersionLabel?: string;
   mainButtonWidth?: string;
   mainButtonHeight?: string;
+  onLaunchOverride?: () => Promise<void>;
+  pickerRoute?: string;
 }
 
 export function MainLaunchButton({
@@ -43,10 +45,13 @@ export function MainLaunchButton({
   selectedVersionLabel,
   mainButtonWidth,
   mainButtonHeight,
+  onLaunchOverride,
+  pickerRoute = "/profiles",
 }: MainLaunchButtonProps) {
   const { t } = useTranslation();
   // Local state for transient success message styling (can be further integrated if needed)
   const [transientSuccessActive, setTransientSuccessActive] = useState(false);
+  const [isOverrideLaunching, setIsOverrideLaunching] = useState(false);
 
   const { selectedVersion, setSelectedVersion } = useVersionSelectionStore();
   const navigate = useNavigate();
@@ -67,8 +72,8 @@ export function MainLaunchButton({
 
 
   // Get profile-specific launch state from hook
-  const isButtonLaunching = isLaunching;
-  const buttonStatusMessage = statusMessage;
+  const isButtonLaunching = onLaunchOverride ? isOverrideLaunching : isLaunching;
+  const buttonStatusMessage = onLaunchOverride && isOverrideLaunching ? t("launcher.launching") : statusMessage;
 
   useEffect(() => {
     const currentStoreVersion = selectedVersion;
@@ -108,6 +113,18 @@ export function MainLaunchButton({
 
   const handleLaunch = async () => {
     if (!selectedVersion) return;
+    if (onLaunchOverride) {
+      if (isOverrideLaunching) return;
+      setIsOverrideLaunching(true);
+      try {
+        await onLaunchOverride();
+        setTransientSuccessActive(true);
+        setTimeout(() => setTransientSuccessActive(false), 3000);
+      } finally {
+        setIsOverrideLaunching(false);
+      }
+      return;
+    }
     await hookHandleLaunch();
   };
 
@@ -123,7 +140,7 @@ export function MainLaunchButton({
     if (isButtonLaunching) return;
 
     // Navigate to profiles tab instead of opening modal
-    navigate("/profiles");
+    navigate(pickerRoute);
   };
 
   const getMainButtonIcon = () => {

@@ -341,8 +341,10 @@ export function App() {
         'solar:add-circle-bold',
         'solar:user-id-bold',
         'solar:widget-bold',
+        'solar:server-square-bold',
         'solar:emoji-funny-circle-bold',
         'solar:shop-bold',
+        'solar:robot-bold',
 
         // Search & Filters
         'solar:magnifer-bold',

@@ -324,6 +324,15 @@ export function GlobalCrashReportModal() {
         {primaryButtonText}
       </Button>
       <Button
+        variant="secondary"
+        icon={<Icon icon="solar:chat-round-dots-bold" className="w-5 h-5" />}
+        disabled
+        title={t('crash_modal.button.ai_coming_soon')}
+        className="flex-1 justify-center whitespace-nowrap normal-case line-through opacity-55 cursor-not-allowed"
+      >
+        {t('crash_modal.button.ask_ai')}
+      </Button>
+      <Button
         onClick={handleContactSupport}
         variant="default"
         icon={<Icon icon="solar:letter-linear" className="w-5 h-5" />}
@@ -361,4 +370,4 @@ export function GlobalCrashReportModal() {
       </div>
     </Modal>
   );
-} 
+}

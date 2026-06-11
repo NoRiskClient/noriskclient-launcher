@@ -12,6 +12,8 @@ import { SettingsPanel } from "./SettingsPanel";
 import { toast } from "../ui/GlobalToaster";
 import { cn } from "../../lib/utils";
 import { Virtuoso } from "react-virtuoso";
+import { useLauncherEdition } from "../edition/EditionSwitch";
+import { openExternalUrl } from "../../services/tauri-service";
 
 type FriendListRow =
   | { type: "header"; status: "online" | "offline"; count: number }
@@ -40,6 +42,7 @@ export function FriendsSidebar() {
   } = useFriendsStore();
 
   const { accentColor } = useThemeStore();
+  const { edition, setEdition } = useLauncherEdition();
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -212,6 +215,35 @@ export function FriendsSidebar() {
             </div>
 
             {activeTab === "friends" && (
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setEdition("java")}
+                  className="h-9 rounded-full border font-minecraft-ten text-xs transition-colors"
+                  style={{
+                    backgroundColor: edition === "java" ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.04)",
+                    borderColor: edition === "java" ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.12)",
+                    color: edition === "java" ? "white" : "rgba(255,255,255,0.55)",
+                  }}
+                >
+                  Java
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEdition("bedrock")}
+                  className="h-9 rounded-full border font-minecraft-ten text-xs transition-colors"
+                  style={{
+                    backgroundColor: edition === "bedrock" ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.04)",
+                    borderColor: edition === "bedrock" ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.12)",
+                    color: edition === "bedrock" ? "white" : "rgba(255,255,255,0.55)",
+                  }}
+                >
+                  Bedrock
+                </button>
+              </div>
+            )}
+
+            {activeTab === "friends" && (
               <div
                 className="flex items-center gap-3 px-4 py-3 rounded-xl mt-3"
                 style={{
@@ -233,13 +265,17 @@ export function FriendsSidebar() {
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {activeTab === "friends" ? (
-              <FriendsTab
-                currentUser={currentUser}
-                onlineFriends={onlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
-                offlineFriends={offlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
-                isLoading={isLoading}
-                accentColor={accentColor.value}
-              />
+              edition === "bedrock" ? (
+                <BedrockFriendsTab accentColor={accentColor.value} />
+              ) : (
+                <FriendsTab
+                  currentUser={currentUser}
+                  onlineFriends={onlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
+                  offlineFriends={offlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
+                  isLoading={isLoading}
+                  accentColor={accentColor.value}
+                />
+              )
             ) : (
               <RequestsTab
                 incomingRequests={incomingRequests}
@@ -251,6 +287,77 @@ export function FriendsSidebar() {
         </div>
       </div>
     </>
+  );
+}
+
+function BedrockFriendsTab({ accentColor }: { accentColor: string }) {
+  const { t } = useTranslation();
+  const [gamertag, setGamertag] = useState("");
+  const [friends, setFriends] = useState<Array<{ id: string; gamertag: string }>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("nrc-bedrock-friends") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const saveFriends = (nextFriends: Array<{ id: string; gamertag: string }>) => {
+    setFriends(nextFriends);
+    localStorage.setItem("nrc-bedrock-friends", JSON.stringify(nextFriends));
+  };
+
+  const addFriend = () => {
+    const name = gamertag.trim();
+    if (!name || friends.some((friend) => friend.gamertag.toLowerCase() === name.toLowerCase())) return;
+    saveFriends([...friends, { id: crypto.randomUUID(), gamertag: name }]);
+    setGamertag("");
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <p className="font-minecraft-ten text-white/55 text-xs mb-2">{t("bedrock.friends.addGamertag")}</p>
+        <div className="flex gap-2">
+          <input value={gamertag} onChange={(event) => setGamertag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addFriend(); }} placeholder={t("bedrock.friends.gamertag")} className="min-w-0 flex-1 h-10 rounded-lg border border-white/10 bg-black/30 px-3 font-minecraft-ten text-white text-sm outline-none focus:border-white/25" />
+          <button type="button" onClick={addFriend} className="w-10 h-10 rounded-full border border-white/15 bg-white/10 hover:bg-white/15 text-white flex items-center justify-center"><Icon icon="solar:user-plus-bold" /></button>
+        </div>
+      </div>
+      <section className="rounded-xl border border-white/10 bg-black/20 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+          <span className="text-xs font-bold uppercase tracking-wider font-minecraft-ten text-white/70">
+            Online 0 aus {friends.length}
+          </span>
+        </div>
+        <div className="border border-white/10 bg-white/5 rounded-lg p-3 font-minecraft-ten text-white/35 text-sm">
+          {t("bedrock.friends.noneOnline")}
+        </div>
+      </section>
+      <section className="rounded-xl border border-white/10 bg-black/20 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-white/25" />
+          <span className="text-xs font-bold uppercase tracking-wider font-minecraft-ten text-white/45">
+            Offline {friends.length} aus {friends.length}
+          </span>
+        </div>
+        {friends.length === 0 ? <div className="border border-white/10 bg-white/5 rounded-lg p-4 text-center">
+          <div
+            className="w-14 h-14 mx-auto mb-3 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: `${accentColor}15`, border: `1px solid ${accentColor}40` }}
+          >
+            <Icon icon="solar:users-group-rounded-bold" className="w-7 h-7" style={{ color: accentColor }} />
+          </div>
+          <p className="text-white/50 text-xs font-minecraft-ten">{t("bedrock.friends.empty")}</p>
+          <p className="text-white/30 text-xl mt-1 font-minecraft">{t("bedrock.friends.emptyHint")}</p>
+        </div> : <div className="space-y-2">
+          {friends.map((friend) => <div key={friend.id} className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full border border-white/10 bg-black/25 flex items-center justify-center text-white/55"><Icon icon="solar:user-bold" className="w-5 h-5" /></div>
+            <button type="button" onClick={() => void openExternalUrl(`https://www.xbox.com/play/user/${encodeURIComponent(friend.gamertag)}`)} className="min-w-0 flex-1 text-left"><span className="block font-minecraft-ten text-white truncate">{friend.gamertag}</span><span className="block font-minecraft-ten text-white/35 text-[10px]">{t("bedrock.friends.viewXbox")}</span></button>
+            <button type="button" onClick={() => saveFriends(friends.filter((item) => item.id !== friend.id))} className="w-8 h-8 rounded-full hover:bg-red-500/15 text-white/40 hover:text-red-300 flex items-center justify-center"><Icon icon="solar:trash-bin-trash-bold" /></button>
+          </div>)}
+        </div>}
+      </section>
+    </div>
   );
 }
 

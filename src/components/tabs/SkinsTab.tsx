@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,8 +12,6 @@ import type {
 } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
 import { StatusMessage } from "../ui/StatusMessage";
 import { SkinViewer } from "../launcher/SkinViewer";
@@ -26,6 +24,8 @@ import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
+import { EditionSwitch, useLauncherEdition } from "../edition/EditionSwitch";
+import { LocalServerService } from "../../services/local-server-service";
 
 const SkinPreview = memo(
   ({
@@ -35,6 +35,8 @@ const SkinPreview = memo(
     localSkinsLoading,
     selectedLocalSkin,
     isApplied,
+    actionLabel,
+    actionIcon = "solar:download-bold",
     onClick,
     onEditSkin,
     onDeleteSkin,
@@ -45,6 +47,8 @@ const SkinPreview = memo(
     localSkinsLoading: boolean;
     selectedLocalSkin: MinecraftSkin | null;
     isApplied?: boolean;
+    actionLabel?: string;
+    actionIcon?: string;
     onClick: (skin: MinecraftSkin) => void;
     onEditSkin?: (
       skin: MinecraftSkin,
@@ -284,6 +288,21 @@ const SkinPreview = memo(
                 </>
               )}
             </div>
+            {actionLabel && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!isDisabled) onClick(skin);
+                }}
+                disabled={isDisabled}
+                className="mt-3 h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-white/70 hover:text-white font-minecraft-ten text-xs inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <Icon icon={actionIcon} className="w-4 h-4" />
+                {actionLabel}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -375,6 +394,7 @@ const AddSkinCard = memo(
 
 
 export function SkinsTab() {
+  const { edition } = useLauncherEdition();
   const {
     activeAccount,
     isLoading: accountLoading,
@@ -386,7 +406,7 @@ export function SkinsTab() {
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
 
   useEffect(() => { setDiscordState("Browsing Skins"); }, []);
-  const [skinData, setSkinData] = useState<MinecraftProfile | null>(null);
+  const [, setSkinData] = useState<MinecraftProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [localSkins, setLocalSkins] = useState<MinecraftSkin[]>([]);
   const [localSkinsLoading, setLocalSkinsLoading] = useState<boolean>(false);
@@ -397,7 +417,6 @@ export function SkinsTab() {
   const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const filteredSkins = useMemo(() => {
     if (!debouncedSearch.trim()) return localSkins;
@@ -634,13 +653,39 @@ export function SkinsTab() {
     return skin.id === currentSkinId;
   };
 
+  const importSkinToBedrock = async (skin: MinecraftSkin) => {
+    setLoading(true);
+    setSelectedLocalSkin(skin);
+    setSelectedSkinId(skin.id);
+
+    try {
+      await toast.promise(
+        LocalServerService.installBedrockSkinPack({
+          name: skin.name,
+          base64Data: skin.base64_data,
+          variant: skin.variant,
+        }),
+        {
+          loading: t("bedrock.skins.importing", { name: skin.name }),
+          success: t("bedrock.skins.imported", { name: skin.name }),
+          error: (error) =>
+            t("bedrock.skins.importFailed", {
+              error: error instanceof Error ? error.message : String(error),
+            }),
+        },
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Add skin button
   const addSkinButton = (
     <button
       onClick={() => startEditSkin(null)}
-      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl normal-case transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed"
       title={t('skins.addSkin')}
-      disabled={!activeAccount}
+      disabled={edition === "java" && !activeAccount}
     >
       <div className="w-4 h-4 flex items-center justify-center">
         <Icon icon="solar:add-circle-bold" className="w-4 h-4" />
@@ -648,6 +693,93 @@ export function SkinsTab() {
       <span>{t('skins.addSkin')}</span>
     </button>
   );
+
+  if (edition === "bedrock") {
+    return (
+      <div className="h-full flex flex-col overflow-hidden p-4 relative">
+        <div className="mb-6 pb-4 border-b border-white/10">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <h1 className="font-minecraft text-white text-4xl normal-case">
+                {t("bedrock.skins.title")}
+              </h1>
+              <p className="font-minecraft-ten text-white/45 text-base mt-1">
+                {t("bedrock.skins.subtitle")}
+              </p>
+            </div>
+            <EditionSwitch />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <SearchWithFilters
+                placeholder={t("skins.searchPlaceholder")}
+                searchValue={search}
+                onSearchChange={setSearch}
+                onSearchEnter={() => {}}
+              />
+            </div>
+            {addSkinButton}
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+          {localSkinsLoading ? (
+            <p className="text-white/70 font-minecraft text-xl text-center py-4">
+              {t("skins.loadingSkins")}
+            </p>
+          ) : localSkinsError ? (
+            <StatusMessage
+              type="error"
+              className="font-minecraft text-lg"
+              message={localSkinsError}
+            />
+          ) : !localSkinsLoading &&
+            localSkins.length > 0 &&
+            filteredSkins.length === 0 &&
+            !localSkinsError ? (
+            <p className="text-white/70 italic font-minecraft text-lg text-center py-10">
+              {t("skins.noSkinsMatchSearch")}
+            </p>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+              <AddSkinCard
+                index={0}
+                onClick={() => startEditSkin(null, undefined)}
+              />
+              {filteredSkins.map((skin, index) => (
+                <SkinPreview
+                  key={skin.id}
+                  skin={skin}
+                  index={index + 1}
+                  loading={loading}
+                  localSkinsLoading={localSkinsLoading}
+                  selectedLocalSkin={selectedLocalSkin}
+                  isApplied={false}
+                  actionLabel={t("bedrock.skins.importToBedrock")}
+                  actionIcon="solar:archive-down-bold"
+                  onClick={importSkinToBedrock}
+                  onEditSkin={startEditSkin}
+                  onDeleteSkin={handleDeleteSkin}
+                />
+              ))}
+              {localSkins.length === 0 && (
+                <div className="col-span-full border border-dashed border-white/15 bg-black/25 rounded-xl p-10 text-center">
+                  <Icon icon="solar:gallery-add-bold" className="w-12 h-12 text-white/45 mx-auto mb-3" />
+                  <h2 className="font-minecraft text-white text-2xl normal-case">
+                    {t("bedrock.skins.empty")}
+                  </h2>
+                  <p className="font-minecraft-ten text-white/45 text-base mt-2">
+                    {t("bedrock.skins.subtitle")}
+                  </p>
+                  <div className="mt-5 flex justify-center">{addSkinButton}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
@@ -666,6 +798,7 @@ export function SkinsTab() {
 
             {/* Action Button */}
             <div className="flex items-center gap-3">
+              <EditionSwitch />
               {activeAccount && addSkinButton}
             </div>
           </div>
