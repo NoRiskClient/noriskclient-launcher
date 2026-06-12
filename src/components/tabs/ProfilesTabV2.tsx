@@ -29,6 +29,7 @@ import { LocalServerService } from "../../services/local-server-service";
 import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
 import type { BedrockContentKind, BedrockProfile } from "../../types/localServer";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getErrorMessage } from "../../utils/error-utils";
 
 export function ProfilesTabV2() {
   const { t } = useTranslation();
@@ -225,7 +226,7 @@ export function ProfilesTabV2() {
           return t('profiles.deleteSuccess', { name: profileName });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: getErrorMessage(err) }),
       });
     }
   };
@@ -237,7 +238,7 @@ export function ProfilesTabV2() {
       loading: t('profiles.openingFolder', { name: profile.name }),
       success: t('profiles.openFolderSuccess', { name: profile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = getErrorMessage(err);
         console.error(`Failed to open folder for ${profile.name}:`, err);
         return t('profiles.openFolderError', { error: message });
       },
@@ -460,6 +461,7 @@ function BedrockProfilesPanel({
   confirm: (options: any) => Promise<string | boolean>;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const avatarUrl = useCrafatarAvatar({ uuid: activeAccount?.id, size: 96 });
   const [profiles, setProfiles] = useState<BedrockProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -480,7 +482,7 @@ function BedrockProfilesPanel({
       const nextProfiles = await LocalServerService.listBedrockProfiles();
       setProfiles(nextProfiles);
     } catch (error) {
-      toast.error(t("bedrock.profiles.loadFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.loadFailed", { error: getErrorMessage(error) }));
     } finally {
       setLoading(false);
     }
@@ -511,7 +513,7 @@ function BedrockProfilesPanel({
       setShowCreate(false);
       toast.success(t("bedrock.profiles.created", { name: created.name }));
     } catch (error) {
-      toast.error(t("bedrock.profiles.createFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.createFailed", { error: getErrorMessage(error) }));
     } finally {
       setCreating(false);
     }
@@ -526,7 +528,7 @@ function BedrockProfilesPanel({
       window.dispatchEvent(new CustomEvent("nrc-bedrock-instance-changed"));
       toast.success(t("bedrock.profiles.launching", { name: profile.name }));
     } catch (error) {
-      toast.error(t("bedrock.profiles.launchFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.launchFailed", { error: getErrorMessage(error) }));
     } finally {
       setBusyProfileId(null);
     }
@@ -543,7 +545,7 @@ function BedrockProfilesPanel({
       const updated = await LocalServerService.updateBedrockProfile(profile.id, { target });
       setProfiles((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
-      toast.error(t("bedrock.profiles.updateFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.updateFailed", { error: getErrorMessage(error) }));
     } finally {
       setBusyProfileId(null);
     }
@@ -559,7 +561,7 @@ function BedrockProfilesPanel({
       setProfiles((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       toast.success(t("bedrock.profiles.contentImported"));
     } catch (error) {
-      toast.error(t("bedrock.profiles.contentFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.contentFailed", { error: getErrorMessage(error) }));
     } finally {
       setBusyProfileId(null);
     }
@@ -582,7 +584,7 @@ function BedrockProfilesPanel({
       setProfiles((current) => current.filter((item) => item.id !== profile.id));
       toast.success(t("bedrock.profiles.deleted", { name: profile.name }));
     } catch (error) {
-      toast.error(t("bedrock.profiles.deleteFailed", { error: String(error) }));
+      toast.error(t("bedrock.profiles.deleteFailed", { error: getErrorMessage(error) }));
     } finally {
       setBusyProfileId(null);
     }
@@ -632,7 +634,7 @@ function BedrockProfilesPanel({
         ) : visibleProfiles.length === 0 ? (
           <EmptyState icon="solar:box-bold" message={t("bedrock.profiles.empty")} />
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             {visibleProfiles.map((profile) => (
               <BedrockProfileCard
                 key={profile.id}
@@ -642,6 +644,7 @@ function BedrockProfilesPanel({
                 onDelete={() => deleteProfile(profile)}
                 onTargetChange={(target) => updateTarget(profile, target)}
                 onImportContent={(kind) => importContent(profile, kind)}
+                onOpen={() => navigate(`/bedrock-profiles/${profile.id}`)}
               />
             ))}
           </div>
@@ -682,6 +685,7 @@ function BedrockProfileCard({
   onDelete,
   onTargetChange,
   onImportContent,
+  onOpen,
 }: {
   profile: BedrockProfile;
   busy: boolean;
@@ -689,6 +693,7 @@ function BedrockProfileCard({
   onDelete: () => void;
   onTargetChange: (target: "release" | "preview") => void;
   onImportContent: (kind: BedrockContentKind) => void;
+  onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const iconSrc = profile.iconPath
@@ -701,7 +706,7 @@ function BedrockProfileCard({
     : t("bedrock.profiles.neverLaunched");
 
   return (
-    <article className="border border-white/10 bg-black/30 rounded-xl p-4 min-h-[190px] flex flex-col">
+    <article onClick={onOpen} className="border border-white/10 bg-black/30 rounded-lg p-4 min-h-[150px] flex flex-col cursor-pointer hover:border-white/20 hover:bg-white/[0.04] transition-colors">
       <div className="flex items-start gap-3">
         <div className="w-16 h-16 rounded-xl border border-white/15 bg-white/10 overflow-hidden flex items-center justify-center">
           {iconSrc ? (
@@ -719,7 +724,7 @@ function BedrockProfileCard({
                 key={target}
                 type="button"
                 disabled={busy || profile.target === target}
-                onClick={() => onTargetChange(target)}
+                onClick={(event) => { event.stopPropagation(); onTargetChange(target); }}
                 className={`h-8 px-3 rounded-md font-minecraft-ten text-xs transition-colors ${
                   profile.target === target ? "bg-white/15 text-white" : "text-white/45 hover:text-white hover:bg-white/10"
                 }`}
@@ -730,8 +735,8 @@ function BedrockProfileCard({
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <button type="button" onClick={onDelete} disabled={busy} className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-red-500/20 text-white/55 hover:text-white flex items-center justify-center disabled:opacity-50" title={t("profiles.delete")}><Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" /></button>
-          <button type="button" onClick={() => onImportContent("addon")} disabled={busy} className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/55 hover:text-white flex items-center justify-center disabled:opacity-50" title={t("bedrock.content.addon")}><Icon icon="solar:box-minimalistic-bold" className="w-4 h-4" /></button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(); }} disabled={busy} className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-red-500/20 text-white/55 hover:text-white flex items-center justify-center disabled:opacity-50" title={t("profiles.delete")}><Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" /></button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onImportContent("addon"); }} disabled={busy} className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/55 hover:text-white flex items-center justify-center disabled:opacity-50" title={t("bedrock.content.addon")}><Icon icon="solar:box-minimalistic-bold" className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -743,7 +748,7 @@ function BedrockProfileCard({
 
       <button
         type="button"
-        onClick={onLaunch}
+        onClick={(event) => { event.stopPropagation(); onLaunch(); }}
         disabled={busy}
         className="mt-4 h-11 rounded-xl border border-emerald-400/40 bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-50 text-white font-minecraft-ten text-base flex items-center justify-center gap-2 transition-colors"
       >

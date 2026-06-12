@@ -75,7 +75,7 @@ export function AppLayout({
     { id: "servers", icon: "solar:server-square-bold", label: t("nav.servers") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
-    { id: "ai", icon: "solar:robot-bold", imageSrc: "/NRclientaisymbol.png", label: t("nav.ai") },
+    { id: "ai", icon: "solar:robot-bold", imageSrc: "/NRclientaisymbol-v2.png", label: t("nav.ai") },
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings") },

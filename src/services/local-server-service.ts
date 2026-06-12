@@ -97,6 +97,18 @@ export class LocalServerService {
     return invoke("delete_bedrock_profile", { profileId });
   }
 
+  static openBedrockProfileFolder(profileId: string): Promise<void> {
+    return invoke("open_bedrock_profile_folder", { profileId });
+  }
+
+  static openBedrockProfileContent(profileId: string, fileName: string, kind: BedrockContentKind): Promise<void> {
+    return invoke("open_bedrock_profile_content", { profileId, fileName, kind });
+  }
+
+  static deleteBedrockProfileContent(profileId: string, fileName: string, kind: BedrockContentKind): Promise<BedrockProfile> {
+    return invoke("delete_bedrock_profile_content", { profileId, fileName, kind });
+  }
+
   static launchBedrockProfile(profileId: string): Promise<BedrockProfile> {
     return invoke("launch_bedrock_profile", { profileId });
   }

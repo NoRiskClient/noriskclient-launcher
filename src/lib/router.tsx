@@ -16,6 +16,7 @@ import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetail
 // DISABLED: Advent Calendar (seasonal feature)
 // import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
 import { ModDetailPage } from "../components/mods/ModDetailPage";
+import { BedrockProfileDetailView } from "../components/profiles/BedrockProfileDetailView";
 
 export const router = createHashRouter([
   {
@@ -46,6 +47,10 @@ export const router = createHashRouter([
       {
         path: "profiles",
         element: <ProfilesTabV2 />,
+      },
+      {
+        path: "bedrock-profiles/:profileId",
+        element: <BedrockProfileDetailView />,
       },
       {
         path: "profiles/:profileId/browse/:contentType",

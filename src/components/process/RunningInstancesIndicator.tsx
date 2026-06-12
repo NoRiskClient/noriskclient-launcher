@@ -14,10 +14,10 @@ import { Label } from "../ui/./Label";
 import { Dropdown } from "../ui/./dropdown/Dropdown";
 import { DropdownHeader } from "../ui/./dropdown/DropdownHeader";
 import { DropdownFooter } from "../ui/./dropdown/DropdownFooter";
-import { useThemeStore } from "../../store/useThemeStore";
 import { invoke } from "@tauri-apps/api/core";
 import { LocalServerService } from "../../services/local-server-service";
 import type { BedrockInstance } from "../../types/localServer";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface RunningInstancesIndicatorProps {
   className?: string;
@@ -38,7 +38,6 @@ export function RunningInstancesIndicator({
     new Set(),
   );
   const buttonRef = useRef<HTMLDivElement>(null);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const fetchProcesses = useCallback(async () => {
     setError(null);
@@ -164,6 +163,11 @@ export function RunningInstancesIndicator({
 
   const instanceCount = processes.length + bedrockInstances.length;
   const hasInstances = instanceCount > 0;
+  const resolveImageSource = (source?: string | null) => {
+    if (!source) return null;
+    if (/^(https?:|data:|asset:)/i.test(source) || source.startsWith("/")) return source;
+    return convertFileSrc(source);
+  };
 
   return (
     <div className={cn("relative", className)}>
@@ -187,7 +191,8 @@ export function RunningInstancesIndicator({
         isOpen={isDropdownOpen}
         onClose={handleCloseDropdown}
         triggerRef={buttonRef}
-        width={350}
+        width={430}
+        className="bg-[#0c0f14]/95"
       >
         <DropdownHeader title={t('instances.running_instances')}>
           <button
@@ -233,30 +238,26 @@ export function RunningInstancesIndicator({
               </p>
             </div>
           ) : (
-            <div className="py-2">
+            <div className="p-3 space-y-4">
+              {processes.length > 0 && (
+                <div className="flex items-center justify-between px-1">
+                  <span className="font-minecraft-ten text-[10px] uppercase text-white/45">Java</span>
+                  <span className="font-minecraft-ten text-[10px] text-emerald-300">{processes.length} aktiv</span>
+                </div>
+              )}
               {processes.map((process) => (
                 <div
                   key={process.id}
-                  className="px-4 py-3 hover:bg-white/10 transition-colors duration-200"
+                  className="rounded-lg border border-white/10 bg-black/30 px-3 py-3 hover:border-white/20 hover:bg-white/[0.06] transition-colors duration-200"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-12 h-12 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                          style={
-                            {
-                              // backgroundColor: `${accentColor.value}30`, // Removed background
-                              // borderWidth: "2px", // Removed border
-                              // borderStyle: "solid", // Removed border
-                              // borderColor: `${accentColor.value}60`, // Removed border
-                            }
-                          }
-                        >
+                        <div className="w-12 h-12 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {process.profile_image_url &&
                           !imageLoadErrors.has(process.id) ? (
                             <img
-                              src={process.profile_image_url}
+                              src={resolveImageSource(process.profile_image_url) || undefined}
                               alt={process.profile_name || "Profile Icon"}
                               className="w-full h-full object-cover"
                               onError={() => {
@@ -278,20 +279,16 @@ export function RunningInstancesIndicator({
                             className="text-xl font-minecraft text-white truncate mb-0 leading-none"
                             title={process.profile_name || process.profile_id}
                           >
-                            {(
-                              process.profile_name ||
-                              `Profile ${process.profile_id.substring(0, 6)}...`
-                            ).toLowerCase()}
+                            {process.profile_name || `Profil ${process.profile_id.substring(0, 6)}...`}
                           </p>
-                          <div className="flex items-center text-lg text-white/60 font-minecraft leading-none">
+                          <div className="mt-1 flex items-center gap-2 text-white/50 font-minecraft-ten text-[9px] leading-none">
+                            {process.minecraft_version && <span>{process.minecraft_version}</span>}
+                            {process.modloader && <span className="capitalize">{process.modloader}</span>}
                             <Icon
                               icon="solar:clock-circle-bold"
-                              className="w-3.5 h-3.5 mr-1.5"
+                              className="w-3.5 h-3.5"
                             />
-                            <span
-                              className="font-minecraft-ten"
-                              style={{ fontSize: "8px" }}
-                            >
+                            <span>
                               {timeAgo(new Date(process.start_time).getTime())}
                             </span>
                             {typeof process.state === "object" &&
@@ -362,8 +359,14 @@ export function RunningInstancesIndicator({
                   </div>
                 </div>
               ))}
+              {bedrockInstances.length > 0 && (
+                <div className="flex items-center justify-between px-1 pt-1">
+                  <span className="font-minecraft-ten text-[10px] uppercase text-white/45">Bedrock</span>
+                  <span className="font-minecraft-ten text-[10px] text-emerald-300">{bedrockInstances.length} aktiv</span>
+                </div>
+              )}
               {bedrockInstances.map((instance) => (
-                <div key={instance.id} className="px-4 py-3 hover:bg-white/10 transition-colors duration-200 border-t border-white/5">
+                <div key={instance.id} className="rounded-lg border border-white/10 bg-black/30 px-3 py-3 hover:border-white/20 hover:bg-white/[0.06] transition-colors duration-200">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center text-white/65 shrink-0">

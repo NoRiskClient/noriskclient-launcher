@@ -1,34 +1,27 @@
-/**
- * Parses an error of any type into a human-readable string message.
- * Handles Error instances, Tauri error objects, plain objects, and primitives.
- *
- * @param err - The error to parse (can be any type)
- * @returns A string representation of the error message
- */
-export function parseErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message;
-  }
+export function getErrorMessage(error: unknown, fallback = "Unbekannter Fehler"): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message.trim()) return error.message;
 
-  if (typeof err === "object" && err !== null) {
-    // Handle Tauri/backend error objects that have a message property
-    if ("message" in err && typeof (err as { message: unknown }).message === "string") {
-      return (err as { message: string }).message;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    for (const key of ["message", "error", "details", "body", "statusText"]) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim()) return value;
+      if (value && typeof value === "object") {
+        const nested = getErrorMessage(value, "");
+        if (nested) return nested;
+      }
     }
 
-    // Handle objects with error property
-    if ("error" in err && typeof (err as { error: unknown }).error === "string") {
-      return (err as { error: string }).error;
-    }
-
-    // Fallback to JSON stringification for other objects
     try {
-      return JSON.stringify(err);
+      const serialized = JSON.stringify(error);
+      if (serialized && serialized !== "{}") return serialized;
     } catch {
-      return "[Unable to parse error object]";
+      // Ignore circular or non-serializable error objects.
     }
   }
 
-  // Handle primitives (string, number, etc.)
-  return String(err);
+  return fallback;
 }
+
+export const parseErrorMessage = getErrorMessage;

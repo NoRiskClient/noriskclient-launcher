@@ -8,6 +8,7 @@ export interface MinecraftAccount {
   expires_at?: string;
   /** If true, the UI should not show the child-protection multiplayer warning for this account */
   ignore_child_protection_warning?: boolean;
+  account_kind?: "java" | "bedrock";
 }
 
 /**

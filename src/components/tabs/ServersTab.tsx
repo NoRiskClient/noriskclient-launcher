@@ -31,6 +31,8 @@ import type {
   UpdateLocalServerSettingsInput,
 } from "../../types/localServer";
 import { setDiscordState } from "../../utils/discordRpc";
+import { EditionSwitch, useLauncherEdition } from "../edition/EditionSwitch";
+import { useProfileStore } from "../../store/profile-store";
 
 type SortMode = "last_played" | "name" | "date_created" | "version_newest" | "version_oldest";
 type DetailTab =
@@ -156,6 +158,7 @@ const loaderOptions: {
 ];
 
 export function ServersTab() {
+  const { edition } = useLauncherEdition();
   const [servers, setServers] = useState<LocalServer[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [logs, setLogs] = useState<Record<string, string[]>>({});
@@ -266,6 +269,7 @@ export function ServersTab() {
 
   const filteredServers = servers
     .filter((server) => {
+      const matchesEdition = edition === "bedrock" ? server.serverType === "bedrock" : server.serverType !== "bedrock";
       const matchesSearch =
         !searchQuery ||
         server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -273,7 +277,7 @@ export function ServersTab() {
         (server.description ?? "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesVersion =
         versionFilter === "all" || server.minecraftVersion.includes(versionFilter);
-      return matchesSearch && matchesVersion;
+      return matchesEdition && matchesSearch && matchesVersion;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -372,6 +376,7 @@ export function ServersTab() {
                   dropdownSize="sm"
                 />
               </div>
+              <EditionSwitch />
               <ActionButtons actions={actions} />
             </div>
           </div>
@@ -409,6 +414,7 @@ export function ServersTab() {
         <CreateServerWizard
           initialPort={nextJavaPort}
           initialBedrockPort={nextBedrockPort}
+          edition={edition}
           onClose={() => setShowCreate(false)}
           onCreatingChange={setCreatingServer}
           onCreated={(server) => {
@@ -572,18 +578,24 @@ function Metric({ label, value }: { label: string; value: string }) {
 function CreateServerWizard({
   initialPort,
   initialBedrockPort,
+  edition,
   onClose,
   onCreatingChange,
   onCreated,
 }: {
   initialPort: number;
   initialBedrockPort: number;
+  edition: "java" | "bedrock";
   onClose: () => void;
   onCreatingChange: (creating: boolean) => void;
   onCreated: (server: LocalServer) => void;
 }) {
-  const [step, setStep] = useState<WizardStep>("version");
-  const [input, setInput] = useState<CreateLocalServerInput>({ ...defaultInput, port: initialPort });
+  const profiles = useProfileStore((state) => state.profiles);
+  const fetchProfiles = useProfileStore((state) => state.fetchProfiles);
+  const [step, setStep] = useState<WizardStep>(edition === "bedrock" ? "loader" : "version");
+  const [input, setInput] = useState<CreateLocalServerInput>(() => edition === "bedrock"
+    ? { ...defaultInput, serverType: "bedrock", serverKind: "bedrock", minecraftVersion: "latest", port: initialBedrockPort, ramMb: 2048 }
+    : { ...defaultInput, port: initialPort });
   const [versionChannel, setVersionChannel] = useState<VersionChannel>("all");
   const [versionSearch, setVersionSearch] = useState("");
   const [versions, setVersions] = useState<MinecraftVersionEntry[]>([]);
@@ -591,7 +603,10 @@ function CreateServerWizard({
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const stepIndex = wizardSteps.findIndex((item) => item.id === step);
+  const activeWizardSteps = edition === "bedrock"
+    ? wizardSteps.filter((item) => item.id !== "version")
+    : wizardSteps;
+  const stepIndex = activeWizardSteps.findIndex((item) => item.id === step);
   const fallbackVersions: MinecraftVersionEntry[] = [
     ...fallbackReleaseVersions.map((id) => ({ id, versionType: "release" })),
     ...fallbackSnapshotVersions.map((id) => ({ id, versionType: "snapshot" })),
@@ -603,6 +618,8 @@ function CreateServerWizard({
   );
 
   useEffect(() => {
+    void fetchProfiles();
+    if (edition === "bedrock") return;
     setVersionsLoading(true);
     LocalServerService.listMinecraftVersions()
       .then((items) => {
@@ -614,15 +631,15 @@ function CreateServerWizard({
       })
       .catch(() => toast.error("Minecraft-Versionen konnten nicht geladen werden. Fallback ist aktiv."))
       .finally(() => setVersionsLoading(false));
-  }, []);
+  }, [edition, fetchProfiles]);
 
   const goNext = () => {
-    const next = wizardSteps[stepIndex + 1];
+    const next = activeWizardSteps[stepIndex + 1];
     if (next) setStep(next.id);
   };
 
   const goBack = () => {
-    const previous = wizardSteps[stepIndex - 1];
+    const previous = activeWizardSteps[stepIndex - 1];
     if (previous) setStep(previous.id);
   };
 
@@ -668,8 +685,8 @@ function CreateServerWizard({
           onClose={() => setShowIconPicker(false)}
         />
       )}
-      <div className="grid grid-cols-4 gap-2 mb-5">
-        {wizardSteps.map((item) => (
+      <div className={`grid ${edition === "bedrock" ? "grid-cols-3" : "grid-cols-4"} gap-2 mb-5`}>
+        {activeWizardSteps.map((item) => (
           <button
             key={item.id}
             onClick={() => setStep(item.id)}
@@ -683,9 +700,9 @@ function CreateServerWizard({
         ))}
       </div>
 
-      {step === "version" && (
+      {step === "version" && edition === "java" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => setVersionChannel("all")}
@@ -736,7 +753,7 @@ function CreateServerWizard({
       {step === "loader" && (
         <div className="space-y-4">
           <div className="grid grid-cols-4 gap-3">
-            {loaderOptions.map((loader) => (
+            {loaderOptions.filter((loader) => edition === "bedrock" ? loader.id === "bedrock" : loader.id !== "bedrock").map((loader) => (
               <button
                 type="button"
                 key={loader.id}
@@ -783,6 +800,37 @@ function CreateServerWizard({
             </p>
           </div>
           <div className="space-y-3">
+            {edition === "java" && (
+              <label className="block font-minecraft-ten text-white/55 text-sm">
+                Inhalte aus Java-Profil übernehmen
+                <select
+                  value={input.sourceProfileId ?? ""}
+                  onChange={(event) => {
+                    const profile = profiles.find((item) => item.id === event.target.value);
+                    if (!profile) {
+                      setInput({ ...input, sourceProfileId: null });
+                      return;
+                    }
+                    const serverType = profile.loader === "fabric" || profile.loader === "forge" || profile.loader === "neoforge"
+                      ? profile.loader
+                      : "paper";
+                    setInput({
+                      ...input,
+                      sourceProfileId: profile.id,
+                      name: input.name || `${profile.name} Server`,
+                      minecraftVersion: profile.game_version,
+                      serverType,
+                      serverKind: kindForServerType(serverType),
+                      loaderVersion: profile.loader_version ?? "",
+                    });
+                  }}
+                  className="mt-2 w-full h-11 rounded-lg border border-white/10 bg-[#11151b] px-3 text-white outline-none"
+                >
+                  <option value="">Ohne Profil-Inhalte</option>
+                  {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} · {profile.game_version}</option>)}
+                </select>
+              </label>
+            )}
             <Input value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} placeholder="Profilname" />
             <Input value={input.serverIp ?? ""} onChange={(event) => setInput({ ...input, serverIp: event.target.value })} placeholder="Server-IP / Adresse optional, z. B. 0.0.0.0" />
             <div className="grid grid-cols-2 gap-3">
@@ -830,7 +878,7 @@ function CreateServerWizard({
         <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
         <div className="flex gap-3">
           {stepIndex > 0 && <Button onClick={goBack}>Zurück</Button>}
-          {stepIndex < wizardSteps.length - 1 ? (
+          {stepIndex < activeWizardSteps.length - 1 ? (
             <Button onClick={goNext}>Weiter</Button>
           ) : (
             <Button disabled={busy} onClick={create} icon={<Icon icon="solar:download-bold" className="w-5 h-5" />}>

@@ -94,6 +94,7 @@ export interface CreateLocalServerInput {
   codexEnabled?: boolean;
   codexMcpPort?: number | null;
   autoUpdateContent?: boolean;
+  sourceProfileId?: string | null;
 }
 
 export interface ImportLocalServerInput extends CreateLocalServerInput {

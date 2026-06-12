@@ -134,7 +134,7 @@ export function VerticalNavbar({
               <img
                 src={item.imageSrc}
                 alt=""
-                className={`w-9 h-9 object-cover ${item.id === "ai" ? "scale-[3]" : ""}`}
+                className="w-7 h-7 object-contain"
                 draggable={false}
               />
             </span>

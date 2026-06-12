@@ -8,7 +8,7 @@ import { useProfileStore } from "../../store/profile-store";
 import { LocalServerService } from "../../services/local-server-service";
 import type { LocalServer } from "../../types/localServer";
 
-const AI_ICON_SRC = "/NRclientaisymbol.png";
+const AI_ICON_SRC = "/NRclientaisymbol-v2.png";
 const CHAT_STORAGE_KEY = "nrc-ai-preview-chats";
 
 type AttachmentType = "profile" | "server" | "image";
@@ -48,7 +48,7 @@ function AiLogo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const dimensions = size === "lg" ? "w-16 h-16" : size === "sm" ? "w-9 h-9" : "w-10 h-10";
   return (
     <div className={`${dimensions} rounded-xl border border-white/15 bg-white/10 overflow-hidden flex items-center justify-center shrink-0`}>
-      <img src={AI_ICON_SRC} alt="" className="w-full h-full object-cover scale-[3]" draggable={false} />
+      <img src={AI_ICON_SRC} alt="" className="w-[72%] h-[72%] object-contain" draggable={false} />
     </div>
   );
 }

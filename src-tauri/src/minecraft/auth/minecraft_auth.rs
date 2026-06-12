@@ -53,6 +53,14 @@ pub enum AuthFlow {
     Direct,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountKind {
+    #[default]
+    Java,
+    Bedrock,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Credentials {
     pub id: Uuid,
@@ -68,6 +76,8 @@ pub struct Credentials {
     /// The authentication flow used to create this account (optional for backwards compatibility)
     #[serde(default)]
     pub auth_flow: Option<AuthFlow>,
+    #[serde(default)]
+    pub account_kind: AccountKind,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -602,6 +612,7 @@ impl MinecraftAuthStore {
             "Getting Minecraft access token",
             Some(70.0),
         ).await?;
+        let xbox_identity = xbox_identity(&xsts_token);
         let minecraft_token = minecraft_token(xsts_token).await
             .map_err(|e| {
                 Self::emit_login_error_event(&state, event_id, format!("Failed to get Minecraft token: {}", e));
@@ -617,11 +628,25 @@ impl MinecraftAuthStore {
             "Checking Minecraft entitlements",
             Some(80.0),
         ).await?;
-        minecraft_entitlements(&minecraft_token.access_token).await
-            .map_err(|e| {
-                Self::emit_login_error_event(&state, event_id, format!("Failed to check Minecraft entitlements: {}", e));
-                e
-            })?;
+        if let Err(error) = minecraft_entitlements(&minecraft_token.access_token).await {
+            if matches!(error, MinecraftAuthenticationError::NoMinecraftLicense) {
+                let (xbox_id, gamertag) = xbox_identity.ok_or(MinecraftAuthenticationError::NoUserHash)?;
+                let credentials = bedrock_credentials(
+                    xbox_id,
+                    gamertag,
+                    minecraft_token.access_token,
+                    oauth_token.value.refresh_token,
+                    oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+                    AuthFlow::Direct,
+                    true,
+                );
+                self.update_or_insert(credentials.clone()).await?;
+                info!("[Direct OAuth Flow] Bedrock-only Microsoft account added");
+                return Ok(credentials);
+            }
+            Self::emit_login_error_event(&state, event_id, format!("Failed to check Minecraft entitlements: {}", error));
+            return Err(error.into());
+        }
         
         // Get profile
         info!("[Direct OAuth Flow] Fetching Minecraft profile");
@@ -661,6 +686,7 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
+            account_kind: AccountKind::Java,
         };
 
         self.update_or_insert(credentials.clone()).await?;
@@ -697,10 +723,28 @@ impl MinecraftAuthStore {
         .await?;
 
         info!("[Auth Flow] Getting Minecraft token");
+        let xbox_identity = xbox_identity(&xbox_token.value);
         let minecraft_token = minecraft_token(xbox_token.value).await?;
 
         info!("[Auth Flow] Checking Minecraft entitlements");
-        minecraft_entitlements(&minecraft_token.access_token).await?;
+        if let Err(error) = minecraft_entitlements(&minecraft_token.access_token).await {
+            if matches!(error, MinecraftAuthenticationError::NoMinecraftLicense) {
+                let (xbox_id, gamertag) = xbox_identity.ok_or(MinecraftAuthenticationError::NoUserHash)?;
+                let credentials = bedrock_credentials(
+                    xbox_id,
+                    gamertag,
+                    minecraft_token.access_token,
+                    oauth_token.value.refresh_token,
+                    oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+                    AuthFlow::Sisu,
+                    true,
+                );
+                self.update_or_insert(credentials.clone()).await?;
+                info!("[Auth Flow] Bedrock-only Microsoft account added");
+                return Ok(credentials);
+            }
+            return Err(error.into());
+        }
 
         info!("[Auth Flow] Fetching Minecraft profile");
         let profile = minecraft_profile(&minecraft_token.access_token).await?;
@@ -734,6 +778,7 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
+            account_kind: AccountKind::Java,
         };
 
         info!(
@@ -924,6 +969,24 @@ impl MinecraftAuthStore {
         info!("[Token Refresh] Authorizing with XSTS (direct)");
         let xsts_token = xsts_authorize_direct(xbox_token).await?;
 
+        if creds.account_kind == AccountKind::Bedrock {
+            let access_token = xsts_token.token.clone();
+            let val = Credentials {
+                id: cred_id,
+                username: profile_name,
+                access_token,
+                refresh_token: oauth_token.value.refresh_token,
+                expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+                norisk_credentials: creds.norisk_credentials.clone(),
+                active: creds.active,
+                ignore_child_protection_warning: creds.ignore_child_protection_warning,
+                auth_flow: Some(AuthFlow::Direct),
+                account_kind: AccountKind::Bedrock,
+            };
+            self.update_or_insert(val.clone()).await?;
+            return Ok(Some(val));
+        }
+
         info!("[Token Refresh] Getting Minecraft token");
         let minecraft_token = minecraft_token(xsts_token).await?;
 
@@ -938,6 +1001,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
+            account_kind: creds.account_kind.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -977,6 +1041,23 @@ impl MinecraftAuthStore {
         .await?;
 
         info!("[Token Refresh] Getting Minecraft token");
+        if creds.account_kind == AccountKind::Bedrock {
+            let val = Credentials {
+                id: cred_id,
+                username: profile_name,
+                access_token: xbox_token.value.token,
+                refresh_token: oauth_token.value.refresh_token,
+                expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+                norisk_credentials: creds.norisk_credentials.clone(),
+                active: creds.active,
+                ignore_child_protection_warning: creds.ignore_child_protection_warning,
+                auth_flow: Some(AuthFlow::Sisu),
+                account_kind: AccountKind::Bedrock,
+            };
+            self.update_or_insert(val.clone()).await?;
+            return Ok(Some(val));
+        }
+
         let minecraft_token = minecraft_token(xbox_token.value).await?;
 
         info!("[Token Refresh] Creating new credentials");
@@ -990,6 +1071,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
+            account_kind: creds.account_kind.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -1140,6 +1222,9 @@ impl MinecraftAuthStore {
                 Ok(val) => {
                     return if val.is_some() {
                         info!("[Token Check] Successfully refreshed Microsoft token");
+                        if creds.account_kind == AccountKind::Bedrock {
+                            return Ok(val);
+                        }
                         Ok(Some(
                             self.refresh_norisk_token_if_necessary(
                                 &val.unwrap().clone(),
@@ -1169,6 +1254,9 @@ impl MinecraftAuthStore {
             }
         } else {
             info!("[Token Check] Microsoft token is still valid");
+            if creds.account_kind == AccountKind::Bedrock {
+                return Ok(Some(creds.clone()));
+            }
             if creds.ignore_child_protection_warning {
                 info!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
                 Ok(None)
@@ -1373,6 +1461,54 @@ pub struct DeviceToken {
     pub not_after: DateTime<Utc>,
     pub token: String,
     pub display_claims: HashMap<String, serde_json::Value>,
+}
+
+fn xbox_identity(token: &DeviceToken) -> Option<(String, String)> {
+    let claim = token.display_claims.get("xui")?.get(0)?;
+    let stable_id = claim
+        .get("xid")
+        .or_else(|| claim.get("uhs"))?
+        .as_str()?
+        .to_string();
+    let gamertag = claim
+        .get("gtg")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("Bedrock Player")
+        .to_string();
+    Some((stable_id, gamertag))
+}
+
+fn bedrock_credentials(
+    xbox_id: String,
+    gamertag: String,
+    access_token: String,
+    refresh_token: String,
+    expires: DateTime<Utc>,
+    auth_flow: AuthFlow,
+    active: bool,
+) -> Credentials {
+    let digest = sha2::Sha256::digest(xbox_id.as_bytes());
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    Credentials {
+        id: Uuid::from_bytes(bytes),
+        username: gamertag,
+        access_token,
+        refresh_token,
+        expires,
+        norisk_credentials: NoRiskCredentials {
+            production: None,
+            experimental: None,
+        },
+        active,
+        ignore_child_protection_warning: true,
+        auth_flow: Some(auth_flow),
+        account_kind: AccountKind::Bedrock,
+    }
 }
 
 pub async fn device_token(

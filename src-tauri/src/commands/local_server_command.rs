@@ -151,6 +151,7 @@ pub struct CreateLocalServerInput {
     pub codex_enabled: Option<bool>,
     pub codex_mcp_port: Option<u16>,
     pub auto_update_content: Option<bool>,
+    pub source_profile_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -416,6 +417,14 @@ pub async fn create_local_server(input: CreateLocalServerInput) -> Result<LocalS
         _ => unreachable!("validated server type"),
     }
 
+    if let Some(profile_id) = input.source_profile_id.filter(|value| !value.trim().is_empty()) {
+        let profile_uuid = Uuid::parse_str(&profile_id)
+            .map_err(|error| AppError::InvalidInput(format!("Ungültige Profil-ID: {error}")))?;
+        let state = State::get().await?;
+        let profile = state.profile_manager.get_profile(profile_uuid).await?;
+        copy_profile_content(&profile, &state, &mut server)?;
+    }
+
     write_server_metadata(&server)?;
     write_codex_metadata(&server)?;
     sync_server_icon(&server).await?;
@@ -456,6 +465,7 @@ pub async fn create_local_server_from_profile(profile_id: String) -> Result<Loca
         codex_enabled: Some(false),
         codex_mcp_port: Some(8765),
         auto_update_content: Some(true),
+        source_profile_id: None,
     })
     .await?;
 
@@ -687,6 +697,64 @@ pub async fn delete_bedrock_profile(profile_id: String) -> Result<(), CommandErr
 }
 
 #[tauri::command]
+pub async fn open_bedrock_profile_folder(profile_id: String) -> Result<(), CommandError> {
+    let dir = bedrock_profile_dir(&profile_id);
+    if !dir.exists() {
+        return Err(CommandError::from(AppError::NotFound(
+            "Bedrock-Profil wurde nicht gefunden.".to_string(),
+        )));
+    }
+    open_path_with_shell(&dir)
+}
+
+#[tauri::command]
+pub async fn open_bedrock_profile_content(
+    profile_id: String,
+    file_name: String,
+    kind: String,
+) -> Result<(), CommandError> {
+    validate_bedrock_content_kind(&kind)?;
+    let profile = read_bedrock_profile(&profile_id)?;
+    let item = profile
+        .installed_content
+        .iter()
+        .find(|item| item.kind == kind && item.file_name == file_name)
+        .ok_or_else(|| CommandError::from(AppError::NotFound("Inhalt wurde nicht gefunden.".to_string())))?;
+    let path = PathBuf::from(&item.path);
+    if !path.exists() {
+        return Err(CommandError::from(AppError::NotFound(
+            "Die importierte Datei existiert nicht mehr.".to_string(),
+        )));
+    }
+    open_path_with_shell(&path)
+}
+
+#[tauri::command]
+pub async fn delete_bedrock_profile_content(
+    profile_id: String,
+    file_name: String,
+    kind: String,
+) -> Result<BedrockProfile, CommandError> {
+    validate_bedrock_content_kind(&kind)?;
+    let mut profile = read_bedrock_profile(&profile_id)?;
+    let item = profile
+        .installed_content
+        .iter()
+        .find(|item| item.kind == kind && item.file_name == file_name)
+        .cloned()
+        .ok_or_else(|| CommandError::from(AppError::NotFound("Inhalt wurde nicht gefunden.".to_string())))?;
+    let path = PathBuf::from(item.path);
+    if path.exists() {
+        fs::remove_file(path).map_err(AppError::from)?;
+    }
+    profile
+        .installed_content
+        .retain(|entry| !(entry.kind == kind && entry.file_name == file_name));
+    write_bedrock_profile(&profile)?;
+    Ok(profile)
+}
+
+#[tauri::command]
 pub async fn launch_bedrock_profile(profile_id: String) -> Result<BedrockProfile, CommandError> {
     let mut profile = read_bedrock_profile(&profile_id)?;
     profile.last_launched_at = Some(chrono::Utc::now().to_rfc3339());
@@ -818,6 +886,7 @@ pub async fn install_bedrock_skin_pack(input: InstallBedrockSkinPackInput) -> Re
     let pack_path = pack_dir.join(format!("{skin_name}.mcpack"));
 
     write_bedrock_skin_pack(&pack_path, &skin_name, &input.variant, &skin_bytes)?;
+    install_skin_pack_into_bedrock(&pack_path, &skin_name)?;
     open_path_with_shell(&pack_path)?;
     Ok(pack_path.to_string_lossy().to_string())
 }
@@ -1838,6 +1907,32 @@ fn write_bedrock_skin_pack(
     zip.start_file("texts/languages.json", options).map_err(AppError::from)?;
     zip.write_all(b"[\"en_US\"]").map_err(AppError::from)?;
     zip.finish().map_err(AppError::from)?;
+    Ok(())
+}
+
+fn install_skin_pack_into_bedrock(pack_path: &Path, skin_name: &str) -> Result<(), CommandError> {
+    let package_dirs = [minecraft_bedrock_package_dir(), minecraft_bedrock_preview_package_dir()];
+    let mut installed = false;
+    for package_dir in package_dirs.into_iter().flatten() {
+        let target = package_dir
+            .join("LocalState")
+            .join("games")
+            .join("com.mojang")
+            .join("skin_packs")
+            .join(format!("nrc_{}", sanitize_file_name(skin_name, "skin")));
+        if target.exists() {
+            fs::remove_dir_all(&target).map_err(AppError::from)?;
+        }
+        ensure_dir(&target)?;
+        extract_zip_archive(pack_path, &target)?;
+        installed = true;
+    }
+
+    if !installed {
+        return Err(CommandError::from(AppError::NotFound(
+            "Minecraft Bedrock oder Preview wurde nicht gefunden.".to_string(),
+        )));
+    }
     Ok(())
 }
 
