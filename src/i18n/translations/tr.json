@@ -580,6 +580,10 @@
   "profiles.sort.versionNewest": "En Yeni Sürüm",
   "profiles.sort.versionOldest": "En Eski Sürüm",
   "profiles.filter.allVersions": "Tüm Sürümler",
+  "profiles.filter.versions": "Sürümler",
+  "profiles.filter.clear": "Temizle",
+  "profiles.filter.noVersions": "Sürüm yok",
+  "profiles.filter.title": "Sürümleri filtrele",
   "profiles.layout.switchToGrid": "Izgara görünümüne geç",
   "profiles.layout.switchToCompact": "Kompakt görünüme geç",
   "profiles.layout.switchToList": "Liste görünümüne geç",
@@ -768,6 +772,12 @@
   "server.stop": "Durdur",
   "server.join": "Katıl",
   "server.mods": "Modlar",
+
+  "wm.public_viewing": "Dünya Kupası Public Viewing",
+  "wm.tooltip": "HugoSMP.net'te Dünya Kupası public viewing! {{version}} sürümüne ihtiyacın var!",
+  "wm.switch_to_main": "ana başlatmaya dön",
+  "wm.switch_to_hugo": "{{server}} sunucusuna geç",
+
   "radius.title": "Kenar Yuvarlaklığı",
   "radius.square": "Kare",
   "radius.minimal": "Minimal",

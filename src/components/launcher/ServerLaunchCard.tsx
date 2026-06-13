@@ -9,6 +9,7 @@ import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 import { LaunchState } from "../../store/launch-state-store";
 import type { ServerPingInfo } from "../../types/minecraft";
+import type { LaunchOverrides } from "../../services/process-service";
 
 interface ServerLaunchCardProps {
   serverAddress: string;
@@ -17,6 +18,8 @@ interface ServerLaunchCardProps {
   disabled?: boolean;
   onMods?: () => void;
   className?: string;
+  /** Runtime launch overrides (version/loader/pack), not persisted. */
+  launchOverrides?: LaunchOverrides;
 }
 
 export function ServerLaunchCard({
@@ -26,6 +29,7 @@ export function ServerLaunchCard({
   disabled = false,
   onMods,
   className = "",
+  launchOverrides,
 }: ServerLaunchCardProps) {
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
@@ -36,7 +40,6 @@ export function ServerLaunchCard({
   const subscribe = useServerPingStore((state) => state.subscribe);
   const triggerBackgroundPing = useServerPingStore((state) => state.triggerBackgroundPing);
 
-  // Use the profile launch hook for launch logic
   const {
     isLaunching,
     statusMessage,
@@ -53,22 +56,18 @@ export function ServerLaunchCard({
     },
   });
 
-  // Get cached ping on mount and subscribe to updates
   useEffect(() => {
-    // Get cached value immediately (may be null on first load)
     const cached = getPing(serverAddress);
     if (cached) {
       setServerInfo(cached);
       setIsLoading(false);
     }
 
-    // Subscribe to updates from background pings
     const unsubscribe = subscribe(serverAddress, (info) => {
       setServerInfo(info);
       setIsLoading(false);
     });
 
-    // Refresh every 30 seconds in background
     const interval = setInterval(() => {
       triggerBackgroundPing(serverAddress);
     }, 30000);
@@ -83,10 +82,9 @@ export function ServerLaunchCard({
     };
   }, [serverAddress, getPing, subscribe, triggerBackgroundPing]);
 
-  // 3D styling (matching ProfileCardV2)
   const get3DStyling = () => {
     const colors = {
-      main: isLaunching ? "#ef4444" : accentColor.value, // Red when launching (stop mode)
+      main: isLaunching ? "#ef4444" : accentColor.value,
       light: isLaunching ? "#f87171" : (accentColor.hoverValue || accentColor.value),
       dark: isLaunching ? "#dc2626" : accentColor.value,
     };
@@ -112,19 +110,16 @@ export function ServerLaunchCard({
 
   const handleClick = () => {
     if (!profileId) return;
-    handleQuickPlayLaunch(undefined, serverAddress);
+    handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
   };
 
-  // Parse MOTD to HTML
   const motdHtml = serverInfo?.description_json
     ? parseMotdToHtml(serverInfo.description_json)
     : serverInfo?.description
       ? parseMotdToHtml(serverInfo.description)
       : null;
 
-  // Determine what to show in the content area
   const renderContent = () => {
-    // When launching, show status message instead of MOTD
     if (isLaunching && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
@@ -135,7 +130,6 @@ export function ServerLaunchCard({
       );
     }
 
-    // Show "STARTING!" briefly after success
     if (statusMessage === "STARTING!") {
       return (
         <div className="flex flex-col items-center justify-center w-full">
@@ -146,7 +140,6 @@ export function ServerLaunchCard({
       );
     }
 
-    // Show error state
     if (launchState === LaunchState.ERROR && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
@@ -157,11 +150,10 @@ export function ServerLaunchCard({
       );
     }
 
-    // Default: Show MOTD
     return (
       <>
         <div
-          className="text-sm motd-container font-minecraft-ten w-full whitespace-pre-wrap"
+          className="text-xs leading-tight motd-container font-minecraft-ten w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
           style={{ textShadow: '2px 2px 0px rgba(0, 0, 0, 0.4)' }}
           title={serverInfo?.description || serverAddress}
         >
@@ -176,7 +168,6 @@ export function ServerLaunchCard({
           )}
         </div>
 
-        {/* Player count + Ping - centered */}
         {serverInfo && (
           <div className="flex items-center justify-center gap-3 mt-1">
             <span className="text-xs text-white/60 font-minecraft-ten">
@@ -210,7 +201,6 @@ export function ServerLaunchCard({
       onMouseLeave={() => setIsHovered(false)}
       onClick={isDisabled ? undefined : handleClick}
     >
-      {/* Server Icon */}
       <div className="relative w-16 h-16 flex-shrink-0 rounded flex items-center justify-center overflow-hidden">
         {isLaunching ? (
           <Icon
@@ -237,19 +227,16 @@ export function ServerLaunchCard({
         )}
       </div>
 
-      {/* Content Area (MOTD or Status) - fixed height to prevent layout shifts */}
       <div className="flex-1 min-w-0 flex flex-col justify-center min-h-[48px]">
         {renderContent()}
       </div>
 
-      {/* Action Buttons - stacked vertically */}
       <div className="flex flex-col gap-2 flex-shrink-0">
-        {/* Join/Stop Button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             if (isDisabled) return;
-            handleQuickPlayLaunch(undefined, serverAddress);
+            handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
           }}
           disabled={isDisabled}
           className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95"
@@ -267,7 +254,6 @@ export function ServerLaunchCard({
           </span>
         </button>
 
-        {/* Mods Button */}
         <button
           onClick={(e) => {
             e.stopPropagation();

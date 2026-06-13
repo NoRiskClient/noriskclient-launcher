@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
+import { invoke } from "@tauri-apps/api/core";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -23,7 +24,13 @@ import {
   openTesterWindow,
 } from "../../services/tester-service";
 
-type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions";
+type DebugTab =
+  | "launcher"
+  | "minecraft"
+  | "process"
+  | "crashes"
+  | "permissions"
+  | "testing";
 
 export function DebugSection() {
   const { t } = useTranslation();
@@ -31,13 +38,19 @@ export function DebugSection() {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<PermissionCacheState | null>(null);
+  const [permissions, setPermissions] = useState<PermissionCacheState | null>(
+    null,
+  );
   const [refreshingPerms, setRefreshingPerms] = useState(false);
 
   // Load files when tab changes
   useEffect(() => {
     if (activeTab === "permissions") {
-      getCachedPermissions().then(setPermissions).catch(() => setPermissions(null));
+      getCachedPermissions()
+        .then(setPermissions)
+        .catch(() => setPermissions(null));
+    } else if (activeTab === "testing") {
+      // no auto-load; user triggers actions manually
     } else {
       loadFiles();
     }
@@ -72,17 +85,19 @@ export function DebugSection() {
       await refreshPermissions();
       const cached = await getCachedPermissions();
       setPermissions(cached);
-      toast.success(t('debug.permissions.refreshed'));
+      toast.success(t("debug.permissions.refreshed"));
     } catch (e) {
       console.error("Failed to refresh permissions:", e);
-      toast.error(t('debug.permissions.refresh_failed', { error: getErrorMessage(e) }));
+      toast.error(
+        t("debug.permissions.refresh_failed", { error: getErrorMessage(e) }),
+      );
     }
     setRefreshingPerms(false);
   }
 
   // Helper to extract error message from Tauri CommandError or any error
   function getErrorMessage(e: unknown): string {
-    if (e && typeof e === 'object' && 'message' in e) {
+    if (e && typeof e === "object" && "message" in e) {
       return (e as { message: string }).message;
     }
     return String(e);
@@ -94,10 +109,10 @@ export function DebugSection() {
       const content = await getLogFileContent(file.path);
       const url = await uploadLogToMclogs(content);
       await writeText(url);
-      toast.success(t('debug.uploaded_copied'));
+      toast.success(t("debug.uploaded_copied"));
     } catch (e) {
       console.error("Failed to upload:", e);
-      toast.error(t('debug.upload_failed', { error: getErrorMessage(e) }));
+      toast.error(t("debug.upload_failed", { error: getErrorMessage(e) }));
     }
     setUploadingFile(null);
   }
@@ -106,10 +121,10 @@ export function DebugSection() {
     try {
       const content = await getLogFileContent(file.path);
       await writeText(content);
-      toast.success(t('debug.copied'));
+      toast.success(t("debug.copied"));
     } catch (e) {
       console.error("Failed to copy:", e);
-      toast.error(t('debug.copy_failed', { error: getErrorMessage(e) }));
+      toast.error(t("debug.copy_failed", { error: getErrorMessage(e) }));
     }
   }
 
@@ -118,7 +133,12 @@ export function DebugSection() {
     { id: "minecraft", name: "MC Logs", count: 0 },
     { id: "process", name: "Process Logs", count: 0 },
     { id: "crashes", name: "Crash Reports", count: 0 },
-    { id: "permissions", name: t('debug.permissions.tab'), count: permissions?.nodes.length ?? 0 },
+    {
+      id: "permissions",
+      name: t("debug.permissions.tab"),
+      count: permissions?.nodes.length ?? 0,
+    },
+    { id: "testing", name: "TESTING", count: 0 },
   ];
 
   const formatSize = (bytes: number) => {
@@ -142,83 +162,263 @@ export function DebugSection() {
         showAddButton={false}
       />
 
-      {activeTab === "permissions" ? (
+      {activeTab === "testing" ? (
+        <TestingPanel />
+      ) : activeTab === "permissions" ? (
         <PermissionsList
           permissions={permissions}
           refreshing={refreshingPerms}
           onRefresh={handleRefreshPermissions}
         />
       ) : (
-      /* File List */
-      <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-white/50">
-            <Icon
-              icon="solar:refresh-bold"
-              className="w-6 h-6 animate-spin mx-auto mb-2"
-            />
-            Loading...
-          </div>
-        ) : files.length === 0 ? (
-          <div className="p-8 text-center text-white/50 font-minecraft-ten">
-            No files found
-          </div>
-        ) : (
-          <div className="divide-y divide-white/10">
-            {files.map((file, i) => (
-              <div
-                key={i}
-                className="p-3 hover:bg-white/5 flex items-center gap-4"
-              >
-                <Icon
-                  icon={
-                    activeTab === "crashes"
-                      ? "solar:danger-triangle-bold"
-                      : "solar:document-text-bold"
-                  }
-                  className={`w-5 h-5 flex-shrink-0 ${activeTab === "crashes" ? "text-red-400" : "text-white/60"}`}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-minecraft-ten truncate">
-                    {file.name}
+        /* File List */
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center text-white/50">
+              <Icon
+                icon="solar:refresh-bold"
+                className="w-6 h-6 animate-spin mx-auto mb-2"
+              />
+              Loading...
+            </div>
+          ) : files.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">
+              No files found
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10">
+              {files.map((file, i) => (
+                <div
+                  key={i}
+                  className="p-3 hover:bg-white/5 flex items-center gap-4"
+                >
+                  <Icon
+                    icon={
+                      activeTab === "crashes"
+                        ? "solar:danger-triangle-bold"
+                        : "solar:document-text-bold"
+                    }
+                    className={`w-5 h-5 flex-shrink-0 ${activeTab === "crashes" ? "text-red-400" : "text-white/60"}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-minecraft-ten truncate">
+                      {file.name}
+                    </div>
+                    <div className="text-xs text-white/40 font-sans truncate">
+                      {file.path}
+                    </div>
                   </div>
-                  <div className="text-xs text-white/40 font-sans truncate">
-                    {file.path}
+                  <div className="text-sm text-white/50 font-sans whitespace-nowrap">
+                    {formatSize(file.size)}
+                  </div>
+                  <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
+                    {formatDate(file.modified)}
+                  </div>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopyContent(file)}
+                      className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
+                      title={t("debug.copy_content")}
+                    >
+                      <Icon
+                        icon="solar:copy-bold"
+                        className="w-4 h-4 text-white/70"
+                      />
+                    </button>
+                    <button
+                      onClick={() => handleUpload(file)}
+                      disabled={uploadingFile === file.path}
+                      className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+                      title={t("debug.upload_mclogs")}
+                    >
+                      {uploadingFile === file.path ? (
+                        <Icon
+                          icon="solar:refresh-bold"
+                          className="w-4 h-4 text-white/70 animate-spin"
+                        />
+                      ) : (
+                        <Icon
+                          icon="solar:upload-bold"
+                          className="w-4 h-4 text-white/70"
+                        />
+                      )}
+                    </button>
                   </div>
                 </div>
-                <div className="text-sm text-white/50 font-sans whitespace-nowrap">
-                  {formatSize(file.size)}
-                </div>
-                <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
-                  {formatDate(file.modified)}
-                </div>
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleCopyContent(file)}
-                    className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
-                    title={t('debug.copy_content')}
-                  >
-                    <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
-                  </button>
-                  <button
-                    onClick={() => handleUpload(file)}
-                    disabled={uploadingFile === file.path}
-                    className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-                    title={t('debug.upload_mclogs')}
-                  >
-                    {uploadingFile === file.path ? (
-                      <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />
-                    ) : (
-                      <Icon icon="solar:upload-bold" className="w-4 h-4 text-white/70" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ModCacheCleanupStats {
+  scanned: number;
+  deleted: string[];
+  freed_bytes: number;
+  failed: string[];
+  skipped_empty_keepset: boolean;
+}
+
+function TestingPanel() {
+  const [loading, setLoading] = useState(false);
+  const [filenames, setFilenames] = useState<string[] | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanStats, setCleanStats] = useState<ModCacheCleanupStats | null>(
+    null,
+  );
+
+  async function runExpectedCacheFilenames() {
+    setLoading(true);
+    try {
+      const result = await invoke<string[]>(
+        "debug_list_expected_cache_filenames",
+      );
+      setFilenames(result);
+      toast.success(
+        `Keep-set: ${result.length} filenames (also dumped to launcher log)`,
+      );
+    } catch (e) {
+      console.error("Failed to list expected cache filenames:", e);
+      toast.error(`Failed: ${String(e)}`);
+    }
+    setLoading(false);
+  }
+
+  async function runCleanModCache() {
+    setCleaning(true);
+    try {
+      const stats = await invoke<ModCacheCleanupStats>(
+        "clean_mod_cache_command",
+      );
+      setCleanStats(stats);
+      if (stats.skipped_empty_keepset) {
+        toast.error(
+          "Skipped: keep-set empty (config not loaded) — nothing deleted",
+        );
+      } else {
+        const mb = (stats.freed_bytes / (1024 * 1024)).toFixed(1);
+        toast.success(
+          `Removed ${stats.deleted.length} orphans, freed ${mb} MB`,
+        );
+      }
+    } catch (e) {
+      console.error("Failed to clean mod_cache:", e);
+      toast.error(`Failed: ${String(e)}`);
+    }
+    setCleaning(false);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon
+          icon="solar:database-bold"
+          className="w-5 h-5 text-amber-300 shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft-ten">
+            mod_cache keep-set
           </div>
-        )}
+          <div className="text-xs text-white/40 font-sans truncate">
+            Every filename any profile/pack could place in mod_cache (step 1 of
+            cache cleanup)
+          </div>
+        </div>
+        <button
+          onClick={runExpectedCacheFilenames}
+          disabled={loading}
+          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run debug_list_expected_cache_filenames"
+        >
+          {loading ? (
+            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="solar:play-bold" className="w-4 h-4" />
+          )}
+          Run
+        </button>
       </div>
+
+      {filenames !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            {filenames.length} filenames
+          </div>
+          {filenames.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">
+              Empty
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {filenames.map((name) => (
+                <div
+                  key={name}
+                  className="p-2 px-4 hover:bg-white/5 text-white/80 font-mono text-xs truncate"
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon
+          icon="solar:trash-bin-trash-bold"
+          className="w-5 h-5 text-red-300 shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft-ten">Clean mod_cache</div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            Delete cached jars not in the keep-set (orphans = stale/unused
+            versions)
+          </div>
+        </div>
+        <button
+          onClick={runCleanModCache}
+          disabled={cleaning}
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run clean_mod_cache_command"
+        >
+          {cleaning ? (
+            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+          )}
+          Clean
+        </button>
+      </div>
+
+      {cleanStats !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            scanned {cleanStats.scanned} · deleted {cleanStats.deleted.length} ·
+            failed {cleanStats.failed.length} · freed{" "}
+            {(cleanStats.freed_bytes / (1024 * 1024)).toFixed(1)} MB
+            {cleanStats.skipped_empty_keepset && " · SKIPPED (empty keep-set)"}
+          </div>
+          {cleanStats.deleted.length === 0 ? (
+            <div className="p-6 text-center text-white/50 font-minecraft-ten">
+              No orphans
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {cleanStats.deleted.map((name) => (
+                <div
+                  key={name}
+                  className="p-2 px-4 hover:bg-white/5 text-red-200/80 font-mono text-xs truncate"
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -230,7 +430,11 @@ interface PermissionsListProps {
   onRefresh: () => void;
 }
 
-function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsListProps) {
+function PermissionsList({
+  permissions,
+  refreshing,
+  onRefresh,
+}: PermissionsListProps) {
   const { t } = useTranslation();
   const nodes = permissions?.nodes ?? [];
   const lastFetched = permissions?.last_fetched
@@ -266,14 +470,17 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
   return (
     <div className="space-y-3">
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
-        <Icon icon="solar:shield-keyhole-bold" className="w-5 h-5 text-white/60 shrink-0" />
+        <Icon
+          icon="solar:shield-keyhole-bold"
+          className="w-5 h-5 text-white/60 shrink-0"
+        />
         <div className="flex-1 min-w-0">
           <div className="text-white font-minecraft-ten">
-            {t('debug.permissions.count', { n: nodes.length })}
+            {t("debug.permissions.count", { n: nodes.length })}
           </div>
           {lastFetched && (
             <div className="text-xs text-white/40 font-sans truncate">
-              {t('debug.permissions.last_refreshed', { time: lastFetched })}
+              {t("debug.permissions.last_refreshed", { time: lastFetched })}
             </div>
           )}
         </div>
@@ -281,7 +488,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
           onClick={onRefresh}
           disabled={refreshing}
           className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-          title={t('debug.permissions.refresh')}
+          title={t("debug.permissions.refresh")}
         >
           <Icon
             icon="solar:refresh-bold"
@@ -292,7 +499,10 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
 
       {canTest && (
         <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
-          <Icon icon="solar:test-tube-bold" className="w-5 h-5 text-amber-300 shrink-0" />
+          <Icon
+            icon="solar:test-tube-bold"
+            className="w-5 h-5 text-amber-300 shrink-0"
+          />
           <div className="flex-1 min-w-0">
             <div className="text-white font-minecraft-ten">Tester Queue</div>
             <div className="text-xs text-white/40 font-sans truncate">
@@ -310,7 +520,10 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
             title="Open tester window"
           >
             {opening ? (
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+              <Icon
+                icon="solar:refresh-bold"
+                className="w-4 h-4 animate-spin"
+              />
             ) : (
               <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
             )}
@@ -322,7 +535,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
       <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
         {nodes.length === 0 ? (
           <div className="p-8 text-center text-white/50 font-minecraft-ten">
-            {t('debug.permissions.empty')}
+            {t("debug.permissions.empty")}
           </div>
         ) : (
           <div className="divide-y divide-white/10">
@@ -331,8 +544,13 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
                 key={node}
                 className="p-3 hover:bg-white/5 flex items-center gap-3"
               >
-                <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400/70 shrink-0" />
-                <div className="text-white/80 font-mono text-sm truncate">{node}</div>
+                <Icon
+                  icon="solar:check-circle-bold"
+                  className="w-4 h-4 text-emerald-400/70 shrink-0"
+                />
+                <div className="text-white/80 font-mono text-sm truncate">
+                  {node}
+                </div>
               </div>
             ))}
           </div>

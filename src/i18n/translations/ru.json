@@ -580,6 +580,10 @@
   "profiles.sort.versionNewest": "Новейшая версия",
   "profiles.sort.versionOldest": "Старейшая версия",
   "profiles.filter.allVersions": "Все версии",
+  "profiles.filter.versions": "Версии",
+  "profiles.filter.clear": "Очистить",
+  "profiles.filter.noVersions": "Нет версий",
+  "profiles.filter.title": "Фильтр версий",
   "profiles.layout.switchToGrid": "Переключить на сетку",
   "profiles.layout.switchToCompact": "Переключить на компактный вид",
   "profiles.layout.switchToList": "Переключить на список",
@@ -888,6 +892,12 @@
   "server.stop": "Стоп",
   "server.join": "Войти",
   "server.mods": "Моды",
+
+  "wm.public_viewing": "Просмотр ЧМ",
+  "wm.tooltip": "Совместный просмотр ЧМ на HugoSMP.net! Нужна {{version}}!",
+  "wm.switch_to_main": "вернуться к обычному запуску",
+  "wm.switch_to_hugo": "Переключиться на {{server}}",
+
   "radius.title": "Радиус скругления",
   "radius.square": "Квадратный",
   "radius.minimal": "Минимальный",

@@ -580,6 +580,10 @@
   "profiles.sort.versionNewest": "Versão mais recente",
   "profiles.sort.versionOldest": "Versão mais antiga",
   "profiles.filter.allVersions": "Todas as Versões",
+  "profiles.filter.versions": "Versões",
+  "profiles.filter.clear": "Limpar",
+  "profiles.filter.noVersions": "Sem versões",
+  "profiles.filter.title": "Filtrar versões",
   "profiles.layout.switchToGrid": "Mudar para visualização em grade",
   "profiles.layout.switchToCompact": "Mudar para visualização compacta",
   "profiles.layout.switchToList": "Mudar para visualização em lista",
@@ -888,6 +892,12 @@
   "server.stop": "Parar",
   "server.join": "Entrar",
   "server.mods": "Mods",
+
+  "wm.public_viewing": "Public Viewing da Copa",
+  "wm.tooltip": "Public viewing da Copa do Mundo no HugoSMP.net! Você precisa da {{version}}!",
+  "wm.switch_to_main": "voltar ao início principal",
+  "wm.switch_to_hugo": "Mudar para {{server}}",
+
   "radius.title": "Raio da Borda",
   "radius.square": "Quadrado",
   "radius.minimal": "Mínimo",

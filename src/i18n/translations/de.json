@@ -644,6 +644,10 @@
   "profiles.sort.versionNewest": "Neueste Version",
   "profiles.sort.versionOldest": "Älteste Version",
   "profiles.filter.allVersions": "Alle Versionen",
+  "profiles.filter.versions": "Versionen",
+  "profiles.filter.clear": "Zurücksetzen",
+  "profiles.filter.noVersions": "Keine Versionen",
+  "profiles.filter.title": "Versionen filtern",
   "profiles.layout.switchToGrid": "Zur Gitteransicht wechseln",
   "profiles.layout.switchToCompact": "Zur kompakten Ansicht wechseln",
   "profiles.layout.switchToList": "Zur Listenansicht wechseln",
@@ -834,6 +838,11 @@
   "server.stop": "Stop",
   "server.join": "Beitreten",
   "server.mods": "Mods",
+
+  "wm.public_viewing": "WM Public Viewing",
+  "wm.tooltip": "WM Public Viewing auf HugoSMP.net! Du brauchst die {{version}}!",
+  "wm.switch_to_main": "zurück zum normalen start",
+  "wm.switch_to_hugo": "Zu {{server}} wechseln",
 
   "radius.title": "Eckenradius",
   "radius.square": "Eckig",

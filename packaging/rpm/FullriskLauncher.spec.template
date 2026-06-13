@@ -1,6 +1,6 @@
 Name:           fullrisk-launcher
-Version:        0.6.24
-Release:        1.%{?dist}
+Version:        0.6.25
+Release:        1.beta.4%{?dist}
 Summary:        FullRiskClient Launcher
 
 License:        MIT
