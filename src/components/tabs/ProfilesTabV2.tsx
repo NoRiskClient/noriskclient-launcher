@@ -25,7 +25,6 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
-import { FullRiskProfileCard } from "../profiles/FullRiskProfileCard";
 import { parseErrorMessage } from "../../utils/error-utils";
 
 // A vertical virtualizer row: a version-section divider header, or a row of up to N cards.
@@ -41,8 +40,6 @@ export function ProfilesTabV2() {
   const { openModal: openWizard } = useProfileWizardStore();
   const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
   const { showModal, hideModal } = useGlobalModal();
-  const uiStylePreset = useThemeStore((state) => state.uiStylePreset);
-  const isFullRiskStyle = uiStylePreset === "fullrisk";
 
   // Persistent filters from theme store
   const {
@@ -244,7 +241,7 @@ export function ProfilesTabV2() {
 
     const confirmed = await confirm({
       title: t("profiles.deleteProfileTitle"),
-      message: `${t("profiles.deleteConfirmQuestion")}\n- ${profileName}\n\n${t("profiles.deleteConfirmCannotUndo")}`,
+      message: t("profiles.deleteConfirmMessageSimple", { name: profileName }),
       confirmText: t("profiles.deleteConfirm"),
       cancelText: t("profiles.cancelAction"),
       type: "danger",
@@ -421,183 +418,137 @@ export function ProfilesTabV2() {
   }
 
   return (
-    <div
-      className={
-        isFullRiskStyle
-          ? "h-full flex flex-col overflow-hidden px-10 py-6 relative"
-          : "h-full flex flex-col overflow-hidden p-4 relative"
-      }
-    >
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Group Tabs */}
-        <GroupTabs
-          groups={groups}
-          activeGroup={activeGroup}
-          onGroupChange={setProfilesTabActiveGroup}
-          showAddButton={false}
-          className={isFullRiskStyle ? "mb-8" : ""}
-        />
+    <div className="h-full flex flex-col overflow-hidden p-4 relative">
+      {/* Group Tabs */}
+      <GroupTabs
+        groups={groups}
+        activeGroup={activeGroup}
+        onGroupChange={setProfilesTabActiveGroup}
+        showAddButton={false}
+      />
 
-        {/* Search & Filter Header */}
-        <div
-          className={
-            isFullRiskStyle
-              ? "mb-8 pb-6 border-b-[3px]"
-              : "mb-6 pb-4 border-b border-white/10"
-          }
-          style={
-            isFullRiskStyle
-              ? { borderColor: "var(--panel-border-strong)" }
-              : undefined
-          }
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 flex-1">
-              <SearchWithFilters
-                placeholder={t("profiles.searchProfiles")}
-                searchValue={searchQuery}
-                onSearchChange={setSearchQuery}
-                sortOptions={[
-                  {
-                    value: "name",
-                    label: t("profiles.sort.name"),
-                    icon: "solar:text-bold",
-                  },
-                  {
-                    value: "last_played",
-                    label: t("profiles.sort.lastPlayed"),
-                    icon: "solar:clock-circle-bold",
-                  },
-                  {
-                    value: "date_created",
-                    label: t("profiles.sort.dateCreated"),
-                    icon: "solar:calendar-add-bold",
-                  },
-                  {
-                    value: "version_newest",
-                    label: t("profiles.sort.versionNewest"),
-                    icon: "solar:arrow-down-bold",
-                  },
-                  {
-                    value: "version_oldest",
-                    label: t("profiles.sort.versionOldest"),
-                    icon: "solar:arrow-up-bold",
-                  },
-                ]}
-                sortValue={sortBy}
-                onSortChange={setProfilesTabSortBy}
-                dropdownSize="sm"
-                filterSlot={
-                  <MultiVersionFilter
-                    options={getVersionFilterOptions()}
-                    selected={selectedVersions}
-                    onToggle={toggleProfilesTabVersionFilter}
-                    onClear={() => setProfilesTabVersionFilters([])}
-                    size="sm"
-                  />
-                }
-              />
-
-              {/* Layout Toggle Button - Right next to SearchWithFilters */}
-              <button
-                onClick={() => {
-                  const nextMode =
-                    layoutMode === "list"
-                      ? "grid"
-                      : layoutMode === "grid"
-                        ? "compact"
-                        : "list";
-                  setProfilesTabLayoutMode(nextMode);
-                }}
-                className={
-                  isFullRiskStyle
-                    ? "flex items-center gap-2 px-4 py-2 fullrisk-panel text-white hover:text-[var(--panel-highlight)] font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
-                    : "flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
-                }
-                title={
-                  layoutMode === "list"
-                    ? t("profiles.layout.switchToGrid")
-                    : layoutMode === "grid"
-                      ? t("profiles.layout.switchToCompact")
-                      : t("profiles.layout.switchToList")
-                }
-              >
-                <div className="w-4 h-8 flex items-center justify-center">
-                  <Icon icon="solar:list-bold" className="w-8 h-8" />
-                </div>
-              </button>
-            </div>
-
-            <ActionButtons actions={actionButtons} />
-          </div>
-        </div>
-
-        {/* Virtualized profile list. Version-divider headers appear only while a version filter is active. */}
-        <div
-          className={
-            isFullRiskStyle && layoutMode === "grid"
-              ? "mx-auto flex max-w-[1280px] flex-wrap justify-center gap-x-10 gap-y-24 items-start pb-10"
-              : layoutMode === "list"
-                ? "space-y-3"
-                : layoutMode === "grid"
-                  ? "grid grid-cols-2 gap-3"
-                  : "grid grid-cols-3 gap-3"
-          }
-        >
-          {virtualRows.length === 0 ? (
-            <EmptyState
-              icon="solar:widget-bold"
-              message={t("profiles.noProfilesFound")}
+      {/* Search & Filter Header */}
+      <div className="mb-6 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 flex-1">
+            <SearchWithFilters
+              placeholder={t("profiles.searchProfiles")}
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              sortOptions={[
+                {
+                  value: "name",
+                  label: t("profiles.sort.name"),
+                  icon: "solar:text-bold",
+                },
+                {
+                  value: "last_played",
+                  label: t("profiles.sort.lastPlayed"),
+                  icon: "solar:clock-circle-bold",
+                },
+                {
+                  value: "date_created",
+                  label: t("profiles.sort.dateCreated"),
+                  icon: "solar:calendar-add-bold",
+                },
+                {
+                  value: "version_newest",
+                  label: t("profiles.sort.versionNewest"),
+                  icon: "solar:arrow-down-bold",
+                },
+                {
+                  value: "version_oldest",
+                  label: t("profiles.sort.versionOldest"),
+                  icon: "solar:arrow-up-bold",
+                },
+              ]}
+              sortValue={sortBy}
+              onSortChange={setProfilesTabSortBy}
+              dropdownSize="sm"
+              filterSlot={
+                <MultiVersionFilter
+                  options={getVersionFilterOptions()}
+                  selected={selectedVersions}
+                  onToggle={toggleProfilesTabVersionFilter}
+                  onClear={() => setProfilesTabVersionFilters([])}
+                  size="sm"
+                />
+              }
             />
-          ) : (
-            <Virtuoso
-              data={virtualRows}
-              className="custom-scrollbar"
-              style={{ height: "100%" }}
-              itemContent={(_index, row) => {
-                if (row.type === "header") {
-                  return (
-                    // Version divider header, e.g. "── 26.1 ──────────────"
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-px w-6 bg-white/10" />
-                      <span className="font-minecraft text-2xl lowercase text-white/60 whitespace-nowrap">
-                        {row.version}
-                      </span>
-                      <div className="h-px flex-1 bg-white/10" />
-                    </div>
-                  );
-                }
+
+            {/* Layout Toggle Button - Right next to SearchWithFilters */}
+            <button
+              onClick={() => {
+                const nextMode =
+                  layoutMode === "list"
+                    ? "grid"
+                    : layoutMode === "grid"
+                      ? "compact"
+                      : "list";
+                setProfilesTabLayoutMode(nextMode);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
+              title={
+                layoutMode === "list"
+                  ? t("profiles.layout.switchToGrid")
+                  : layoutMode === "grid"
+                    ? t("profiles.layout.switchToCompact")
+                    : t("profiles.layout.switchToList")
+              }
+            >
+              <div className="w-4 h-8 flex items-center justify-center">
+                <Icon icon="solar:list-bold" className="w-8 h-8" />
+              </div>
+            </button>
+          </div>
+
+          <ActionButtons actions={actionButtons} />
+        </div>
+      </div>
+
+      {/* Virtualized profile list. Version-divider headers appear only while a version filter is active. */}
+      <div className="flex-1 min-h-0 h-full">
+        {virtualRows.length === 0 ? (
+          <EmptyState
+            icon="solar:widget-bold"
+            message={t("profiles.noProfilesFound")}
+          />
+        ) : (
+          <Virtuoso
+            data={virtualRows}
+            className="custom-scrollbar"
+            style={{ height: "100%" }}
+            itemContent={(_index, row) => {
+              if (row.type === "header") {
                 return (
-                  <div className={`grid ${gridColsClass} gap-3 mb-3`}>
-                    {row.profiles.map((profile) =>
-                      isFullRiskStyle && layoutMode === "grid" ? (
-                        <FullRiskProfileCard
-                          key={profile.id}
-                          profile={profile}
-                          onSettings={handleSettings}
-                          onMods={handleMods}
-                          onDelete={handleDeleteProfile}
-                          onOpenFolder={handleOpenFolder}
-                        />
-                      ) : (
-                        <ProfileCardV2
-                          key={profile.id}
-                          profile={profile}
-                          onSettings={handleSettings}
-                          onMods={handleMods}
-                          onDelete={handleDeleteProfile}
-                          onOpenFolder={handleOpenFolder}
-                          layoutMode={layoutMode}
-                          variant={isFullRiskStyle ? "3d" : "default"}
-                        />
-                      ),
-                    )}
+                  // Version divider header, e.g. "── 26.1 ──────────────"
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-px w-6 bg-white/10" />
+                    <span className="font-minecraft text-2xl lowercase text-white/60 whitespace-nowrap">
+                      {row.version}
+                    </span>
+                    <div className="h-px flex-1 bg-white/10" />
                   </div>
                 );
-              }}
-            />
-          )}
-        </div>
+              }
+              return (
+                <div className={`grid ${gridColsClass} gap-3 mb-3`}>
+                  {row.profiles.map((profile) => (
+                    <ProfileCardV2
+                      key={profile.id}
+                      profile={profile}
+                      onSettings={handleSettings}
+                      onMods={handleMods}
+                      onDelete={handleDeleteProfile}
+                      onOpenFolder={handleOpenFolder}
+                      layoutMode={layoutMode}
+                    />
+                  ))}
+                </div>
+              );
+            }}
+          />
+        )}
       </div>
 
       {/* Modals from ProfilesTab.tsx */}

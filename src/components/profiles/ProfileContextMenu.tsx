@@ -24,6 +24,7 @@ interface ProfileContextMenuProps {
   onDelete: (profileId: string, profileName: string) => void;
   onDuplicate: () => void;
   onOpenFolder: () => void;
+  onCreateDesktopShortcut: () => void;
   onExport: () => void;
   onOpenSettings: () => void;
   onRepair?: () => void;
@@ -77,6 +78,7 @@ export const ProfileContextMenu = forwardRef<
     onDelete,
     onDuplicate,
     onOpenFolder,
+    onCreateDesktopShortcut,
     onExport,
     onOpenSettings,
     onRepair,
@@ -100,12 +102,12 @@ export const ProfileContextMenu = forwardRef<
       // Use a rough estimate for menu dimensions or measure actual dimensions
       const menuWidth = 220; // Approximate width based on content
       // Calculate height based on profile type and available options
-      let menuHeight = 180; // Base height including settings, duplicate, open folder, export
+      let menuHeight = 220; // Base height including settings, duplicate, open folder, export, shortcut
       
       if (!profile.is_standard_version) {
-        menuHeight = 240; // Non-standard: all settings + delete + separators
+        menuHeight = 280; // Non-standard: all settings + delete + separators
       } else if (onRepair) {
-        menuHeight = 220; // Standard with repair: java settings + repair button + separators
+        menuHeight = 260; // Standard with repair: java settings + repair button + separators
       }
       
       const newPosition = calculateMenuPosition(x, y, menuWidth, menuHeight);
@@ -258,6 +260,22 @@ export const ProfileContextMenu = forwardRef<
           />
           <span className="font-minecraft-ten text-base text-white/80">
             {t('profiles.exportProfile')}
+          </span>
+        </li>
+        <li
+          className="px-4 py-2.5 flex items-center gap-3 hover:bg-white/10 cursor-pointer transition-colors duration-150"
+          onClick={(e) => {
+            e.stopPropagation();
+            console.log("[ContextMenu] Desktop shortcut item clicked");
+            handleAction(onCreateDesktopShortcut);
+          }}
+        >
+          <Icon
+            icon="solar:shortcut-bold"
+            className="w-5 h-5 text-white"
+          />
+          <span className="font-minecraft-ten text-base text-white/80">
+            Shortcut to Desktop
           </span>
         </li>
 

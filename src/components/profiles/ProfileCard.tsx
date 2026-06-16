@@ -268,6 +268,15 @@ export function ProfileCard({
     }
   };
 
+  const handleCreateDesktopShortcut = () => {
+    const shortcutPromise = ProfileService.createProfileDesktopShortcut(profile.id);
+    toast.promise(shortcutPromise, {
+      loading: `Creating desktop shortcut for '${profile.name}'...`,
+      success: "Desktop shortcut created",
+      error: (err) => `Failed to create shortcut: ${parseErrorMessage(err)}`,
+    });
+  };
+
   const handleRepairFromContextMenu = async () => {
     if (!profile?.id) {
       toast.error(t('profiles.errors.id_missing_repair'));
@@ -454,6 +463,7 @@ export function ProfileCard({
         onDelete={handleDeleteFromContextMenu}
         onDuplicate={handleDuplicateFromContextMenu}
         onOpenFolder={handleOpenFolder}
+        onCreateDesktopShortcut={handleCreateDesktopShortcut}
         onExport={handleExportFromContextMenu}
         onOpenSettings={onEdit}
         onRepair={handleRepairFromContextMenu}

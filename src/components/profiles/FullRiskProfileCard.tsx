@@ -5,7 +5,7 @@ import type { Profile } from "../../types/profile";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 import { Button } from "../ui/buttons/Button";
 import { ProfileIconV2 } from "./ProfileIconV2";
-import { resolveImagePath } from "../../services/profile-service";
+import { createProfileDesktopShortcut, resolveImagePath } from "../../services/profile-service";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
@@ -221,6 +221,18 @@ export function FullRiskProfileCard({
           error: (err) => err instanceof Error ? err.message : String(err),
         });
         await navigator.clipboard?.writeText(result.code).catch(() => undefined);
+      },
+    },
+    {
+      id: "desktop-shortcut",
+      label: "Shortcut to Desktop",
+      icon: "solar:shortcut-bold",
+      onClick: async () => {
+        await toast.promise(createProfileDesktopShortcut(profile.id), {
+          loading: "Creating desktop shortcut...",
+          success: "Desktop shortcut created",
+          error: (err) => err instanceof Error ? err.message : String(err),
+        });
       },
     },
     {

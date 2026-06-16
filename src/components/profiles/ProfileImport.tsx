@@ -18,6 +18,7 @@ import { parseErrorMessage } from "../../utils/error-utils";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { EventType, type EventPayload } from "../../types/events";
 import { useTranslation } from "react-i18next";
+import { importSharedProfile } from "../../services/profile-share-service";
 
 interface ProfileImportProps {
   onClose: () => void;
@@ -30,6 +31,8 @@ export function ProfileImport({
 }: ProfileImportProps) {
   const { t } = useTranslation();
   const [isImporting, setIsImporting] = useState(false);
+  const [isCodeImporting, setIsCodeImporting] = useState(false);
+  const [shareCode, setShareCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -142,12 +145,44 @@ export function ProfileImport({
     }
   };
 
+  const handleImportCode = async () => {
+    const code = shareCode.trim();
+    if (!code) {
+      toast.error("Enter a share code first");
+      return;
+    }
+
+    setIsCodeImporting(true);
+    try {
+      const newProfileId = await toast.promise(importSharedProfile(code), {
+        loading: "Importing shared profile...",
+        success: "Shared profile imported",
+        error: (err) => err instanceof Error ? err.message : String(err),
+      });
+      useProfileStore.getState().fetchProfiles();
+      onImportComplete();
+      onClose();
+      navigate(`/profilesv2/${newProfileId}`);
+    } finally {
+      setIsCodeImporting(false);
+    }
+  };
+
   const renderFooter = () => (
-    <div className="flex justify-end">
+    <div className="flex justify-end gap-3">
+      <Button
+        variant="secondary"
+        onClick={handleImportCode}
+        disabled={isImporting || isCodeImporting || !shareCode.trim()}
+        icon={<Icon icon="solar:key-minimalistic-square-bold" className="w-5 h-5 text-white" />}
+        size="md"
+      >
+        {isCodeImporting ? "importing code" : "import code"}
+      </Button>
       <Button
         variant="default"
         onClick={handleImport}
-        disabled={isImporting}
+        disabled={isImporting || isCodeImporting}
         icon={<Icon icon="solar:upload-bold" className="w-5 h-5 text-white" />}
         size="md"
       >
@@ -182,6 +217,32 @@ export function ProfileImport({
             <p className="text-lg text-white/70 mb-6 font-minecraft-ten tracking-wide select-none">
               {t('profiles.import_description')}
             </p>
+
+            <div className="mb-6">
+              <label
+                htmlFor="profileShareCode"
+                className="block text-2xl text-white font-minecraft mb-3 select-none lowercase"
+              >
+                share code
+              </label>
+              <div className="flex gap-3">
+                <input
+                  id="profileShareCode"
+                  value={shareCode}
+                  onChange={(event) => setShareCode(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      void handleImportCode();
+                    }
+                  }}
+                  disabled={isImporting || isCodeImporting}
+                  maxLength={16}
+                  className="min-w-0 flex-1 rounded-md border-2 bg-black/30 px-4 py-3 font-minecraft text-2xl text-white outline-none placeholder:text-white/35"
+                  style={{ borderColor: `${accentColor.value}60` }}
+                  placeholder="ABCDEFGH"
+                />
+              </div>
+            </div>
 
             <div className="mb-6">
               <h3 className="text-2xl text-white font-minecraft mb-4 select-none lowercase">

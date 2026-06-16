@@ -30,7 +30,7 @@ import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
-import { resolveImagePath } from "../../services/profile-service";
+import { createProfileDesktopShortcut, resolveImagePath } from "../../services/profile-service";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { shareProfile } from "../../services/profile-share-service";
 
@@ -355,6 +355,18 @@ export function ProfileCardV2({
         await navigator.clipboard
           ?.writeText(result.code)
           .catch(() => undefined);
+      },
+    },
+    {
+      id: "desktop-shortcut",
+      label: "Shortcut to Desktop",
+      icon: "solar:shortcut-bold",
+      onClick: async (profile) => {
+        await toast.promise(createProfileDesktopShortcut(profile.id), {
+          loading: "Creating desktop shortcut...",
+          success: "Desktop shortcut created",
+          error: (err) => (err instanceof Error ? err.message : String(err)),
+        });
       },
     },
     {

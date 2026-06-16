@@ -61,7 +61,7 @@ use commands::minecraft_command::{
 use commands::profile_command::{
     abort_profile_launch, add_modrinth_content_to_profile, add_modrinth_mod_to_profile,
     batch_check_content_installed, check_for_group_migration_command, check_world_lock_status, copy_profile, copy_world,
-    create_profile, delete_custom_mod, delete_mod_from_profile, delete_profile, delete_world,
+    create_profile, create_profile_desktop_shortcut, delete_custom_mod, delete_mod_from_profile, delete_profile, delete_world,
     dismiss_standard_profiles,
     export_profile, get_all_profiles_and_last_played, get_custom_mods, get_local_content,
     get_local_datapacks, get_local_resourcepacks, get_local_shaderpacks, get_log_file_content,
@@ -542,6 +542,7 @@ let default_panic_hook = std::panic::take_hook();
             utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
             utils::mod_cache_cleanup::clean_mod_cache_command,
             create_profile,
+            create_profile_desktop_shortcut,
             get_profile,
             update_profile,
             delete_profile,

@@ -44,6 +44,10 @@ export async function createProfile(
   return invoke<string>("create_profile", { params });
 }
 
+export async function createProfileDesktopShortcut(profileId: string): Promise<string> {
+  return invoke<string>("create_profile_desktop_shortcut", { profileId });
+}
+
 export async function updateProfile(
   id: string,
   params: UpdateProfileParams,

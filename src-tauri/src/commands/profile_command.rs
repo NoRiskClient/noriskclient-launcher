@@ -36,6 +36,7 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::process::Command;
 use sysinfo::System;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
@@ -90,6 +91,99 @@ pub struct ExportProfileParams {
     file_name: String,           // Base name without extension
     include_files: Option<Vec<PathBuf>>,
     open_folder: bool, // Whether to open the exports folder after export
+}
+
+#[tauri::command]
+pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String, CommandError> {
+    let state = State::get().await?;
+    let profile = state.profile_manager.get_profile(profile_id).await?;
+    let desktop_dir = dirs::desktop_dir()
+        .ok_or_else(|| AppError::Other("Desktop directory not found".to_string()))?;
+    let exe_path = std::env::current_exe()
+        .map_err(|e| AppError::Other(format!("Failed to resolve launcher executable: {}", e)))?;
+    let shortcut_name = sanitize(format!("{} - FullRiskClient", profile.name));
+
+    #[cfg(target_os = "windows")]
+    {
+        let shortcut_path = desktop_dir.join(format!("{}.lnk", shortcut_name));
+        let escape_ps = |value: &str| value.replace('\'', "''");
+        let working_dir = exe_path
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let script = format!(
+            "$shell = New-Object -ComObject WScript.Shell; \
+             $shortcut = $shell.CreateShortcut('{}'); \
+             $shortcut.TargetPath = '{}'; \
+             $shortcut.Arguments = 'launch --profile {}'; \
+             $shortcut.WorkingDirectory = '{}'; \
+             $shortcut.Save();",
+            escape_ps(&shortcut_path.to_string_lossy()),
+            escape_ps(&exe_path.to_string_lossy()),
+            profile_id,
+            escape_ps(&working_dir),
+        );
+
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| AppError::Other(format!("Failed to create shortcut: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(AppError::Other(format!(
+                "Failed to create shortcut: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
+            .into());
+        }
+
+        return Ok(shortcut_path.to_string_lossy().to_string());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use tokio::fs;
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let shortcut_path = desktop_dir.join(format!("{}.desktop", shortcut_name));
+        let content = format!(
+            "[Desktop Entry]\nType=Application\nName={}\nExec=\"{}\" launch --profile {}\nTerminal=false\n",
+            profile.name.replace('\n', " "),
+            exe_path.to_string_lossy(),
+            profile_id
+        );
+        fs::write(&shortcut_path, content).await?;
+        #[cfg(unix)]
+        {
+            let mut permissions = fs::metadata(&shortcut_path).await?.permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&shortcut_path, permissions).await?;
+        }
+        return Ok(shortcut_path.to_string_lossy().to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use tokio::fs;
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let shortcut_path = desktop_dir.join(format!("{}.command", shortcut_name));
+        let content = format!(
+            "#!/bin/sh\n\"{}\" launch --profile {}\n",
+            exe_path.to_string_lossy(),
+            profile_id
+        );
+        fs::write(&shortcut_path, content).await?;
+        #[cfg(unix)]
+        {
+            let mut permissions = fs::metadata(&shortcut_path).await?.permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&shortcut_path, permissions).await?;
+        }
+        return Ok(shortcut_path.to_string_lossy().to_string());
+    }
 }
 
 // DTO for the new command
