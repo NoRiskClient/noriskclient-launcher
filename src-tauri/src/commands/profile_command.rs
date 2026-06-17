@@ -153,12 +153,12 @@ pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String,
             exe_path.to_string_lossy(),
             profile_id
         );
-        fs::write(&shortcut_path, content).await?;
+        fs::write(&shortcut_path, content).await;
         #[cfg(unix)]
         {
             let mut permissions = fs::metadata(&shortcut_path).await?.permissions();
             permissions.set_mode(0o755);
-            fs::set_permissions(&shortcut_path, permissions).await?;
+            fs::set_permissions(&shortcut_path, permissions).await;
         }
         return Ok(shortcut_path.to_string_lossy().to_string());
     }
@@ -178,7 +178,7 @@ pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String,
         fs::write(&shortcut_path, content).await?;
         #[cfg(unix)]
         {
-            let mut permissions = fs::metadata(&shortcut_path).await?.permissions();
+            let mut permissions = fs::metadata(&shortcut_path).await.permissions();
             permissions.set_mode(0o755);
             fs::set_permissions(&shortcut_path, permissions).await?;
         }
