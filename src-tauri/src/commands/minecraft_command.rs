@@ -682,7 +682,7 @@ pub async fn add_skin_locally(
     );
 
     let mut final_skin_name = payload.target_skin_name.clone();
-    let mut final_skin_variant = payload.target_skin_variant.clone();
+    let final_skin_variant = payload.target_skin_variant.clone();
 
     // Extract base64 data using the reusable function
     let base64_data = get_base64_from_skin_source(&payload.source).await?;
