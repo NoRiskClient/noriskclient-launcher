@@ -140,33 +140,41 @@ pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String,
         return Ok(shortcut_path.to_string_lossy().to_string());
     }
 
-    #[cfg(target_os = "linux")]
-    {
-        use tokio::fs;
-        #[cfg(unix)]
-        use std::os::unix::fs::PermissionsExt;
+#[cfg(target_os = "linux")]
+{
+    use tokio::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
 
-        let shortcut_path = desktop_dir.join(format!("{}.desktop", shortcut_name));
-        let content = format!(
-            "[Desktop Entry]\nType=Application\nName={}\nExec=\"{}\" launch --profile {}\nTerminal=false\n",
-            profile.name.replace('\n', " "),
-            exe_path.to_string_lossy(),
-            profile_id
-        );
-        fs::write(&shortcut_path, content).await?;
-        #[cfg(unix)]
-        {
-            let mut permissions = fs::metadata(&shortcut_path)
-                .await
-                .map_err(|e| CommandError::from(AppError::Io(e)))?
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&shortcut_path, permissions)
-                .await
-                .map_err(|e| CommandError::from(AppError::Io(e)))?;
-        }
-        return Ok(shortcut_path.to_string_lossy().to_string());
+    let shortcut_path = desktop_dir.join(format!("{}.desktop", shortcut_name));
+
+    let content = format!(
+        "[Desktop Entry]\nType=Application\nName={}\nExec=\"{}\" launch --profile {}\nTerminal=false\n",
+        profile.name.replace('\n', " "),
+        exe_path.to_string_lossy(),
+        profile_id
+    );
+
+    fs::write(&shortcut_path, content)
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?;
+
+    #[cfg(unix)]
+    {
+        let mut permissions = fs::metadata(&shortcut_path)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?
+            .permissions();
+
+        permissions.set_mode(0o755);
+
+        fs::set_permissions(&shortcut_path, permissions)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?;
     }
+
+    Ok(shortcut_path.to_string_lossy().to_string())
+}
 
     #[cfg(target_os = "macos")]
     {
@@ -180,20 +188,22 @@ pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String,
             exe_path.to_string_lossy(),
             profile_id
         );
-        fs::write(&shortcut_path, content).await?;
-        #[cfg(unix)]
-        {
-            let mut permissions = fs::metadata(&shortcut_path)
-                .await
-                .map_err(|e| CommandError::from(AppError::Io(e)))?
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&shortcut_path, permissions)
-                .await
-                .map_err(|e| CommandError::from(AppError::Io(e)))?;
+        fs::write(&shortcut_path, content)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?;
+            #[cfg(unix)]
+            {
+                let mut permissions = fs::metadata(&shortcut_path)
+                    .await
+                    .map_err(|e| CommandError::from(AppError::Io(e)))?
+                    .permissions();
+                permissions.set_mode(0o755);
+                fs::set_permissions(&shortcut_path, permissions)
+                    .await
+                    .map_err(|e| CommandError::from(AppError::Io(e)))?;
+            }
+            return Ok(shortcut_path.to_string_lossy().to_string());
         }
-        return Ok(shortcut_path.to_string_lossy().to_string());
-    }
 }
 
 // DTO for the new command
