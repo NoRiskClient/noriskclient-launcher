@@ -368,6 +368,46 @@ pub async fn restore_from_backup<P: AsRef<Path>>(
     }
 }
 
+/// Restores a specific user-chosen backup file over `target_path`. Validates the
+/// backup lives inside the profiles backup dir, refuses empty/corrupt backups,
+/// and snapshots the current file as `profiles.corrupted.<ts>` first.
+pub async fn restore_specific_backup(target_path: &Path, backup_path: &Path) -> Result<PathBuf> {
+    // Security: the backup must resolve inside <backup_root>/profiles.
+    let backups_dir = get_backup_root().join("profiles");
+    let canon_dir = fs::canonicalize(&backups_dir).await.map_err(AppError::Io)?;
+    let canon_backup = fs::canonicalize(backup_path).await.map_err(AppError::Io)?;
+    if !canon_backup.starts_with(&canon_dir) {
+        return Err(AppError::Other(format!(
+            "Refusing to restore from outside the backups directory: {}",
+            backup_path.display()
+        )));
+    }
+
+    if !is_valid_profiles_backup(&canon_backup).await {
+        return Err(AppError::Other(format!(
+            "Backup is empty or unreadable: {}",
+            backup_path.display()
+        )));
+    }
+
+    if target_path.exists() {
+        let corrupted_path = target_path.with_extension(format!(
+            "corrupted.{}",
+            Utc::now().format("%Y%m%d_%H%M%S")
+        ));
+        fs::copy(target_path, &corrupted_path).await?;
+        info!("Saved current profiles file as: {}", corrupted_path.display());
+    }
+
+    fs::copy(&canon_backup, target_path).await.map_err(AppError::Io)?;
+    info!(
+        "Restored '{}' from chosen backup '{}'",
+        target_path.display(),
+        canon_backup.display()
+    );
+    Ok(target_path.to_path_buf())
+}
+
 /// Lists all available backups for a file
 pub async fn list_backups<P: AsRef<Path>>(
     source_path: P,
