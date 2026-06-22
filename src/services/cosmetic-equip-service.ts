@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 import {
   type CosmeticRealOutfit,
+  type CosmeticSettings,
+  type CustomTextureSource,
   ZERO_UUID,
 } from "../types/cosmeticOutfit";
 import {
@@ -10,7 +12,51 @@ import {
   type ResolvedCosmetic,
 } from "../lib/cosmetics/cosmeticRendererAssets";
 import { resolvePackCosmetic } from "../lib/cosmetics/cosmeticPack";
-import { getCapeImageUrl } from "./cape-service";
+import { getCapeImageUrl, getPlayerProfileByUuidOrName } from "./cape-service";
+import type { TexturesData } from "../types/minecraft";
+
+async function skinUrlForPlayerName(name: string): Promise<string | null> {
+  if (!name) return null;
+  try {
+    const profile = await getPlayerProfileByUuidOrName(name);
+    const texturesProp = profile.properties?.find((p) => p.name === "textures");
+    if (!texturesProp) return null;
+    const decoded = JSON.parse(atob(texturesProp.value)) as TexturesData;
+    const url = decoded.textures?.SKIN?.url;
+    return url ? url.replace(/^http:/, "https:") : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveCustomSkinUrl(
+  src?: CustomTextureSource | null
+): Promise<string | null> {
+  if (!src) return null;
+  switch (src.type) {
+    case "playerName":
+      return skinUrlForPlayerName(src.name);
+    case "url":
+      return src.url || null;
+    case "base64":
+      if (!src.data) return null;
+      return src.data.startsWith("data:")
+        ? src.data
+        : `data:image/png;base64,${src.data}`;
+    default:
+      return null;
+  }
+}
+
+async function applyCustomTexture(
+  cosmetic: ResolvedCosmetic | null,
+  settings?: CosmeticSettings
+): Promise<ResolvedCosmetic | null> {
+  if (!cosmetic) return cosmetic;
+  const url = await resolveCustomSkinUrl(settings?.customTexture);
+  if (url) cosmetic.urls.texture = url;
+  return cosmetic;
+}
 
 function capeCosmetic(hash: string): ResolvedCosmetic {
   return {
@@ -70,7 +116,9 @@ export async function getEquippedCosmetics(
 
   const packResolved = await Promise.all(
     cosmeticIds.map((id) =>
-      resolvePackCosmetic(id, settingsById[id]).catch(() => null)
+      resolvePackCosmetic(id, settingsById[id])
+        .then((c) => applyCustomTexture(c, settingsById[id]))
+        .catch(() => null)
     )
   );
 
@@ -81,7 +129,9 @@ export async function getEquippedCosmetics(
     missingIds.map((id) => {
       const product = products.get(id);
       if (!product) return Promise.resolve(null);
-      return toResolvedCosmetic(product, settingsById[id]).catch(() => null);
+      return toResolvedCosmetic(product, settingsById[id])
+        .then((c) => applyCustomTexture(c, settingsById[id]))
+        .catch(() => null);
     })
   );
 

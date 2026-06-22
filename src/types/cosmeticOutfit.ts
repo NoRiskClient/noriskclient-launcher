@@ -4,6 +4,12 @@ export interface Vec3Object {
   z: number;
 }
 
+export type CustomTextureSource =
+  | { type: "playerName"; name: string }
+  | { type: "url"; url: string }
+  | { type: "hash"; hash: string }
+  | { type: "base64"; data: string };
+
 export interface CosmeticSettings {
   color?: { red: number; green: number; blue: number } | null;
   scale?: number;
@@ -13,6 +19,7 @@ export interface CosmeticSettings {
   hash?: string | null;
   frames?: number;
   frameDelay?: number;
+  customTexture?: CustomTextureSource | null;
 }
 
 export interface CosmeticOutfit {
