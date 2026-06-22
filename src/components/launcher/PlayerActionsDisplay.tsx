@@ -10,7 +10,7 @@ import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
 import { useProfileStore } from '../../store/profile-store';
 import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
-import { SkinRenderer } from 'nrc-skin-renderer/react';
+import { SkinRenderer } from '@noriskclient/nrc-skin-renderer/react';
 import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useSelectedIcon } from '../../hooks/useSelectedIcon';

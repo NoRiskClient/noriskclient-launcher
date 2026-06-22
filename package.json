@@ -12,6 +12,7 @@
   "dependencies": {
     "@flasham/react-skinview3d": "^3.0.1",
     "@iconify/react": "^5.2.1",
+    "@noriskclient/nrc-skin-renderer": "^0.1.0",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "8.13.7",
     "@sfirew/minecraft-motd-parser": "^1.1.4",
@@ -33,7 +34,6 @@
     "i18next": "^25.8.4",
     "immer": "^10.1.1",
     "lucide-react": "^0.509.0",
-    "nrc-skin-renderer": "https://github.com/NoRiskClient/nrc-skin-renderer.git",
     "ogl": "^1.0.11",
     "prettier": "^3.5.3",
     "react": "18.3.1",

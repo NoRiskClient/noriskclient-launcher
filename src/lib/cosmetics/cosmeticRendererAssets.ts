@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import type { CosmeticAssetUrls } from "nrc-skin-renderer/core";
+import type { CosmeticAssetUrls } from "@noriskclient/nrc-skin-renderer/core";
 import type { CosmeticSettings } from "../../types/cosmeticOutfit";
 
 export const CMS_URL = "https://cms.norisk.gg";

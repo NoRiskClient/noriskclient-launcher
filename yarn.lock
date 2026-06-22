@@ -416,6 +416,11 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
+"@noriskclient/nrc-skin-renderer@^0.1.0":
+  version "0.1.0"
+  resolved "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.1.0.tgz#86d0dddd524a14dc772c8920b3323448c6022e8d"
+  integrity sha512-/gG1CTETEYljvApAI8Hxecj3LD3oGX8sWFEOqzRzwWd4s4D1R3bH5DGtyYhVqlULqucj8LS4xPHgaVr+PKDjpQ==
+
 "@npmcli/agent@^3.0.0":
   version "3.0.0"
   resolved "https://registry.npmjs.org/@npmcli/agent/-/agent-3.0.0.tgz"
@@ -3212,10 +3217,6 @@ npm@^11.3.0:
     treeverse "^3.0.0"
     validate-npm-package-name "^6.0.0"
     which "^5.0.0"
-
-"nrc-skin-renderer@https://github.com/NoRiskClient/nrc-skin-renderer.git":
-  version "0.1.0"
-  resolved "https://github.com/NoRiskClient/nrc-skin-renderer.git#ba8f344c2808dee1c4fde8928e012a134641f68d"
 
 object-assign@^4.0.1, object-assign@^4.1.1:
   version "4.1.1"
