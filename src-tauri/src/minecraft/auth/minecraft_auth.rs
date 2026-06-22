@@ -1163,6 +1163,23 @@ impl MinecraftAuthStore {
                             return Ok(Some(old_credentials));
                         }
                     }
+                    // Transient outage (Mojang/Microsoft rate-limit or server error): the
+                    // endpoint answered but with a non-token body (e.g. HTTP 429 during an
+                    // auth outage). Keep showing the account with its cached credentials
+                    // instead of failing the whole account load — the real token refresh
+                    // happens again at game launch.
+                    if let AppError::MinecraftAuthenticationError(
+                        MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
+                    ) = &err
+                    {
+                        if status_code.as_u16() == 429 || status_code.is_server_error() {
+                            info!(
+                                "[Token Check] Transient outage ({}) during refresh, using cached credentials",
+                                status_code
+                            );
+                            return Ok(Some(old_credentials));
+                        }
+                    }
                     info!("[Token Check] Error during token refresh: {:?}", err);
                     Err(err)
                 }

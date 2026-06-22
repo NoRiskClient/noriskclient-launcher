@@ -244,14 +244,18 @@ impl NoriskPackDownloadService {
         target_path: &PathBuf,
         expected_sha1: Option<&str>,
     ) -> Result<()> {
-        // Use the new centralized download utility with optional SHA1 verification
+        // Explicit hash wins; else best-effort Maven `.sha1` sidecar (None = ZIP heuristic fallback).
+        let resolved_sha1 = match expected_sha1 {
+            Some(hash) => Some(hash.to_string()),
+            None => DownloadUtils::try_fetch_sha1_sidecar(url).await,
+        };
+
         let mut config = DownloadConfig::new()
             .with_streaming(true)  // Use streaming for potentially large mod files
             .with_retries(3);
 
-        // Only add SHA1 verification if hash is provided
-        if let Some(hash) = expected_sha1 {
-            config = config.with_sha1(hash.to_string());
+        if let Some(hash) = resolved_sha1 {
+            config = config.with_sha1(hash);
         }
 
         DownloadUtils::download_file(url, target_path, config).await

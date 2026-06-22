@@ -341,6 +341,7 @@ pub async fn launch_profile(
             quick_play_mp_clone,
             migration_info_clone,
             Vec::new(),
+            false,
         )
             .await;
 
@@ -2690,15 +2691,16 @@ pub async fn launch_profile_with_overrides(
     // Runtime-only local mods (referenced in place, never persisted to the profile).
     let local_mod_paths = resolve_local_mod_paths(&local_mods).await?;
 
-    // Mirror launch_profile's install spawn — minus the persistence side-effects
-    // (no update_profile, no last_played_profile, no add_launching_process).
+    // Mirror launch_profile's install spawn — minus the profile persistence
+    // side-effects (no update_profile, no last_played_profile). The launching
+    // handle IS registered so the UI stop button can abort the install phase.
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
     let profile_id = profile.id;
     let profile_clone = profile.clone();
 
-    tokio::spawn(async move {
-        match installer::install_minecraft_version(
+    let handle = tokio::spawn(async move {
+        let install_result = installer::install_minecraft_version(
             &version,
             &modloader.as_str(),
             &profile_clone,
@@ -2707,9 +2709,15 @@ pub async fn launch_profile_with_overrides(
             qp_mp,
             None,
             local_mod_paths,
+            true,
         )
-        .await
-        {
+        .await;
+
+        if let Ok(state) = State::get().await {
+            state.process_manager.remove_launching_process(profile_id);
+        }
+
+        match install_result {
             Ok(_) => log::info!(
                 "[CLI launch] Profile {} started ({} {}).",
                 profile_id,
@@ -2723,6 +2731,10 @@ pub async fn launch_profile_with_overrides(
             ),
         }
     });
+
+    state
+        .process_manager
+        .add_launching_process(profile_id, handle);
 
     Ok(())
 }
@@ -3019,6 +3031,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
             qp_mp,
             None,
             local_mod_paths,
+            false,
         )
         .await
         {

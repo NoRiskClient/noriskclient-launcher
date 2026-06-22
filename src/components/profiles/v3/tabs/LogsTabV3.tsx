@@ -31,6 +31,7 @@ import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { Tooltip } from "../../../ui/Tooltip";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface LogsTabV3Props {
   profile: Profile;
@@ -112,7 +113,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
       onRefresh?.();
     } catch (err) {
       console.error("[V3 Logs] Failed to list:", err);
-      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(parseErrorMessage(err));
     } finally {
       if (mountedRef.current) setIsLoadingList(false);
     }
@@ -136,7 +137,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         if (mountedRef.current) setRawContent(content);
       } catch (err) {
         console.error("[V3 Logs] Failed to load content:", err);
-        if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+        if (mountedRef.current) setError(parseErrorMessage(err));
       } finally {
         if (mountedRef.current) setIsLoadingContent(false);
       }
@@ -178,7 +179,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
     try {
       await openLogFileDirectory(selectedPath);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(parseErrorMessage(err));
     }
   }, [selectedPath]);
 
@@ -191,7 +192,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         {
           loading: t("profiles.v3.logs.uploading"),
           success: (u: string) => t("profiles.v3.logs.uploadSuccess", { url: u }),
-          error: (err) => t("profiles.v3.logs.uploadFailed", { error: err instanceof Error ? err.message : String(err) }),
+          error: (err) => t("profiles.v3.logs.uploadFailed", { error: parseErrorMessage(err) }),
         },
       );
       // Copy URL to clipboard so the user can paste it straight into a chat.

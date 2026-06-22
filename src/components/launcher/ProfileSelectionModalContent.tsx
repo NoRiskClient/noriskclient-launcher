@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { toast } from "react-hot-toast";
 import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ProfileSelectionModalContentProps {
   onVersionChange: (versionId: string) => void;
@@ -45,7 +46,7 @@ export function ProfileSelectionModalContent({
         loading: `Deleting profile '${profileName}'...`,
         success: `Profile '${profileName}' deleted successfully!`,
         error: (err) =>
-          `Failed to delete profile: ${err instanceof Error ? err.message : String(err.message)}`,
+          `Failed to delete profile: ${parseErrorMessage(err)}`,
       });
 
       // Refresh profiles after successful deletion

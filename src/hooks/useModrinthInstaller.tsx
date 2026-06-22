@@ -15,6 +15,7 @@ import { EventType, type EventPayload } from "../types/events";
 import { toast } from "react-hot-toast";
 import { ProgressToast } from "../components/ui/ProgressToast";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
 interface PendingInstall {
   version: ModrinthVersion;
@@ -98,7 +99,7 @@ export function useModrinthInstaller(
         console.error("❌ Failed to install content:", err);
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
         setError(
-          i18n.t('modrinth_installer.errors.install_failed', { error: err instanceof Error ? err.message : String(err) }),
+          i18n.t('modrinth_installer.errors.install_failed', { error: parseErrorMessage(err) }),
         );
         throw err;
       }
@@ -171,7 +172,7 @@ export function useModrinthInstaller(
         console.error("❌ Failed to install content:", err);
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
         setError(
-          i18n.t('modrinth_installer.errors.install_failed', { error: err instanceof Error ? err.message : String(err) }),
+          i18n.t('modrinth_installer.errors.install_failed', { error: parseErrorMessage(err) }),
         );
         throw err;
       }
@@ -345,7 +346,7 @@ export function useModrinthInstaller(
         return newProfileId;
       } catch (err) {
         console.error("❌ Failed to install modpack:", err);
-        const errorMessage = err instanceof Error ? err.message : String(err);
+        const errorMessage = parseErrorMessage(err);
         setError(i18n.t('modrinth_installer.errors.install_failed', { error: errorMessage }));
         setInstallState((prev) => ({ ...prev, [versionId]: "error" }));
 
@@ -410,7 +411,7 @@ export function useModrinthInstaller(
         setShowProfilePopup(true);
       } catch (error) {
         setError(
-          i18n.t('modrinth_installer.errors.installation_error', { error: error instanceof Error ? error.message : String(error) }),
+          i18n.t('modrinth_installer.errors.installation_error', { error: parseErrorMessage(error) }),
         );
       }
     },

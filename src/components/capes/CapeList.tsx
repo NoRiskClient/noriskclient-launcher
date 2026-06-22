@@ -20,6 +20,7 @@ import { CapeImage } from "./CapeImage";
 import { VanillaCapeImage } from "./VanillaCapeImage";
 import { Tooltip } from "../ui/Tooltip";
 import { getPlayerProfileByUuidOrName, getCapesByHashes, getCapeImageUrl, getCapeReviewImageUrl } from "../../services/cape-service";
+import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
@@ -93,12 +94,20 @@ function CapeItemDisplay({
   const isDenied = capeState === 'DENIED';
   const isInReview = capeState === 'IN_REVIEW';
 
-  const handleCapeClick = useCallback(() => {
+  const handleCapeClick = useCallback(async () => {
     if (isCurrentlyEquipping || !showModal || isDenied) return;
 
-    const userSkinUrl = activeAccount?.id
-      ? `https://crafatar.com/skins/${activeAccount.id}`
-      : undefined;
+    let userSkinUrl: string | undefined;
+    if (activeAccount?.id) {
+      try {
+        const active = await MinecraftSkinService.getActiveSkin();
+        if (active?.base64_data) {
+          userSkinUrl = `data:image/png;base64,${active.base64_data}`;
+        }
+      } catch (e) {
+        console.error("[CapeList] Failed to load active skin for preview:", e);
+      }
+    }
 
     const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
     const capeUrl = isVanilla

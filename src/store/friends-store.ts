@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import { translateApiError } from '../utils/nrc-error-translations';
 
 export type OnlineState = 'ONLINE' | 'OFFLINE' | 'AFK' | 'BUSY' | 'INVISIBLE';
 
@@ -127,7 +128,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       const pendingRequests = await invoke<FriendRequestWithUsers[]>('get_pending_requests');
       set({ pendingRequests });
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
     }
   },
 
@@ -136,7 +137,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       const currentUser = await invoke<FriendsUser>('get_friends_user');
       set({ currentUser });
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
     }
   },
 
@@ -144,7 +145,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
     try {
       await invoke('send_friend_request', { targetName: name });
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -159,7 +160,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       }));
       await get().loadFriends();
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -173,7 +174,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
         ),
       }));
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -185,7 +186,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
         friends: state.friends.filter((f) => f.uuid !== uuid),
       }));
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -199,7 +200,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
           : null,
       }));
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -214,7 +215,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       }));
       return enabled;
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },
@@ -223,7 +224,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
     try {
       await invoke('connect_friends_websocket');
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
     }
   },
 
@@ -232,7 +233,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       await invoke('disconnect_friends_websocket');
       set({ wsConnected: false });
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
     }
   },
 
@@ -314,7 +315,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
           : null,
       }));
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: translateApiError(e) });
       throw e;
     }
   },

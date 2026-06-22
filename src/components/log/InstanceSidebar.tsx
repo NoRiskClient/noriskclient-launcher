@@ -9,7 +9,7 @@ import { useLaunchStateStore, LaunchState } from "../../store/launch-state-store
 import { ProcessMetadata, ProcessState } from "../../types/processState";
 import { EventType } from "../../types/events";
 import * as ProcessService from "../../services/process-service";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 type InstanceStatus = "running" | "idle" | "crashed" | "starting" | "stopping";
 
@@ -142,7 +142,7 @@ function InstanceItem({
   const statusColor = getStatusColor(instance.status);
 
   // Get avatar for the account
-  const avatarUrl = useCrafatarAvatar({
+  const avatarUrl = usePlayerAvatar({
     uuid: instance.accountUuid,
     size: 16,
     overlay: true,

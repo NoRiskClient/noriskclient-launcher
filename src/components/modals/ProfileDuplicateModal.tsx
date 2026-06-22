@@ -11,6 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
 import { useProfileStore } from "../../store/profile-store";
 import { copyProfile } from "../../services/profile-service";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function ProfileDuplicateModal() {
   const { t } = useTranslation();
@@ -55,7 +56,7 @@ export function ProfileDuplicateModal() {
     } catch (err) {
       console.error("Failed to duplicate profile:", err);
       toast.error(
-        t('profile_duplicate.toast.failed', { error: err instanceof Error ? err.message : String(err) })
+        t('profile_duplicate.toast.failed', { error: parseErrorMessage(err) })
       );
     } finally {
       setIsLoading(false);

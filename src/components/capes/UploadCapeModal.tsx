@@ -9,6 +9,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { uploadCape } from "../../services/cape-service";
+import { humanizeTimestamps } from "../../utils/time-utils";
 import { toast } from "react-hot-toast";
 
 const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
@@ -37,8 +38,8 @@ const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
 interface UploadCapeModalProps {
   previewImageUrl: string;
   previewImagePath: string;
-  formatErrorMessage: (error: string) => string;
-  isWarningMessage: (error: string) => boolean;
+  formatErrorMessage: (error: unknown) => string;
+  isWarningMessage: (error: unknown) => boolean;
   onCancelUpload: () => void;
 }
 
@@ -82,9 +83,9 @@ export function UploadCapeModal({
       onCancelUpload(); // Close modal on success
     } catch (err: any) {
       console.error("Error uploading cape:", err);
-      const formattedError = formatErrorMessage(err.message || "Unknown error");
+      const formattedError = humanizeTimestamps(formatErrorMessage(err));
 
-      if (isWarningMessage(formattedError)) {
+      if (isWarningMessage(err)) {
         setUploadWarning(formattedError);
         setUploadError(null);
       } else {

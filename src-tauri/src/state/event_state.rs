@@ -44,6 +44,7 @@ pub enum EventType {
     TriggerProfileUpdate,
     MinecraftProcessExited,
     StarlightSkinUpdated,
+    MinecraftSkinChanged,
     Error,
     LaunchSuccessful,
     CrashReportContentAvailable,
@@ -146,6 +147,18 @@ impl EventState {
             error: None,
         };
         self.emit(payload).await // Use the existing emit method
+    }
+
+    pub async fn skin_changed(&self, account_id: Option<Uuid>) -> Result<()> {
+        let payload = EventPayload {
+            event_id: Uuid::new_v4(),
+            event_type: EventType::MinecraftSkinChanged,
+            target_id: account_id,
+            message: "Active account skin changed, UI refresh triggered.".to_string(),
+            progress: None,
+            error: None,
+        };
+        self.emit(payload).await
     }
 
     pub async fn complete_event(&self, event_id: Uuid) -> Result<()> {

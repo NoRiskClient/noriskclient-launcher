@@ -4,7 +4,7 @@ import i18n from "../../i18n/i18n";
 import { Icon } from "@iconify/react";
 import { useFriendsStore, OnlineState } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { StatusSelector } from "./StatusSelector";
 
 const getStatusConfig = (): Record<OnlineState, { color: string; label: string; glow: string }> => ({
@@ -64,7 +64,7 @@ export function SettingsPanel() {
   const { t } = useTranslation();
   const { accentColor } = useThemeStore();
   const { currentUser, closeSettings, updatePrivacySetting } = useFriendsStore();
-  const avatarUrl = useCrafatarAvatar({ uuid: currentUser?.uuid, size: 64 });
+  const avatarUrl = usePlayerAvatar({ uuid: currentUser?.uuid, size: 64 });
   const [loadingSettings, setLoadingSettings] = useState<Record<string, boolean>>({});
 
   if (!currentUser) {

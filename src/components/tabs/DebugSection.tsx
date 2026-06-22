@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
+import { invoke } from "@tauri-apps/api/core";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -23,7 +24,7 @@ import {
   openTesterWindow,
 } from "../../services/tester-service";
 
-type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions";
+type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
 
 export function DebugSection() {
   const { t } = useTranslation();
@@ -38,6 +39,8 @@ export function DebugSection() {
   useEffect(() => {
     if (activeTab === "permissions") {
       getCachedPermissions().then(setPermissions).catch(() => setPermissions(null));
+    } else if (activeTab === "testing") {
+      // no auto-load; user triggers actions manually
     } else {
       loadFiles();
     }
@@ -119,6 +122,7 @@ export function DebugSection() {
     { id: "process", name: "Process Logs", count: 0 },
     { id: "crashes", name: "Crash Reports", count: 0 },
     { id: "permissions", name: t('debug.permissions.tab'), count: permissions?.nodes.length ?? 0 },
+    { id: "testing", name: "TESTING", count: 0 },
   ];
 
   const formatSize = (bytes: number) => {
@@ -142,7 +146,9 @@ export function DebugSection() {
         showAddButton={false}
       />
 
-      {activeTab === "permissions" ? (
+      {activeTab === "testing" ? (
+        <TestingPanel />
+      ) : activeTab === "permissions" ? (
         <PermissionsList
           permissions={permissions}
           refreshing={refreshingPerms}
@@ -219,6 +225,142 @@ export function DebugSection() {
           </div>
         )}
       </div>
+      )}
+    </div>
+  );
+}
+
+interface ModCacheCleanupStats {
+  scanned: number;
+  deleted: string[];
+  freed_bytes: number;
+  failed: string[];
+  skipped_empty_keepset: boolean;
+}
+
+function TestingPanel() {
+  const [loading, setLoading] = useState(false);
+  const [filenames, setFilenames] = useState<string[] | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanStats, setCleanStats] = useState<ModCacheCleanupStats | null>(null);
+
+  async function runExpectedCacheFilenames() {
+    setLoading(true);
+    try {
+      const result = await invoke<string[]>("debug_list_expected_cache_filenames");
+      setFilenames(result);
+      toast.success(`Keep-set: ${result.length} filenames (also dumped to launcher log)`);
+    } catch (e) {
+      console.error("Failed to list expected cache filenames:", e);
+      toast.error(`Failed: ${String(e)}`);
+    }
+    setLoading(false);
+  }
+
+  async function runCleanModCache() {
+    setCleaning(true);
+    try {
+      const stats = await invoke<ModCacheCleanupStats>("clean_mod_cache_command");
+      setCleanStats(stats);
+      if (stats.skipped_empty_keepset) {
+        toast.error("Skipped: keep-set empty (config not loaded) — nothing deleted");
+      } else {
+        const mb = (stats.freed_bytes / (1024 * 1024)).toFixed(1);
+        toast.success(`Removed ${stats.deleted.length} orphans, freed ${mb} MB`);
+      }
+    } catch (e) {
+      console.error("Failed to clean mod_cache:", e);
+      toast.error(`Failed: ${String(e)}`);
+    }
+    setCleaning(false);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon icon="solar:database-bold" className="w-5 h-5 text-amber-300 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft-ten">mod_cache keep-set</div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            Every filename any profile/pack could place in mod_cache (step 1 of cache cleanup)
+          </div>
+        </div>
+        <button
+          onClick={runExpectedCacheFilenames}
+          disabled={loading}
+          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run debug_list_expected_cache_filenames"
+        >
+          {loading ? (
+            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="solar:play-bold" className="w-4 h-4" />
+          )}
+          Run
+        </button>
+      </div>
+
+      {filenames !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            {filenames.length} filenames
+          </div>
+          {filenames.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">Empty</div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {filenames.map((name) => (
+                <div key={name} className="p-2 px-4 hover:bg-white/5 text-white/80 font-mono text-xs truncate">
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5 text-red-300 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft-ten">Clean mod_cache</div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            Delete cached jars not in the keep-set (orphans = stale/unused versions)
+          </div>
+        </div>
+        <button
+          onClick={runCleanModCache}
+          disabled={cleaning}
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run clean_mod_cache_command"
+        >
+          {cleaning ? (
+            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+          )}
+          Clean
+        </button>
+      </div>
+
+      {cleanStats !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            scanned {cleanStats.scanned} · deleted {cleanStats.deleted.length} · failed{" "}
+            {cleanStats.failed.length} · freed {(cleanStats.freed_bytes / (1024 * 1024)).toFixed(1)} MB
+            {cleanStats.skipped_empty_keepset && " · SKIPPED (empty keep-set)"}
+          </div>
+          {cleanStats.deleted.length === 0 ? (
+            <div className="p-6 text-center text-white/50 font-minecraft-ten">No orphans</div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {cleanStats.deleted.map((name) => (
+                <div key={name} className="p-2 px-4 hover:bg-white/5 text-red-200/80 font-mono text-xs truncate">
+                  {name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -39,6 +39,7 @@ import {
   getDifficultyString,
   getGameModeString,
 } from "../../../services/world-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 // --- Icons to preload for WorldsTab ---
 const WORLDS_TAB_ICONS_TO_PRELOAD = [
@@ -328,7 +329,7 @@ export function WorldsTab({
         setServerPings((prev) => ({ ...prev, [address]: pingResult }));
       } catch (err) {
         console.error(`[WorldsTab] Failed to ping ${address}:`, err);
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = parseErrorMessage(err);
         const errorResult: ServerPingInfo = {
           error: errorMsg,
           description: null,
@@ -495,7 +496,7 @@ export function WorldsTab({
             setWorldToCopy(null);
           } catch (err) {
             console.error("Failed to copy world:", err);
-            const errorMsg = err instanceof Error ? err.message : String(err);
+            const errorMsg = parseErrorMessage(err);
             setCopyWorldError(t('worlds.copy_failed', { error: errorMsg }));
             toast.error(t('worlds.copy_failed', { error: errorMsg }));
           } finally {
@@ -532,7 +533,7 @@ export function WorldsTab({
           } catch (err) {
             console.error("Delete failed:", err);
             toast.error(
-              t('worlds.delete_failed', { error: err instanceof Error ? err.message : String(err) }),
+              t('worlds.delete_failed', { error: parseErrorMessage(err) }),
             );
           } finally {
             setIsActuallyDeleting(false);
@@ -565,7 +566,7 @@ export function WorldsTab({
       } catch (err) {
         console.error(`Failed to open folder ${worldFolderPath}:`, err);
         toast.error(
-          t('worlds.open_folder_failed', { error: err instanceof Error ? err.message : String(err) }),
+          t('worlds.open_folder_failed', { error: parseErrorMessage(err) }),
         );
       }
     },
@@ -621,7 +622,7 @@ export function WorldsTab({
       } catch (err) {
         console.error(`[WorldsTab] World import ERROR for: ${worldPath}:`, err);
         toast.error(
-          t('worlds.import_failed', { error: err instanceof Error ? err.message : String(err) }),
+          t('worlds.import_failed', { error: parseErrorMessage(err) }),
           { id: loadingToastId }
         );
       }
