@@ -191,7 +191,7 @@ export function PlayerActionsDisplay({
           <>
             {/* Featured Server Toggle - above the launch button */}
             <div
-              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
+              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-32' : 'bottom-24'}`}
             >
               <button
                 onClick={() => setFeatureMode(!featureMode)}
@@ -201,7 +201,7 @@ export function PlayerActionsDisplay({
                 {featureMode ? "switch to main launch" : FEATURED_SERVER.name.toLowerCase()}
               </button>
             </div>
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center px-4">
               {featureMode ? (
                 // Show featured server card with MOTD
                 <ServerLaunchCard
