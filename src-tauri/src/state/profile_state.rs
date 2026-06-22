@@ -350,6 +350,15 @@ impl Profile {
     }
 }
 
+/// Metadata about a single `profiles.json` backup, surfaced to the restore UI.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProfileBackupInfo {
+    pub path: String,
+    pub backup_time: i64,
+    pub file_size: u64,
+    pub profile_count: usize,
+}
+
 // Profile Manager
 pub struct ProfileManager {
     profiles: Arc<RwLock<HashMap<Uuid, Profile>>>,
@@ -621,6 +630,46 @@ impl ProfileManager {
         ).await?;
 
         info!("ProfileManager: Successfully saved {} profiles", self.profiles.read().await.len());
+        Ok(())
+    }
+
+    /// Lists available `profiles.json` backups (newest first) for the restore UI.
+    pub async fn list_profile_backups(&self) -> Result<Vec<ProfileBackupInfo>> {
+        let backups = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await?;
+        let mut out = Vec::with_capacity(backups.len());
+        for (path, mtime) in backups {
+            let file_size = fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
+            let profile_count = match fs::read_to_string(&path).await {
+                Ok(data) => serde_json::from_str::<Vec<serde_json::Value>>(&data)
+                    .map(|v| v.len())
+                    .unwrap_or(0),
+                Err(_) => 0,
+            };
+            out.push(ProfileBackupInfo {
+                path: path.to_string_lossy().to_string(),
+                backup_time: mtime.timestamp(),
+                file_size,
+                profile_count,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Restores a user-chosen backup over `profiles.json` and reloads the
+    /// in-memory map so the change is live without a restart.
+    pub async fn restore_profile_backup(&self, backup_path: PathBuf) -> Result<()> {
+        // Hold the save lock so a concurrent save_profiles can't clobber the
+        // file mid-restore.
+        let _guard = self.save_lock.lock().await;
+        backup_utils::restore_specific_backup(&self.profiles_path, &backup_path).await?;
+        let reloaded = self
+            .load_profiles_internal(&self.profiles_path.clone())
+            .await?;
+        *self.profiles.write().await = reloaded;
+        info!(
+            "ProfileManager: Reloaded {} profiles after restore",
+            self.profiles.read().await.len()
+        );
         Ok(())
     }
 
