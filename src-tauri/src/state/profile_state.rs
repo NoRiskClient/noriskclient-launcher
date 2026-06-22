@@ -421,6 +421,12 @@ impl ProfileManager {
             max_backups_per_file: 10, // Keep more backups for profiles
             max_backup_age_seconds: 90 * 24 * 60 * 60, // 90 days for profiles
             min_backup_interval_seconds: 60, // TEMP: Increased to 5 minutes to prevent spam during testing
+            gfs: Some(backup_utils::GfsPolicy {
+                keep_recent: 10,
+                daily_days: 14,
+                weekly_weeks: 8,
+                monthly_months: 12,
+            }),
         };
 
         Ok(Self {
@@ -3453,12 +3459,20 @@ impl PostInitializationHandler for ProfileManager {
                 log::warn!("Trash purge after init failed: {}", e);
             }
 
-            // Clean up old backups for profiles category using our specific config
-            if let Err(e) = crate::utils::backup_utils::cleanup_old_backups(
-                &profiles_path_clone,
-                Some("profiles"),
-                &backup_config_clone,
-            ).await {
+            // Clean up old backups for profiles category (generational if configured)
+            let cleanup_result = match &backup_config_clone.gfs {
+                Some(policy) => crate::utils::backup_utils::cleanup_old_backups_generational(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    policy,
+                ).await,
+                None => crate::utils::backup_utils::cleanup_old_backups(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    &backup_config_clone,
+                ).await,
+            };
+            if let Err(e) = cleanup_result {
                 log::warn!("Profile backup cleanup after init failed: {}", e);
             }
         });
