@@ -41,6 +41,13 @@
     },
     {
         "type": "file",
+        "url": "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.1.0.tgz#86d0dddd524a14dc772c8920b3323448c6022e8d",
+        "sha512": "fe01b5093113118963bc0a4023c1f179c8f72c3de8197f2c58510eab3473c16778b380f54776c7e431adc98855aa550baae723f0b4b8c4f1e0695afe3ca0e3a5",
+        "dest-filename": "@noriskclient-nrc-skin-renderer-0.1.0.tgz",
+        "dest": "flatpak-node/yarn-mirror"
+    },
+    {
+        "type": "file",
         "url": "https://registry.npmjs.org/@alloc/quick-lru/-/quick-lru-5.2.0.tgz",
         "sha512": "52b700041fb86d4ac5001c1b96e4c8044ad7c2f6ec53f57b4d959f99b8097db930881bb3892f60c5d383532ba279c7dd190f398e094c5ba8ee4b7fb3e53b0a2f",
         "dest-filename": "@alloc-quick-lru-5.2.0.tgz",
@@ -4366,12 +4373,6 @@
         "dest": "flatpak-node/yarn-mirror"
     },
     {
-        "type": "git",
-        "url": "https://github.com/NoRiskClient/nrc-skin-renderer.git",
-        "commit": "ba8f344c2808dee1c4fde8928e012a134641f68d",
-        "dest": "flatpak-node/tmp/nrc-skin-renderer.git-ba8f344c2808dee1c4fde8928e012a134641f68d"
-    },
-    {
         "type": "script",
         "commands": [
             "version=$(node --version | sed \"s/^v//\")",
@@ -4382,6 +4383,12 @@
         ],
         "dest-filename": "setup_sdk_node_headers.sh",
         "dest": "flatpak-node"
+    },
+    {
+        "type": "shell",
+        "commands": [
+            "bash flatpak-node/setup_sdk_node_headers.sh"
+        ]
     },
     {
         "type": "shell",
@@ -4429,14 +4436,6 @@
         "dest": "flatpak-node/cache/esbuild",
         "only-arches": [
             "x86_64"
-        ]
-    },
-    {
-        "type": "shell",
-        "commands": [
-            "mkdir -p flatpak-node/yarn-mirror",
-            "cd flatpak-node/tmp/nrc-skin-renderer.git-ba8f344c2808dee1c4fde8928e012a134641f68d; git archive --format tar -o ../../yarn-mirror/nrc-skin-renderer.git-ba8f344c2808dee1c4fde8928e012a134641f68d HEAD",
-            "bash flatpak-node/setup_sdk_node_headers.sh"
         ]
     }
 ]
