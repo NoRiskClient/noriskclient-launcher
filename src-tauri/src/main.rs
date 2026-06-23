@@ -708,6 +708,8 @@ async fn main() {
             commands::tester_command::fetch_tester_queue,
             commands::tester_command::submit_tester_vote,
             commands::tester_command::open_tester_window,
+            commands::poll_command::get_active_poll_command,
+            commands::poll_command::submit_poll_vote_command,
             commands::nrc_commands::get_mobile_app_token,
             commands::nrc_commands::reset_mobile_app_token,
             commands::nrc_commands::get_advent_calendar_command,

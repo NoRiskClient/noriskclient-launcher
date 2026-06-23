@@ -10,6 +10,14 @@
   "news.no_news_available": "Momentan keine Neuigkeiten verfügbar.",
   "news.item": "Neuigkeit",
 
+  "strawpoll.thanks": "Danke für dein Feedback!",
+  "strawpoll.dismiss": "Umfrage schließen",
+  "strawpoll.loading": "Umfrage wird geladen...",
+  "strawpoll.send": "Senden",
+  "strawpoll.skip": "Überspringen",
+  "strawpoll.feedback_title": "Erzähl uns mehr",
+  "strawpoll.feedback_placeholder": "Dein Feedback (optional)",
+
   "settings.tabs.general": "Allgemein",
   "settings.tabs.appearance": "Hintergrund",
   "settings.tabs.advanced": "Erweitert",

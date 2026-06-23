@@ -10,6 +10,14 @@
   "news.no_news_available": "No news available at the moment.",
   "news.item": "News Item",
 
+  "strawpoll.thanks": "Thanks for your feedback!",
+  "strawpoll.dismiss": "Dismiss poll",
+  "strawpoll.loading": "Loading poll...",
+  "strawpoll.send": "Send",
+  "strawpoll.skip": "Skip",
+  "strawpoll.feedback_title": "Tell us more",
+  "strawpoll.feedback_placeholder": "Your feedback (optional)",
+
   "settings.tabs.general": "General",
   "settings.tabs.appearance": "Background",
   "settings.tabs.advanced": "Advanced",
