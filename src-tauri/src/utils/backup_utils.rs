@@ -1,7 +1,7 @@
 use crate::config::{LAUNCHER_DIRECTORY, ProjectDirsExt};
 use crate::error::{AppError, Result};
 use chrono::{DateTime, Datelike, Utc};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -115,7 +115,7 @@ async fn create_backup_inner(
     // Skip if identical to most recent backup (dedup by content, not by time).
     if let Some(latest) = latest_backup_path(&backup_base, original_name).await {
         if files_equal(source_path, &latest).await {
-            info!(
+            debug!(
                 "Skipping backup for {} - content identical to latest backup",
                 source_path.display()
             );
