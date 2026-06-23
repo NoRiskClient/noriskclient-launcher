@@ -10,6 +10,33 @@ import { logInfo, logWarn } from "../utils/logging-utils";
 import i18n from '../i18n/i18n';
 import { parseErrorMessage } from "../utils/error-utils";
 
+export interface LaunchOverrides {
+  game_version?: string;
+  loader?: string;
+  loader_version?: string;
+  pack?: string;
+}
+
+async function assertExperimentalLaunchAllowed(): Promise<boolean> {
+  try {
+    const config = await getLauncherConfig();
+    if (config?.is_experimental) {
+      logInfo("[ProcessService] Experimental mode is enabled in settings");
+      const isAllowed = await hasPermission(PERMISSION.EXPERIMENTAL_MODE);
+      logInfo(`[ProcessService] Permission check result: ${isAllowed}`);
+      if (!isAllowed) {
+        toast.error(i18n.t('settings.disable_experimental'));
+        return false;
+      }
+    }
+  } catch (e) {
+    logWarn(
+      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
+    );
+  }
+  return true;
+}
+
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
     const runningProcesses = await getRunningProcesses();
@@ -32,24 +59,22 @@ export async function launch(
   quickPlaySingleplayer?: string,
   quickPlayMultiplayer?: string,
   migrationInfo?: any,
-  skipLastPlayedUpdate?: boolean
+  skipLastPlayedUpdate?: boolean,
+  overrides?: LaunchOverrides,
 ): Promise<void> {
-  // Guard: If experimental mode is enabled in settings, require backend permission
-  try {
-    const config = await getLauncherConfig();
-    if (config?.is_experimental) {
-      logInfo("[ProcessService] Experimental mode is enabled in settings");
-      const isAllowed = await hasPermission(PERMISSION.EXPERIMENTAL_MODE);
-      logInfo(`[ProcessService] Permission check result: ${isAllowed}`);
-      if (!isAllowed) {
-        toast.error(i18n.t('settings.disable_experimental'));
-        return; // Block launch
-      }
-    }
-  } catch (e) {
-    logWarn(
-      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
-    );
+  if (!(await assertExperimentalLaunchAllowed())) {
+    return;
+  }
+
+  if (overrides) {
+    return invoke<void>("launch_profile_with_overrides", {
+      profileRef: id,
+      overrides,
+      quickPlaySingleplayer,
+      quickPlayMultiplayer,
+      localMods: [],
+      account: null,
+    });
   }
 
   return invoke<void>("launch_profile", {

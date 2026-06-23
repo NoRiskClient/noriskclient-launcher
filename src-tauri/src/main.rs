@@ -69,9 +69,9 @@ use commands::profile_command::{
     get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
-    launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
+    launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
-    resolve_loader_version, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
+    resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
@@ -382,6 +382,11 @@ async fn main() {
                     utils::log_archive::cleanup_oversized_logs().await;
                 });
 
+                // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
+                tauri::async_runtime::spawn(async {
+                    utils::mod_cache_cleanup::run_startup_cleanup().await;
+                });
+
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
@@ -510,6 +515,8 @@ async fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
+            utils::mod_cache_cleanup::clean_mod_cache_command,
             create_profile,
             get_profile,
             update_profile,
@@ -517,6 +524,8 @@ async fn main() {
             repair_profile,
             resolve_loader_version,
             list_profiles,
+            list_profile_backups,
+            restore_profile_backup,
             search_profiles,
             get_minecraft_versions,
             launch_profile,

@@ -10,7 +10,8 @@ use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
+    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
+    ProfileState,
 };
 use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
@@ -341,6 +342,7 @@ pub async fn launch_profile(
             quick_play_mp_clone,
             migration_info_clone,
             Vec::new(),
+            false,
         )
             .await;
 
@@ -859,6 +861,22 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
     let state = State::get().await?;
     let profiles = state.profile_manager.search_profiles(&query).await?;
     Ok(profiles)
+}
+
+#[tauri::command]
+pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.list_profile_backups().await?)
+}
+
+#[tauri::command]
+pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state
+        .profile_manager
+        .restore_profile_backup(backup_path.into())
+        .await?;
+    Ok(())
 }
 
 /// Loads and returns the list of standard profiles from the local configuration file.
@@ -2690,15 +2708,16 @@ pub async fn launch_profile_with_overrides(
     // Runtime-only local mods (referenced in place, never persisted to the profile).
     let local_mod_paths = resolve_local_mod_paths(&local_mods).await?;
 
-    // Mirror launch_profile's install spawn — minus the persistence side-effects
-    // (no update_profile, no last_played_profile, no add_launching_process).
+    // Mirror launch_profile's install spawn — minus the profile persistence
+    // side-effects (no update_profile, no last_played_profile). The launching
+    // handle IS registered so the UI stop button can abort the install phase.
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
     let profile_id = profile.id;
     let profile_clone = profile.clone();
 
-    tokio::spawn(async move {
-        match installer::install_minecraft_version(
+    let handle = tokio::spawn(async move {
+        let install_result = installer::install_minecraft_version(
             &version,
             &modloader.as_str(),
             &profile_clone,
@@ -2707,9 +2726,15 @@ pub async fn launch_profile_with_overrides(
             qp_mp,
             None,
             local_mod_paths,
+            true,
         )
-        .await
-        {
+        .await;
+
+        if let Ok(state) = State::get().await {
+            state.process_manager.remove_launching_process(profile_id);
+        }
+
+        match install_result {
             Ok(_) => log::info!(
                 "[CLI launch] Profile {} started ({} {}).",
                 profile_id,
@@ -2723,6 +2748,10 @@ pub async fn launch_profile_with_overrides(
             ),
         }
     });
+
+    state
+        .process_manager
+        .add_launching_process(profile_id, handle);
 
     Ok(())
 }
@@ -3019,6 +3048,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
             qp_mp,
             None,
             local_mod_paths,
+            false,
         )
         .await
         {

@@ -127,6 +127,23 @@ impl State {
             .await?;
         log::info!("State::init - ProcessManager post-initialization complete.");
 
+        // Apply any token handbacks the in-game client dropped while we were closed, then keep
+        // watching for new ones (mirrors the Discord client-state poller).
+        crate::minecraft::auth::token_handback::consume_pending(
+            &initial_state_arc.minecraft_account_manager_v2,
+        )
+        .await;
+        {
+            let store = initial_state_arc.minecraft_account_manager_v2.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    crate::minecraft::auth::token_handback::consume_pending(&store).await;
+                }
+            });
+        }
+        log::info!("State::init - Auth handback watcher started.");
+
         initial_state_arc
             .skin_manager
             .on_state_ready(app.clone())

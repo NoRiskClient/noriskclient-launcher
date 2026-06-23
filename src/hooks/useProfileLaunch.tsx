@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LaunchState } from "../store/launch-state-store";
 import { useLaunchStateStore } from "../store/launch-state-store";
 import * as ProcessService from "../services/process-service";
+import type { LaunchOverrides } from "../services/process-service";
 import { toast } from "react-hot-toast";
 import i18n from "../i18n/i18n";
 import { useGlobalModal } from "./useGlobalModal";
@@ -240,7 +241,11 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     statusMessage: buttonStatusMessage,
     launchState,
     handleLaunch,
-    handleQuickPlayLaunch: async (singleplayer?: string, multiplayer?: string) => {
+    handleQuickPlayLaunch: async (
+      singleplayer?: string,
+      multiplayer?: string,
+      overrides?: LaunchOverrides,
+    ) => {
       const currentProfile = getProfileState(profileId);
 
       if (currentProfile.isButtonLaunching) {
@@ -259,6 +264,30 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               : err.message || err.toString() || "Error during abort.";
           toast.error(i18n.t('launch.stop_failed', { message: abortErrorMsg }), { id: `launch-error-${profileId}` });
           finalizeButtonLaunch(profileId, abortErrorMsg);
+        }
+        return;
+      }
+
+      if (overrides) {
+        initiateButtonLaunch(profileId);
+        try {
+          await ProcessService.launch(
+            profileId,
+            singleplayer,
+            multiplayer,
+            undefined,
+            skipLastPlayedUpdate,
+            overrides,
+          );
+        } catch (err: any) {
+          console.error("Failed to launch profile with overrides:", err);
+          const launchErrorMsg =
+            typeof err === "string"
+              ? err
+              : err.message || err.toString() || "Unknown error during launch.";
+          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
+          setLaunchError(profileId, launchErrorMsg);
+          onLaunchError?.(launchErrorMsg);
         }
         return;
       }
