@@ -108,7 +108,7 @@ export function SettingsTab() {
     toggleBackgroundAnimation,
   } = useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
-  const { qualityLevel, setQualityLevel } = useQualitySettingsStore();
+  const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
   const { borderRadius, setBorderRadius, setAnalyticsConsent } = useThemeStore();
 
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -574,6 +574,15 @@ export function SettingsTab() {
                     toggleStaticBackground();
                     toggleBackgroundAnimation();
                   }}
+                  disabled={saving}
+                  size="sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white/70 font-minecraft-ten">3D Cosmetics</span>
+                <ToggleSwitch
+                  checked={cosmeticRenderer3d}
+                  onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
                   disabled={saving}
                   size="sm"
                 />
