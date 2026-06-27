@@ -25,7 +25,13 @@ const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
 /// launcher skips its own download/copy/cleanup of non-override entries and
 /// passes `-Dnrc.assets.{dir,bucket}` so the client takes over. Every other
 /// pack runs the legacy launcher-side asset pipeline.
-const CLIENT_MANAGED_PACKS: &[&str] = &["nrc-nightly", "nrc-standalone", "nrc-mini"];
+const CLIENT_MANAGED_PACKS: &[&str] = &[
+    "nrc-nightly",
+    "nrc-standalone",
+    "nrc-mini",
+    "verity-nexus",
+    "verity-emote",
+];
 
 /// `true` when the given (effective) pack id is client-managed — see
 /// `CLIENT_MANAGED_PACKS`. `overrides/` entries are always kept regardless,
