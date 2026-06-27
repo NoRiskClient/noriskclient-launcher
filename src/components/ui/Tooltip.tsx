@@ -9,6 +9,8 @@ interface TooltipProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  // "cursor" (default): follows the mouse. "top": static, centered above the trigger element.
+  position?: "cursor" | "top";
 }
 
 export function Tooltip({
@@ -16,7 +18,9 @@ export function Tooltip({
   children,
   delay = 300,
   className = "",
+  position = "cursor",
 }: TooltipProps) {
+  const isStatic = position === "top";
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -48,11 +52,23 @@ export function Tooltip({
     setTooltipPosition({ x, y });
   };
 
+  // Static mode: anchor centered above the trigger. The `translate(-50%, -100%)` on the
+  // tooltip element handles centering + sitting above, so we only need the top-center point.
+  const positionAboveTrigger = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+  };
+
   const showTooltip = (e: React.MouseEvent) => {
     isHoveringRef.current = true;
 
     // Sofort die Position aktualisieren
-    updateTooltipPosition(e.clientX, e.clientY);
+    if (isStatic) {
+      positionAboveTrigger();
+    } else {
+      updateTooltipPosition(e.clientX, e.clientY);
+    }
 
     timeoutRef.current = setTimeout(() => {
       if (isHoveringRef.current) {
@@ -62,6 +78,7 @@ export function Tooltip({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (isStatic) return; // static tooltip doesn't follow the cursor
     if (isHoveringRef.current) {
       updateTooltipPosition(e.clientX, e.clientY);
       // Wenn der Tooltip noch nicht sichtbar ist, zeige ihn sofort
@@ -89,7 +106,8 @@ export function Tooltip({
   }, []);
 
   const getTooltipClasses = () => {
-    const baseClasses = "fixed z-50 px-3 py-2 text-xs font-minecraft-ten text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+    // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
+    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft-ten text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
 
     return `${baseClasses} ${className}`;
   };
@@ -119,6 +137,9 @@ export function Tooltip({
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             position: 'fixed',
+            // static mode: center horizontally on the anchor point and sit above it
+            transform: isStatic ? 'translate(-50%, -100%)' : undefined,
+            textAlign: isStatic ? 'center' : undefined,
             backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
             borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
             maxWidth: '300px', // Kompakt für kürzere Texte
@@ -140,4 +161,9 @@ interface SimpleTooltipProps extends Omit<TooltipProps, 'children'> {
 
 export function SimpleTooltip(props: SimpleTooltipProps) {
   return <Tooltip {...props} />;
+}
+
+// Static tooltip: shown centered above the trigger element instead of following the cursor.
+export function StaticTooltip(props: Omit<TooltipProps, 'position'>) {
+  return <Tooltip {...props} position="top" />;
 }

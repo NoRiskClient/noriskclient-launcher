@@ -34,6 +34,8 @@ export interface SearchWithFiltersProps {
   showSort?: boolean;
   /** Whether to show the filter dropdown */
   showFilter?: boolean;
+  /** Custom filter control rendered in the filter slot (inside the search bar), replacing the default dropdown. */
+  filterSlot?: React.ReactNode;
   dropdownSize?: 'sm' | 'md';
 }
 
@@ -52,6 +54,7 @@ export function SearchWithFilters({
   searchIcon = "solar:magnifer-bold",
   showSort = true,
   showFilter = true,
+  filterSlot,
   dropdownSize = 'md',
 }: SearchWithFiltersProps) {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,23 +102,31 @@ export function SearchWithFilters({
         )}
         
         {/* Version/Filter */}
-        {showFilter && filterOptions.length > 0 && (
+        {filterSlot ? (
           <>
             {/* Separator */}
             <div className="h-4 w-px bg-white/20 mx-2"></div>
-            
-            {/* Filter Button */}
-            <div className="relative">
-              <CustomDropdown
-                label=""
-                value={filterValue}
-                onChange={onFilterChange}
-                options={filterOptions}
-                className="w-auto"
-                size={dropdownSize}
-              />
-            </div>
+            <div className="relative">{filterSlot}</div>
           </>
+        ) : (
+          showFilter && filterOptions.length > 0 && (
+            <>
+              {/* Separator */}
+              <div className="h-4 w-px bg-white/20 mx-2"></div>
+
+              {/* Filter Button */}
+              <div className="relative">
+                <CustomDropdown
+                  label=""
+                  value={filterValue}
+                  onChange={onFilterChange}
+                  options={filterOptions}
+                  className="w-auto"
+                  size={dropdownSize}
+                />
+              </div>
+            </>
+          )
         )}
       </div>
     </div>

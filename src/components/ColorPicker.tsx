@@ -62,7 +62,7 @@ export function ColorPicker({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 p-1">
         {Object.values(ACCENT_COLORS).map((color) => (
           <button
             key={color.name}

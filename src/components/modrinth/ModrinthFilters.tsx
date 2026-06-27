@@ -8,6 +8,7 @@ import type { ModrinthCategory, ModrinthGameVersion, ModrinthLoader, ModrinthPro
 import { LoadingIndicator } from "../ui/LoadingIndicator";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { useThemeStore } from "../../store/useThemeStore";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // Simple FilterGroup component
 const FilterGroup = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -135,7 +136,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load categories:", error);
         setCategoriesError(
-          `Failed to load categories: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load categories: ${parseErrorMessage(error)}`
         );
       } finally {
         setCategoriesLoading(false);
@@ -173,7 +174,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load game versions:", error);
         setGameVersionsError(
-          `Failed to load game versions: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load game versions: ${parseErrorMessage(error)}`
         );
       } finally {
         setGameVersionsLoading(false);
@@ -195,7 +196,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load loaders:", error);
         setLoadersError(
-          `Failed to load loaders: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load loaders: ${parseErrorMessage(error)}`
         );
       } finally {
         setLoadersLoading(false);

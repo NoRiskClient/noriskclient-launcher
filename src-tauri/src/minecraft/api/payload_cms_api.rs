@@ -37,10 +37,14 @@ pub struct SubmitTestVoteResponse {
 }
 
 impl PayloadCmsApi {
-    pub fn get_cms_base(_is_experimental: bool) -> String {
-        // TODO: switch back to is_experimental-based selection once cms.norisk.gg
-        // has the tester-window endpoints deployed.
-        String::from("https://cms-staging.norisk.gg")
+    pub fn get_cms_base(is_experimental: bool) -> String {
+        if is_experimental {
+            debug!("[Payload CMS] Using experimental CMS endpoint");
+            String::from("https://cms-staging.norisk.gg")
+        } else {
+            debug!("[Payload CMS] Using production CMS endpoint");
+            String::from("https://cms.norisk.gg")
+        }
     }
 
     pub async fn fetch_needs_testing(

@@ -10,6 +10,7 @@ import { openExternalUrl } from "../../services/tauri-service";
 import { uploadLogToMclogs } from "../../services/log-service";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // Hex colors for filter buttons
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -200,7 +201,7 @@ export function LogViewerCore({
       // Extract error message properly from Tauri CommandError
       const errorMessage = error && typeof error === 'object' && 'message' in error
         ? (error as { message: string }).message
-        : String(error);
+        : parseErrorMessage(error);
       toast.error(errorMessage || t('logs.upload_failed'));
     } finally {
       setIsUploading(false);

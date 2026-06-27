@@ -18,6 +18,7 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import { ContentTable } from "../../ui/ContentTable";
 import { Button } from "../../ui/buttons/Button";
 import { gsap } from "gsap";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface ResourcePacksTabProps {
   profile: Profile;
@@ -117,7 +118,7 @@ export function ResourcePacksTab({
     } catch (error) {
       console.error("Failed to load resource packs:", error);
       setResourcePacksError(
-        `Failed to load resource packs: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load resource packs: ${parseErrorMessage(error)}`,
       );
     } finally {
       setLoadingResourcePacks(false);
@@ -283,7 +284,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to toggle pack enabled state:", err);
       setResourcePacksError(
-        `Failed to toggle pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to toggle pack: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -331,7 +332,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to update pack:", err);
       setResourcePacksError(
-        `Failed to update pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update pack: ${parseErrorMessage(err)}`,
       );
 
       setResourcePackUpdates({ ...resourcePackUpdates });
@@ -394,7 +395,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to update all packs:", err);
       setResourcePacksError(
-        `Failed to update all packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update all packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -434,7 +435,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to delete pack:", err);
       setResourcePacksError(
-        `Failed to delete pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete pack: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -452,7 +453,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to open directory:", err);
       setResourcePacksError(
-        `Failed to open directory: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to open directory: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -480,7 +481,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to enable selected packs:", err);
       setResourcePacksError(
-        `Failed to enable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to enable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -508,7 +509,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to disable selected packs:", err);
       setResourcePacksError(
-        `Failed to disable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to disable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -551,7 +552,7 @@ export function ResourcePacksTab({
     } catch (err) {
       console.error("Failed to delete selected packs:", err);
       setResourcePacksError(
-        `Failed to delete selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);

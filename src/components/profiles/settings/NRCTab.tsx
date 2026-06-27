@@ -12,6 +12,7 @@ import { Button } from "../../ui/buttons/Button";
 import { gsap } from "gsap";
 import { toast } from "react-hot-toast";
 import * as ProfileService from "../../../services/profile-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface NoriskPack {
   displayName: string;
@@ -137,7 +138,7 @@ export function NRCTab({
       toast.success(t('profiles.repair_success'));
     } catch (err) {
       console.error("Failed to repair profile:", err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = parseErrorMessage(err);
       toast.error(t('profiles.repair_failed', { error: errorMessage }));
     } finally {
       setIsRepairing(false);

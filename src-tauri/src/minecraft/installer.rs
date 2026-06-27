@@ -82,6 +82,8 @@ pub async fn install_minecraft_version(
     quick_play_multiplayer: Option<String>,
     migration_info: Option<crate::utils::profile_utils::MigrationInfo>,
     extra_local_mods: Vec<std::path::PathBuf>,
+    // Use the passed-in profile as-is instead of reloading by id (override launches).
+    skip_profile_reload: bool,
 ) -> Result<()> {
     // Convert string modloader to ModLoader enum
     let modloader_enum = match modloader_str {
@@ -108,6 +110,21 @@ pub async fn install_minecraft_version(
     let state = State::get().await?;
     let is_experimental_mode = state.config_manager.is_experimental_mode().await;
     let launcher_config = state.config_manager.get_config().await;
+
+    let profile_owned;
+    let profile = if skip_profile_reload {
+        profile
+    } else {
+        if let Err(e) = state
+            .profile_manager
+            .resolve_and_migrate_pack_id(profile.id)
+            .await
+        {
+            warn!("[PackFallback] Pack migration check failed for profile {}: {}.", profile.id, e);
+        }
+        profile_owned = state.profile_manager.get_profile(profile.id).await?;
+        &profile_owned
+    };
 
     info!(
         "[Launch] Setting experimental mode: {}",

@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { useFriendsStore } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
+import { translateApiError } from "../../utils/nrc-error-translations";
 
 export function AddFriendInput() {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ export function AddFriendInput() {
       setUsername("");
       setTimeout(() => setSuccess(false), 3000);
     } catch (e: any) {
-      setError(e?.message || t('friends.send_request_failed'));
+      setError(translateApiError(e, t('friends.send_request_failed')));
     } finally {
       setIsLoading(false);
     }

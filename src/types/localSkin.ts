@@ -69,10 +69,10 @@ export interface GetStarlightSkinRenderPayload {
 }
 // --- End Payload Type ---
 
-// --- Payload Type for get_crafatar_avatar command ---
-export interface GetCrafatarAvatarPayload {
+export interface ActiveSkin {
   uuid: string;
-  size?: number | null;
-  overlay?: boolean;
+  base64_data: string;
+  variant: SkinVariant;
+  source: string;
+  updated_at: string;
 }
-// --- End Payload Type --- 

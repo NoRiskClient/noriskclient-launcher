@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { ProcessMetadata, ProcessState } from "../types/processState";
+import { parseErrorMessage } from "../utils/error-utils";
 
 export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG" | "TRACE" | "UNKNOWN";
 
@@ -296,7 +297,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         }
       }
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: parseErrorMessage(error), isLoading: false });
       console.error("Failed to fetch processes:", error);
     }
   },
@@ -525,7 +526,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       await invoke("stop_process", { processId });
     } catch (error) {
       console.error("Failed to stop process:", error);
-      set({ error: String(error) });
+      set({ error: parseErrorMessage(error) });
     }
   },
 }));

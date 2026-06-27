@@ -15,6 +15,7 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import { ContentTable } from "../../ui/ContentTable";
 import { Button } from "../../ui/buttons/Button";
 import { gsap } from "gsap";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface DataPacksTabProps {
   profile: Profile;
@@ -109,7 +110,7 @@ export function DataPacksTab({
     } catch (error) {
       console.error("Failed to load data packs:", error);
       setDataPacksError(
-        `Failed to load data packs: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load data packs: ${parseErrorMessage(error)}`,
       );
     } finally {
       setLoadingDataPacks(false);
@@ -274,7 +275,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to toggle pack enabled state:", err);
       setDataPacksError(
-        `Failed to toggle pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to toggle pack: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -322,7 +323,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to update pack:", err);
       setDataPacksError(
-        `Failed to update pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update pack: ${parseErrorMessage(err)}`,
       );
       setDataPackUpdates({ ...dataPackUpdates });
     } finally {
@@ -382,7 +383,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to update all packs:", err);
       setDataPacksError(
-        `Failed to update all packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to update all packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -422,7 +423,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to delete pack:", err);
       setDataPacksError(
-        `Failed to delete pack: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete pack: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -440,7 +441,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to open directory:", err);
       setDataPacksError(
-        `Failed to open directory: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to open directory: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -468,7 +469,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to enable selected packs:", err);
       setDataPacksError(
-        `Failed to enable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to enable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -496,7 +497,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to disable selected packs:", err);
       setDataPacksError(
-        `Failed to disable selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to disable selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
@@ -539,7 +540,7 @@ export function DataPacksTab({
     } catch (err) {
       console.error("Failed to delete selected packs:", err);
       setDataPacksError(
-        `Failed to delete selected packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to delete selected packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setLoadingOperation(false);
