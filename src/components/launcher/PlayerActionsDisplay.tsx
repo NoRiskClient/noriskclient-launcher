@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { MainLaunchButton } from './MainLaunchButton';
+import { SkinViewer } from './SkinViewer';
 import { useThemeStore } from '../../store/useThemeStore';
 import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
@@ -13,6 +14,9 @@ import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useSelectedIcon } from '../../hooks/useSelectedIcon';
 import { useIdleEmote } from '../../hooks/useIdleEmote';
+import { useStarlightRender } from '../../hooks/useStarlightRender';
+import { useQualitySettingsStore } from '../../store/quality-settings-store';
+import { useWindowFocus } from '../../hooks/useWindowFocus';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StaticTooltip } from '../ui/Tooltip';
@@ -150,6 +154,9 @@ export function PlayerActionsDisplay({
   const { cosmetics: equippedCosmetics, loading: cosmeticsLoading } = useEquippedCosmetics(activeAccount?.id);
   const selectedIcon = useSelectedIcon(activeAccount?.id);
   const idleEmote = useIdleEmote();
+  const cosmeticRenderer3d = useQualitySettingsStore((s) => s.cosmeticRenderer3d);
+  const isWindowFocused = useWindowFocus();
+  const resolvedSkinUrl = useStarlightRender(!cosmeticRenderer3d, playerName);
   const rigLoading = useMinLoading(skinLoading || cosmeticsLoading, 450);
   const rigCosmetics = React.useMemo(
     () =>
@@ -189,34 +196,46 @@ export function PlayerActionsDisplay({
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            width: `${skinViewerMaxDisplayWidth}px`,
-            height: `${skinViewerDisplayHeight}px`,
-          }}
-        >
-          <SkinRenderer
-            textureUrl={rigTextureUrl}
-            variant={rigVariant}
-            cosmetics={rigCosmetics}
-            emote={idleEmote}
-            nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
-            loading={rigLoading}
-            skeletonColor={accentColor.value}
-            className="bg-transparent"
+        {cosmeticRenderer3d ? (
+          <div
+            className="relative flex-shrink-0"
             style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: `${rigDisplayWidth}px`,
-              height: `${rigDisplayHeight}px`,
-              pointerEvents: "none",
-              filter: skinViewerStyles.filter,
+              width: `${skinViewerMaxDisplayWidth}px`,
+              height: `${skinViewerDisplayHeight}px`,
             }}
+          >
+            <SkinRenderer
+              textureUrl={rigTextureUrl}
+              variant={rigVariant}
+              cosmetics={rigCosmetics}
+              emote={idleEmote}
+              nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
+              loading={rigLoading}
+              paused={!isWindowFocused}
+              skeletonColor={accentColor.value}
+              className="bg-transparent"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                width: `${rigDisplayWidth}px`,
+                height: `${rigDisplayHeight}px`,
+                pointerEvents: "none",
+                filter: skinViewerStyles.filter,
+              }}
+            />
+          </div>
+        ) : (
+          <SkinViewer
+            skinUrl={resolvedSkinUrl}
+            playerName={playerName?.toString()}
+            width={skinViewerMaxDisplayWidth}
+            height={skinViewerDisplayHeight}
+            className="bg-transparent flex-shrink-0"
+            style={skinViewerStyles}
           />
-        </div>
+        )}
 
         {!isLoadingProfiles && (
           <>
