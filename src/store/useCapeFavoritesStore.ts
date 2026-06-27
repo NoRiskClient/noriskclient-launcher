@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setCapeFavorite } from "../services/cape-service";
 import { toast } from "react-hot-toast";
+import { translateApiError } from "../utils/nrc-error-translations";
 
 interface CapeFavoritesState {
   favoriteCapeIds: string[];
@@ -67,8 +68,7 @@ export const useCapeFavoritesStore = create<CapeFavoritesState>()(
           // Fire-and-forget server sync; do not overwrite local state with response
           await setCapeFavorite(capeId, favorite, noriskToken);
         } catch (err) {
-          const message = err instanceof Error ? err.message : String((err as any)?.message ?? err);
-          toast.error(`Failed to sync favorite: ${message}`);
+          toast.error(translateApiError(err, "Failed to sync favorite"));
           // Intentionally do not revert local state
         }
       },

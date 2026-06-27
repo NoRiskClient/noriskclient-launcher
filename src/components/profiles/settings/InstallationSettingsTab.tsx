@@ -16,6 +16,7 @@ import { gsap } from "gsap";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface InstallationSettingsTabProps {
   profile: Profile;
@@ -137,7 +138,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error("Failed to fetch Minecraft versions:", err);
         setError(
-          `failed to fetch minecraft versions: ${err instanceof Error ? err.message : String(err)}`,
+          `failed to fetch minecraft versions: ${parseErrorMessage(err)}`,
         );
       } finally {
         setIsLoadingVersions(false);
@@ -211,7 +212,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error(`Failed to fetch ${editedProfile.loader} versions:`, err);
         setError(
-          `failed to fetch ${editedProfile.loader} versions: ${err instanceof Error ? err.message : String(err)}`,
+          `failed to fetch ${editedProfile.loader} versions: ${parseErrorMessage(err)}`,
         );
       } finally {
         setIsLoadingLoaderVersions(false);

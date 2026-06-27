@@ -38,7 +38,8 @@ import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
 import { ConfirmDeletionModal } from "./ConfirmDeletionModal";
 import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
-import { translateCapeError, isCapeInReview } from "../../utils/cape-error-translations";
+import { isCapeInReview } from "../../utils/cape-error-translations";
+import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 
 
@@ -192,13 +193,16 @@ export function CapeBrowser(): JSX.Element {
 
 
   // Helper function to format and translate error messages
-  const formatErrorMessage = (error: string): string => {
-    return translateCapeError(error);
+  const formatErrorMessage = (error: unknown): string => {
+    return translateApiError(error, t('common.unknownError'));
   };
 
   // Helper function to determine if error is a warning (cape in review)
-  const isWarningMessage = (error: string): boolean => {
-    return isCapeInReview(error);
+  const isWarningMessage = (error: unknown): boolean => {
+    const key = (error as any)?.translatable_key as string | undefined;
+    if (key) return key.includes("in_review");
+    const raw = typeof error === "string" ? error : (error as any)?.message ?? "";
+    return isCapeInReview(raw);
   };
 
 
@@ -639,7 +643,7 @@ export function CapeBrowser(): JSX.Element {
       error: (err: any) => {
         setIsEquippingCapeId(null);
         console.error("Error equipping cape:", err);
-        return t('capes.failedToEquipCape', { error: err.message || t('common.unknownError') });
+        return t('capes.failedToEquipCape', { error: translateApiError(err, t('common.unknownError')) });
       },
     });
   };
@@ -651,7 +655,7 @@ export function CapeBrowser(): JSX.Element {
       toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
-      toast.error(t('capes.failedToUnequipCape', { error: err.message || t('common.unknownError') }));
+      toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
     } finally {
       setIsUnequipping(false);
     }
@@ -669,7 +673,7 @@ export function CapeBrowser(): JSX.Element {
             hideModal('delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape:", err);
-            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+            toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
           }
         }}
         onCancelDelete={() => hideModal('delete-cape-modal')}
@@ -690,7 +694,7 @@ export function CapeBrowser(): JSX.Element {
             hideModal('mod-delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape (moderator):", err);
-            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+            toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
           }
         }}
         onCancelDelete={() => hideModal('mod-delete-cape-modal')}
@@ -724,12 +728,12 @@ export function CapeBrowser(): JSX.Element {
         ));
       } catch (err: any) {
         console.error("Error creating preview URL:", err);
-        toast.error(t('capes.couldntPreviewFile', { error: err.message || t('common.unknownError') }));
+        toast.error(t('capes.couldntPreviewFile', { error: translateApiError(err, t('common.unknownError')) }));
       }
     } catch (err: any) {
       console.error("Error selecting cape file:", err);
       toast.error(
-        t('capes.failedToSelectCapeFile', { error: err.message || t('common.unknownError') }),
+        t('capes.failedToSelectCapeFile', { error: translateApiError(err, t('common.unknownError')) }),
       );
     }
   };
@@ -784,7 +788,7 @@ export function CapeBrowser(): JSX.Element {
       loading: t('capes.downloadingTemplate'),
       success: t('capes.templateDownloadedSuccess'),
       error: (err: any) =>
-        t('capes.failedToDownloadTemplate', { error: err.message || t('common.unknownError') }),
+        t('capes.failedToDownloadTemplate', { error: translateApiError(err, t('common.unknownError')) }),
     });
   };
 

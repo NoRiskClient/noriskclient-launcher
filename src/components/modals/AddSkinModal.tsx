@@ -16,6 +16,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
 import { SearchStyleInput } from "../ui/Input";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface AddSkinModalProps {
   skin?: MinecraftSkin;
@@ -181,11 +182,11 @@ export const AddSkinModal = memo(
       } catch (error) {
         console.error("Error loading skin preview:", error);
         console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
+          message: parseErrorMessage(error),
           stack: error instanceof Error ? error.stack : undefined,
           input: trimmedInput
         });
-        toast.error(t('skins.failedToLoadPreview', { error: error instanceof Error ? error.message : String(error) }));
+        toast.error(t('skins.failedToLoadPreview', { error: parseErrorMessage(error) }));
       } finally {
         setIsPreviewLoading(false);
       }

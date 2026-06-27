@@ -12,6 +12,7 @@ import { Select } from "../../ui/Select";
 import { Tooltip } from "../../ui/Tooltip";
 import type { NrcCompatibilityData } from "../../../utils/nrc-compatibility";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 function NrcLoaderCompatibleTooltipContent() {
   const { t } = useTranslation();
@@ -127,7 +128,7 @@ export function ProfileWizardV2Step2({
             ? err.message 
             : typeof err === 'object' && err !== null && 'message' in err
             ? String((err as any).message)
-            : String(err);
+            : parseErrorMessage(err);
           const errorKind = typeof err === 'object' && err !== null && 'kind' in err
             ? String((err as any).kind)
             : '';
@@ -250,7 +251,7 @@ export function ProfileWizardV2Step2({
           ? err.message 
           : typeof err === 'object' && err !== null && 'message' in err
           ? String((err as any).message)
-          : String(err);
+          : parseErrorMessage(err);
         const errorKind = typeof err === 'object' && err !== null && 'kind' in err
           ? String((err as any).kind)
           : '';

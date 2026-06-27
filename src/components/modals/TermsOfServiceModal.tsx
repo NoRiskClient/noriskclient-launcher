@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/buttons/Button';
 import { Icon } from '@iconify/react';
 import { useThemeStore } from '../../store/useThemeStore';
+import { BannerCard } from '../ui/BannerCard';
 import { openExternalUrl } from '../../services/tauri-service';
 import { toast } from 'react-hot-toast';
 
@@ -16,32 +17,9 @@ interface AnalyticsConsentBannerProps {
 
 export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: AnalyticsConsentBannerProps) {
   const { t } = useTranslation();
-  const { accentColor } = useThemeStore();
   return (
     <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
-      <div
-        className="bg-black/20 backdrop-blur-md border border-white/10 hover:border-white/20 shadow-2xl rounded-lg p-4 relative transition-all duration-200 cursor-default"
-        style={{
-          backgroundColor: 'rgba(0,0,0,0.2)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderBottom: `2px solid ${accentColor.value}80`,
-          boxShadow: `
-            0 4px 0 rgba(0,0,0,0.3),
-            0 6px 12px rgba(0,0,0,0.35),
-            inset 0 1px 0 ${accentColor.value}1A
-          `
-        }}
-      >
-        <button
-          onClick={onDismiss}
-          className="absolute top-3 right-3 p-1 text-gray-400 hover:text-white transition-colors"
-          title={t('analytics.banner.dismiss')}
-        >
-          <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
-        </button>
-
+      <BannerCard onDismiss={onDismiss} dismissTitle={t('analytics.banner.dismiss')}>
         <div className="flex items-start gap-3 pr-8">
           <Icon icon="solar:chart-square-bold" className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
 
@@ -80,7 +58,7 @@ export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: Analy
             </div>
           </div>
         </div>
-      </div>
+      </BannerCard>
     </div>
   );
 }

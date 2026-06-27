@@ -16,7 +16,6 @@ use serde_json;
 use std::collections::HashMap;
 use rand;
 use uuid::Uuid;
-use crate::utils::string_utils::safe_truncate;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -166,44 +165,19 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to request server ID from NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Server ID request response status: {}", status);
+        let server_response = crate::utils::api_utils::parse_response_with_logging::<ServerIdResponse>(response, "NoRisk server-id").await?;
 
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Server ID request error response: Status {}, Body: {}",
-                status, error_body
-            );
+        let server_id = &server_response.server_id;
+        if !server_id.starts_with("nrc-") {
+            error!("[NoRisk API] Invalid server ID received: {}", server_id);
             return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for server ID request: {}, Body: {}",
-                status, error_body
+                "Invalid server ID received from NoRisk API: {}",
+                server_id
             )));
         }
 
-        debug!("[NoRisk API] Parsing server ID response as JSON");
-        match response.json::<ServerIdResponse>().await {
-            Ok(server_response) => {
-                let server_id = &server_response.server_id;
-                if !server_id.starts_with("nrc-") {
-                    error!("[NoRisk API] Invalid server ID received: {}", server_id);
-                    return Err(AppError::RequestError(format!(
-                        "Invalid server ID received from NoRisk API: {}",
-                        server_id
-                    )));
-                }
-
-                info!("[NoRisk API] Server ID request successful: {}", server_id);
-                Ok(server_response)
-            }
-            Err(e) => {
-                error!("[NoRisk API] Failed to parse server ID response: {}", e);
-                Err(AppError::ParseError(format!("Failed to parse NoRisk API server ID response: {}", e)))
-            }
-        }
+        info!("[NoRisk API] Server ID request successful: {}", server_id);
+        Ok(server_response)
     }
 
     pub async fn post_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
@@ -247,22 +221,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to send request to NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        response.json::<T>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<T>(response, endpoint).await
     }
 
     pub async fn get_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
@@ -292,22 +251,7 @@ impl NoRiskApi {
             AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
         })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        response.json::<T>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<T>(response, endpoint).await
     }
 
     pub async fn delete_from_norisk_endpoint_text_with_parameters(
@@ -343,22 +287,7 @@ impl NoRiskApi {
             ))
         })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text");
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })
+        crate::utils::api_utils::parse_text_response_with_logging(response, endpoint).await
     }
 
     /// Secure version of token refresh using server-provided server ID
@@ -449,36 +378,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to send v3 token refresh request to NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] v3 token refresh response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] v3 token refresh error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API v3 returned error status: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing v3 token refresh response body as JSON");
-        match response.json::<NoRiskToken>().await {
-            Ok(token) => {
-                info!("[NoRisk API] v3 token refresh successful");
-                debug!("[NoRisk API] Token valid status: {}", token.value.len() > 0);
-                Ok(token)
-            }
-            Err(e) => {
-                error!("[NoRisk API] Failed to parse v3 token refresh response: {}", e);
-                Err(AppError::ParseError(format!("Failed to parse NoRisk API v3 response: {}", e)))
-            }
-        }
+        crate::utils::api_utils::parse_response_with_logging::<NoRiskToken>(response, "NoRisk token refresh v3").await
     }
 
     pub async fn request_from_norisk_endpoint<T: for<'de> Deserialize<'de>>(
@@ -549,8 +449,10 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskModpacksConfig> {
-        debug!("[NoRisk API] Fetching modpack configuration from v3 endpoint (staging)");
-        // TODO: Remove hardcoded staging once v3 is deployed to production
+        debug!(
+            "[NoRisk API] Fetching modpack configuration from v3 endpoint. Experimental: {}",
+            is_experimental
+        );
         Self::get_from_norisk_endpoint("launcher/modpacks-v3", norisk_token, None, is_experimental)
             .await
     }
@@ -650,24 +552,23 @@ impl NoRiskApi {
             .await
     }
 
-    /// Submits a crash log to the NoRisk API.
-    pub async fn submit_crash_log(
+    /// Analyze a crash log; returns the launcher verdict (CrashCheckResult JSON). Served by the
+    /// discord-bot API (same route also lives in core-backend; base can be switched later).
+    pub async fn check_crash_log(
         norisk_token: &str,
         crash_log_data: &CrashlogDto,
         request_uuid: &str,
         is_experimental: bool,
-    ) -> Result<()> {
-        let base_url = Self::get_api_base(is_experimental);
-        let endpoint = "core/crashlog";
+    ) -> Result<serde_json::Value> {
+        let base_url = if is_experimental {
+            "https://discord-api-staging.norisk.gg/api/v1/discord"
+        } else {
+            "https://discord-api.norisk.gg/api/v1/discord"
+        };
+        let endpoint = "crashlog/check";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!(
-            "[NoRisk API] Submitting crash log to endpoint: {}",
-            endpoint
-        );
-        debug!("[NoRisk API] Full URL: {}", url);
-        debug!("[NoRisk API] With request UUID: {}", request_uuid);
-        debug!("[NoRisk API] Crash log data: {:?}", crash_log_data);
+        debug!("[NoRisk API] Checking crash log at: {}", url);
 
         let response = HTTP_CLIENT
             .post(url)
@@ -677,33 +578,11 @@ impl NoRiskApi {
             .send()
             .await
             .map_err(|e| {
-                error!("[NoRisk API] Crash log submission request failed: {}", e);
-                AppError::RequestError(format!("Failed to send crash log to NoRisk API: {}", e))
+                error!("[NoRisk API] Crash log check request failed: {}", e);
+                AppError::RequestError(format!("Failed to send crash log check to NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!(
-            "[NoRisk API] Crash log submission response status: {}",
-            status
-        );
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Crash log submission error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for crash log: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        info!("[NoRisk API] Crash log submitted successfully.");
-        Ok(())
+        crate::utils::api_utils::parse_response_with_logging::<serde_json::Value>(response, endpoint).await
     }
 
     pub async fn get_mcreal_app_token(
@@ -729,28 +608,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to get mobile app token from NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] McReal app token response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] McReal app token error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for mobile app token: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read mobile app token response: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API mobile app token response: {}", e))
-        })
+        crate::utils::api_utils::parse_text_response_with_logging(response, "McReal app token").await
     }
 
     pub async fn get_user_permissions(
@@ -776,28 +634,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to get permissions from NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Permissions response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Permissions error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for permissions: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.json::<Vec<String>>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse permissions response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API permissions response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(response, "NoRisk permissions").await
     }
 
     pub async fn reset_mcreal_app_token(
@@ -823,28 +660,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to reset mobile app token from NoRisk API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] McReal app token reset response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] McReal app token reset error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for mobile app token reset: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read mobile app token reset response: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API mobile app token reset response: {}", e))
-        })
+        crate::utils::api_utils::parse_text_response_with_logging(response, "McReal app token reset").await
     }
 
     /// Fetches the advent calendar data from the NoRisk API.
@@ -880,44 +696,7 @@ impl NoRiskApi {
             AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
         })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text before parsing");
-        let response_text = response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })?;
-
-        debug!("[NoRisk API] Response body (first 500 chars): {}",
-            if response_text.len() > 500 {
-                format!("{}...", safe_truncate(&response_text, 500))
-            } else {
-                response_text.clone()
-            }
-        );
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        serde_json::from_str::<Vec<AdventCalendarDay>>(&response_text).map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            error!("[NoRisk API] Full response body: {}", response_text);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}. Response body: {}", e, response_text))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<AdventCalendarDay>>(response, "Advent calendar").await
     }
 
     /// Claims a reward for a specific day in the advent calendar.
@@ -949,47 +728,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to claim advent calendar day: {}", e))
             })?;
 
-        let status = response.status();
-        debug!(
-            "[NoRisk API] Advent calendar claim response status: {}",
-            status
-        );
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Advent calendar claim error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for advent calendar claim: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text before parsing");
-        let response_text = response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })?;
-
-        debug!("[NoRisk API] Response body (first 500 chars): {}",
-            if response_text.len() > 500 {
-                format!("{}...", safe_truncate(&response_text, 500))
-            } else {
-                response_text.clone()
-            }
-        );
-
-        debug!("[NoRisk API] Parsing advent calendar claim response body as JSON");
-        serde_json::from_str::<AdventCalendarDay>(&response_text).map_err(|e| {
-            error!("[NoRisk API] Failed to parse advent calendar claim response: {}", e);
-            error!("[NoRisk API] Full response body: {}", response_text);
-            AppError::ParseError(format!("Failed to parse NoRisk API advent calendar claim response: {}. Response body: {}", e, response_text))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<AdventCalendarDay>(response, "Advent calendar claim").await
     }
 
     /// Report a referral code to the backend for tracking.
@@ -1028,26 +767,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to report referral code: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Referral report response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Referral report error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for referral report: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        info!("[NoRisk API] Successfully reported referral code");
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Referral report").await
     }
 
     /// Get information about a referral code (public endpoint, no auth required).
@@ -1069,31 +789,7 @@ impl NoRiskApi {
                 AppError::RequestError(format!("Failed to fetch referral info: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Referral info response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Referral info error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for referral info: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        let info = response.json::<ReferralInfo>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse referral info response: {}", e);
-            AppError::ParseError(format!("Failed to parse referral info: {}", e))
-        })?;
-
-        info!("[NoRisk API] Successfully fetched referral info for: {}", info.referrer_name);
-        Ok(info)
+        crate::utils::api_utils::parse_response_with_logging::<ReferralInfo>(response, "Referral info").await
     }
 
     /// Get all notifications for the current user
@@ -1140,10 +836,7 @@ impl NoRiskApi {
             .await
             .map_err(|e| AppError::RequestError(e.to_string()))?;
 
-        if !response.status().is_success() {
-            return Err(AppError::RequestError(format!("Status: {}", response.status())));
-        }
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Mark all notifications read").await
     }
 
     /// Mark a specific notification as read
@@ -1169,10 +862,7 @@ impl NoRiskApi {
             .await
             .map_err(|e| AppError::RequestError(e.to_string()))?;
 
-        if !response.status().is_success() {
-            return Err(AppError::RequestError(format!("Status: {}", response.status())));
-        }
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Mark notification read").await
     }
 
     /// Confirm an auth bridge session for website authentication.
@@ -1195,20 +885,7 @@ impl NoRiskApi {
             .await
             .map_err(|e| AppError::RequestError(format!("Auth bridge request failed: {}", e)))?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AppError::RequestError(format!(
-                "Auth bridge failed: {} - {}",
-                status, body
-            )));
-        }
-
-        info!("[NoRisk API] Auth bridge confirmation successful");
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Auth bridge confirm").await
     }
 
     /// Fetches the unique players (last 24h) stat from the NoRisk API.

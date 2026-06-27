@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { FriendsFriendUser, OnlineState, useFriendsStore } from "../../store/friends-store";
 import { useChatStore } from "../../store/chat-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { NotificationBadge } from "../ui/NotificationBadge";
 import { cn } from "../../lib/utils";
 
@@ -27,7 +27,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
   const { accentColor } = useThemeStore();
   const [isRemoving, setIsRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const avatarUrl = useCrafatarAvatar({ uuid: friend.uuid, size: 48 });
+  const avatarUrl = usePlayerAvatar({ uuid: friend.uuid, size: 48 });
 
   const unreadCount = useMemo(() => {
     const chat = chats.find(c => c.participants.some(p => p.userId === friend.uuid));

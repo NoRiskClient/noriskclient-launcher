@@ -2,8 +2,7 @@ use crate::{
     config::HTTP_CLIENT,
     error::{AppError, Result},
 };
-use log::{debug, error, info};
-use reqwest::StatusCode;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -183,22 +182,11 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send request to Cape API: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[Cape API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "Cape API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[Cape API] Parsing response body as JSON");
-        response.json::<CapesBrowseResponse>().await.map_err(|e| {
-            error!("[Cape API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse Cape API response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<CapesBrowseResponse>(
+            response,
+            "Cape browse",
+        )
+        .await
     }
 
     /// Get capes for a specific player
@@ -251,35 +239,11 @@ impl CapeApi {
                 ))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API get_player_capes] Response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[Cape API get_player_capes] Error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "Cape API (get_player_capes) returned error status: {}. Details: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[Cape API get_player_capes] Parsing response body as JSON");
-        response.json::<Vec<CosmeticCape>>().await.map_err(|e| {
-            error!(
-                "[Cape API get_player_capes] Failed to parse response: {}",
-                e
-            );
-            AppError::ParseError(format!(
-                "Failed to parse Cape API response for get_player_capes: {}",
-                e
-            ))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<CosmeticCape>>(
+            response,
+            "Cape get player",
+        )
+        .await
     }
 
     /// Get owned capes grouped by review state
@@ -316,25 +280,11 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send get owned capes list request: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!("[Cape API] Error response: Status {}, Body: {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Cape API (get_owned_capes_list) returned error status: {}. Details: {}",
-                status, error_body
-            )));
-        }
-
-        response.json::<HashMap<String, Vec<CosmeticCape>>>().await.map_err(|e| {
-            error!("[Cape API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse owned capes list response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<HashMap<String, Vec<CosmeticCape>>>(
+            response,
+            "Cape owned list",
+        )
+        .await
     }
 
     /// Equip a specific cape for a player
@@ -380,32 +330,7 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send equip cape request: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        match status {
-            StatusCode::OK => {
-                info!(
-                    "[Cape API] Cape {} equipped successfully for player {}",
-                    cape_hash, player_uuid
-                );
-                Ok(())
-            }
-            _ => {
-                let response_text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-                error!(
-                    "[Cape API] Error equipping cape: Status {}, Response: {}",
-                    status, response_text
-                );
-                Err(AppError::RequestError(format!(
-                    "Failed to equip cape. Status: {}, Details: {}",
-                    status, response_text
-                )))
-            }
-        }
+        crate::utils::api_utils::expect_success_with_logging(response, "Cape equip").await
     }
 
     /// Check if the current user is a moderator (team member)
@@ -490,32 +415,7 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send delete cape request: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        match status {
-            StatusCode::OK => {
-                info!(
-                    "[Cape API] Cape {} deleted successfully for player {}",
-                    cape_hash, player_uuid
-                );
-                Ok(())
-            }
-            _ => {
-                let response_text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-                error!(
-                    "[Cape API] Error deleting cape: Status {}, Response: {}",
-                    status, response_text
-                );
-                Err(AppError::RequestError(format!(
-                    "Failed to delete cape. Status: {}, Details: {}",
-                    status, response_text
-                )))
-            }
-        }
+        crate::utils::api_utils::expect_success_with_logging(response, "Cape delete").await
     }
 
     /// Upload a new cape image for a player
@@ -575,32 +475,10 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send upload cape request: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        let response_text = response.text().await.map_err(|e| {
-            error!("[Cape API] Failed to read response text: {}", e);
-            AppError::RequestError(format!("Failed to read upload cape response text: {}", e))
-        })?;
-
-        if status.is_success() {
-            info!(
-                "[Cape API] Cape uploaded successfully for player {}. Response: {}",
-                player_uuid, response_text
-            );
-            Ok(CapeUploadResponse {
-                cape_hash: response_text,
-            })
-        } else {
-            error!(
-                "[Cape API] Error uploading cape: Status {}, Response: {}",
-                status, response_text
-            );
-            Err(AppError::RequestError(format!(
-                "Failed to upload cape. Status: {}, Details: {}",
-                status, response_text
-            )))
-        }
+        let cape_hash =
+            crate::utils::api_utils::parse_text_response_with_logging(response, "Cape upload")
+                .await?;
+        Ok(CapeUploadResponse { cape_hash })
     }
 
     /// Fetch multiple capes by hashes (max 100)
@@ -636,34 +514,11 @@ impl CapeApi {
                 ))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        if !status.is_success() {
-            let response_text = response
-                .text()
-                .await
-                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-            error!(
-                "[Cape API] Error getting capes by hashes: Status {}, Response: {}",
-                status, response_text
-            );
-            return Err(AppError::RequestError(format!(
-                "Failed to get capes by hashes. Status: {}, Details: {}",
-                status, response_text
-            )));
-        }
-
-        response.json::<Vec<CosmeticCape>>().await.map_err(|e| {
-            error!(
-                "[Cape API] Failed to parse get capes by hashes response body: {}",
-                e
-            );
-            AppError::ParseError(format!(
-                "Failed to parse get capes by hashes response body: {}",
-                e
-            ))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<CosmeticCape>>(
+            response,
+            "Cape get by hashes",
+        )
+        .await
     }
 
     /// Add a cape to user's favorites
@@ -703,40 +558,11 @@ impl CapeApi {
                 ))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        if status.is_success() {
-            let favorites = response.json::<Vec<String>>().await.map_err(|e| {
-                error!(
-                    "[Cape API] Failed to parse add favorite response body: {}",
-                    e
-                );
-                AppError::ParseError(format!(
-                    "Failed to parse add favorite cape response body: {}",
-                    e
-                ))
-            })?;
-            info!(
-                "[Cape API] Cape {} added to favorites successfully. Total favorites: {}",
-                cape_hash,
-                favorites.len()
-            );
-            Ok(favorites)
-        } else {
-            let response_text = response
-                .text()
-                .await
-                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-            error!(
-                "[Cape API] Error adding favorite cape: Status {}, Response: {}",
-                status, response_text
-            );
-            Err(AppError::RequestError(format!(
-                "Failed to add favorite cape. Status: {}, Details: {}",
-                status, response_text
-            )))
-        }
+        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(
+            response,
+            "Cape add favorite",
+        )
+        .await
     }
 
     /// Remove a cape from user's favorites
@@ -776,40 +602,11 @@ impl CapeApi {
                 ))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        if status.is_success() {
-            let favorites = response.json::<Vec<String>>().await.map_err(|e| {
-                error!(
-                    "[Cape API] Failed to parse remove favorite response body: {}",
-                    e
-                );
-                AppError::ParseError(format!(
-                    "Failed to parse remove favorite cape response body: {}",
-                    e
-                ))
-            })?;
-            info!(
-                "[Cape API] Cape {} removed from favorites successfully. Total favorites: {}",
-                cape_hash,
-                favorites.len()
-            );
-            Ok(favorites)
-        } else {
-            let response_text = response
-                .text()
-                .await
-                .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-            error!(
-                "[Cape API] Error removing favorite cape: Status {}, Response: {}",
-                status, response_text
-            );
-            Err(AppError::RequestError(format!(
-                "Failed to remove favorite cape. Status: {}, Details: {}",
-                status, response_text
-            )))
-        }
+        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(
+            response,
+            "Cape remove favorite",
+        )
+        .await
     }
 
     /// Unequip the currently equipped cape for a player
@@ -854,31 +651,6 @@ impl CapeApi {
                 AppError::RequestError(format!("Failed to send unequip cape request: {}", e))
             })?;
 
-        let status = response.status();
-        debug!("[Cape API] Response status: {}", status);
-
-        match status {
-            StatusCode::OK => {
-                info!(
-                    "[Cape API] Cape unequipped successfully for player {}",
-                    player_uuid
-                );
-                Ok(())
-            }
-            _ => {
-                let response_text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|e| format!("Error reading error response body: {}", e));
-                error!(
-                    "[Cape API] Error unequipping cape: Status {}, Response: {}",
-                    status, response_text
-                );
-                Err(AppError::RequestError(format!(
-                    "Failed to unequip cape. Status: {}, Details: {}",
-                    status, response_text
-                )))
-            }
-        }
+        crate::utils::api_utils::expect_success_with_logging(response, "Cape unequip").await
     }
 }

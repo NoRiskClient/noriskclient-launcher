@@ -28,27 +28,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to get chat: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Chat API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Chat API] Chat response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Chat API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse chat response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Chat>(response, "Chat get/create private").await
     }
 
     pub async fn get_private_chats(
@@ -70,27 +50,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to get chats: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Chat API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Chat API] Chats response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Chat API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse chats response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<ComputedChat>>(response, "Chat get private list").await
     }
 
     pub async fn get_messages(
@@ -116,27 +76,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to get messages: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Chat API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Chat API] Messages response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Chat API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse messages response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<Vec<ChatMessage>>(response, "Chat get messages").await
     }
 
     pub async fn send_message(
@@ -167,27 +107,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to send message: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Chat API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Chat API] Send message response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Chat API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse send message response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<ChatMessage>(response, "Chat send message").await
     }
 
     pub async fn edit_message(
@@ -215,27 +135,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to edit message: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Chat API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Chat API] Edit message response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Chat API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse edit message response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<ChatMessage>(response, "Chat edit message").await
     }
 
     pub async fn delete_message(
@@ -258,17 +158,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to delete message: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Chat delete message").await
     }
 
     pub async fn mark_message_received(
@@ -296,17 +186,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to mark message received: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Chat mark received").await
     }
 
     pub async fn add_reaction(
@@ -334,17 +214,7 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to add reaction: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Chat add reaction").await
     }
 
     pub async fn remove_reaction(
@@ -369,16 +239,6 @@ impl ChatApi {
                 AppError::RequestError(format!("Failed to remove reaction: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Chat API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Chat API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Chat remove reaction").await
     }
 }

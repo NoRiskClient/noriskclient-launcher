@@ -16,6 +16,7 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import gsap from "gsap";
 import { listen } from "@tauri-apps/api/event";
 import { EventType, type EventPayload } from "../../../types/events";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface ExportSettingsTabProps {
   profile: Profile;
@@ -124,7 +125,7 @@ export function ExportSettingsTab({
         setDirectoryStructure(structure);
       } catch (err) {
         console.error("Failed to fetch directory structure:", err);
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         setDirectoryError(t('export.load_structure_failed', { error: message }));
         toast.error(t('export.load_structure_failed', { error: message }));
       } finally {
@@ -195,7 +196,7 @@ export function ExportSettingsTab({
       setExportMessage("");
       exportToastIdRef.current = null;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err.message);
+      const message = parseErrorMessage(err);
       console.error("Failed to export profile:", err);
       toast.error(t('export.export_failed', { error: message }), { id: toastId });
       setIsExporting(false);

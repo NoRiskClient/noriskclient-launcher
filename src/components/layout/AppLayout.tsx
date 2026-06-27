@@ -44,6 +44,7 @@ import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 const appConfig = {
   version: "v0.5.22",
@@ -414,7 +415,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
         {
           loading: t('header.update.downloading'),
           success: t('header.update.success'),
-          error: (err) => t('header.update.failed', { error: err instanceof Error ? err.message : String(err) }),
+          error: (err) => t('header.update.failed', { error: parseErrorMessage(err) }),
         }
       );
     } catch (error) {
