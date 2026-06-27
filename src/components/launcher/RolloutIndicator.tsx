@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { useThemeStore } from "../../store/useThemeStore";
 import { Button } from "../ui/buttons/Button";
 import { openExternalUrl } from "../../services/tauri-service";
@@ -27,6 +28,7 @@ const CLOSE_DELAY = 150;
 
 export function RolloutIndicator() {
   const { t } = useTranslation();
+  const isWindowFocused = useWindowFocus();
   const accentColor = useThemeStore((s) => s.accentColor);
   const [inRollout, setInRollout] = useState(false);
   const [optedOut, setOptedOut] = useState(false);
@@ -118,6 +120,9 @@ export function RolloutIndicator() {
   if (!inRollout) return null;
 
   const iconColor = optedOut ? undefined : ACTIVE_COLOR;
+  // Only pulse while the window is focused — a CSS `infinite` animation keeps
+  // driving the GPU even when the launcher is minimized/hidden (issue #40).
+  const animate = !optedOut && isWindowFocused;
 
   return (
     <div
@@ -125,19 +130,30 @@ export function RolloutIndicator() {
       onMouseEnter={handleIconEnter}
       onMouseLeave={handleIconLeave}
     >
+      {/* Static glow layer. Rendered once and never animated, so the GPU does
+          not re-rasterize the drop-shadow blur every frame. The pulsing icon
+          below carries no filter, keeping the animation a cheap composite. */}
+      {!optedOut && (
+        <Icon
+          icon="solar:bolt-bold"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 w-full h-full"
+          style={{
+            color: ACTIVE_COLOR,
+            filter: `drop-shadow(0 0 8px ${ACTIVE_COLOR})`,
+          }}
+        />
+      )}
       <button
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
         className={cn(
-          "w-full h-full flex items-center justify-center cursor-pointer",
-          optedOut ? "opacity-40 grayscale" : "animate-pulse",
+          "relative w-full h-full flex items-center justify-center cursor-pointer",
+          optedOut ? "opacity-40 grayscale" : "",
+          animate ? "animate-pulse" : "",
         )}
-        style={
-          optedOut
-            ? undefined
-            : { color: ACTIVE_COLOR, filter: `drop-shadow(0 0 8px ${ACTIVE_COLOR})` }
-        }
+        style={optedOut ? undefined : { color: ACTIVE_COLOR }}
         aria-label={
           optedOut
             ? t("rollout.popover.click_to_opt_in")

@@ -25,6 +25,7 @@ import { ModrinthService } from "../../../services/modrinth-service";
 import { AutoSizer } from "react-virtualized/dist/es/AutoSizer";
 import { List } from "react-virtualized/dist/es/List";
 import type { ListRowProps } from "react-virtualized";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface ModsTabProps {
   profile: Profile;
@@ -175,7 +176,7 @@ export function ModsTab({
     } catch (error) {
       console.error("Failed to update mod:", error);
       setError(
-        `Failed to update mod: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to update mod: ${parseErrorMessage(error)}`,
       );
     } finally {
       setUpdatingMods((prev) => {
@@ -220,7 +221,7 @@ export function ModsTab({
     } catch (error) {
       console.error("Failed to fetch mods:", error);
       setError(
-        `Failed to load mods: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load mods: ${parseErrorMessage(error)}`,
       );
     } finally {
       setIsLoading(false);
@@ -334,7 +335,7 @@ export function ModsTab({
     } catch (error) {
       console.error("Failed to toggle mod:", error);
       setError(
-        `Failed to toggle mod: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to toggle mod: ${parseErrorMessage(error)}`,
       );
     }
   };
@@ -352,7 +353,7 @@ export function ModsTab({
     } catch (error) {
       console.error("Failed to delete mod:", error);
       setError(
-        `Failed to delete mod: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to delete mod: ${parseErrorMessage(error)}`,
       );
     }
   };
@@ -401,7 +402,7 @@ export function ModsTab({
     } catch (error) {
       console.error("Failed to delete selected mods:", error);
       setError(
-        `Failed to delete selected mods: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to delete selected mods: ${parseErrorMessage(error)}`,
       );
     }
   };

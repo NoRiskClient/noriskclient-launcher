@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
 import { getRandomBlockIcon } from "../../../data/block-icons";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
 const forbiddenTrailing = /[ .]$/;
@@ -257,7 +258,7 @@ export function ProfileWizardV2Step3({
             });
         } catch (err) {
             console.error("Failed to create profile:", err);
-            setError(t('profiles.wizard.createError', { error: err instanceof Error ? err.message : String(err) }));
+            setError(t('profiles.wizard.createError', { error: parseErrorMessage(err) }));
         } finally {
             setCreating(false);
         }

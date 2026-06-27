@@ -28,6 +28,7 @@ import { ThemedSurface } from "../../ui/ThemedSurface"; // Added import
 import { getImagePreview as getImgPreviewServiceCall } from "../../../services/tauri-service"; // Import service
 import type { ImagePreviewPayload } from "../../../types/fileSystem"; // Import types
 import { ProfileScreenshotModal } from "../ProfileScreenshotModal";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface ScreenshotItem {
   id: string;
@@ -200,7 +201,7 @@ export function ScreenshotsTab({
         setRawScreenshots(result);
       } catch (err) {
         console.error("Failed to fetch screenshots:", err);
-        setError(err instanceof Error ? err.message : String(err));
+        setError(parseErrorMessage(err));
         setRawScreenshots([]);
       } finally {
         setIsLoading(false);

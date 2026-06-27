@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { FriendRequestWithUsers, useFriendsStore } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { cn } from "../../lib/utils";
 
 interface FriendRequestItemProps {
@@ -19,7 +19,7 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
   const [isHovered, setIsHovered] = useState(false);
 
   const otherUser = request.users.find((u) => u.uuid !== currentUser?.uuid);
-  const avatarUrl = useCrafatarAvatar({ uuid: otherUser?.uuid, size: 48 });
+  const avatarUrl = usePlayerAvatar({ uuid: otherUser?.uuid, size: 48 });
 
   if (!otherUser) return null;
 

@@ -34,6 +34,7 @@ import { CopyWorldDialog } from "../../../modals/CopyWorldDialog";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface WorldsTabV3Props {
   profile: Profile;
@@ -131,7 +132,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       }
     } catch (err) {
       console.error("[V3 Worlds] Failed to load worlds/servers:", err);
-      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(parseErrorMessage(err));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -216,7 +217,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     try {
       await revealItemInDir(world.icon_path);
     } catch (err) {
-      toast.error(t("worlds.open_folder_failed", { error: err instanceof Error ? err.message : String(err) }));
+      toast.error(t("worlds.open_folder_failed", { error: parseErrorMessage(err) }));
     }
   }, [t]);
 
@@ -230,7 +231,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           {
             loading: t("worlds.deleting", { name: displayName }),
             success: t("worlds.delete_success", { name: displayName }),
-            error: (err) => t("worlds.delete_failed", { error: err instanceof Error ? err.message : String(err) }),
+            error: (err) => t("worlds.delete_failed", { error: parseErrorMessage(err) }),
           },
         );
         await loadData();
@@ -266,7 +267,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           {
             loading: t("worlds.copying", { name: displayName }),
             success: t("worlds.copy_success", { name: params.targetWorldName }),
-            error: (err) => t("worlds.copy_failed", { error: err instanceof Error ? err.message : String(err) }),
+            error: (err) => t("worlds.copy_failed", { error: parseErrorMessage(err) }),
           },
         );
         hideModal(modalId);
@@ -306,7 +307,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         {
           loading: t("worlds.importing", { name: folderName }),
           success: t("worlds.import_success", { name: folderName }),
-          error: (err) => t("worlds.import_failed", { error: err instanceof Error ? err.message : String(err) }),
+          error: (err) => t("worlds.import_failed", { error: parseErrorMessage(err) }),
         },
       );
       await loadData();

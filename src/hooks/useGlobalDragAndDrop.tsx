@@ -288,7 +288,7 @@ export function useGlobalDragAndDrop() {
                 .catch((err) => {
                   console.error(`[DragDrop Hook ${instanceId}] Content import ERROR (OpID: ${operationId}) at ${new Date().toISOString()}:`, err);
                   toast.error(
-                    i18n.t('dragdrop.content_import_failed', { itemType: itemTypeName, error: err instanceof Error ? err.message : String(err) }),
+                    i18n.t('dragdrop.content_import_failed', { itemType: itemTypeName, error: parseErrorMessage(err) }),
                     { id: loadingToastId }
                   );
                 });

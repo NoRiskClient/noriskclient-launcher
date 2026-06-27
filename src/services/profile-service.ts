@@ -34,6 +34,21 @@ export async function searchProfiles(query: string): Promise<Profile[]> {
   return invoke<Profile[]>("search_profiles", { query });
 }
 
+export interface ProfileBackupInfo {
+  path: string;
+  backup_time: number;
+  file_size: number;
+  profile_count: number;
+}
+
+export async function listProfileBackups(): Promise<ProfileBackupInfo[]> {
+  return invoke<ProfileBackupInfo[]>("list_profile_backups");
+}
+
+export async function restoreProfileBackup(backupPath: string): Promise<void> {
+  return invoke<void>("restore_profile_backup", { backupPath });
+}
+
 export async function getProfile(id: string): Promise<Profile> {
   return invoke<Profile>("get_profile", { id });
 }

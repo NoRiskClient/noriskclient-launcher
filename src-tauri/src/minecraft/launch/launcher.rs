@@ -441,6 +441,10 @@ impl MinecraftLauncher {
                     "-Dnorisk.experimental={}",
                     params.is_experimental_mode
                 ));
+
+                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
+                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
+                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
             } else {
                 info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
             }
@@ -571,6 +575,11 @@ impl MinecraftLauncher {
             Some(p) => p.effective_norisk_pack_id().await,
             None => None,
         };
+        // Snapshot mod manifest (incl. disabled) for crash analysis.
+        let crash_mods = match &profile {
+            Some(p) => crate::state::process_state::build_crash_mod_manifest(p, &state).await,
+            None => Vec::new(),
+        };
         let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name, profile_image_url) =
             match profile {
                 Some(p) => {
@@ -620,6 +629,7 @@ impl MinecraftLauncher {
                 profile_image_url,
                 post_exit_hook,
                 params.memory_max_mb,
+                crash_mods,
             )
             .await?;
 

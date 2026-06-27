@@ -36,9 +36,10 @@ import type { LocalContentItem } from "../../hooks/useLocalContentManager";
 import { ModpackDebugInfo } from "../../debug";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { Tooltip } from "../ui/Tooltip";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 type MainTabType = "content" | "worlds" | "logs" | "screenshots";
 type ContentTabType = "mods" | "resourcepacks" | "datapacks" | "shaderpacks" | "nrc";
@@ -102,7 +103,7 @@ export function ProfileDetailViewV2({
     : null;
 
   // Load preferred account avatar
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });
@@ -231,7 +232,7 @@ export function ProfileDetailViewV2({
           return t('profiles.deleteSuccess', { name: currentProfile.name });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: parseErrorMessage(err) }),
       });
     } catch (error) {
       console.error("Delete failed:", error);
@@ -266,7 +267,7 @@ export function ProfileDetailViewV2({
       loading: t('profiles.openingFolder', { name: currentProfile.name }),
       success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         console.error(`Failed to open folder for ${currentProfile.name}:`, err);
         return t('profiles.openFolderError', { error: message });
       },
@@ -476,7 +477,7 @@ export function ProfileDetailViewV2({
                           className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
                           style={{ imageRendering: 'pixelated' }}
                           onError={(e) => {
-                            e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
                       )}

@@ -11,6 +11,7 @@ import { Card } from "../ui/Card";
 import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthFilters } from "../modrinth/ModrinthFilters";
 import type { ModrinthProjectType } from "../../types/modrinth";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ModrinthTabProps {
   profiles?: Profile[];
@@ -40,7 +41,7 @@ export function ModrinthTab({
       } catch (err) {
         console.error("Failed to load profiles:", err);
         setError(
-          `Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to load profiles: ${parseErrorMessage(err)}`,
         );
         setProfilesLoaded(true);
       }
