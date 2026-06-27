@@ -452,6 +452,7 @@
   "skins.slim": "Slim",
   "skins.classic": "Classic",
   "skins.applied": "Applied",
+  "skins.rendererFallback": "Skin renderer unavailable, showing fallback preview.",
   "skins.addNewSkin": "Add New Skin",
   "skins.uploadOrImport": "Upload or import a skin",
   "skins.failedToParseSkinDetails": "Failed to parse skin details",

@@ -4,7 +4,7 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
-import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
+import type { MinecraftProfile } from "../../types/minecraft";
 import type {
   GetStarlightSkinRenderPayload,
   MinecraftSkin,
@@ -27,6 +27,22 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+
+interface ActiveSkinInfo {
+  name: string;
+  renderUrl: string;
+  fallbackSkinUrl: string | null;
+  variant: SkinVariant;
+}
+
+let hasWarnedAboutSkinRendererFallback = false;
+
+const showSkinRendererFallbackWarning = (message: string) => {
+  if (hasWarnedAboutSkinRendererFallback) return;
+  hasWarnedAboutSkinRendererFallback = true;
+  toast(message);
+};
 
 const SkinPreview = memo(
   ({
@@ -69,6 +85,7 @@ const SkinPreview = memo(
     const [starlightRenderUrl, setStarlightRenderUrl] = useState<string | null>(
       null,
     );
+    const [fallbackSkinUrl, setFallbackSkinUrl] = useState<string | null>(null);
     const [isRenderLoading, setIsRenderLoading] = useState<boolean>(true);
     const [canShowSpinner, setCanShowSpinner] = useState<boolean>(false);
     const spinnerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -77,6 +94,7 @@ const SkinPreview = memo(
       let isMounted = true;
       setIsRenderLoading(true);
       setStarlightRenderUrl(null);
+      setFallbackSkinUrl(null);
       setCanShowSpinner(false);
 
       if (spinnerTimeoutRef.current) {
@@ -103,11 +121,14 @@ const SkinPreview = memo(
             if (isMounted) {
               if (localPath) {
                 setStarlightRenderUrl(convertFileSrc(localPath));
+                setFallbackSkinUrl(null);
               } else {
                 console.warn(
                   `[SkinPreview] Starlight render returned empty path for ${skin.name}.`,
                 );
                 setStarlightRenderUrl("");
+                setFallbackSkinUrl(`data:image/png;base64,${skin.base64_data}`);
+                showSkinRendererFallbackWarning(t("skins.rendererFallback"));
               }
               setIsRenderLoading(false);
               setCanShowSpinner(false);
@@ -121,6 +142,8 @@ const SkinPreview = memo(
             );
             if (isMounted) {
               setStarlightRenderUrl("");
+              setFallbackSkinUrl(`data:image/png;base64,${skin.base64_data}`);
+              showSkinRendererFallbackWarning(t("skins.rendererFallback"));
               setIsRenderLoading(false);
               setCanShowSpinner(false);
               if (spinnerTimeoutRef.current)
@@ -228,6 +251,14 @@ const SkinPreview = memo(
                 <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
                 <p className="font-minecraft text-xs text-white/70 lowercase">{t('skins.loading')}</p>
               </div>
+            ) : !isRenderLoading && fallbackSkinUrl ? (
+              <SkinView3DWrapper
+                skinUrl={fallbackSkinUrl}
+                skinVariant={skin.variant}
+                width={140}
+                height={280}
+                zoom={0.78}
+              />
             ) : !isRenderLoading ? (
               <SkinViewer
                 skinUrl={starlightRenderUrl || ""}
@@ -375,6 +406,96 @@ const AddSkinCard = memo(
 );
 
 
+const CurrentSkinPreview = memo(
+  ({ skin, index }: { skin: ActiveSkinInfo; index: number }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const accentColor = useThemeStore((state) => state.accentColor);
+    const isBackgroundAnimationEnabled = useThemeStore(
+      (state) => state.isBackgroundAnimationEnabled,
+    );
+    const { t } = useTranslation();
+
+    const animationStyle = isBackgroundAnimationEnabled
+      ? { animationDelay: `${index * 0.075}s` }
+      : {};
+    const animationClasses = isBackgroundAnimationEnabled
+      ? "animate-in fade-in duration-500 fill-mode-both"
+      : "";
+
+    return (
+      <div
+        style={{
+          ...animationStyle,
+          backgroundColor: isHovered ? `${accentColor.value}20` : undefined,
+          borderColor: isHovered ? `${accentColor.value}60` : undefined,
+        }}
+        className={cn(
+          "relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 transition-all duration-200",
+          animationClasses,
+        )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="absolute top-3 right-3 z-20 text-green-400">
+          <Icon icon="solar:check-circle-bold" className="w-5 h-5" />
+        </div>
+
+        <div className="flex flex-col items-center gap-3 relative z-10 w-full">
+          <div
+            className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
+            style={{ width: "140px", height: "280px" }}
+          >
+            {skin.fallbackSkinUrl ? (
+              <SkinView3DWrapper
+                skinUrl={skin.fallbackSkinUrl}
+                skinVariant={skin.variant}
+                width={140}
+                height={280}
+                zoom={0.78}
+              />
+            ) : (
+              <SkinViewer
+                skinUrl={skin.renderUrl}
+                width={140}
+                height={280}
+                className="rounded-sm block"
+              />
+            )}
+          </div>
+
+          <div className="flex-grow min-w-0 w-full text-center">
+            <h3
+              className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              title={skin.name}
+            >
+              {skin.name}
+            </h3>
+
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+              <div className="text-white/60 flex items-center gap-1">
+                <Icon
+                  icon="solar:palette-bold"
+                  className="w-3 h-3 text-white/50"
+                />
+                <span>
+                  {skin.variant === "slim"
+                    ? t("skins.slim")
+                    : t("skins.classic")}
+                </span>
+              </div>
+              <div className="w-px h-3 bg-white/30"></div>
+              <div className="text-green-400 flex items-center gap-1">
+                <Icon icon="solar:check-circle-bold" className="w-3 h-3" />
+                <span>{t("skins.applied")}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
 export function SkinsTab() {
   const {
     activeAccount,
@@ -395,7 +516,12 @@ export function SkinsTab() {
   const [selectedLocalSkin, setSelectedLocalSkin] =
     useState<MinecraftSkin | null>(null);
   const [search, setSearch] = useState<string>("");
-  const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
+  const [currentSkinBase64, setCurrentSkinBase64] = useState<string | null>(
+    null,
+  );
+  const [activeSkinInfo, setActiveSkinInfo] = useState<ActiveSkinInfo | null>(
+    null,
+  );
 
   const debouncedSearch = useDebounce(search, 250);
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -407,6 +533,14 @@ export function SkinsTab() {
     );
   }, [localSkins, debouncedSearch]);
 
+  const shouldShowActiveSkin = useMemo(() => {
+    if (!activeSkinInfo) return false;
+    if (!debouncedSearch.trim()) return true;
+    return activeSkinInfo.name
+      .toLowerCase()
+      .includes(debouncedSearch.toLowerCase());
+  }, [activeSkinInfo, debouncedSearch]);
+
   const loadSkinData = useCallback(async () => {
     if (!activeAccount) return;
 
@@ -415,28 +549,59 @@ export function SkinsTab() {
     try {
       const data = await MinecraftSkinService.getUserSkinData();
       setSkinData(data);
+      setActiveSkinInfo(null);
+      setCurrentSkinBase64(null);
 
-      if (data?.properties) {
-        const texturesProp = data.properties.find(
-          (prop: { name: string; value: string }) => prop.name === "textures",
-        );
+      // Use the active account's local skin bytes as the source of truth for
+      // both applied-state detection and the "currently applied" preview card.
+      const activeSkin = await MinecraftSkinService.getActiveSkin().catch(
+        () => null,
+      );
 
-        if (texturesProp) {
-          try {
-            const decodedValue = atob(texturesProp.value);
-            const texturesJson = JSON.parse(decodedValue) as TexturesData;
-            const skinInfo = texturesJson.textures?.SKIN;
+      if (activeSkin?.base64_data) {
+        const base64Data = activeSkin.base64_data;
+        setCurrentSkinBase64(base64Data);
 
-            if (skinInfo?.url) {
-              const urlParts = skinInfo.url.split("/");
-              const skinIdFromUrl = urlParts[urlParts.length - 1].split(".")[0];
-              setCurrentSkinId(skinIdFromUrl);
-            }
-          } catch (e) {
-            console.error("Error parsing skin textures:", e);
-            toast.error(t('skins.failedToParseSkinDetails'));
+        let renderUrl = "";
+        let fallbackSkinUrl: string | null = `data:image/png;base64,${base64Data}`;
+
+        try {
+          const payload: GetStarlightSkinRenderPayload = {
+            player_name:
+              data?.name ||
+              activeAccount.minecraft_username ||
+              activeAccount.username ||
+              "skin",
+            render_type: "default",
+            render_view: "full",
+            base64_skin_data: base64Data,
+          };
+          const localPath =
+            await MinecraftSkinService.getStarlightSkinRender(payload);
+          if (localPath) {
+            renderUrl = convertFileSrc(localPath);
+            fallbackSkinUrl = null;
+          } else {
+            showSkinRendererFallbackWarning(t("skins.rendererFallback"));
           }
+        } catch (renderError) {
+          console.warn(
+            "Failed to fetch Starlight render for current skin:",
+            renderError,
+          );
+          showSkinRendererFallbackWarning(t("skins.rendererFallback"));
         }
+
+        setActiveSkinInfo({
+          name:
+            data?.name ||
+            activeAccount.minecraft_username ||
+            activeAccount.username ||
+            t("skins.applied"),
+          renderUrl,
+          fallbackSkinUrl,
+          variant: activeSkin.variant ?? "classic",
+        });
       }
     } catch (err) {
       console.error("Error loading skin data:", err);
@@ -444,7 +609,7 @@ export function SkinsTab() {
     } finally {
       setLoading(false);
     }
-  }, [activeAccount]);
+  }, [activeAccount, t]);
 
   const loadLocalSkins = useCallback(async () => {
     setLocalSkinsLoading(true);
@@ -612,6 +777,7 @@ export function SkinsTab() {
         skin.variant,
         skin.name,
       );
+      setSelectedSkinId(skin.id);
 
       toast.success(
         t('skins.appliedSkinSuccess', { name: skin.name, variant: skin.variant }),
@@ -626,8 +792,12 @@ export function SkinsTab() {
   };
 
   const isSkinApplied = (skin: MinecraftSkin): boolean => {
-    if (!currentSkinId) return false;
-    return skin.id === currentSkinId;
+    if (selectedSkinId === skin.id) return true;
+    if (!currentSkinBase64) return false;
+    return (
+      skin.base64_data.replace(/\s/g, "") ===
+      currentSkinBase64.replace(/\s/g, "")
+    );
   };
 
   // Add skin button
@@ -699,6 +869,7 @@ export function SkinsTab() {
               ) : !localSkinsLoading &&
                 localSkins.length > 0 &&
                 filteredSkins.length === 0 &&
+                !shouldShowActiveSkin &&
                 !localSkinsError ? (
                 <p className="text-white/70 italic font-minecraft text-lg">
                   {t('skins.noSkinsMatchSearch')}
@@ -709,11 +880,14 @@ export function SkinsTab() {
                     index={0}
                     onClick={() => startEditSkin(null, undefined)}
                   />
+                  {shouldShowActiveSkin && activeSkinInfo && (
+                    <CurrentSkinPreview skin={activeSkinInfo} index={1} />
+                  )}
                   {filteredSkins.map((skin, index) => (
                     <SkinPreview
                       key={skin.id}
                       skin={skin}
-                      index={index + 1}
+                      index={index + (shouldShowActiveSkin ? 2 : 1)}
                       loading={loading}
                       localSkinsLoading={localSkinsLoading}
                       selectedLocalSkin={selectedLocalSkin}

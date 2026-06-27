@@ -130,6 +130,7 @@ export function UploadCapeModal({
             capeUrl={paddedPreviewUrl || previewImageUrl}
             className="w-full h-full"
             zoom={1.5}
+            startFromBack={true}
             displayAsElytra={showElytraPreview}
           />
           {!isCapeOnly && (

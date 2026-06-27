@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { SkinViewer } from './SkinViewer';
+import { SkinView3DWrapper } from '../common/SkinView3DWrapper';
 import { MainLaunchButton } from './MainLaunchButton';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useSkinStore } from '../../store/useSkinStore';
 import { MinecraftSkinService } from '../../services/minecraft-skin-service';
-import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
+import type { GetStarlightSkinRenderPayload, SkinVariant } from '../../types/localSkin';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
@@ -19,6 +20,7 @@ import { isWorldCupEventActive } from '../../data/worldcup-event';
 import type { LaunchOverrides } from '../../services/process-service';
 
 const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
+let hasWarnedAboutSkinRendererFallback = false;
 
 const FEATURED_SERVER = {
   address: "hugosmp.net",
@@ -82,7 +84,11 @@ export function PlayerActionsDisplay({
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
   const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
+  const [fallbackSkinUrl, setFallbackSkinUrl] = useState<string | null>(null);
+  const [fallbackSkinVariant, setFallbackSkinVariant] =
+    useState<SkinVariant>("classic");
   const skinRevision = useSkinStore((state) => state.skinRevision);
+  const skinPreviewRequestIdRef = useRef(0);
   const navigate = useNavigate();
 
   const isLoadingProfiles = launchButtonVersions.length === 0;
@@ -112,33 +118,76 @@ export function PlayerActionsDisplay({
   };
 
   useEffect(() => {
+    const requestId = ++skinPreviewRequestIdRef.current;
+    const isCurrentRequest = () => requestId === skinPreviewRequestIdRef.current;
+
+    const warnFallbackOnce = () => {
+      if (hasWarnedAboutSkinRendererFallback) return;
+      hasWarnedAboutSkinRendererFallback = true;
+      toast.warning(t("skins.rendererFallback"));
+    };
+
     const fetchAndSetSkin = async () => {
-      if (playerName) {
-        try {
-          const activeSkin = await MinecraftSkinService.getActiveSkin().catch(() => null);
-          const payload: GetStarlightSkinRenderPayload = {
-            player_name: playerName,
-            render_type: "default",
-            render_view: "full",
-            base64_skin_data: activeSkin?.base64_data ?? null,
-          };
-          const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
-          if (localPath) {
-            setResolvedSkinUrl(convertFileSrc(localPath));
-          } else {
-            setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-          }
-        } catch (error) {
-          console.error("[PlayerActionsDisplay] Failed to fetch starlight skin render:", error);
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-        }
-      } else {
+      if (!playerName) {
         setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
+        setFallbackSkinUrl(null);
+        return;
+      }
+
+      const activeSkin = await MinecraftSkinService.getActiveSkin().catch(
+        () => null,
+      );
+      if (!isCurrentRequest()) return;
+
+      // Starlight is the preferred renderer; when it is unavailable we render
+      // the active account's local skin bytes via skinview3d instead of
+      // falling back to the default Steve skin.
+      const useLocalFallback = () => {
+        if (activeSkin?.base64_data) {
+          setFallbackSkinUrl(`data:image/png;base64,${activeSkin.base64_data}`);
+          setFallbackSkinVariant(activeSkin.variant ?? "classic");
+          warnFallbackOnce();
+        } else {
+          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
+          setFallbackSkinUrl(null);
+        }
+      };
+
+      try {
+        const payload: GetStarlightSkinRenderPayload = {
+          player_name: playerName,
+          render_type: "default",
+          render_view: "full",
+          base64_skin_data: activeSkin?.base64_data ?? null,
+        };
+        const localPath =
+          await MinecraftSkinService.getStarlightSkinRender(payload);
+        if (!isCurrentRequest()) return;
+
+        if (localPath) {
+          setResolvedSkinUrl(convertFileSrc(localPath));
+          setFallbackSkinUrl(null);
+        } else {
+          useLocalFallback();
+        }
+      } catch (error) {
+        if (!isCurrentRequest()) return;
+        console.error(
+          "[PlayerActionsDisplay] Failed to fetch starlight skin render:",
+          error,
+        );
+        useLocalFallback();
       }
     };
 
     fetchAndSetSkin();
-  }, [playerName, skinRevision]);
+
+    return () => {
+      if (isCurrentRequest()) {
+        skinPreviewRequestIdRef.current += 1;
+      }
+    };
+  }, [playerName, skinRevision, t]);
 
   const dropShadowX = '2px';
   const dropShadowY = '4px';
@@ -190,14 +239,26 @@ export function PlayerActionsDisplay({
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <SkinViewer
-          skinUrl={resolvedSkinUrl} 
-          playerName={playerName?.toString()} 
-          width={skinViewerMaxDisplayWidth} 
-          height={skinViewerDisplayHeight} 
-          className="bg-transparent flex-shrink-0"
-          style={skinViewerStyles}
-        />
+        {fallbackSkinUrl ? (
+          <div style={skinViewerStyles} className="bg-transparent flex-shrink-0">
+            <SkinView3DWrapper
+              skinUrl={fallbackSkinUrl}
+              skinVariant={fallbackSkinVariant}
+              width={skinViewerMaxDisplayWidth}
+              height={skinViewerDisplayHeight}
+              zoom={0.95}
+            />
+          </div>
+        ) : (
+          <SkinViewer
+            skinUrl={resolvedSkinUrl}
+            playerName={playerName?.toString()}
+            width={skinViewerMaxDisplayWidth}
+            height={skinViewerDisplayHeight}
+            className="bg-transparent flex-shrink-0"
+            style={skinViewerStyles}
+          />
+        )}
 
         {!isLoadingProfiles && (
           <>

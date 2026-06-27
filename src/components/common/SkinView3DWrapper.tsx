@@ -85,9 +85,7 @@ export const SkinView3DWrapper: React.FC<SkinView3DWrapperProps> = ({
     viewer.zoom = zoom;
    
     if (startFromBack && viewer.playerObject) {
-        viewer.playerObject.rotation.y = Math.PI; 
-    } else if (!enableAutoRotate && viewer.playerObject) {
-        viewer.playerObject.rotation.y = Math.PI; 
+        viewer.playerObject.rotation.y = Math.PI;
     }
 
 
