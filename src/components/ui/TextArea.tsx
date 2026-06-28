@@ -106,7 +106,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           <textarea
             ref={ref}
             rows={rows}            className={cn(
-              "w-full h-full bg-transparent outline-none",
+              "no-radius w-full h-full bg-transparent outline-none",
               "text-white placeholder-white placeholder-opacity-50",
               "font-minecraft lowercase p-4 text-xl",
               "focus:outline-none",

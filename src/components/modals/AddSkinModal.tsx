@@ -376,7 +376,6 @@ export const AddSkinModal = memo(
                   onChange={(e) => setPreviewSkinName(e.target.value)}
                   placeholder={t('skins.enterSkinName')}
                   disabled={isLoading}
-                  className="h-8 py-0 pl-2 font-minecraft text-3xl leading-8 tracking-wide"
                 />
               </div>
             </div>
@@ -439,7 +438,6 @@ export const AddSkinModal = memo(
                     onChange={(e) => setPreviewSkinName(e.target.value)}
                     placeholder={t('skins.enterSkinName')}
                     disabled={isLoading}
-                    className="h-8 py-0 pl-2 font-minecraft text-3xl leading-8 tracking-wide"
                   />
                 </div>
 

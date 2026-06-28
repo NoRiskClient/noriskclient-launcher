@@ -52,7 +52,7 @@ export function ChatInput({ onSend, disabled, accentColor }: ChatInputProps) {
           rows={1}
           disabled={disabled}
           className={cn(
-            "flex-1 resize-none px-2 py-1.5 rounded-lg text-sm font-minecraft-ten",
+            "no-radius flex-1 resize-none px-2 py-1.5 rounded-lg text-sm font-minecraft-ten",
             "bg-transparent text-white placeholder-white/40",
             "focus:outline-none transition-all duration-200",
             "max-h-32 overflow-y-auto custom-scrollbar",
