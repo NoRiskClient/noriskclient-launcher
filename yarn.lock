@@ -416,10 +416,10 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@noriskclient/nrc-skin-renderer@^0.1.3":
-  version "0.1.3"
-  resolved "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.1.3.tgz#1bc2e124422f421fa862690cd1b664d7619238e4"
-  integrity sha512-Lz0WBtutaf/PZcpp+hVMr2qgNHx9MYCtTUYCKrngv8d9XFAnA94PBPf+/+boGvf8DzoUEdMDOiPEUl5v2aZgLg==
+"@noriskclient/nrc-skin-renderer@^0.1.4":
+  version "0.1.4"
+  resolved "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.1.4.tgz#4e68d08ffe75425cd7499e1efc5836b8007617db"
+  integrity sha512-0B+x6uXM9csRLLDJewspLIDJoL1YgQ4vEN0YYZLGHE9vOfSiSPSszqxqLmV9w8veV7PFUydnAg03N3aiDsD6qA==
 
 "@npmcli/agent@^3.0.0":
   version "3.0.0"
