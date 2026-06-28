@@ -147,6 +147,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       setIsFocused(true);
     };
 
+    const hasClearableValue =
+      !!clearable &&
+      typeof props.value === "string" &&
+      props.value.length > 0;
+
     const handleBlur = () => {
       if (props.disabled) return;
       setIsFocused(false);
@@ -252,14 +257,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               {...props}
             />
 
-            {clearable && props.value && (
+            {hasClearableValue && (
               <button
                 type="button"
                 onClick={handleClear}
                 className="flex items-center justify-center w-10 h-full transition-opacity duration-200 hover:opacity-80 text-white"
+                aria-label="Clear input"
                 tabIndex={-1}
               >
-                <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                <Icon icon="lucide:x" className="w-4 h-4" />
               </button>
             )}
           </div>

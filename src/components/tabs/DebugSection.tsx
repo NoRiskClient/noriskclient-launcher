@@ -23,6 +23,13 @@ import {
   fetchTesterQueueCount,
   openTesterWindow,
 } from "../../services/tester-service";
+import {
+  listProfileBackups,
+  restoreProfileBackup,
+  type ProfileBackupInfo,
+} from "../../services/profile-service";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useProfileStore } from "../../store/profile-store";
 
 type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
 
@@ -239,10 +246,55 @@ interface ModCacheCleanupStats {
 }
 
 function TestingPanel() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [filenames, setFilenames] = useState<string[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanStats, setCleanStats] = useState<ModCacheCleanupStats | null>(null);
+  const [backups, setBackups] = useState<ProfileBackupInfo[] | null>(null);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [restoringPath, setRestoringPath] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const fetchProfiles = useProfileStore((s) => s.fetchProfiles);
+
+  async function loadBackups() {
+    setLoadingBackups(true);
+    try {
+      const result = await listProfileBackups();
+      setBackups(result);
+    } catch (e) {
+      console.error("Failed to list profile backups:", e);
+      toast.error(t("settings.backups.load_failed", { error: String(e) }));
+    }
+    setLoadingBackups(false);
+  }
+
+  async function handleRestore(backup: ProfileBackupInfo) {
+    const date = new Date(backup.backup_time * 1000).toLocaleString();
+    const ok = await confirm({
+      title: t("settings.backups.restore_confirm_title"),
+      message: t("settings.backups.restore_confirm_message", {
+        date,
+        count: backup.profile_count,
+      }),
+      confirmText: t("settings.backups.restore"),
+      cancelText: t("common.cancel"),
+      type: "warning",
+      fullscreen: true,
+    });
+    if (!ok) return;
+    setRestoringPath(backup.path);
+    try {
+      await restoreProfileBackup(backup.path);
+      await fetchProfiles();
+      await loadBackups();
+      toast.success(t("settings.backups.restored", { count: backup.profile_count, date }));
+    } catch (e) {
+      console.error("Failed to restore profile backup:", e);
+      toast.error(t("settings.backups.restore_failed", { error: String(e) }));
+    }
+    setRestoringPath(null);
+  }
 
   async function runExpectedCacheFilenames() {
     setLoading(true);
@@ -362,6 +414,75 @@ function TestingPanel() {
           )}
         </div>
       )}
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon icon="solar:history-bold" className="w-5 h-5 text-emerald-300 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft-ten">{t("settings.backups.title")}</div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            {t("settings.backups.description")}
+          </div>
+        </div>
+        <button
+          onClick={loadBackups}
+          disabled={loadingBackups}
+          className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run list_profile_backups"
+        >
+          {loadingBackups ? (
+            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="solar:list-bold" className="w-4 h-4" />
+          )}
+          {t("settings.backups.load")}
+        </button>
+      </div>
+
+      {backups !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            {t("settings.backups.count", { count: backups.length })}
+          </div>
+          {backups.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">
+              {t("settings.backups.empty")}
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {backups.map((b) => (
+                <div key={b.path} className="p-3 px-4 hover:bg-white/5 flex items-center gap-4">
+                  <Icon icon="solar:archive-bold" className="w-5 h-5 text-white/50 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-minecraft-ten truncate">
+                      {new Date(b.backup_time * 1000).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-white/40 font-sans truncate">
+                      {t("settings.backups.meta", {
+                        count: b.profile_count,
+                        size: (b.file_size / 1024).toFixed(1),
+                      })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(b)}
+                    disabled={restoringPath !== null}
+                    className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {restoringPath === b.path ? (
+                      <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Icon icon="solar:restart-bold" className="w-4 h-4" />
+                    )}
+                    {t("settings.backups.restore")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmDialog}
     </div>
   );
 }

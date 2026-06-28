@@ -421,17 +421,19 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="space-y-3 text-xs font-minecraft-ten">
           {/* License */}
           {project.license && (
-            <div className="flex justify-between items-center">
-              <span className="text-white/50">{t('mod_detail.license')}</span>
+            <div className="flex justify-between items-start gap-3">
+              <span className="text-white/50 shrink-0">{t('mod_detail.license')}</span>
               {project.license.url ? (
                 <button
                   onClick={handleOpenLicense}
-                  className="text-accent hover:text-accent/80 transition-colors"
+                  className="text-accent hover:text-accent/80 transition-colors text-left [overflow-wrap:anywhere] min-w-0"
                 >
                   {project.license.name}
                 </button>
               ) : (
-                <span className="text-white/90">{project.license.name}</span>
+                <span className="text-white/90 text-left [overflow-wrap:anywhere] min-w-0">
+                  {project.license.name}
+                </span>
               )}
             </div>
           )}

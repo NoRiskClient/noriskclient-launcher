@@ -350,6 +350,15 @@ impl Profile {
     }
 }
 
+/// Metadata about a single `profiles.json` backup, surfaced to the restore UI.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProfileBackupInfo {
+    pub path: String,
+    pub backup_time: i64,
+    pub file_size: u64,
+    pub profile_count: usize,
+}
+
 // Profile Manager
 pub struct ProfileManager {
     profiles: Arc<RwLock<HashMap<Uuid, Profile>>>,
@@ -421,6 +430,12 @@ impl ProfileManager {
             max_backups_per_file: 10, // Keep more backups for profiles
             max_backup_age_seconds: 90 * 24 * 60 * 60, // 90 days for profiles
             min_backup_interval_seconds: 60, // TEMP: Increased to 5 minutes to prevent spam during testing
+            gfs: Some(backup_utils::GfsPolicy {
+                keep_recent: 10,
+                daily_days: 14,
+                weekly_weeks: 8,
+                monthly_months: 12,
+            }),
         };
 
         Ok(Self {
@@ -615,6 +630,46 @@ impl ProfileManager {
         ).await?;
 
         info!("ProfileManager: Successfully saved {} profiles", self.profiles.read().await.len());
+        Ok(())
+    }
+
+    /// Lists available `profiles.json` backups (newest first) for the restore UI.
+    pub async fn list_profile_backups(&self) -> Result<Vec<ProfileBackupInfo>> {
+        let backups = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await?;
+        let mut out = Vec::with_capacity(backups.len());
+        for (path, mtime) in backups {
+            let file_size = fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
+            let profile_count = match fs::read_to_string(&path).await {
+                Ok(data) => serde_json::from_str::<Vec<serde_json::Value>>(&data)
+                    .map(|v| v.len())
+                    .unwrap_or(0),
+                Err(_) => 0,
+            };
+            out.push(ProfileBackupInfo {
+                path: path.to_string_lossy().to_string(),
+                backup_time: mtime.timestamp(),
+                file_size,
+                profile_count,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Restores a user-chosen backup over `profiles.json` and reloads the
+    /// in-memory map so the change is live without a restart.
+    pub async fn restore_profile_backup(&self, backup_path: PathBuf) -> Result<()> {
+        // Hold the save lock so a concurrent save_profiles can't clobber the
+        // file mid-restore.
+        let _guard = self.save_lock.lock().await;
+        backup_utils::restore_specific_backup(&self.profiles_path, &backup_path).await?;
+        let reloaded = self
+            .load_profiles_internal(&self.profiles_path.clone())
+            .await?;
+        *self.profiles.write().await = reloaded;
+        info!(
+            "ProfileManager: Reloaded {} profiles after restore",
+            self.profiles.read().await.len()
+        );
         Ok(())
     }
 
@@ -3453,12 +3508,20 @@ impl PostInitializationHandler for ProfileManager {
                 log::warn!("Trash purge after init failed: {}", e);
             }
 
-            // Clean up old backups for profiles category using our specific config
-            if let Err(e) = crate::utils::backup_utils::cleanup_old_backups(
-                &profiles_path_clone,
-                Some("profiles"),
-                &backup_config_clone,
-            ).await {
+            // Clean up old backups for profiles category (generational if configured)
+            let cleanup_result = match &backup_config_clone.gfs {
+                Some(policy) => crate::utils::backup_utils::cleanup_old_backups_generational(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    policy,
+                ).await,
+                None => crate::utils::backup_utils::cleanup_old_backups(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    &backup_config_clone,
+                ).await,
+            };
+            if let Err(e) = cleanup_result {
                 log::warn!("Profile backup cleanup after init failed: {}", e);
             }
         });
