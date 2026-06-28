@@ -1525,6 +1525,17 @@
   "debug.permissions.empty": "Keine Berechtigungen gecacht. Aktualisieren klicken zum Laden.",
 
   "logs.no_logs_to_upload": "Keine Logs zum Hochladen",
+  "logs.lines": "{{count}} ZEILEN",
+  "logs.following": "FOLGT",
+  "logs.paused": "PAUSIERT",
+  "logs.scroll_to_bottom": "NACH UNTEN",
+  "logs.upload": "HOCHLADEN",
+  "logs.uploading": "LÄDT HOCH...",
+  "logs.select_log_placeholder": "Log auswählen...",
+  "logs.clear": "LEEREN",
+  "logs.settings": "LOG-EINSTELLUNGEN",
+  "logs.thread_prefix": "Thread-Präfix",
+  "logs.thread_prefix_desc": "[Thread/LEVEL]-Präfix anzeigen",
   "logs.uploaded_url_copied": "Hochgeladen! URL in Zwischenablage kopiert",
   "logs.upload_failed": "Logs konnten nicht hochgeladen werden",
 
