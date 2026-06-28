@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useThemeStore } from "../store/useThemeStore";
+import { useLauncherTheme } from "../hooks/useLauncherTheme";
 
 export function ThemeInitializer() {
   const applyAccentColorToDOM = useThemeStore(
@@ -10,6 +11,7 @@ export function ThemeInitializer() {
   const applyBorderRadiusToDOM = useThemeStore(
     (state) => state.applyBorderRadiusToDOM,
   );
+  useLauncherTheme();
 
   useEffect(() => {
     applyAccentColorToDOM();

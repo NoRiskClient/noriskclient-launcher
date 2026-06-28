@@ -8,6 +8,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { getPlayerProfileByUuidOrName } from "../../services/cape-service";
 // import type { MinecraftProfile } from '../../types/minecraft'; // Not needed if not fetching profile for display
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { CapeImage } from "./CapeImage"; // Assuming we want to show a 2D preview
 import { Card } from "../ui/Card";
 import { cn } from "../../lib/utils";
@@ -42,6 +43,7 @@ export function CapeCard({
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
+  const { t } = useTranslation();
   const isFavorite = useCapeFavoritesStore((s) => s.isFavorite(capeHash));
   const toggleFavoriteOptimistic = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
 
@@ -96,7 +98,7 @@ export function CapeCard({
               event.stopPropagation();
               toggleFavoriteOptimistic(capeHash);
             }}
-            title={isFavorite ? "Unfavorite" : "Favorite"}
+            title={isFavorite ? t('capes.unfavorite') : t('capes.favorite')}
             disabled={isLoading}
             size="xs"
             variant="ghost"
@@ -111,9 +113,9 @@ export function CapeCard({
         </div>
         <p
           className="font-minecraft text-white lowercase truncate text-3xl transition-transform duration-300 ease-out group-hover:scale-110"
-          title={creatorName ? `By ${creatorName}` : capeHash}
+          title={creatorName ? t('capes.byCreator', { name: creatorName }) : capeHash}
         >
-          {creatorName ? creatorName : "Unknown"}
+          {creatorName ? creatorName : t('common.unknown')}
         </p>
 
         <div className="h-64 flex relative pt-2 pb-2 flex-grow items-center justify-center transition-transform duration-300 ease-out group-hover:scale-105">
@@ -131,7 +133,7 @@ export function CapeCard({
             {elytra && (
               <div
                 className="absolute top-1 left-1 bg-accent text-accent-foreground px-1.5 py-0.5 text-xs font-bold rounded-sm pixelated-text shadow-md uppercase z-10"
-                title="This cape includes an Elytra texture."
+                title={t('capes.includesElytraTexture')}
                 style={{ backgroundColor: accentColor.value, color: "#ffffff" }}
               >
                 Elytra
@@ -142,7 +144,7 @@ export function CapeCard({
 
         <div className="flex items-center justify-between mt-auto">
           <p className="text-white/60 font-minecraft lowercase text-2xl transition-transform duration-300 ease-out group-hover:scale-110">
-            Uses: {uses.toLocaleString()}
+            {t('capes.uses', { formattedCount: uses.toLocaleString() })}
           </p>
         </div>
 
@@ -150,7 +152,7 @@ export function CapeCard({
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-20 transition-opacity duration-300 ease-in-out">
             <div className="w-20 h-20 border-4 border-t-transparent border-white rounded-full animate-spin mb-4 transition-all duration-300"></div>
             <span className="font-minecraft text-2xl text-white lowercase animate-pulse transition-all duration-300">
-              Applying...
+              {t('capes.applying')}
             </span>
           </div>
         )}
@@ -162,7 +164,7 @@ export function CapeCard({
                 event.stopPropagation();
                 onDelete(event);
               }}
-              title="Delete cape"
+              title={t('capes.deleteCape')}
               disabled={isLoading}
               size="xs"
               variant="destructive"

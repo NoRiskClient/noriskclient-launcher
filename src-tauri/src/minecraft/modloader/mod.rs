@@ -5,11 +5,16 @@ pub mod quilt_installer;
 
 use crate::config::ProjectDirsExt;
 use crate::error::Result;
+use crate::minecraft::api::fabric_api::FabricApi;
+use crate::minecraft::api::forge_api::ForgeApi;
+use crate::minecraft::api::neo_forge_api::NeoForgeApi;
+use crate::minecraft::api::quilt_api::QuiltApi;
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
 use async_trait::async_trait;
 use fabric_installer::FabricInstaller;
 use forge_installer::ForgeInstaller;
+use log::warn;
 use neoforge_installer::NeoForgeInstaller;
 use quilt_installer::QuiltInstaller;
 use serde::{Deserialize, Serialize};
@@ -46,22 +51,39 @@ impl ModloaderFactory {
             };
         }
 
-        // 1. Check for user overwrite first (highest priority)
+        // 1. Check for user overwrite first (highest priority).
+        //
+        // New per-loader map takes precedence over the legacy single-slot
+        // `overwrite_loader_version`. The legacy fallback is only consulted
+        // when the map is entirely empty — a "virgin" old profile that no
+        // new-code write has touched. Once any entry lands in the map, the
+        // legacy field is treated as stale (it may have been written for a
+        // different loader and we can't know which).
         if profile.settings.use_overwrite_loader_version {
-            if let Some(overwrite_version) = &profile.settings.overwrite_loader_version {
-                if !overwrite_version.is_empty() {
+            let loader_key = profile.loader.as_str();
+            if let Some(v) = profile.settings.overwrite_loader_versions.get(loader_key) {
+                if !v.is_empty() {
                     return ResolvedLoaderVersion {
-                        version: Some(overwrite_version.clone()),
+                        version: Some(v.clone()),
                         reason: LoaderVersionReason::UserOverwrite,
                     };
+                }
+            } else if profile.settings.overwrite_loader_versions.is_empty() {
+                if let Some(v) = &profile.settings.overwrite_loader_version {
+                    if !v.is_empty() {
+                        return ResolvedLoaderVersion {
+                            version: Some(v.clone()),
+                            reason: LoaderVersionReason::UserOverwrite,
+                        };
+                    }
                 }
             }
         }
 
-        // 2. Check for Norisk pack policy
-        if let Some(selected_pack_id) = &profile.selected_norisk_pack_id {
+        // 2. Check for Norisk pack policy (honors rollout alias)
+        if let Some(selected_pack_id) = profile.effective_norisk_pack_id().await {
             if let Some(config) = norisk_pack_config {
-                if let Ok(resolved_pack) = config.get_resolved_pack_definition(selected_pack_id) {
+                if let Ok(resolved_pack) = config.get_resolved_pack_definition(&selected_pack_id) {
                     if let Some(policy) = &resolved_pack.loader_policy {
                         let loader_key = profile.loader.as_str();
                         let mut resolved_version: Option<String> = None;
@@ -128,10 +150,85 @@ impl ModloaderFactory {
             }
         }
 
-        // 4. No version resolved
+        // 4. Auto-resolve from the loader's own API — fetch the latest
+        // available version so the frontend always has a concrete string
+        // to show instead of a useless "latest" placeholder. Reason stays
+        // ProfileDefault because this is "what the system picked for you"
+        // with no explicit override involved. Network failures fall through
+        // to NotResolved.
+        if let Some(auto) = Self::fetch_latest_from_api(&profile.loader, minecraft_version).await {
+            return ResolvedLoaderVersion {
+                version: Some(auto),
+                reason: LoaderVersionReason::ProfileDefault,
+            };
+        }
+
+        // 5. No version resolved (API unavailable, unsupported loader, …)
         ResolvedLoaderVersion {
             version: None,
             reason: LoaderVersionReason::NotResolved,
+        }
+    }
+
+    /// Calls the live loader metadata API for `loader` + `mc_version` and
+    /// returns the top (newest) entry formatted like the rest of the launcher
+    /// stores it. For Fabric/Quilt that means appending " (stable)" when the
+    /// loader flags it — matches the wizard's `"{ver} (stable)"` encoding
+    /// (see `ModLoaderStep.tsx:194`) so saved + resolved values compare
+    /// cleanly. Errors are swallowed with a warn-level log so the UI stays
+    /// responsive.
+    async fn fetch_latest_from_api(
+        loader: &ModLoader,
+        mc_version: &str,
+    ) -> Option<String> {
+        match loader {
+            ModLoader::Fabric => match FabricApi::new().get_loader_versions(mc_version).await {
+                Ok(list) => list.first().map(|v| {
+                    if v.loader.stable {
+                        format!("{} (stable)", v.loader.version)
+                    } else {
+                        v.loader.version.clone()
+                    }
+                }),
+                Err(e) => {
+                    warn!("Auto-resolve fabric: {}", e);
+                    None
+                }
+            },
+            ModLoader::Quilt => match QuiltApi::new().get_loader_versions(mc_version).await {
+                Ok(list) => list.first().map(|v| {
+                    if v.loader.stable {
+                        format!("{} (stable)", v.loader.version)
+                    } else {
+                        v.loader.version.clone()
+                    }
+                }),
+                Err(e) => {
+                    warn!("Auto-resolve quilt: {}", e);
+                    None
+                }
+            },
+            ModLoader::Forge => match ForgeApi::new().get_all_versions().await {
+                Ok(meta) => meta
+                    .get_versions_for_minecraft(mc_version)
+                    .first()
+                    .cloned(),
+                Err(e) => {
+                    warn!("Auto-resolve forge: {}", e);
+                    None
+                }
+            },
+            ModLoader::NeoForge => match NeoForgeApi::new().get_all_versions().await {
+                Ok(meta) => meta
+                    .get_versions_for_minecraft(mc_version)
+                    .first()
+                    .cloned(),
+                Err(e) => {
+                    warn!("Auto-resolve neoforge: {}", e);
+                    None
+                }
+            },
+            ModLoader::Vanilla => None,
         }
     }
 

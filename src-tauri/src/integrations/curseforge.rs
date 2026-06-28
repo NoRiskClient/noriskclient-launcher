@@ -1,9 +1,10 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{Mod, ModLoader, ModPackInfo, ModPackSource, ModSource, Profile, ProfileSettings, ProfileState};
 use log::{debug, error, info, warn};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -20,6 +21,9 @@ use sysinfo::System;
 
 // Import for profile image upload functionality
 use crate::commands::path_commands::UploadProfileImagesPayload;
+use crate::utils::serde_utils::deserialize_optional_u64_from_string;
+
+use crate::utils::string_utils::safe_truncate;
 
 // Base URL for CurseForge API
 const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
@@ -202,6 +206,7 @@ pub struct CurseForgeFile {
     pub isEarlyAccessContent: Option<bool>,
     pub earlyAccessEndDate: Option<String>,
     pub fileFingerprint: u64,
+    #[serde(default, deserialize_with = "parse_vec_default_on_null")]
     pub modules: Vec<CurseForgeModule>,
 }
 
@@ -240,6 +245,14 @@ pub struct CurseForgeFileIndex {
     pub releaseType: u32,
     pub gameVersionTypeId: Option<u32>,
     pub modLoader: Option<u32>,
+}
+
+fn parse_vec_default_on_null<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Ok(Option::<Vec<T>>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 // Function to search for mods on CurseForge
@@ -306,7 +319,7 @@ pub async fn search_mods(
                 .iter()
                 .map(|loader| (*loader as u32).to_string())
                 .collect();
-            query_params.push(("modLoaderTypes".to_string(), loader_ids.join(",")));
+            query_params.push(("modLoaderTypes".to_string(), format!("[{}]", loader_ids.join(","))));
             log::debug!("CurseForge search - Mod loader types: {:?}", loader_types);
         }
     }
@@ -360,7 +373,7 @@ pub async fn search_mods(
     // Log response body for debugging (truncated if too long)
     const MAX_BODY_LOG_LENGTH: usize = 2000;
     let logged_body = if response_text.len() > MAX_BODY_LOG_LENGTH {
-        format!("{}... (truncated, full length: {})", &response_text[..MAX_BODY_LOG_LENGTH], response_text.len())
+        format!("{}... (truncated, full length: {})", safe_truncate(&response_text, MAX_BODY_LOG_LENGTH), response_text.len())
     } else {
         response_text.clone()
     };
@@ -382,7 +395,7 @@ pub async fn search_mods(
             log::error!(
                 "CurseForge JSON parsing failed. Parse error: {}. Response body (first 500 chars): {}",
                 parse_err,
-                &response_text[..response_text.len().min(500)]
+                safe_truncate(&response_text, 500)
             );
 
             // Try to parse as error response
@@ -393,7 +406,7 @@ pub async fn search_mods(
             return Err(AppError::Other(format!(
                 "Failed to parse CurseForge JSON response: {}. Response starts with: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             )));
         }
     };
@@ -651,7 +664,7 @@ pub async fn get_mod_files(
     // Log response body for debugging (truncated if too long)
     const MAX_BODY_LOG_LENGTH: usize = 2000;
     let logged_body = if response_text.len() > MAX_BODY_LOG_LENGTH {
-        format!("{}... (truncated, full length: {})", &response_text[..MAX_BODY_LOG_LENGTH], response_text.len())
+        format!("{}... (truncated, full length: {})", safe_truncate(&response_text, MAX_BODY_LOG_LENGTH), response_text.len())
     } else {
         response_text.clone()
     };
@@ -673,7 +686,7 @@ pub async fn get_mod_files(
             log::error!(
                 "CurseForge files JSON parsing failed. Parse error: {}. Response body (first 500 chars): {}",
                 parse_err,
-                &response_text[..response_text.len().min(500)]
+                safe_truncate(&response_text, 500)
             );
 
             // Try to parse as error response
@@ -684,7 +697,7 @@ pub async fn get_mod_files(
             return Err(AppError::Other(format!(
                 "Failed to parse CurseForge files JSON response: {}. Response starts with: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             )));
         }
     };
@@ -802,7 +815,7 @@ pub async fn get_file_changelog(mod_id: u32, file_id: u32) -> Result<String> {
             log::error!(
                 "Failed to parse CurseForge changelog JSON response: {}. Response: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             );
             // Try to return the raw response if it's not JSON (fallback)
             if response_text.trim().is_empty() {
@@ -816,6 +829,61 @@ pub async fn get_file_changelog(mod_id: u32, file_id: u32) -> Result<String> {
     log::debug!("Successfully retrieved changelog for file ID {} (HTML length: {} chars)", file_id, changelog_response.data.len());
 
     Ok(changelog_response.data)
+}
+
+/// Response structure for CurseForge description API
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CurseForgeDescriptionResponse {
+    pub data: String,
+}
+
+/// Get the full description for a CurseForge mod
+/// Returns HTML formatted description
+pub async fn get_mod_description(mod_id: u32) -> Result<String> {
+    let url = format!("{}/mods/{}/description", CURSEFORGE_API_BASE_URL, mod_id);
+
+    log::info!("Getting CurseForge mod description: mod_id={}", mod_id);
+
+    let response = HTTP_CLIENT
+        .get(&url)
+        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to get CurseForge mod description: {}", e)))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::warn!("CurseForge mod description API returned {}: {}", status, error_text);
+        return Ok(String::new());
+    }
+
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to read CurseForge description response: {}", e)))?;
+
+    // Parse the JSON response
+    let description_response: CurseForgeDescriptionResponse = match serde_json::from_str(&response_text) {
+        Ok(parsed) => parsed,
+        Err(parse_err) => {
+            log::error!(
+                "Failed to parse CurseForge description JSON response: {}. Response: {}",
+                parse_err,
+                safe_truncate(&response_text, 200)
+            );
+            if response_text.trim().is_empty() {
+                return Ok(String::new());
+            } else {
+                return Ok(response_text);
+            }
+        }
+    };
+
+    log::debug!("Successfully retrieved description for mod ID {} (HTML length: {} chars)", mod_id, description_response.data.len());
+
+    Ok(description_response.data)
 }
 
 /// Get multiple mods by their IDs
@@ -860,7 +928,7 @@ pub async fn get_mods_by_ids(
     // Log response body for debugging (truncated if too long)
     const MAX_BODY_LOG_LENGTH: usize = 2000;
     let logged_body = if response_text.len() > MAX_BODY_LOG_LENGTH {
-        format!("{}... (truncated, full length: {})", &response_text[..MAX_BODY_LOG_LENGTH], response_text.len())
+        format!("{}... (truncated, full length: {})", safe_truncate(&response_text, MAX_BODY_LOG_LENGTH), response_text.len())
     } else {
         response_text.clone()
     };
@@ -882,7 +950,7 @@ pub async fn get_mods_by_ids(
             log::error!(
                 "CurseForge get mods by IDs JSON parsing failed. Parse error: {}. Response body (first 500 chars): {}",
                 parse_err,
-                &response_text[..response_text.len().min(500)]
+                safe_truncate(&response_text, 500)
             );
 
             // Try to parse as error response
@@ -893,7 +961,7 @@ pub async fn get_mods_by_ids(
             return Err(AppError::Other(format!(
                 "Failed to parse CurseForge get mods by IDs JSON response: {}. Response starts with: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             )));
         }
     };
@@ -950,7 +1018,7 @@ pub async fn get_files_by_ids(file_ids: Vec<u32>) -> Result<Vec<CurseForgeFile>>
     // Log response body for debugging (truncated if too long)
     const MAX_BODY_LOG_LENGTH: usize = 2000;
     let logged_body = if response_text.len() > MAX_BODY_LOG_LENGTH {
-        format!("{}... (truncated, full length: {})", &response_text[..MAX_BODY_LOG_LENGTH], response_text.len())
+        format!("{}... (truncated, full length: {})", safe_truncate(&response_text, MAX_BODY_LOG_LENGTH), response_text.len())
     } else {
         response_text.clone()
     };
@@ -972,7 +1040,7 @@ pub async fn get_files_by_ids(file_ids: Vec<u32>) -> Result<Vec<CurseForgeFile>>
             log::error!(
                 "CurseForge get files by IDs JSON parsing failed. Parse error: {}. Response body (first 500 chars): {}",
                 parse_err,
-                &response_text[..response_text.len().min(500)]
+                safe_truncate(&response_text, 500)
             );
 
             // Try to parse as error response
@@ -983,7 +1051,7 @@ pub async fn get_files_by_ids(file_ids: Vec<u32>) -> Result<Vec<CurseForgeFile>>
             return Err(AppError::Other(format!(
                 "Failed to parse CurseForge get files by IDs JSON response: {}. Response starts with: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             )));
         }
     };
@@ -1020,8 +1088,8 @@ pub struct CurseForgeMinecraft {
     pub version: String,
     #[serde(rename = "modLoaders")]
     pub mod_loaders: Vec<CurseForgeModLoader>,
-    #[serde(rename = "recommendedRam")]
-    pub recommended_ram: Option<u64>, // Optional field for recommended RAM
+    #[serde(rename = "recommendedRam", default, deserialize_with = "deserialize_optional_u64_from_string")]
+    pub recommended_ram: Option<u64>, // Optional field for recommended RAM (can be string or number)
 }
 
 /// Represents a mod loader entry in CurseForge manifest
@@ -1237,6 +1305,7 @@ pub async fn process_curseforge_pack_from_zip(pack_path: &Path) -> Result<(Profi
         background: None,
         modpack_info: None,
         preferred_account_id: None,
+        playtime_seconds: 0,
     };
 
     info!("Prepared potential profile object for '{}'", profile.name);
@@ -1390,6 +1459,7 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 associated_loader: Some(determine_loader_from_curseforge_loaders(&manifest.minecraft.mod_loaders).0),
                 modpack_origin: Some(format!("curseforge:{}:{}", project_id, file_id)), // From modpack
                 updates_enabled: false, // Disable updates for modpack mods (updated with pack)
+                force_include_versions: Vec::new(),
             };
 
             info!(
@@ -1412,7 +1482,15 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
 /// Extracts files from the "overrides" directory within a CurseForge modpack archive
 /// into the specified target profile directory, using concurrent streaming operations.
 /// This function is called with the manifest to determine the overrides directory name.
-pub async fn extract_curseforge_overrides(pack_path: &Path, profile: &Profile, manifest: &CurseForgeManifest) -> Result<()> {
+/// If event_id is provided with progress_offset and progress_scale, progress events will be emitted.
+pub async fn extract_curseforge_overrides(
+    pack_path: &Path,
+    profile: &Profile,
+    manifest: &CurseForgeManifest,
+    event_id: Option<Uuid>,
+    progress_offset: f64,
+    progress_scale: f64,
+) -> Result<()> {
     let overrides_dir = manifest.overrides.as_deref().unwrap_or("overrides");
 
     info!(
@@ -1463,6 +1541,23 @@ pub async fn extract_curseforge_overrides(pack_path: &Path, profile: &Profile, m
         "Found {} entries in the CurseForge pack archive. Preparing concurrent streaming for overrides...",
         num_entries
     );
+
+    // Count override files for progress tracking
+    let overrides_prefix_for_count = format!("{}/", overrides_dir);
+    let mut override_file_count = 0usize;
+    for index in 0..num_entries {
+        if let Some(entry) = zip_lister.file().entries().get(index) {
+            if let Ok(name) = entry.filename().as_str() {
+                if name.starts_with(&overrides_prefix_for_count) && !name.ends_with('/') {
+                    override_file_count += 1;
+                }
+            }
+        }
+    }
+
+    // Create a counter for tracking extraction progress
+    let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
 
@@ -1598,6 +1693,12 @@ pub async fn extract_curseforge_overrides(pack_path: &Path, profile: &Profile, m
                     entry_filename_str, final_dest_path, entry_uncompressed_size
                 );
 
+                let task_counter = extraction_counter.clone();
+                let task_total = total_files;
+                let task_state = state.clone();
+                let task_event_id = event_id;
+                let task_progress_offset = progress_offset;
+                let task_progress_scale = progress_scale;
                 extraction_tasks.push(tokio::spawn(async move {
                     let _permit = task_io_semaphore.acquire().await.map_err(|e| {
                         error!(
@@ -1691,6 +1792,25 @@ pub async fn extract_curseforge_overrides(pack_path: &Path, profile: &Profile, m
                         bytes_copied,
                         task_final_dest_path.display()
                     );
+
+                    // Increment counter and emit progress
+                    let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    if task_total > 0 {
+                        // Scale progress within the provided range
+                        let extraction_progress = completed as f64 / task_total as f64;
+                        let overall_progress = task_progress_offset + (extraction_progress * task_progress_scale);
+                        if let Some(id) = task_event_id {
+                            let _ = task_state.event_state.emit(EventPayload {
+                                event_id: id,
+                                event_type: EventType::TaskProgress,
+                                target_id: None,
+                                message: format!("Extracting files... ({}/{})", completed, task_total),
+                                progress: Some(overall_progress),
+                                error: None,
+                            }).await;
+                        }
+                    }
+
                     Ok::<(), AppError>(())
                 }));
             }
@@ -1719,12 +1839,41 @@ pub async fn extract_curseforge_overrides(pack_path: &Path, profile: &Profile, m
 
 /// Imports a profile from a CurseForge modpack, processing, resolving, extracting, and saving it.
 /// If project_id and file_id are provided, detailed ModPackInfo will be created.
+/// If event_id is provided, progress events will be emitted.
+/// progress_offset and progress_scale can be used to adjust progress range (e.g. when called after a download phase).
 pub async fn import_curseforge_pack_as_profile(
     pack_path: PathBuf,
     project_id: Option<u32>,
-    file_id: Option<u32>
+    file_id: Option<u32>,
+    event_id: Option<Uuid>,
+    progress_offset: f64,
+    progress_scale: f64,
 ) -> Result<Uuid> {
     info!("Starting full import process for CurseForge pack: {:?}", pack_path);
+
+    let state = crate::state::state_manager::State::get().await?;
+
+    // Helper to emit progress if event_id is provided
+    // Progress is scaled: actual = offset + (progress * scale)
+    let emit_progress = |progress: f64, message: String| {
+        let state = state.clone();
+        let event_id = event_id;
+        let scaled_progress = progress_offset + (progress * progress_scale);
+        async move {
+            if let Some(id) = event_id {
+                let _ = state.event_state.emit(EventPayload {
+                    event_id: id,
+                    event_type: EventType::TaskProgress,
+                    target_id: None,
+                    message,
+                    progress: Some(scaled_progress),
+                    error: None,
+                }).await;
+            }
+        }
+    };
+
+    emit_progress(0.05, "Parsing modpack manifest...".to_string()).await;
 
     // Find manifest.json in the pack and read it directly
     let (profile, manifest) = process_curseforge_pack_from_zip(&pack_path).await?;
@@ -1734,6 +1883,9 @@ pub async fn import_curseforge_pack_as_profile(
         profile.name
     );
 
+    emit_progress(0.10, format!("Parsed manifest for '{}'", profile.name)).await;
+    emit_progress(0.15, format!("Resolving {} mods...", manifest.files.len())).await;
+
     // 2. Resolve mods from manifest files
     let resolved_mods = resolve_curseforge_manifest_files(&manifest).await?;
     info!(
@@ -1741,6 +1893,8 @@ pub async fn import_curseforge_pack_as_profile(
         resolved_mods.len()
     );
     profile.mods = resolved_mods;
+
+    emit_progress(0.40, format!("Resolved {} mods", profile.mods.len())).await;
 
     // 2.5. Create ModPackInfo for this modpack (if we have the required parameters)
     if let (Some(project_id), Some(file_id)) = (project_id, file_id) {
@@ -1800,17 +1954,23 @@ pub async fn import_curseforge_pack_as_profile(
         })?;
     }
 
+    emit_progress(0.45, "Extracting files...".to_string()).await;
+
     // 4. Extract overrides to the correct final profile location
     info!(
         "Extracting overrides to profile directory: {:?}",
         target_dir
     );
     // Use the absolute path to the pack file for extraction
-    extract_curseforge_overrides(&pack_path, &profile, &manifest).await?;
+    // Progress from 0.45 to 0.90 during extraction (45% of the remaining scale)
+    let extraction_progress_offset = progress_offset + (0.45 * progress_scale);
+    let extraction_progress_scale = 0.45 * progress_scale; // 45% of the total scale for extraction
+    extract_curseforge_overrides(&pack_path, &profile, &manifest, event_id, extraction_progress_offset, extraction_progress_scale).await?;
     info!("Successfully extracted overrides.");
 
+    emit_progress(0.90, "Saving profile...".to_string()).await;
+
     // 5. Save the profile using ProfileManager via State
-    let state = crate::state::state_manager::State::get().await?;
     info!(
         "Saving the new profile '{}' (ID: {})...",
         profile.name, profile.id
@@ -1821,22 +1981,48 @@ pub async fn import_curseforge_pack_as_profile(
         profile_id
     );
 
+    emit_progress(1.0, "Import complete!".to_string()).await;
+
     Ok(profile_id) // Return the ID of the created profile
 }
 
 
 /// Downloads a CurseForge modpack file and installs it as a new profile
+/// If event_id is provided, progress events will be emitted.
 pub async fn download_and_install_curseforge_modpack(
     project_id: u32,
     file_id: u32,
     file_name: String,
     download_url: String,
     icon_url: Option<String>,
+    event_id: Option<Uuid>,
 ) -> Result<Uuid> {
     info!(
         "Downloading and installing CurseForge modpack for project {}, file {}, URL: {}",
         project_id, file_id, download_url
     );
+
+    let state = crate::state::state_manager::State::get().await?;
+
+    // Helper to emit progress if event_id is provided
+    let emit_progress = |progress: f64, message: String| {
+        let state = state.clone();
+        let event_id = event_id;
+        async move {
+            if let Some(id) = event_id {
+                let _ = state.event_state.emit(EventPayload {
+                    event_id: id,
+                    event_type: EventType::TaskProgress,
+                    target_id: None,
+                    message,
+                    progress: Some(progress),
+                    error: None,
+                }).await;
+            }
+        }
+    };
+
+    emit_progress(0.0, "Downloading modpack...".to_string()).await;
 
     // Ensure the file name has .zip extension (CurseForge packs are usually .zip)
     let file_name_zip = if !file_name.ends_with(".zip") {
@@ -1880,11 +2066,15 @@ pub async fn download_and_install_curseforge_modpack(
         )));
     }
 
+    emit_progress(0.10, "Downloading modpack...".to_string()).await;
+
     // Get the bytes and write to file
     let bytes = response.bytes().await.map_err(|e| {
         error!("Failed to read CurseForge modpack bytes: {}", e);
         AppError::Download(format!("Failed to read CurseForge modpack bytes: {}", e))
     })?;
+
+    emit_progress(0.18, "Saving downloaded file...".to_string()).await;
 
     let mut file = tokio::fs::File::create(&temp_file_path).await.map_err(|e| {
         error!("Failed to create temporary file: {}", e);
@@ -1904,16 +2094,22 @@ pub async fn download_and_install_curseforge_modpack(
 
     drop(file); // Explicitly close the file
 
+    emit_progress(0.20, "Download complete, processing...".to_string()).await;
+
     info!(
         "Successfully downloaded CurseForge modpack to: {:?}",
         temp_file_path
     );
 
     // Install the modpack as a profile
+    // Use progress offset 0.20 and scale 0.80 to continue from download progress
     let profile_id = import_curseforge_pack_as_profile(
         temp_file_path.clone(),
         Some(project_id),
-        Some(file_id)
+        Some(file_id),
+        event_id,
+        0.20, // offset: download used 0-20%
+        0.80, // scale: import uses remaining 80%
     ).await?;
 
     info!(
@@ -2262,7 +2458,7 @@ pub async fn check_mod_updates_bulk(
     // Log response body for debugging (truncated if too long)
     const MAX_BODY_LOG_LENGTH: usize = 2000;
     let logged_body = if response_text.len() > MAX_BODY_LOG_LENGTH {
-        format!("{}... (truncated, full length: {})", &response_text[..MAX_BODY_LOG_LENGTH], response_text.len())
+        format!("{}... (truncated, full length: {})", safe_truncate(&response_text, MAX_BODY_LOG_LENGTH), response_text.len())
     } else {
         response_text.clone()
     };
@@ -2284,7 +2480,7 @@ pub async fn check_mod_updates_bulk(
             error!(
                 "CurseForge fingerprint JSON parsing failed. Parse error: {}. Response body (first 500 chars): {}",
                 parse_err,
-                &response_text[..response_text.len().min(500)]
+                safe_truncate(&response_text, 500)
             );
 
             // Try to parse as error response
@@ -2295,7 +2491,7 @@ pub async fn check_mod_updates_bulk(
             return Err(AppError::Other(format!(
                 "Failed to parse CurseForge fingerprint JSON response: {}. Response starts with: {}",
                 parse_err,
-                &response_text[..response_text.len().min(200)]
+                safe_truncate(&response_text, 200)
             )));
         }
     };

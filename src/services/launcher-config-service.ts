@@ -115,4 +115,42 @@ export async function setGlobalMemorySettings(memorySettings: MemorySettings): P
     console.error("[LauncherConfigService] Failed to set global memory settings:", error);
     throw error;
   }
-} 
+}
+
+/**
+ * Gets the global custom JVM arguments from the launcher configuration.
+ * @returns A promise that resolves with the global custom JVM arguments string or null.
+ */
+export async function getGlobalCustomJvmArgs(): Promise<string | null> {
+  console.log("[LauncherConfigService] Getting global custom JVM args");
+  try {
+    const config = await getLauncherConfig();
+    console.log("[LauncherConfigService] Retrieved global custom JVM args:", config.global_custom_jvm_args);
+    return config.global_custom_jvm_args;
+  } catch (error) {
+    console.error("[LauncherConfigService] Failed to get global custom JVM args:", error);
+    throw error;
+  }
+}
+
+/**
+ * Sets the global custom JVM arguments in the launcher configuration.
+ * @param jvmArgs The new JVM arguments string to save, or null to clear.
+ * @returns A promise that resolves when the settings are successfully set.
+ * @throws If fetching or setting the config fails.
+ */
+export async function setGlobalCustomJvmArgs(jvmArgs: string | null): Promise<void> {
+  console.log(`[LauncherConfigService] Setting global custom JVM args:`, jvmArgs);
+  try {
+    const currentConfig = await getLauncherConfig();
+    const newConfig: LauncherConfig = {
+      ...currentConfig,
+      global_custom_jvm_args: jvmArgs,
+    };
+    await setLauncherConfig(newConfig);
+    console.log("[LauncherConfigService] Successfully set global custom JVM args.");
+  } catch (error) {
+    console.error("[LauncherConfigService] Failed to set global custom JVM args:", error);
+    throw error;
+  }
+}

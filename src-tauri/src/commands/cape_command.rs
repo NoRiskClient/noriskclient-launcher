@@ -4,6 +4,7 @@ use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::state::state_manager::State;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
@@ -240,7 +241,7 @@ pub async fn get_player_capes(
         "[CMD get_player_capes] Request UUID for API call: {}",
         uuid_for_request
     );
-    debug!("[CMD get_player_capes] Calling cape_api.get_player_capes with player_uuid: {}, request_uuid: {}, is_experimental: {}", 
+    debug!("[CMD get_player_capes] Calling cape_api.get_player_capes with player_uuid: {}, request_uuid: {}, is_experimental: {}",
         player_uuid_to_use, uuid_for_request, is_experimental);
 
     cape_api
@@ -256,6 +257,42 @@ pub async fn get_player_capes(
                 "[CMD get_player_capes] Error from cape_api.get_player_capes: {:?}",
                 e
             );
+            CommandError::from(e)
+        })
+}
+
+/// Get owned capes grouped by review state (ACCEPTED, IN_REVIEW, DENIED)
+#[tauri::command]
+pub async fn get_owned_capes_list(
+    page: Option<u32>,
+    limit: Option<u32>,
+    norisk_token: Option<String>,
+) -> Result<HashMap<String, Vec<CosmeticCape>>, CommandError> {
+    debug!("Command called: get_owned_capes_list");
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let active_account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+
+    let token_to_use = match norisk_token {
+        Some(token) => token,
+        None => active_account
+            .norisk_credentials
+            .get_token_for_mode(is_experimental)?,
+    };
+
+    let cape_api = CapeApi::new();
+
+    cape_api
+        .get_owned_capes_list(&token_to_use, page, limit, is_experimental)
+        .await
+        .map_err(|e| {
+            debug!("Failed to get owned capes list: {:?}", e);
             CommandError::from(e)
         })
 }
@@ -332,6 +369,12 @@ pub async fn equip_cape(
 
     if result.is_ok() {
         debug!("Command completed: equip_cape");
+
+        let mut props = std::collections::HashMap::new();
+        props.insert("cape_hash".to_string(), serde_json::Value::String(cape_hash.clone()));
+        props.insert("cape_source".to_string(), serde_json::Value::String("custom".to_string()));
+        props.insert("cape_name".to_string(), serde_json::Value::String(cape_hash));
+        crate::commands::analytics_command::track_event("cape_selected", props);
     } else {
         debug!("Command failed: equip_cape");
     }
@@ -482,17 +525,45 @@ pub async fn remove_favorite_cape(
         })
 }
 
+/// Check if the current user is a moderator (team member)
+#[tauri::command]
+pub async fn check_is_moderator() -> Result<bool, CommandError> {
+    debug!("Command called: check_is_moderator");
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let active_account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+
+    let token = active_account
+        .norisk_credentials
+        .get_token_for_mode(is_experimental)?;
+
+    CapeApi::check_is_moderator(&token, is_experimental)
+        .await
+        .map_err(|e| {
+            debug!("Failed to check moderator status: {:?}", e);
+            CommandError::from(e)
+        })
+}
+
 /// Delete a specific cape owned by the player
 ///
 /// Parameters:
 /// - cape_hash: Hash of the cape to delete
 /// - norisk_token: Optional NoRisk token
 /// - player_uuid: Optional UUID of the player (defaults to active account)
+/// - reason: Optional reason for deletion (used by moderators)
 #[tauri::command]
 pub async fn delete_cape(
     cape_hash: String,
     norisk_token: Option<String>,
     player_uuid: Option<Uuid>,
+    reason: Option<String>,
 ) -> Result<(), CommandError> {
     debug!(
         "Command called: delete_cape for cape_hash: {}, player_uuid: {:?}",
@@ -545,7 +616,7 @@ pub async fn delete_cape(
     };
 
     let result = cape_api
-        .delete_cape(&token_to_use, &uuid_to_use, &cape_hash, is_experimental)
+        .delete_cape(&token_to_use, &uuid_to_use, &cape_hash, reason.as_deref(), is_experimental)
         .await
         .map_err(|e| {
             debug!("Failed to delete cape: {:?}", e);
@@ -639,7 +710,7 @@ pub async fn upload_cape(
             CommandError::from(e)
         })?;
 
-    debug!("Command completed: upload_cape, was_resized: {}", response.was_resized);
+    debug!("Command completed: upload_cape");
 
     Ok(response)
 }
@@ -727,21 +798,19 @@ pub async fn unequip_cape(
 #[tauri::command]
 pub async fn download_template_and_open_explorer(
     app_handle: tauri::AppHandle,
+    with_elytra: bool,
 ) -> Result<(), CommandError> {
-    debug!("Command called: download_template_and_open_explorer");
+    debug!("Command called: download_template_and_open_explorer (elytra: {})", with_elytra);
 
-    // Get the state manager
     let state = State::get().await?;
-
-    // Get the is_experimental value from the config state
     let is_experimental = state.config_manager.is_experimental_mode().await;
     debug!("Using experimental mode: {}", is_experimental);
 
-    // Set template URL based on experimental mode
+    let template_file = if with_elytra { "template.png" } else { "template_no_elytra.png" };
     let template_url = if is_experimental {
-        "https://cdn.norisk.gg/capes-staging/template.png"
+        format!("https://cdn.norisk.gg/capes-staging/{}", template_file)
     } else {
-        "https://cdn.norisk.gg/capes/template.png"
+        format!("https://cdn.norisk.gg/capes/{}", template_file)
     };
     debug!("Template URL: {}", template_url);
 
@@ -762,8 +831,8 @@ pub async fn download_template_and_open_explorer(
 
     debug!("Downloads directory: {:?}", downloads_dir);
 
-    // Create the output file path
-    let file_path = downloads_dir.join("nrc_cape_template.png");
+    let download_name = if with_elytra { "nrc_cape_template.png" } else { "nrc_cape_template_no_elytra.png" };
+    let file_path = downloads_dir.join(download_name);
     let file_path_str = file_path.to_string_lossy().to_string();
 
     // Download the template using reqwest

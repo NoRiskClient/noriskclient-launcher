@@ -8,6 +8,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
@@ -16,12 +17,11 @@ import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage";
 import { VanillaCapeImage } from "./VanillaCapeImage";
 import { Tooltip } from "../ui/Tooltip";
-import { getPlayerProfileByUuidOrName, getCapesByHashes } from "../../services/cape-service";
-// Removed VirtuosoGrid import - using native scrolling instead
+import { getPlayerProfileByUuidOrName, getCapesByHashes, getCapeImageUrl, getCapeReviewImageUrl } from "../../services/cape-service";
+import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
-import { Card } from "../ui/Card";
 import { Modal } from "../ui/Modal";
 import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
@@ -29,9 +29,13 @@ import gsap from "gsap";
 import { IconButton } from "../ui/buttons/IconButton";
 import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
+import type { CapeReviewState } from "../../types/noriskCapes";
 
-
-// Removed ListComponent - using native grid layout instead
+function getCapeReviewState(cape: CosmeticCape): CapeReviewState {
+  if (cape.accepted) return 'ACCEPTED';
+  if (cape.moderatorMessage === 'In Review') return 'IN_REVIEW';
+  return 'DENIED';
+}
 
 interface CapeItemDisplayProps {
   cape: CosmeticCape | VanillaCape;
@@ -47,6 +51,10 @@ interface CapeItemDisplayProps {
   showModal?: (id: string, component: ReactNode) => void;
   hideModal?: (id: string) => void;
   isVanilla?: boolean;
+  showReviewState?: boolean;
+  isExperimental?: boolean;
+  isModerator?: boolean;
+  onModeratorDeleteClick?: (cape: CosmeticCape, e: React.MouseEvent) => void;
 }
 
 function CapeItemDisplay({
@@ -63,29 +71,55 @@ function CapeItemDisplay({
   showModal,
   hideModal,
   isVanilla = false,
+  showReviewState = false,
+  isExperimental = false,
+  isModerator = false,
+  onModeratorDeleteClick,
 }: CapeItemDisplayProps) {
-  const handleCapeClick = useCallback(() => {
-    if (isCurrentlyEquipping || !showModal) return;
+  const { t } = useTranslation();
+  const [creatorName, setCreatorName] = useState<string | null>(null);
+  const [creatorLoading, setCreatorLoading] = useState<boolean>(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const capeState = !isVanilla ? getCapeReviewState(cape as CosmeticCape) : 'ACCEPTED';
+  const isDenied = capeState === 'DENIED';
+  const isInReview = capeState === 'IN_REVIEW';
 
-    const userSkinUrl = activeAccount?.id
-      ? `https://crafatar.com/skins/${activeAccount.id}`
-      : undefined;
+  const handleCapeClick = useCallback(async () => {
+    if (isCurrentlyEquipping || !showModal || isDenied) return;
+
+    let userSkinUrl: string | undefined;
+    if (activeAccount?.id) {
+      try {
+        const active = await MinecraftSkinService.getActiveSkin();
+        if (active?.base64_data) {
+          userSkinUrl = `data:image/png;base64,${active.base64_data}`;
+        }
+      } catch (e) {
+        console.error("[CapeList] Failed to load active skin for preview:", e);
+      }
+    }
 
     const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
-    const capeUrl = isVanilla ? (cape as VanillaCape).url : `https://cdn.norisk.gg/capes/prod/${capeId}.png`;
+    const capeUrl = isVanilla
+      ? (cape as VanillaCape).url
+      : isInReview
+        ? getCapeReviewImageUrl(capeId, isExperimental)
+        : getCapeImageUrl(capeId, isExperimental);
 
     showModal(`cape-preview-${capeId}`, (
       <Modal
-        title="Cape Preview"
+        title={t('capes.capePreview')}
         onClose={() => hideModal && hideModal(`cape-preview-${capeId}`)}
         width="md"
         variant="flat"
       >
         <Cape3DPreviewWithToggle
           skinUrl={userSkinUrl}
-          capeUrl={isVanilla ? capeUrl : undefined}
+          capeUrl={capeUrl}
           capeId={capeId}
           isEquipped={false}
+          isExperimental={isExperimental}
           onEquipCape={() => {
             onEquipCape(capeId);
             hideModal && hideModal(`cape-preview-${capeId}`);
@@ -93,18 +127,13 @@ function CapeItemDisplay({
         />
       </Modal>
     ));
-  }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla]);
-  const [creatorName, setCreatorName] = useState<string | null>(null);
-  const [creatorLoading, setCreatorLoading] = useState<boolean>(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const accentColor = useThemeStore((state) => state.accentColor);
+  }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
 
-  // Only use favorites for NoRisk capes
   const isFavorite = !isVanilla ? useCapeFavoritesStore((s) => s.isFavorite((cape as CosmeticCape)._id)) : false;
   const toggleFavoriteOptimistic = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
 
   useEffect(() => {
-    if (isVanilla) return; // Vanilla capes don't have creators
+    if (isVanilla) return;
 
     let isMounted = true;
     const cosmeticCape = cape as CosmeticCape;
@@ -143,28 +172,21 @@ function CapeItemDisplay({
     };
   }, [cape, creatorNameCache, isVanilla]);
 
-  // Use consistent dimensions like original CapeDisplay
   const displayWidth = 140;
-  const displayHeight = Math.round(displayWidth * (16 / 10)); // 16:10 aspect ratio for capes
+  const displayHeight = Math.round(displayWidth * (16 / 10));
 
-  // Grid layout (similar to ProfileCardV2 grid mode)
   return (
     <div
-      className="relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
+      className={cn(
+        "group relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
+        isDenied ? "cursor-default opacity-60" : "cursor-pointer"
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={(e) => {
-        e.preventDefault();
-        handleCapeClick();
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        handleCapeClick();
-      }}
+      onClick={(e) => { e.preventDefault(); handleCapeClick(); }}
+      onContextMenu={(e) => { e.preventDefault(); handleCapeClick(); }}
     >
-      {/* Action buttons - top right */}
-      <div className={`absolute top-3 right-3 z-20 flex flex-col gap-1`}>
-        {/* Favorite button (only for NoRisk capes) */}
+      <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
         {!isVanilla && (
           <button
             onClick={(e) => {
@@ -173,7 +195,7 @@ function CapeItemDisplay({
               toggleFavoriteOptimistic((cape as CosmeticCape)._id);
             }}
             className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-            title={isFavorite ? "Unfavorite" : "Favorite"}
+            title={isFavorite ? t('capes.unfavorite') : t('capes.favorite')}
             disabled={isCurrentlyEquipping}
           >
             <Icon
@@ -184,7 +206,6 @@ function CapeItemDisplay({
           </button>
         )}
 
-        {/* Delete button (only if canDelete and not vanilla) */}
         {canDelete && onDeleteCapeClick && !isVanilla && (
           <button
             onClick={(e) => {
@@ -193,20 +214,31 @@ function CapeItemDisplay({
               onDeleteCapeClick(cape as CosmeticCape, e);
             }}
             className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
-            title="Delete Cape"
+            title={t('capes.deleteCape')}
             disabled={isCurrentlyEquipping}
           >
-            <Icon
-              icon="solar:close-circle-bold"
-              className="w-4 h-4"
-            />
+            <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
           </button>
         )}
+
       </div>
 
-      {/* Cape content */}
+      {isModerator && onModeratorDeleteClick && !isVanilla && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onModeratorDeleteClick(cape as CosmeticCape, e);
+          }}
+          className="absolute bottom-3 right-3 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500/60 text-red-400 hover:text-white border border-red-500/30 hover:border-red-400 backdrop-blur-sm transition-all duration-200 opacity-0 group-hover:opacity-100"
+          title={t('capes.moderatorDelete')}
+          disabled={isCurrentlyEquipping}
+        >
+          <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       <div className="flex flex-col items-center gap-3 relative z-10 w-full">
-        {/* Cape Image */}
         <div
           className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-300 ease-out"
           style={{
@@ -216,25 +248,27 @@ function CapeItemDisplay({
             borderColor: isEquipped ? accentColor.value : (isHovered ? `${accentColor.value}60` : 'transparent'),
           }}
         >
-          {isVanilla ? (
-            <VanillaCapeImage
-              imageUrl={imageUrl}
-              width={displayWidth}
-              className="rounded-sm block"
-            />
-          ) : (
-            <CapeImage
-              imageUrl={imageUrl}
-              part="front"
-              width={displayWidth}
-              className="rounded-sm block"
-            />
-          )}
+          {(() => {
+            if (isVanilla) {
+              return <VanillaCapeImage imageUrl={imageUrl} width={displayWidth} className="rounded-sm block" />;
+            }
+            const cosmeticCape = cape as CosmeticCape;
+            if (isInReview) {
+              return <CapeImage imageUrl={getCapeReviewImageUrl(cosmeticCape._id, isExperimental)} part="front" width={displayWidth} className="rounded-sm block" />;
+            }
+            if (isDenied) {
+              return cosmeticCape.blurHash
+                ? <CapeImage imageUrl={cosmeticCape.blurHash} part="front" width={displayWidth} className="rounded-sm block blur-sm" />
+                : <div className="w-full h-full flex items-center justify-center bg-white/5">
+                    <Icon icon="solar:close-circle-bold-duotone" className="w-10 h-10 text-white/20" />
+                  </div>;
+            }
+            return <CapeImage imageUrl={imageUrl} part="front" width={displayWidth} className="rounded-sm block" />;
+          })()}
 
-          {/* Equipped badge */}
           {isEquipped && !isCurrentlyEquipping && (
             <div className="absolute top-2 right-2 z-30">
-              <Tooltip content="This cape is currently equipped">
+              <Tooltip content={t('capes.currentlyEquipped')}>
                 <Icon
                   icon="solar:check-circle-bold"
                   className="w-4 h-4"
@@ -244,7 +278,6 @@ function CapeItemDisplay({
             </div>
           )}
 
-          {/* Equipping overlay */}
           {isCurrentlyEquipping && (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
               <Icon
@@ -253,16 +286,37 @@ function CapeItemDisplay({
                 style={{ color: accentColor.value }}
               />
               <span className="font-minecraft text-xs text-white lowercase">
-                Equipping
+                {t('capes.equipping')}
               </span>
+            </div>
+          )}
+
+          {showReviewState && (isInReview || isDenied) && (
+            <div className={cn(
+              "absolute bottom-0 inset-x-0 z-20 flex items-center justify-center gap-1.5 py-1.5 backdrop-blur-sm",
+              isInReview
+                ? "bg-yellow-500/20 border-t border-yellow-500/30"
+                : "bg-red-500/20 border-t border-red-500/30"
+            )}>
+              {isDenied ? (
+                <Tooltip content={(cape as CosmeticCape).moderatorMessage}>
+                  <div className="flex items-center gap-1.5">
+                    <Icon icon="solar:close-circle-bold" className="w-4 h-4 text-red-400" />
+                    <span className="text-[11px] font-minecraft-ten lowercase text-red-400">{t('capes.denied')}</span>
+                  </div>
+                </Tooltip>
+              ) : (
+                <>
+                  <Icon icon="solar:clock-circle-bold" className="w-4 h-4 text-yellow-400" />
+                  <span className="text-[11px] font-minecraft-ten lowercase text-yellow-400">{t('capes.inReview')}</span>
+                </>
+              )}
             </div>
           )}
 
         </div>
 
-        {/* Cape Info */}
         <div className="flex-grow min-w-0 w-full text-center">
-          {/* Creator Name or Cape Name */}
           <h3
             className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
             title={
@@ -274,12 +328,11 @@ function CapeItemDisplay({
             {isVanilla
               ? (cape as VanillaCape).name
               : creatorLoading
-                ? "Loading..."
-                : creatorName || "Unknown"
+                ? t('common.loading')
+                : creatorName || t('common.unknown')
             }
           </h3>
 
-          {/* Usage Stats (only for NoRisk capes) */}
           {!isVanilla && (
             <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
               <div className="text-white/60 flex items-center gap-1">
@@ -287,7 +340,7 @@ function CapeItemDisplay({
                   icon="solar:download-minimalistic-outline"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>{(cape as CosmeticCape).uses.toLocaleString()} uses</span>
+                <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
               </div>
             </div>
           )}
@@ -315,6 +368,10 @@ export interface CapeListProps {
   groupFavoritesInHeader?: boolean;
   showFavoritesOnly?: boolean;
   isVanilla?: boolean;
+  showReviewState?: boolean;
+  isExperimental?: boolean;
+  isModerator?: boolean;
+  onModeratorDeleteCape?: (cape: CosmeticCape) => void;
 }
 
 export function CapeList({
@@ -334,10 +391,15 @@ export function CapeList({
   groupFavoritesInHeader = true,
   showFavoritesOnly = false,
   isVanilla = false,
+  showReviewState = false,
+  isExperimental = false,
+  isModerator = false,
+  onModeratorDeleteCape,
 }: CapeListProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
   const { showModal, hideModal } = useGlobalModal();
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -364,10 +426,8 @@ export function CapeList({
       cape => !capes.some(c => (c as CosmeticCape)._id === cape._id)
     );
 
-    const finalResult = [...result, ...fetchedFavorites];
-    return finalResult;
+    return [...result, ...fetchedFavorites];
   }, [favoriteCapeIds, favoriteCapesFetched, capes, isVanilla]); // Keep capes dependency but optimize the calculation
-
 
   const missingFavoriteIds = useMemo(() => {
     // Always fetch missing favorites, regardless of groupFavoritesInHeader
@@ -525,6 +585,16 @@ export function CapeList({
     [onDeleteCape, isVanilla],
   );
 
+  const handleModeratorDeleteClickInternal = useCallback(
+    (cape: CosmeticCape, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onModeratorDeleteCape) {
+        onModeratorDeleteCape(cape);
+      }
+    },
+    [onModeratorDeleteCape],
+  );
+
   const handlePreview3D = useCallback(() => {
     // Preview is now handled by direct click, this function is kept for potential future use
     setContextMenu(null);
@@ -546,13 +616,13 @@ export function CapeList({
           message={
             isVanilla
               ? searchQuery
-                ? `No vanilla capes found for "${searchQuery}"`
-                : "You don't own any vanilla Minecraft capes yet"
+                ? t('capes.noVanillaCapesFoundForSearch', { query: searchQuery })
+                : t('capes.noVanillaCapesOwned')
               : showFavoritesOnly
-              ? "Mark some capes as favorites by clicking the heart icon!"
+              ? t('capes.markFavoritesHint')
               : searchQuery
-              ? `No capes found for "${searchQuery}"`
-              : "No capes available"
+              ? t('capes.noCapesFoundForSearch', { query: searchQuery })
+              : t('capes.noCapesAvailable')
           }
         />
       </div>
@@ -609,14 +679,14 @@ export function CapeList({
             }}
           >
             {stableFavoriteCapes.map((cape) => {
-              const imageUrl = `https://cdn.norisk.gg/capes/prod/${cape._id}.png`;
+              const imageUrl = getCapeImageUrl(cape._id, isExperimental);
               return (
                 <CapeItemDisplay
                   key={`fav-${cape._id}`}
                   cape={cape}
                   imageUrl={imageUrl}
                   isCurrentlyEquipping={isEquippingCapeId === cape._id}
-                  isEquipped={false} // Favorites don't show equipped status for now
+                  isEquipped={false}
                   onEquipCape={onEquipCape}
                   canDelete={canDelete}
                   onDeleteCapeClick={handleDeleteClickInternal}
@@ -626,6 +696,9 @@ export function CapeList({
                   showModal={(id, component) => showModal(id, component)}
                   hideModal={(id) => hideModal(id)}
                   isVanilla={isVanilla}
+                  isExperimental={isExperimental}
+                  isModerator={isModerator}
+                  onModeratorDeleteClick={handleModeratorDeleteClickInternal}
                 />
               );
             })}
@@ -645,7 +718,7 @@ export function CapeList({
           {itemsToRender.map((cape) => {
             const imageUrl = isVanilla
               ? (cape as VanillaCape).url
-              : `https://cdn.norisk.gg/capes/prod/${(cape as CosmeticCape)._id}.png`;
+              : getCapeImageUrl((cape as CosmeticCape)._id, isExperimental);
             const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
             const isEquipped = equippedCapeId === capeId;
             return (
@@ -664,6 +737,10 @@ export function CapeList({
                 showModal={(id, component) => showModal(id, component)}
                 hideModal={(id) => hideModal(id)}
                 isVanilla={isVanilla}
+                showReviewState={showReviewState}
+                isExperimental={isExperimental}
+                isModerator={isModerator}
+                onModeratorDeleteClick={handleModeratorDeleteClickInternal}
               />
             );
           })}
@@ -701,7 +778,7 @@ export function CapeList({
             >
               <Icon icon="ph:eye-bold" className="w-5 h-5 text-white" />
               <span className="font-minecraft-ten text-base text-white/80">
-                Preview
+                {t('capes.preview')}
               </span>
             </li>
           </ul>
@@ -716,18 +793,20 @@ function Cape3DPreviewWithToggle({
   capeUrl,
   capeId,
   onEquipCape,
-  isEquipped = false
+  isEquipped = false,
+  isExperimental = false,
 }: {
   skinUrl?: string;
-  capeUrl?: string; // Optional - falls nicht übergeben, wird CDN URL verwendet
+  capeUrl?: string;
   capeId: string;
   onEquipCape: () => void;
-  isEquipped?: boolean; // Optional - für Vanilla Capes relevant
+  isEquipped?: boolean;
+  isExperimental?: boolean;
 }) {
+  const { t } = useTranslation();
   const [showElytra, setShowElytra] = useState(false);
 
-  // Verwende capeUrl falls übergeben, sonst CDN URL
-  const finalCapeUrl = capeUrl || `https://cdn.norisk.gg/capes/prod/${capeId}.png`;
+  const finalCapeUrl = capeUrl || getCapeImageUrl(capeId, isExperimental);
 
   return (
     <div className="p-4">
@@ -743,8 +822,8 @@ function Cape3DPreviewWithToggle({
               className="w-5 h-5"
             />
           }
-          title={showElytra ? "Show as Cape" : "Show as Elytra"}
-          aria-label={showElytra ? "Show as Cape" : "Show as Elytra"}
+          title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
+          aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
         />
         <SkinView3DWrapper
           skinUrl={skinUrl}
@@ -766,7 +845,7 @@ function Cape3DPreviewWithToggle({
           size="lg"
           className="px-8"
         >
-          {isEquipped ? 'UNEQUIP CAPE' : 'SELECT CAPE'}
+          {isEquipped ? t('capes.unequipCape') : t('capes.selectCape')}
         </Button>
       </div>
     </div>

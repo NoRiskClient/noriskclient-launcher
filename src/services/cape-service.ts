@@ -1,6 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { CapesBrowseResponse, BrowseCapesOptions, GetPlayerCapesPayloadOptions, CosmeticCape } from '../types/noriskCapes';
+import type { CapesBrowseResponse, BrowseCapesOptions, GetPlayerCapesPayloadOptions, CosmeticCape, OwnedCapesResponse } from '../types/noriskCapes';
 import type { MinecraftProfile } from '../types/minecraft';
+
+export const getCapeImageUrl = (hash: string, isExperimental: boolean): string => {
+  const base = isExperimental ? 'https://cdn.norisk.gg/capes-staging/prod' : 'https://cdn.norisk.gg/capes/prod';
+  return `${base}/${hash}.png`;
+};
+
+export const getCapeReviewImageUrl = (hash: string, isExperimental: boolean): string => {
+  const base = isExperimental ? 'https://cdn.norisk.gg/capes-staging/review' : 'https://cdn.norisk.gg/capes/review';
+  return `${base}/${hash}.png`;
+};
 
 /**
  * Browse capes with optional parameters
@@ -64,25 +74,26 @@ export const equipCape = (
 export const deleteCape = (
   capeHash: string,
   noriskToken?: string,
-  playerUuid?: string
+  playerUuid?: string,
+  reason?: string
 ): Promise<void> => {
   return invoke('delete_cape', {
     capeHash,
     noriskToken,
-    playerUuid
+    playerUuid,
+    reason
   });
+};
+
+export const checkIsModerator = (): Promise<boolean> => {
+  return invoke('check_is_moderator');
 };
 
 /**
  * Response from cape upload operation
  */
 export interface CapeUploadResponse {
-  /** The hash/ID of the uploaded cape */
   capeHash: string;
-  /** Whether the cape was resized to 512x256 */
-  wasResized: boolean;
-  /** Original dimensions if the cape was resized (null if already correct size) */
-  originalDimensions: [number, number] | null;
 }
 
 /**
@@ -91,7 +102,7 @@ export interface CapeUploadResponse {
  * @param imagePath Path to the cape image file (PNG)
  * @param noriskToken Optional NoRisk token
  * @param playerUuid Optional UUID of the player (defaults to active account)
- * @returns A promise that resolves to the cape upload response with hash and resize info
+ * @returns A promise that resolves to the cape upload response with hash
  */
 export const uploadCape = (
   imagePath: string,
@@ -127,9 +138,9 @@ export const unequipCape = (
  * 
  * @returns A promise that resolves when the template has been downloaded and the folder is opened
  */
-export const downloadTemplateAndOpenExplorer = (): Promise<void> => {
-  console.log('[cape-service] Downloading cape template and opening explorer');
-  return invoke('download_template_and_open_explorer');
+export const downloadTemplateAndOpenExplorer = (withElytra: boolean): Promise<void> => {
+  console.log('[cape-service] Downloading cape template and opening explorer (elytra:', withElytra, ')');
+  return invoke('download_template_and_open_explorer', { withElytra });
 };
 
 /**
@@ -200,4 +211,12 @@ export const getCapesByHashes = (
   noriskToken?: string,
 ): Promise<CosmeticCape[]> => {
   return invoke('get_capes_by_hashes', { hashes, noriskToken });
-}; 
+};
+
+export const getOwnedCapesList = (
+  page?: number,
+  limit?: number,
+  noriskToken?: string,
+): Promise<OwnedCapesResponse> => {
+  return invoke('get_owned_capes_list', { page, limit, noriskToken });
+};

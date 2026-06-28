@@ -5,7 +5,7 @@ use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::ClasspathBuilder;
 use crate::minecraft::GameArguments;
 use crate::minecraft::JvmArguments;
-use crate::state::profile_state::{Profile, WindowSize};
+use crate::state::profile_state::{ImageSource, Profile, ProfileBanner, WindowSize};
 use crate::state::state_manager::State;
 use log::{debug, error, info, warn};
 use serde_json::Value;
@@ -109,6 +109,53 @@ impl MinecraftLaunchParameters {
     pub fn with_quick_play_multiplayer(mut self, server_address: String) -> Self {
         self.quick_play_multiplayer = Some(server_address);
         self
+    }
+}
+
+/// Resolves a profile banner to an absolute file path or URL string.
+/// Returns None if the banner is None or cannot be resolved.
+fn resolve_profile_banner_path(
+    banner: &Option<ProfileBanner>,
+    profile_id: Uuid,
+    profile_path: &Path,
+) -> Option<String> {
+    let banner = banner.as_ref()?;
+
+    match &banner.source {
+        ImageSource::Url { url } => Some(url.clone()),
+        ImageSource::Base64 { data, mime_type } => {
+            let mime = mime_type.clone().unwrap_or_else(|| "image/png".to_string());
+            let clean_data = data.replace("\n", "").replace("\r", "").replace(" ", "");
+            Some(format!("data:{};base64,{}", mime, clean_data))
+        }
+        ImageSource::AbsolutePath { path } => {
+            let path_buf = PathBuf::from(path);
+            if path_buf.exists() {
+                Some(path_buf.to_string_lossy().to_string())
+            } else {
+                warn!("Profile banner absolute path does not exist: {:?}", path_buf);
+                None
+            }
+        }
+        ImageSource::RelativePath { path } => {
+            let launcher_dir = LAUNCHER_DIRECTORY.root_dir();
+            let full_path = launcher_dir.join(path);
+            if full_path.exists() {
+                Some(full_path.to_string_lossy().to_string())
+            } else {
+                warn!("Profile banner relative path does not exist: {:?}", full_path);
+                None
+            }
+        }
+        ImageSource::RelativeProfile { path } => {
+            let full_path = profile_path.join(path);
+            if full_path.exists() {
+                Some(full_path.to_string_lossy().to_string())
+            } else {
+                warn!("Profile banner profile-relative path does not exist: {:?}", full_path);
+                None
+            }
+        }
     }
 }
 
@@ -281,14 +328,31 @@ impl MinecraftLauncher {
         info!("Adding RAM JVM argument: -Xmx{}M", params.memory_max_mb);
         command.arg(format!("-Xmx{}M", params.memory_max_mb));
 
-        // Add recommended GC flags
-        command.arg("-XX:+UnlockExperimentalVMOptions");
-        command.arg("-XX:+UseG1GC");
-        // Add additional G1GC optimization flags like vanilla launcher
-        command.arg("-XX:G1NewSizePercent=20");
-        command.arg("-XX:G1ReservePercent=20");
-        command.arg("-XX:MaxGCPauseMillis=50");
-        command.arg("-XX:G1HeapRegionSize=32M");
+        // Check if custom JVM args contain a custom GC setting
+        //fix for https://github.com/NoRiskClient/issues/issues/2357
+        let custom_gc_patterns = [
+            "-XX:+UseZGC",
+            "-XX:+UseG1GC",
+            "-XX:+UseShenandoahGC",
+            "-XX:+UseParallelGC",
+            "-XX:+UseSerialGC",
+        ];
+        let has_custom_gc = params.additional_jvm_args.iter().any(|arg| {
+            custom_gc_patterns.iter().any(|pattern| arg.contains(pattern))
+        });
+
+        // Add recommended GC flags only if no custom GC is specified
+        if has_custom_gc {
+            info!("Custom GC detected in JVM arguments, skipping default G1GC flags");
+        } else {
+            command.arg("-XX:+UnlockExperimentalVMOptions");
+            command.arg("-XX:+UseG1GC");
+            // Add additional G1GC optimization flags like vanilla launcher
+            command.arg("-XX:G1NewSizePercent=20");
+            command.arg("-XX:G1ReservePercent=20");
+            command.arg("-XX:MaxGCPauseMillis=50");
+            command.arg("-XX:G1HeapRegionSize=32M");
+        }
 
         // Add NoRisk client specific parameters
         // Only add token if we have credentials AND a NoRisk pack is selected in the profile
@@ -297,6 +361,51 @@ impl MinecraftLauncher {
         // Add profile name for ingame display
         if let Some(p) = &profile {
             command.arg(format!("-Dnorisk.profile.name={}", p.name));
+            if let Some(pack_id) = p.selected_norisk_pack_id.as_ref() {
+                command.arg(format!("-Dnorisk.pack={}", pack_id));
+            }
+        }
+
+        // Pass meta dir to game client for shared Discord state file
+        command.arg(format!("-Dnorisk.meta.dir={}", crate::config::LAUNCHER_DIRECTORY.meta_dir().display()));
+
+        // Hand off asset management to the in-game client only for packs whose
+        // client owns asset management (see `client_managed_assets`). Every
+        // other pack runs the legacy launcher-side asset pipeline — passing the
+        // props there would double-write the cache alongside it.
+        let effective_pack = match &profile {
+            Some(p) => p.effective_norisk_pack_id().await,
+            None => None,
+        };
+        if effective_pack
+            .as_deref()
+            .map(crate::minecraft::downloads::client_managed_assets)
+            .unwrap_or(false)
+        {
+            let pack_id = effective_pack.as_deref().unwrap();
+
+            // Layout matches norisk_assets_download.rs
+            // (`<meta>/assets/noriskclient/<bucket>/objects/...`) so any blob
+            // we've already downloaded is reusable as-is.
+            let assets_root = crate::config::LAUNCHER_DIRECTORY
+                .meta_dir()
+                .join("assets")
+                .join("noriskclient");
+            command.arg(format!("-Dnrc.assets.dir={}", assets_root.display()));
+
+            // Bucket list comes from the resolved pack's `assets` field
+            // (norisk_modpacks.json). Order is base→priority — client overlays
+            // the last entry on top, falling back per-asset.
+            let packs_config = state.norisk_pack_manager.get_config().await;
+            match packs_config.get_resolved_pack_definition(pack_id) {
+                Ok(pack_def) if !pack_def.assets.is_empty() => {
+                    command.arg(format!("-Dnrc.assets.bucket={}", pack_def.assets.join(",")));
+                }
+                Ok(_) => {}
+                Err(e) => log::warn!("[launcher] Resolving pack '{}' for nrc.assets.bucket failed: {}", pack_id, e),
+            }
+        } else {
+            info!("[launcher] pack not client-managed — running legacy asset pipeline, omitting -Dnrc.assets.* JVM args");
         }
 
         if let Some(creds) = &self.credentials {
@@ -332,6 +441,10 @@ impl MinecraftLauncher {
                     "-Dnorisk.experimental={}",
                     params.is_experimental_mode
                 ));
+
+                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
+                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
+                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
             } else {
                 info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
             }
@@ -339,23 +452,28 @@ impl MinecraftLauncher {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
         }
 
-        // Add Fabric specific mods folder argument if loader is Fabric
-        // Note: When using -Dfabric.addMods (prototype), this is still harmless and allows user mods in mods/.
+        // Add per-loader mods-folder JVM argument so the loader picks up jars from the
+        // launcher-managed per-version directory (analogous to fabric.modsFolder, mirrored
+        // for Forge/NeoForge via nrc-forgeloader's -Dnrc.modsFolder).
+        // Note: complementary to addMods=@<meta>, both sources are merged by the loader.
         if let Some(p_ref) = &profile {
-            if p_ref.loader == crate::state::profile_state::ModLoader::Fabric {
+            let prop: Option<&str> = match p_ref.loader {
+                crate::state::profile_state::ModLoader::Fabric => Some("fabric.modsFolder"),
+                crate::state::profile_state::ModLoader::Forge
+                | crate::state::profile_state::ModLoader::NeoForge => Some("nrc.modsFolder"),
+                _ => None,
+            };
+            if let Some(prop) = prop {
                 match state.profile_manager.get_profile_mods_path(p_ref) {
                     Ok(mods_path) => {
                         let mods_path_str = mods_path.to_string_lossy().replace("\\", "/");
-                        let fabric_mods_arg = format!("-Dfabric.modsFolder={}", mods_path_str);
-                        info!(
-                            "Adding Fabric mods folder JVM argument: {}",
-                            fabric_mods_arg
-                        );
-                        command.arg(fabric_mods_arg);
+                        let mods_arg = format!("-D{}={}", prop, mods_path_str);
+                        info!("Adding mods folder JVM argument: {}", mods_arg);
+                        command.arg(mods_arg);
                     }
                     Err(e) => {
                         warn!(
-                            "Could not get Fabric mods path for profile '{}' (ID: {}): {}. Fabric mods folder argument will not be set.",
+                            "Could not get mods path for profile '{}' (ID: {}): {}. Mods folder argument will not be set.",
                             p_ref.name, p_ref.id, e
                         );
                     }
@@ -453,20 +571,48 @@ impl MinecraftLauncher {
         };
 
         // Extract optional profile information for process metadata
-        let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name) =
+        let effective_pack = match &profile {
+            Some(p) => p.effective_norisk_pack_id().await,
+            None => None,
+        };
+        // Snapshot mod manifest (incl. disabled) for crash analysis.
+        let crash_mods = match &profile {
+            Some(p) => crate::state::process_state::build_crash_mod_manifest(p, &state).await,
+            None => Vec::new(),
+        };
+        let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name, profile_image_url) =
             match profile {
-                Some(p) => (
-                    Some(p.loader.as_str().to_string()),
-                    p.loader_version,
-                    p.selected_norisk_pack_id,
-                    Some(p.name),
-                ),
-                None => (None, None, None, None),
+                Some(p) => {
+                    // Resolve profile banner image path
+                    let image_url = resolve_profile_banner_path(
+                        &p.banner,
+                        params.profile_id,
+                        &self.game_directory,
+                    );
+                    (
+                        Some(p.loader.as_str().to_string()),
+                        p.loader_version,
+                        effective_pack,
+                        Some(p.name),
+                        image_url,
+                    )
+                }
+                None => (None, None, None, None, None),
             };
 
         // Get post-exit hook from config at launch time (not at exit time)
         let launcher_config = state.config_manager.get_config().await;
         let post_exit_hook = launcher_config.hooks.post_exit.clone();
+
+        // Clear latest.log before launch to avoid mixing logs from previous sessions
+        let latest_log = self.game_directory.join("logs").join("latest.log");
+        if latest_log.exists() {
+            if let Err(e) = std::fs::remove_file(&latest_log) {
+                log::warn!("Failed to clear latest.log before launch: {}", e);
+            } else {
+                log::info!("Cleared previous latest.log before launch");
+            }
+        }
 
         // Start the process using ProcessManager with additional metadata
         process_manager
@@ -480,7 +626,10 @@ impl MinecraftLauncher {
                 profile_loader_version,
                 profile_norisk_pack,
                 profile_name,
+                profile_image_url,
                 post_exit_hook,
+                params.memory_max_mb,
+                crash_mods,
             )
             .await?;
 

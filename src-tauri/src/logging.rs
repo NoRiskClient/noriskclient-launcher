@@ -13,8 +13,8 @@ const LOG_DIR_NAME: &str = "logs";
 const LOG_FILE_NAME: &str = "launcher.log";
 const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {m}{n}";
 const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} | {h({l}):5.5} | {m}{n}"; // Slightly simpler pattern for console
-const LOG_FILE_SIZE_LIMIT_MB: u64 = 10;
-const LOG_FILE_BACKUP_COUNT: u32 = 5;
+const LOG_FILE_SIZE_LIMIT_BYTES: u64 = 4_800_000; // ~4.8MB to fit Discord's 8MB upload limit
+const LOG_FILE_BACKUP_COUNT: u32 = 10;
 
 /// Initializes the logging system using log4rs.
 /// Configures a rolling file appender and a console appender.
@@ -34,7 +34,7 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
     let log_file_path = log_dir.join(LOG_FILE_NAME);
 
     // --- Configure File Rolling Policy ---
-    let size_trigger = SizeTrigger::new(LOG_FILE_SIZE_LIMIT_MB * 1024 * 1024);
+    let size_trigger = SizeTrigger::new(LOG_FILE_SIZE_LIMIT_BYTES);
     let roller_pattern = log_dir.join(format!("{}.{{}}", LOG_FILE_NAME));
     let roller = FixedWindowRoller::builder()
         .base(1)

@@ -6,8 +6,7 @@ import type { Profile } from "../../../types/profile";
 import { Button } from "../../ui/buttons/Button";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { RangeSlider } from "../../ui/RangeSlider";
-import { Input } from "../../ui/Input";
-import { TextArea } from "../../ui/TextArea";
+import { Input, SearchStyleTextArea } from "../../ui/Input";
 import { Checkbox } from "../../ui/Checkbox";
 import { Card } from "../../ui/Card";
 import { gsap } from "gsap";
@@ -15,8 +14,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
 import { cn } from "../../../lib/utils";
-import { getGlobalMemorySettings, setGlobalMemorySettings } from "../../../services/launcher-config-service";
+import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalCustomJvmArgs, setGlobalCustomJvmArgs } from "../../../services/launcher-config-service";
 import type { MemorySettings } from "../../../types/launcherConfig";
+import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface JavaSettingsTabProps {
   editedProfile: Profile;
@@ -42,6 +43,7 @@ export function JavaSettingsTab({
   tempRamMb,
   setTempRamMb,
 }: JavaSettingsTabProps) {
+  const { t } = useTranslation();
   const [useCustomJava, setUseCustomJava] = useState(
     editedProfile.settings?.use_custom_java_path ?? false,
   );
@@ -80,6 +82,10 @@ export function JavaSettingsTab({
   const [globalMemorySettings, setGlobalMemorySettingsState] = useState<MemorySettings | null>(null);
   const [isLoadingGlobalMemory, setIsLoadingGlobalMemory] = useState(false);
   const [isSystemRamLoaded, setIsSystemRamLoaded] = useState(false);
+
+  // Global JVM args for standard profiles
+  const [globalJvmArgs, setGlobalJvmArgsState] = useState<string | null>(null);
+  const [isLoadingGlobalJvmArgs, setIsLoadingGlobalJvmArgs] = useState(false);
   
 
   useEffect(() => {
@@ -127,7 +133,7 @@ export function JavaSettingsTab({
       setDetectedJavaInstallations(installations);
       if (installations.length === 0) {
         toast(
-          "No Java installations found on your system. You may need to specify the path manually if you use a custom Java setup.",
+          t('java.no_installations_found'),
         );
       } else if (!customJavaPathInput) {
         const currentProfileJavaPath = editedProfile.settings?.java_path;
@@ -142,9 +148,9 @@ export function JavaSettingsTab({
     } catch (error) {
       console.error("Error detecting Java installations:", error);
       const errorMessage =
-        error instanceof Error ? error.message : String(error);
+        parseErrorMessage(error);
       setJavaDetectionError(errorMessage); // Store for internal reference if needed
-      toast.error(`Failed to detect Java: ${errorMessage}`);
+      toast.error(t('java.detect_failed', { error: errorMessage }));
       setDetectedJavaInstallations([]);
     } finally {
       setIsDetectingJava(false);
@@ -169,10 +175,12 @@ export function JavaSettingsTab({
       getGlobalMemorySettings()
         .then((settings) => {
           setGlobalMemorySettingsState(settings);
+          // Synchronize tempRamMb with global settings for standard profiles
+          setTempRamMb(settings.max);
         })
         .catch((error) => {
           console.error("Failed to load global memory settings:", error);
-          toast.error("Failed to load global memory settings");
+          toast.error(t('java.load_memory_failed'));
         })
         .finally(() => {
           setIsLoadingGlobalMemory(false);
@@ -181,13 +189,34 @@ export function JavaSettingsTab({
       // For custom profiles, we're not loading anything
       setIsLoadingGlobalMemory(false);
     }
+  }, [editedProfile.is_standard_version, setTempRamMb]);
+
+  // Load global JVM args for standard profiles
+  useEffect(() => {
+    if (editedProfile.is_standard_version) {
+      setIsLoadingGlobalJvmArgs(true);
+      getGlobalCustomJvmArgs()
+        .then((args) => {
+          setGlobalJvmArgsState(args);
+          // Initialize useCustomArgs based on whether global args exist
+          setUseCustomArgs((args?.length || 0) > 0);
+        })
+        .catch((error) => {
+          console.error("Failed to load global JVM args:", error);
+          toast.error(t('java.load_jvm_failed'));
+        })
+        .finally(() => {
+          setIsLoadingGlobalJvmArgs(false);
+        });
+    } else {
+      setIsLoadingGlobalJvmArgs(false);
+    }
   }, [editedProfile.is_standard_version]);
 
   const browseForJavaPath = async () => {
     try {
       const selected = await open({
-        title:
-          "Select Java Executable (javaw.exe, java) or Installation Directory",
+        title: t('settings.java.select_java_executable'),
         directory: false,
         multiple: false,
       });
@@ -200,14 +229,14 @@ export function JavaSettingsTab({
       const errorMessage = String(
         error instanceof Error ? error.message : error,
       );
-      toast.error(`Error browsing for Java: ${errorMessage}`);
+      toast.error(t('java.browse_error', { error: errorMessage }));
     }
   };
 
   const testCustomJavaPath = async (path_to_test?: string) => {
     const currentPath = path_to_test || customJavaPathInput;
     if (!currentPath) {
-      toast.error("Please select or enter a Java path to test.");
+      toast.error(t('java.select_path_to_test'));
       return;
     }
     setIsValidatingJavaPath(true);
@@ -219,7 +248,7 @@ export function JavaSettingsTab({
       });
       if (isValid) {
         setValidationResult("valid");
-        toast.success("Java path is valid!");
+        toast.success(t('java.path_valid'));
         updateProfile({
           settings: {
             ...editedProfile.settings,
@@ -229,17 +258,15 @@ export function JavaSettingsTab({
         });
       } else {
         setValidationResult("invalid");
-        toast.error(
-          "Invalid Java Path. Check the path or ensure it's a compatible Java version.",
-        );
+        toast.error(t('java.path_invalid'));
       }
     } catch (error: any) {
       console.error(`Error validating Java path ${currentPath}:`, error);
       setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
-        ? "Selected Java path does not exist."
-        : error?.message || String(error);
-      toast.error(`Java Validation error: ${message}`);
+        ? t('java.path_not_exist')
+        : error?.message || parseErrorMessage(error);
+      toast.error(t('java.validation_error', { error: message }));
     } finally {
       setIsValidatingJavaPath(false);
     }
@@ -270,7 +297,7 @@ export function JavaSettingsTab({
         setGlobalMemorySettingsState(newGlobalSettings);
       } catch (error) {
         console.error("Failed to save global memory settings:", error);
-        toast.error("Failed to save global RAM settings");
+        toast.error(t('java.save_ram_failed'));
       }
     } else {
       // For custom profiles, save to profile settings
@@ -297,10 +324,22 @@ export function JavaSettingsTab({
     testCustomJavaPath(installation.path); // Auto-test selected detected path
   };
 
-  const handleJavaArgsChange = (args: string) => {
-    const newSettings = { ...editedProfile.settings };
-    newSettings.custom_jvm_args = args;
-    updateProfile({ settings: newSettings });
+  const handleJavaArgsChange = async (args: string) => {
+    if (editedProfile.is_standard_version) {
+      // For standard profiles, save to global settings
+      try {
+        await setGlobalCustomJvmArgs(args || null);
+        setGlobalJvmArgsState(args || null);
+      } catch (error) {
+        console.error("Failed to save global JVM args:", error);
+        toast.error(t('java.save_jvm_failed'));
+      }
+    } else {
+      // For custom profiles, save to profile settings
+      const newSettings = { ...editedProfile.settings };
+      newSettings.custom_jvm_args = args;
+      updateProfile({ settings: newSettings });
+    }
   };
 
   const handleCustomJavaToggle = (checked: boolean) => {
@@ -323,21 +362,42 @@ export function JavaSettingsTab({
     }
   };
 
-  const handleCustomArgsToggle = (checked: boolean) => {
+  const handleCustomArgsToggle = async (checked: boolean) => {
     setUseCustomArgs(checked);
-    const newSettings = { ...editedProfile.settings };
-    if (checked) {
-      if (!newSettings.custom_jvm_args) {
-        newSettings.custom_jvm_args = [
-          "-XX:+UseG1GC",
-          "-XX:+ParallelRefProcEnabled",
-          "-XX:MaxGCPauseMillis=200",
-        ].join(" ");
+
+    const defaultArgs = [
+      "-XX:+UseG1GC",
+      "-XX:+ParallelRefProcEnabled",
+      "-XX:MaxGCPauseMillis=200",
+    ].join(" ");
+
+    if (editedProfile.is_standard_version) {
+      // For standard profiles, save to global settings
+      try {
+        if (checked) {
+          const argsToSet = globalJvmArgs || defaultArgs;
+          await setGlobalCustomJvmArgs(argsToSet);
+          setGlobalJvmArgsState(argsToSet);
+        } else {
+          await setGlobalCustomJvmArgs(null);
+          setGlobalJvmArgsState(null);
+        }
+      } catch (error) {
+        console.error("Failed to save global JVM args:", error);
+        toast.error(t('java.save_jvm_failed'));
       }
     } else {
-      newSettings.custom_jvm_args = null;
+      // For custom profiles, save to profile settings
+      const newSettings = { ...editedProfile.settings };
+      if (checked) {
+        if (!newSettings.custom_jvm_args) {
+          newSettings.custom_jvm_args = defaultArgs;
+        }
+      } else {
+        newSettings.custom_jvm_args = null;
+      }
+      updateProfile({ settings: newSettings });
     }
-    updateProfile({ settings: newSettings });
 
     if (checked && isBackgroundAnimationEnabled) {
       const textareaContainer = argsRef.current?.querySelector(
@@ -364,7 +424,7 @@ export function JavaSettingsTab({
       <div ref={memoryRef} className="space-y-4">
         <div>
           <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-            {editedProfile.is_standard_version ? "global memory allocated" : "memory allocated"}
+            {editedProfile.is_standard_version ? t('profiles.settings.globalMemoryAllocated') : t('profiles.settings.memoryAllocated')}
           </h3>
           <Card
             variant="flat"
@@ -374,14 +434,20 @@ export function JavaSettingsTab({
               <div className="flex items-center justify-center py-8">
                 <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
                 <span className="text-white font-minecraft">
-                  Loading settings...
+                  {t('profiles.settings.loadingSettings')}
                 </span>
               </div>
             ) : (
               <>
                 <RangeSlider
                   value={tempRamMb}
-                  onChange={setTempRamMb}
+                  onChange={(value) => {
+                    setTempRamMb(value);
+                    // For standard profiles, save to global settings immediately
+                    if (editedProfile.is_standard_version) {
+                      handleMemoryChange(value);
+                    }
+                  }}
                   min={512}
                   max={systemRam}
                   step={512}
@@ -393,11 +459,11 @@ export function JavaSettingsTab({
                   unit="MB"
                 />
                 <div className="mt-3 text-xs text-white/70 tracking-wide font-minecraft-ten">
-                  Recommended: {recommendedMaxRam} MB (
+                  {t('profiles.settings.recommended')}: {recommendedMaxRam} MB (
                   {(recommendedMaxRam / 1024).toFixed(1)} GB)
                   {editedProfile.is_standard_version && (
                     <div className="mt-1 text-accent font-minecraft-ten">
-                      ⚠ This setting applies to all standard profiles
+                      {t('profiles.settings.appliesToAllStandard')}
                     </div>
                   )}
                 </div>
@@ -414,7 +480,7 @@ export function JavaSettingsTab({
             <Checkbox
               checked={useCustomJava}
               onChange={(e) => handleCustomJavaToggle(e.target.checked)}
-              label="custom java installation"
+              label={t('profiles.settings.customJavaInstallation')}
               className="text-2xl"
               variant="flat"
             />
@@ -423,11 +489,10 @@ export function JavaSettingsTab({
           {!useCustomJava && (
             <div className="mt-3">
               <div className="text-2xl text-white font-minecraft mb-2 lowercase tracking-wide select-none">
-                using launcher default java
+                {t('profiles.settings.usingDefaultJava')}
               </div>
-              {/* Consider fetching and displaying the actual default path if available */}
               <div className="text-xs text-white/70 font-minecraft-ten break-all lowercase tracking-wide select-none">
-                The launcher will use its bundled Java or a system-wide default.
+                {t('profiles.settings.defaultJavaDescription')}
               </div>
             </div>
           )}
@@ -440,7 +505,7 @@ export function JavaSettingsTab({
                     icon="solar:refresh-bold"
                     className="w-5 h-5 mr-2 animate-spin"
                   />
-                  <span>Detecting Java installations...</span>
+                  <span>{t('profiles.settings.detectingJava')}</span>
                 </div>
               )}
 
@@ -449,14 +514,14 @@ export function JavaSettingsTab({
                   htmlFor="custom-java-path-input"
                   className="block text-xs text-white/70 font-minecraft-ten mt-3 mb-2 tracking-wide"
                 >
-                  Manual Java Path (javaw.exe or java executable)
+                  {t('profiles.settings.manualJavaPath')}
                 </label>
                 <div className="flex gap-3">
                   <Input
                     id="custom-java-path-input"
                     value={customJavaPathInput}
                     onChange={(e) => handleJavaPathInputChange(e.target.value)}
-                    placeholder="Path to java executable (e.g., .../bin/javaw.exe)"
+                    placeholder={t('placeholders.java_path')}
                     className="flex-1 text-2xl py-3"
                     variant="flat"
                   />
@@ -472,9 +537,9 @@ export function JavaSettingsTab({
                       />
                     }
                     className="text-2xl"
-                    aria-label="Browse for Java executable"
+                    aria-label={t('profiles.settings.browse_java')}
                   >
-                    Browse
+                    {t('profiles.settings.browse')}
                   </Button>
                 </div>
               </div>
@@ -482,7 +547,7 @@ export function JavaSettingsTab({
               {detectedJavaInstallations.length > 0 && !isDetectingJava && (
                 <div className="space-y-2 pt-2">
                   <h4 className="text-xs text-white/70 font-minecraft-ten mb-2 tracking-wide">
-                    Detected Java Installations (click to use):
+                    {t('profiles.settings.detectedJavaInstallations')}
                   </h4>
                   <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 p-2 bg-black/10 rounded-lg">
                     {detectedJavaInstallations.map((java) => (
@@ -533,45 +598,58 @@ export function JavaSettingsTab({
                 }
                 className="text-2xl mt-2 w-full sm:w-auto"
               >
-                {isValidatingJavaPath ? "Testing..." : "Test & Use Path"}
+                {isValidatingJavaPath ? t('profiles.settings.testing') : t('profiles.settings.testAndUsePath')}
               </Button>
             </div>
           )}
         </div>
       </div>
 
-      {!editedProfile.is_standard_version && (
-        <div ref={argsRef} className="space-y-4">
-          <div>
-            
-          <div className="mb-3">
-            <Checkbox
-              checked={useCustomArgs}
-              onChange={(e) => handleCustomArgsToggle(e.target.checked)}
-              label="custom java arguments"
-              className="text-2xl"
-              variant="flat"
-            />
-          </div>
+      <div ref={argsRef} className="space-y-4">
+        <div>
 
-          {useCustomArgs && (
-            <div className="custom-args-textarea">
-              <TextArea
-                value={editedProfile.settings?.custom_jvm_args || ""}
-                onChange={(e) => handleJavaArgsChange(e.target.value)}
-                placeholder="enter java arguments..."
-                className="w-full min-h-[100px] text-2xl"
-                variant="flat"
-              />
-              <p className="mt-2 text-xs text-white/50 font-minecraft-ten tracking-wide">
-                Arguments should be separated by spaces. Example: -Xmx4G
-                -XX:+UseG1GC
-              </p>
-            </div>
-          )}
+        <div className="mb-3">
+          <Checkbox
+            checked={useCustomArgs}
+            onChange={(e) => handleCustomArgsToggle(e.target.checked)}
+            label={editedProfile.is_standard_version ? t('profiles.settings.globalCustomJavaArgs') : t('profiles.settings.customJavaArgs')}
+            className="text-2xl"
+            variant="flat"
+            disabled={editedProfile.is_standard_version && isLoadingGlobalJvmArgs}
+          />
         </div>
+
+        {useCustomArgs && (
+          <div className="custom-args-textarea">
+            {editedProfile.is_standard_version && isLoadingGlobalJvmArgs ? (
+              <div className="flex items-center justify-center py-8">
+                <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
+                <span className="text-white font-minecraft">{t('profiles.settings.loadingSettings')}</span>
+              </div>
+            ) : (
+              <>
+                <SearchStyleTextArea
+                  value={editedProfile.is_standard_version
+                    ? (globalJvmArgs || "")
+                    : (editedProfile.settings?.custom_jvm_args || "")}
+                  onChange={(e) => handleJavaArgsChange(e.target.value)}
+                  placeholder={t('profiles.settings.enterJavaArgs')}
+                  minHeight="100px"
+                />
+                <p className="mt-2 text-xs text-white/50 font-minecraft-ten tracking-wide">
+                  {t('profiles.settings.javaArgsHint')}
+                  {editedProfile.is_standard_version && (
+                    <span className="block mt-1 text-accent">
+                      {t('profiles.settings.appliesToAllStandard')}
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
-      )}
+    </div>
     </div>
   );
 }

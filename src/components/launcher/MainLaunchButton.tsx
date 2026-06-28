@@ -2,12 +2,14 @@
 
 import type React from "react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { LaunchState } from "../../store/launch-state-store";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
+import { RolloutIndicator } from "./RolloutIndicator";
 
 import { useThemeStore } from "../../store/useThemeStore";
 import { useVersionSelectionStore } from "../../store/version-selection-store";
@@ -42,6 +44,7 @@ export function MainLaunchButton({
   mainButtonWidth,
   mainButtonHeight,
 }: MainLaunchButtonProps) {
+  const { t } = useTranslation();
   // Local state for transient success message styling (can be further integrated if needed)
   const [transientSuccessActive, setTransientSuccessActive] = useState(false);
 
@@ -216,8 +219,12 @@ export function MainLaunchButton({
             variant={
               getButtonVariant() === "destructive" ? "destructive" : "3d"
             }
-            aria-label="Select version"
+            aria-label={t('launcher.select_version')}
           />
+
+          <div className="absolute -top-2 -left-2 w-7 h-7 z-10 pointer-events-auto">
+            <RolloutIndicator />
+          </div>
         </div>
       </div>
     </div>

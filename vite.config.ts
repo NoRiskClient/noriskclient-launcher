@@ -15,7 +15,7 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
+    port: 1430,
     strictPort: true,
     host: host || false,
     hmr: host
@@ -35,7 +35,9 @@ export default defineConfig(async () => ({
       input: {
         main: resolve(__dirname, 'index.html'),
         updater: resolve(__dirname, 'updater.html'),
-        logWindow: resolve(__dirname, 'log-window.html')
+        minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
+        singleLogWindow: resolve(__dirname, 'single-log-window.html'),
+        testerWindow: resolve(__dirname, 'tester-window.html')
       }
     }
   }

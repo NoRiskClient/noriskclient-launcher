@@ -95,6 +95,21 @@
     opacity: 0;
 }
 
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+}
+
 @keyframes ripple {
     0% {
         transform: scale(0);
@@ -310,6 +325,41 @@
 .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+}
+
+/*
+ * Modrinth scroll containers don't carry the `.custom-scrollbar` class, so
+ * their scrollbar falls back to the browser default — looks out of place
+ * anywhere it's rendered (BrowseTab, the V3 Add-content overlay/sheet,
+ * etc.). Scoping the accent-tinted scrollbar to the known class names keeps
+ * the rule predictable without forking the component.
+ */
+.search-results-area,
+.filters-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4) transparent;
+}
+.search-results-area::-webkit-scrollbar,
+.filters-sidebar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.search-results-area::-webkit-scrollbar-track,
+.filters-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.search-results-area::-webkit-scrollbar-thumb,
+.filters-sidebar::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4);
+    border-radius: 4px;
+}
+.search-results-area::-webkit-scrollbar-thumb:hover,
+.filters-sidebar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.6);
+}
+.search-results-area::-webkit-scrollbar-thumb:active,
+.filters-sidebar::-webkit-scrollbar-thumb:active {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.8);
 }
 
 :root {

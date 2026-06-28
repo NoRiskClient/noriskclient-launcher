@@ -20,11 +20,21 @@ export enum EventType {
   LaunchingMinecraft = "launching_minecraft",
   MinecraftOutput = "minecraft_output",
   AccountLogin = "account_login",
+  AccountLoginStarted = "account_login_started",
+  AccountLoginWaitingForBrowser = "account_login_waiting_for_browser",
+  AccountLoginExchangingToken = "account_login_exchanging_token",
+  AccountLoginExchangingXboxToken = "account_login_exchanging_xbox_token",
+  AccountLoginExchangingXstsToken = "account_login_exchanging_xsts_token",
+  AccountLoginGettingMinecraftToken = "account_login_getting_minecraft_token",
+  AccountLoginCheckingEntitlements = "account_login_checking_entitlements",
+  AccountLoginFetchingProfile = "account_login_fetching_profile",
+  AccountLoginCompleted = "account_login_completed",
   AccountRefresh = "account_refresh",
   AccountLogout = "account_logout",
   ProfileUpdate = "profile_update",
   TriggerProfileUpdate = "trigger_profile_update",
   MinecraftProcessExited = "minecraft_process_exited",
+  MinecraftSkinChanged = "minecraft_skin_changed",
   Error = "error",
   LaunchSuccessful = "launch_successful",
   CrashReportContentAvailable = "crash_report_content_available",
@@ -32,6 +42,8 @@ export enum EventType {
   MigrationCompleted = "migration_completed",
   MigrationFailed = "migration_failed",
   ExportingProfile = "exporting_profile",
+  ProcessMetricsUpdate = "process_metrics_update",
+  TaskProgress = "task_progress",
 }
 
 export interface EventPayload {
@@ -55,4 +67,11 @@ export interface MinecraftProcessExitedPayload {
 export interface CrashReportContentAvailablePayload {
   process_id: string;
   content: string;
+}
+
+export interface ProcessMetricsPayload {
+  process_id: string;
+  memory_bytes: number;
+  cpu_percent: number;
+  timestamp: string;
 }

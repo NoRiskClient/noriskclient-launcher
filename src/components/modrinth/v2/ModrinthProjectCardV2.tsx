@@ -18,8 +18,10 @@ import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
+import { useTranslation } from "react-i18next";
 import { ThemedSurface } from "../../ui/ThemedSurface";
 import { Tooltip } from "../../ui/Tooltip";
+import { useNavigate } from "react-router-dom";
 
 type Profile = any;
 
@@ -155,6 +157,16 @@ export interface ModrinthProjectCardV2Props
     sha1Hash: string,
   ) => void;
   itemIndex?: number;
+  /**
+   * Override the default title-click behavior. Used by in-place detail
+   * views (e.g. the V3 Add-content sheet) to render the mod detail as a
+   * stacked layer instead of navigating away from the current surface.
+   * The router-based full-page fallback is used when not provided.
+   */
+  onProjectClick?: (
+    project: UnifiedModSearchResult | any,
+    source: "modrinth" | "curseforge",
+  ) => void;
 }
 
 export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
@@ -196,7 +208,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     itemIndex,
     isBlocked = false, // Deprecated
     projectNoRiskStatus = null,
+    onProjectClick,
   }) => {
+    const { t } = useTranslation();
+    const navigate = useNavigate();
+
     useEffect(() => {
       preloadIcons([
         "solar:download-minimalistic-bold",
@@ -205,12 +221,27 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
       ]);
     }, []);
 
+    const handleTitleClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      const source: "modrinth" | "curseforge" =
+        hit.source === "Modrinth" ? "modrinth" : "curseforge";
+      // When a consumer owns the surface (e.g. the Add-content sheet),
+      // let them handle the click in-place instead of hard-navigating
+      // away from their overlay.
+      if (onProjectClick) {
+        onProjectClick(hit, source);
+        return;
+      }
+      navigate(`/mods/${source}/${hit.project_id}`);
+    };
+
     return (
       <div>
         {/* Main Card */}
         <div
+          onClick={handleTitleClick}
           className={cn(
-            "relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
+            "relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
           installStatus?.is_installed &&
             !installStatus?.is_included_in_norisk_pack &&
             "border-l-green-500",
@@ -301,24 +332,12 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Project Info */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-row items-baseline space-x-1.5 mb-1">
-            <a
-              href={hit.project_url}
-              onClick={async (e) => {
-                e.preventDefault();
-                try {
-                  await openExternalUrl(hit.project_url);
-                } catch (error) {
-                  console.error("Failed to open external URL:", error);
-                  toast.error("Could not open link in browser.");
-                }
-              }}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white font-minecraft-ten text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline cursor-pointer"
-              title={`Open ${hit.title} on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
+            <span
+              className="text-white font-minecraft-ten text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
+              title={`View ${hit.title} details`}
             >
               {hit.title}
-            </a>
+            </span>
             {hit.author && (
               <a
                 href={
@@ -336,7 +355,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                     );
                   } catch (error) {
                     console.error("Failed to open external URL:", error);
-                    toast.error("Could not open link in browser.");
+                    toast.error(t('common.open_link_failed'));
                   }
                 }}
                 target="_blank"

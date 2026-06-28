@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::event_state::{
-    EventPayload, EventState, EventType, MinecraftProcessExitedPayload,
+    EventPayload, EventType, MinecraftProcessExitedPayload,
 };
 use crate::state::{self, post_init::PostInitializationHandler, State};
 use async_trait::async_trait;
@@ -16,8 +16,7 @@ use std::process::ExitStatus;
 use std::sync::Arc;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System};
 use tauri::Manager;
-use tokio::fs::{self as async_fs, File};
-use tokio::io::{AsyncBufReadExt, AsyncSeekExt, BufReader};
+use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -60,7 +59,103 @@ pub struct ProcessMetadata {
     pub modloader_version: Option<String>,
     pub norisk_pack: Option<String>,
     pub profile_name: Option<String>,
+    pub profile_image_url: Option<String>,
     pub post_exit_hook: Option<String>,
+    pub memory_max_mb: u32,
+    #[serde(default)]
+    pub log_session_id: Option<String>,
+    #[serde(default)]
+    pub mods: Vec<CrashModInfo>,
+}
+
+/// Mod from the launch manifest (incl. disabled). Mirrors backend `CrashModInfo`. `norisk` = pack module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrashModInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub source: Option<String>,
+    pub enabled: bool,
+    pub norisk: bool,
+}
+
+fn mod_source_kind(source: &crate::state::profile_state::ModSource) -> &'static str {
+    use crate::state::profile_state::ModSource;
+    match source {
+        ModSource::Local { .. } => "local",
+        ModSource::Url { .. } => "url",
+        ModSource::Maven { .. } => "maven",
+        ModSource::Embedded { .. } => "embedded",
+        ModSource::Modrinth { .. } => "modrinth",
+        ModSource::CurseForge { .. } => "curseforge",
+    }
+}
+
+fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
+    use crate::state::profile_state::ModSource;
+    let file = m.file_name_override.clone().or_else(|| match &m.source {
+        ModSource::Local { file_name } => Some(file_name.clone()),
+        ModSource::Url { file_name, .. } => file_name.clone(),
+        ModSource::Modrinth { file_name, .. } => Some(file_name.clone()),
+        ModSource::CurseForge { file_name, .. } => Some(file_name.clone()),
+        ModSource::Maven { coordinates, .. } => Some(coordinates.clone()),
+        ModSource::Embedded { name } => Some(name.clone()),
+    });
+    file.map(|f| f.trim_end_matches(".disabled").trim_end_matches(".jar").to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| m.display_name.clone())
+        .unwrap_or_else(|| m.id.to_string())
+}
+
+/// Snapshot custom + NoRisk-pack mods (incl. disabled) for the crash payload.
+pub async fn build_crash_mod_manifest(
+    profile: &crate::state::profile_state::Profile,
+    state: &State,
+) -> Vec<CrashModInfo> {
+    use crate::state::profile_state::NoriskModIdentifier;
+    let mut out: Vec<CrashModInfo> = Vec::new();
+
+    for m in &profile.mods {
+        out.push(CrashModInfo {
+            id: custom_mod_id(m),
+            name: m.display_name.clone(),
+            version: m.version.clone(),
+            source: Some(mod_source_kind(&m.source).to_string()),
+            enabled: m.enabled,
+            norisk: false,
+        });
+    }
+
+    if let Some(pack_id) = profile.effective_norisk_pack_id().await {
+        let config = state.norisk_pack_manager.get_config().await;
+        match config.get_resolved_pack_definition(&pack_id) {
+            Ok(def) => {
+                for entry in &def.mods {
+                    let identifier = NoriskModIdentifier {
+                        pack_id: pack_id.clone(),
+                        mod_id: entry.id.clone(),
+                        game_version: profile.game_version.clone(),
+                        loader: profile.loader.clone(),
+                    };
+                    out.push(CrashModInfo {
+                        id: entry.id.clone(),
+                        name: entry.display_name.clone(),
+                        version: None,
+                        source: Some("norisk".to_string()),
+                        enabled: !profile.disabled_norisk_mods_detailed.contains(&identifier),
+                        norisk: true,
+                    });
+                }
+            }
+            Err(e) => log::warn!(
+                "[CrashManifest] Could not resolve pack '{}' for crash manifest: {}",
+                pack_id,
+                e
+            ),
+        }
+    }
+
+    out
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -75,7 +170,6 @@ pub enum ProcessState {
 #[derive(Debug)]
 struct Process {
     metadata: ProcessMetadata,
-    last_log_position: Arc<Mutex<u64>>,
 }
 
 // Kapselt die Nachricht, die vom notify event handler zum ProcessManager geschickt wird
@@ -271,7 +365,6 @@ impl ProcessManager {
                         );
                         let process_entry = Process {
                             metadata: metadata.clone(), // metadata hier klonen
-                            last_log_position: Arc::new(Mutex::new(0)),
                         };
                         processes_map_writer.insert(process_entry.metadata.id, process_entry);
                         log::debug!(
@@ -520,7 +613,10 @@ impl ProcessManager {
         modloader_version: Option<String>,
         norisk_pack: Option<String>,
         profile_name: Option<String>,
+        profile_image_url: Option<String>,
         post_exit_hook: Option<String>,
+        memory_max_mb: u32,
+        mods: Vec<CrashModInfo>,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -542,6 +638,55 @@ impl ProcessManager {
             command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
         }
 
+        let process_id = Uuid::new_v4();
+        let session_start = Utc::now();
+
+        let mut log_session_id: Option<String> = None;
+        let mut log_writer_handle: Option<
+            Arc<Mutex<crate::utils::bounded_log_writer::BoundedLogWriter>>,
+        > = None;
+        {
+            let session = crate::utils::log_archive::SessionInfo {
+                process_id,
+                profile_id,
+                profile_name: profile_name.as_deref(),
+                minecraft_version: minecraft_version.as_deref(),
+                modloader: modloader.as_deref(),
+                modloader_version: modloader_version.as_deref(),
+                norisk_pack: norisk_pack.as_deref(),
+                account_name: account_name.as_deref(),
+                start_time: session_start,
+                mods: &mods,
+            };
+            match crate::utils::log_archive::create_session(&session) {
+                Ok((session_id, log_path)) => {
+                    match crate::utils::bounded_log_writer::BoundedLogWriter::create(
+                        log_path.clone(),
+                    )
+                    .await
+                    {
+                        Ok(writer) => {
+                            command.stdout(std::process::Stdio::piped());
+                            command.stderr(std::process::Stdio::piped());
+                            log_session_id = Some(session_id);
+                            log_writer_handle = Some(Arc::new(Mutex::new(writer)));
+                            log::info!(
+                                "Capturing game stdout/stderr to {:?} (capped at {} MB, rotates to .N.gz)",
+                                log_path,
+                                crate::utils::bounded_log_writer::MAX_LOG_BYTES / (1024 * 1024)
+                            );
+                        }
+                        Err(e) => log::warn!(
+                            "Could not open {:?} for bounded stdout/stderr capture: {}",
+                            log_path,
+                            e
+                        ),
+                    }
+                }
+                Err(e) => log::warn!("Could not create log session dir: {}", e),
+            }
+        }
+
         let mut tokio_command = tokio::process::Command::from(command);
         let mut child = tokio_command.spawn().map_err(|e| {
             log::error!(
@@ -551,16 +696,30 @@ impl ProcessManager {
             AppError::ProcessSpawnFailed(e.to_string())
         })?;
 
+        if let Some(writer) = log_writer_handle.as_ref() {
+            if let Some(stdout) = child.stdout.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stdout, writer, "stdout").await;
+                });
+            }
+            if let Some(stderr) = child.stderr.take() {
+                let writer = writer.clone();
+                tokio::spawn(async move {
+                    crate::utils::bounded_log_writer::forward_pipe(stderr, writer, "stderr").await;
+                });
+            }
+        }
+
         let pid = child.id().ok_or_else(|| {
             log::error!("Failed to get PID immediately after spawning process.");
             AppError::ProcessSpawnFailed("Could not get PID".to_string())
         })?;
-        let process_id = Uuid::new_v4();
 
         let metadata = ProcessMetadata {
             id: process_id,
             profile_id,
-            start_time: Utc::now(),
+            start_time: session_start,
             state: ProcessState::Running,
             pid,
             account_uuid,
@@ -570,7 +729,11 @@ impl ProcessManager {
             modloader_version,
             norisk_pack,
             profile_name: profile_name.clone(),
+            profile_image_url,
             post_exit_hook,
+            memory_max_mb,
+            log_session_id,
+            mods,
         };
 
         log::info!(
@@ -581,7 +744,6 @@ impl ProcessManager {
 
         let process_entry = Process {
             metadata: metadata.clone(),
-            last_log_position: Arc::new(Mutex::new(0)),
         };
 
         {
@@ -633,7 +795,7 @@ impl ProcessManager {
                     "Notifying Discord manager about game process {} start.",
                     process_id
                 );
-                state.discord_manager.notify_game_start(process_id).await;
+                state.discord_manager.notify_game_start(process_id, metadata.profile_name.clone(), metadata.minecraft_version.clone()).await;
             }
             Err(e) => {
                 log::error!("Failed to get global state to update Discord timestamp for process {}: {}. Discord state might be incorrect.", process_id, e);
@@ -752,6 +914,60 @@ impl ProcessManager {
                     .map(|p_entry| p_entry.metadata.clone())
             };
 
+            // Accumulate playtime on the profile. `last_played` is already set at launch-time;
+            // here we add the session duration to the running total so the Hero stat reflects
+            // cumulative minutes across launches.
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                let elapsed = chrono::Utc::now().signed_duration_since(metadata.start_time);
+                let secs = elapsed.num_seconds().max(0) as u64;
+                if secs > 0 {
+                    if let Ok(state) = &state_for_monitor_res {
+                        match state.profile_manager.get_profile(metadata.profile_id).await {
+                            Ok(mut profile) => {
+                                profile.playtime_seconds =
+                                    profile.playtime_seconds.saturating_add(secs);
+                                if let Err(e) = state
+                                    .profile_manager
+                                    .update_profile(metadata.profile_id, profile)
+                                    .await
+                                {
+                                    log::warn!(
+                                        "Failed to persist playtime (+{}s) for profile {}: {}",
+                                        secs,
+                                        metadata.profile_id,
+                                        e
+                                    );
+                                } else {
+                                    log::info!(
+                                        "Added {}s of playtime to profile {}",
+                                        secs,
+                                        metadata.profile_id
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "Could not load profile {} to update playtime: {}",
+                                    metadata.profile_id,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                if let Some(session_id) = &metadata.log_session_id {
+                    crate::utils::log_archive::finalize_game_session(
+                        session_id,
+                        exit_code,
+                        success,
+                    )
+                    .await;
+                }
+            }
+
             // Try to get crash content if it was processed very fast. No extensive polling here.
             let crash_content_for_payload: Option<String> = {
                 if let Ok(state) = &state_for_monitor_res {
@@ -765,6 +981,15 @@ impl ProcessManager {
                     None
                 }
             };
+
+            log::debug!(
+                "[EXIT-DBG] process={} exit_code={:?} success={} intentional_stop={} has_crash_report={}",
+                process_id,
+                exit_code,
+                success,
+                was_intentionally_stopped,
+                crash_content_for_payload.is_some()
+            );
 
             // Event an UI senden
             if let Ok(state) = &state_for_monitor_res {
@@ -819,15 +1044,37 @@ impl ProcessManager {
                 );
             }
 
+            // Show main window again if it was hidden (hide_on_process_start setting)
+            if let Ok(global_state) = State::get().await {
+                let launcher_config = global_state.config_manager.get_config().await;
+                if launcher_config.hide_on_process_start {
+                    log::info!("Showing main window after process exit (hide_on_process_start = true)");
+                    if let Some(main_window) = app_handle_clone_for_monitor.get_webview_window("main") {
+                        if let Err(e) = main_window.show() {
+                            log::error!("Failed to show main window after process exit: {}", e);
+                        }
+                        if let Err(e) = main_window.unminimize() {
+                            log::error!("Failed to unminimize main window after process exit: {}", e);
+                        }
+                        if let Err(e) = main_window.set_focus() {
+                            log::error!("Failed to focus main window after process exit: {}", e);
+                        }
+                    } else {
+                        log::warn!("Main window not found, could not show it after process exit");
+                    }
+                }
+            }
+
+            // Remove process from map
             log::info!(
-                "Removing process entry {} from manager post-exit.",
+                "Removing process entry {} from processes map post-exit.",
                 process_id
             );
             let mut processes_map_writer_monitor = processes_arc_clone.write().await;
-            let removed_process_metadata = processes_map_writer_monitor.remove(&process_id);
+            let removed_process = processes_map_writer_monitor.remove(&process_id);
             drop(processes_map_writer_monitor);
 
-            if removed_process_metadata.is_none() {
+            if removed_process.is_none() {
                 log::warn!(
                     "Process entry {} was already removed before final monitor task cleanup.",
                     process_id
@@ -855,9 +1102,12 @@ impl ProcessManager {
                     success,
                     &state,
                     process_id,
-                    &removed_process_metadata,
+                    &removed_process,
                 )
                 .await;
+
+                // Notify Discord that game has stopped
+                state.discord_manager.notify_game_stop(process_id).await;
             } else {
                 log::error!("Monitor task for process {} could not get state to stop watcher or save processes.", process_id);
             }
@@ -1094,20 +1344,28 @@ impl ProcessManager {
         }
     }
 
-    async fn periodic_log_tailer(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
-        let mut interval = interval(Duration::from_secs(1)); // Log-Tailing kann weiterhin häufig sein
-        log::info!("Starting periodic log tailing task (crash reports handled by notify).");
+    /// Periodically collects CPU and memory metrics for running processes.
+    /// Emits ProcessMetricsUpdate events to the frontend.
+    async fn periodic_metrics_collector(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
+        let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
+        log::info!("Starting periodic metrics collector task.");
+
+        let mut sys = System::new_all();
+
+        // Get number of CPU cores for normalizing CPU usage (sysinfo reports per-core %)
+        let num_cpus = sys.cpus().len().max(1) as f32;
+        log::info!("Metrics collector: Detected {} CPU cores for normalization", num_cpus);
 
         loop {
             interval.tick().await;
-            log::trace!("Running periodic log tail check...");
+            log::trace!("Running periodic metrics collection...");
 
-            let app_state_res = state::State::get().await; // Holen des globalen Zustands
+            let app_state_res = state::State::get().await;
             let app_state = match app_state_res {
                 Ok(state) => state,
                 Err(e) => {
                     log::error!(
-                        "Log tailer failed to get global state: {}. Skipping cycle.",
+                        "Metrics collector failed to get global state: {}. Skipping cycle.",
                         e
                     );
                     continue;
@@ -1116,269 +1374,99 @@ impl ProcessManager {
 
             let processes_map_reader = processes_arc.read().await;
             if processes_map_reader.is_empty() {
-                log::trace!("No processes to tail logs for.");
+                log::trace!("No processes to collect metrics for.");
                 drop(processes_map_reader);
                 continue;
             }
 
-            let processes_to_tail: Vec<(Uuid, Uuid, Arc<Mutex<u64>>)> = processes_map_reader
+            // Collect PIDs of running processes
+            let running_processes: Vec<(Uuid, u32)> = processes_map_reader
                 .iter()
                 .filter(|(_, process_entry)| {
                     process_entry.metadata.state == ProcessState::Running
-                        || process_entry.metadata.state == ProcessState::Starting
                 })
-                .map(|(id, process_entry)| {
-                    (
-                        *id,
-                        process_entry.metadata.profile_id,
-                        Arc::clone(&process_entry.last_log_position),
-                    )
-                })
+                .map(|(id, process_entry)| (*id, process_entry.metadata.pid))
                 .collect();
 
             drop(processes_map_reader);
 
-            for (process_id, profile_id, last_pos_mutex) in processes_to_tail {
-                let instance_path = match app_state // Verwende app_state Variable
-                    .profile_manager
-                    .get_profile_instance_path(profile_id)
-                    .await
-                {
-                    Ok(path) => path,
-                    Err(e) => {
-                        log::warn!("Could not get instance path for profile {} (process {}): {}. Skipping log tail.", profile_id, process_id, e);
-                        continue;
-                    }
-                };
+            if running_processes.is_empty() {
+                log::trace!("No running processes to collect metrics for.");
+                continue;
+            }
 
-                let latest_log_path = instance_path.join("logs").join("latest.log");
-                if !latest_log_path.exists() {
-                    log::trace!(
-                        "Log file {:?} for process {} does not exist yet.",
-                        latest_log_path,
-                        process_id
-                    );
-                } else {
-                    if let Err(e) = Self::tail_log_file(
-                        &latest_log_path,
+            // Refresh process information for the PIDs we're interested in
+            let pids_to_refresh: Vec<Pid> = running_processes
+                .iter()
+                .map(|(_, pid)| Pid::from(*pid as usize))
+                .collect();
+
+            sys.refresh_processes(ProcessesToUpdate::Some(&pids_to_refresh), true);
+
+            // Collect and emit metrics for each process
+            for (process_id, pid) in running_processes {
+                let sysinfo_pid = Pid::from(pid as usize);
+                if let Some(process_info) = sys.process(sysinfo_pid) {
+                    let memory_bytes = process_info.memory();
+                    // Normalize CPU usage: sysinfo reports per-core %, so divide by num cores
+                    // e.g., 400% on 4 cores = 100% normalized
+                    let raw_cpu = process_info.cpu_usage();
+                    let cpu_percent = (raw_cpu / num_cpus).min(100.0);
+
+                    let metrics_payload = crate::state::event_state::ProcessMetricsPayload {
                         process_id,
-                        &last_pos_mutex,
-                        &app_state.event_state, // Verwende app_state Variable
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "Error tailing log file {:?} for process {}: {}",
-                            latest_log_path,
+                        memory_bytes,
+                        cpu_percent,
+                        timestamp: Utc::now(),
+                    };
+
+                    let event_payload = EventPayload {
+                        event_id: Uuid::new_v4(),
+                        event_type: EventType::ProcessMetricsUpdate,
+                        target_id: Some(process_id),
+                        message: serde_json::to_string(&metrics_payload).unwrap_or_else(|e| {
+                            log::error!(
+                                "Failed to serialize ProcessMetricsPayload for {}: {}",
+                                process_id,
+                                e
+                            );
+                            String::from("{ \"error\": \"serialization failed\" }")
+                        }),
+                        progress: None,
+                        error: None,
+                    };
+
+                    if let Err(e) = app_state.event_state.emit(event_payload).await {
+                        log::error!(
+                            "Failed to emit ProcessMetricsUpdate for process {}: {}",
                             process_id,
                             e
                         );
+                    } else {
+                        log::trace!(
+                            "Emitted metrics for process {}: memory={}MB, cpu={:.1}%",
+                            process_id,
+                            memory_bytes / (1024 * 1024),
+                            cpu_percent
+                        );
                     }
+                } else {
+                    log::warn!(
+                        "Process {} (PID {}) not found in system for metrics collection",
+                        process_id,
+                        pid
+                    );
                 }
             }
         }
-    }
-
-
-    async fn tail_log_file(
-        log_path: &PathBuf,
-        process_id: Uuid,
-        last_pos_mutex: &Arc<Mutex<u64>>,
-        event_state: &EventState,
-    ) -> Result<()> {
-        let current_metadata = tokio::fs::metadata(log_path).await.map_err(AppError::Io)?;
-        let current_size = current_metadata.len();
-
-        let mut last_pos_guard = last_pos_mutex.lock().await;
-        let original_last_pos = *last_pos_guard; // Store the original value from the mutex
-
-        let mut read_from_pos = original_last_pos;
-        let mut just_skipped_initial = false;
-
-        if current_size < original_last_pos {
-            log::info!("Log file {:?} seems to have rotated or shrunk (current: {}, last: {}). Resetting read position to 0.", log_path, current_size, original_last_pos);
-            read_from_pos = 0;
-            // After rotation, we read the new file from the start.
-        } else if original_last_pos == 0 && current_size > 0 {
-            // If last_pos was 0 (fresh process) and there's content,
-            // set read_from_pos to current_size to skip existing lines.
-            log::info!(
-                "Initial tail for process {} on log {:?}. Setting read position to end of file ({}) to capture only new lines.",
-                process_id,
-                log_path,
-                current_size
-            );
-            read_from_pos = current_size;
-            just_skipped_initial = true;
-        }
-
-        let mut bytes_actually_read: u64 = 0;
-
-        if current_size > read_from_pos {
-            log::trace!(
-                "Reading new logs from {:?} for process {} (from byte {} up to {})",
-                log_path,
-                process_id,
-                read_from_pos,
-                current_size
-            );
-            let file = File::open(log_path).await.map_err(AppError::Io)?;
-            let mut reader = BufReader::new(file);
-
-            reader
-                .seek(std::io::SeekFrom::Start(read_from_pos))
-                .await
-                .map_err(AppError::Io)?;
-
-            let mut byte_buffer = Vec::new();
-            loop {
-                let current_stream_pos = read_from_pos + bytes_actually_read;
-                if current_stream_pos >= current_size {
-                    break;
-                }
-                byte_buffer.clear();
-
-                match reader.read_until(b'\n', &mut byte_buffer).await {
-                    Ok(0) => break, // EOF
-                    Ok(bytes) => {
-                        let bytes_u64 = bytes as u64;
-
-                        //TODO ö,ä... richtig parsen
-                        let line_string = String::from_utf8_lossy(&byte_buffer);
-                        let trimmed_line = line_string.trim_end();
-
-                        if !trimmed_line.is_empty() {
-                            // Mask sensitive information before sending to UI
-                            let safe_line = crate::utils::security_utils::mask_sensitive_data(trimmed_line);
-
-                            log::trace!("Sending line for {}: {}", process_id, safe_line);
-                            let log_event_payload = EventPayload {
-                                event_id: Uuid::new_v4(),
-                                event_type: EventType::MinecraftOutput,
-                                target_id: Some(process_id),
-                                message: safe_line.to_string(),
-                                progress: None,
-                                error: None,
-                            };
-                            if let Err(e) = event_state.emit(log_event_payload).await {
-                                log::error!("Failed to emit log update via EventState: {}", e);
-                            }
-                        }
-
-                        bytes_actually_read += bytes_u64;
-
-                        if read_from_pos + bytes_actually_read > current_size {
-                            log::warn!(
-                                "Read beyond expected size in log tailer for {:?}. Correcting bytes_actually_read.",
-                                log_path
-                            );
-                            bytes_actually_read = current_size - read_from_pos; // Cap it
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Error reading bytes from log file {:?}: {}", log_path, e);
-                        if current_size > read_from_pos {
-                            bytes_actually_read = current_size - read_from_pos;
-                        } else {
-                            bytes_actually_read = 0; // No bytes could be read or determined
-                            log::warn!("Attempting to advance log position to end of current file size due to read error and unclear progress.");
-                        }
-                        break;
-                    }
-                }
-            }
-        } else {
-            if just_skipped_initial {
-                log::trace!(
-                    "Skipped reading initial content for process {} in {:?}. Log position will be set to {}.",
-                    process_id,
-                    log_path,
-                    current_size
-                );
-            } else {
-                log::trace!(
-                    "No new logs found for process {} in {:?}",
-                    process_id,
-                    log_path
-                );
-            }
-        }
-
-        // Update the stored last_log_position.
-        if just_skipped_initial {
-            // If we skipped, the new "last position" is the end of the file we skipped to.
-            *last_pos_guard = current_size;
-        } else {
-            // If we read (or attempted to read), the new position is where we started plus what we read.
-            *last_pos_guard = read_from_pos + bytes_actually_read;
-        }
-
-        log::trace!(
-            "Updated log position for process {} to {}",
-            process_id,
-            *last_pos_guard
-        );
-
-        Ok(())
-    }
-
-    /// Retrieves the full content of the latest.log file for a given process.
-    /// Internally accesses the global state to get the ProfileManager.
-    pub async fn get_full_log_content(&self, process_id: Uuid) -> Result<String> {
-        log::info!(
-            "Attempting to get full log content for process {}",
-            process_id
-        );
-
-        // 1. Get profile_id from this ProcessManager's state
-        let process_metadata = self.get_process_metadata(process_id).await.ok_or_else(|| {
-            log::warn!(
-                "Process {} not found in ProcessManager when getting full log.",
-                process_id
-            );
-            AppError::ProcessNotFound(process_id)
-        })?;
-        let profile_id = process_metadata.profile_id;
-        log::debug!("Found profile_id {} for process {}", profile_id, process_id);
-
-        // 2. Get instance_path using the global state
-        let app_state = state::State::get().await?; // Get global state
-        let instance_path = app_state
-            .profile_manager
-            .get_profile_instance_path(profile_id)
-            .await?; // Access profile manager
-        let log_path = instance_path.join("logs").join("latest.log");
-        log::debug!("Constructed log path for full read: {:?}", log_path);
-
-        // 3. Read the log file content
-        if !log_path.exists() {
-            log::warn!("Log file not found at path: {:?}", log_path);
-            return Ok("".to_string());
-        }
-
-        // Read file as bytes first to handle potential invalid UTF-8
-        let log_bytes = async_fs::read(&log_path).await.map_err(|e| {
-            log::error!("Failed to read log file bytes {:?}: {}", log_path, e);
-            AppError::Io(e)
-        })?;
-
-        // Convert bytes to string, replacing invalid sequences
-        let log_content = String::from_utf8_lossy(&log_bytes).to_string();
-
-        log::info!(
-            "Successfully read {} bytes (lossy converted to string) from log file for process {}",
-            log_bytes.len(),
-            process_id
-        );
-        Ok(log_content)
     }
 
     /// Fetches the latest crash report for a given profile.
     /// Uses profile_id to locate the crash-reports directory (since process might be removed from map).
     /// If process_id is provided, emits events and stores content for that process.
-    pub async fn fetch_latest_crash_report(&self, profile_id: Uuid, process_id: Option<Uuid>) -> Result<Option<String>> {
-        log::info!("Manually fetching latest crash report for profile {} (process {:?})", profile_id, process_id);
+    /// If process_start_time is provided, only considers crash reports created after that time.
+    pub async fn fetch_latest_crash_report(&self, profile_id: Uuid, process_id: Option<Uuid>, process_start_time: Option<DateTime<Utc>>) -> Result<Option<String>> {
+        log::info!("Manually fetching latest crash report for profile {} (process {:?}, start_time {:?})", profile_id, process_id, process_start_time);
         
         // 1. Get crash-reports directory path using profile_id
         let app_state = state::State::get().await?;
@@ -1402,6 +1490,14 @@ impl ProcessManager {
                     if name_str.starts_with("crash-") && name_str.ends_with(".txt") {
                         if let Ok(metadata) = async_fs::metadata(&path).await {
                             if let Ok(modified) = metadata.modified() {
+                                // Skip crash reports that are older than the process start time
+                                if let Some(start_time) = process_start_time {
+                                    let start_system_time: std::time::SystemTime = start_time.into();
+                                    if modified < start_system_time {
+                                        log::debug!("Skipping crash report {:?} - created before process start time", path);
+                                        continue;
+                                    }
+                                }
                                 match &latest_crash_file {
                                     None => latest_crash_file = Some((path.clone(), modified)),
                                     Some((_, latest_time)) if modified > *latest_time => {
@@ -1525,7 +1621,7 @@ impl ProcessManager {
         success: bool,
         state: &State,
         process_id: Uuid,
-        removed_process_metadata: &Option<Process>,
+        removed_process: &Option<Process>,
     ) {
         // Early return if process was not successful
         if !success {
@@ -1533,7 +1629,7 @@ impl ProcessManager {
         }
 
         // Get hook from process metadata (captured at start time) instead of current config
-        let hook = match removed_process_metadata {
+        let hook = match removed_process {
             Some(process) => match &process.metadata.post_exit_hook {
                 Some(h) => h,
                 None => return, // No hook was configured when process started
@@ -1547,7 +1643,7 @@ impl ProcessManager {
             hook
         );
 
-        let removed_process = match removed_process_metadata {
+        let removed_process_inner = match removed_process {
             Some(p) => p,
             None => {
                 log::warn!(
@@ -1560,7 +1656,7 @@ impl ProcessManager {
 
         let profile = match state
             .profile_manager
-            .get_profile(removed_process.metadata.profile_id)
+            .get_profile(removed_process_inner.metadata.profile_id)
             .await
         {
             Ok(p) => p,
@@ -1630,26 +1726,28 @@ impl ProcessManager {
                     let launcher_config = global_state.config_manager.get_config().await;
                     if launcher_config.open_logs_after_starting {
                         log::info!(
-                            "Config: Attempting to auto-open log window for process {}",
+                            "Config: Attempting to auto-open log windows for process {}",
                             process_id
                         );
-                        match crate::commands::process_command::open_log_window(
+
+                        // Open the new minecraft log window
+                        match crate::commands::process_command::open_minecraft_log_window(
                             (*app_handle_clone).clone(),
-                            process_id,
-                            Some(true),
+                            None, // No crashed process - this is auto-open on launch
                         )
                         .await
                         {
                             Ok(()) => log::info!(
-                                "Log window for process {} successfully auto-opened.",
+                                "Minecraft log window successfully auto-opened for process {}.",
                                 process_id
                             ),
                             Err(e) => log::error!(
-                                "Error auto-opening log window for process {}: {:?}",
+                                "Error auto-opening minecraft log window for process {}: {:?}",
                                 process_id,
                                 e
                             ),
                         }
+
                     } else {
                         log::debug!(
                             "Config: Auto-open log window is disabled for process {}",
@@ -1693,9 +1791,9 @@ impl PostInitializationHandler for ProcessManager {
         ));
         log::info!("ProcessManager: Spawned periodic_process_check task.");
 
-        let tailer_processes_arc = Arc::clone(&self.processes);
-        tokio::spawn(Self::periodic_log_tailer(tailer_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_log_tailer task.");
+        let metrics_processes_arc = Arc::clone(&self.processes);
+        tokio::spawn(Self::periodic_metrics_collector(metrics_processes_arc));
+        log::info!("ProcessManager: Spawned periodic_metrics_collector task.");
 
         log::info!("ProcessManager: Successfully completed on_state_ready.");
         Ok(())

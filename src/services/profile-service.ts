@@ -34,6 +34,21 @@ export async function searchProfiles(query: string): Promise<Profile[]> {
   return invoke<Profile[]>("search_profiles", { query });
 }
 
+export interface ProfileBackupInfo {
+  path: string;
+  backup_time: number;
+  file_size: number;
+  profile_count: number;
+}
+
+export async function listProfileBackups(): Promise<ProfileBackupInfo[]> {
+  return invoke<ProfileBackupInfo[]>("list_profile_backups");
+}
+
+export async function restoreProfileBackup(backupPath: string): Promise<void> {
+  return invoke<void>("restore_profile_backup", { backupPath });
+}
+
 export async function getProfile(id: string): Promise<Profile> {
   return invoke<Profile>("get_profile", { id });
 }
@@ -317,10 +332,6 @@ export async function refreshStandardVersions(): Promise<void> {
   return invoke<void>("refresh_standard_versions");
 }
 
-export async function getProfileLatestLogContent(profileId: string): Promise<string> {
-  return invoke<string>("get_profile_latest_log_content", { profileId });
-}
-
 export async function getAllProfilesAndLastPlayed(): Promise<AllProfilesAndLastPlayed> {
   return invoke<AllProfilesAndLastPlayed>("get_all_profiles_and_last_played");
 }
@@ -336,8 +347,8 @@ export async function checkForGroupMigration(profileId: string): Promise<Migrati
   return invoke<MigrationInfo>("check_for_group_migration_command", { profileId });
 }
 
-export async function importProfileByPath(filePathStr: string): Promise<string> {
-  return invoke<string>("import_profile", { filePathStr });
+export async function importProfileByPath(filePathStr: string, eventId?: string): Promise<string> {
+  return invoke<string>("import_profile", { filePathStr, eventId });
 }
 
 export async function resolveImagePath(
@@ -371,6 +382,10 @@ export async function getProfileInstancePath(profileId: string): Promise<string>
 }
 export async function getDefaultProfilePath(): Promise<string> {
   return invoke<string>("get_default_profile_path");
+}
+
+export async function getProfileDiskSize(profileId: string): Promise<number> {
+  return invoke<number>("get_profile_disk_size", { profileId });
 }
 
 export interface AddSymlinkParams {

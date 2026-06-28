@@ -11,6 +11,7 @@ export interface GenericDetailListItemProps {
 
   iconNode?: ReactNode;
   title: ReactNode;
+  onTitleClick?: () => void;
   descriptionNode?: ReactNode;
   infoItems?: Array<{
     icon?: string;
@@ -45,6 +46,7 @@ export function GenericDetailListItem({
   onSelectionChange,
   iconNode,
   title,
+  onTitleClick,
   descriptionNode,
   infoItems,
   isDisabled = false,
@@ -93,9 +95,10 @@ export function GenericDetailListItem({
 
       {/* Content Area - Title, Description, Badges */}
       <div className="flex-1 min-w-0">
-        <h3 
-          className={`font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case mb-1 ${isDisabled ? 'text-white/50 line-through' : 'text-white'}`}
+        <h3
+          className={`font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case mb-1 ${isDisabled ? 'text-white/50 line-through' : 'text-white'} ${onTitleClick ? 'cursor-pointer hover:underline' : ''}`}
           title={typeof title === 'string' ? title : undefined}
+          onClick={onTitleClick ? (e) => { e.stopPropagation(); onTitleClick(); } : undefined}
         >
           {title}
         </h3>

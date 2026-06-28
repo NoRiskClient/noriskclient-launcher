@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   ModrinthProjectType,
 } from "../../../types/modrinth";
@@ -86,6 +87,7 @@ export const ModrinthSearchControlsV2: React.FC<
   modSource,
   onModSourceChange,
 }) => {
+  const { t } = useTranslation();
   const globalDisplayContext = useDisplayContextStore((state) => state.context);
   const effectiveDisplayContext =
     overrideDisplayContext || globalDisplayContext;
@@ -131,7 +133,7 @@ export const ModrinthSearchControlsV2: React.FC<
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 flex-1">
             <SearchWithFilters
-              placeholder={`Search ${projectType}s...`}
+              placeholder={t('content.search_placeholder', { type: projectType })}
               searchValue={searchTerm}
               onSearchChange={onSearchTermChange}
               sortOptions={sortOptions}
@@ -142,7 +144,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={onToggleSidebar}
               className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
-              title={isSidebarVisible ? "Hide filters" : "Show filters"}
+              title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
             >
               <div className="w-4 h-8 flex items-center justify-center">
                 <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
@@ -162,7 +164,7 @@ export const ModrinthSearchControlsV2: React.FC<
                   ? "bg-green-400/40 text-white border border-green-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
               )}
-              title="Search Modrinth"
+              title={t('content.search_modrinth')}
             >
               <img
                 src="https://cdn.modrinth.com/modrinth-new.png"
@@ -180,7 +182,7 @@ export const ModrinthSearchControlsV2: React.FC<
                   ? "bg-orange-400/40 text-white border border-orange-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
               )}
-              title="Search CurseForge"
+              title={t('content.search_curseforge')}
             >
               <img
                 src="https://cdn.norisk.gg/misc/curseforge.webp"
@@ -205,7 +207,7 @@ export const ModrinthSearchControlsV2: React.FC<
                 icon="solar:trash-bin-trash-bold"
                 className="w-4 h-4 mr-1"
               />
-              <span>Clear All</span>
+              <span>{t('content.filters.clear_all')}</span>
             </TagBadge>
 
             {selectedGameVersions.map((version) => (
@@ -264,7 +266,7 @@ export const ModrinthSearchControlsV2: React.FC<
                 size="md"
                 onClick={onRemoveClientRequiredTag}
               >
-                <span>Client</span>
+                <span>{t('content.filters.client')}</span>
                 <Icon
                   icon="solar:close-circle-bold"
                   className="w-4 h-4 ml-1"
@@ -280,7 +282,7 @@ export const ModrinthSearchControlsV2: React.FC<
                 size="md"
                 onClick={onRemoveServerRequiredTag}
               >
-                <span>Server</span>
+                <span>{t('content.filters.server')}</span>
                 <Icon
                   icon="solar:close-circle-bold"
                   className="w-4 h-4 ml-1"

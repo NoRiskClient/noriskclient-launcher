@@ -29,12 +29,22 @@ pub enum EventType {
     LaunchingMinecraft,
     MinecraftOutput,
     AccountLogin,
+    AccountLoginStarted,
+    AccountLoginWaitingForBrowser,
+    AccountLoginExchangingToken,
+    AccountLoginExchangingXboxToken,
+    AccountLoginExchangingXstsToken,
+    AccountLoginGettingMinecraftToken,
+    AccountLoginCheckingEntitlements,
+    AccountLoginFetchingProfile,
+    AccountLoginCompleted,
     AccountRefresh,
     AccountLogout,
     ProfileUpdate,
     TriggerProfileUpdate,
     MinecraftProcessExited,
     StarlightSkinUpdated,
+    MinecraftSkinChanged,
     Error,
     LaunchSuccessful,
     CrashReportContentAvailable,
@@ -42,6 +52,8 @@ pub enum EventType {
     MigrationCompleted,
     MigrationFailed,
     ExportingProfile,
+    ProcessMetricsUpdate,
+    TaskProgress,
 }
 
 #[derive(Serialize, Clone)]
@@ -68,6 +80,14 @@ pub struct MinecraftProcessExitedPayload {
 pub struct CrashReportContentAvailablePayload {
     pub process_id: Uuid,
     pub content: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProcessMetricsPayload {
+    pub process_id: Uuid,
+    pub memory_bytes: u64,
+    pub cpu_percent: f32,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Clone)]
@@ -127,6 +147,18 @@ impl EventState {
             error: None,
         };
         self.emit(payload).await // Use the existing emit method
+    }
+
+    pub async fn skin_changed(&self, account_id: Option<Uuid>) -> Result<()> {
+        let payload = EventPayload {
+            event_id: Uuid::new_v4(),
+            event_type: EventType::MinecraftSkinChanged,
+            target_id: account_id,
+            message: "Active account skin changed, UI refresh triggered.".to_string(),
+            progress: None,
+            error: None,
+        };
+        self.emit(payload).await
     }
 
     pub async fn complete_event(&self, event_id: Uuid) -> Result<()> {

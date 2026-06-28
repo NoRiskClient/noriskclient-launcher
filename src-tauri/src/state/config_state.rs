@@ -22,6 +22,22 @@ pub struct Hooks {
     pub post_exit: Option<String>,
 }
 
+/// Referral tracking state - keeps code even after redemption for tracing
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct ReferralState {
+    /// The download UUID from the installer filename
+    pub code: String,
+    /// Whether the code has been successfully reported to backend
+    #[serde(default)]
+    pub redeemed: bool,
+    /// Timestamp when the code was redeemed
+    #[serde(default)]
+    pub redeemed_at: Option<i64>,
+    /// Account UUID that redeemed the code
+    #[serde(default)]
+    pub redeemed_by_account: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
     #[serde(default = "default_config_version")]
@@ -52,7 +68,21 @@ pub struct LauncherConfig {
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
     #[serde(default)]
+    pub global_custom_jvm_args: Option<String>,
+    #[serde(default)]
     pub custom_game_directory: Option<PathBuf>,
+    #[serde(default = "default_enable_analytics")]
+    pub enable_analytics: bool,
+    #[serde(default = "default_use_browser_based_login")]
+    pub use_browser_based_login: bool,
+    #[serde(default = "default_cache_natives_extraction")]
+    pub cache_natives_extraction: bool,
+    /// Referral tracking state - code stays even after redemption
+    #[serde(default)]
+    pub referral_state: Option<ReferralState>,
+    /// Pack rollout override: "auto" | "off" | "on"
+    #[serde(default = "default_pack_rollout_override")]
+    pub pack_rollout_override: String,
 }
 
 fn default_config_version() -> u32 {
@@ -90,6 +120,22 @@ fn default_global_memory_settings() -> MemorySettings {
     }
 }
 
+fn default_enable_analytics() -> bool {
+    false
+}
+
+fn default_use_browser_based_login() -> bool {
+    false
+}
+
+fn default_cache_natives_extraction() -> bool {
+    true
+}
+
+fn default_pack_rollout_override() -> String {
+    "auto".to_string()
+}
+
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
@@ -106,7 +152,13 @@ impl Default for LauncherConfig {
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
             global_memory_settings: default_global_memory_settings(),
+            global_custom_jvm_args: None,
             custom_game_directory: None,
+            enable_analytics: default_enable_analytics(),
+            use_browser_based_login: default_use_browser_based_login(),
+            cache_natives_extraction: default_cache_natives_extraction(),
+            referral_state: None,
+            pack_rollout_override: default_pack_rollout_override(),
         }
     }
 }
@@ -154,19 +206,19 @@ impl ConfigManager {
                 // Update the stored config
                 let mut config = self.config.write().await;
                 *config = loaded_config.clone();
-                
+
                 // Update cache
                 update_custom_game_dir(loaded_config.custom_game_directory);
             }
             Err(e) => {
                 error!("Failed to parse config file: {}", e);
                 warn!("Attempting to migrate or preserve existing settings...");
-                
+
                 // Try to parse as generic JSON first to preserve user settings
                 match serde_json::from_str::<serde_json::Value>(&config_data) {
                     Ok(json_value) => {
                         info!("Config file is valid JSON, attempting migration...");
-                        
+
                         // Create backup of original config
                         let backup_path = self.config_path.with_extension("json.backup");
                         if let Err(backup_err) = fs::copy(&self.config_path, &backup_path).await {
@@ -174,10 +226,10 @@ impl ConfigManager {
                         } else {
                             info!("Created config backup at: {:?}", backup_path);
                         }
-                        
+
                         // Start with default config and try to migrate settings
                         let mut migrated_config = LauncherConfig::default();
-                        
+
                         // Migrate known fields that might exist
                         if let Some(obj) = json_value.as_object() {
                             // Migrate simple boolean fields
@@ -199,7 +251,17 @@ impl ConfigManager {
                             if let Some(hide) = obj.get("hide_on_process_start").and_then(|v| v.as_bool()) {
                                 migrated_config.hide_on_process_start = hide;
                             }
-                            
+                            if let Some(analytics) = obj.get("enable_analytics").and_then(|v| v.as_bool()) {
+                                migrated_config.enable_analytics = analytics;
+                            }
+                            if let Some(browser_login) = obj.get("use_browser_based_login").and_then(|v| v.as_bool()) {
+                                migrated_config.use_browser_based_login = browser_login;
+                            }
+                            if let Some(cache_natives) = obj.get("cache_natives_extraction").and_then(|v| v.as_bool()) {
+                                migrated_config.cache_natives_extraction = cache_natives;
+                            }
+
+
                             // Migrate numeric fields
                             if let Some(downloads) = obj.get("concurrent_downloads").and_then(|v| v.as_u64()) {
                                 if downloads > 0 && downloads <= 20 { // Reasonable bounds
@@ -211,7 +273,7 @@ impl ConfigManager {
                                     migrated_config.concurrent_io_limit = io_limit as usize;
                                 }
                             }
-                            
+
                             // Migrate string fields
                             if let Some(grouping) = obj.get("profile_grouping_criterion").and_then(|v| v.as_str()) {
                                 // Validate known values and migrate "none" to "group"
@@ -228,35 +290,35 @@ impl ConfigManager {
                                     }
                                 }
                             }
-                            
+
                             // Migrate UUID fields (with validation)
                             if let Some(profile_str) = obj.get("last_played_profile").and_then(|v| v.as_str()) {
                                 if let Ok(uuid) = Uuid::parse_str(profile_str) {
                                     migrated_config.last_played_profile = Some(uuid);
                                 }
                             }
-                            
+
                             // Migrate custom game directory
                             if let Some(custom_dir_str) = obj.get("custom_game_directory").and_then(|v| v.as_str()) {
                                 migrated_config.custom_game_directory = Some(PathBuf::from(custom_dir_str));
                             }
                         }
-                        
+
                         info!("Migration completed, saving migrated configuration");
                         let mut config = self.config.write().await;
                         *config = migrated_config.clone();
                         drop(config); // Release lock before save
-                        
+
                         // Save the migrated config
                         self.save_config().await?;
-                        
+
                         // Update cache
                         update_custom_game_dir(migrated_config.custom_game_directory);
                     }
                     Err(json_err) => {
                         error!("Config file is not valid JSON: {}", json_err);
                         warn!("Config file is corrupted, creating backup and using defaults");
-                        
+
                         // Create backup of corrupted file
                         let backup_path = self.config_path.with_extension("json.corrupted");
                         if let Err(backup_err) = fs::copy(&self.config_path, &backup_path).await {
@@ -264,9 +326,9 @@ impl ConfigManager {
                         } else {
                             info!("Backed up corrupted config to: {:?}", backup_path);
                         }
-                        
+
                         // Use default config and save it
-                self.save_config().await?;
+                        self.save_config().await?;
                     }
                 }
             }
@@ -327,7 +389,13 @@ impl ConfigManager {
                 && current.hide_on_process_start == new_config.hide_on_process_start
                 && current.global_memory_settings.min == new_config.global_memory_settings.min
                 && current.global_memory_settings.max == new_config.global_memory_settings.max
+                && current.global_custom_jvm_args == new_config.global_custom_jvm_args
                 && current.custom_game_directory == new_config.custom_game_directory
+                && current.enable_analytics == new_config.enable_analytics
+                && current.use_browser_based_login == new_config.use_browser_based_login
+                && current.cache_natives_extraction == new_config.cache_natives_extraction
+                && current.referral_state == new_config.referral_state
+                && current.pack_rollout_override == new_config.pack_rollout_override
             {
                 debug!("No config changes detected, skipping save");
                 false
@@ -365,6 +433,10 @@ impl ConfigManager {
                         "Changing beta channel check: {} -> {}",
                         current.check_beta_channel, new_config.check_beta_channel
                     );
+
+                    let mut props = std::collections::HashMap::new();
+                    props.insert("enabled".to_string(), serde_json::Value::Bool(new_config.check_beta_channel));
+                    crate::commands::analytics_command::track_event("beta_update_toggled", props);
                 }
                 if current.profile_grouping_criterion != new_config.profile_grouping_criterion {
                     info!(
@@ -410,10 +482,28 @@ impl ConfigManager {
                         new_config.global_memory_settings.min, new_config.global_memory_settings.max
                     );
                 }
+                if current.global_custom_jvm_args != new_config.global_custom_jvm_args {
+                    info!(
+                        "Changing global custom JVM args: {:?} -> {:?}",
+                        current.global_custom_jvm_args, new_config.global_custom_jvm_args
+                    );
+                }
                 if current.custom_game_directory != new_config.custom_game_directory {
                     info!(
                         "Changing custom game directory: {:?} -> {:?}",
                         current.custom_game_directory, new_config.custom_game_directory
+                    );
+                }
+                if current.enable_analytics != new_config.enable_analytics {
+                    info!(
+                        "Changing analytics: {} -> {}",
+                        current.enable_analytics, new_config.enable_analytics
+                    );
+                }
+                if current.use_browser_based_login != new_config.use_browser_based_login {
+                    info!(
+                        "Changing use browser based login: {} -> {}",
+                        current.use_browser_based_login, new_config.use_browser_based_login
                     );
                 }
 
@@ -432,7 +522,13 @@ impl ConfigManager {
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
                     global_memory_settings: new_config.global_memory_settings,
+                    global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
                     custom_game_directory: new_config.custom_game_directory.clone(),
+                    enable_analytics: new_config.enable_analytics,
+                    use_browser_based_login: new_config.use_browser_based_login,
+                    cache_natives_extraction: new_config.cache_natives_extraction,
+                    referral_state: new_config.referral_state.clone(),
+                    pack_rollout_override: new_config.pack_rollout_override.clone(),
                 };
 
                 true

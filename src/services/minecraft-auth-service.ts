@@ -46,4 +46,22 @@ export class MinecraftAuthService {
       throw error;
     }
   }
+
+  static async cancelLogin(): Promise<void> {
+    try {
+      await invoke("cancel_login");
+    } catch (error) {
+      console.error("Failed to cancel login:", error);
+      throw error;
+    }
+  }
+
+  static async isFlatpak(): Promise<boolean> {
+    try {
+      return await invoke<boolean>("is_flatpak");
+    } catch (error) {
+      console.error("Failed to check Flatpak status:", error);
+      return false;
+    }
+  }
 }

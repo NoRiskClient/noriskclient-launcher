@@ -48,18 +48,25 @@ impl ClasspathBuilder {
             }
 
             if let Some(artifact) = &lib.downloads.artifact {
-                // Extrahiere den Pfad aus dem Maven-Format (group:artifact:version)
+                // Extrahiere den Pfad aus dem Maven-Format (group:artifact:version[:classifier])
                 let parts: Vec<&str> = lib.name.split(':').collect();
-                if parts.len() != 3 {
+                if parts.len() != 3 && parts.len() != 4 {
                     info!("❌ Skipping library with invalid format: {}", lib.name);
                     continue;
                 }
 
                 let (group, artifact_name, version) = (parts[0], parts[1], parts[2]);
-                let relativ_path = artifact
-                    .path
-                    .clone()
-                    .unwrap_or(format!("{}-{}.jar", artifact_name, version));
+                let classifier = parts.get(3).copied();
+                // Distinguish classifier'd entries (e.g. lwjgl:natives-windows) from the
+                // base artifact so they don't overwrite each other in self.libraries.
+                let lib_key = match classifier {
+                    Some(c) => format!("{}:{}", artifact_name, c),
+                    None => artifact_name.to_string(),
+                };
+                let relativ_path = artifact.path.clone().unwrap_or_else(|| match classifier {
+                    Some(c) => format!("{}-{}-{}.jar", artifact_name, version, c),
+                    None => format!("{}-{}.jar", artifact_name, version),
+                });
                 info!("Library path: {}", relativ_path);
                 let jar_path = LAUNCHER_DIRECTORY
                     .meta_dir()
@@ -67,7 +74,7 @@ impl ClasspathBuilder {
                     .join(relativ_path.clone());
 
                 // Prüfe ob wir diese Library schon haben
-                if let Some(existing) = self.libraries.get(artifact_name) {
+                if let Some(existing) = self.libraries.get(&lib_key) {
                     // Nur ersetzen wenn neue Version höher ist
                     if compare_versions(version, &existing.version) == std::cmp::Ordering::Greater {
                         info!(
@@ -75,7 +82,7 @@ impl ClasspathBuilder {
                             relativ_path, existing.path, existing.version, version
                         );
                         self.libraries.insert(
-                            artifact_name.to_string(),
+                            lib_key.clone(),
                             LibraryInfo {
                                 path: jar_path,
                                 version: version.to_string(),
@@ -85,13 +92,13 @@ impl ClasspathBuilder {
                     } else {
                         info!(
                             "⏩ Skipping library {} (existing version {} is newer or equal to {})",
-                            artifact_name, existing.version, version
+                            lib_key, existing.version, version
                         );
                     }
                 } else {
                     info!("✅ Adding library: {}", relativ_path);
                     self.libraries.insert(
-                        artifact_name.to_string(),
+                        lib_key.clone(),
                         LibraryInfo {
                             path: jar_path,
                             version: version.to_string(),

@@ -8,6 +8,7 @@ export interface DropdownOption {
   value: string;
   label: string;
   icon?: string;
+  separator?: boolean;
 }
 
 interface CustomDropdownProps {
@@ -17,6 +18,7 @@ interface CustomDropdownProps {
   onChange: (value: string) => void;
   className?: string;
   variant?: 'default' | 'search';
+  size?: 'sm' | 'md';
 }
 
 export function CustomDropdown({
@@ -26,7 +28,9 @@ export function CustomDropdown({
   onChange,
   className = "",
   variant = 'default',
+  size = 'md',
 }: CustomDropdownProps) {
+  const isSm = size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -63,10 +67,10 @@ export function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 transition-all duration-200 focus:outline-none focus:ring-0 focus:border-transparent ${
           variant === 'search'
-            ? 'w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft-ten text-xl'
+            ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
             : label
-            ? 'w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft-ten text-xl'
-            : 'bg-transparent rounded-md px-2 py-1 text-white font-minecraft-ten text-xl'
+            ? `w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
+            : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
         }`}
         style={{
           boxShadow: isOpen ? `0 0 0 1px ${accentColor.value}40` : 'none',
@@ -111,33 +115,39 @@ export function CustomDropdown({
           variant === 'search' ? 'left-0 right-0' : label ? 'left-0 right-0' : 'left-0 w-56'
         }`}>
           <div className="py-2">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleOptionClick(option.value)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left font-minecraft-ten text-base transition-colors duration-150 ${
-                  option.value === value
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/80 hover:bg-white/5 hover:text-white'
-                }`}
-                style={{
-                  backgroundColor: option.value === value ? `${accentColor.value}20` : undefined,
-                }}
-              >
-                {option.icon && (
-                  <Icon icon={option.icon} className="w-4 h-4 text-white/70 flex-shrink-0" />
+            {options.map((option, index) => (
+              <div key={option.value}>
+                {option.separator && index > 0 && (
+                  <div className={`border-t border-white/10 ${isSm ? 'my-1 mx-2' : 'my-1.5 mx-3'}`} />
                 )}
-                <span className="flex-1">{option.label}</span>
-                <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                  {option.value === value && (
-                    <Icon 
-                      icon="solar:check-circle-bold" 
-                      className="w-4 h-4"
-                      style={{ color: accentColor.value }}
-                    />
+                <button
+                  onClick={() => handleOptionClick(option.value)}
+                  className={`w-full flex items-center gap-2.5 text-left font-minecraft-ten transition-colors duration-150 ${
+                    isSm ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-3 text-base'
+                  } ${
+                    option.value === value
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/80 hover:bg-white/5 hover:text-white'
+                  }`}
+                  style={{
+                    backgroundColor: option.value === value ? `${accentColor.value}20` : undefined,
+                  }}
+                >
+                  {option.icon && (
+                    <Icon icon={option.icon} className="w-4 h-4 text-white/70 flex-shrink-0" />
                   )}
-                </div>
-              </button>
+                  <span className="flex-1">{option.label}</span>
+                  <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                    {option.value === value && (
+                      <Icon
+                        icon="solar:check-circle-bold"
+                        className="w-4 h-4"
+                        style={{ color: accentColor.value }}
+                      />
+                    )}
+                  </div>
+                </button>
+              </div>
             ))}
           </div>
         </div>

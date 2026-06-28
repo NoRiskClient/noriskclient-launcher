@@ -9,7 +9,7 @@ use crate::state::profile_state::Profile;
 use crate::state::State;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -20,6 +20,25 @@ use uuid::Uuid;
 const ASSETS_DIR: &str = "assets";
 const NORISK_ASSETS_DIR: &str = "noriskclient";
 const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
+
+/// Packs whose in-game NRC client owns regular asset management. For these the
+/// launcher skips its own download/copy/cleanup of non-override entries and
+/// passes `-Dnrc.assets.{dir,bucket}` so the client takes over. Every other
+/// pack runs the legacy launcher-side asset pipeline.
+const CLIENT_MANAGED_PACKS: &[&str] = &[
+    "nrc-nightly",
+    "nrc-standalone",
+    "nrc-mini",
+    "verity-nexus",
+    "verity-emote",
+];
+
+/// `true` when the given (effective) pack id is client-managed — see
+/// `CLIENT_MANAGED_PACKS`. `overrides/` entries are always kept regardless,
+/// they land in the profile game dir which the client doesn't manage.
+pub fn client_managed_assets(pack_id: &str) -> bool {
+    CLIENT_MANAGED_PACKS.contains(&pack_id)
+}
 
 pub struct NoriskClientAssetsDownloadService {
     base_path: PathBuf,
@@ -68,14 +87,14 @@ impl NoriskClientAssetsDownloadService {
             info!("[NRC Assets Download] Keep local assets flag is enabled for this profile");
         }
 
-        // Use profile's selected pack as the *main* pack ID
-        let main_pack_id = match &profile.selected_norisk_pack_id {
+        // Use profile's effective pack as the *main* pack ID (honors rollout alias)
+        let main_pack_id = match profile.effective_norisk_pack_id().await {
             Some(pack_id) if !pack_id.is_empty() => {
                 info!(
                     "[NRC Assets Download] Using main pack ID from profile: {}",
                     pack_id
                 );
-                pack_id.clone()
+                pack_id
             }
             _ => {
                 info!(
@@ -84,6 +103,12 @@ impl NoriskClientAssetsDownloadService {
                 return Ok(());
             }
         };
+
+        let client_managed = client_managed_assets(&main_pack_id);
+        info!(
+            "[NRC Assets Download] Pack '{}' client-managed assets: {}",
+            main_pack_id, client_managed
+        );
 
         let creds = match credentials {
             Some(c) => c,
@@ -190,6 +215,7 @@ impl NoriskClientAssetsDownloadService {
                     &request_uuid,
                     is_experimental,
                     keep_local_assets,
+                    client_managed,
                     &game_directory,
                     group_progress_start,
                     group_progress_end,
@@ -221,8 +247,14 @@ impl NoriskClientAssetsDownloadService {
             }
         }
 
-        // --- Cleanup Orphan Assets (only if keep_local_assets is false) ---
-        if !keep_local_assets {
+        // --- Cleanup Orphan Assets ---
+        // Cleanup wipes anything in `target_base_dir` (= <gameDir>/NoRiskClient/assets/)
+        // not in `all_expected_target_paths`. In client-managed mode the launcher
+        // doesn't populate that dir anymore, so cleanup would mass-delete on every
+        // launch — skip entirely.
+        if client_managed {
+            info!("[NRC Assets Cleanup] Skipping orphan cleanup (client-managed mode).");
+        } else if !keep_local_assets {
             info!(
                 "[NRC Assets Cleanup] Cleaning up orphan files in target directory: {}",
                 target_base_dir.display()
@@ -236,12 +268,12 @@ impl NoriskClientAssetsDownloadService {
             )
             .await?;
 
-            match self
+            match measure_time!("NRC cleanup", self
                 .cleanup_orphan_assets(&target_base_dir, &all_expected_target_paths)
-                .await
+                .await)
             {
                 Ok(deleted_count) => info!(
-                    "[NRC Assets Cleanup] Successfully cleaned up {} orphan items.",
+                    "[NRC Assets Cleanup] Cleaned up {} orphan items",
                     deleted_count
                 ),
                 Err(e) => {
@@ -286,6 +318,7 @@ impl NoriskClientAssetsDownloadService {
         request_uuid: &str,
         is_experimental: bool,
         keep_local_assets: bool,
+        client_managed: bool,
         game_directory: &PathBuf,
         progress_start: f64,
         progress_end: f64,
@@ -304,8 +337,8 @@ impl NoriskClientAssetsDownloadService {
         .await?;
 
         let assets =
-            match NoRiskApi::norisk_assets(asset_id, norisk_token, request_uuid, is_experimental)
-                .await
+            match measure_time!(format!("NRC API call '{}'", asset_id), NoRiskApi::norisk_assets(asset_id, norisk_token, request_uuid, is_experimental)
+                .await)
             {
                 Ok(fetched_assets) => {
                     info!(
@@ -357,6 +390,34 @@ impl NoriskClientAssetsDownloadService {
                 }
             };
 
+        // Client-managed mode: in-game client owns the regular asset cache, we
+        // only keep `overrides/` entries (those land in the profile game dir).
+        let assets = if client_managed {
+            let total = assets.objects.len();
+            let mut filtered = assets;
+            filtered.objects.retain(|name, _| name.starts_with("overrides/"));
+            info!(
+                "[NRC Assets Group '{}'] client-managed mode: kept {} override entries (of {}); regular assets handled by in-game client",
+                asset_id,
+                filtered.objects.len(),
+                total,
+            );
+            if filtered.objects.is_empty() {
+                self.emit_progress_event(
+                    state,
+                    profile_id,
+                    &format!("Group '{}' fully client-managed — no overrides", asset_id),
+                    progress_end,
+                    None,
+                )
+                .await?;
+                return Ok(HashSet::new());
+            }
+            filtered
+        } else {
+            assets
+        };
+
         // --- Calculate Expected Paths Before Download/Copy ---
         let mut expected_paths_for_group: HashSet<PathBuf> = HashSet::new();
         for name in assets.objects.keys() {
@@ -397,7 +458,7 @@ impl NoriskClientAssetsDownloadService {
         )
         .await?;
 
-        match self
+        match measure_time!(format!("NRC download '{}'", asset_id), self
             .download_nrc_assets(
                 asset_id,
                 &assets,
@@ -405,12 +466,9 @@ impl NoriskClientAssetsDownloadService {
                 norisk_token,
                 Some(profile_id),
             )
-            .await
+            .await)
         {
-            Ok(_) => info!(
-                "[NRC Assets Group '{}'] Successfully downloaded assets.",
-                asset_id
-            ),
+            Ok(_) => {},
             Err(e) => {
                 error!(
                     "[NRC Assets Group '{}'] Failed to download assets: {}. Skipping copy.",
@@ -431,7 +489,7 @@ impl NoriskClientAssetsDownloadService {
         .await?;
 
         // Pass target_base_dir to copy function
-        match self
+        match measure_time!(format!("NRC copy '{}'", asset_id), self
             .copy_assets_to_game_dir(
                 asset_id,
                 &assets,
@@ -440,12 +498,9 @@ impl NoriskClientAssetsDownloadService {
                 game_directory,
                 Some(profile_id),
             )
-            .await
+            .await)
         {
-            Ok(_) => info!(
-                "[NRC Assets Group '{}'] Successfully copied assets.",
-                asset_id
-            ),
+            Ok(_) => {},
             Err(e) => {
                 error!(
                     "[NRC Assets Group '{}'] Failed to copy assets: {}. Skipping cleanup for this group's contribution.",
@@ -512,22 +567,25 @@ impl NoriskClientAssetsDownloadService {
         let mut job_count = 0;
 
         let state = if profile_id.is_some() {
-            State::get().await.ok() // Change to ok() to allow optional state
+            State::get().await.ok()
         } else {
             None
         };
-        // Clone state before the closure so the original `state` remains available after the loop
         let state_clone_for_inspect = state.clone();
+
+        // Pre-scan existing objects to avoid per-file fs::try_exists calls
+        let objects_dir = assets_path.join("objects");
+        let existing_objects = measure_time!(format!("NRC objects scan '{}'", asset_id), {
+            Self::scan_objects_dir(&objects_dir).await
+        });
 
         for (name, asset) in assets_list {
             let hash = asset.hash.clone();
             let size = asset.size;
-            
-            // Store assets by hash like Mojang: objects/ab/abcdef123...
-            let hash_prefix = &hash[0..2]; // First 2 chars
-            let objects_dir = assets_path.join("objects").join(hash_prefix);
-            let target_path = objects_dir.join(&hash);
-            
+
+            let hash_prefix = &hash[0..2];
+            let target_path = objects_dir.join(hash_prefix).join(&hash);
+
             let name_clone = name.clone();
             let task_counter_clone = Arc::clone(&task_counter);
             let completed_counter_clone = Arc::clone(&completed_counter);
@@ -535,8 +593,8 @@ impl NoriskClientAssetsDownloadService {
             let asset_id_clone = asset_id.to_string();
             let norisk_token_clone = norisk_token.to_string();
 
-            // Hash-based check - if hash file exists, content is guaranteed correct
-            if fs::try_exists(&target_path).await? {
+            // Fast in-memory check instead of filesystem call
+            if existing_objects.contains_key(&hash) {
                 trace!(
                     "[NRC Assets Download '{}'] Skipping asset {} (hash {} already exists)",
                     asset_id_clone,
@@ -734,6 +792,38 @@ impl NoriskClientAssetsDownloadService {
         }
     }
 
+    /// Scans an objects directory (objects/xx/hash) and returns a HashMap of hash -> file size.
+    async fn scan_objects_dir(objects_path: &Path) -> HashMap<String, u64> {
+        let mut existing = HashMap::new();
+
+        let mut prefix_dirs = match fs::read_dir(objects_path).await {
+            Ok(dir) => dir,
+            Err(_) => return existing,
+        };
+
+        while let Ok(Some(prefix_entry)) = prefix_dirs.next_entry().await {
+            if !prefix_entry.path().is_dir() {
+                continue;
+            }
+
+            let mut hash_files = match fs::read_dir(prefix_entry.path()).await {
+                Ok(dir) => dir,
+                Err(_) => continue,
+            };
+
+            while let Ok(Some(hash_entry)) = hash_files.next_entry().await {
+                if let Ok(metadata) = hash_entry.metadata().await {
+                    if metadata.is_file() {
+                        let file_name = hash_entry.file_name().to_string_lossy().to_string();
+                        existing.insert(file_name, metadata.len());
+                    }
+                }
+            }
+        }
+
+        existing
+    }
+
     /// Helper method to emit progress events
     async fn emit_progress_event(
         &self,
@@ -821,6 +911,12 @@ impl NoriskClientAssetsDownloadService {
             .await?;
         }
 
+        // Pre-scan source objects to avoid per-file fs::try_exists + fs::metadata calls
+        let source_objects_dir = source_dir.join("objects");
+        let source_cache = measure_time!(format!("NRC copy source scan '{}'", asset_id), {
+            Self::scan_objects_dir(&source_objects_dir).await
+        });
+
         let batch_size = 50;
         let mut batch_count = 0;
         let total_batches = (total_assets + batch_size - 1) / batch_size;
@@ -832,92 +928,52 @@ impl NoriskClientAssetsDownloadService {
 
             for (name, asset) in chunk {
                 let hash = &asset.hash;
-                
-                // Source is now hash-based: objects/ab/abcdef123...
-                let hash_prefix = &hash[0..2];
-                let source_path = source_dir.join("objects").join(hash_prefix).join(hash);
 
                 // Special handling for override assets
                 let (target_path, is_override) = if name.starts_with("overrides/") {
-                    // For overrides, copy to Minecraft directory and strip the "overrides/" prefix
                     let relative_path = name.strip_prefix("overrides/").unwrap_or(name);
                     (minecraft_dir.join(relative_path), true)
                 } else {
-                    // Normal assets go to the target base directory
                     (target_base_dir.join(&name), false)
                 };
 
-                if !fs::try_exists(&source_path).await? {
-                    warn!(
-                        "[NRC Assets Copy '{}'] Hash file missing: {} (for asset {})",
-                        asset_id,
-                        source_path.display(),
-                        name
-                    );
-                    continue;
-                }
+                // Fast in-memory source check instead of fs::try_exists + fs::metadata
+                let source_size = match source_cache.get(hash.as_str()) {
+                    Some(&size) => size,
+                    None => {
+                        warn!(
+                            "[NRC Assets Copy '{}'] Hash file missing in cache for asset {} (hash {})",
+                            asset_id, name, hash
+                        );
+                        continue;
+                    }
+                };
 
                 let needs_copy = if fs::try_exists(&target_path).await? {
                     if is_override {
-                        // For override files, skip if the file already exists
-                        debug!(
-                            "[NRC Assets Copy '{}'] Skipping override file {} (already exists)",
-                            asset_id, name
-                        );
                         false
                     } else if keep_local_assets {
-                        debug!(
-                            "[NRC Assets Copy '{}'] Keeping local asset {} (keep_local_assets)",
-                            asset_id, name
-                        );
                         false
                     } else {
-                        // Hash-based system: check size first, then modification time
-                        let source_metadata = fs::metadata(&source_path).await?;
+                        // Compare target size against cached source size
                         let target_metadata = fs::metadata(&target_path).await?;
-                        
-                        if target_metadata.len() as i64 != asset.size {
+                        if target_metadata.len() != source_size {
                             debug!(
-                                "[NRC Assets Copy '{}'] Target size mismatch for {} (hash {}), needs copy",
-                                asset_id, name, hash
+                                "[NRC Assets Copy '{}'] Size mismatch for {}: target={}b, source={}b",
+                                asset_id, name, target_metadata.len(), source_size
                             );
                             true
                         } else {
-                            // Same size - check if hash file (source) is newer than target
-                            let source_modified = source_metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
-                            let target_modified = target_metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
-                            
-                            if source_modified > target_modified {
-                                debug!(
-                                    "[NRC Assets Copy '{}'] Hash file {} is newer than target, needs copy",
-                                    asset_id, name
-                                );
-                                true
-                            } else {
-                                trace!(
-                                    "[NRC Assets Copy '{}'] Skipping {} (hash {}), target is up to date",
-                                    asset_id, name, hash
-                                );
-                                false
-                            }
+                            false
                         }
                     }
                 } else {
-                    if is_override {
-                        debug!(
-                            "[NRC Assets Copy '{}'] Override file doesn't exist for {} (hash {}), copying to Minecraft dir",
-                            asset_id, name, hash
-                        );
-                    } else {
-                        debug!(
-                            "[NRC Assets Copy '{}'] Target doesn't exist for {} (hash {}), needs copy",
-                            asset_id, name, hash
-                        );
-                    }
                     true
                 };
 
                 if needs_copy {
+                    let hash_prefix = &hash[0..2];
+                    let source_path = source_objects_dir.join(hash_prefix).join(hash);
                     if let Some(parent) = target_path.parent() {
                         if !fs::try_exists(parent).await? {
                             fs::create_dir_all(parent).await?;

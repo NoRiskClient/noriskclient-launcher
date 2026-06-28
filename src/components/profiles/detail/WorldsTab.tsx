@@ -19,7 +19,7 @@ import { ConfirmDeleteDialog } from "../../modals/ConfirmDeleteDialog";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { useProfileLaunch } from "../../../hooks/useProfileLaunch.tsx";
 import { toast } from "react-hot-toast";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { revealItemInDir } from "../../../utils/opener-utils";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { LaunchButton } from "../../ui/buttons/LaunchButton";
 import { GenericList } from "../../ui/GenericList";
@@ -34,10 +34,12 @@ import type {
 import type { CopyWorldParams, Profile } from "../../../types/profile";
 import { timeAgo } from "../../../utils/time-utils";
 import * as WorldService from "../../../services/world-service";
+import { useTranslation } from "react-i18next";
 import {
   getDifficultyString,
   getGameModeString,
 } from "../../../services/world-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 // --- Icons to preload for WorldsTab ---
 const WORLDS_TAB_ICONS_TO_PRELOAD = [
@@ -91,6 +93,7 @@ export function WorldsTab({
   searchQuery = "",
   onLaunchRequest,
 }: WorldsTabProps) {
+  const { t } = useTranslation();
   const allProfilesFromStore = useProfileStore((state) => state.profiles);
   const isLoadingProfilesFromStore = useProfileStore((state) => state.loading);
   const { showModal, hideModal } = useGlobalModal();
@@ -118,12 +121,12 @@ export function WorldsTab({
     if (isWorld) {
       // Launch with specific world using QuickPlay
       console.log(`🚀 QuickPlay Singleplayer: Launching world: ${item.folder_name}`);
-      toast.success(`🚀 Launching world: ${item.display_name || item.folder_name}`);
+      toast.success(t('worlds.launching_world', { name: item.display_name || item.folder_name }));
       handleQuickPlayLaunch(item.folder_name, undefined);
     } else if (item.address) {
       // Launch with specific server using QuickPlay
       console.log(`🌐 QuickPlay Multiplayer: Joining server: ${item.address}`);
-      toast.success(`🌐 Joining server: ${item.name || item.address}`);
+      toast.success(t('worlds.joining_server', { name: item.name || item.address }));
       handleQuickPlayLaunch(undefined, item.address);
     } else {
       // Regular launch as fallback
@@ -326,7 +329,7 @@ export function WorldsTab({
         setServerPings((prev) => ({ ...prev, [address]: pingResult }));
       } catch (err) {
         console.error(`[WorldsTab] Failed to ping ${address}:`, err);
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = parseErrorMessage(err);
         const errorResult: ServerPingInfo = {
           error: errorMsg,
           description: null,
@@ -484,7 +487,7 @@ export function WorldsTab({
           try {
             await WorldService.copyWorld(copyParams);
             toast.success(
-              `World '${getWorldDisplayName(world)}' copied successfully as '${params.targetWorldName}'!`,
+              t('worlds.copy_success', { source: getWorldDisplayName(world), target: params.targetWorldName }),
             );
             if (params.targetProfileId === profile.id) {
               await loadData();
@@ -493,9 +496,9 @@ export function WorldsTab({
             setWorldToCopy(null);
           } catch (err) {
             console.error("Failed to copy world:", err);
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            setCopyWorldError(`Copy failed: ${errorMsg}`);
-            toast.error(`Failed to copy world: ${errorMsg}`);
+            const errorMsg = parseErrorMessage(err);
+            setCopyWorldError(t('worlds.copy_failed', { error: errorMsg }));
+            toast.error(t('worlds.copy_failed', { error: errorMsg }));
           } finally {
             setIsCopyingWorld(false);
           }
@@ -523,14 +526,14 @@ export function WorldsTab({
           setIsActuallyDeleting(true);
           try {
             await WorldService.deleteWorld(profile.id, world.folder_name);
-            toast.success(`World "${getWorldDisplayName(world)}" deleted.`);
+            toast.success(t('worlds.delete_success', { name: getWorldDisplayName(world) }));
             hideModal("delete-world-dialog");
             setWorldToDelete(null);
             await loadData();
           } catch (err) {
             console.error("Delete failed:", err);
             toast.error(
-              `Delete failed: ${err instanceof Error ? err.message : String(err)}`,
+              t('worlds.delete_failed', { error: parseErrorMessage(err) }),
             );
           } finally {
             setIsActuallyDeleting(false);
@@ -547,7 +550,7 @@ export function WorldsTab({
   const handleOpenWorldFolder = useCallback(
     async (world: WorldInfo) => {
       if (!world?.icon_path) {
-        toast.error("World path is not available.");
+        toast.error(t('worlds.path_not_available'));
         console.error(
           "Cannot open world folder: Profile path is missing.",
           profile,
@@ -559,11 +562,11 @@ export function WorldsTab({
       try {
         console.log(`Attempting to open folder: ${worldFolderPath}`);
         await revealItemInDir(worldFolderPath);
-        toast.success(`Opened folder for '${getWorldDisplayName(world)}'`);
+        toast.success(t('worlds.open_folder_success', { name: getWorldDisplayName(world) }));
       } catch (err) {
         console.error(`Failed to open folder ${worldFolderPath}:`, err);
         toast.error(
-          `Failed to open folder: ${err instanceof Error ? err.message : String(err)}`,
+          t('worlds.open_folder_failed', { error: parseErrorMessage(err) }),
         );
       }
     },
@@ -582,7 +585,7 @@ export function WorldsTab({
       const selectedPath = await openDialog({
         directory: true,
         multiple: false,
-        title: 'Select Minecraft World Folder to Import',
+        title: t('worlds.import_title'),
       });
 
       if (!selectedPath) {
@@ -601,7 +604,7 @@ export function WorldsTab({
 
       const operationId = `world-import-button-${Date.now()}`;
       const loadingToastId = `loading-${operationId}`;
-      toast.loading(`Importing world '${folderName}'...`, { id: loadingToastId });
+      toast.loading(t('worlds.importing', { name: folderName }), { id: loadingToastId });
 
       try {
         const generatedFolderName = await WorldService.importWorld(
@@ -611,7 +614,7 @@ export function WorldsTab({
         );
         console.log(`[WorldsTab] World import SUCCESS: ${worldPath} -> ${generatedFolderName}`);
         toast.success(
-          `World '${folderName}' imported successfully as '${generatedFolderName}'!`,
+          t('worlds.import_success', { source: folderName, target: generatedFolderName }),
           { id: loadingToastId, duration: 4000 }
         );
         // Refresh the worlds list
@@ -619,13 +622,13 @@ export function WorldsTab({
       } catch (err) {
         console.error(`[WorldsTab] World import ERROR for: ${worldPath}:`, err);
         toast.error(
-          `Failed to import world: ${err instanceof Error ? err.message : String(err)}`,
+          t('worlds.import_failed', { error: parseErrorMessage(err) }),
           { id: loadingToastId }
         );
       }
     } catch (error) {
       console.error('[WorldsTab] Failed to open folder picker:', error);
-      toast.error('Failed to open folder picker');
+      toast.error(t('worlds.folder_picker_failed'));
     }
   }, [profile.id, loadData]);
 
@@ -715,7 +718,7 @@ export function WorldsTab({
               <p className="text-white/60 text-xs truncate font-minecraft-ten">
                 {item.last_played
                   ? `Last played: ${timeAgo(item.last_played)}`
-                  : "Never played"}
+                  : t('worlds.never_played')}
               </p>
             ) : (
               <div
@@ -723,7 +726,7 @@ export function WorldsTab({
                 title={pingInfo?.description || item.address || ""}
               >
                 {isPinging ? (
-                  <span className="italic text-white/50">Pinging...</span>
+                  <span className="italic text-white/50">{t('worlds.pinging')}</span>
                 ) : hasPingError ? (
                   <span className="text-red-400 italic">
                     Error: {pingInfo?.error}
@@ -738,7 +741,7 @@ export function WorldsTab({
                   />
                 ) : (
                   <span className="italic text-white/50">
-                    {item.address || "Address missing"}
+                    {item.address || t('worlds.address_missing')}
                   </span>
                 )}
               </div>
@@ -769,7 +772,7 @@ export function WorldsTab({
                     size="sm"
                     iconElement={<Icon icon="solar:skull-bold" />}
                   >
-                    Hardcore
+                    {t('worlds.hardcore')}
                   </TagBadge>
                 )}
                 {item.difficulty_locked && (
@@ -777,7 +780,7 @@ export function WorldsTab({
                     size="sm"
                     iconElement={<Icon icon="solar:lock-bold" />}
                   >
-                    Locked
+                    {t('worlds.locked')}
                   </TagBadge>
                 )}
                 {item.version_name && (
@@ -793,11 +796,11 @@ export function WorldsTab({
               <>
                 {isPinging ? (
                   <TagBadge size="sm" variant="default">
-                    Pinging...
+                    {t('worlds.pinging')}
                   </TagBadge>
                 ) : hasPingError ? (
                   <TagBadge size="sm" variant="destructive">
-                    Error
+                    {t('worlds.error')}
                   </TagBadge>
                 ) : pingInfo ? (
                   (() => {
@@ -862,7 +865,7 @@ export function WorldsTab({
                   })()
                 ) : (
                   <TagBadge size="sm" variant="inactive">
-                    Offline / Unknown
+                    {t('worlds.offline_unknown')}
                   </TagBadge>
                 )}
               </>
@@ -874,10 +877,10 @@ export function WorldsTab({
       const playActions = [
         {
           id: "play",
-          label: isLaunching ? "STOP" : (isWorld ? "PLAY" : "JOIN"),
+          label: isLaunching ? t('worlds.stop') : (isWorld ? t('worlds.play') : t('worlds.join')),
           icon: isLaunching ? "solar:stop-bold" : (isWorld ? "solar:play-bold" : "solar:login-3-bold"),
           variant: isLaunching ? "destructive" : "secondary",
-          tooltip: isLaunching ? "Stop Launch" : (isWorld ? "Play World" : "Join Server"),
+          tooltip: isLaunching ? t('worlds.stop_launch') : (isWorld ? t('worlds.play_world') : t('worlds.join_server')),
           disabled: !isWorld && !item.address,
           onClick: () => handleWorldServerLaunch(item),
         },
@@ -888,7 +891,7 @@ export function WorldsTab({
           id: "copy",
           label: "",
           icon: "solar:copy-bold",
-          tooltip: "Copy World",
+          tooltip: t('worlds.copy_world'),
           disabled: isCopyingWorld,
           onClick: () => handleOpenCopyDialog(item),
         },
@@ -896,7 +899,7 @@ export function WorldsTab({
           id: "folder",
           label: "",
           icon: "solar:folder-open-bold-duotone",
-          tooltip: "Open World Folder",
+          tooltip: t('worlds.open_world_folder'),
           onClick: () => handleOpenWorldFolder(item),
         },
         {
@@ -1013,7 +1016,7 @@ export function WorldsTab({
         {/* Only show search if parent isn't providing it */}
         {!searchQuery && (
           <SearchWithFilters
-            placeholder="search worlds & servers..."
+            placeholder={t('worlds.search_placeholder')}
             searchValue={localSearchQuery}
             onSearchChange={setLocalSearchQuery}
             showSort={false}
@@ -1025,16 +1028,16 @@ export function WorldsTab({
         <div className="flex items-center gap-4 ml-auto">
           <ActionButton
             icon="solar:folder-with-files-bold"
-            label="IMPORT"
+            label={t('worlds.import_button')}
             variant="text"
             size="sm"
             onClick={handleImportWorld}
             disabled={loading}
-            tooltip="Import world folder"
+            tooltip={t('worlds.import_title')}
           />
           <ActionButton
             icon={loading ? "solar:refresh-circle-bold-duotone" : "solar:refresh-bold"}
-            label="REFRESH"
+            label={t('worlds.refresh_button')}
             variant="text"
             size="sm"
             onClick={handleRefresh}
@@ -1045,7 +1048,7 @@ export function WorldsTab({
                 displayItems.filter((item) => item.type === "server").length >
                   0)
             }
-            tooltip="Refresh worlds and servers"
+            tooltip={t('common.refresh')}
             className={loading ? "animate-spin" : ""}
           />
         </div>
@@ -1061,10 +1064,10 @@ export function WorldsTab({
         emptyStateIcon={"solar:planet-bold"}
         emptyStateMessage={
           effectiveSearchQuery
-            ? `no worlds or servers match your search`
-            : `no worlds or servers found`
+            ? t('worlds.no_match_search')
+            : t('worlds.none_found')
         }
-        emptyStateDescription={"Create worlds or add servers in Minecraft"}
+        emptyStateDescription={t('worlds.create_in_minecraft')}
         loadingItemCount={0}
       />
 

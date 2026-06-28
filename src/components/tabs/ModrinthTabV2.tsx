@@ -5,6 +5,8 @@ import { ModrinthSearchV2 } from "../modrinth/v2/ModrinthSearchV2"; // Adjusted 
 import type { Profile } from "../../types/profile";
 import { getAllProfilesAndLastPlayed } from "../../services/profile-service";
 import { ErrorMessage } from "../ui/ErrorMessage";
+import { setDiscordState } from "../../utils/discordRpc";
+import { parseErrorMessage } from "../../utils/error-utils";
 // import { LoadingOverlay } from "../ui/LoadingOverlay"; // Removed
 // import { Card } from "../ui/Card"; // Card might not be directly needed here anymore
 // import { useThemeStore } from "../../store/useThemeStore"; // Theme store might be used by sub-components
@@ -22,6 +24,9 @@ export function ModrinthTabV2({
   // const [refreshKey, setRefreshKey] = useState(0); // May or may not be needed depending on V2 search interaction
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
   const [profilesLoaded, setProfilesLoaded] = useState(initialProfiles.length > 0);
+
+  useEffect(() => { setDiscordState("Browsing Mods"); }, []);
+
   // const [isLoading, setIsLoading] = useState(initialProfiles.length === 0); // Removed
   // const [loadingProgress, setLoadingProgress] = useState(0); // Removed
 
@@ -35,7 +40,7 @@ export function ModrinthTabV2({
         } catch (err) {
           console.error("Failed to load profiles:", err);
           setError(
-            `Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`,
+            `Failed to load profiles: ${parseErrorMessage(err)}`,
           );
         } finally {
           setProfilesLoaded(true);

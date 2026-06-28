@@ -27,6 +27,15 @@ use image::{
 };
 use std::io::Cursor; // For writing encoded image to a byte vector
 
+/// File information for log/crash report listings
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub modified: i64, // Unix timestamp
+}
+
 /// Sets a file as enabled or disabled by adding or removing the .disabled extension
 #[tauri::command]
 pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), CommandError> {
@@ -718,4 +727,240 @@ pub async fn get_image_preview(
         preview_width,
         preview_height,
     })
+}
+
+/// Lists all launcher log files from the logs directory
+#[tauri::command]
+pub async fn list_launcher_logs() -> Result<Vec<FileInfo>, CommandError> {
+    use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+
+    let logs_dir = LAUNCHER_DIRECTORY.root_dir().join("logs");
+    info!("Listing launcher logs from: {:?}", logs_dir);
+
+    if !logs_dir.exists() {
+        debug!("Logs directory does not exist");
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    let mut entries = fs::read_dir(&logs_dir)
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?
+    {
+        let path = entry.path();
+        if path.is_file() {
+            let name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            // Include .log files and .log.X backup files (rotated logs)
+            if name.ends_with(".log") || name.contains(".log.") {
+                if let Ok(metadata) = entry.metadata().await {
+                    let modified = metadata
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs() as i64)
+                        .unwrap_or(0);
+
+                    files.push(FileInfo {
+                        path: path.to_string_lossy().to_string(),
+                        name,
+                        size: metadata.len(),
+                        modified,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by modified time (newest first)
+    files.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    info!("Found {} launcher log files", files.len());
+    Ok(files)
+}
+
+/// Lists crash report files from all profiles, returns the 20 most recent
+#[tauri::command]
+pub async fn list_crash_reports() -> Result<Vec<FileInfo>, CommandError> {
+    use crate::state::state_manager::State;
+
+    info!("Listing crash reports from all profiles");
+
+    let state = State::get().await?;
+    let profiles = state.profile_manager.list_profiles().await?;
+
+    let mut all_files = Vec::new();
+
+    for profile in profiles {
+        if let Ok(instance_path) = state
+            .profile_manager
+            .get_profile_instance_path(profile.id)
+            .await
+        {
+            let crash_reports_dir = instance_path.join("crash-reports");
+
+            if !crash_reports_dir.exists() {
+                continue;
+            }
+
+            if let Ok(mut entries) = fs::read_dir(&crash_reports_dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let name = path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        // Only include crash-*.txt files
+                        if name.starts_with("crash-") && name.ends_with(".txt") {
+                            if let Ok(metadata) = entry.metadata().await {
+                                let modified = metadata
+                                    .modified()
+                                    .ok()
+                                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                                    .map(|d| d.as_secs() as i64)
+                                    .unwrap_or(0);
+
+                                all_files.push(FileInfo {
+                                    path: path.to_string_lossy().to_string(),
+                                    name,
+                                    size: metadata.len(),
+                                    modified,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by modified time (newest first) and take top 20
+    all_files.sort_by(|a, b| b.modified.cmp(&a.modified));
+    all_files.truncate(20);
+
+    info!("Found {} crash report files across all profiles", all_files.len());
+    Ok(all_files)
+}
+
+/// Lists MC log files from all profiles, returns the 20 most recent
+#[tauri::command]
+pub async fn list_all_mc_logs() -> Result<Vec<FileInfo>, CommandError> {
+    use crate::state::state_manager::State;
+
+    info!("Listing MC logs from all profiles");
+
+    let state = State::get().await?;
+    let profiles = state.profile_manager.list_profiles().await?;
+
+    let mut all_files = Vec::new();
+
+    for profile in profiles {
+        if let Ok(instance_path) = state
+            .profile_manager
+            .get_profile_instance_path(profile.id)
+            .await
+        {
+            let logs_dir = instance_path.join("logs");
+
+            if !logs_dir.exists() {
+                continue;
+            }
+
+            if let Ok(mut entries) = fs::read_dir(&logs_dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let name = path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        // Include .log files and .log.gz files
+                        if name.ends_with(".log") || name.ends_with(".log.gz") {
+                            if let Ok(metadata) = entry.metadata().await {
+                                let modified = metadata
+                                    .modified()
+                                    .ok()
+                                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                                    .map(|d| d.as_secs() as i64)
+                                    .unwrap_or(0);
+
+                                all_files.push(FileInfo {
+                                    path: path.to_string_lossy().to_string(),
+                                    name,
+                                    size: metadata.len(),
+                                    modified,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by modified time (newest first) and take top 20
+    all_files.sort_by(|a, b| b.modified.cmp(&a.modified));
+    all_files.truncate(20);
+
+    info!("Found {} MC log files across all profiles", all_files.len());
+    Ok(all_files)
+}
+
+/// Lists archived game-session process logs from {launcher_root}/logs/game/
+#[tauri::command]
+pub async fn list_process_logs() -> Result<Vec<FileInfo>, CommandError> {
+    let archive_dir = crate::utils::log_archive::archive_root();
+    info!("Listing archived process logs from: {:?}", archive_dir);
+
+    if !archive_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut all_files = Vec::new();
+    let mut sessions = fs::read_dir(&archive_dir)
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?;
+
+    while let Ok(Some(session)) = sessions.next_entry().await {
+        let session_path = session.path();
+        if !session_path.is_dir() {
+            continue;
+        }
+        let session_name = session.file_name().to_string_lossy().to_string();
+        let process_log = session_path.join("nrc-process.log");
+        if !process_log.is_file() {
+            continue;
+        }
+        if let Ok(metadata) = fs::metadata(&process_log).await {
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            all_files.push(FileInfo {
+                path: process_log.to_string_lossy().to_string(),
+                name: session_name,
+                size: metadata.len(),
+                modified,
+            });
+        }
+    }
+
+    all_files.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    info!("Found {} archived process logs", all_files.len());
+    Ok(all_files)
 }

@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../ui/buttons/Button";
@@ -53,6 +54,7 @@ import { ActionButton } from "../../../ui/ActionButton"; // Added for custom upd
 import { ModUpdateText, useModUpdateText } from "../../../ui/ModUpdateText"; // Added for formatted update text
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
 import { parseMotdToHtml } from "../../../../utils/motd-utils";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 /**
  * Determines if a given version is the currently installed version for an item
@@ -187,6 +189,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   onRefreshRequired,
   onBrowseContentRequest, // Destructure new prop
 }: LocalContentTabV2Props<T>) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const accentColor = useThemeStore((state) => state.accentColor);
   const { confirm, confirmDialog } = useConfirmDialog(); // Added hook
@@ -349,7 +352,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           setNoriskPacksConfig(config);
         } catch (err) {
           console.error("Failed to fetch NoRisk packs config:", err);
-          toast.error("Failed to load NoRisk pack list.");
+          toast.error(t('content.errors.load_norisk_packs'));
           setNoriskPacksConfig(null);
         } finally {
           setIsFetchingPacksConfig(false);
@@ -368,18 +371,18 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       await ProfileService.refreshNoriskPacks();
       const config = await ProfileService.getNoriskPacksResolved();
       setNoriskPacksConfig(config);
-      toast.success("NoRisk Pack list refreshed.");
+      toast.success(t('content.toast.pack_list_refreshed'));
     } catch (err) {
       console.error("Failed to refresh NoRisk packs list:", err);
-      toast.error("Failed to refresh NoRisk pack list.");
+      toast.error(t('content.toast.pack_list_refresh_failed'));
     } finally {
       setIsRefreshingPacksList(false);
     }
-  }, [contentType]);
+  }, [contentType, t]);
 
   const noriskPackOptions = useMemo((): SelectOption[] => {
     if (contentType !== "NoRiskMod" || !noriskPacksConfig) {
-      return [{ value: "", label: "- No Pack Selected -" }];
+      return [{ value: "", label: t('content.no_pack_selected_option') }];
     }
     const options = Object.entries(noriskPacksConfig.packs).map(
       ([id, packDef]) => ({
@@ -388,8 +391,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       }),
     );
     options.sort((a, b) => a.label.localeCompare(b.label));
-    return [{ value: "", label: "- No Pack Selected -" }, ...options];
-  }, [contentType, noriskPacksConfig]);
+    return [{ value: "", label: t('content.no_pack_selected_option') }, ...options];
+  }, [contentType, noriskPacksConfig, t]);
 
   const handleSelectedPackChange = useCallback(
     async (newPackId: string | null) => {
@@ -413,7 +416,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       } catch (err) {
         console.error("Failed to update selected NoRisk pack:", err);
         toast.error(
-          `Failed to switch NoRisk pack: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to switch NoRisk pack: ${parseErrorMessage(err)}`,
         );
       }
     },
@@ -423,7 +426,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   // Update default onAddContent to use the new dialog and service call
   const defaultOnAddContent = async () => {
     if (!profile) {
-      toast.error("Profile data is not available to add content.");
+      toast.error(t('content.toast.profile_unavailable'));
       return;
     }
 
@@ -433,30 +436,30 @@ export function LocalContentTabV2<T extends LocalContentItem>({
     switch (currentContentType) {
       case "Mod":
         dialogFilters = [
-          { name: "Java Archives", extensions: ["jar", "jar.disabled"] },
+          { name: t('content.filter.java_archives'), extensions: ["jar", "jar.disabled"] },
         ];
         break;
       case "ResourcePack":
         dialogFilters = [
           {
-            name: "Resource Pack Archives",
+            name: t('content.filter.resource_pack_archives'),
             extensions: ["zip", "zip.disabled"],
           },
         ];
         break;
       case "ShaderPack":
         dialogFilters = [
-          { name: "Shader Pack Archives", extensions: ["zip", "zip.disabled"] },
+          { name: t('content.filter.shader_pack_archives'), extensions: ["zip", "zip.disabled"] },
         ];
         break;
       case "DataPack":
         dialogFilters = [
-          { name: "Data Pack Archives", extensions: ["zip", "zip.disabled"] },
+          { name: t('content.filter.data_pack_archives'), extensions: ["zip", "zip.disabled"] },
         ];
         break;
       default:
         toast.error(
-          `Local import is not configured for content type: ${currentContentType}`,
+          t('content.toast.import_not_configured', { contentType: currentContentType }),
         );
         return;
     }
@@ -468,7 +471,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         multiple: true,
         directory: false,
         filters: dialogFilters,
-        title: `Select ${itemTypeNamePlural} to Import for profile: ${profile.name}`,
+        title: t('content.dialog.select_to_import', { itemType: itemTypeNamePlural, profileName: profile.name }),
       });
 
       if (selectedPathsArray && selectedPathsArray.length > 0) {
@@ -476,7 +479,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         const filePaths = selectedPathsArray;
 
         const toastId = toast.loading(
-          `Importing ${filePaths.length} ${itemTypeNamePlural.toLowerCase()}...`,
+          t('content.toast.importing', { count: filePaths.length, itemType: itemTypeNamePlural.toLowerCase() }),
         );
         try {
           await ContentService.installLocalContentToProfile({
@@ -485,7 +488,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             content_type: currentContentType as BackendContentType,
           });
           toast.success(
-            `${filePaths.length} ${itemTypeNamePlural.toLowerCase()} import process initiated. List will refresh.`,
+            t('content.toast.import_success', { count: filePaths.length, itemType: itemTypeNamePlural.toLowerCase() }),
             { id: toastId },
           );
           fetchData(true);
@@ -498,7 +501,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             importError,
           );
           toast.error(
-            `Failed to import ${itemTypeNamePlural.toLowerCase()}: ${importError instanceof Error ? importError.message : String(importError)}`,
+            t('content.toast.import_failed', { itemType: itemTypeNamePlural.toLowerCase(), error: parseErrorMessage(importError) }),
             { id: toastId },
           );
         }
@@ -508,7 +511,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
     } catch (dialogError) {
       console.error("Error opening file dialog:", dialogError);
       toast.error(
-        `Could not open file dialog: ${dialogError instanceof Error ? dialogError.message : String(dialogError)}`,
+        t('content.toast.dialog_error', { error: parseErrorMessage(dialogError) }),
       );
     }
   };
@@ -616,8 +619,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             console.error(`Failed to fetch ${platformName} versions:`, error);
             setVersionsError(
               error instanceof Error
-                ? `Failed to load versions from ${platformName}: ${error.message}`
-                : `Failed to load versions from ${platformName}.`,
+                ? t('content.version_load_failed_details', { platform: platformName, error: error.message })
+                : t('content.version_load_failed', { platform: platformName }),
             );
           }
           setIsLoadingVersions(false);
@@ -627,8 +630,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           setIsLoadingVersions(false);
           setVersionsError(
             currentItem
-              ? `Version history not available on ${getItemPlatformDisplayName(currentItem)}.`
-              : "Item not found.",
+              ? t('content.version_history_unavailable', { platform: getItemPlatformDisplayName(currentItem) })
+              : t('content.item_not_found'),
           );
         }
       }
@@ -750,10 +753,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           {iconToShow}
           {isBlockedByNoRisk && (
             <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
-              <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+              <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
                 <div>
-                  <Icon 
-                    icon="solar:danger-triangle-bold" 
+                  <Icon
+                    icon="solar:danger-triangle-bold"
                     className="w-4 h-4 text-red-500 drop-shadow-lg"
                   />
                 </div>
@@ -762,10 +765,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           )}
           {!isBlockedByNoRisk && isWarningByNoRisk && (
             <div className="absolute top-0.5 left-0.5 z-10 pointer-events-auto">
-              <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+              <Tooltip content={t('modrinth.warning_mod_tooltip')}>
                 <div>
-                  <Icon 
-                    icon="solar:danger-triangle-bold" 
+                  <Icon
+                    icon="solar:danger-triangle-bold"
                     className="w-4 h-4 text-yellow-500 drop-shadow-lg"
                   />
                 </div>
@@ -790,15 +793,15 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
         if (item.fallback_version) {
           versionText = item.fallback_version;
-          descriptionText = `Version: ${item.fallback_version}`;
-          titleText = `Version: ${item.fallback_version}`;
+          descriptionText = `${t('content.version_label')} ${item.fallback_version}`;
+          titleText = `${t('content.version_label')} ${item.fallback_version}`;
         } else if (item.modrinth_info?.version_number) {
           versionText = item.modrinth_info.version_number;
-          descriptionText = `Version: ${item.modrinth_info.version_number}`;
-          titleText = `Modrinth Version: ${item.modrinth_info.version_number}`;
+          descriptionText = `${t('content.version_label')} ${item.modrinth_info.version_number}`;
+          titleText = `Modrinth ${t('content.version_label')} ${item.modrinth_info.version_number}`;
         } else if (isItemStillLoadingDetails) {
-          descriptionText = "Loading...";
-          titleText = "Loading details...";
+          descriptionText = t('common.loading');
+          titleText = t('content.loading_details');
         } else {
           descriptionText = formatFileSize(item.file_size || 0);
           titleText = `Size: ${formatFileSize(item.file_size || 0)}`;
@@ -808,7 +811,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           <span title={titleText} className="flex items-center">
             {versionText ? (
               <>
-                <span>Version: {versionText}</span>
+                <span>{t('content.version_label')} {versionText}</span>
                 {contentType !== "NoRiskMod" && (
                   <div className="relative">
                     <button
@@ -830,7 +833,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                           setOpenVersionDropdownId(item.filename);
                         }
                       }}
-                      title="View version options"
+                      title={t('content.view_version_options')}
                     >
                       <span
                         className={`font-minecraft-ten transition-transform duration-200 ${isItemOpen ? "rotate-90" : ""}`}
@@ -854,7 +857,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                         >
                           {isLoadingVersions ? (
                             <div className="text-white/70 text-sm tracking-wider">
-                              Loading versions...
+                              {t('content.loading_versions')}
                             </div>
                           ) : versionsError ? (
                             <div className="text-red-400 text-sm tracking-wider">
@@ -864,7 +867,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                             availableVersions.length > 0 ? (
                             <>
                               <div className="font-bold mb-2 text-sm tracking-wider">
-                                Available Versions on {getItemPlatformDisplayName(item)}:
+                                {t('content.available_versions_on', { platform: getItemPlatformDisplayName(item) })}
                               </div>
                               <div className="max-h-48 overflow-y-auto custom-scrollbar">
                                 {availableVersions.map((version) => {
@@ -901,11 +904,11 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                           ) : availableVersions &&
                             availableVersions.length === 0 ? (
                             <div className="text-white/70 text-sm tracking-wider">
-                              No other compatible versions found on {getItemPlatformDisplayName(item)}.
+                              {t('content.no_compatible_versions', { platform: getItemPlatformDisplayName(item) })}
                             </div>
                           ) : (
                             <div className="text-white/70 text-sm tracking-wider">
-                              Version history not available on {getItemPlatformDisplayName(item)}.
+                              {t('content.version_history_unavailable', { platform: getItemPlatformDisplayName(item) })}
                             </div> // Fallback for items without version history
                           )}
                         </div>,
@@ -918,7 +921,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
               <span>{descriptionText}</span>
             )}
             {item.is_directory && (
-              <span className="ml-1 text-xs text-white/60">(Folder)</span>
+              <span className="ml-1 text-xs text-white/60">{t('content.folder_label')}</span>
             )}
           </span>
         );
@@ -931,7 +934,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       const itemBadgesNode = [
         // NoRisk crash warning (highest priority)
         ...(isBlockedByNoRisk ? [{
-          text: "CRASHES WITH NRC",
+          text: t('content.badge.crashes_with_nrc'),
           color: "#ef4444"
         }] : []),
 
@@ -1015,7 +1018,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           id: "updating",
           icon: LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[11],
           variant: "secondary",
-          tooltip: "Updating...",
+          tooltip: t('content.actions.updating'),
           disabled: true,
           loading: true,
           onClick: () => {},
@@ -1025,10 +1028,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       // Main toggle action
       itemActions.push({
         id: "toggle",
-        label: isToggling ? "..." : !item.is_disabled ? "DISABLE" : "ENABLE",
+        label: isToggling ? "..." : !item.is_disabled ? t('common.disable') : t('common.enable'),
         icon: !item.is_disabled ? "solar:close-circle-bold" : "solar:check-circle-bold",
         variant: !item.is_disabled ? "secondary" : "primary",
-        tooltip: !item.is_disabled ? "Disable this item" : "Enable this item",
+        tooltip: !item.is_disabled ? t('content.actions.disable_item') : t('content.actions.enable_item'),
         disabled: isToggling,
         onClick: () => handleToggleItemEnabled(item),
       });
@@ -1039,7 +1042,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           id: "delete",
           icon: isDeleting ? LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[11] : LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[6],
           variant: "destructive",
-          tooltip: `Delete ${itemTypeName}`,
+          tooltip: t('content.actions.delete_item', { itemType: itemTypeName }),
           disabled: isDeleting,
           loading: isDeleting,
           onClick: () => handleDeleteItem(item),
@@ -1051,7 +1054,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         id: "more",
         icon: LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[7],
         variant: "secondary",
-        tooltip: "More Actions",
+        tooltip: t('content.actions.more'),
         onClick: (e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -1128,7 +1131,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                 icon={LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[5]}
                 className="w-4 h-4 flex-shrink-0 text-white/70"
               />
-              <span className="flex-1">Open Folder</span>
+              <span className="flex-1">{t('content.actions.open_folder')}</span>
             </button>
             {item.id && (
               <button
@@ -1149,13 +1152,23 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                 className="w-4 h-4 flex-shrink-0 text-white/70"
               />
               <span className="flex-1">
-                {(item.updates_enabled ?? true) ? "Disable Check" : "Enable Check"}
+                {(item.updates_enabled ?? true) ? t('content.actions.disable_check') : t('content.actions.enable_check')}
               </span>
             </button>
             )}
           </div>
         </div>
       );
+
+      // Determine if we can navigate to mod detail page
+      const canNavigateToDetail = item.modrinth_info?.project_id || item.curseforge_info?.project_id;
+      const handleTitleClick = canNavigateToDetail ? () => {
+        if (item.modrinth_info?.project_id) {
+          navigate(`/mods/modrinth/${item.modrinth_info.project_id}`);
+        } else if (item.curseforge_info?.project_id) {
+          navigate(`/mods/curseforge/${item.curseforge_info.project_id}`);
+        }
+      } : undefined;
 
       return (
         <GenericDetailListItem
@@ -1167,6 +1180,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           }
           iconNode={itemIconNode}
           title={itemTitle}
+          onTitleClick={handleTitleClick}
           descriptionNode={itemDescriptionNode}
           infoItems={itemBadgesNode}
           isDisabled={item.is_disabled}
@@ -1216,6 +1230,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       versionsError,
       handleSwitchContentVersion,
       isBlockedConfigLoaded,
+      navigate,
     ],
   );
 
@@ -1269,7 +1284,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       </div>
       {contentUpdateError && (
         <div className="text-xs text-red-400 p-1 bg-red-900/30 border border-red-700/50 rounded">
-          Update Check Error: {contentUpdateError}
+          {t('content.update_check_error', { error: contentUpdateError })}
         </div>
       )}
       <>
@@ -1281,13 +1296,13 @@ export function LocalContentTabV2<T extends LocalContentItem>({
             onChange={(checked) => handleSelectAllToggle(checked)}
             label={
               selectedItemIds.size > 0
-                ? `${selectedItemIds.size} selected`
-                : "Select All"
+                ? `${selectedItemIds.size} ${t('common.selected')}`
+                : t('common.select_all')
             }
             tooltip={
               areAllFilteredSelected
-                ? "Deselect all visible"
-                : "Select all visible"
+                ? t('content.actions.deselect_all')
+                : t('content.actions.select_all')
             }
           />
 
@@ -1299,37 +1314,37 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                 actions={[
                   {
                     id: "batch-toggle",
-                    label: isBatchToggling ? "TOGGLING..." : `TOGGLE (${selectedItemIds.size})`,
+                    label: isBatchToggling ? t('content.actions.toggling') : `${t('content.actions.toggle')} (${selectedItemIds.size})`,
                     icon: isBatchToggling ? LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[11] : "solar:refresh-bold",
                     variant: "text" as const,
                     disabled: isBatchToggling,
                     loading: isBatchToggling,
-                    tooltip: `Toggle enable/disable for ${selectedItemIds.size} selected items`,
+                    tooltip: t('content.actions.toggle_selected', { count: selectedItemIds.size }),
                     onClick: handleBatchToggleSelected,
                   },
                   // Smart updates toggle button - only show if we have valid items
                   ...(updatesToggleConfig ? [{
                     id: "batch-toggle-updates",
                     label: updatesToggleConfig.shouldEnable
-                      ? `ENABLE CHECK (${updatesToggleConfig.actionCount})`
-                      : `DISABLE CHECK (${updatesToggleConfig.actionCount})`,
+                      ? `${t('content.actions.enable_check')} (${updatesToggleConfig.actionCount})`
+                      : `${t('content.actions.disable_check')} (${updatesToggleConfig.actionCount})`,
                     icon: updatesToggleConfig.shouldEnable
                       ? "solar:check-circle-bold"
                       : "solar:close-circle-bold",
                     variant: "text" as const,
                     tooltip: updatesToggleConfig.shouldEnable
-                      ? `Enable update checks for ${updatesToggleConfig.actionCount} selected items`
-                      : `Disable update checks for ${updatesToggleConfig.actionCount} selected items`,
+                      ? t('content.actions.enable_checks_selected', { count: updatesToggleConfig.actionCount })
+                      : t('content.actions.disable_checks_selected', { count: updatesToggleConfig.actionCount }),
                     onClick: () => handleBatchToggleSelectedUpdatesEnabled(updatesToggleConfig.shouldEnable),
                   }] : []),
                   ...(contentType !== "NoRiskMod" ? [{
                     id: "batch-delete",
-                    label: isBatchDeleting ? "DELETING..." : `DELETE (${selectedItemIds.size})`,
+                    label: isBatchDeleting ? t('content.actions.deleting') : `${t('common.delete')} (${selectedItemIds.size})`,
                     icon: isBatchDeleting ? LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[11] : LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[6],
                     variant: "text" as const,
                     disabled: isBatchDeleting,
                     loading: isBatchDeleting,
-                    tooltip: `Delete ${selectedItemIds.size} selected items`,
+                    tooltip: t('content.actions.delete_selected', { count: selectedItemIds.size }),
                     onClick: handleBatchDeleteSelected,
                   }] : []),
                 ]}
@@ -1351,7 +1366,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                           handleSelectedPackChange(value === "" ? null : value)
                         }
                         options={noriskPackOptions}
-                        placeholder="Select Pack..."
+                        placeholder={t('content.select_pack_placeholder')}
                         className="!h-9 text-sm min-w-[180px] max-w-[250px] truncate"
                         size="sm"
                       />
@@ -1359,7 +1374,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                         noriskPacksConfig?.packs[profile.selected_norisk_pack_id]
                           ?.isExperimental && (
                           <div className="text-xs text-yellow-500/80 font-minecraft">
-                            (Experimental)
+                            {t('content.experimental')}
                           </div>
                         )}
                     </div>
@@ -1371,12 +1386,12 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                     actions={[
                       {
                         id: "update-all",
-                        label: isUpdatingAll ? "UPDATING ALL..." : `UPDATE ALL (${updatableContentCount})`,
+                        label: isUpdatingAll ? t('content.actions.updating_all') : `${t('content.actions.update_all')} (${updatableContentCount})`,
                         icon: isUpdatingAll ? LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[11] : LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[14],
                         variant: "highlight" as const,
                         disabled: isUpdatingAll,
                         loading: isUpdatingAll,
-                        tooltip: `Update all ${updatableContentCount} mods with enabled updates`,
+                        tooltip: t('content.actions.update_all_tooltip', { count: updatableContentCount }),
                         onClick: handleUpdateAllAvailableContent,
                       },
                     ]}
@@ -1390,10 +1405,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                     actions={[
                       {
                         id: "browse",
-                        label: `DOWNLOAD ${itemTypeNamePlural.toUpperCase()}`,
+                        label: `${t('content.actions.download')} ${itemTypeNamePlural.toUpperCase()}`,
                         icon: "solar:add-circle-bold",
                         variant: "highlight" as const,
-                        tooltip: `Browse and download ${itemTypeNamePlural} online`,
+                        tooltip: t('content.actions.browse_tooltip', { itemType: itemTypeNamePlural }),
                         onClick: () => {
                           if (profile && onBrowseContentRequest) {
                             const browseContentType = getBrowseTabContentType(contentType);
@@ -1406,7 +1421,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                       },
                       {
                         id: "add",
-                        label: "IMPORT",
+                        label: t('content.actions.import'),
                         icon: "solar:folder-with-files-bold",
                         variant: "text" as const,
                         tooltip: addContentButtonText,
@@ -1422,10 +1437,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
                   actions={[
                     {
                       id: "refresh",
-                      label: "REFRESH",
+                      label: t('common.refresh'),
                       icon: LOCAL_CONTENT_TAB_ICONS_TO_PRELOAD[13],
                       variant: "text" as const,
-                      tooltip: "Refresh List",
+                      tooltip: t('content.actions.refresh_list'),
                       onClick: () => fetchData(true),
                     },
                   ]}
@@ -1444,8 +1459,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   if (!profile) {
     return (
       <div className="p-4 font-minecraft text-center text-white/70">
-        Profile data is not available. Cannot display{" "}
-        {itemTypeNamePlural.toLowerCase()}.
+        {t('content.profile_unavailable', { itemType: itemTypeNamePlural.toLowerCase() })}
       </div>
     );
   }
@@ -1459,12 +1473,12 @@ export function LocalContentTabV2<T extends LocalContentItem>({
 
       try {
         const newName = await confirm({
-          title: "Clone Profile",
-          inputLabel: "New profile name",
-          inputPlaceholder: "Enter a name for the cloned profile",
+          title: t('profiles.clone'),
+          inputLabel: t('profiles.new_name'),
+          inputPlaceholder: t('profiles.clone_name_placeholder'),
           inputInitialValue: `${profile.name} (Copy)`,
           inputRequired: true,
-          confirmText: "CLONE",
+          confirmText: t('profiles.clone_button'),
           type: "input",
           fullscreen: true, // Or false, depending on desired dialog style
         });
@@ -1478,7 +1492,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
           );
 
           toast.promise(clonePromise, {
-            loading: `Cloning profile '${profile.name}' as '${newName}'...`,
+            loading: t('content.toast.cloning', { name: profile.name, newName }),
             success: (newProfileId) => {
               // Immediately attempt to update the group after cloning is successful
               updateProfile(newProfileId, { group: "CUSTOM" })
@@ -1497,10 +1511,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
               fetchProfiles(); // Refresh profiles list in the store
               if (onRefreshRequired) onRefreshRequired(); // Refresh parent view if callback provided
               navigate(`/profilesv2/${newProfileId}`); // Navigate to the new profile's detail view
-              return `Profile '${newName}' cloned successfully!`; // Toast for cloning success
+              return t('content.toast.clone_success', { name: newName }); // Toast for cloning success
             },
             error: (err) =>
-              `Failed to clone profile: ${err instanceof Error ? err.message : String(err.message)}`,
+              t('content.toast.clone_failed', { error: parseErrorMessage(err) }),
           });
         }
       } catch (err) {
@@ -1509,7 +1523,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         if (err !== "cancel") {
           // Check if it's not a cancellation
           console.error("Error in clone setup or dialog: ", err);
-          toast.error("Could not initiate cloning process.");
+          toast.error(t('content.toast.clone_init_failed'));
         }
       }
     };
@@ -1521,7 +1535,7 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         onClick={handleCloneProfile} // Updated onClick
         icon={<Icon icon="solar:copy-bold-duotone" className="mr-2" />}
       >
-        CLONE PROFILE
+        {t('profiles.clone_profile')}
       </Button>
     );
 
@@ -1529,8 +1543,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
       <>
         <EmptyState
           icon="solar:shield-warning-bold-duotone"
-          message="Standard profiles are read-only."
-          description="Clone to make changes and manage content."
+          message={t('content.standard_readonly')}
+          description={t('content.clone_to_edit')}
           action={cloneButton}
           fullHeight={true}
           className="justify-center"
@@ -1548,11 +1562,11 @@ export function LocalContentTabV2<T extends LocalContentItem>({
   // Dynamic empty state messages
   const getEmptyStateMessage = () => {
     if (contentType === "NoRiskMod" && !profile?.selected_norisk_pack_id) {
-      return "No NoRisk Pack Selected";
+      return t('content.no_pack_selected');
     } else if (error) {
       return ""; // Remove title, show only button
     } else if ((isLoading || isFetchingPacksConfig) && items.length === 0) {
-      return `Loading ${itemTypeNamePlural}...`;
+      return t('content.loading_items', { itemType: itemTypeNamePlural });
     } else if (
       !searchQuery &&
       items.length === 0 &&
@@ -1566,31 +1580,31 @@ export function LocalContentTabV2<T extends LocalContentItem>({
     ) {
       return ""; // Remove title, show only button
     } else {
-      return `Manage your ${itemTypeNamePlural}`;
+      return t('content.manage_items', { itemType: itemTypeNamePlural });
     }
   };
 
   const getEmptyStateDescription = () => {
     if (contentType === "NoRiskMod" && !profile?.selected_norisk_pack_id) {
-      return "Please select a NoRisk Modpack from the dropdown to manage its mods.";
+      return t('content.select_pack_description');
     } else if (error) {
-      return "Please try refreshing or check the console.";
+      return t('content.error_description');
     } else if ((isLoading || isFetchingPacksConfig) && items.length === 0) {
-      return "Please wait while content is being loaded.";
+      return t('content.loading_description');
     } else if (
       !searchQuery &&
       items.length === 0 &&
       selectedItemIds.size === 0
     ) {
-      return `Drag & drop ${itemTypeNamePlural} here to add them, or click Browse to discover and install content online.`;
+      return t('content.empty_description', { itemType: itemTypeNamePlural });
     } else if (
       searchQuery &&
       filteredItems.length === 0 &&
       selectedItemIds.size === 0
     ) {
-      return "Try a different search term or clear the search filter.";
+      return t('content.no_search_results');
     } else {
-      return `Select ${itemTypeNamePlural} to perform batch actions or manage them individually.`;
+      return t('content.select_to_manage', { itemType: itemTypeNamePlural });
     }
   };
 
@@ -1646,10 +1660,10 @@ export function LocalContentTabV2<T extends LocalContentItem>({
               actions={[
                 {
                   id: "browse-empty",
-                  label: `BROWSE ${itemTypeNamePlural.toUpperCase()}`,
+                  label: `${t('content.actions.browse')} ${itemTypeNamePlural.toUpperCase()}`,
                   icon: "solar:add-circle-bold",
                   variant: "highlight" as const,
-                  tooltip: `Browse and download ${itemTypeNamePlural} online`,
+                  tooltip: t('content.actions.browse_tooltip', { itemType: itemTypeNamePlural }),
                   onClick: handleEmptyStateBrowse,
                 },
               ]}
@@ -1674,8 +1688,8 @@ export function LocalContentTabV2<T extends LocalContentItem>({
         isDeleting={isDialogActionLoading}
         title={
           itemToDeleteForDialog
-            ? `Delete ${getDisplayFileName(itemToDeleteForDialog)}?`
-            : `Delete Selected ${itemTypeNamePlural}?`
+            ? t('content.delete_item_title', { name: getDisplayFileName(itemToDeleteForDialog) })
+            : t('content.delete_selected_title', { itemType: itemTypeNamePlural })
         }
       />
     </>

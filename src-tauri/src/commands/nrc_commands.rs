@@ -1,6 +1,5 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::norisk_api::CrashlogDto;
-use crate::minecraft::api::norisk_api::NoRiskApi;
+use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward, UniquePlayersResponse, UserNotification};
 use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::state::state_manager::State;
@@ -73,6 +72,8 @@ pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
             .title("Discord X NoRiskClient")
             .always_on_top(true)
             .center()
+            .inner_size(500.0, 700.0)
+            .min_inner_size(400.0, 500.0)
             .max_inner_size(1250.0, 1000.0)
             .build()
             .map_err(|e| {
@@ -192,9 +193,182 @@ pub async fn discord_auth_unlink() -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), CommandError> {
+pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
+    debug!("Executing github_auth_link command");
+    let state = State::get().await?;
+
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for GitHub link.".to_string(),
+        ))?;
+
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    let url_string = format!(
+        "https://api{}.norisk.gg/api/v1/core/oauth/github?token={}",
+        if is_experimental { "-staging" } else { "" },
+        token
+    );
+    debug!("Generated GitHub auth URL string: {}", url_string);
+
+    let external_url = Url::parse(&url_string).map_err(|e| {
+        CommandError::from(AppError::Other(format!(
+            "Invalid URL format for GitHub auth: {}",
+            e
+        )))
+    })?;
+
+    if let Some(window) = app.get_webview_window("github-signin") {
+        debug!("Closing existing github-signin window.");
+        if let Err(e) = window.close().map_err(|e_close| {
+            CommandError::from(AppError::Other(format!(
+                "Failed to close existing GitHub window: {}",
+                e_close
+            )))
+        }) {
+            debug!("Error closing existing github-signin window: {:?}", e);
+        }
+    }
+
+    let start_time = Utc::now();
+
+    let window =
+        WebviewWindowBuilder::new(&app, "github-signin", WebviewUrl::External(external_url))
+            .title("GitHub X NoRiskClient")
+            .always_on_top(true)
+            .center()
+            .inner_size(500.0, 700.0)
+            .min_inner_size(400.0, 500.0)
+            .max_inner_size(1250.0, 1000.0)
+            .build()
+            .map_err(|e| {
+                CommandError::from(AppError::Other(format!(
+                    "Failed to build GitHub window: {}",
+                    e
+                )))
+            })?;
+
+    window
+        .request_user_attention(Some(UserAttentionType::Critical))
+        .map_err(|e| {
+            CommandError::from(AppError::Other(format!(
+                "Failed to request user attention for GitHub window: {}",
+                e
+            )))
+        })?;
+    debug!("GitHub sign-in window opened.");
+
+    while (Utc::now() - start_time) < ChronoDuration::minutes(10) {
+        match window.url().map_err(|e| {
+            CommandError::from(AppError::Other(format!(
+                "Failed to get GitHub window URL: {}",
+                e
+            )))
+        }) {
+            Ok(current_url) => {
+                let current_url_str = current_url.as_str();
+                if current_url_str
+                    .starts_with("https://api.norisk.gg/api/v1/core/oauth/github/complete")
+                    || current_url_str.starts_with(
+                        "https://api-staging.norisk.gg/api/v1/core/oauth/github/complete",
+                    )
+                {
+                    debug!("GitHub authentication successful, closing window.");
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    window.close().map_err(|e_close| {
+                        CommandError::from(AppError::Other(format!(
+                            "Failed to close GitHub window after auth: {}",
+                            e_close
+                        )))
+                    })?;
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                debug!(
+                    "Error getting window URL (assuming closed by user): {:?}",
+                    e
+                );
+                return Ok(());
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    debug!("GitHub auth timed out after 10 minutes.");
+    window.close().map_err(|e_close| {
+        CommandError::from(AppError::Other(format!(
+            "Failed to close GitHub window after timeout: {}",
+            e_close
+        )))
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn github_auth_status() -> Result<bool, CommandError> {
+    debug!("Executing github_auth_status command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for GitHub status check.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
     debug!(
-        "Executing submit_crash_log_command with payload: {:?}",
+        "Checking GitHub link status for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::github_link_status(&token, &account_id_str, is_experimental).await?)
+}
+
+#[tauri::command]
+pub async fn github_auth_unlink() -> Result<(), CommandError> {
+    debug!("Executing github_auth_unlink command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for GitHub unlink.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Unlinking GitHub for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    NoRiskApi::unlink_github(&token, &account_id_str, is_experimental).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_crash_log_command(
+    payload: CrashlogDto,
+) -> Result<serde_json::Value, CommandError> {
+    debug!(
+        "Executing check_crash_log_command with payload: {:?}",
         payload
     );
     let state = State::get().await?;
@@ -205,25 +379,20 @@ pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), Comman
         .get_active_account()
         .await?
         .ok_or(AppError::AccountError(
-            "No active account found for submitting crash log.".to_string(),
+            "No active account found for checking crash log.".to_string(),
         ))?;
 
     let norisk_creds = &selected_account_arc.norisk_credentials;
     let token = norisk_creds.get_token_for_mode(is_experimental)?;
 
-    debug!(
-        "Submitting crash log for account {} (experimental: {}).",
-        selected_account_arc.id, is_experimental
-    );
-
-    NoRiskApi::submit_crash_log(
+    let result = NoRiskApi::check_crash_log(
         &token,
         &payload,
         &selected_account_arc.id.to_string(),
         is_experimental,
     )
     .await?;
-    Ok(())
+    Ok(result)
 }
 
 #[tauri::command]
@@ -313,4 +482,159 @@ pub async fn download_and_install_update_command(app: AppHandle) -> Result<(), C
     debug!("Using beta channel setting from config: {}", is_beta_channel);
     updater_utils::download_and_install_update(&app, is_beta_channel).await?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_advent_calendar_command() -> Result<Vec<AdventCalendarDay>, CommandError> {
+    debug!("Executing get_advent_calendar_command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for advent calendar.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Fetching advent calendar for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::get_advent_calendar(&token, &account_id_str, is_experimental).await?)
+}
+
+#[tauri::command]
+pub async fn claim_advent_calendar_day_command(tag: u32) -> Result<AdventCalendarDay, CommandError> {
+    debug!("Executing claim_advent_calendar_day_command with tag: {}", tag);
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for claiming advent calendar day.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Claiming advent calendar day {} for account {} (experimental: {})",
+        tag, account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::claim_advent_calendar_day(&token, tag, &account_id_str, is_experimental).await?)
+}
+
+/// Get information about a referral code.
+/// This is a public endpoint that doesn't require authentication.
+/// Used to display referrer info in the UI before login.
+#[tauri::command]
+pub async fn get_referral_info(code: String) -> Result<ReferralInfo, CommandError> {
+    debug!("Executing get_referral_info command for code: {}", code);
+
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    Ok(NoRiskApi::get_referral_info(&code, is_experimental).await?)
+}
+
+/// Get all notifications for the current user
+#[tauri::command]
+pub async fn get_notifications() -> Result<Vec<UserNotification>, CommandError> {
+    debug!("Executing get_notifications command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for notifications.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Fetching notifications for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    Ok(NoRiskApi::get_notifications(&token, &account_id_str, is_experimental).await?)
+}
+
+/// Mark all notifications as read
+#[tauri::command]
+pub async fn mark_all_notifications_read() -> Result<(), CommandError> {
+    debug!("Executing mark_all_notifications_read command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for marking notifications read.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Marking all notifications as read for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    NoRiskApi::mark_all_notifications_read(&token, &account_id_str, is_experimental).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn mark_notification_read(notification_id: String) -> Result<(), CommandError> {
+    debug!("Executing mark_notification_read command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+
+    let selected_account_arc = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or(AppError::AccountError(
+            "No active account found for marking notification read.".to_string(),
+        ))?;
+
+    let account_id_str = selected_account_arc.id.to_string();
+    let norisk_creds = &selected_account_arc.norisk_credentials;
+    let token = norisk_creds.get_token_for_mode(is_experimental)?;
+
+    debug!(
+        "Marking notification as read for account {} (experimental: {})",
+        account_id_str, is_experimental
+    );
+
+    NoRiskApi::mark_notification_read(&token, &notification_id, &account_id_str, is_experimental).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_unique_players_24h_command() -> Result<UniquePlayersResponse, CommandError> {
+    debug!("Executing get_unique_players_24h_command");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    Ok(NoRiskApi::get_unique_players_24h(is_experimental).await?)
 }

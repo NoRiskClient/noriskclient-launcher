@@ -10,7 +10,12 @@ export interface CosmeticCape {
   moderatorMessage: string; // String in Rust, renamed from "moderatorMessage" in JSON
   creationDate: number; // i64 in Rust, renamed from "creationDate" in JSON
   elytra: boolean; // bool in Rust
+  blurHash?: string; // Optional blur hash for the cape image
 }
+
+export type CapeReviewState = 'ACCEPTED' | 'IN_REVIEW' | 'DENIED';
+
+export type OwnedCapesResponse = Record<CapeReviewState, CosmeticCape[]>;
 
 export interface PaginationInfo {
   currentPage: number; // i32 in Rust, renamed from "currentPage" in JSON

@@ -9,9 +9,12 @@ import { Checkbox } from "../../ui/Checkbox";
 import { gsap } from "gsap";
 import { ProfileIcon } from "../ProfileIcon";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
 import type { MinecraftAccount } from "../../../types/minecraft";
 import { cn } from "../../../lib/utils";
+import { useTranslation } from "react-i18next";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { toast } from "react-hot-toast";
 
 interface GeneralSettingsTabProps {
   profile: Profile;
@@ -32,6 +35,7 @@ export function GeneralSettingsTab({
   onDelete,
   isDeleting,
 }: GeneralSettingsTabProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
@@ -72,7 +76,7 @@ export function GeneralSettingsTab({
 
   // Component for account avatar with caching
   function AccountAvatar({ account }: { account: MinecraftAccount }) {
-    const avatarUrl = useCrafatarAvatar({
+    const avatarUrl = usePlayerAvatar({
       uuid: account.id,
       overlay: true,
     });
@@ -88,8 +92,7 @@ export function GeneralSettingsTab({
         className="w-full h-full object-cover pixelated"
         style={{ imageRendering: 'pixelated' }}
         onError={(e) => {
-          // Fallback to default Steve head
-          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+          e.currentTarget.style.display = 'none';
         }}
       />
     );
@@ -99,13 +102,22 @@ export function GeneralSettingsTab({
     updateProfile({ preferred_account_id: accountId });
   };
 
+  const handleCopyProfileId = async () => {
+    try {
+      await writeText(profile.id);
+      toast.success(t('profiles.settings.profileIdCopied'));
+    } catch (e) {
+      console.error("Failed to copy profile ID:", e);
+    }
+  };
+
   return (
     <div ref={tabRef} className="space-y-6 select-none">
       <div ref={formRef} className="space-y-6">
         <div className="flex gap-6">
           <div className="flex-1 flex flex-col">
             <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-              profile name
+              {t('profiles.settings.profileName')}
             </label>
             <div className="flex items-center gap-4">
               <ProfileIcon
@@ -127,7 +139,7 @@ export function GeneralSettingsTab({
               <SearchStyleInput
                 value={editedProfile.name}
                 onChange={(e) => updateProfile({ name: e.target.value })}
-                placeholder="Enter profile name"
+                placeholder={t('profiles.settings.enterProfileName')}
                 className="text-xl flex-1"
                 disabled={profile.is_standard_version ? true : false}
               />
@@ -136,13 +148,13 @@ export function GeneralSettingsTab({
 
           <div className="flex-1 flex flex-col">
             <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-              group
+              {t('profiles.settings.group')}
             </label>
             <div className="flex items-center">
               <SearchStyleInput
                 value={editedProfile.group || ""}
                 onChange={(e) => updateProfile({ group: e.target.value || null })}
-                placeholder="e.g. modpacks, vanilla+"
+                placeholder={t('placeholders.group_name')}
                 className="text-xl w-full"
                 disabled={profile.is_standard_version ? true : false}
               />
@@ -153,7 +165,7 @@ export function GeneralSettingsTab({
         {/* Shared Minecraft Folder Checkbox */}
         <div className="space-y-1">
           <Checkbox
-            label="Use shared Minecraft folder"
+            label={t('profiles.settings.useSharedFolder')}
             checked={editedProfile.use_shared_minecraft_folder ?? false}
             onChange={(event) => {
               const newValue = event.target.checked;
@@ -161,18 +173,18 @@ export function GeneralSettingsTab({
                 use_shared_minecraft_folder: newValue
               });
             }}
-            description="When enabled, a shared Minecraft folder will be used based on the group. Your settings, worlds, configs and resource packs will remain the same between profiles."
+            description={t('profiles.settings.sharedFolderDescription')}
             descriptionClassName="font-minecraft-ten text-sm"
             size="lg"
           />
           <p className="text-xs text-white/50 font-minecraft-ten ml-10 -mt-1">
-            (you can change this anytime)
+            {t('profiles.settings.canChangeAnytime')}
           </p>
         </div>
 
         <div>
           <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-            quick play path
+            {t('profiles.settings.quickPlayPath')}
           </label>
           <SearchStyleInput
             value={editedProfile.settings.quick_play_path || ""}
@@ -184,18 +196,17 @@ export function GeneralSettingsTab({
                 }
               })
             }
-            placeholder="World name or server address (e.g. MyWorld or hypixel.net)"
+            placeholder={t('profiles.settings.quickPlayPlaceholder')}
             className="text-xl"
           />
           <p className="text-xs text-white/70 mt-2 font-minecraft-ten tracking-wide select-none">
-            Enter a world name for singleplayer or server address for multiplayer.
-            Server addresses are detected by containing a dot (e.g. hypixel.net).
+            {t('profiles.settings.quickPlayDescription')}
           </p>
         </div>
 
         <div ref={accountRef} className="space-y-3">
           <h3 className="text-3xl font-minecraft text-white lowercase">
-            preferred launch account
+            {t('profiles.settings.preferredAccount')}
           </h3>
           
           {accounts.length > 0 ? (
@@ -256,9 +267,24 @@ export function GeneralSettingsTab({
             </div>
           ) : (
             <div className="text-center py-4 text-white/50 font-minecraft text-lg lowercase">
-              No accounts found
+              {t('profiles.settings.noAccountsFound')}
             </div>
           )}
+        </div>
+
+        {/* Profile ID — discreet, click to copy */}
+        <div className="pt-4 mt-2 border-t border-white/10">
+          <button
+            type="button"
+            onClick={handleCopyProfileId}
+            title={t('profiles.settings.copyProfileId')}
+            className="group flex items-center gap-1.5 text-white/30 hover:text-white/55 transition-colors"
+          >
+            <Icon icon="solar:copy-linear" className="w-3.5 h-3.5" />
+            <span className="font-minecraft-ten text-xs tracking-wide">
+              {profile.id}
+            </span>
+          </button>
         </div>
 
       </div>

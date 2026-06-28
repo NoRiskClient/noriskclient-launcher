@@ -69,6 +69,48 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
 
 SearchStyleInput.displayName = "SearchStyleInput";
 
+// SearchStyleTextArea - für mehrzeilige Eingaben im SearchStyle Design
+export interface SearchStyleTextAreaProps
+  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size"> {
+  placeholder?: string;
+  icon?: string;
+  error?: string;
+  minHeight?: string;
+}
+
+export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTextAreaProps>(
+  ({ className, placeholder = "Enter text...", icon, error, minHeight = "100px", ...props }, ref) => {
+    return (
+      <div className="w-full">
+        <div className="flex items-start gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+          {icon && (
+            <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0 mt-1" />
+          )}
+          <textarea
+            ref={ref}
+            placeholder={placeholder}
+            className={cn(
+              "bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none resize-none",
+              className
+            )}
+            style={{ minHeight }}
+            spellCheck={false}
+            autoComplete="off"
+            {...props}
+          />
+        </div>
+        {error && (
+          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
+
+SearchStyleTextArea.displayName = "SearchStyleTextArea";
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   (
     {

@@ -222,7 +222,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type="button"
         disabled={disabled}        className={cn(
           "relative overflow-hidden lowercase font-minecraft transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
-          "flex items-center justify-center gap-2 backdrop-blur-md",
+          "flex items-center justify-center gap-2 backdrop-blur-md whitespace-nowrap",
           radiusClass,
           sizeClasses,
           getBorderClasses(),

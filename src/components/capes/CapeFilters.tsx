@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SearchInput } from "../ui/SearchInput";
 import { Select, type SelectOption } from "../ui/Select";
 import { Icon } from "@iconify/react";
@@ -28,6 +29,7 @@ export function CapeFilters({
 }: CapeFiltersProps) {
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const { activeAccount } = useMinecraftAuthStore();
+  const { t } = useTranslation();
 
   const handleSearchChange = (value: string) => {
     setSearchInputValue(value);
@@ -59,38 +61,38 @@ export function CapeFilters({
 
   const sortOptions: SelectOption[] = [
     {
-      value: "",
-      label: "Newest",
+      value: "mostUsed",
+      label: t('capes.mostUsed'),
+      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
+    },
+    {
+      value: "newest",
+      label: t('capes.newest'),
       icon: <Icon icon="solar:sort-by-time-linear" className="w-5 h-5" />,
     },
     {
       value: "oldest",
-      label: "Oldest",
+      label: t('capes.oldest'),
       icon: (
         <Icon icon="mdi:arrow-up-bold-circle-outline" className="w-5 h-5" />
       ),
-    },
-    {
-      value: "mostUsed",
-      label: "Most Used",
-      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
     },
   ];
 
   const timeFrameOptions: SelectOption[] = [
     {
       value: "",
-      label: "All Time",
+      label: t('capes.allTime'),
       icon: <Icon icon="solar:calendar-mark-linear" className="w-5 h-5" />,
     },
     {
       value: "weekly",
-      label: "Weekly",
+      label: t('capes.weekly'),
       icon: <Icon icon="mdi:calendar-week-outline" className="w-5 h-5" />,
     },
     {
       value: "monthly",
-      label: "Monthly",
+      label: t('capes.monthly'),
       icon: <Icon icon="solar:calendar-date-linear" className="w-5 h-5" />,
     },
   ];
@@ -101,7 +103,7 @@ export function CapeFilters({
         value={searchInputValue}
         onChange={handleSearchChange}
         onSearch={handleSearch}
-        placeholder="Search capes..."
+        placeholder={t('capes.searchCapesPlaceholder')}
         variant="flat"
         className="w-full md:w-auto flex-grow md:flex-grow-0 h-[42px]"
       />
@@ -111,7 +113,7 @@ export function CapeFilters({
         onChange={handleSortChange}
         options={sortOptions}
         variant="flat"
-        aria-label="Sort by"
+        aria-label={t('capes.sortBy')}
         className="w-full md:w-52 h-[42px]"
       />
 
@@ -120,7 +122,7 @@ export function CapeFilters({
         onChange={handleTimeFrameChange}
         options={timeFrameOptions}
         variant="flat"
-        aria-label="Filter by period"
+        aria-label={t('capes.filterByPeriod')}
         className="w-full md:w-52 h-[42px]"
       />
 
@@ -133,13 +135,13 @@ export function CapeFilters({
         disabled={!activeAccount}
         title={
           !activeAccount
-            ? "No active Minecraft account"
+            ? t('capes.noActiveAccount')
             : currentFilters.showOwnedOnly
-              ? "Show All Capes"
-              : "Show My Capes"
+              ? t('capes.showAllCapes')
+              : t('capes.showMyCapes')
         }
       >
-        My Capes
+        {t('capes.myCapes')}
       </Button>
     </div>
   );

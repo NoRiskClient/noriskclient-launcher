@@ -75,7 +75,16 @@ export interface ProfileSettings {
   java_path: string | null;       // Option<String> -> string | null
   use_custom_java_path: boolean; // Added boolean flag
   use_overwrite_loader_version: boolean; // Added boolean flag for loader version overwrite
-  overwrite_loader_version: string | null; // Option<String> -> string | null
+  overwrite_loader_version: string | null; // LEGACY single-slot; read-only path, writes go through the map below. Kept for old-profile compat.
+  /**
+   * Per-loader override map. Keys match `ModLoader::as_str()` ("fabric",
+   * "forge", "quilt", "neoforge"). Lets a profile hold distinct pinned
+   * versions for each loader, so fabric → forge → fabric restores the
+   * earlier fabric pick. Legacy profiles get the legacy field mirrored
+   * into it on the first save (backend handler). Optional because Rust
+   * uses `skip_serializing_if = "is_empty"` — absent when empty.
+   */
+  overwrite_loader_versions?: Record<string, string>;
   memory: MemorySettings;
   resolution: WindowSize | null;
   fullscreen: boolean;
@@ -164,6 +173,11 @@ export interface Mod {
 
   /// True if automatic updates are enabled for this mod (default: true)
   updates_enabled: boolean;
+
+  /// MC versions the user has explicitly forced this mod to load on,
+  /// even if they are not listed in `game_versions`. Populated at install/update
+  /// time when the profile's MC version is missing from the upstream metadata.
+  force_include_versions: string[];
 }
 
 export interface NoriskModIdentifier {
@@ -214,6 +228,7 @@ export interface Profile {
   norisk_information: NoriskInformation | null;
   modpack_info?: ModPackInfo | null;
   preferred_account_id: string | null;
+  playtime_seconds?: number;
 }
 
 export interface ProfileGroup {
@@ -266,6 +281,7 @@ export interface CopyProfileParams {
   new_profile_name: string;
   use_shared_minecraft_folder?: boolean;
   include_files?: string[];
+  copy_all_files?: boolean;
 }
 
 export interface ExportProfileParams {
@@ -279,6 +295,7 @@ export interface ExportProfileParams {
 export interface UploadProfileIconPayload {
   path?: string;      // Source path of the image file (optional)
   profileId: string; // UUID of the profile (as string)
+  iconUrl?: string;  // Optional URL to download the image from
   imageType: string; // "icon" or "background"
 }
 

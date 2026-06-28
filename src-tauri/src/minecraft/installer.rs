@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
@@ -46,6 +48,31 @@ async fn emit_progress_event(
     Ok(event_id)
 }
 
+/// Runs an async step with automatic start/completion events and timing.
+/// Emits a start event ("label...") at 0%, runs the closure, then emits
+/// a completion event ("label completed! (Xms)") at 100%.
+/// The timing also appears in launcher.log via log::info!.
+async fn timed_step<F, Fut, T>(
+    state: &State,
+    event_type: EventType,
+    profile_id: Uuid,
+    label: &str,
+    f: F,
+) -> Result<T>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    emit_progress_event(state, event_type.clone(), profile_id, &format!("{}...", label), 0.0, None).await?;
+    info!("{}", label);
+    let start = Instant::now();
+    let result = f().await?;
+    let elapsed_ms = start.elapsed().as_millis();
+    info!("[Timing] {} took {}ms", label, elapsed_ms);
+    emit_progress_event(state, event_type, profile_id, &format!("{} completed! ({}ms)", label, elapsed_ms), 1.0, None).await?;
+    Ok(result)
+}
+
 pub async fn install_minecraft_version(
     version_id: &str,
     modloader_str: &str,
@@ -54,6 +81,9 @@ pub async fn install_minecraft_version(
     quick_play_singleplayer: Option<String>,
     quick_play_multiplayer: Option<String>,
     migration_info: Option<crate::utils::profile_utils::MigrationInfo>,
+    extra_local_mods: Vec<std::path::PathBuf>,
+    // Use the passed-in profile as-is instead of reloading by id (override launches).
+    skip_profile_reload: bool,
 ) -> Result<()> {
     // Convert string modloader to ModLoader enum
     let modloader_enum = match modloader_str {
@@ -81,6 +111,21 @@ pub async fn install_minecraft_version(
     let is_experimental_mode = state.config_manager.is_experimental_mode().await;
     let launcher_config = state.config_manager.get_config().await;
 
+    let profile_owned;
+    let profile = if skip_profile_reload {
+        profile
+    } else {
+        if let Err(e) = state
+            .profile_manager
+            .resolve_and_migrate_pack_id(profile.id)
+            .await
+        {
+            warn!("[PackFallback] Pack migration check failed for profile {}: {}.", profile.id, e);
+        }
+        profile_owned = state.profile_manager.get_profile(profile.id).await?;
+        &profile_owned
+    };
+
     info!(
         "[Launch] Setting experimental mode: {}",
         is_experimental_mode
@@ -89,6 +134,8 @@ pub async fn install_minecraft_version(
         "[Launch] Using concurrent downloads: {}",
         launcher_config.concurrent_downloads
     );
+
+    let total_start = Instant::now();
 
     // <--- HARDCODED TEST ERROR (50% CHANCE) --- >
     let should_throw_error = {
@@ -176,6 +223,7 @@ pub async fn install_minecraft_version(
     .await?;
 
     // Check if profile uses a custom Java path
+    let step_start = Instant::now();
     let mut custom_java_valid = false;
     let java_path = if profile.settings.use_custom_java_path && profile.settings.java_path.is_some()
     {
@@ -245,7 +293,7 @@ pub async fn install_minecraft_version(
             &state,
             EventType::InstallingJava,
             profile.id,
-            "Using custom Java installation!",
+            &format!("Using custom Java installation! ({}ms)", step_start.elapsed().as_millis()),
             1.0,
             None,
         )
@@ -271,7 +319,7 @@ pub async fn install_minecraft_version(
             &state,
             EventType::InstallingJava,
             profile.id,
-            &format!("Java {} installation completed!", java_version),
+            &format!("Java {} installation completed! ({}ms)", java_version, step_start.elapsed().as_millis()),
             1.0,
             None,
         )
@@ -290,9 +338,9 @@ pub async fn install_minecraft_version(
     info!("\nChecking for StartUpHelper data to import...");
 
     // Load NoriskPackDefinition if a pack is selected
-    let norisk_pack = if let Some(pack_id) = &profile.selected_norisk_pack_id {
+    let norisk_pack = if let Some(pack_id) = profile.effective_norisk_pack_id().await {
         let config = state.norisk_pack_manager.get_config().await;
-        config.get_resolved_pack_definition(pack_id).ok()
+        config.get_resolved_pack_definition(&pack_id).ok()
     } else {
         None
     };
@@ -316,112 +364,43 @@ pub async fn install_minecraft_version(
     }
     info!("User data import check complete.");
 
-    // Emit libraries download event
-    let libraries_event_id = emit_progress_event(
-        &state,
-        EventType::DownloadingLibraries,
-        profile.id,
-        "Downloading libraries...",
-        0.0,
-        None,
-    )
-    .await?;
-
-    // Download all required files
-    info!("\nDownloading libraries...");
+    // Download libraries
     let libraries_service = MinecraftLibrariesDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
-    libraries_service
-        .download_libraries(&piston_meta.libraries)
-        .await?;
-    info!("Library download completed!");
+    timed_step(&state, EventType::DownloadingLibraries, profile.id, "Downloading libraries", || async {
+        libraries_service.download_libraries(&piston_meta.libraries).await
+    }).await?;
 
-    emit_progress_event(
-        &state,
-        EventType::DownloadingLibraries,
-        profile.id,
-        "Libraries download completed!",
-        1.0,
-        None,
-    )
-    .await?;
-
-    // Emit natives extraction event
-    let natives_event_id = emit_progress_event(
-        &state,
-        EventType::ExtractingNatives,
-        profile.id,
-        "Extracting natives...",
-        0.0,
-        None,
-    )
-    .await?;
-
-    info!("\nExtracting natives...");
+    // Extract natives
     let natives_service = MinecraftNativesDownloadService::new();
-    natives_service
-        .extract_natives(&piston_meta.libraries, version_id)
-        .await?;
-    info!("Native extraction completed!");
+    let cache_natives = launcher_config.cache_natives_extraction;
+    timed_step(&state, EventType::ExtractingNatives, profile.id, "Extracting natives", || async {
+        natives_service.extract_natives(&piston_meta.libraries, version_id, cache_natives).await
+    }).await?;
 
-    emit_progress_event(
-        &state,
-        EventType::ExtractingNatives,
-        profile.id,
-        "Natives extraction completed!",
-        1.0,
-        None,
-    )
-    .await?;
-
-    info!("\nDownloading assets...");
+    // Download MC assets (handles progress events internally)
     let assets_service = MinecraftAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
-    assets_service
-        .download_assets_with_progress(&piston_meta.asset_index, profile.id)
-        .await?;
-    info!("Asset download completed!");
+    measure_time!("MC assets download", {
+        assets_service
+            .download_assets_with_progress(&piston_meta.asset_index, profile.id)
+            .await?
+    });
 
-    // Download NoRiskClient assets if profile has a selected pack
-    info!("\nDownloading NoRiskClient assets...");
-
+    // Download NoRiskClient assets (handles progress events internally)
     let norisk_assets_service = NoriskClientAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
+    measure_time!("NRC assets download", {
+        norisk_assets_service
+            .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
+            .await?
+    });
 
-    // Download assets for this profile - progress events are now handled internally
-    norisk_assets_service
-        .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
-        .await?;
-
-    info!("NoRiskClient Asset download completed!");
-
-    // Emit client download event
-    let client_event_id = emit_progress_event(
-        &state,
-        EventType::DownloadingClient,
-        profile.id,
-        "Downloading Minecraft client...",
-        0.0,
-        None,
-    )
-    .await?;
-
-    info!("\nDownloading Minecraft client...");
+    // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new();
-    client_service
-        .download_client(&piston_meta.downloads.client, &piston_meta.id)
-        .await?;
-    info!("Client download completed!");
-
-    emit_progress_event(
-        &state,
-        EventType::DownloadingClient,
-        profile.id,
-        "Minecraft client download completed!",
-        1.0,
-        None,
-    )
-    .await?;
+    timed_step(&state, EventType::DownloadingClient, profile.id, "Downloading client", || async {
+        client_service.download_client(&piston_meta.downloads.client, &piston_meta.id).await
+    }).await?;
 
     // Create and use Minecraft launcher
     let launcher = MinecraftLauncher::new(
@@ -487,7 +466,9 @@ pub async fn install_minecraft_version(
             java_path.clone(),
             launcher_config.concurrent_downloads,
         );
-        let modloader_result = modloader_installer.install(version_id, &install_profile).await?;
+        let modloader_result = measure_time!("Modloader installation", {
+            modloader_installer.install(version_id, &install_profile).await?
+        });
 
         // Apply modloader specific parameters to launch parameters
         if let Some(main_class) = modloader_result.main_class {
@@ -524,14 +505,23 @@ pub async fn install_minecraft_version(
         launch_params = launch_params.with_main_class(&piston_meta.main_class);
     }
 
-    // Add custom JVM arguments from profile settings string
-    if let Some(jvm_args_str) = &profile.settings.custom_jvm_args {
+    // Add custom JVM arguments (global for standard profiles, profile-specific for custom)
+    let custom_jvm_args_str = if profile.is_standard_version {
+        let state = State::get().await?;
+        let config = state.config_manager.get_config().await;
+        config.global_custom_jvm_args.clone()
+    } else {
+        profile.settings.custom_jvm_args.clone()
+    };
+
+    if let Some(jvm_args_str) = custom_jvm_args_str {
         if !jvm_args_str.trim().is_empty() {
             let mut current_jvm_args = launch_params.additional_jvm_args.clone();
             let custom_args: Vec<String> =
                 jvm_args_str.split_whitespace().map(String::from).collect();
             info!(
-                "Adding custom JVM arguments from profile: {:?}",
+                "Adding custom JVM arguments from {}: {:?}",
+                if profile.is_standard_version { "global settings" } else { "profile" },
                 custom_args
             );
             current_jvm_args.extend(custom_args);
@@ -596,42 +586,14 @@ pub async fn install_minecraft_version(
     };
 
     // --- Step: Ensure profile-defined mods are downloaded/verified in cache ---
-    let mods_event_id = emit_progress_event(
-        &state,
-        EventType::DownloadingMods,
-        profile.id,
-        "Downloading/Checking Profile Mods... (Phase 1)",
-        0.0,
-        None,
-    )
-    .await?;
-
-    info!(
-        "Ensuring profile-defined mods for profile '{}' are downloaded to cache...",
-        profile.name
-    );
     let mod_downloader_service =
         ModDownloadService::with_concurrency(launcher_config.concurrent_downloads);
-    mod_downloader_service
-        .download_mods_to_cache(&profile)
-        .await?;
-    info!(
-        "Profile mod cache check/download completed successfully for profile '{}'",
-        profile.name
-    );
-
-    emit_progress_event(
-        &state,
-        EventType::DownloadingMods,
-        profile.id,
-        "Profile Mods downloaded successfully! (Phase 1)",
-        1.0,
-        None,
-    )
-    .await?;
+    timed_step(&state, EventType::DownloadingMods, profile.id, "Downloading profile mods", || async {
+        mod_downloader_service.download_mods_to_cache(&profile).await
+    }).await?;
 
     // --- Step: Download mods from selected Norisk Pack (if any) ---
-    if let Some(selected_pack_id) = &profile.selected_norisk_pack_id {
+    if let Some(selected_pack_id) = profile.effective_norisk_pack_id().await {
         // Use the already loaded config
         if let Some(config) = loaded_norisk_config.as_ref() {
             let norisk_mods_event_id = emit_progress_event(
@@ -655,15 +617,17 @@ pub async fn install_minecraft_version(
             let norisk_downloader_service =
                 NoriskPackDownloadService::with_concurrency(launcher_config.concurrent_downloads);
             let loader_str = modloader_enum.as_str();
-
-            match norisk_downloader_service
-                .download_pack_mods_to_cache(
-                    config, // Pass the reference to the loaded config
-                    selected_pack_id,
-                    version_id,
-                    loader_str,
-                )
-                .await
+            let pack_download_start = Instant::now();
+            match measure_time!(format!("Norisk pack mods download '{}'", selected_pack_id), {
+                norisk_downloader_service
+                    .download_pack_mods_to_cache(
+                        config,
+                        &selected_pack_id,
+                        version_id,
+                        loader_str,
+                    )
+                    .await
+            })
             {
                 Ok(_) => {
                     info!(
@@ -675,8 +639,8 @@ pub async fn install_minecraft_version(
                         EventType::DownloadingMods,
                         profile.id,
                         &format!(
-                            "Norisk Pack '{}' Mods downloaded successfully! (Phase 2)",
-                            selected_pack_id
+                            "Norisk Pack '{}' Mods downloaded successfully! (Phase 2) ({}ms)",
+                            selected_pack_id, pack_download_start.elapsed().as_millis()
                         ),
                         1.0,
                         None,
@@ -728,7 +692,7 @@ pub async fn install_minecraft_version(
 
     // ---> NEW: Get custom mods for this profile <---
     info!("Listing custom mods for profile '{}'...", profile.name);
-    let custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
+    let mut custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
     info!(
         "Found {} custom mods for profile '{}'",
         custom_mod_infos.len(),
@@ -736,28 +700,52 @@ pub async fn install_minecraft_version(
     );
     // ---> END NEW <---
 
+    // CLI temp launch: extra local mod jars referenced in place (not copied).
+    // Fed through the custom-mod path so the resolver writes their absolute path
+    // into the addMods meta file. Fabric + Forge/NeoForge only (vanilla has no
+    // meta file).
+    for path in &extra_local_mods {
+        match path.file_name() {
+            Some(name) => {
+                info!("[Local Mods] Adding CLI local mod in-place: {}", path.display());
+                custom_mod_infos.push(crate::state::profile_state::CustomModInfo {
+                    filename: name.to_string_lossy().into_owned(),
+                    is_enabled: true,
+                    path: path.clone(),
+                });
+            }
+            None => warn!(
+                "[Local Mods] Skipping --mods path without filename: {}",
+                path.display()
+            ),
+        }
+    }
+
     // Call the resolver function using the already loaded config (or None)
-    let target_mods = crate::minecraft::downloads::mod_resolver::resolve_target_mods(
-        profile,
-        loaded_norisk_config.as_ref(), // Pass the reference directly
-        Some(&custom_mod_infos),       // ---> NEW: Pass custom mods <---
-        version_id,
-        modloader_enum.as_str(),
-        &mod_cache_dir,
-    )
-    .await?;
+    let resolve_start = Instant::now();
+    let target_mods = measure_time!("Mod resolving", {
+        crate::minecraft::downloads::mod_resolver::resolve_target_mods(
+            profile,
+            loaded_norisk_config.as_ref(),
+            Some(&custom_mod_infos),
+            version_id,
+            modloader_enum.as_str(),
+            &mod_cache_dir,
+        )
+        .await?
+    });
 
     emit_progress_event(
         &state,
         EventType::SyncingMods,
         profile.id,
-        &format!("Resolved {} mods for sync.", target_mods.len()),
+        &format!("Resolved {} mods for sync. ({}ms)", target_mods.len(), resolve_start.elapsed().as_millis()),
         1.0,
         None,
     )
     .await?;
 
-    // --- Prototype: Provide managed mods via Fabric addMods meta file (Fabric only) ---
+    // --- Provide managed mods via meta file (Fabric: addMods, Forge: NrcCoreMod) ---
     if modloader_enum == ModLoader::Fabric {
         let add_mods_arg = crate::minecraft::downloads::mod_resolver::build_fabric_add_mods_arg(
             profile.id,
@@ -769,62 +757,77 @@ pub async fn install_minecraft_version(
         current_jvm_args.push(add_mods_arg);
         launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
         info!("Configured Fabric addMods meta file for profile '{}'", profile.name);
+    } else if modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
+        let loader_str = if modloader_enum == ModLoader::NeoForge { "neoforge" } else { "forge" };
+        let is_legacy_forge = modloader_enum == ModLoader::Forge
+            && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
+
+        let (early_service_mods, meta_mods) = if modloader_enum == ModLoader::NeoForge {
+            crate::minecraft::downloads::mod_resolver::split_neoforge_early_service_mods(&target_mods).await
+        } else {
+            (Vec::new(), target_mods.clone())
+        };
+
+        let meta_path = crate::minecraft::downloads::mod_resolver::build_forge_add_mods_meta(
+            profile.id,
+            version_id,
+            &meta_mods,
+        )
+        .await?;
+
+        let forge_libs = crate::minecraft::downloads::forge_libraries_download::ForgeLibrariesDownload::new();
+        let loader_path = forge_libs.resolve_forgeloader(version_id, loader_str).await?;
+
+        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
+        let meta_path_str = meta_path.to_string_lossy().replace("\\", "/");
+        current_jvm_args.push(format!("-Dnrc.addMods=@{}", meta_path_str));
+
+        if is_legacy_forge {
+            current_jvm_args.push("-Dfml.coreMods.load=gg.norisk.forgeloader.forge.ForgeModLoader".to_string());
+        }
+        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
+
+        let mut libs = launch_params.additional_libraries.clone();
+        libs.push(loader_path);
+        for tm in &early_service_mods {
+            libs.push(tm.cache_path.clone());
+        }
+        launch_params = launch_params.with_additional_libraries(libs);
+
+        info!(
+            "Configured {} ForgeModLoader for profile '{}' ({} meta mods, {} early-service mods on cp)",
+            loader_str, profile.name, meta_mods.len(), early_service_mods.len()
+        );
     }
 
     // --- Step: Sync mods from cache to profile directory ---
-    let sync_event_id = emit_progress_event(
-        &state,
-        EventType::SyncingMods,
-        profile.id,
-        "Syncing mods to profile directory... (Phase 3)",
-        0.0,
-        None,
-    )
-    .await?;
-
-    info!(
-        "Syncing mods from cache to profile directory for '{}'...",
-        profile.name
-    );
-
-    // Get the correct mods directory path for the profile
     let profile_mods_path = state.profile_manager.get_profile_mods_path(profile)?;
 
-    // Ensure mods folder exists for all loaders before launch/sync
-    async_fs::create_dir_all(&profile_mods_path).await?;
-
-    // Pass the resolved target_mods list and the specific mods path to the sync function
-    if modloader_enum == ModLoader::Fabric {
-        info!(
-            "Skipping mods folder sync for Fabric (using addMods meta file instead)."
-        );
-    } else {
-        mod_downloader_service
-            .sync_mods_to_profile(&target_mods, &profile_mods_path)
-            .await?;
-    }
-
-    info!("Mod sync completed for profile '{}'", profile.name);
-    emit_progress_event(
-        &state,
-        EventType::SyncingMods,
-        profile.id,
-        "Mod sync complete! (Phase 3)",
-        1.0,
-        None,
-    )
-    .await?;
+    timed_step(&state, EventType::SyncingMods, profile.id, "Syncing mods", || async {
+        if modloader_enum == ModLoader::Vanilla {
+            info!("Vanilla loader: skipping mod sync — vanilla does not load mods from mods/.");
+        } else {
+            async_fs::create_dir_all(&profile_mods_path).await?;
+            if modloader_enum == ModLoader::Fabric || modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
+                info!("Cleaning managed mods from mods/ folder (all mods loaded via meta file from cache).");
+                mod_downloader_service.clean_managed_mods(&target_mods, &profile_mods_path).await?;
+            } else {
+                mod_downloader_service.sync_mods_to_profile(&target_mods, &profile_mods_path).await?;
+            }
+        }
+        Ok(())
+    }).await?;
 
     // Download log4j configuration if available
     let mut log4j_arg = None;
     if let Some(logging) = &piston_meta.logging {
-        info!("\nDownloading log4j configuration...");
         let logging_service = MinecraftLoggingDownloadService::new();
-        let config_path = logging_service
-            .download_logging_config(&logging.client)
-            .await?;
+        let config_path = measure_time!("Log4j config download", {
+            logging_service
+                .download_logging_config(&logging.client)
+                .await?
+        });
         log4j_arg = Some(logging_service.get_jvm_argument(&config_path));
-        info!("Log4j configuration download completed!");
     }
 
     // Add log4j configuration to JVM arguments if available
@@ -872,30 +875,11 @@ pub async fn install_minecraft_version(
     }
 
     // --- Launch Minecraft ---
-    // Emit launch event
-    let launch_event_id = emit_progress_event(
-        &state,
-        EventType::LaunchingMinecraft,
-        profile.id,
-        "Starting Minecraft...",
-        0.0,
-        None,
-    )
-    .await?;
+    timed_step(&state, EventType::LaunchingMinecraft, profile.id, "Launching Minecraft", || async {
+        launcher.launch(&piston_meta, launch_params, Some(profile.clone())).await
+    }).await?;
 
-    launcher
-        .launch(&piston_meta, launch_params, Some(profile.clone()))
-        .await?;
-
-    emit_progress_event(
-        &state,
-        EventType::LaunchingMinecraft,
-        profile.id,
-        "Minecraft launched successfully!",
-        1.0,
-        None,
-    )
-    .await?;
+    info!("[Timing] Total installation took {}ms", total_start.elapsed().as_millis());
 
     Ok(())
 }

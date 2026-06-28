@@ -127,11 +127,11 @@ pub async fn repair_profile_mods(profile_id: Uuid) -> Result<()> {
         }
 
         // 3. Delete NoRisk pack mod files from cache
-        if let Some(pack_id) = &profile.selected_norisk_pack_id {
+        if let Some(pack_id) = profile.effective_norisk_pack_id().await {
             info!("Cleaning NoRisk pack mod cache for pack: {}", pack_id);
-            
+
             let norisk_config = state.norisk_pack_manager.get_config().await;
-            match norisk_config.get_resolved_pack_definition(pack_id) {
+            match norisk_config.get_resolved_pack_definition(&pack_id) {
                 Ok(resolved_pack) => {
                     for norisk_mod in &resolved_pack.mods {
                         // Get the cache path for this NoRisk mod

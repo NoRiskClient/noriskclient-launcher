@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use tokio::fs as tokio_fs;
 
 const NEO_FORGE_MAVEN_METADATA_URL: &str =
-    "https://maven.neoforged.net/net/neoforged/neoforge/maven-metadata.xml";
+    "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
 
 pub struct NeoForgeApi {
     base_url: String,

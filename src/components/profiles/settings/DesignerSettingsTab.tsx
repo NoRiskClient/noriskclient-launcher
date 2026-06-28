@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types/profile";
 import { Checkbox } from "../../ui/Checkbox";
 // import { Label } from "../../ui/Label"; // No longer needed for this specific checkbox
@@ -13,7 +14,8 @@ export function DesignerSettingsTab({
   editedProfile,
   updateProfile,
 }: DesignerSettingsTabProps) {
-  
+  const { t } = useTranslation();
+
   const handleKeepLocalAssetsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     updateProfile({
       norisk_information: {
@@ -29,13 +31,13 @@ export function DesignerSettingsTab({
     <div className="space-y-4 pt-2">
       <div>
         <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
-          Asset Management
+          {t('designer.asset_management')}
         </h3>
         <div className="p-0">
           <div className="flex items-center space-x-3 mb-2">
             <Checkbox
               id="keepLocalAssetsDesigner"
-              label="Keep Local Assets"
+              label={t('designer.keep_local_assets')}
               checked={
                 editedProfile.norisk_information?.keep_local_assets || false
               }
@@ -45,8 +47,7 @@ export function DesignerSettingsTab({
             />
           </div>
           <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none pl-1">
-            If checked, edited assets (wings, norisk.jsons, etc.) will not be 
-            overwritten upon relaunch.
+            {t('designer.keep_local_assets_description')}
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import type { ModrinthVersion } from "../../../types/modrinth";
@@ -74,6 +75,7 @@ export function ContentPackRow({
   onCheckForUpdates,
   children,
 }: ContentPackRowProps) {
+  const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localIcon, setLocalIcon] = useState<string | null>(null);
@@ -97,9 +99,9 @@ export function ContentPackRow({
   }, []);
 
   const extractFileName = (path?: string): string => {
-    if (!path) return "Unknown file";
+    if (!path) return t('content.unknown_file');
     const parts = path.split(/[/\\]/);
-    return parts[parts.length - 1] || "Unknown file";
+    return parts[parts.length - 1] || t('content.unknown_file');
   };
 
   const getDisplayName = (): string => {
@@ -114,7 +116,7 @@ export function ContentPackRow({
 
     if (contentPack.curseforge_info?.name) return contentPack.curseforge_info.name;
 
-    return "Unknown pack";
+    return t('content.unknown_pack');
   };
 
   const getFormattedFileSize = (): string | null => {
@@ -270,7 +272,7 @@ export function ContentPackRow({
           </div>
           <div className="text-white/50 text-lg lowercase truncate">
             {contentPack.creator && (
-              <span className="mr-2">by {contentPack.creator}</span>
+              <span className="mr-2">{t('content.by_creator', { creator: contentPack.creator })}</span>
             )}
             {contentPack.version && (
               <>
@@ -309,7 +311,7 @@ export function ContentPackRow({
             variant="secondary"
             size="sm"
             icon={<Icon icon="solar:folder-open-bold" />}
-            title="Open containing folder"
+            title={t('content.open_containing_folder')}
           />
         )}
 
@@ -327,7 +329,7 @@ export function ContentPackRow({
             />
           }
           title={
-            deleteConfirm ? "Click again to confirm deletion" : "Delete pack"
+            deleteConfirm ? t('content.confirm_deletion') : t('content.delete_pack')
           }
         />
       </div>

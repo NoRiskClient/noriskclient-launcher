@@ -8,6 +8,7 @@ use crate::utils::mc_utils;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
 use reqwest;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -125,26 +126,33 @@ impl MinecraftAssetsDownloadService {
             "[Assets Download] Preparing {} potential jobs...",
             assets.len()
         );
+
+        // Build a HashMap of existing files (hash -> size) from the objects directory
+        // This replaces 4585 individual fs::try_exists + fs::metadata calls with a single directory scan
+        let objects_path = assets_path.join("objects");
+        let existing_files = measure_time!("Assets cache scan", {
+            Self::scan_existing_assets(&objects_path).await
+        });
+        info!("[Assets Download] Found {} cached assets on disk", existing_files.len());
+
         let mut job_count = 0;
 
         for (name, asset) in assets {
             let hash = asset.hash.clone();
             let size = asset.size;
-            let target_path = assets_path.join("objects").join(&hash[..2]).join(&hash);
-            let name_clone = name.clone(); // Clone name for the async block
+            let name_clone = name.clone();
             let task_counter_clone = Arc::clone(&task_counter);
             let completed_counter_clone = Arc::clone(&completed_counter);
             let total_to_download_clone = Arc::clone(&total_to_download);
+            let target_path = objects_path.join(&hash[..2]).join(&hash);
 
-            // Check if asset exists and size matches
-            if fs::try_exists(&target_path).await? {
-                if let Ok(metadata) = fs::metadata(&target_path).await {
-                    if metadata.len() as i64 == size {
-                        trace!("[Assets Download] Skipping asset {} (already exists with correct size)", name_clone);
-                        continue; // Skip this asset
-                    }
-                    warn!("[Assets Download] Asset {} exists but size mismatch (expected {}, got {}), redownloading.", name_clone, size, metadata.len());
+            // Fast in-memory check instead of filesystem calls
+            if let Some(&cached_size) = existing_files.get(&hash) {
+                if cached_size as i64 == size {
+                    trace!("[Assets Download] Skipping asset {} (already exists with correct size)", name_clone);
+                    continue;
                 }
+                warn!("[Assets Download] Asset {} exists but size mismatch (expected {}, got {}), redownloading.", name_clone, size, cached_size);
             }
 
             job_count += 1;
@@ -339,6 +347,41 @@ impl MinecraftAssetsDownloadService {
         // Read and parse the downloaded index
         let content = fs::read(&index_path).await?;
         Ok(serde_json::from_slice(&content)?)
+    }
+
+    /// Scans the objects directory and returns a HashMap of hash -> file size.
+    /// This replaces thousands of individual filesystem calls with a single batch scan.
+    async fn scan_existing_assets(objects_path: &PathBuf) -> HashMap<String, u64> {
+        let mut existing = HashMap::new();
+
+        // Read all prefix directories (00, 01, ..., ff)
+        let mut prefix_dirs = match fs::read_dir(objects_path).await {
+            Ok(dir) => dir,
+            Err(_) => return existing,
+        };
+
+        while let Ok(Some(prefix_entry)) = prefix_dirs.next_entry().await {
+            if !prefix_entry.path().is_dir() {
+                continue;
+            }
+
+            // Read all hash files in this prefix directory
+            let mut hash_files = match fs::read_dir(prefix_entry.path()).await {
+                Ok(dir) => dir,
+                Err(_) => continue,
+            };
+
+            while let Ok(Some(hash_entry)) = hash_files.next_entry().await {
+                if let Ok(metadata) = hash_entry.metadata().await {
+                    if metadata.is_file() {
+                        let file_name = hash_entry.file_name().to_string_lossy().to_string();
+                        existing.insert(file_name, metadata.len());
+                    }
+                }
+            }
+        }
+
+        existing
     }
 
     /// Helper method for emitting progress events

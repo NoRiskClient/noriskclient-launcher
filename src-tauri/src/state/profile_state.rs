@@ -74,6 +74,12 @@ pub struct Mod {
     /// True if automatic updates are enabled for this mod (default: true)
     #[serde(default = "default_true")]
     pub updates_enabled: bool,
+    /// Additional MC versions the user has explicitly forced this mod to load on,
+    /// even if they are not listed in `game_versions`. Written at install/update time
+    /// when the target profile's MC version is absent from the upstream metadata
+    /// (e.g. a mod tagged only for 26.1.1 installed into a 26.1.2 profile).
+    #[serde(default)]
+    pub force_include_versions: Vec<String>,
 }
 
 // New struct to uniquely identify a Norisk Pack mod within a specific context
@@ -119,9 +125,11 @@ pub struct Profile {
     pub path: String,                   // Dateipfad
     pub game_version: String,           // Minecraft Version
     pub loader: ModLoader,              // Modloader Typ
+    #[serde(default)]
     pub loader_version: Option<String>, // Modloader Version
     #[serde(default)]
     pub created: DateTime<Utc>, // Erstellungsdatum
+    #[serde(default)]
     pub last_played: Option<DateTime<Utc>>, // Letzter Start
     #[serde(default)]
     pub settings: ProfileSettings, // Profil Einstellungen
@@ -145,11 +153,13 @@ pub struct Profile {
     /// True if this is a standard profile template, false if it's a user profile.
     #[serde(default)] // Defaults to false for existing user profiles
     pub is_standard_version: bool,
+    #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
     pub banner: Option<ProfileBanner>, // Banner/background image for the profile
     #[serde(default)]
     pub background: Option<ProfileBanner>,
+    #[serde(default)]
     pub norisk_information: Option<NoriskInformation>,
     /// Information about this profile's modpack origin (if it was created from a modpack)
     #[serde(default)]
@@ -158,6 +168,19 @@ pub struct Profile {
     /// If set, this account will be used instead of the global active account
     #[serde(default)]
     pub preferred_account_id: Option<Uuid>,
+    /// Accumulated Minecraft playtime for this profile, in seconds.
+    /// Incremented on process-exit via `ProcessManager` using `start_time - exit_time`.
+    #[serde(default)]
+    pub playtime_seconds: u64,
+}
+
+impl Profile {
+    pub async fn effective_norisk_pack_id(&self) -> Option<String> {
+        let original = self.selected_norisk_pack_id.as_deref()?;
+        Some(
+            crate::commands::pack_rollout_commands::resolve_effective_pack_id(original).await,
+        )
+    }
 }
 
 fn default_true() -> bool {
@@ -249,7 +272,18 @@ pub struct ProfileSettings {
     pub use_custom_java_path: bool, // Ob der benutzerdefinierte Java-Pfad verwendet werden soll
     #[serde(default)]
     pub use_overwrite_loader_version: bool, // Ob die überschriebene Loader-Version verwendet werden soll
-    pub overwrite_loader_version: Option<String>, // Überschriebene Loader-Version
+    // LEGACY single-slot override. Kept for backwards-compat with existing
+    // profile JSONs and with the settings modal that still writes here. The
+    // handler (profile_command.rs) mirrors any non-empty value into
+    // `overwrite_loader_versions` under the current loader key on save, so
+    // new reads prefer the per-loader map.
+    pub overwrite_loader_version: Option<String>,
+    // Per-loader override map. Key = `ModLoader::as_str()` ("fabric", "forge",
+    // "quilt", "neoforge"). Lets profiles hold distinct pinned versions for
+    // each loader, so switching Fabric → Forge → Fabric restores the Fabric
+    // pick instead of inheriting a meaningless string.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub overwrite_loader_versions: HashMap<String, String>,
     pub memory: MemorySettings,    // Speicher Einstellungen
     #[serde(default)]
     pub resolution: Option<WindowSize>, // Auflösung
@@ -316,12 +350,72 @@ impl Profile {
     }
 }
 
+/// Metadata about a single `profiles.json` backup, surfaced to the restore UI.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProfileBackupInfo {
+    pub path: String,
+    pub backup_time: i64,
+    pub file_size: u64,
+    pub profile_count: usize,
+}
+
 // Profile Manager
 pub struct ProfileManager {
     profiles: Arc<RwLock<HashMap<Uuid, Profile>>>,
     profiles_path: PathBuf,
     save_lock: Mutex<()>,
     backup_config: BackupConfig,
+}
+
+/// Rewrite an installed mod in-place to a [`UnifiedVersion`] (Modrinth or CurseForge): source,
+/// version, game versions, loader, and force-include the profile MC if the version omits it.
+/// Shared by both unified version-switch paths. Errors if the version has no file.
+fn apply_unified_version_to_mod(
+    m: &mut Mod,
+    v: &crate::integrations::unified_mod::UnifiedVersion,
+    profile_mc_version: &str,
+) -> Result<()> {
+    use crate::integrations::unified_mod::ModPlatform;
+
+    let primary_file = v
+        .files
+        .iter()
+        .find(|f| f.primary)
+        .or_else(|| v.files.first())
+        .ok_or_else(|| AppError::Other(format!("Unified version {} has no file", v.id)))?;
+
+    m.source = match v.source {
+        ModPlatform::Modrinth => ModSource::Modrinth {
+            project_id: v.project_id.clone(),
+            version_id: v.id.clone(),
+            file_name: primary_file.filename.clone(),
+            download_url: primary_file.url.clone(),
+            file_hash_sha1: primary_file.hashes.get("sha1").cloned(),
+        },
+        ModPlatform::CurseForge => ModSource::CurseForge {
+            project_id: v.project_id.clone(),
+            file_id: v.id.clone(),
+            file_name: primary_file.filename.clone(),
+            download_url: primary_file.url.clone(),
+            file_hash_sha1: primary_file.hashes.get("sha1").cloned(),
+            file_fingerprint: primary_file.fingerprint,
+        },
+    };
+
+    m.version = Some(v.version_number.clone());
+    m.game_versions = Some(v.game_versions.clone());
+    if !v.game_versions.iter().any(|g| g == profile_mc_version)
+        && !m.force_include_versions.iter().any(|g| g == profile_mc_version)
+    {
+        m.force_include_versions.push(profile_mc_version.to_string());
+    }
+    if let Some(loader) = v.loaders.first().and_then(|s| ModLoader::from_str(s).ok()) {
+        m.associated_loader = Some(loader);
+    }
+    if m.display_name.is_none() {
+        m.display_name = Some(v.name.clone());
+    }
+    Ok(())
 }
 
 impl ProfileManager {
@@ -336,6 +430,12 @@ impl ProfileManager {
             max_backups_per_file: 10, // Keep more backups for profiles
             max_backup_age_seconds: 90 * 24 * 60 * 60, // 90 days for profiles
             min_backup_interval_seconds: 60, // TEMP: Increased to 5 minutes to prevent spam during testing
+            gfs: Some(backup_utils::GfsPolicy {
+                keep_recent: 10,
+                daily_days: 14,
+                weekly_weeks: 8,
+                monthly_months: 12,
+            }),
         };
 
         Ok(Self {
@@ -375,10 +475,48 @@ impl ProfileManager {
 
             match fs::read_to_string(path).await {
                 Ok(data) => {
-                    match serde_json::from_str::<Vec<Profile>>(&data) {
-                        Ok(profiles) => {
-                            info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
-                            return Ok(profiles.into_iter().map(|p| (p.id, p)).collect());
+                    match serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                        Ok(raw_entries) => {
+                            // Parse each profile independently so a single
+                            // malformed entry can't wipe the entire list. A
+                            // skipped entry is logged with its name/id; every
+                            // other profile still loads.
+                            let total = raw_entries.len();
+                            let mut profiles: HashMap<Uuid, Profile> = HashMap::new();
+                            let mut failed = 0;
+                            for (idx, raw) in raw_entries.into_iter().enumerate() {
+                                match serde_json::from_value::<Profile>(raw.clone()) {
+                                    Ok(p) => {
+                                        profiles.insert(p.id, p);
+                                    }
+                                    Err(parse_err) => {
+                                        failed += 1;
+                                        let name = raw
+                                            .get("name")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("<unknown>");
+                                        let id = raw
+                                            .get("id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("<unknown>");
+                                        error!(
+                                            "ProfileManager: Skipping unparseable profile at index {} (name='{}', id={}): {}",
+                                            idx, name, id, parse_err
+                                        );
+                                    }
+                                }
+                            }
+                            if failed > 0 {
+                                warn!(
+                                    "ProfileManager: Loaded {}/{} profiles, {} skipped due to parse errors",
+                                    profiles.len(),
+                                    total,
+                                    failed
+                                );
+                            } else {
+                                info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
+                            }
+                            return Ok(profiles);
                         }
                         Err(e) => {
                             if attempt_count < max_attempts {
@@ -444,7 +582,14 @@ impl ProfileManager {
 
         let profiles_data = {
             let profiles_guard = self.profiles.read().await;
-            let profiles_vec: Vec<&Profile> = profiles_guard.values().collect();
+            // Transient/temp profiles (CLI `temp` subcommand) live only in the
+            // in-memory map — their `path` starts with "noriskclient/temp/".
+            // They must never be persisted, even if an unrelated save fires
+            // while one is active.
+            let profiles_vec: Vec<&Profile> = profiles_guard
+                .values()
+                .filter(|p| !p.path.starts_with("noriskclient/temp/"))
+                .collect();
 
             // Validate that we have profiles to save
             if profiles_vec.is_empty() {
@@ -486,6 +631,61 @@ impl ProfileManager {
 
         info!("ProfileManager: Successfully saved {} profiles", self.profiles.read().await.len());
         Ok(())
+    }
+
+    /// Lists available `profiles.json` backups (newest first) for the restore UI.
+    pub async fn list_profile_backups(&self) -> Result<Vec<ProfileBackupInfo>> {
+        let backups = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await?;
+        let mut out = Vec::with_capacity(backups.len());
+        for (path, mtime) in backups {
+            let file_size = fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
+            let profile_count = match fs::read_to_string(&path).await {
+                Ok(data) => serde_json::from_str::<Vec<serde_json::Value>>(&data)
+                    .map(|v| v.len())
+                    .unwrap_or(0),
+                Err(_) => 0,
+            };
+            out.push(ProfileBackupInfo {
+                path: path.to_string_lossy().to_string(),
+                backup_time: mtime.timestamp(),
+                file_size,
+                profile_count,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Restores a user-chosen backup over `profiles.json` and reloads the
+    /// in-memory map so the change is live without a restart.
+    pub async fn restore_profile_backup(&self, backup_path: PathBuf) -> Result<()> {
+        // Hold the save lock so a concurrent save_profiles can't clobber the
+        // file mid-restore.
+        let _guard = self.save_lock.lock().await;
+        backup_utils::restore_specific_backup(&self.profiles_path, &backup_path).await?;
+        let reloaded = self
+            .load_profiles_internal(&self.profiles_path.clone())
+            .await?;
+        *self.profiles.write().await = reloaded;
+        info!(
+            "ProfileManager: Reloaded {} profiles after restore",
+            self.profiles.read().await.len()
+        );
+        Ok(())
+    }
+
+    /// Inserts a profile into the in-memory map WITHOUT persisting to
+    /// `profiles.json`. Used for throwaway temp profiles (CLI `temp` subcommand)
+    /// so that by-id lookups during launch — `get_profile`,
+    /// `get_profile_instance_path`, `list_custom_mods`, ProcessManager
+    /// playtime/crash handling — all succeed. `save_profiles()` filters these
+    /// out by their `temp/` path prefix, so they never reach disk.
+    pub async fn register_transient_profile(&self, profile: Profile) {
+        let id = profile.id;
+        self.profiles.write().await.insert(id, profile);
+        log::info!(
+            "[ProfileManager] Registered transient (temp) profile {} (in-memory only)",
+            id
+        );
     }
 
     // CRUD Operationen
@@ -563,6 +763,53 @@ impl ProfileManager {
         }
         self.save_profiles().await?;
         Ok(())
+    }
+
+    pub async fn resolve_and_migrate_pack_id(&self, profile_id: Uuid) -> Result<Option<String>> {
+        let mut profile = self.get_profile(profile_id).await?;
+        // Empty string is the "no pack / vanilla" sentinel — never migrate it.
+        let Some(original) = profile
+            .selected_norisk_pack_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+        else {
+            return Ok(None);
+        };
+
+        let aliased =
+            crate::commands::pack_rollout_commands::resolve_effective_pack_id(&original).await;
+
+        let state = crate::state::state_manager::State::get().await?;
+        let config = state.norisk_pack_manager.get_config().await;
+
+        // Skip migration before pack config has loaded — would otherwise nuke every profile on first boot.
+        if config.packs.is_empty() {
+            return Ok(Some(aliased));
+        }
+
+        if config.packs.contains_key(&aliased) {
+            return Ok(Some(aliased));
+        }
+
+        let fallback = crate::commands::pack_fallback_commands::get_fallback_pack_id().await;
+        warn!(
+            "[PackFallback] Profile '{}' references missing pack '{}' (from '{}'). Falling back to '{}'.",
+            profile.name, aliased, original, fallback
+        );
+
+        if !config.packs.contains_key(&fallback) {
+            error!(
+                "[PackFallback] Fallback pack '{}' also missing. Clearing selection for profile '{}'.",
+                fallback, profile.name
+            );
+            profile.selected_norisk_pack_id = None;
+            self.update_profile(profile_id, profile).await?;
+            return Ok(None);
+        }
+
+        profile.selected_norisk_pack_id = Some(fallback.clone());
+        self.update_profile(profile_id, profile).await?;
+        Ok(Some(fallback))
     }
 
     /// Helper function to check if any other profile uses the same path
@@ -841,6 +1088,13 @@ impl ProfileManager {
                             display_name_log, version_log, profile_id
                         );
 
+                        let force_include_versions = match &game_versions {
+                            Some(list) if !list.contains(&profile.game_version) => {
+                                vec![profile.game_version.clone()]
+                            }
+                            _ => Vec::new(),
+                        };
+
                         let new_mod = Mod {
                             id: Uuid::new_v4(),
                             source: source.clone(),
@@ -854,6 +1108,7 @@ impl ProfileManager {
                                 .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
                             modpack_origin: None, // Manually added mod
                             updates_enabled: true, // Updates enabled by default
+                            force_include_versions,
                         };
                         profile.mods.push(new_mod);
                         needs_save = true;
@@ -938,19 +1193,27 @@ impl ProfileManager {
                                                         vec![profile_game_version.clone()]
                                                     };
                                                     
-                                                     // Attempt 1: Find the latest version supporting any of the *target* game versions.
-                                                     best_dep_version = dep_versions.iter()
-                                                         .filter(|dep_v| {
-                                                            // Check if the dependency version supports AT LEAST ONE of the target game versions
-                                                            target_game_versions_for_dep.iter().any(|target_gv| dep_v.game_versions.contains(target_gv))
-                                                         })
-                                                         .max_by_key(|v| &v.date_published);
+                                                     // Attempt 1: among versions supporting the target game versions, pick the one
+                                                     // CONTEMPORANEOUS with the parent — the newest dep version published at-or-before
+                                                     // the parent's release date. Installing the absolute newest dep for an OLD parent
+                                                     // (e.g. switching Iris to its oldest version) wrongly pulls a brand-new Sodium.
+                                                     let parent_date = version_info.date_published.as_str();
+                                                     let compatible: Vec<&ModrinthVersion> = dep_versions.iter()
+                                                         .filter(|dep_v| target_game_versions_for_dep.iter().any(|target_gv| dep_v.game_versions.contains(target_gv)))
+                                                         .collect();
+                                                     best_dep_version = compatible.iter().copied()
+                                                         .filter(|v| v.date_published.as_str() <= parent_date)
+                                                         .max_by(|a, b| a.date_published.cmp(&b.date_published))
+                                                         .or_else(|| compatible.iter().copied().min_by(|a, b| a.date_published.cmp(&b.date_published)));
 
-                                                     // Attempt 2: If no match for target game versions, fall back to the overall latest compatible version (loader match only).
+                                                     // Attempt 2: no game-version match -> newest contemporaneous-or-older for the loader,
+                                                     // else the overall newest.
                                                      if best_dep_version.is_none() {
-                                                         warn!("Could not find dependency version matching target game versions {:?} for project '{}'. Falling back to latest version compatible with loader '{}'.", target_game_versions_for_dep, dep_project_id, profile_loader_str);
+                                                         warn!("Could not find dependency version matching target game versions {:?} for project '{}'. Falling back to loader-compatible version near parent date '{}'.", target_game_versions_for_dep, dep_project_id, parent_date);
                                                          best_dep_version = dep_versions.iter()
-                                                             .max_by_key(|v| &v.date_published);
+                                                             .filter(|v| v.date_published.as_str() <= parent_date)
+                                                             .max_by(|a, b| a.date_published.cmp(&b.date_published))
+                                                             .or_else(|| dep_versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
                                                      }
                                                  }
 
@@ -1092,44 +1355,57 @@ impl ProfileManager {
             },
         };
 
-        let mut profiles = self.profiles.write().await;
+        let mut needs_save = false;
+        {
+            let mut profiles = self.profiles.write().await;
+            if let Some(profile) = profiles.get_mut(&payload.profile_id) {
+                if !profile.mods.iter().any(|m| m.source == source) {
+                    info!(
+                        "Adding mod {} to profile {}",
+                        display_name_log, payload.profile_id
+                    );
 
-        if let Some(profile) = profiles.get_mut(&payload.profile_id) {
-            if !profile.mods.iter().any(|m| m.source == source) {
-                info!(
-                    "Adding mod {} to profile {}",
-                    display_name_log, payload.profile_id
-                );
+                    let force_include_versions = match &payload.game_versions {
+                        Some(list) if !list.contains(&profile.game_version) => {
+                            vec![profile.game_version.clone()]
+                        }
+                        _ => Vec::new(),
+                    };
 
-                let new_mod = Mod {
-                    id: Uuid::new_v4(),
-                    source: source.clone(),
-                    enabled: true,
-                    display_name: payload.content_name.clone(),
-                    version: payload.version_number.clone(),
-                    game_versions: payload.game_versions.clone(),
-                    file_name_override: None,
-                    associated_loader: payload.loaders
-                        .clone()
-                        .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
-                    modpack_origin: None, // Manually added mod
-                    updates_enabled: true, // Updates enabled by default
-                };
-                profile.mods.push(new_mod);
-                drop(profiles);
-                self.save_profiles().await?;
-                info!(
-                    "Successfully added {} mod {} to profile {}",
-                    platform_name, display_name_log, payload.profile_id
-                );
+                    let new_mod = Mod {
+                        id: Uuid::new_v4(),
+                        source: source.clone(),
+                        enabled: true,
+                        display_name: payload.content_name.clone(),
+                        version: payload.version_number.clone(),
+                        game_versions: payload.game_versions.clone(),
+                        file_name_override: None,
+                        associated_loader: payload.loaders
+                            .clone()
+                            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
+                        modpack_origin: None, // Manually added mod
+                        updates_enabled: true, // Updates enabled by default
+                        force_include_versions,
+                    };
+                    profile.mods.push(new_mod);
+                    needs_save = true;
+                } else {
+                    info!(
+                        "{} mod {} already exists in profile {}. Skipping addition.",
+                        platform_name, display_name_log, payload.profile_id
+                    );
+                }
             } else {
-                info!(
-                    "{} mod {} already exists in profile {}. Skipping addition.",
-                    platform_name, display_name_log, payload.profile_id
-                );
+                return Err(AppError::ProfileNotFound(payload.profile_id));
             }
-        } else {
-            return Err(AppError::ProfileNotFound(payload.profile_id));
+        }
+
+        if needs_save {
+            self.save_profiles().await?;
+            info!(
+                "Successfully added {} mod {} to profile {}",
+                platform_name, display_name_log, payload.profile_id
+            );
         }
 
         // Install dependencies if requested
@@ -1635,6 +1911,8 @@ impl ProfileManager {
             AppError::ProfileNotFound(profile_id)
         })?;
 
+        let profile_mc_version = profile.game_version.clone();
+
         info!(
             "Checking required dependencies for new CurseForge version {}...",
             new_version_details.id
@@ -1714,6 +1992,15 @@ impl ProfileManager {
 
                 mod_to_update.version = Some(new_version_details.displayName.clone());
                 mod_to_update.game_versions = Some(new_version_details.gameVersions.clone());
+                if !new_version_details.gameVersions.contains(&profile_mc_version)
+                    && !mod_to_update
+                        .force_include_versions
+                        .contains(&profile_mc_version)
+                {
+                    mod_to_update
+                        .force_include_versions
+                        .push(profile_mc_version.clone());
+                }
                 // For CurseForge, we don't have explicit loader info in the file, so we keep the existing one
                 // or try to determine it from game versions
                 if mod_to_update.associated_loader.is_none() {
@@ -1767,6 +2054,38 @@ impl ProfileManager {
     /// Updates the version of a specific Modrinth mod instance within a profile,
     /// after checking for the presence of required dependencies (by project ID).
     /// Automatically adds missing dependencies.
+    /// Switch an installed mod (Modrinth OR CurseForge) to a specific [`UnifiedVersion`], keyed by the
+    /// mod's UUID. Pure source swap — no dependency install — so the change is fully reversible (the
+    /// crash-fix flow stores the previous version and swaps back on undo). Platform comes from the
+    /// target version; the caller resolves versions from the mod's own source so they always match.
+    pub async fn update_mod_to_unified_version(
+        &self,
+        profile_id: Uuid,
+        mod_id: Uuid,
+        new_version: &crate::integrations::unified_mod::UnifiedVersion,
+    ) -> Result<()> {
+        let mut profiles = self.profiles.write().await;
+        let profile = profiles
+            .get_mut(&profile_id)
+            .ok_or(AppError::ProfileNotFound(profile_id))?;
+        let profile_mc_version = profile.game_version.clone();
+
+        let index = profile
+            .mods
+            .iter()
+            .position(|m| m.id == mod_id)
+            .ok_or(AppError::ModNotFoundInProfile { profile_id, mod_id })?;
+        apply_unified_version_to_mod(&mut profile.mods[index], new_version, &profile_mc_version)?;
+
+        drop(profiles);
+        self.save_profiles().await?;
+        info!(
+            "Switched mod {} to unified version {} ({:?}) in profile {}",
+            mod_id, new_version.version_number, new_version.source, profile_id
+        );
+        Ok(())
+    }
+
     pub async fn update_profile_modrinth_mod_version(
         &self,
         profile_id: Uuid,
@@ -1787,6 +2106,8 @@ impl ProfileManager {
             );
             AppError::ProfileNotFound(profile_id)
         })?;
+
+        let profile_mc_version = profile.game_version.clone();
 
         info!(
             "Checking required dependencies for new version {}...",
@@ -1871,6 +2192,17 @@ impl ProfileManager {
                         mod_to_update.version = Some(new_version_details.version_number.clone());
                         mod_to_update.game_versions =
                             Some(new_version_details.game_versions.clone());
+                        if !new_version_details
+                            .game_versions
+                            .contains(&profile_mc_version)
+                            && !mod_to_update
+                                .force_include_versions
+                                .contains(&profile_mc_version)
+                        {
+                            mod_to_update
+                                .force_include_versions
+                                .push(profile_mc_version.clone());
+                        }
                         mod_to_update.associated_loader = new_version_details
                             .loaders
                             .first()
@@ -1974,7 +2306,14 @@ impl ProfileManager {
             .await
             {
                 Ok(versions) => {
-                    if let Some(best_version) = versions.iter().max_by_key(|v| &v.date_published) {
+                    // no pin -> newest dep published at-or-before the parent's date, not the absolute
+                    // newest (else switching Iris to an old version pulls a brand-new, incompatible Sodium)
+                    let parent_date = new_version_details.date_published.as_str();
+                    let best_version = versions.iter()
+                        .filter(|v| v.date_published.as_str() <= parent_date)
+                        .max_by(|a, b| a.date_published.cmp(&b.date_published))
+                        .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
+                    if let Some(best_version) = best_version {
                         if let Some(primary_file) = best_version.files.iter().find(|f| f.primary) {
                             match self
                                 .add_modrinth_mod(
@@ -2155,10 +2494,15 @@ impl ProfileManager {
     pub fn get_profile_mods_path_single(&self, profile: &Profile) -> Result<PathBuf> {
         let instance_path = self.calculate_instance_path_for_profile(profile)?;
         let mods_path = match profile.loader {
-            ModLoader::Fabric => {
-                let fabric_version_folder = format!("{}-{}-{}", "nrc", profile.game_version, "fabric");
-                instance_path.join("mods").join(fabric_version_folder)
-            }
+            ModLoader::Fabric => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-fabric", profile.game_version)),
+            ModLoader::Forge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-forge", profile.game_version)),
+            ModLoader::NeoForge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-neoforge", profile.game_version)),
             _ => instance_path.join("mods"),
         };
         log::debug!(
@@ -2183,10 +2527,15 @@ impl ProfileManager {
         };
         
         let mods_path = match profile.loader {
-            ModLoader::Fabric => {
-                let fabric_version_folder = format!("nrc-{}-fabric-{}", profile.game_version, uuid_short);
-                instance_path.join("mods").join(fabric_version_folder)
-            }
+            ModLoader::Fabric => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-fabric-{}", profile.game_version, uuid_short)),
+            ModLoader::Forge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-forge-{}", profile.game_version, uuid_short)),
+            ModLoader::NeoForge => instance_path
+                .join("mods")
+                .join(format!("nrc-{}-neoforge-{}", profile.game_version, uuid_short)),
             _ => instance_path.join("mods"),
         };
         log::debug!(
@@ -2881,6 +3230,8 @@ impl ProfileManager {
             AppError::ProfileNotFound(profile_id)
         })?;
 
+        let profile_mc_version = profile.game_version.clone();
+
         let current_item = payload.current_item_details.as_ref().ok_or_else(|| {
             AppError::InvalidInput("Missing current_item_details in payload.".to_string())
         })?;
@@ -2903,55 +3254,12 @@ impl ProfileManager {
         });
 
         if let Some(index) = mod_to_update_index {
-            let mod_to_update = &mut profile.mods[index];
-
-            // Update the mod source based on the platform from unified version
-            match payload.new_version_details.source {
-                crate::integrations::unified_mod::ModPlatform::Modrinth => {
-                    // Find primary file
-                    let primary_file = payload.new_version_details.files.iter()
-                        .find(|f| f.primary)
-                        .or_else(|| payload.new_version_details.files.first())
-                        .ok_or_else(|| AppError::InvalidInput("No primary file found in unified version".to_string()))?;
-
-                    mod_to_update.source = ModSource::Modrinth {
-                        project_id: payload.new_version_details.project_id.clone(),
-                        version_id: payload.new_version_details.id.clone(),
-                        file_name: primary_file.filename.clone(),
-                        download_url: primary_file.url.clone(),
-                        file_hash_sha1: primary_file.hashes.get("sha1").cloned(),
-                    };
-
-                    mod_to_update.version = Some(payload.new_version_details.version_number.clone());
-                    mod_to_update.game_versions = Some(payload.new_version_details.game_versions.clone());
-                },
-                crate::integrations::unified_mod::ModPlatform::CurseForge => {
-                    // Find primary file
-                    let primary_file = payload.new_version_details.files.iter()
-                        .find(|f| f.primary)
-                        .or_else(|| payload.new_version_details.files.first())
-                        .ok_or_else(|| AppError::InvalidInput("No primary file found in unified version".to_string()))?;
-
-                    mod_to_update.source = ModSource::CurseForge {
-                        project_id: payload.new_version_details.project_id.clone(),
-                        file_id: payload.new_version_details.id.clone(),
-                        file_name: primary_file.filename.clone(),
-                        download_url: primary_file.url.clone(),
-                        file_hash_sha1: primary_file.hashes.get("sha1").cloned(),
-                        file_fingerprint: primary_file.fingerprint,
-                    };
-
-                    mod_to_update.version = Some(payload.new_version_details.version_number.clone());
-                    mod_to_update.game_versions = Some(payload.new_version_details.game_versions.clone());
-                },
-            }
-
-            // Update display name if available
-            if mod_to_update.display_name.is_none() {
-                mod_to_update.display_name = Some(payload.new_version_details.name.clone());
-            }
-
-            info!("Successfully updated mod {} in profile {}", mod_to_update.id, profile_id);
+            apply_unified_version_to_mod(
+                &mut profile.mods[index],
+                &payload.new_version_details,
+                &profile_mc_version,
+            )?;
+            info!("Successfully updated mod {} in profile {}", profile.mods[index].id, profile_id);
         } else {
             error!(
                 "Mod not found in profile {} for update with unified version",
@@ -2980,6 +3288,7 @@ impl ProfileManager {
                 profile_id,
                 &payload.new_version_details.dependencies,
                 &payload.new_version_details.source,
+                &payload.new_version_details.date_published,
             ).await {
                 error!("Failed to install dependencies: {}", e);
                 // Don't fail the entire operation if dependency installation fails
@@ -3014,6 +3323,7 @@ impl ProfileManager {
         profile_id: Uuid,
         dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
         platform: &crate::integrations::unified_mod::ModPlatform,
+        parent_date: &str, // release date of the mod we just switched to — pick a contemporaneous dep
     ) -> Result<()> {
         use crate::integrations::unified_mod::{UnifiedModVersionsParams, ModPlatform};
 
@@ -3035,19 +3345,35 @@ impl ProfileManager {
 
                 info!("Installing missing dependency: {}", dep_project_id);
 
-                // Get the dependency version details
+                // Fetch the dependency's versions (loader-only so a pinned version_id is always present;
+                // we filter by game version ourselves below).
                 let versions_params = UnifiedModVersionsParams {
                     source: platform.clone(),
                     project_id: dep_project_id.clone(),
-                    loaders: Some(vec![profile.loader.as_str().to_string()]), // Use profile's loader
-                    game_versions: Some(vec![profile.game_version.clone()]),
-                    limit: Some(1), // Get latest version
+                    loaders: Some(vec![profile.loader.as_str().to_string()]),
+                    game_versions: None,
+                    limit: None,
                     offset: None,
                 };
 
                 match crate::integrations::unified_mod::get_mod_versions_unified(versions_params).await {
                     Ok(versions_response) => {
-                        if let Some(dep_version) = versions_response.versions.first() {
+                        let mc = &profile.game_version;
+                        let versions = &versions_response.versions;
+                        // 1) exact pin from the parent's dependency metadata (e.g. Iris -> a specific Sodium)
+                        // 2) else the dep CONTEMPORANEOUS with the parent (newest <= parent's date) for this MC
+                        // 3) else newest for this MC  4) else newest overall
+                        let chosen = dependency.version_id.as_ref()
+                            .and_then(|vid| versions.iter().find(|v| &v.id == vid))
+                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc) && v.date_published.as_str() <= parent_date).max_by(|a, b| a.date_published.cmp(&b.date_published)))
+                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc)).max_by(|a, b| a.date_published.cmp(&b.date_published)))
+                            .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
+                        info!(
+                            "[dep-resolve] {} pin={:?} parent_date={} candidates={} -> chosen={:?} ({:?})",
+                            dep_project_id, dependency.version_id, parent_date, versions.len(),
+                            chosen.map(|v| &v.version_number), chosen.map(|v| &v.id)
+                        );
+                        if let Some(dep_version) = chosen {
                             // Create install payload for the dependency
                             let dep_payload = crate::commands::content_command::InstallContentPayload {
                                 profile_id,
@@ -3182,12 +3508,20 @@ impl PostInitializationHandler for ProfileManager {
                 log::warn!("Trash purge after init failed: {}", e);
             }
 
-            // Clean up old backups for profiles category using our specific config
-            if let Err(e) = crate::utils::backup_utils::cleanup_old_backups(
-                &profiles_path_clone,
-                Some("profiles"),
-                &backup_config_clone,
-            ).await {
+            // Clean up old backups for profiles category (generational if configured)
+            let cleanup_result = match &backup_config_clone.gfs {
+                Some(policy) => crate::utils::backup_utils::cleanup_old_backups_generational(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    policy,
+                ).await,
+                None => crate::utils::backup_utils::cleanup_old_backups(
+                    &profiles_path_clone,
+                    Some("profiles"),
+                    &backup_config_clone,
+                ).await,
+            };
+            if let Err(e) = cleanup_result {
                 log::warn!("Profile backup cleanup after init failed: {}", e);
             }
         });
@@ -3237,6 +3571,7 @@ impl Default for ProfileSettings {
             use_custom_java_path: false,
             use_overwrite_loader_version: false,
             overwrite_loader_version: None,
+            overwrite_loader_versions: HashMap::new(),
             memory: MemorySettings::default(),
             resolution: None,
             fullscreen: false,

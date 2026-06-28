@@ -2,8 +2,12 @@ import { invoke } from '@tauri-apps/api/core';
 import type { BlogPost } from '../types/wordPress';
 import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
+import type { AdventCalendarDay, Reward } from '../types/advent';
+import type { UserNotification } from '../types/notification';
 import { useProfileStore } from '../store/profile-store';
-import { getBlockedModsConfig } from './flagsmith-service';
+import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './flagsmith-service';
+import { refreshPermissions } from './permission-service';
+import { logInfo, logError } from '../utils/logging-utils';
 
 /**
  * Fetches the latest news and changelog posts from the backend.
@@ -61,6 +65,29 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
       .catch((error) => {
         console.error("Failed to load blocked mods config:", error);
       });
+
+    // Fire and forget: Load pack rollout aliases from Flagsmith
+    getPackRolloutConfig()
+      .then((config) => {
+        logInfo(`Pack rollout config loaded: ${JSON.stringify(config)}`);
+      })
+      .catch((error) => {
+        logError(`Failed to load pack rollout config: ${error}`);
+      });
+
+    // Fire and forget: Load pack fallback id from Flagsmith
+    getPackFallbackConfig()
+      .then((config) => {
+        logInfo(`Pack fallback config loaded: ${JSON.stringify(config)}`);
+      })
+      .catch((error) => {
+        logError(`Failed to load pack fallback config: ${error}`);
+      });
+
+    // Fire and forget: Refresh user permissions from NoRisk backend
+    refreshPermissions()
+      .then(() => logInfo("User permissions refreshed on mount"))
+      .catch((error) => logError(`Failed to refresh permissions: ${error}`));
 
     try {
       await refreshNoriskPacks();
@@ -138,6 +165,36 @@ export const discordAuthUnlink = (): Promise<void> => {
 };
 
 /**
+ * Initiates the GitHub account linking process.
+ *
+ * @returns A promise that resolves when the command is successfully sent.
+ * @throws If the backend command fails.
+ */
+export const githubAuthLink = (): Promise<void> => {
+  return invoke('github_auth_link');
+};
+
+/**
+ * Checks the GitHub account linking status.
+ *
+ * @returns A promise that resolves to a boolean indicating if a GitHub account is linked.
+ * @throws If the backend command fails.
+ */
+export const githubAuthStatus = (): Promise<boolean> => {
+  return invoke('github_auth_status');
+};
+
+/**
+ * Unlinks the currently linked GitHub account.
+ *
+ * @returns A promise that resolves when the unlinking process is successful.
+ * @throws If the backend command fails.
+ */
+export const githubAuthUnlink = (): Promise<void> => {
+  return invoke('github_auth_unlink');
+};
+
+/**
  * Gets the mobile app token for NoRisk mobile app linking.
  *
  * @returns A promise that resolves to the mobile app token string.
@@ -179,6 +236,73 @@ export const checkUpdateAvailable = (): Promise<UpdateInfo | null> => {
 export const downloadAndInstallUpdate = (): Promise<void> => {
   return invoke('download_and_install_update_command');
 };
+
+/**
+ * Fetches the advent calendar data from the backend.
+ *
+ * @returns A promise that resolves to an array of AdventCalendarDay objects.
+ * @throws If the backend command fails.
+ */
+export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => {
+  return invoke('get_advent_calendar_command');
+};
+
+/**
+ * Claims a reward for a specific day in the advent calendar.
+ *
+ * @param tag The day number (1-24) to claim.
+ * @returns A promise that resolves to the claimed AdventCalendarDay.
+ * @throws If the backend command fails.
+ */
+export const claimAdventCalendarDay = (tag: number): Promise<AdventCalendarDay> => {
+  return invoke('claim_advent_calendar_day_command', { tag });
+};
+
+/**
+ * Fetches all notifications for the current user.
+ *
+ * @returns A promise that resolves to an array of UserNotification objects.
+ * @throws If the backend command fails.
+ */
+export const getNotifications = (): Promise<UserNotification[]> => {
+  return invoke('get_notifications');
+};
+
+/**
+ * Marks all notifications as read.
+ *
+ * @returns A promise that resolves when all notifications are marked as read.
+ * @throws If the backend command fails.
+ */
+export const markAllNotificationsRead = (): Promise<void> => {
+  return invoke('mark_all_notifications_read');
+};
+
+/**
+ * Marks a specific notification as read.
+ *
+ * @param notificationId The ID of the notification to mark as read.
+ * @returns A promise that resolves when the notification is marked as read.
+ * @throws If the backend command fails.
+ */
+export const markNotificationRead = (notificationId: string): Promise<void> => {
+  return invoke('mark_notification_read', { notificationId });
+};
+
+export interface UniquePlayersResponse {
+  count: number;
+  windowHours: number;
+  computedAtMs: number;
+}
+
+/**
+ * Fetches the unique-players-in-the-last-24h stat from the backend
+ * (cached server-side for 30 minutes).
+ */
+export const getUniquePlayers24h = (): Promise<UniquePlayersResponse> => {
+  return invoke('get_unique_players_24h_command');
+};
+
 
 // Re-export logging utilities for backward compatibility
 export { log as logMessage, logDebug as logMessageDebug, logInfo as logMessageInfo, logWarn as logMessageWarn, logError as logMessageError } from '../utils/logging-utils';

@@ -7,7 +7,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { LaunchState } from "../store/launch-state-store";
 import { useLaunchStateStore } from "../store/launch-state-store";
 import * as ProcessService from "../services/process-service";
+import type { LaunchOverrides } from "../services/process-service";
 import { toast } from "react-hot-toast";
+import i18n from "../i18n/i18n";
 import { useGlobalModal } from "./useGlobalModal";
 import { GroupMigrationModal } from "../components/modals/GroupMigrationModal";
 import { checkForGroupMigration } from "../services/profile-service";
@@ -61,15 +63,15 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             if (eventTypeFromPayload === FrontendEventType.LaunchSuccessful) {
               console.log(`[useProfileLaunch] LaunchSuccessful event for ${profileId}`);
               finalizeButtonLaunch(profileId);
-              setButtonStatusMessage(profileId, "STARTING!");
+              setButtonStatusMessage(profileId, i18n.t('launch.starting'));
               setTimeout(() => {
                 setButtonStatusMessage(profileId, null);
               }, 3000);
               onLaunchSuccess?.();
             } else if (eventTypeFromPayload === FrontendEventType.Error) {
               console.log(`[useProfileLaunch] Error event via state_event for ${profileId}`);
-              const eventErrorMsg = eventMessage || "Error during launch process.";
-              toast.error(`Error: ${eventErrorMsg}`);
+              const eventErrorMsg = eventMessage || i18n.t('launch.error.unknown');
+              toast.error(i18n.t('launch.error', { error: eventErrorMsg }), { id: `launch-error-${profileId}` });
               setLaunchError(profileId, eventErrorMsg);
               onLaunchError?.(eventErrorMsg);
             } else {
@@ -140,7 +142,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           console.error(`[useProfileLaunch] Error during polling is_profile_launching:`, err);
           const pollErrorMsg =
             err.message || err.toString() || "Error while checking profile status.";
-          toast.error(`Polling error: ${pollErrorMsg}`);
+          toast.error(i18n.t('launch.polling_error', { error: pollErrorMsg }), { id: `launch-error-${profileId}` });
           finalizeButtonLaunch(profileId, pollErrorMsg);
           clearPolling();
         }
@@ -164,7 +166,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         typeof err === "string"
           ? err
           : err.message || err.toString() || "Unknown error during launch.";
-      toast.error(`Launch failed: ${launchErrorMsg}`);
+      toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
       setLaunchError(profileId, launchErrorMsg);
       onLaunchError?.(launchErrorMsg);
     }
@@ -185,9 +187,11 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
 
     if (currentProfile.isButtonLaunching) {
       try {
-        setButtonStatusMessage(profileId, "Attempting to stop...");
+        setButtonStatusMessage(profileId, i18n.t('launch.stopping'));
+        // Yield to allow React to render the status update before blocking on abort
+        await new Promise(resolve => setTimeout(resolve, 0));
         await ProcessService.abort(profileId);
-        toast.success("Launch process stopped.");
+        toast.success(i18n.t('launch.stopped'));
         finalizeButtonLaunch(profileId);
       } catch (err: any) {
         console.error("Failed to abort launch:", err);
@@ -195,7 +199,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           typeof err === "string"
             ? err
             : err.message || err.toString() || "Error during abort.";
-        toast.error(`Stop failed: ${abortErrorMsg}`);
+        toast.error(i18n.t('launch.stop_failed', { message: abortErrorMsg }), { id: `launch-error-${profileId}` });
         finalizeButtonLaunch(profileId, abortErrorMsg);
       }
       return;
@@ -237,14 +241,20 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     statusMessage: buttonStatusMessage,
     launchState,
     handleLaunch,
-    handleQuickPlayLaunch: async (singleplayer?: string, multiplayer?: string) => {
+    handleQuickPlayLaunch: async (
+      singleplayer?: string,
+      multiplayer?: string,
+      overrides?: LaunchOverrides,
+    ) => {
       const currentProfile = getProfileState(profileId);
 
       if (currentProfile.isButtonLaunching) {
         try {
-          setButtonStatusMessage(profileId, "Attempting to stop...");
+          setButtonStatusMessage(profileId, i18n.t('launch.stopping'));
+          // Yield to allow React to render the status update before blocking on abort
+          await new Promise(resolve => setTimeout(resolve, 0));
           await ProcessService.abort(profileId);
-          toast.success("Launch process stopped.");
+          toast.success(i18n.t('launch.stopped'));
           finalizeButtonLaunch(profileId);
         } catch (err: any) {
           console.error("Failed to abort launch:", err);
@@ -252,8 +262,32 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             typeof err === "string"
               ? err
               : err.message || err.toString() || "Error during abort.";
-          toast.error(`Stop failed: ${abortErrorMsg}`);
+          toast.error(i18n.t('launch.stop_failed', { message: abortErrorMsg }), { id: `launch-error-${profileId}` });
           finalizeButtonLaunch(profileId, abortErrorMsg);
+        }
+        return;
+      }
+
+      if (overrides) {
+        initiateButtonLaunch(profileId);
+        try {
+          await ProcessService.launch(
+            profileId,
+            singleplayer,
+            multiplayer,
+            undefined,
+            skipLastPlayedUpdate,
+            overrides,
+          );
+        } catch (err: any) {
+          console.error("Failed to launch profile with overrides:", err);
+          const launchErrorMsg =
+            typeof err === "string"
+              ? err
+              : err.message || err.toString() || "Unknown error during launch.";
+          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
+          setLaunchError(profileId, launchErrorMsg);
+          onLaunchError?.(launchErrorMsg);
         }
         return;
       }
@@ -273,7 +307,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               typeof err === "string"
                 ? err
                 : err.message || err.toString() || "Unknown error during launch.";
-            toast.error(`Launch failed: ${launchErrorMsg}`);
+            toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
             setLaunchError(profileId, launchErrorMsg);
             onLaunchError?.(launchErrorMsg);
           }
@@ -298,7 +332,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
                   typeof err === "string"
                     ? err
                     : err.message || err.toString() || "Unknown error during launch.";
-                toast.error(`Launch failed: ${launchErrorMsg}`);
+                toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
                 setLaunchError(profileId, launchErrorMsg);
                 onLaunchError?.(launchErrorMsg);
               }
@@ -331,7 +365,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             typeof err === "string"
               ? err
               : err.message || err.toString() || "Unknown error during launch.";
-          toast.error(`Launch failed: ${launchErrorMsg}`);
+          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
           setLaunchError(profileId, launchErrorMsg);
           onLaunchError?.(launchErrorMsg);
         }

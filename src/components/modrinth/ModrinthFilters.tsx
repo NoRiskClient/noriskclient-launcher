@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { ModrinthService } from "../../services/modrinth-service";
 import type { ModrinthCategory, ModrinthGameVersion, ModrinthLoader, ModrinthProjectType } from "../../types/modrinth";
 import { LoadingIndicator } from "../ui/LoadingIndicator";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { useThemeStore } from "../../store/useThemeStore";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // Simple FilterGroup component
 const FilterGroup = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -86,6 +88,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
   onLoaderChange,
   onEnvironmentChange,
 }) => {
+  const { t } = useTranslation();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [categories, setCategories] = useState<ModrinthCategory[]>([]);
   const [filteredCategories, setFilteredCategories] = useState<ModrinthCategory[]>([]);
@@ -133,7 +136,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load categories:", error);
         setCategoriesError(
-          `Failed to load categories: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load categories: ${parseErrorMessage(error)}`
         );
       } finally {
         setCategoriesLoading(false);
@@ -171,7 +174,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load game versions:", error);
         setGameVersionsError(
-          `Failed to load game versions: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load game versions: ${parseErrorMessage(error)}`
         );
       } finally {
         setGameVersionsLoading(false);
@@ -193,7 +196,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       } catch (error) {
         console.error("Failed to load loaders:", error);
         setLoadersError(
-          `Failed to load loaders: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to load loaders: ${parseErrorMessage(error)}`
         );
       } finally {
         setLoadersLoading(false);
@@ -286,11 +289,11 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
         borderBottomColor: `${accentColor.value}60`
       }}
     >
-      <h2 className="font-minecraft text-3xl mb-4 tracking-wide text-white/90 lowercase select-none">Filters</h2>
-      
-      <Accordion title="Categories" defaultOpen>
+      <h2 className="font-minecraft text-3xl mb-4 tracking-wide text-white/90 lowercase select-none">{t('modrinth.filters')}</h2>
+
+      <Accordion title={t('modrinth.categories')} defaultOpen>
         {categoriesLoading ? (
-          <LoadingIndicator message="Loading categories..." />
+          <LoadingIndicator message={t('modrinth.loading_categories')} />
         ) : categoriesError ? (
           <ErrorMessage message={categoriesError} />
         ) : (
@@ -312,9 +315,9 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
         )}
       </Accordion>
 
-      <Accordion title="Game Versions" defaultOpen>
+      <Accordion title={t('modrinth.game_versions')} defaultOpen>
         {gameVersionsLoading ? (
-          <LoadingIndicator message="Loading versions..." />
+          <LoadingIndicator message={t('modrinth.loading_versions')} />
         ) : gameVersionsError ? (
           <ErrorMessage message={gameVersionsError} />
         ) : (
@@ -333,9 +336,9 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
       </Accordion>
 
       {(projectType === "mod" || projectType === "modpack") && (
-        <Accordion title="Mod Loaders" defaultOpen>
+        <Accordion title={t('modrinth.mod_loaders')} defaultOpen>
           {loadersLoading ? (
-            <LoadingIndicator message="Loading loaders..." />
+            <LoadingIndicator message={t('modrinth.loading_loaders')} />
           ) : loadersError ? (
             <ErrorMessage message={loadersError} />
           ) : (
@@ -354,17 +357,17 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
         </Accordion>
       )}
 
-      <Accordion title="Environment" defaultOpen>
+      <Accordion title={t('modrinth.environment')} defaultOpen>
         <div className="space-y-2">
           <CheckboxItem
             id="environment-client"
-            label="Client"
+            label={t('content.filters.client')}
             checked={selectedEnvironments.includes("client")}
             onChange={checked => handleEnvironmentChange("client", checked)}
           />
           <CheckboxItem
             id="environment-server"
-            label="Server"
+            label={t('content.filters.server')}
             checked={selectedEnvironments.includes("server")}
             onChange={checked => handleEnvironmentChange("server", checked)}
           />

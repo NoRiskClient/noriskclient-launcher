@@ -253,3 +253,19 @@ export interface ModrinthGameVersion {
     date: string;                      // The date of the game version release (ISO-8601)
     major: boolean;                    // Whether or not this is a major version
 }
+
+// --- Team Members ---
+export interface ModrinthTeamMember {
+    team_id: string;
+    user: ModrinthUser;
+    role: string;
+    ordering: number;
+}
+
+export interface ModrinthUser {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    bio: string | null;
+    role: string | null; // User's site-wide role
+}

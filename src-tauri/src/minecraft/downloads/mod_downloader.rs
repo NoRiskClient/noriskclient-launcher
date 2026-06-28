@@ -243,11 +243,8 @@ impl ModDownloadService {
 
         for filename in &mods_to_remove {
             let target_path = profile_mods_dir.join(filename);
-            info!("Removing mod from '{}': {}", profile_name, filename);
-            fs::remove_file(&target_path).await.map_err(|e| {
-                error!("Failed to remove {:?}: {}", target_path, e);
-                AppError::Io(e)
-            })?;
+            info!("Moving mod to trash from '{}': {}", profile_name, filename);
+            crate::utils::trash_utils::move_path_to_trash(&target_path, Some("managed_mods")).await?;
         }
 
         for filename in &mods_to_add {
@@ -277,6 +274,89 @@ impl ModDownloadService {
             "Mod sync completed for '{}' -> {:?}",
             profile_name, profile_mods_dir
         );
+        Ok(())
+    }
+
+    /// Removes managed mods from the profile mods directory.
+    /// Uses SHA1 matching when available (Modrinth/CurseForge), falls back to filename for mods
+    /// without a known hash (Maven/URL/local). User-added mods are left untouched.
+    pub async fn clean_managed_mods(
+        &self,
+        target_mods: &[TargetMod],
+        profile_mods_dir: &PathBuf,
+    ) -> Result<()> {
+        if !profile_mods_dir.exists() {
+            return Ok(());
+        }
+
+        // Split target mods into SHA1-known and filename-only
+        let known_hashes: HashSet<String> = target_mods
+            .iter()
+            .filter_map(|tm| tm.sha1.as_ref().map(|h| h.to_lowercase()))
+            .collect();
+        let filename_only: HashSet<String> = target_mods
+            .iter()
+            .filter(|tm| tm.sha1.is_none())
+            .map(|tm| tm.filename.clone())
+            .collect();
+
+        // Collect all files in mods/
+        let mut files: Vec<PathBuf> = Vec::new();
+        let mut dir_entries = read_dir(&profile_mods_dir).await?;
+        while let Some(entry) = dir_entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_file() {
+                files.push(path);
+            }
+        }
+
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        // Compute SHA1 of all files in mods/ in parallel
+        let hash_futures: Vec<_> = files
+            .iter()
+            .map(|path| {
+                let path = path.clone();
+                async move {
+                    let hash = crate::utils::hash_utils::calculate_sha1_from_file(&path).await.ok();
+                    (path, hash)
+                }
+            })
+            .collect();
+        let hashed_files: Vec<(PathBuf, Option<String>)> =
+            futures::future::join_all(hash_futures).await;
+
+        // Determine which files to remove
+        let mut removed = 0;
+        for (path, hash) in hashed_files {
+            let filename = match path.file_name().and_then(|n| n.to_str()) {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+
+            let is_managed = if let Some(ref h) = hash {
+                // SHA1 match: catches renamed files too
+                if known_hashes.contains(&h.to_lowercase()) {
+                    true
+                } else {
+                    // No SHA1 match, try filename for mods without known hash
+                    filename_only.contains(&filename)
+                }
+            } else {
+                // Hash computation failed, fall back to filename
+                filename_only.contains(&filename)
+            };
+
+            if is_managed {
+                info!("Moving managed mod to trash: {}", filename);
+                crate::utils::trash_utils::move_path_to_trash(&path, Some("managed_mods")).await?;
+                removed += 1;
+            }
+        }
+
+        info!("Cleaned {} managed mods from mods/", removed);
         Ok(())
     }
 

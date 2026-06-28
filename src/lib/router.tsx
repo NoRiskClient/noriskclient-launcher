@@ -1,5 +1,6 @@
 import { createHashRouter, Navigate } from "react-router-dom";
 import { App } from "../App";
+import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { PlayTab } from "../components/tabs/PlayTab";
 import { ProfilesTab } from "../components/tabs/ProfilesTab";
 import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
@@ -10,11 +11,15 @@ import { BrowseTab } from "../components/profiles/detail/BrowseTab";
 import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
 import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
 import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetailViewV2Wrapper";
+// DISABLED: Advent Calendar (seasonal feature)
+// import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
+import { ModDetailPage } from "../components/mods/ModDetailPage";
 
 export const router = createHashRouter([
   {
     path: "/",
     element: <App />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -49,6 +54,10 @@ export const router = createHashRouter([
         element: <ModrinthTabV2 />,
       },
       {
+        path: "mods/:source/:projectId",
+        element: <ModDetailPage />,
+      },
+      {
         path: "skins",
         element: <SkinsTab />,
       },
@@ -60,6 +69,11 @@ export const router = createHashRouter([
         path: "settings",
         element: <SettingsTab />,
       },
+      // DISABLED: Advent Calendar (seasonal feature)
+      // {
+      //   path: "advent-calendar",
+      //   element: <AdventCalendarTab />,
+      // },
     ],
   },
 ]);

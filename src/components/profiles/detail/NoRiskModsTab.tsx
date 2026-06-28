@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -24,6 +25,7 @@ import { Logo } from "../../ui/Logo";
 import { Label } from "../../ui/Label";
 import { gsap } from "gsap";
 import { ErrorMessage } from "../../ui/ErrorMessage";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface NoRiskMod {
   id: string;
@@ -48,6 +50,7 @@ export function NoRiskModsTab({
   isActive = false,
   searchQuery = "",
 }: NoRiskModsTabProps) {
+  const { t } = useTranslation();
   const [noriskMods, setNoriskMods] = useState<NoRiskMod[]>([]);
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -119,7 +122,7 @@ export function NoRiskModsTab({
         await setupEventListeners();
       } catch (error) {
         setError(
-          `Failed to load initial data: ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to load initial data: ${parseErrorMessage(error)}`,
         );
       } finally {
         setIsLoading(false);
@@ -157,7 +160,7 @@ export function NoRiskModsTab({
       }
     } catch (error) {
       setError(
-        `Failed to load NoRisk packs: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load NoRisk packs: ${parseErrorMessage(error)}`,
       );
     }
   };
@@ -229,9 +232,7 @@ export function NoRiskModsTab({
           } catch (lastResortError) {
             setError(
               `Failed to load NoRisk mods: ${
-                lastResortError instanceof Error
-                  ? lastResortError.message
-                  : String(lastResortError)
+                parseErrorMessage(lastResortError)
               }`,
             );
             setNoriskMods([]);
@@ -242,7 +243,7 @@ export function NoRiskModsTab({
       }
     } catch (error) {
       setError(
-        `Failed to load NoRisk mods: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load NoRisk mods: ${parseErrorMessage(error)}`,
       );
     } finally {
       setIsLoading(false);
@@ -303,7 +304,7 @@ export function NoRiskModsTab({
       }
     } catch (processError) {
       setError(
-        `Error processing mods: ${processError instanceof Error ? processError.message : String(processError)}`,
+        `Error processing mods: ${parseErrorMessage(processError)}`,
       );
     }
   };
@@ -354,7 +355,7 @@ export function NoRiskModsTab({
       );
     } catch (error) {
       setError(
-        `Failed to toggle mod: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to toggle mod: ${parseErrorMessage(error)}`,
       );
     }
   };
@@ -397,7 +398,7 @@ export function NoRiskModsTab({
       if (onRefresh) onRefresh();
     } catch (error) {
       setError(
-        `Failed to refresh NoRisk packs: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to refresh NoRisk packs: ${parseErrorMessage(error)}`,
       );
     } finally {
       setRefreshing(false);
@@ -458,7 +459,7 @@ export function NoRiskModsTab({
             <SearchInput
               value={localSearchQuery}
               onChange={setLocalSearchQuery}
-              placeholder="search norisk mods..."
+              placeholder={t('content.norisk.search_placeholder')}
             />
           </div>
         )}
@@ -529,7 +530,7 @@ export function NoRiskModsTab({
             </div>
           </div>
         ) : isLoading ? (
-          <LoadingState message="loading norisk mods..." />
+          <LoadingState message={t('content.norisk.loading')} />
         ) : error ? (
           <ErrorMessage message={error} />
         ) : (

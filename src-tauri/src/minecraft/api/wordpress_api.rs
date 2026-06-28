@@ -6,6 +6,7 @@ use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
+use crate::utils::string_utils::safe_truncate;
 
 pub struct WordPressApi;
 
@@ -119,7 +120,7 @@ impl WordPressApi {
         );
         // Log the first 1000 characters for brevity in logs, or the full response if shorter
         let log_preview = if response_text.len() > 1000 {
-            format!("{}... (truncated)", &response_text[..1000])
+            format!("{}... (truncated)", safe_truncate(&response_text, 1000))
         } else {
             response_text.clone()
         };

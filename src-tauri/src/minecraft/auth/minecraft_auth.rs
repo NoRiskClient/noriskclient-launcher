@@ -24,8 +24,15 @@ use serde_json::json;
 use sha2::Digest;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, RwLock};
 use uuid::Uuid;
+use axum::{
+    extract::Query,
+    response::Html,
+    routing::get,
+    Router,
+};
+use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
@@ -34,6 +41,16 @@ use crate::minecraft::api::NoRiskApi;
 pub struct NoRiskTokenClaims {
     exp: usize,
     username: String,
+}
+
+/// Represents the authentication flow used to create an account
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub enum AuthFlow {
+    /// SISU/Device flow (Xbox app style authentication)
+    #[default]
+    Sisu,
+    /// Direct OAuth flow (browser-based login, AuthMe style)
+    Direct,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -45,6 +62,16 @@ pub struct Credentials {
     pub expires: DateTime<Utc>,
     pub norisk_credentials: NoRiskCredentials,
     pub active: bool,
+    /// If true, the launcher will not show the child-protection multiplayer warning modal for this account
+    #[serde(default)]
+    pub ignore_child_protection_warning: bool,
+    /// The authentication flow used to create this account (optional for backwards compatibility)
+    #[serde(default)]
+    pub auth_flow: Option<AuthFlow>,
+    /// Absolute expiry of the *Minecraft* access_token (distinct from `expires`, the Microsoft OAuth
+    /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
+    #[serde(default)]
+    pub mc_access_token_expires: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -151,6 +178,10 @@ pub enum MinecraftAuthenticationError {
     NoSessionId,
     #[error("Error reading user hash")]
     NoUserHash,
+    #[error("This Microsoft account does not have a Minecraft Java Edition license. You may only have Bedrock Edition.")]
+    NoMinecraftLicense,
+    #[error("{0}")]
+    XboxError(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -170,6 +201,16 @@ pub struct MinecraftLoginFlow {
     pub redirect_uri: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DirectOAuthFlow {
+    pub verifier: String,
+    pub challenge: String,
+    pub state: String,
+    pub redirect_uri: String,
+    pub authorize_url: String,
+}
+
+#[derive(Clone)]
 pub struct MinecraftAuthStore {
     accounts: Arc<RwLock<Vec<Credentials>>>,
     store_path: PathBuf,
@@ -372,7 +413,47 @@ impl MinecraftAuthStore {
         Ok((key, res.value, res.date, true))
     }
 
-    pub async fn login_begin(&self) -> Result<MinecraftLoginFlow> {
+    /// Starts a direct OAuth2 flow (for Flatpak/localhost redirect)
+    /// This uses the direct OAuth2 endpoint instead of SISU
+    pub async fn login_begin_direct_oauth(&self, redirect_uri: &str) -> Result<DirectOAuthFlow> {
+        info!("[Direct OAuth Flow] Starting direct OAuth2 login");
+        
+        // Generate OAuth challenge
+        let verifier = generate_oauth_challenge();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&verifier);
+        let result = hasher.finalize();
+        let challenge = BASE64_URL_SAFE_NO_PAD.encode(result);
+        
+        // Generate state
+        let state = generate_oauth_challenge();
+        
+        // Build authorization URL
+        let mut authorize_url = url::Url::parse(DIRECT_OAUTH_AUTHORIZE_URL)
+            .map_err(|e| AppError::Other(format!("Failed to parse authorize URL: {}", e)))?;
+        
+        authorize_url.query_pairs_mut()
+            .append_pair("client_id", DIRECT_OAUTH_CLIENT_ID)
+            .append_pair("response_type", "code")
+            .append_pair("redirect_uri", redirect_uri)
+            .append_pair("scope", "XboxLive.signin offline_access")
+            .append_pair("code_challenge", &challenge)
+            .append_pair("code_challenge_method", "S256")
+            .append_pair("state", &state)
+            .append_pair("prompt", "select_account");
+        
+        info!("[Direct OAuth Flow] Generated authorization URL");
+        
+        Ok(DirectOAuthFlow {
+            verifier,
+            challenge,
+            state,
+            redirect_uri: redirect_uri.to_string(),
+            authorize_url: authorize_url.to_string(),
+        })
+    }
+
+    pub async fn login_begin(&self, redirect_uri: Option<&str>) -> Result<MinecraftLoginFlow> {
         info!("[Auth Flow] Starting login_begin process");
         info!("[Auth Flow] Initializing device token refresh");
         let (key, token, current_date, valid_date) =
@@ -385,7 +466,7 @@ impl MinecraftAuthStore {
         let result = hasher.finalize();
         let challenge = BASE64_URL_SAFE_NO_PAD.encode(result);
 
-        match sisu_authenticate(&token.token, &challenge, &key, current_date).await {
+        match sisu_authenticate(&token.token, &challenge, &key, current_date, redirect_uri).await {
             Ok((session_id, redirect_uri)) => {
                 info!("[Auth Flow] SISU authentication successful");
                 info!("[Auth Flow] Session ID generated: {}", session_id);
@@ -412,7 +493,7 @@ impl MinecraftAuthStore {
 
                     info!("[Auth Flow] Retrying SISU authentication");
                     let (session_id, redirect_uri) =
-                        sisu_authenticate(&token.token, &challenge, &key, current_date).await?;
+                        sisu_authenticate(&token.token, &challenge, &key, current_date, redirect_uri).await?;
 
                     info!(
                         "[Auth Flow] Retry successful - New session ID: {}",
@@ -430,6 +511,168 @@ impl MinecraftAuthStore {
                 }
             }
         }
+    }
+
+    /// Helper method to emit login progress events
+    async fn emit_login_progress_event(
+        state: &Arc<crate::state::State>,
+        event_id: Uuid,
+        event_type: crate::state::event_state::EventType,
+        message: &str,
+        progress: Option<f64>,
+    ) -> Result<()> {
+        state.emit_event(crate::state::event_state::EventPayload {
+            event_id,
+            event_type,
+            target_id: None,
+            message: message.to_string(),
+            progress,
+            error: None,
+        }).await
+    }
+
+    /// Helper method to emit login error events
+    fn emit_login_error_event(
+        state: &Arc<crate::state::State>,
+        event_id: Uuid,
+        error_message: String,
+    ) {
+        let state_clone = Arc::clone(state);
+        tokio::spawn(async move {
+            let _ = state_clone.emit_event(crate::state::event_state::EventPayload {
+                event_id,
+                event_type: crate::state::event_state::EventType::Error,
+                target_id: None,
+                message: error_message.clone(),
+                progress: None,
+                error: Some(error_message),
+            }).await;
+        });
+    }
+
+    /// Completes the direct OAuth2 flow (for Flatpak/localhost redirect)
+    pub async fn login_finish_direct_oauth(&self, code: &str, flow: DirectOAuthFlow) -> Result<Credentials> {
+        self.login_finish_direct_oauth_with_events(code, flow, Uuid::new_v4()).await
+    }
+
+    /// Completes the direct OAuth2 flow with event emission (for Flatpak/localhost redirect)
+    pub async fn login_finish_direct_oauth_with_events(&self, code: &str, flow: DirectOAuthFlow, event_id: Uuid) -> Result<Credentials> {
+        info!("[Direct OAuth Flow] Starting login_finish_direct_oauth");
+        let state = crate::state::State::get().await?;
+        
+        // Exchange code for access token
+        info!("[Direct OAuth Flow] Exchanging code for access token");
+        let oauth_token = direct_oauth_token(code, &flow.verifier, &flow.redirect_uri).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to exchange authorization code: {}", e));
+                e
+            })?;
+        
+        // Exchange Microsoft access token for Xbox token (RPS method, no SISU)
+        info!("[Direct OAuth Flow] Exchanging Microsoft token for Xbox token");
+        Self::emit_login_progress_event(
+            &state,
+            event_id,
+            crate::state::event_state::EventType::AccountLoginExchangingXboxToken,
+            "Exchanging Microsoft token for Xbox token",
+            Some(50.0),
+        ).await?;
+        let xbox_token = xbox_authenticate_rps(&oauth_token.value.access_token).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to authenticate with Xbox: {}", e));
+                e
+            })?;
+        
+        // Exchange Xbox token for XSTS token
+        info!("[Direct OAuth Flow] Exchanging Xbox token for XSTS token");
+        Self::emit_login_progress_event(
+            &state,
+            event_id,
+            crate::state::event_state::EventType::AccountLoginExchangingXstsToken,
+            "Exchanging Xbox token for XSTS token",
+            Some(60.0),
+        ).await?;
+        let xsts_token = xsts_authorize_direct(xbox_token).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to authorize XSTS token: {}", e));
+                e
+            })?;
+        
+        // Get Minecraft token
+        info!("[Direct OAuth Flow] Getting Minecraft token");
+        Self::emit_login_progress_event(
+            &state,
+            event_id,
+            crate::state::event_state::EventType::AccountLoginGettingMinecraftToken,
+            "Getting Minecraft access token",
+            Some(70.0),
+        ).await?;
+        let minecraft_token = minecraft_token(xsts_token).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to get Minecraft token: {}", e));
+                e
+            })?;
+        
+        // Check entitlements
+        info!("[Direct OAuth Flow] Checking Minecraft entitlements");
+        Self::emit_login_progress_event(
+            &state,
+            event_id,
+            crate::state::event_state::EventType::AccountLoginCheckingEntitlements,
+            "Checking Minecraft entitlements",
+            Some(80.0),
+        ).await?;
+        minecraft_entitlements(&minecraft_token.access_token).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to check Minecraft entitlements: {}", e));
+                e
+            })?;
+        
+        // Get profile
+        info!("[Direct OAuth Flow] Fetching Minecraft profile");
+        Self::emit_login_progress_event(
+            &state,
+            event_id,
+            crate::state::event_state::EventType::AccountLoginFetchingProfile,
+            "Fetching Minecraft profile",
+            Some(90.0),
+        ).await?;
+        let profile = minecraft_profile(&minecraft_token.access_token).await
+            .map_err(|e| {
+                Self::emit_login_error_event(&state, event_id, format!("Failed to fetch Minecraft profile: {}", e));
+                e
+            })?;
+        info!(
+            "[Direct OAuth Flow] Profile retrieved - ID: {:?}, Name: {}",
+            profile.id, profile.name
+        );
+        
+        let profile_id = profile.id.unwrap_or_default();
+        let existing_account = self.get_account_by_id(profile_id).await?;
+        
+        let credentials = Credentials {
+            id: profile_id,
+            active: true,
+            username: profile.name,
+            access_token: minecraft_token.access_token,
+            refresh_token: oauth_token.value.refresh_token,
+            expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+            norisk_credentials: match existing_account {
+                Some(ref account) => account.norisk_credentials.clone(),
+                None => NoRiskCredentials {
+                    production: None,
+                    experimental: None,
+                },
+            },
+            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
+            auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+        };
+
+        self.update_or_insert(credentials.clone()).await?;
+        info!("[Direct OAuth Flow] Login process completed successfully (auth_flow: Direct)");
+        
+        Ok(credentials)
     }
 
     pub async fn login_finish(&self, code: &str, flow: MinecraftLoginFlow) -> Result<Credentials> {
@@ -489,12 +732,15 @@ impl MinecraftAuthStore {
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
             norisk_credentials: match existing_account {
-                Some(account) => account.norisk_credentials.clone(),
+                Some(ref account) => account.norisk_credentials.clone(),
                 None => NoRiskCredentials {
                     production: None,
                     experimental: None,
                 },
             },
+            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
+            auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         info!(
@@ -502,7 +748,7 @@ impl MinecraftAuthStore {
             credentials.username
         );
         self.update_or_insert(credentials.clone()).await?;
-        info!("[Auth Flow] Login process completed successfully");
+        info!("[Auth Flow] Login process completed successfully (auth_flow: Sisu)");
 
         Ok(credentials)
     }
@@ -589,6 +835,8 @@ impl MinecraftAuthStore {
                 }
             );
 
+            info!("[NoRisk Token] Account is known to have child protection enabled: {}", creds.ignore_child_protection_warning);
+
             match NoRiskApi::refresh_norisk_token_v3(
                 &system_id,
                 &creds.username,
@@ -611,6 +859,9 @@ impl MinecraftAuthStore {
                         copied_credentials.norisk_credentials.production = Some(norisk_token);
                     }
 
+                    // reset child protection warning flag on successful token refresh
+                    copied_credentials.ignore_child_protection_warning = false;
+
                     // Update the account in storage
                     info!("[NoRisk Token] Updating account in storage");
                     self.update_or_insert(copied_credentials.clone()).await?;
@@ -622,7 +873,12 @@ impl MinecraftAuthStore {
                     info!("[NoRisk Token] Token refresh failed: {:?}", e);
                     info!("[NoRisk Token] Falling back to original credentials");
                     // Return the original credentials if token refresh fails
-                    Ok(creds.clone())
+                    let creds_mut =  &mut creds.clone();
+                    if e.to_string().contains("InsufficientPrivilegesException") && e.to_string().contains("/session/minecraft/join") {
+                        info!("[NoRisk Token] Detected child protection restriction, setting ignore_child_protection_warning to true");
+                        creds_mut.ignore_child_protection_warning = true;
+                    }
+                    Ok(creds_mut.clone())
                 }
             }
         } else {
@@ -633,13 +889,75 @@ impl MinecraftAuthStore {
 
     async fn refresh_token(&self, creds: &Credentials) -> Result<Option<Credentials>> {
         info!(
-            "[Token Refresh] Starting token refresh for account: {}",
-            creds.username
+            "[Token Refresh] Starting token refresh for account: {} (auth_flow: {:?})",
+            creds.username, creds.auth_flow
         );
         let cred_id = creds.id;
         let profile_name = creds.username.clone();
 
-        info!("[Token Refresh] Getting OAuth refresh token");
+        // Use the stored auth_flow to determine which refresh method to use
+        // For backwards compatibility, None defaults to trying Direct first, then SISU
+        match creds.auth_flow {
+            Some(AuthFlow::Direct) => {
+                info!("[Token Refresh] Using Direct OAuth flow");
+                self.refresh_token_direct(creds, cred_id, profile_name).await
+            }
+            Some(AuthFlow::Sisu) => {
+                info!("[Token Refresh] Using SISU flow");
+                self.refresh_token_sisu(creds, cred_id, profile_name).await
+            }
+            None => {
+                // Backwards compatibility: try SISU first (default), then Direct
+                info!("[Token Refresh] No auth_flow stored, trying SISU first (default)...");
+                match self.refresh_token_sisu(creds, cred_id, profile_name.clone()).await {
+                    Ok(result) => Ok(result),
+                    Err(sisu_err) => {
+                        info!("[Token Refresh] SISU flow failed: {:?}, trying Direct...", sisu_err);
+                        self.refresh_token_direct(creds, cred_id, profile_name).await
+                    }
+                }
+            }
+        }
+    }
+
+    /// Refresh token using Direct OAuth flow (browser-based login)
+    async fn refresh_token_direct(&self, creds: &Credentials, cred_id: Uuid, profile_name: String) -> Result<Option<Credentials>> {
+        info!("[Token Refresh] Getting OAuth refresh token (Direct flow)");
+        let oauth_token = oauth_refresh_direct(&creds.refresh_token).await?;
+
+        info!("[Token Refresh] Getting Xbox token (direct via RPS)");
+        let xbox_token = xbox_authenticate_rps(&oauth_token.value.access_token).await?;
+
+        info!("[Token Refresh] Authorizing with XSTS (direct)");
+        let xsts_token = xsts_authorize_direct(xbox_token).await?;
+
+        info!("[Token Refresh] Getting Minecraft token");
+        let minecraft_token = minecraft_token(xsts_token).await?;
+
+        info!("[Token Refresh] Creating new credentials");
+        let val = Credentials {
+            id: cred_id,
+            username: profile_name,
+            access_token: minecraft_token.access_token,
+            refresh_token: oauth_token.value.refresh_token,
+            expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
+            norisk_credentials: creds.norisk_credentials.clone(),
+            active: creds.active,
+            ignore_child_protection_warning: creds.ignore_child_protection_warning,
+            auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+        };
+
+        info!("[Token Refresh] Updating account in storage");
+        self.update_or_insert(val.clone()).await?;
+        info!("[Token Refresh] Token refresh completed successfully (Direct flow)");
+
+        Ok(Some(val))
+    }
+
+    /// Refresh token using SISU flow (device flow)
+    async fn refresh_token_sisu(&self, creds: &Credentials, cred_id: Uuid, profile_name: String) -> Result<Option<Credentials>> {
+        info!("[Token Refresh] Getting OAuth refresh token (SISU flow)");
         let oauth_token = oauth_refresh(&creds.refresh_token).await?;
 
         info!("[Token Refresh] Refreshing device token");
@@ -676,13 +994,16 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: creds.clone().norisk_credentials,
-            active: creds.clone().active,
+            norisk_credentials: creds.norisk_credentials.clone(),
+            active: creds.active,
+            ignore_child_protection_warning: creds.ignore_child_protection_warning,
+            auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         info!("[Token Refresh] Updating account in storage");
         self.update_or_insert(val.clone()).await?;
-        info!("[Token Refresh] Token refresh completed successfully");
+        info!("[Token Refresh] Token refresh completed successfully (SISU flow)");
 
         Ok(Some(val))
     }
@@ -737,7 +1058,12 @@ impl MinecraftAuthStore {
                     info!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         info!("[Account Manager] Updating account in list");
-                        *existing = updated.clone();
+                        // Preserve ignore flag from in-memory existing account to avoid
+                        // overwriting a recent user 'ignore' action performed concurrently.
+                        let existing_flag = existing.ignore_child_protection_warning;
+                        let mut merged = updated.clone();
+                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                        *existing = merged;
                     }
                     info!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
@@ -765,11 +1091,25 @@ impl MinecraftAuthStore {
         {
             let mut accounts = self.accounts.write().await;
 
+            // If new credentials are active, deactivate all other accounts first
+            if credentials.active {
+                info!("[Account Manager] New account is active, deactivating all other accounts");
+                for account in accounts.iter_mut() {
+                    account.active = false;
+                }
+            }
+
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
                 info!("[Account Manager] Found existing account, updating credentials");
-                *existing = credentials;
-                info!("[Account Manager] Account successfully updated");
+                // Preserve the existing ignore_child_protection_warning flag to avoid
+                // races where another concurrent flow set the flag while this flow
+                // was constructing credentials from stale data.
+                let existing_flag = existing.ignore_child_protection_warning;
+                let mut merged = credentials.clone();
+                merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                *existing = merged;
+                info!("[Account Manager] Account successfully updated (merged ignore flag)");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
                 info!("[Account Manager] No existing account found, creating new account");
@@ -799,8 +1139,14 @@ impl MinecraftAuthStore {
             creds.expires
         );
 
-        if creds.expires <= Utc::now() + Duration::minutes(5) {
-            info!("[Token Check] Microsoft token nearing expiry, initiating proactive refresh");
+        // Refresh on the Minecraft token's own expiry (12h buffer, Prism-style); None = legacy
+        // account → refresh once to populate the field.
+        let mc_stale = match creds.mc_access_token_expires {
+            Some(exp) => exp <= Utc::now() + Duration::hours(12),
+            None => true,
+        };
+        if mc_stale {
+            info!("[Token Check] Minecraft token stale or nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
             let res = self.refresh_token(&old_credentials).await;
@@ -832,17 +1178,39 @@ impl MinecraftAuthStore {
                             return Ok(Some(old_credentials));
                         }
                     }
+                    // Transient outage (Mojang/Microsoft rate-limit or server error): the
+                    // endpoint answered but with a non-token body (e.g. HTTP 429 during an
+                    // auth outage). Keep showing the account with its cached credentials
+                    // instead of failing the whole account load — the real token refresh
+                    // happens again at game launch.
+                    if let AppError::MinecraftAuthenticationError(
+                        MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
+                    ) = &err
+                    {
+                        if status_code.as_u16() == 429 || status_code.is_server_error() {
+                            info!(
+                                "[Token Check] Transient outage ({}) during refresh, using cached credentials",
+                                status_code
+                            );
+                            return Ok(Some(old_credentials));
+                        }
+                    }
                     info!("[Token Check] Error during token refresh: {:?}", err);
                     Err(err)
                 }
             }
         } else {
             info!("[Token Check] Microsoft token is still valid");
-            info!("[Token Check] Checking NoRisk token status");
-            Ok(Some(
-                self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
-                    .await?,
-            ))
+            if creds.ignore_child_protection_warning {
+                info!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
+                Ok(None)
+            } else {
+                info!("[Token Check] Checking NoRisk token status");
+                Ok(Some(
+                    self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
+                        .await?,
+                ))
+            }
         }
     }
 
@@ -888,7 +1256,12 @@ impl MinecraftAuthStore {
                     info!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         info!("[Account Manager] Updating account in list");
-                        *existing = updated.clone();
+                        // Preserve ignore flag from in-memory existing account to avoid
+                        // overwriting a recent user 'ignore' action performed concurrently.
+                        let existing_flag = existing.ignore_child_protection_warning;
+                        let mut merged = updated.clone();
+                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
+                        *existing = merged;
                     }
                     info!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
@@ -1014,6 +1387,11 @@ const MICROSOFT_CLIENT_ID: &str = "00000000402b5328";
 const AUTH_REPLY_URL: &str = "https://login.live.com/oauth20_desktop.srf";
 const REQUESTED_SCOPE: &str = "service::user.auth.xboxlive.com::MBI_SSL";
 
+// Alternative Client-ID for direct OAuth2 flow (supports localhost redirect)
+const DIRECT_OAUTH_CLIENT_ID: &str = "e16699bb-2aa8-46da-b5e3-45cbcce29091";
+const DIRECT_OAUTH_AUTHORIZE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
+const DIRECT_OAUTH_TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+
 pub struct RequestWithDate<T> {
     pub date: DateTime<Utc>,
     pub value: T,
@@ -1079,7 +1457,9 @@ async fn sisu_authenticate(
     challenge: &str,
     key: &DeviceTokenKey,
     current_date: DateTime<Utc>,
+    redirect_uri: Option<&str>,
 ) -> Result<(String, RequestWithDate<RedirectUri>)> {
+    let redirect_uri_value = redirect_uri.unwrap_or(AUTH_REPLY_URL);
     let res = send_signed_request::<RedirectUri>(
         None,
         "https://sisu.xboxlive.com/authenticate",
@@ -1096,7 +1476,7 @@ async fn sisu_authenticate(
             "state": generate_oauth_challenge(),
             "prompt": "select_account"
           },
-          "RedirectUri": AUTH_REPLY_URL,
+          "RedirectUri": redirect_uri_value,
           "Sandbox": "RETAIL",
           "TokenType": "code",
           "TitleId": "1794566092",
@@ -1181,6 +1561,197 @@ async fn oauth_token(code: &str, verifier: &str) -> Result<RequestWithDate<OAuth
     })
 }
 
+/// Direct OAuth2 token exchange (for localhost redirect)
+async fn direct_oauth_token(
+    code: &str,
+    verifier: &str,
+    redirect_uri: &str,
+) -> Result<RequestWithDate<OAuthToken>> {
+    let mut query = HashMap::new();
+    query.insert("client_id", DIRECT_OAUTH_CLIENT_ID);
+    query.insert("code", code);
+    query.insert("code_verifier", verifier);
+    query.insert("grant_type", "authorization_code");
+    query.insert("redirect_uri", redirect_uri);
+
+    let res = auth_retry(|| {
+        HTTP_CLIENT
+            .post(DIRECT_OAUTH_TOKEN_URL)
+            .header("Accept", "application/json")
+            .form(&query)
+            .send()
+    })
+    .await
+    .map_err(|source| MinecraftAuthenticationError::Request {
+        source,
+        step: MinecraftAuthStep::GetOAuthToken,
+    })?;
+
+    let status = res.status();
+    let current_date = get_date_header(res.headers());
+    let text = res
+        .text()
+        .await
+        .map_err(|source| MinecraftAuthenticationError::Request {
+            source,
+            step: MinecraftAuthStep::GetOAuthToken,
+        })?;
+
+    let body = serde_json::from_str(&text).map_err(|source| {
+        MinecraftAuthenticationError::DeserializeResponse {
+            source,
+            raw: text,
+            step: MinecraftAuthStep::GetOAuthToken,
+            status_code: status,
+        }
+    })?;
+
+    Ok(RequestWithDate {
+        date: current_date,
+        value: body,
+    })
+}
+
+/// Xbox authentication using RPS method (direct, no SISU)
+async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
+    let res = auth_retry(|| {
+        HTTP_CLIENT
+            .post("https://user.auth.xboxlive.com/user/authenticate")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .json(&json!({
+                "Properties": {
+                    "AuthMethod": "RPS",
+                    "SiteName": "user.auth.xboxlive.com",
+                    "RpsTicket": format!("d={}", access_token)
+                },
+                "RelyingParty": "http://auth.xboxlive.com",
+                "TokenType": "JWT"
+            }))
+            .send()
+    })
+    .await
+    .map_err(|source| MinecraftAuthenticationError::Request {
+        source,
+        step: MinecraftAuthStep::SisuAuthorize,
+    })?;
+
+    let status = res.status();
+    let text = res
+        .text()
+        .await
+        .map_err(|source| MinecraftAuthenticationError::Request {
+            source,
+            step: MinecraftAuthStep::SisuAuthorize,
+        })?;
+
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|source| {
+        MinecraftAuthenticationError::DeserializeResponse {
+            source,
+            raw: text.clone(),
+            step: MinecraftAuthStep::SisuAuthorize,
+            status_code: status,
+        }
+    })?;
+
+    json.get("Token")
+        .and_then(|t| t.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| {
+            AppError::MinecraftAuthenticationError(
+                MinecraftAuthenticationError::DeserializeResponse {
+                    source: serde_json::Error::io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Missing Token field in Xbox authentication response",
+                    )),
+                    raw: text,
+                    step: MinecraftAuthStep::SisuAuthorize,
+                    status_code: status,
+                }
+            )
+        })
+}
+
+/// XSTS authorization (direct, no device token)
+/// Xbox error response structure for XSTS authorization failures
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct XboxErrorResponse {
+    XErr: Option<u64>,
+    Message: Option<String>,
+    Redirect: Option<String>,
+}
+
+/// Converts Xbox error codes to user-friendly messages
+fn xbox_error_to_message(xerr: u64, redirect: Option<&str>) -> String {
+    match xerr {
+        2148916233 => "This Microsoft account doesn't have an Xbox account. Please create one at xbox.com or sign in to the Xbox app first.".to_string(),
+        2148916235 => "This is a child account that needs parental approval. Please have a parent approve Xbox Live access.".to_string(),
+        2148916236 | 2148916237 => "Xbox Live is not available in your country/region or adult verification is required.".to_string(),
+        2148916238 => "This is a child account. Child accounts cannot access Minecraft without parental setup.".to_string(),
+        _ => format!(
+            "Xbox authentication failed (Error code: {}). {}",
+            xerr,
+            redirect.map(|r| format!("Please visit: {}", r)).unwrap_or_default()
+        ),
+    }
+}
+
+async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
+    let res = auth_retry(|| {
+        HTTP_CLIENT
+            .post("https://xsts.auth.xboxlive.com/xsts/authorize")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .json(&json!({
+                "Properties": {
+                    "SandboxId": "RETAIL",
+                    "UserTokens": [xbox_token]
+                },
+                "RelyingParty": "rp://api.minecraftservices.com/",
+                "TokenType": "JWT"
+            }))
+            .send()
+    })
+    .await
+    .map_err(|source| MinecraftAuthenticationError::Request {
+        source,
+        step: MinecraftAuthStep::XstsAuthorize,
+    })?;
+
+    let status = res.status();
+    let current_date = get_date_header(res.headers());
+    let text = res
+        .text()
+        .await
+        .map_err(|source| MinecraftAuthenticationError::Request {
+            source,
+            step: MinecraftAuthStep::XstsAuthorize,
+        })?;
+
+    // Check for Xbox error response (401 Unauthorized with XErr code)
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        if let Ok(xbox_error) = serde_json::from_str::<XboxErrorResponse>(&text) {
+            if let Some(xerr) = xbox_error.XErr {
+                let message = xbox_error_to_message(xerr, xbox_error.Redirect.as_deref());
+                info!("Xbox authentication error: XErr={}, Message={:?}", xerr, xbox_error.Message);
+                return Err(MinecraftAuthenticationError::XboxError(message).into());
+            }
+        }
+    }
+
+    let body: DeviceToken = serde_json::from_str(&text).map_err(|source| {
+        MinecraftAuthenticationError::DeserializeResponse {
+            source,
+            raw: text,
+            step: MinecraftAuthStep::XstsAuthorize,
+            status_code: status,
+        }
+    })?;
+
+    Ok(body)
+}
+
 async fn oauth_refresh(refresh_token: &str) -> Result<RequestWithDate<OAuthToken>> {
     let mut query = HashMap::new();
     query.insert("client_id", "00000000402b5328");
@@ -1192,6 +1763,53 @@ async fn oauth_refresh(refresh_token: &str) -> Result<RequestWithDate<OAuthToken
     let res = auth_retry(|| {
         HTTP_CLIENT
             .post("https://login.live.com/oauth20_token.srf")
+            .header("Accept", "application/json")
+            .form(&query)
+            .send()
+    })
+    .await
+    .map_err(|source| MinecraftAuthenticationError::Request {
+        source,
+        step: MinecraftAuthStep::RefreshOAuthToken,
+    })?;
+
+    let status = res.status();
+    let current_date = get_date_header(res.headers());
+    let text = res
+        .text()
+        .await
+        .map_err(|source| MinecraftAuthenticationError::Request {
+            source,
+            step: MinecraftAuthStep::RefreshOAuthToken,
+        })?;
+
+    let body = serde_json::from_str(&text).map_err(|source| {
+        MinecraftAuthenticationError::DeserializeResponse {
+            source,
+            raw: text,
+            step: MinecraftAuthStep::RefreshOAuthToken,
+            status_code: status,
+        }
+    })?;
+
+    Ok(RequestWithDate {
+        date: current_date,
+        value: body,
+    })
+}
+
+/// Refresh OAuth token for accounts created with browser-based login (Direct OAuth flow)
+/// Uses the same client_id and token URL as the browser login
+async fn oauth_refresh_direct(refresh_token: &str) -> Result<RequestWithDate<OAuthToken>> {
+    let mut query = HashMap::new();
+    query.insert("client_id", DIRECT_OAUTH_CLIENT_ID);
+    query.insert("refresh_token", refresh_token);
+    query.insert("grant_type", "refresh_token");
+    query.insert("scope", "XboxLive.signin offline_access");
+
+    let res = auth_retry(|| {
+        HTTP_CLIENT
+            .post(DIRECT_OAUTH_TOKEN_URL)
             .header("Accept", "application/json")
             .form(&query)
             .send()
@@ -1316,7 +1934,17 @@ struct MinecraftToken {
     // pub username: String,
     pub access_token: String,
     // pub token_type: String,
-    // pub expires_in: u64,
+    /// Lifetime of the Minecraft access token in seconds (~86400). Tracked so the refresh
+    /// guard keys on the *Minecraft* token rather than the Microsoft OAuth token.
+    #[serde(default)]
+    pub expires_in: u64,
+}
+
+/// Absolute expiry for a freshly minted Minecraft access token. Mirrors Prism's
+/// `currentTime + expires_in`, with a defensive 24h fallback when the field is absent (0).
+pub(crate) fn mc_token_expiry(expires_in: u64) -> DateTime<Utc> {
+    let secs = if expires_in == 0 { 24 * 3600 } else { expires_in as i64 };
+    Utc::now() + Duration::seconds(secs)
 }
 
 async fn minecraft_token(
@@ -1408,9 +2036,17 @@ async fn minecraft_profile(
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct MinecraftEntitlements {}
+struct MinecraftEntitlements {
+    #[serde(default)]
+    items: Vec<EntitlementItem>,
+}
+
+#[derive(Deserialize, Debug)]
+struct EntitlementItem {
+    name: String,
+}
 
 async fn minecraft_entitlements(
     token: &str,
@@ -1440,14 +2076,27 @@ async fn minecraft_entitlements(
             step: MinecraftAuthStep::MinecraftEntitlements,
         })?;
 
-    serde_json::from_str(&text).map_err(|source| {
+    let entitlements: MinecraftEntitlements = serde_json::from_str(&text).map_err(|source| {
         MinecraftAuthenticationError::DeserializeResponse {
             source,
             raw: text,
             step: MinecraftAuthStep::MinecraftEntitlements,
             status_code: status,
         }
-    })
+    })?;
+
+    // Check if the account has a Minecraft Java Edition license
+    // Valid license items are "product_minecraft" or "game_minecraft"
+    let has_java_license = entitlements.items.iter().any(|item| {
+        item.name == "product_minecraft" || item.name == "game_minecraft"
+    });
+
+    if !has_java_license {
+        info!("No Minecraft Java license found. Entitlements: {:?}", entitlements.items);
+        return Err(MinecraftAuthenticationError::NoMinecraftLicense);
+    }
+
+    Ok(entitlements)
 }
 
 // auth utils
@@ -1599,6 +2248,17 @@ async fn send_signed_request<T: DeserializeOwned>(
         }));
     }
 
+    // Check for Xbox error response (401 Unauthorized with XErr code)
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        if let Ok(xbox_error) = serde_json::from_str::<XboxErrorResponse>(&text) {
+            if let Some(xerr) = xbox_error.XErr {
+                let message = xbox_error_to_message(xerr, xbox_error.Redirect.as_deref());
+                info!("Xbox authentication error in signed request: XErr={}, Message={:?}", xerr, xbox_error.Message);
+                return Err(AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::XboxError(message)));
+            }
+        }
+    }
+
     let body = serde_json::from_str(&text).map_err(|source| {
         MinecraftAuthenticationError::DeserializeResponse {
             source,
@@ -1627,4 +2287,99 @@ fn generate_oauth_challenge() -> String {
 
     let bytes: Vec<u8> = (0..64).map(|_| rng.gen::<u8>()).collect();
     bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
+}
+
+/// Starts a local HTTP server to listen for OAuth callback.
+/// Returns a oneshot receiver that will receive the authorization code when the callback is received.
+/// 
+/// # Arguments
+/// * `port` - The port to listen on
+/// * `success_html` - HTML content to display on successful authentication
+/// * `error_html` - HTML content to display on authentication error
+pub async fn start_oauth_callback_server(
+    port: u16,
+    success_html: String,
+    error_html: String,
+) -> Result<(tokio::task::JoinHandle<Result<()>>, oneshot::Receiver<Result<String>>)> {
+    info!("[OAuth Server] Starting callback server on port {}", port);
+
+    let (tx, rx) = oneshot::channel();
+    let tx_shared = Arc::new(tokio::sync::Mutex::new(Some(tx)));
+    let success_html_shared = Arc::new(success_html);
+    let error_html_shared = Arc::new(error_html);
+
+    // Create the router with shared state
+    let app = Router::new().route(
+        "/callback",
+        get({
+            let tx_shared = tx_shared.clone();
+            let success_html_shared = success_html_shared.clone();
+            let error_html_shared = error_html_shared.clone();
+            move |Query(params): Query<HashMap<String, String>>| {
+                let tx_shared = tx_shared.clone();
+                let success_html_shared = success_html_shared.clone();
+                let error_html_shared = error_html_shared.clone();
+                async move {
+                    if let Some(code) = params.get("code") {
+                        info!("[OAuth Server] Received authorization code");
+                        // Send the code through the channel
+                        if let Some(tx) = tx_shared.lock().await.take() {
+                            let _ = tx.send(Ok(code.clone()));
+                        }
+                        Html(success_html_shared.as_str().to_string())
+                    } else if let Some(error) = params.get("error") {
+                        let error_description = params
+                            .get("error_description")
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown error");
+                        error!(
+                            "[OAuth Server] Received error: {} - {}",
+                            error, error_description
+                        );
+                        // Send error through the channel
+                        if let Some(tx) = tx_shared.lock().await.take() {
+                            let _ = tx.send(Err(AppError::AccountError(format!(
+                                "OAuth error: {} - {}",
+                                error, error_description
+                            ))));
+                        }
+                        // Inject error into HTML template via URL parameters
+                        // The JavaScript in the template will handle displaying the error
+                        let error_url = format!("?error={}&error_description={}", 
+                            urlencoding::encode(error),
+                            urlencoding::encode(error_description));
+                        Html(error_html_shared.as_str().to_string())
+                    } else {
+                        error!("[OAuth Server] Received callback without code or error");
+                        // Send error through the channel
+                        if let Some(tx) = tx_shared.lock().await.take() {
+                            let _ = tx.send(Err(AppError::AccountError(
+                                "No authorization code received".to_string(),
+                            )));
+                        }
+                        // Use error HTML template (error will be handled by JavaScript in the template)
+                        Html(error_html_shared.as_str().to_string())
+                    }
+                }
+            }
+        }),
+    );
+
+    // Bind to the address
+    let addr = format!("127.0.0.1:{}", port);
+    let listener = TcpListener::bind(&addr)
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to bind to {}: {}", addr, e)))?;
+
+    info!("[OAuth Server] Listening on http://{}", addr);
+
+    // Spawn the server task using axum's serve
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .await
+            .map_err(|e| AppError::Other(format!("Server error: {}", e)))?;
+        Ok(())
+    });
+
+    Ok((handle, rx))
 }

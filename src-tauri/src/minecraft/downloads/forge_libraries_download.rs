@@ -1,15 +1,48 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::forge_install_profile::ForgeInstallProfile;
 use crate::minecraft::dto::forge_meta::ForgeVersion;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use futures::stream::{iter, StreamExt};
 use log::info;
+use serde::Deserialize;
 use std::path::PathBuf;
 use tokio::fs;
 
 const LIBRARIES_DIR: &str = "libraries";
 const DEFAULT_CONCURRENT_DOWNLOADS: usize = 10;
+
+#[derive(Debug, Deserialize)]
+struct ForgeloaderResolveResponse {
+    artifact_version: String,
+    download_url: String,
+}
+
+async fn fetch_forgeloader_resolution(
+    loader: &str,
+    mc_version: &str,
+) -> Result<ForgeloaderResolveResponse> {
+    let url = format!(
+        "https://assets.norisk.gg/api/v1/assets/forgeloader?loader={}&mc={}",
+        loader, mc_version
+    );
+    let response = HTTP_CLIENT
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::RequestError(format!("forgeloader resolve request failed: {}", e)))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(AppError::Other(format!(
+            "forgeloader resolver returned {} for {} {}",
+            status, loader, mc_version
+        )));
+    }
+    response
+        .json::<ForgeloaderResolveResponse>()
+        .await
+        .map_err(|e| AppError::Other(format!("forgeloader resolver response parse failed: {}", e)))
+}
 
 pub struct ForgeLibrariesDownload {
     base_path: PathBuf,
@@ -310,5 +343,62 @@ impl ForgeLibrariesDownload {
 
         info!("\n✨ All legacy libraries processed successfully!");
         Ok(())
+    }
+
+    pub async fn resolve_forgeloader(
+        &self,
+        minecraft_version: &str,
+        loader: &str,
+    ) -> Result<PathBuf> {
+        match fetch_forgeloader_resolution(loader, minecraft_version).await {
+            Ok(resolved) => {
+                let jar_path = self.artifact_path(&resolved.artifact_version);
+                DownloadUtils::download_file(
+                    &resolved.download_url,
+                    &jar_path,
+                    DownloadConfig::new().with_streaming(true).with_retries(3),
+                )
+                .await?;
+                info!("Forgeloader {} → {:?}", resolved.artifact_version, jar_path);
+                Ok(jar_path)
+            }
+            Err(backend_err) => match self.find_local_forgeloader(loader, minecraft_version).await {
+                Some(p) => {
+                    info!("Forgeloader backend unreachable ({}); using cached {:?}", backend_err, p);
+                    Ok(p)
+                }
+                None => Err(backend_err),
+            },
+        }
+    }
+
+    fn artifact_path(&self, artifact_version: &str) -> PathBuf {
+        self.base_path.join(format!(
+            "gg/norisk/nrc-forgeloader/{0}/nrc-forgeloader-{0}.jar",
+            artifact_version
+        ))
+    }
+
+    async fn find_local_forgeloader(&self, loader: &str, mc_version: &str) -> Option<PathBuf> {
+        let dir = self.base_path.join("gg/norisk/nrc-forgeloader");
+        let suffix = format!("+{}.{}", loader, mc_version);
+        let mut entries = fs::read_dir(&dir).await.ok()?;
+        let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.ends_with(&suffix) {
+                continue;
+            }
+            let jar = entry.path().join(format!("nrc-forgeloader-{}.jar", name));
+            let meta = match fs::metadata(&jar).await {
+                Ok(m) if m.is_file() => m,
+                _ => continue,
+            };
+            let Ok(mtime) = meta.modified() else { continue };
+            if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
+                best = Some((mtime, jar));
+            }
+        }
+        best.map(|(_, p)| p)
     }
 }

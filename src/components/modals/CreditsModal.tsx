@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -13,6 +14,7 @@ interface CreditsModalProps {
 }
 
 export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   
   if (!isOpen) return null;
@@ -27,7 +29,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
 
   return (
     <Modal
-      title="Credits"
+      title={t('credits_modal.title')}
       titleIcon={<Icon icon="solar:code-bold" className="w-6 h-6" />}
       onClose={onClose}
       width="md"
@@ -59,8 +61,8 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-right mr-3">
-                <p className="text-white/80 font-minecraft text-lg lowercase tracking-wide" title="(sirknubble did it better)">
-                  UI & Frontend
+                <p className="text-white/80 font-minecraft text-lg lowercase tracking-wide">
+                  {t('credits_modal.ui_frontend')}
                 </p>
               </div>
               <IconButton
@@ -101,7 +103,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             </div>
             <div className="text-right">
               <p className="text-white/80 font-minecraft text-lg lowercase tracking-wide">
-                Backend & Core
+                {t('credits_modal.backend_core')}
               </p>
             </div>
           </div>
@@ -111,10 +113,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             <Button
               variant="ghost"
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-              onClick={() => handleOpenUrl("https://blog.norisk.gg/open-source-licenses/")}
+              onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
             >
               <Icon icon="solar:external-link-bold" className="w-5 h-5" />
-              <span className="font-minecraft text-lg lowercase">View Licenses</span>
+              <span className="font-minecraft text-lg lowercase">{t('credits_modal.view_licenses')}</span>
             </Button>
           </div>
         </div>

@@ -41,7 +41,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -54,13 +54,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Clean workspace (including node_modules)
+        run: git clean -fdx
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
-
-      - name: Clean workspace (including node_modules)
-        run: git clean -fdx
 
       - name: install frontend dependencies
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
@@ -73,12 +73,87 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Wird evtl. intern von Tauri benötigt
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
         with:
           # Revert to using packageManager and args
           args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }} # Füge --target hinzu, wenn es gesetzt ist
           packageManager: yarn # Set packageManager to yarn
+      
+      - name: Fix AppImage (Remove Wayland libs & Resign)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          # Pass the secrets directly to the environment
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          echo "--- Fix AppImage Started ---"
           
-      # --- Umbenennen und Artefakte vorbereiten --- 
+          BUNDLE_DIR="$(pwd)/${{ matrix.output_path }}/appimage"
+          cd "$BUNDLE_DIR"
+          APPIMAGE=$(ls *.AppImage | head -n 1)
+          echo "Target: $APPIMAGE"
+          
+          chmod +x "$APPIMAGE"
+          ./"$APPIMAGE" --appimage-extract > /dev/null
+          
+          echo "Removing conflicting libraries..."
+          find squashfs-root -name "*wayland*" -delete
+          
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          
+          export ARCH=x86_64
+          ./appimagetool-x86_64.AppImage squashfs-root/ "$APPIMAGE"
+          
+          echo "Re-signing..."
+          
+          cd - > /dev/null
+          
+          yarn tauri signer sign "$BUNDLE_DIR/$APPIMAGE"
+          
+          cd "$BUNDLE_DIR"
+          rm -rf squashfs-root appimagetool-x86_64.AppImage
+          
+          echo "--- Fix Complete ---"
+
+      # --- EV Code Signing (Windows) ---
+      - name: Find Windows EXE for Signing
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        id: find_exe
+        run: |
+          $NsisDir = "${{ github.workspace }}\src-tauri\target\release\bundle\nsis"
+          $ExeFile = Get-ChildItem -Path $NsisDir -Filter "*.exe" | Where-Object { $_.Name -notlike "*.sig" } | Select-Object -First 1
+          echo "EXE_PATH=$($ExeFile.FullName)" >> $env:GITHUB_OUTPUT
+          echo "NSIS_DIR=$NsisDir" >> $env:GITHUB_OUTPUT
+          echo "Found EXE: $($ExeFile.FullName)"
+        shell: pwsh
+
+      - name: Sign Windows EXE with SSL.com EV Certificate
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-beta')
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ steps.find_exe.outputs.EXE_PATH }}
+          environment_name: PROD
+          malware_block: false
+          override: true
+
+      - name: Re-sign Windows EXE for Tauri Updater
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-beta')
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          echo "Re-signing EXE for Tauri updater after EV code signing..."
+          yarn tauri signer sign "${{ steps.find_exe.outputs.EXE_PATH }}"
+          echo "Re-signing complete."
+        shell: bash
+
+      # --- Umbenennen und Artefakte vorbereiten ---
       - name: Rename Linux Artifacts
         if: matrix.platform == 'ubuntu-22.04'
         run: |

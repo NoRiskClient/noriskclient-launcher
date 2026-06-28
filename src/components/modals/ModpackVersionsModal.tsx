@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { Button } from "../ui/buttons/Button";
@@ -11,6 +13,7 @@ import type { ModPackSource } from "../../types/profile";
 import UnifiedService from "../../services/unified-service";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // HTML sanitizer for CurseForge HTML content
 const sanitizeHtml = (html: string) => {
@@ -88,6 +91,7 @@ function VersionItem({
   isSelected: boolean;
   onSelect: (version: UnifiedVersion) => void;
 }) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [curseforgeChangelog, setCurseforgeChangelog] = useState<string | null>(null);
   const [isLoadingChangelog, setIsLoadingChangelog] = useState(false);
@@ -155,7 +159,7 @@ function VersionItem({
             </span>
             {isInstalled && (
               <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft-ten uppercase">
-                Current
+                {t('modpack_versions.current')}
               </span>
             )}
           </div>
@@ -183,7 +187,7 @@ function VersionItem({
                 />
               )}
               <span className="text-white/70">
-                {isLoadingChangelog ? "Loading..." : "Changelog"}
+                {isLoadingChangelog ? t('common.loading') : t('modpack_versions.changelog')}
               </span>
             </button>
           )}
@@ -194,13 +198,13 @@ function VersionItem({
       {isExpanded && displayChangelog && (
         <div className="mt-3 pt-3 border-t border-white/10">
           <div className="text-xs font-minecraft-ten text-white/70 mb-2 uppercase">
-            Changelog
+            {t('modpack_versions.changelog')}
           </div>
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {isLoadingChangelog ? (
               <div className="flex items-center justify-center py-4">
                 <Icon icon="solar:refresh-circle-bold" className="w-5 h-5 animate-spin text-white/50" />
-                <span className="ml-2 text-sm text-white/50 font-minecraft-ten">Loading changelog...</span>
+                <span className="ml-2 text-sm text-white/50 font-minecraft-ten">{t('modpack_versions.loading_changelog')}</span>
               </div>
             ) : displayChangelog ? (
               version.source === "CurseForge" ? (
@@ -213,6 +217,7 @@ function VersionItem({
                 // Render Markdown for Modrinth
                 <div className="prose prose-invert prose-sm max-w-none font-minecraft-ten">
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ children }) => <h1 className="text-lg font-bold text-white mb-2 mt-4 first:mt-0">{children}</h1>,
                       h2: ({ children }) => <h2 className="text-base font-bold text-white mb-2 mt-3">{children}</h2>,
@@ -227,6 +232,16 @@ function VersionItem({
                       pre: ({ children }) => <pre className="bg-black/30 p-2 rounded text-xs font-mono text-white/90 overflow-x-auto mb-2">{children}</pre>,
                       blockquote: ({ children }) => <blockquote className="border-l-2 border-accent pl-3 italic text-white/70 my-2">{children}</blockquote>,
                       a: ({ href, children }) => <a href={href} className="text-accent hover:text-accent/80 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto mb-2">
+                          <table className="w-full border-collapse text-sm">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-black/30">{children}</thead>,
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => <tr className="border-b border-white/10 hover:bg-white/5">{children}</tr>,
+                      th: ({ children }) => <th className="p-2 border border-white/20 text-left font-semibold text-white/90">{children}</th>,
+                      td: ({ children }) => <td className="p-2 border border-white/20 text-white/80">{children}</td>,
                     }}
                   >
                     {displayChangelog}
@@ -235,7 +250,7 @@ function VersionItem({
               )
             ) : (
               <div className="text-sm text-white/50 font-minecraft-ten text-center py-4">
-                No changelog available for this version.
+                {t('modpack_versions.no_changelog')}
               </div>
             )}
           </div>
@@ -255,6 +270,7 @@ export function ModpackVersionsModal({
   onSwitchComplete,
   isSwitching = false,
 }: ModpackVersionsModalProps) {
+  const { t } = useTranslation();
   const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
     // DEBUG: Add mock changelogs to initial versions for testing with Markdown (only for Modrinth)
     if (initialVersions && initialVersions.all_versions.length > 0) {
@@ -453,13 +469,13 @@ This release focuses on stability and performance improvements.
         };
 
         // Show loading toast
-        const loadingToast = toast.loading(`Switching ${modpackName} to version ${selectedVersion.version_number}...`);
+        const loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: selectedVersion.version_number }));
 
         await UnifiedService.switchModpackVersion(request);
 
         // Dismiss loading toast and show success
         toast.dismiss(loadingToast);
-        toast.success(`Successfully switched ${modpackName} to version ${selectedVersion.version_number}!`);
+        toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: selectedVersion.version_number }));
 
         // Don't refresh here - let parent components handle the refresh
 
@@ -472,7 +488,7 @@ This release focuses on stability and performance improvements.
         onClose();
 
       } catch (error) {
-        toast.error(`Failed to switch modpack version: ${error}`);
+        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
       }
     } else if (onVersionSwitch) {
       // Fallback to old method if we don't have all required info
@@ -489,7 +505,7 @@ This release focuses on stability and performance improvements.
 
   return (
     <Modal
-      title={`${modpackName} - Versions`}
+      title={t('modpack_versions.title', { name: modpackName })}
       titleIcon={<Icon icon="solar:archive-bold" className="w-6 h-6 text-blue-400" />}
       onClose={onClose}
       width="lg"
@@ -501,7 +517,7 @@ This release focuses on stability and performance improvements.
             onClick={onClose}
             disabled={isSwitching}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="default"
@@ -509,7 +525,7 @@ This release focuses on stability and performance improvements.
             disabled={!selectedVersion || isSwitching}
             icon={isSwitching ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
           >
-            {isSwitching ? "Switching..." : selectedVersion ? "Switch Version" : "Select a Version"}
+            {isSwitching ? t('modpack_versions.button.switching') : selectedVersion ? t('modpack_versions.button.switch_version') : t('modpack_versions.button.select_version')}
           </Button>
         </div>
       }
@@ -517,13 +533,13 @@ This release focuses on stability and performance improvements.
       <div className="p-4">
         <div className="mb-4 text-sm text-white/70 font-minecraft-ten">
           {isLoadingVersions ? (
-            "Loading versions..."
+            t('modpack_versions.loading')
           ) : (
             <>
               {versions.all_versions.length} version{versions.all_versions.length !== 1 ? 's' : ''} available
               {versions.updates_available && (
                 <span className="ml-2 text-green-400">
-                  • Updates available
+                  {t('modpack_versions.updates_available')}
                 </span>
               )}
             </>
@@ -541,7 +557,7 @@ This release focuses on stability and performance improvements.
           </div>
         ) : (
           <div className="mb-4 text-xs text-white/50 font-minecraft-ten text-center">
-            Click on a version to select it for switching
+            {t('modpack_versions.select_hint')}
           </div>
         )}
 
@@ -559,7 +575,7 @@ This release focuses on stability and performance improvements.
 
         {sortedVersions.length === 0 && (
           <div className="text-center py-8 text-white/50 font-minecraft-ten">
-            No versions found for this modpack.
+            {t('modpack_versions.no_versions')}
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@
 module.exports = {
   darkMode: ["class"],
   content: [
-    "./index.html",
+    "./*.html",
     "./src/**/*.{js,ts,jsx,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
     "app/**/*.{ts,tsx}",
@@ -63,6 +63,7 @@ module.exports = {
       },
       fontFamily: {
         minecraft: ["Minecraft", "monospace"],
+        "minecraft-ten": ["MinecraftTen", "sans-serif"],
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",

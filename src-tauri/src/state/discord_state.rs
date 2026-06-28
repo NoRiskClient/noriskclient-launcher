@@ -1,29 +1,32 @@
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::state; // Need this for State and ProcessState access
+use crate::state;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use log::{debug, error, info, warn};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager; // Keep for app_handle.state()
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-// Discord application ID for NoRiskClient
-const DISCORD_APP_ID: &str = "1237087999104122981"; // Replace with actual Discord application ID
+const DISCORD_APP_ID: &str = "1237087999104122981";
 
-// Different states for Discord Rich Presence
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiscordState {
     Idle,
-    // TODO: Add other states like InGame(profile_name), Editing(profile_name) etc.
+    Custom(String),
+    InGame {
+        profile_name: String,
+        mc_version: String,
+    },
 }
 
+#[derive(Clone)]
 pub struct DiscordManager {
     client: Arc<Mutex<Option<DiscordIpcClient>>>,
     current_state: Arc<RwLock<DiscordState>>,
     enabled: Arc<RwLock<bool>>,
     idle_start_timestamp: Arc<RwLock<Option<i64>>>,
+    last_client_state: Arc<RwLock<Option<String>>>,
 }
 
 impl DiscordManager {
@@ -33,7 +36,6 @@ impl DiscordManager {
             enabled
         );
 
-        // Get current time for initial idle timestamp
         let initial_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
@@ -44,9 +46,9 @@ impl DiscordManager {
             current_state: Arc::new(RwLock::new(DiscordState::Idle)),
             enabled: Arc::new(RwLock::new(enabled)),
             idle_start_timestamp: Arc::new(RwLock::new(initial_timestamp)),
+            last_client_state: Arc::new(RwLock::new(None)),
         };
 
-        // Initialize Discord presence if enabled
         if enabled {
             debug!("Discord Rich Presence initially enabled, connecting...");
             if let Err(e) = manager.connect().await {
@@ -59,6 +61,30 @@ impl DiscordManager {
         } else {
             info!("Discord Rich Presence is disabled");
         }
+
+        // Start background poller to watch for client state file changes
+        let poller_clone = manager.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                if !*poller_clone.enabled.read().await {
+                    continue;
+                }
+                // Check if client state changed
+                let new_client_state = Self::read_active_client_state()
+                    .and_then(|j| j["state"].as_str().map(|s| s.to_string()));
+                let mut last = poller_clone.last_client_state.write().await;
+                if *last != new_client_state {
+                    debug!("Client state file changed: {:?} -> {:?}", *last, new_client_state);
+                    *last = new_client_state;
+                    drop(last);
+                    // Force re-render current state with new client info
+                    let current = poller_clone.current_state.read().await.clone();
+                    poller_clone.set_state_internal(current, true).await.ok();
+                }
+            }
+        });
+
         info!("Successfully initialized Discord Rich Presence Manager");
 
         Ok(manager)
@@ -73,7 +99,6 @@ impl DiscordManager {
         debug!("Attempting to connect to Discord...");
         let mut client_lock = self.client.lock().await;
 
-        // Only initialize if not already initialized
         if client_lock.is_none() {
             debug!("No existing Discord client, creating new one...");
             match DiscordIpcClient::new(DISCORD_APP_ID)
@@ -131,11 +156,6 @@ impl DiscordManager {
         Ok(())
     }
 
-    /* TODO
-    lass mal brainstormen wie wir das handhaben wollen also imagine wir starten ein profil
-    und dann editieren wir was im mods oder so... dann würden wir ja das spiel quasi überschreiben check?
-     */
-    // Public method that catches errors to prevent application crashes
     pub async fn set_state(&self, state: DiscordState, force: bool) -> Result<()> {
         debug!("Setting Discord state to: {:?}", state);
         match self.set_state_internal(state, force).await {
@@ -145,15 +165,12 @@ impl DiscordManager {
                     "Error setting Discord state: {}. Continuing without Discord presence.",
                     e
                 );
-                // Return Ok to prevent application errors
                 Ok(())
             }
         }
     }
 
-    // Internal implementation that can be forced to update
     async fn set_state_internal(&self, state: DiscordState, force: bool) -> Result<()> {
-        // Check if Discord is enabled
         if !*self.enabled.read().await {
             debug!("Discord Rich Presence is disabled, ignoring state update");
             return Ok(());
@@ -161,13 +178,10 @@ impl DiscordManager {
 
         {
             let mut current_state = self.current_state.write().await;
-
-            // Only update if state changed or forced
             if !force && *current_state == state {
                 debug!("Discord state unchanged, skipping update");
                 return Ok(());
             }
-
             debug!(
                 "Updating Discord state from {:?} to {:?}",
                 *current_state, state
@@ -175,32 +189,26 @@ impl DiscordManager {
             *current_state = state.clone();
         }
 
-        // Lock the client and set the activity
+        // Write launcher state to shared file
+        self.write_launcher_state_file(&state);
+
         let mut client_lock = self.client.lock().await;
 
-        // If client is None, try to reconnect
         if client_lock.is_none() {
             debug!("No Discord client available, attempting to reconnect...");
-            drop(client_lock); // Release the lock before reconnecting
+            drop(client_lock);
             self.connect().await?;
             client_lock = self.client.lock().await;
         }
 
         if let Some(client_ref) = client_lock.as_mut() {
-            // Create activity for current state (pass self to access timestamp)
-            let activity = self.create_activity_for_state(&state).await; // Make async
-
             debug!("Sending activity to Discord...");
-            match client_ref
-                .set_activity(activity)
-                .map_err(|e| AppError::DiscordError(format!("Discord activity error: {}", e)))
-            {
+            match self.build_and_set_activity(&state, client_ref).await {
                 Ok(_) => {
                     debug!("Successfully updated Discord Rich Presence");
                 }
                 Err(e) => {
                     warn!("Failed to update Discord Rich Presence: {}", e);
-                    // Try to reconnect
                     debug!("Attempting to reconnect to Discord...");
                     if let Err(reconnect_e) = client_ref.reconnect().map_err(|e| {
                         AppError::DiscordError(format!("Discord reconnect error: {}", e))
@@ -210,14 +218,7 @@ impl DiscordManager {
                     }
 
                     debug!("Reconnection successful, trying to set activity again...");
-                    // Try setting activity again after reconnect with a new activity
-                    let new_activity = self.create_activity_for_state(&state).await;
-                    if let Err(retry_e) = client_ref.set_activity(new_activity).map_err(|e| {
-                        AppError::DiscordError(format!(
-                            "Discord activity error after reconnect: {}",
-                            e
-                        ))
-                    }) {
+                    if let Err(retry_e) = self.build_and_set_activity(&state, client_ref).await {
                         error!(
                             "Failed to update Discord Rich Presence after reconnect: {}",
                             retry_e
@@ -228,49 +229,167 @@ impl DiscordManager {
                 }
             }
         } else {
-            // This case should be less likely now due to the reconnect logic above
             warn!("Failed to get Discord client, cannot set activity");
         }
 
         Ok(())
     }
 
-    // Make async to allow reading the timestamp lock
-    async fn create_activity_for_state(&self, state: &DiscordState) -> activity::Activity {
-        let icon = "icon_512px"; // Use a consistent icon name
-
-        // TODO: Resolve button issue
+    async fn build_and_set_activity(&self, state: &DiscordState, client_ref: &mut DiscordIpcClient) -> std::result::Result<(), AppError> {
+        let icon = "icon_512px";
         let download_button = activity::Button::new("DOWNLOAD", "https://norisk.gg/");
         let buttons = vec![download_button];
 
-        debug!("Creating activity for Discord state: {:?}", state);
-        match state {
+        let client_state = Self::read_active_client_state();
+        debug!("Building activity for state: {:?}, client_active: {}", state, client_state.is_some());
+
+        let idle_timestamp = *self.idle_start_timestamp.read().await;
+        let default_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        // Determine line 1 (details) and optional line 2 (state)
+        // Client state file has priority when game is running
+        let (line1, line2, start_time): (String, Option<String>, i64) = match state {
             DiscordState::Idle => {
-                // Read the idle start timestamp
-                let idle_timestamp = *self.idle_start_timestamp.read().await;
+                let time = idle_timestamp.unwrap_or(default_time);
+                if let Some(ref client) = client_state {
+                    let cl_state = client["state"].as_str().unwrap_or("Playing").to_string();
+                    let cl_details = client["details"].as_str().map(|s| s.to_string());
+                    (cl_state, cl_details, time)
+                } else {
+                    ("Idling".to_string(), None, time)
+                }
+            }
+            DiscordState::Custom(text) => {
+                let time = idle_timestamp.unwrap_or(default_time);
+                if let Some(ref client) = client_state {
+                    let cl_state = client["state"].as_str().unwrap_or("Playing").to_string();
+                    let cl_details = client["details"].as_str().map(|s| s.to_string());
+                    (cl_state, cl_details, time)
+                } else {
+                    (text.clone(), None, time)
+                }
+            }
+            DiscordState::InGame { mc_version, .. } => {
+                if let Some(ref client) = client_state {
+                    let cl_state = client["state"].as_str().unwrap_or("In Game").to_string();
+                    let cl_details = client["details"].as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| Some(format!("On Minecraft {}", mc_version)));
+                    (cl_state, cl_details, default_time)
+                } else {
+                    ("In Game".to_string(), Some(format!("On Minecraft {}", mc_version)), default_time)
+                }
+            }
+        };
 
-                let start_time = idle_timestamp.unwrap_or_else(|| {
-                    warn!("Idle state detected but no idle timestamp found. Using current time.");
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .map(|d| d.as_secs() as i64)
-                        .unwrap_or(0) // Fallback if time is before epoch
-                });
+        let mut activity = activity::Activity::new()
+            .state(&line1);
+        if let Some(ref l2) = line2 {
+            activity = activity.details(l2);
+        }
+        let activity = activity
+            .assets(
+                activity::Assets::new()
+                    .large_image(icon)
+                    .large_text("NoRisk Client"),
+            )
+            .timestamps(activity::Timestamps::new().start(start_time))
+            .buttons(buttons);
 
-                activity::Activity::new()
-                    .state("Idling...")
-                    .assets(
-                        activity::Assets::new()
-                            .large_image(icon)
-                            .large_text("NoRiskClient"),
-                    )
-                    .timestamps(activity::Timestamps::new().start(start_time))
-                    .buttons(buttons) // Include buttons here
+        client_ref.set_activity(activity)
+            .map_err(|e| AppError::DiscordError(format!("Discord activity error: {}", e)))?;
+        Ok(())
+    }
+
+    // --- State File Methods ---
+
+    /// Write launcher state to shared discord directory
+    fn write_launcher_state_file(&self, state: &DiscordState) {
+        let discord_dir = LAUNCHER_DIRECTORY.meta_dir().join("discord");
+        if std::fs::create_dir_all(&discord_dir).is_err() {
+            return;
+        }
+        let file = discord_dir.join("launcher.json");
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let (state_str, details) = match state {
+            DiscordState::Idle => ("Idling".to_string(), None),
+            DiscordState::Custom(text) => (text.clone(), None),
+            DiscordState::InGame {
+                profile_name,
+                mc_version,
+            } => ("In Game".to_string(), Some(format!("{} {}", profile_name, mc_version))),
+        };
+
+        let json = serde_json::json!({
+            "source": "launcher",
+            "state": state_str,
+            "details": details,
+            "timestamp": now
+        });
+        std::fs::write(&file, json.to_string()).ok();
+    }
+
+    /// Read the most recent active client state file (not stale, < 30s)
+    fn read_active_client_state() -> Option<serde_json::Value> {
+        let discord_dir = LAUNCHER_DIRECTORY.meta_dir().join("discord");
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        std::fs::read_dir(&discord_dir)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .map_or(false, |n| n.starts_with("client."))
+            })
+            .filter_map(|e| {
+                let content = std::fs::read_to_string(e.path()).ok()?;
+                let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+                let timestamp = json["timestamp"].as_u64()?;
+                if now.saturating_sub(timestamp) > 30_000 {
+                    // Stale — cleanup
+                    std::fs::remove_file(e.path()).ok();
+                    return None;
+                }
+                Some(json)
+            })
+            .max_by_key(|j| j["timestamp"].as_u64().unwrap_or(0))
+    }
+
+    /// Cleanup all client state files (called when game stops)
+    fn cleanup_client_files() {
+        let discord_dir = LAUNCHER_DIRECTORY.meta_dir().join("discord");
+        if let Ok(entries) = std::fs::read_dir(&discord_dir) {
+            for entry in entries.flatten() {
+                if entry
+                    .file_name()
+                    .to_str()
+                    .map_or(false, |n| n.starts_with("client."))
+                {
+                    std::fs::remove_file(entry.path()).ok();
+                }
             }
         }
     }
 
-    // Set enable/disable state
+    /// Cleanup launcher state file (called on shutdown)
+    pub fn cleanup_launcher_file() {
+        let file = LAUNCHER_DIRECTORY.meta_dir().join("discord").join("launcher.json");
+        std::fs::remove_file(&file).ok();
+    }
+
+    // --- Public API ---
+
     pub async fn set_enabled(&self, enabled: bool) -> Result<()> {
         debug!("Setting Discord Rich Presence enabled: {}", enabled);
         let mut enabled_lock = self.enabled.write().await;
@@ -278,32 +397,30 @@ impl DiscordManager {
         *enabled_lock = enabled;
 
         if !was_enabled && enabled {
-            // Was disabled, now enabled - connect
-            debug!("Discord was disabled, now enabled - connecting...");
+            debug!("Discord was disabled, now enabled - spawning background connection...");
             drop(enabled_lock);
 
-            // Catch errors to prevent application crashes
-            if let Err(e) = self.connect().await {
-                error!("Failed to connect to Discord when enabling: {}", e);
-                // Continue without error return
-                return Ok(());
-            }
-
-            // Set initial state and catch errors
-            if let Err(e) = self.set_state_internal(DiscordState::Idle, true).await {
-                error!("Failed to set initial Discord state: {}", e);
-                // Continue without error return
-                return Ok(());
-            }
+            let manager_clone = self.clone();
+            tokio::spawn(async move {
+                info!("Discord: Starting background connection...");
+                if let Err(e) = manager_clone.connect().await {
+                    error!("Failed to connect to Discord when enabling: {}", e);
+                    return;
+                }
+                if let Err(e) = manager_clone
+                    .set_state_internal(DiscordState::Idle, true)
+                    .await
+                {
+                    error!("Failed to set initial Discord state: {}", e);
+                    return;
+                }
+                info!("Discord: Background connection completed successfully.");
+            });
         } else if was_enabled && !enabled {
-            // Was enabled, now disabled - disconnect
             debug!("Discord was enabled, now disabled - disconnecting...");
             drop(enabled_lock);
-
-            // Catch errors to prevent application crashes
             if let Err(e) = self.disconnect().await {
                 error!("Failed to disconnect from Discord when disabling: {}", e);
-                // Continue without error return
             }
         } else {
             debug!("Discord enabled state unchanged: {}", enabled);
@@ -312,103 +429,89 @@ impl DiscordManager {
         Ok(())
     }
 
-    /// Clears the idle start timestamp, typically called when a non-idle activity begins.
     pub async fn clear_idle_timestamp(&self) {
         if !*self.enabled.read().await {
-            debug!("Discord is disabled, skipping clear_idle_timestamp.");
             return;
         }
         let mut timestamp_lock = self.idle_start_timestamp.write().await;
         if timestamp_lock.is_some() {
             debug!("Clearing Discord idle start timestamp.");
             *timestamp_lock = None;
-        } else {
-            debug!("Discord idle start timestamp was already None.");
         }
     }
 
     pub async fn get_current_state(&self) -> DiscordState {
-        let state = self.current_state.read().await.clone();
-        debug!("Getting current Discord state: {:?}", state);
-        state
+        self.current_state.read().await.clone()
     }
 
     pub async fn is_enabled(&self) -> bool {
-        let enabled = *self.enabled.read().await;
-        debug!("Checking if Discord is enabled: {}", enabled);
-        enabled
+        *self.enabled.read().await
     }
 
     pub async fn handle_focus_event(&self) -> Result<()> {
         debug!("Handling focus event within DiscordManager.");
 
         if !self.is_enabled().await {
-            debug!("Focus handling: DRP is disabled, doing nothing.");
             return Ok(());
         }
 
-        // Get the global state and check processes
-        let is_game_running = match state::State::get().await {
-            Ok(state) => {
-                // Access process manager via the successfully retrieved state
-                let processes = state.process_manager.list_processes().await;
-                processes
-                    .iter()
-                    .any(|p| p.state == state::process_state::ProcessState::Running)
-            }
-            Err(e) => {
-                error!("Focus handling: Failed to get global state using State::get(): {}. Assuming game might be running.", e);
-                // Safety measure: Assume a game *might* be running if we can't get state.
-                true
-            }
-        };
-
-        if !is_game_running {
-            debug!(
-                "Focus handling: DRP enabled, no game running. Ensuring idle timestamp and state."
-            );
-            self.ensure_idle_timestamp_set().await; // Ensure timestamp is set
-                                                    // Force update to Idle state (will use the timestamp we just potentially set)
-            self.set_state_internal(DiscordState::Idle, true).await?;
-        } else {
-            debug!("Focus handling: Game is running, yielding DRP control.");
-        }
+        // Re-apply the current state (force=true to refresh Discord with latest client files)
+        let current = self.current_state.read().await.clone();
+        debug!("Focus handling: Re-applying current state: {:?}", current);
+        self.set_state_internal(current, true).await?;
 
         Ok(())
     }
 
-    /// Notifies the Discord manager that a game process has started.
-    /// This will clear the idle timestamp if Discord is enabled.
-    pub async fn notify_game_start(&self, process_id: Uuid) {
-        debug!(
-            "Received game start notification for process {}, clearing idle timestamp.",
-            process_id
-        );
-        self.clear_idle_timestamp().await;
+    pub async fn set_custom_state(&self, text: String) {
+        self.set_state(DiscordState::Custom(text), false).await.ok();
     }
 
-    /// Ensures the idle_start_timestamp is set to the current time if it is None.
-    /// This is typically called when transitioning to an Idle state when no game is running.
+    pub async fn notify_game_start(
+        &self,
+        process_id: Uuid,
+        profile_name: Option<String>,
+        mc_version: Option<String>,
+    ) {
+        debug!(
+            "Game start notification for process {}: profile={:?}, version={:?}",
+            process_id, profile_name, mc_version
+        );
+        self.clear_idle_timestamp().await;
+
+        if let (Some(name), Some(version)) = (profile_name, mc_version) {
+            self.set_state(
+                DiscordState::InGame {
+                    profile_name: name,
+                    mc_version: version,
+                },
+                true,
+            )
+            .await
+            .ok();
+        }
+    }
+
+    pub async fn notify_game_stop(&self, process_id: Uuid) {
+        debug!("Game stop notification for process {}", process_id);
+        Self::cleanup_client_files();
+        self.ensure_idle_timestamp_set().await;
+        self.set_state(DiscordState::Idle, true).await.ok();
+    }
+
     async fn ensure_idle_timestamp_set(&self) {
-        // This check might seem redundant if called only when DRP is enabled,
-        // but it's good practice for a private helper.
         if !*self.enabled.read().await {
             return;
         }
         let mut timestamp_lock = self.idle_start_timestamp.write().await;
         if timestamp_lock.is_none() {
-            debug!("ensure_idle_timestamp_set: Timestamp was None, setting to current time.");
+            debug!("Setting idle timestamp to current time.");
             *timestamp_lock = Some(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .map(|d| d.as_secs() as i64)
-                    .unwrap_or_else(|_| {
-                        error!("System time is before UNIX EPOCH!");
-                        0 // Fallback timestamp
-                    }),
+                    .unwrap_or(0),
             );
-        } else {
-            debug!("ensure_idle_timestamp_set: Timestamp already set.");
         }
     }
 }

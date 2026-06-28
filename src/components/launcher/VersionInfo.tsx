@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import * as ProfileService from "../../services/profile-service";
@@ -18,6 +19,7 @@ interface VersionInfoProps {
 }
 
 export function VersionInfo({ profileId, className }: VersionInfoProps) {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function VersionInfo({ profileId, className }: VersionInfoProps) {
         icon={ <Icon icon="pixel:exclamation-triangle-solid" className="w-4 h-4" /> }
         className={cn("font-minecraft", className)}
       >
-        Error loading data
+        {t('empty_states.error_loading_data')}
       </Button>
     );
   }

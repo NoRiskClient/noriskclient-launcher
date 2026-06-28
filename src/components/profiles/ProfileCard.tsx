@@ -16,7 +16,9 @@ import { useNavigate } from "react-router-dom";
 import { ProfileIcon } from "./ProfileIcon";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 import { useLaunchStateStore } from "../../store/launch-state-store";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ProfileCardProps {
   profile: Profile;
@@ -39,6 +41,7 @@ export function ProfileCard({
   interactionMode = "launch",
   onSettingsNavigation,
 }: ProfileCardProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const navigate = useNavigate();
 
@@ -137,7 +140,7 @@ export function ProfileCard({
   const handleClone = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!profile.id) {
-      toast.error("Profile ID is missing, cannot clone.");
+      toast.error(t('profiles.errors.id_missing_clone'));
       return;
     }
     try {
@@ -166,7 +169,7 @@ export function ProfileCard({
               return `Profile '${newName}' cloned successfully!`;
             },
             error: (err) =>
-              `Failed to clone profile: ${err instanceof Error ? err.message : String(err.message)}`,
+              `Failed to clone profile: ${parseErrorMessage(err)}`,
           })
           .finally(() => {
             setIsCloning(false);
@@ -174,7 +177,7 @@ export function ProfileCard({
       }
     } catch (err) {
       console.error("Error in clone setup or dialog: ", err);
-      toast.error("Could not initiate cloning process.");
+      toast.error(t('profiles.errors.clone_failed'));
       setIsCloning(false);
     }
   };
@@ -203,7 +206,7 @@ export function ProfileCard({
       loading: `Opening folder for '${profile.name}'...`,
       success: `Successfully opened folder for '${profile.name}'!`,
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         if (
           message.toLowerCase().includes("not found") ||
           message.toLowerCase().includes("does not exist")
@@ -267,7 +270,7 @@ export function ProfileCard({
 
   const handleRepairFromContextMenu = async () => {
     if (!profile?.id) {
-      toast.error("Profile ID is missing, cannot repair.");
+      toast.error(t('profiles.errors.id_missing_repair'));
       return;
     }
 
@@ -277,7 +280,7 @@ export function ProfileCard({
       loading: `Repairing profile '${profile.name}'...`,
       success: `Profile '${profile.name}' repaired successfully!`,
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         return `Failed to repair profile: ${message}`;
       },
     });
@@ -410,27 +413,27 @@ export function ProfileCard({
                 className="flex items-center gap-2 text-white/60 mt-1 font-minecraft-ten text-xs whitespace-nowrap overflow-hidden text-ellipsis h-5 max-w-full"
                 title={
                   isCloning
-                    ? "Cloning profile..."
+                    ? t('profiles.cloning')
                     : isButtonLaunching
-                      ? buttonStatusMessage || "Starting..."
-                      : `${profile.loader || "Vanilla"} - ${profile.game_version}`
+                      ? buttonStatusMessage || t('profiles.starting')
+                      : `${profile.loader || t('common.vanilla')} - ${profile.game_version}`
                 }
               >
                 {isCloning ? (
-                  <span className="opacity-70">Cloning profile...</span>
+                  <span className="opacity-70">{t('profiles.cloning')}</span>
                 ) : isButtonLaunching ? (
                   <span className="opacity-70">
-                    {buttonStatusMessage || "Starting..."}
+                    {buttonStatusMessage || t('profiles.starting')}
                   </span>
                 ) : (
                   <>
                     <img
                       src={getModLoaderIcon() || "/placeholder.svg"}
-                      alt={profile.loader || "Vanilla"}
+                      alt={profile.loader || t('common.vanilla')}
                       className="w-4 h-4 object-contain"
                     />
                     <span>
-                      {profile.loader || "Vanilla"} {profile.game_version}
+                      {profile.loader || t('common.vanilla')} {profile.game_version}
                     </span>
                   </>
                 )}

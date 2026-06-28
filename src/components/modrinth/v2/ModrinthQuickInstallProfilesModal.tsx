@@ -13,6 +13,7 @@ import type { DropdownOption } from '../../ui/CustomDropdown';
 import { ModrinthQuickProfile } from './ModrinthQuickProfile';
 import { ActionButton } from '../../ui/ActionButton';
 import { toast } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Universal Profiles Modal for Modrinth Installation
@@ -85,6 +86,7 @@ export function ModrinthQuickInstallProfilesModal({
   installStatus = {},
   version,
 }: ModrinthQuickInstallProfilesModalProps) {
+  const { t } = useTranslation();
   const { profilesTabSortBy, setProfilesTabSortBy, accentColor } = useThemeStore();
   const [searchValue, setSearchValue] = useState('');
   const [sortValue, setSortValue] = useState(profilesTabSortBy);
@@ -149,7 +151,7 @@ export function ModrinthQuickInstallProfilesModal({
   // Handle profile creation with promise toast
   const handleCreateAndInstallProfile = async () => {
     if (!quickProfileName.trim()) {
-      setQuickProfileError("Profile name cannot be empty.");
+      setQuickProfileError(t('modrinth.profile_name_empty'));
       return;
     }
     setQuickProfileError(null);
@@ -162,20 +164,20 @@ export function ModrinthQuickInstallProfilesModal({
     try {
       await toast.promise(createPromise, {
         loading: selectedSourceProfileId
-          ? `Creating profile '${profileNameToCreate}' by copying existing profile and installing ${project.title}...`
-          : `Creating profile '${profileNameToCreate}' and installing ${project.title}...`,
+          ? t('modrinth.creating_profile_copying', { name: profileNameToCreate, title: project.title })
+          : t('modrinth.creating_profile_installing', { name: profileNameToCreate, title: project.title }),
         success: (result) => {
           console.log('✅ New profile created successfully');
           // Close the modal after successful profile creation
           onClose();
           return selectedSourceProfileId
-            ? `Successfully created profile '${profileNameToCreate}' by copying existing profile and installed ${project.title}!`
-            : `Successfully created profile '${profileNameToCreate}' and installed ${project.title}!`;
+            ? t('modrinth.profile_copy_success', { name: profileNameToCreate, title: project.title })
+            : t('modrinth.profile_create_success', { name: profileNameToCreate, title: project.title });
         },
         error: (error) => {
           console.error('❌ Failed to create new profile:', error);
-          setQuickProfileError(error instanceof Error ? error.message : 'Failed to create profile');
-          return `Failed to create profile: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          setQuickProfileError(error instanceof Error ? error.message : t('modrinth.profile_create_failed'));
+          return t('modrinth.profile_create_error', { error: error instanceof Error ? error.message : t('modrinth.unknown_error') });
         }
       });
     } finally {
@@ -256,11 +258,11 @@ export function ModrinthQuickInstallProfilesModal({
 
   // Sort options for the dropdown
   const sortOptions: DropdownOption[] = [
-    { value: 'last_played', label: 'Last Played', icon: 'solar:clock-circle-bold' },
-    { value: 'name', label: 'Name', icon: 'solar:text-bold' },
-    { value: 'game_version', label: 'MC Version', icon: 'solar:gamepad-bold' },
-    { value: 'loader', label: 'Loader', icon: 'solar:settings-bold' },
-    { value: 'created', label: 'Created', icon: 'solar:calendar-bold' },
+    { value: 'last_played', label: t('profiles.sort.lastPlayed'), icon: 'solar:clock-circle-bold' },
+    { value: 'name', label: t('profiles.sort.name'), icon: 'solar:text-bold' },
+    { value: 'game_version', label: t('profiles.sort.mcVersion'), icon: 'solar:gamepad-bold' },
+    { value: 'loader', label: t('profiles.sort.loader'), icon: 'solar:settings-bold' },
+    { value: 'created', label: t('profiles.sort.dateCreated'), icon: 'solar:calendar-bold' },
   ];
 
   // Get mod loader icon - reused from ProfileCardV2.tsx
@@ -281,7 +283,7 @@ export function ModrinthQuickInstallProfilesModal({
 
   // Format last played date - simplified version from ProfileCardV2.tsx
   const formatLastPlayed = (lastPlayed: string | null): string => {
-    if (!lastPlayed) return "Never played";
+    if (!lastPlayed) return t('profiles.card.neverPlayed');
 
     const date = new Date(lastPlayed);
     const now = new Date();
@@ -292,14 +294,14 @@ export function ModrinthQuickInstallProfilesModal({
     const diffInWeeks = Math.floor(diffInDays / 7);
     const diffInMonths = Math.floor(diffInDays / 30);
 
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
-    if (diffInMonths < 12) return `${diffInMonths}mo ago`;
+    if (diffInMinutes < 1) return t('profiles.card.justNow');
+    if (diffInMinutes < 60) return t('profiles.card.minutesAgo', { count: diffInMinutes });
+    if (diffInHours < 24) return t('profiles.card.hoursAgo', { count: diffInHours });
+    if (diffInDays < 7) return t('profiles.card.daysAgo', { count: diffInDays });
+    if (diffInWeeks < 4) return t('profiles.card.weeksAgo', { count: diffInWeeks });
+    if (diffInMonths < 12) return t('profiles.card.monthsAgo', { count: diffInMonths });
 
-    return `${Math.floor(diffInDays / 365)}y ago`;
+    return t('profiles.card.yearsAgo', { count: Math.floor(diffInDays / 365) });
   };
 
   const isActuallyCopying = selectedSourceProfileId !== null;
@@ -308,8 +310,8 @@ export function ModrinthQuickInstallProfilesModal({
     <Modal
       title={
         showQuickProfileView
-          ? (isActuallyCopying ? `Copy & Install: ${project.title}` : `New Profile for: ${project.title}`)
-          : `Install ${project.title}${version ? ` (v${version.version_number})` : ''}`
+          ? (isActuallyCopying ? t('modrinth.copy_and_install_title', { title: project.title }) : t('modrinth.new_profile_for', { title: project.title }))
+          : (version ? t('modrinth.install_title_version', { title: project.title, version: version.version_number }) : t('modrinth.install_title', { title: project.title }))
       }
       onClose={onClose}
       width="md"
@@ -344,12 +346,12 @@ export function ModrinthQuickInstallProfilesModal({
                 className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-2xl lowercase font-minecraft"
               >
                 <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span>Back to Profiles</span>
+                <span>{t('modrinth.back_to_profiles')}</span>
               </button>
 
               <ActionButton
                 icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"}
-                label={isCreatingProfile ? "Creating..." : "Create & Install"}
+                label={isCreatingProfile ? t('modrinth.creating') : t('modrinth.create_and_install')}
                 variant="primary"
                 size="md"
                 className="py-[0.29em]"
@@ -367,7 +369,7 @@ export function ModrinthQuickInstallProfilesModal({
             {/* Version info (placed above search) */}
             {version && (
               <p className="text-gray-400 text-xs text-center font-minecraft-ten mb-4 -mt-2">
-                This will install version {version.version_number} of {project.title}.
+                {t('modrinth.will_install_version', { version: version.version_number, title: project.title })}
               </p>
             )}
 
@@ -376,7 +378,7 @@ export function ModrinthQuickInstallProfilesModal({
               <div className="flex gap-3 items-start">
                 <div className="flex-1">
                   <SearchWithFilters
-                    placeholder="Search profiles..."
+                    placeholder={t('placeholders.search_profiles')}
                     searchValue={searchValue}
                     onSearchChange={handleSearchChange}
                     sortOptions={sortOptions}
@@ -389,7 +391,7 @@ export function ModrinthQuickInstallProfilesModal({
                 {onInstallToNewProfile && (
                   <ActionButton
                     icon="solar:add-folder-line-duotone"
-                    label="New Profile"
+                    label={t('profiles.new_profile')}
                     variant="primary"
                     size="md"
                     className="py-[0.29em]"
@@ -406,12 +408,12 @@ export function ModrinthQuickInstallProfilesModal({
           <div className="text-center py-8 min-h-[400px] flex flex-col justify-center">
             <Icon icon="solar:folder-error-bold" className="mx-auto mb-4 text-4xl text-white/30" />
             <h3 className="text-xl font-minecraft text-white/50 lowercase mb-2">
-              {profiles.length === 0 ? 'No profiles available' : 'No profiles found'}
+              {profiles.length === 0 ? t('modrinth.no_profiles_available') : t('modrinth.no_profiles_found')}
             </h3>
             <p className="text-white/40 text-sm lowercase">
               {profiles.length === 0
-                ? 'Create a profile first to install content'
-                : 'Try adjusting your search or filters'
+                ? t('modrinth.create_profile_first')
+                : t('modrinth.adjust_search_filters')
               }
             </p>
           </div>
@@ -459,12 +461,12 @@ export function ModrinthQuickInstallProfilesModal({
                     <div className="text-white/60 flex items-center gap-1">
                       <img
                         src={getModLoaderIcon(profile)}
-                        alt={profile.loader || "Vanilla"}
+                        alt={profile.loader || t('common.vanilla')}
                         className="w-3 h-3 object-contain"
                       />
                       <span>
                         {profile.loader === "vanilla"
-                          ? "Vanilla"
+                          ? t('common.vanilla')
                           : profile.loader_version || profile.loader
                         }
                       </span>
@@ -496,7 +498,7 @@ export function ModrinthQuickInstallProfilesModal({
                         className="flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
                       >
                         <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
-                        <span>Uninstalling...</span>
+                        <span>{t('modrinth.uninstalling')}</span>
                       </button>
                     );
                   } else if (canUninstall) {
@@ -512,7 +514,7 @@ export function ModrinthQuickInstallProfilesModal({
                         className="flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
                       >
                         <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
-                        <span>Uninstall</span>
+                        <span>{t('common.uninstall')}</span>
                       </button>
                     );
                   } else {
@@ -561,17 +563,17 @@ export function ModrinthQuickInstallProfilesModal({
                         {isInstalled ? (
                           <>
                             <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-                            <span>Installed</span>
+                            <span>{t('modrinth.installed')}</span>
                           </>
                         ) : isInstalling ? (
                           <>
                             <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
-                            <span>Installing...</span>
+                            <span>{t('modrinth.installing')}</span>
                           </>
                         ) : (
                           <>
                             <Icon icon="solar:download-bold" className="w-4 h-4" />
-                            <span>Install</span>
+                            <span>{t('modrinth.install')}</span>
                           </>
                         )}
                       </button>
@@ -593,7 +595,7 @@ export function ModrinthQuickInstallProfilesModal({
                 }}
                 className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-sm font-minecraft"
               >
-                <span>Close</span>
+                <span>{t('common.close')}</span>
               </button>
             </div>
           </>

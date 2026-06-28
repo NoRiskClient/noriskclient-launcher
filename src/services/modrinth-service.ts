@@ -11,6 +11,7 @@ import type {
   ModrinthCategory,
   ModrinthLoader,
   ModrinthGameVersion,
+  ModrinthTeamMember,
 } from "../types/modrinth";
 import type {
   UnifiedModVersionsParams,
@@ -88,6 +89,12 @@ export class ModrinthService {
     });
   }
 
+  static async getProjectMembers(projectIdOrSlug: string): Promise<ModrinthTeamMember[]> {
+    return invoke<ModrinthTeamMember[]>("get_modrinth_project_members", {
+      projectIdOrSlug,
+    });
+  }
+
   static async checkUpdates(
     request: ModrinthBulkUpdateRequestBody,
   ): Promise<Record<string, ModrinthVersion>> {
@@ -102,6 +109,8 @@ export class ModrinthService {
     fileName: string,
     downloadUrl: string,
     iconUrl?: string,
+    fileSize?: number,
+    eventId?: string,
   ): Promise<string> {
     return invoke<string>("download_and_install_modrinth_modpack", {
       projectId,
@@ -109,6 +118,8 @@ export class ModrinthService {
       fileName,
       downloadUrl,
       iconUrl,
+      fileSize,
+      eventId,
     });
   }
 

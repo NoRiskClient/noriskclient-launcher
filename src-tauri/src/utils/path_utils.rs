@@ -802,6 +802,35 @@ pub async fn count_files_recursively(dir_path: &Path) -> Result<usize> {
     Ok(count)
 }
 
+/// Sums the size of every file under a directory recursively, in bytes.
+/// Unreadable entries are skipped silently to avoid aborting the whole walk on a permission hiccup.
+pub async fn calculate_dir_size_recursively(dir_path: &Path) -> Result<u64> {
+    let mut total: u64 = 0;
+    let mut dirs_to_check = vec![dir_path.to_path_buf()];
+
+    while let Some(current_dir) = dirs_to_check.pop() {
+        let mut entries = match fs::read_dir(&current_dir).await {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let file_type = match entry.file_type().await {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            if file_type.is_file() {
+                if let Ok(meta) = entry.metadata().await {
+                    total = total.saturating_add(meta.len());
+                }
+            } else if file_type.is_dir() {
+                dirs_to_check.push(entry.path());
+            }
+        }
+    }
+
+    Ok(total)
+}
+
 /// Copies directory with progress events for each file
 pub async fn copy_dir_with_progress(
     source: &Path,

@@ -1,24 +1,27 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::minecraft_auth::MinecraftAuthStore;
+use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManager};
 use crate::state::config_state::ConfigManager;
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
+use crate::state::friends_state::FriendsState;
 use crate::state::norisk_packs_state::{default_norisk_packs_path, NoriskPackManager};
 use crate::state::norisk_versions_state::{default_norisk_versions_path, NoriskVersionManager};
 use crate::state::post_init::PostInitializationHandler;
 use crate::state::process_state::{default_processes_path, ProcessManager};
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
+use crate::utils::referral_utils;
 use std::sync::Arc;
-use tokio::sync::{OnceCell, Semaphore};
+use tokio::sync::{OnceCell, Mutex, Semaphore};
+use tokio::task::JoinHandle;
 
 // Global state that will be initialized once
 static LAUNCHER_STATE: OnceCell<Arc<State>> = OnceCell::const_new();
 
 pub struct State {
-    // Basic state properties will be added here
-    pub initialized: bool, // This flag now signifies full post-init completion
+    pub initialized: bool,
     pub profile_manager: ProfileManager,
     pub event_state: EventState,
     pub process_manager: ProcessManager,
@@ -27,8 +30,11 @@ pub struct State {
     pub norisk_version_manager: NoriskVersionManager,
     pub config_manager: ConfigManager,
     pub skin_manager: SkinManager,
+    pub active_skin_manager: ActiveSkinManager,
     pub discord_manager: DiscordManager,
+    pub friends_state: FriendsState,
     pub io_semaphore: Arc<Semaphore>,
+    pub login_server_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
 }
 
 impl State {
@@ -45,10 +51,12 @@ impl State {
                 let norisk_pack_manager = NoriskPackManager::new(default_norisk_packs_path())?;
                 let norisk_version_manager = NoriskVersionManager::new(default_norisk_versions_path())?;
                 let skin_manager = SkinManager::new(default_skins_path())?;
+                let active_skin_manager = ActiveSkinManager::new(default_active_skins_path())?;
                 let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
                 log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
+                let friends_state = FriendsState::new();
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
                     profile_manager,
@@ -59,8 +67,11 @@ impl State {
                     norisk_version_manager,
                     config_manager,
                     skin_manager,
+                    active_skin_manager,
                     discord_manager,
+                    friends_state,
                     io_semaphore,
+                    login_server_handle: Arc::new(Mutex::new(None)),
                 }))
             })
             .await?;
@@ -116,11 +127,64 @@ impl State {
             .await?;
         log::info!("State::init - ProcessManager post-initialization complete.");
 
+        // Apply any token handbacks the in-game client dropped while we were closed, then keep
+        // watching for new ones (mirrors the Discord client-state poller).
+        crate::minecraft::auth::token_handback::consume_pending(
+            &initial_state_arc.minecraft_account_manager_v2,
+        )
+        .await;
+        {
+            let store = initial_state_arc.minecraft_account_manager_v2.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    crate::minecraft::auth::token_handback::consume_pending(&store).await;
+                }
+            });
+        }
+        log::info!("State::init - Auth handback watcher started.");
+
         initial_state_arc
             .skin_manager
             .on_state_ready(app.clone())
             .await?;
         log::info!("State::init - SkinManager post-initialization complete.");
+
+        initial_state_arc
+            .active_skin_manager
+            .on_state_ready(app.clone())
+            .await?;
+        log::info!("State::init - ActiveSkinManager post-initialization complete.");
+
+        let reconcile_state = initial_state_arc.clone();
+        tokio::spawn(async move {
+            match reconcile_state
+                .minecraft_account_manager_v2
+                .get_active_account()
+                .await
+            {
+                Ok(Some(account)) => {
+                    let uuid = account.id.to_string();
+                    match reconcile_state.active_skin_manager.reconcile(&uuid).await {
+                        Ok(changed) => {
+                            if changed {
+                                let _ = reconcile_state
+                                    .event_state
+                                    .skin_changed(Some(account.id))
+                                    .await;
+                            }
+                        }
+                        Err(e) => log::warn!(
+                            "State::init - Startup skin reconcile failed for {}: {}",
+                            uuid,
+                            e
+                        ),
+                    }
+                }
+                Ok(None) => log::debug!("State::init - No active account, skipping skin reconcile."),
+                Err(e) => log::warn!("State::init - Could not get active account for skin reconcile: {}", e),
+            }
+        });
 
         initial_state_arc
             .norisk_pack_manager
@@ -140,6 +204,12 @@ impl State {
             "Launcher Config - Discord Rich Presence: {}",
             final_config.enable_discord_presence
         );
+
+        // Check for referral code from installer (affiliate/friend links)
+        if let Err(e) = referral_utils::check_and_process_referral_code().await {
+            log::warn!("State::init - Failed to process referral code: {}", e);
+            // Don't fail initialization, just log the error
+        }
 
         log::info!(
             "State::init - Full initialization, including all post-init handlers, complete."

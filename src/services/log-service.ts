@@ -271,4 +271,44 @@ export async function uploadLogToMclogs(logContent: string): Promise<string> {
 export async function openLogFileDirectory(filePath: string): Promise<void> {
     // Ensure the backend command name matches exactly
     await invoke('open_file_directory', { filePath });
-} 
+}
+
+// --- Debug Tab Service Functions ---
+
+/**
+ * File information for log/crash report listings
+ */
+export interface FileInfo {
+  path: string;
+  name: string;
+  size: number;
+  modified: number; // Unix timestamp in seconds
+}
+
+/**
+ * Lists all launcher log files from the logs directory.
+ * @returns A promise that resolves to an array of FileInfo objects.
+ */
+export async function listLauncherLogs(): Promise<FileInfo[]> {
+  return await invoke<FileInfo[]>('list_launcher_logs');
+}
+
+/**
+ * Lists the 20 most recent crash report files from all profiles.
+ * @returns A promise that resolves to an array of FileInfo objects.
+ */
+export async function listCrashReports(): Promise<FileInfo[]> {
+  return await invoke<FileInfo[]>('list_crash_reports');
+}
+
+/**
+ * Lists the 20 most recent MC log files from all profiles.
+ * @returns A promise that resolves to an array of FileInfo objects.
+ */
+export async function listAllMcLogs(): Promise<FileInfo[]> {
+  return await invoke<FileInfo[]>('list_all_mc_logs');
+}
+
+export async function listProcessLogs(): Promise<FileInfo[]> {
+  return await invoke<FileInfo[]>('list_process_logs');
+}

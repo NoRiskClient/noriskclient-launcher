@@ -18,6 +18,7 @@ pub struct TargetMod {
     pub mod_id: String, // Canonical Key (e.g., "modrinth:AANobbMI")
     pub filename: String,
     pub cache_path: PathBuf,
+    pub sha1: Option<String>, // Known SHA1 from Modrinth/CurseForge (None for Maven/URL/local)
 }
 
 // --- Helper function to check if a filename is blocked by Flagsmith config ---
@@ -70,6 +71,7 @@ async fn try_add_mod_to_final_list(
     mod_name: &str,
     project_id: Option<&str>, // Only for Modrinth mods
     enable_flagsmith_blocking: bool, // Flag to enable/disable Flagsmith blocking
+    sha1: Option<String>, // Known SHA1 hash (Modrinth/CurseForge)
 ) -> bool {
     // 1. Check Modrinth Project ID if applicable
     if let Some(pid) = project_id {
@@ -120,9 +122,10 @@ async fn try_add_mod_to_final_list(
             mod_id: canonical_key,
             filename,
             cache_path,
+            sha1,
         },
     );
-    
+
     true
 }
 
@@ -172,9 +175,17 @@ pub async fn resolve_target_mods(
             _ => None, // Ignore other types
         }
     }
+    fn get_sha1_from_source(source: &ModSource) -> Option<String> {
+        match source {
+            ModSource::Modrinth { file_hash_sha1, .. } => file_hash_sha1.clone(),
+            ModSource::CurseForge { file_hash_sha1, .. } => file_hash_sha1.clone(),
+            _ => None,
+        }
+    }
 
     // 1. Process Pack Mods (Only Modrinth)
-    if let (Some(ref pack_id), Some(config)) = (&profile.selected_norisk_pack_id, norisk_config) {
+    let effective_pack_id = profile.effective_norisk_pack_id().await;
+    if let (Some(pack_id), Some(config)) = (effective_pack_id.as_ref(), norisk_config) {
         info!("Resolving mods from selected Norisk Pack: '{}'", pack_id);
         match config.get_resolved_pack_definition(pack_id) {
             Ok(pack_definition) => {
@@ -240,6 +251,7 @@ pub async fn resolve_target_mods(
                                             mod_name,
                                             Some(project_id),
                                             enable_flagsmith_blocking,
+                                            None, // Pack mods don't store SHA1
                                         ).await;
                                     }
                                     Err(e) => {
@@ -277,8 +289,9 @@ pub async fn resolve_target_mods(
                                             &mut final_mods,
                                             "pack URL",
                                             mod_name,
-                                            None, // URL mods don't have project IDs
+                                            None,
                                             enable_flagsmith_blocking,
+                                            None,
                                         ).await;
                                     }
                                     Err(e) => {
@@ -326,8 +339,9 @@ pub async fn resolve_target_mods(
                                             &mut final_mods,
                                             "pack Maven",
                                             mod_name,
-                                            None, // Maven mods don't have project IDs
+                                            None,
                                             enable_flagsmith_blocking,
+                                            None,
                                         ).await;
                                     }
                                     Err(e) => {
@@ -373,17 +387,22 @@ pub async fn resolve_target_mods(
 
         // 1. Game Version Check
         if let Some(mod_gv_list) = &mod_info.game_versions {
-            if !mod_gv_list.is_empty() && !mod_gv_list.contains(&minecraft_version.to_string()) {
+            let mc_ver = minecraft_version.to_string();
+            if !mod_gv_list.is_empty()
+                && !mod_gv_list.contains(&mc_ver)
+                && !mod_info.force_include_versions.contains(&mc_ver)
+            {
                 debug!(
-                    "Skipping profile mod '{}' (intended for MC {:?}) because target version is {}",
+                    "Skipping profile mod '{}' (intended for MC {:?}, force={:?}) because target version is {}",
                     mod_info
                         .display_name
                         .as_deref()
                         .unwrap_or(&mod_info.id.to_string()),
                     mod_gv_list,
+                    mod_info.force_include_versions,
                     minecraft_version
                 );
-                continue; // Skip if target game version is not in the list
+                continue; // Skip if target game version is not in either list
             }
         }
 
@@ -432,6 +451,7 @@ pub async fn resolve_target_mods(
                                 mod_name,
                                 Some(project_id),
                                 enable_flagsmith_blocking,
+                                get_sha1_from_source(&mod_info.source),
                             ).await;
                         }
                         Err(e) => {
@@ -470,6 +490,7 @@ pub async fn resolve_target_mods(
                                 mod_name,
                                 Some(project_id),
                                 enable_flagsmith_blocking,
+                                get_sha1_from_source(&mod_info.source),
                             ).await;
                         }
                         Err(e) => {
@@ -511,8 +532,9 @@ pub async fn resolve_target_mods(
                                 &mut final_mods,
                                 mod_type_str,
                                 mod_name,
-                                None, // URL/Maven mods don't have project IDs
+                                None,
                                 enable_flagsmith_blocking,
+                                None, // URL/Maven mods don't have SHA1
                             ).await;
                         }
                         Err(e) => {
@@ -571,7 +593,8 @@ pub async fn resolve_target_mods(
                 let target = TargetMod {
                     mod_id: canonical_key.clone(),
                     filename: info.filename.clone(),
-                    cache_path: info.path.clone(), // Use the direct path from custom_mods
+                    cache_path: info.path.clone(),
+                    sha1: None, // Local custom mods don't have known SHA1
                 };
 
                 // Use the unique canonical key
@@ -643,3 +666,94 @@ pub async fn build_fabric_add_mods_arg(
         meta.to_string_lossy().replace("\\", "/")
     ))
 }
+
+const NEOFORGE_EARLY_SERVICE_CLASSES: &[&str] = &[
+    "net.neoforged.neoforgespi.earlywindow.GraphicsBootstrapper",
+    "net.neoforged.neoforgespi.earlywindow.ImmediateWindowProvider",
+    "net.neoforged.neoforgespi.locating.IModFileCandidateLocator",
+    "net.neoforged.neoforgespi.locating.IModFileReader",
+    "net.neoforged.neoforgespi.locating.IDependencyLocator",
+];
+
+pub async fn has_neoforge_early_service(jar_path: &std::path::Path) -> bool {
+    use async_zip::tokio::read::seek::ZipFileReader;
+    use tokio::io::BufReader;
+
+    let file = match tokio::fs::File::open(jar_path).await {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut buf_reader = BufReader::new(file);
+    let zip = match ZipFileReader::with_tokio(&mut buf_reader).await {
+        Ok(z) => z,
+        Err(_) => return false,
+    };
+    let targets: Vec<String> = NEOFORGE_EARLY_SERVICE_CLASSES
+        .iter()
+        .map(|c| format!("META-INF/services/{}", c))
+        .collect();
+    for entry in zip.file().entries() {
+        if let Ok(name) = entry.filename().as_str() {
+            if targets.iter().any(|t| t == name) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub async fn split_neoforge_early_service_mods(
+    mods: &[TargetMod],
+) -> (Vec<TargetMod>, Vec<TargetMod>) {
+    use futures::stream::{FuturesUnordered, StreamExt};
+
+    let mut tasks: FuturesUnordered<_> = mods
+        .iter()
+        .cloned()
+        .map(|tm| async move {
+            let early = has_neoforge_early_service(&tm.cache_path).await;
+            (tm, early)
+        })
+        .collect();
+
+    let mut early = Vec::new();
+    let mut normal = Vec::new();
+    while let Some((tm, is_early)) = tasks.next().await {
+        if is_early {
+            info!("NeoForge early-service jar detected (→ classpath): {}", tm.filename);
+            early.push(tm);
+        } else {
+            normal.push(tm);
+        }
+    }
+    (early, normal)
+}
+
+/// Creates a Forge addMods meta file listing ALL mod JARs (absolute paths, one per line).
+/// ForgeModLoader reads this via `-Dnrc.addMods=@<meta>` and registers each JAR with ModListHelper.
+pub async fn build_forge_add_mods_meta(
+    profile_id: Uuid,
+    minecraft_version: &str,
+    target_mods: &[TargetMod],
+) -> crate::error::Result<PathBuf> {
+    let runtime_dir = LAUNCHER_DIRECTORY.meta_dir().join("runtime");
+    fs::create_dir_all(&runtime_dir).await?;
+
+    let meta_file_path = runtime_dir.join(format!(
+        "nrc_forge_mods_{}_{}.txt",
+        profile_id, minecraft_version
+    ));
+
+    let mut meta_contents = String::new();
+    for tm in target_mods {
+        let p = tm.cache_path.to_string_lossy().replace("\\", "/");
+        meta_contents.push_str(&p);
+        meta_contents.push('\n');
+    }
+
+    fs::write(&meta_file_path, meta_contents).await?;
+    Ok(meta_file_path)
+}
+
+
+

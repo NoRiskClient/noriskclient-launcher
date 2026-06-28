@@ -1,8 +1,13 @@
-use crate::error::CommandError;
+use crate::error::{AppError, CommandError};
 use crate::state::process_state::ProcessMetadata;
 use crate::state::state_manager::State;
+use chrono::{DateTime, Utc};
+use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
+
+const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
+const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -37,62 +42,103 @@ pub async fn stop_process(process_id: Uuid) -> Result<(), CommandError> {
     Ok(())
 }
 
-#[tauri::command]
-pub async fn get_full_log(process_id: Uuid) -> Result<String, CommandError> {
-    let state = State::get().await?;
-    let log_content = state
-        .process_manager
-        .get_full_log_content(process_id)
-        .await?;
-    Ok(log_content)
+#[derive(serde::Serialize)]
+pub struct ProcessLogCursor {
+    pub cursor: u64,
+    pub output: String,
+    pub new_file: bool,
 }
 
-#[tauri::command]
-pub async fn open_log_window<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    process_id: Uuid,
-    is_live_logs: Option<bool>,
-) -> Result<(), CommandError> {
-    let window_label = format!("log_window_{}", process_id);
-
-    if let Some(window) = app.get_webview_window(&window_label) {
-        window.set_focus().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to focus existing log window {}: {}",
-                window_label, e
-            )))
-        })?;
-        return Ok(());
+fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
+    if session_id.is_empty()
+        || session_id.contains('/')
+        || session_id.contains('\\')
+        || session_id.contains("..")
+    {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Invalid log session id: {session_id}"
+        ))));
     }
-
-    let is_live = is_live_logs.unwrap_or(false);
-
-    let window = tauri::WebviewWindowBuilder::new(
-        &app,
-        &window_label,
-        tauri::WebviewUrl::App(
-            format!(
-                "log-window.html?processId={}&isLiveLogs={}",
-                process_id, is_live
-            )
-            .into(),
-        ),
-    )
-    .title(format!("Minecraft Logs ({})", process_id))
-    .inner_size(1200.0, 800.0)
-    .center()
-    .build()
-    .map_err(|e| CommandError::from(crate::error::AppError::Other(e.to_string())))?;
 
     Ok(())
 }
 
+fn process_log_path(session_id: &str) -> PathBuf {
+    crate::utils::log_archive::archive_root()
+        .join(session_id)
+        .join(PROCESS_LOG_FILE_NAME)
+}
+
+fn clamp_log_read_len(requested: Option<u64>) -> u64 {
+    requested
+        .unwrap_or(MAX_LOG_CURSOR_BYTES)
+        .clamp(1, MAX_LOG_CURSOR_BYTES)
+}
+
 #[tauri::command]
-pub async fn fetch_crash_report(profile_id: Uuid, process_id: Option<Uuid>) -> Result<Option<String>, CommandError> {
+pub async fn get_process_log_cursor(
+    session_id: String,
+    cursor: u64,
+    max_bytes: Option<u64>,
+) -> Result<ProcessLogCursor, CommandError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
+
+    if !path.exists() {
+        return Ok(ProcessLogCursor {
+            cursor: 0,
+            output: String::new(),
+            new_file: false,
+        });
+    }
+
+    let mut file = tokio::fs::File::open(&path).await.map_err(AppError::Io)?;
+    let total_bytes = file.metadata().await.map_err(AppError::Io)?.len();
+
+    let mut read_start = cursor;
+    let mut new_file = false;
+    if read_start > total_bytes {
+        read_start = 0;
+        new_file = true;
+    }
+
+    let read_len = clamp_log_read_len(max_bytes);
+    let available = total_bytes.saturating_sub(read_start);
+    let bounded_read_len = read_len.min(available);
+
+    file.seek(std::io::SeekFrom::Start(read_start))
+        .await
+        .map_err(AppError::Io)?;
+
+    let mut buf = Vec::with_capacity(bounded_read_len as usize);
+    let mut reader = file.take(bounded_read_len);
+    let read = reader.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+    let next_cursor = read_start + read as u64;
+
+    let output =
+        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf));
+
+    Ok(ProcessLogCursor {
+        cursor: next_cursor,
+        output,
+        new_file,
+    })
+}
+
+#[tauri::command]
+pub async fn fetch_crash_report(profile_id: Uuid, process_id: Option<Uuid>, process_start_time: Option<String>) -> Result<Option<String>, CommandError> {
     let state = State::get().await?;
+
+    // Parse the ISO 8601 timestamp if provided
+    let parsed_start_time: Option<DateTime<Utc>> = process_start_time
+        .as_ref()
+        .and_then(|ts| ts.parse::<DateTime<Utc>>().ok());
+
     let crash_content = state
         .process_manager
-        .fetch_latest_crash_report(profile_id, process_id)
+        .fetch_latest_crash_report(profile_id, process_id, parsed_start_time)
         .await?;
     Ok(crash_content)
 }
@@ -102,7 +148,180 @@ pub async fn set_discord_state(
     state_type: String,
     profile_name: Option<String>,
 ) -> Result<(), CommandError> {
+    log::info!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
     let state = State::get().await?;
-    //TODO
+    state.discord_manager.set_custom_state(state_type).await;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn open_minecraft_log_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    crashed_process: Option<String>, // JSON-encoded ProcessMetadata for crashed process
+) -> Result<(), CommandError> {
+    let window_label = "minecraft_log_window";
+
+    if let Some(window) = app.get_webview_window(window_label) {
+        window.show().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to show minecraft log window: {}",
+                e
+            )))
+        })?;
+        window.unminimize().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to unminimize minecraft log window: {}",
+                e
+            )))
+        })?;
+        // Trick to bring window to front on Windows: temporarily set always on top
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(false);
+        window.set_focus().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to focus minecraft log window: {}",
+                e
+            )))
+        })?;
+        return Ok(());
+    }
+
+    let url = match &crashed_process {
+        Some(json) => format!(
+            "minecraft-log-window.html?crashedProcess={}",
+            urlencoding::encode(json)
+        ),
+        None => "minecraft-log-window.html".to_string(),
+    };
+
+    let _window = tauri::WebviewWindowBuilder::new(
+        &app,
+        window_label,
+        tauri::WebviewUrl::App(url.into()),
+    )
+    .title("Minecraft Logs")
+    .inner_size(1200.0, 800.0)
+    .decorations(false)
+    .center()
+    .visible(false)
+    .build()
+    .map_err(|e| CommandError::from(crate::error::AppError::Other(e.to_string())))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_single_log_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    instance_id: String,
+    instance_name: String,
+    profile_id: String,
+    account_name: Option<String>,
+    start_time: Option<i64>,
+) -> Result<(), CommandError> {
+    let window_label = format!("single_log_window_{}", instance_id);
+
+    if let Some(window) = app.get_webview_window(&window_label) {
+        window.set_focus().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to focus single log window: {}",
+                e
+            )))
+        })?;
+        return Ok(());
+    }
+
+    let account_param = account_name
+        .as_ref()
+        .map(|n| format!("&accountName={}", urlencoding::encode(n)))
+        .unwrap_or_default();
+
+    let start_time_param = start_time
+        .map(|t| format!("&startTime={}", t))
+        .unwrap_or_default();
+
+    let window_title = match &account_name {
+        Some(name) => format!("Logs - {} - {}", instance_name, name),
+        None => format!("Logs - {}", instance_name),
+    };
+
+    let _window = tauri::WebviewWindowBuilder::new(
+        &app,
+        &window_label,
+        tauri::WebviewUrl::App(
+            format!(
+                "single-log-window.html?instanceId={}&instanceName={}&profileId={}{}{}",
+                instance_id,
+                urlencoding::encode(&instance_name),
+                profile_id,
+                account_param,
+                start_time_param
+            )
+            .into(),
+        ),
+    )
+    .title(window_title)
+    .inner_size(900.0, 600.0)
+    .decorations(false)
+    .center()
+    .visible(false)
+    .build()
+    .map_err(|e| CommandError::from(crate::error::AppError::Other(e.to_string())))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn focus_main_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<(), CommandError> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to show main window: {}",
+                e
+            )))
+        })?;
+        window.unminimize().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to unminimize main window: {}",
+                e
+            )))
+        })?;
+        // Trick to bring window to front on Windows: temporarily set always on top
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(false);
+        window.set_focus().map_err(|e| {
+            CommandError::from(crate::error::AppError::Other(format!(
+                "Failed to focus main window: {}",
+                e
+            )))
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_log_session_id() {
+        assert!(validate_log_session_id("valid-session-123").is_ok());
+        assert!(validate_log_session_id("abc_def-123").is_ok());
+
+        assert!(validate_log_session_id("").is_err());
+        assert!(validate_log_session_id("session/id").is_err());
+        assert!(validate_log_session_id("session\\id").is_err());
+        assert!(validate_log_session_id("session..id").is_err());
+    }
+
+    #[test]
+    fn test_clamp_log_read_len() {
+        assert_eq!(clamp_log_read_len(None), MAX_LOG_CURSOR_BYTES);
+        assert_eq!(clamp_log_read_len(Some(100)), 100);
+        assert_eq!(clamp_log_read_len(Some(0)), 1);
+        assert_eq!(clamp_log_read_len(Some(MAX_LOG_CURSOR_BYTES + 100)), MAX_LOG_CURSOR_BYTES);
+    }
+}
+

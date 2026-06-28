@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
 
+use crate::utils::string_utils::safe_truncate;
+
 // Base URL for Modrinth API v2
 const MODRINTH_API_BASE_URL: &str = "https://api.modrinth.com/v2";
 
@@ -225,6 +227,25 @@ pub struct ModrinthGameVersion {
     pub major: bool,          // Whether it's a major version
 }
 // --- End Structures for Tags/Categories ---
+
+// --- Structures for Team Members ---
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModrinthTeamMember {
+    pub team_id: String,
+    pub user: ModrinthUser,
+    pub role: String,
+    pub ordering: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModrinthUser {
+    pub id: String,
+    pub username: String,
+    pub avatar_url: Option<String>,
+    pub bio: Option<String>,
+    pub role: Option<String>, // User's site-wide role, not team role
+}
+// --- End Structures for Team Members ---
 
 // NEUE Struktur für den Input der Bulk-Abfrage
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
@@ -1027,7 +1048,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
     if response_body_text.len() > MAX_RAW_BODY_LOG_LENGTH {
         logged_response_body_display = format!(
             "{}... (body truncated, original length: {})",
-            &response_body_text[..MAX_RAW_BODY_LOG_LENGTH],
+            safe_truncate(&response_body_text, MAX_RAW_BODY_LOG_LENGTH),
             response_body_text.len()
         );
     } else {
@@ -1226,4 +1247,68 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
         game_versions.len()
     );
     Ok(game_versions)
+}
+
+/// Fetches team members for a specific project from Modrinth.
+/// https://docs.modrinth.com/api/operations/getprojectteammembers/
+pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<ModrinthTeamMember>> {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/project/{}/members",
+        MODRINTH_API_BASE_URL, project_id_or_slug
+    );
+
+    log::info!("Fetching Modrinth project members from: {}", url);
+
+    let response = client
+        .get(&url)
+        .header(
+            "User-Agent",
+            format!(
+                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
+                env!("CARGO_PKG_VERSION")
+            ),
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            AppError::Other(format!(
+                "Modrinth API request to fetch project members failed: {}",
+                e
+            ))
+        })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error body from project members endpoint".to_string());
+        log::error!(
+            "Modrinth API error fetching project members (Status: {}): {}",
+            status,
+            error_text
+        );
+        return Err(AppError::Other(format!(
+            "Modrinth API returned error {} fetching project members: {}",
+            status, error_text
+        )));
+    }
+
+    let members = response
+        .json::<Vec<ModrinthTeamMember>>()
+        .await
+        .map_err(|e| {
+            AppError::Other(format!(
+                "Failed to parse Modrinth project members response: {}",
+                e
+            ))
+        })?;
+
+    log::info!(
+        "Successfully fetched {} team members for project {}.",
+        members.len(),
+        project_id_or_slug
+    );
+    Ok(members)
 }

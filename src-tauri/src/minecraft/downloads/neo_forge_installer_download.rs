@@ -34,7 +34,7 @@ impl NeoForgeInstallerDownloadService {
         let jar_path = self.base_path.join(&maven_path);
 
         // Konstruiere die Download-URL
-        let url = format!("https://maven.neoforged.net/{}", maven_path);
+        let url = format!("https://maven.neoforged.net/releases/{}", maven_path);
 
         info!("Downloading from: {}", url);
 

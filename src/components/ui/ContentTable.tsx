@@ -1,6 +1,7 @@
 "use client";
 
 import React, { type ReactNode, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { Checkbox } from "./Checkbox";
@@ -57,6 +58,7 @@ export function ContentTable({
   role = "table",
   ariaLabel,
 }: ContentTableProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
 
@@ -218,7 +220,7 @@ export function ContentTable({
           backgroundColor: `${colors.main}20`,
           borderColor: `${colors.main}40`,
         }}
-        aria-label="Table summary"
+        aria-label={t('content.table_summary')}
       >
         <div className="text-white/70 font-minecraft text-xl lowercase">
           {filteredCount > 0 ? (

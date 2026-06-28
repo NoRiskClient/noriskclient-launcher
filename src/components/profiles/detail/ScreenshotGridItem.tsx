@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
 import type { ScreenshotInfo as ActualScreenshotInfo } from "../../../types/profile";
 import { Icon } from "@iconify/react";
@@ -24,6 +25,7 @@ const ScreenshotGridItemComponent: React.FC<ScreenshotGridItemProps> = ({
   isLoading,
   hasError,
 }: ScreenshotGridItemProps) => {
+  const { t } = useTranslation();
   const [isImageTagLoaded, setIsImageTagLoaded] = useState(false);
   const [imageTagError, setImageTagError] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
@@ -90,14 +92,14 @@ const ScreenshotGridItemComponent: React.FC<ScreenshotGridItemProps> = ({
       {(!isLoading && (hasError || imageTagError)) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-2">
           <Icon icon="solar:gallery-remove-bold-duotone" className="w-8 h-8 text-red-400/80 mb-1" />
-          <p className="text-red-400/90 text-xs font-minecraft text-center">Preview Error</p>
+          <p className="text-red-400/90 text-xs font-minecraft text-center">{t('screenshots.preview_error')}</p>
         </div>
       )}
 
       {!isLoading && !previewSrc && !hasError && !imageTagError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 p-2">
           <Icon icon="solar:gallery-minimalistic-broken" className="w-8 h-8 text-white/50 mb-1" />
-          <p className="text-white/60 text-xs font-minecraft text-center">No Preview</p>
+          <p className="text-white/60 text-xs font-minecraft text-center">{t('screenshots.no_preview')}</p>
         </div>
       )}
     </div>

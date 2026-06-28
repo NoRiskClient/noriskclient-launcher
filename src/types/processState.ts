@@ -31,6 +31,18 @@ export interface ProcessMetadata {
   norisk_pack?: string | null;
   profile_name?: string | null;
   profile_image_url?: string | null;
+  memory_max_mb: number; // u32 - Max RAM allocated for the process
+  log_session_id?: string | null;
+  mods?: CrashModInfo[];
+}
+
+export interface CrashModInfo {
+  id: string;
+  name?: string | null;
+  version?: string | null;
+  source?: string | null;
+  enabled: boolean;
+  norisk: boolean;
 }
 
 /**

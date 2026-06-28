@@ -69,33 +69,41 @@ impl NeoForgeMavenMetadata {
             return None;
         }
 
-        match parts[0].parse::<u32>() {
-            Ok(p1) => {
-                if p1 > 0 {
-                    // Release/Beta logic
-                    if parts.len() < 2 {
-                        return None; // Need at least p1 and p2
-                    }
-                    match parts[1].parse::<u32>() {
-                        Ok(p2) => {
-                            if p2 > 0 {
-                                Some(format!("1.{}.{}", p1, p2))
-                            } else {
-                                Some(format!("1.{}", p1))
-                            }
-                        }
-                        Err(_) => None, // p2 is not a number
-                    }
-                } else {
-                    // p1 == 0, Snapshot/Custom logic
-                    if parts.len() > 1 {
-                        Some(parts[1].to_string())
-                    } else {
-                        None // Need at least two parts for snapshot logic
-                    }
-                }
+        let p1 = parts[0].parse::<u32>().ok()?;
+
+        // p1 == 0: snapshot/custom form like "0.25w14craftmine" — the next
+        // segment IS the MC version ID.
+        if p1 == 0 {
+            return parts.get(1).map(|s| s.to_string());
+        }
+
+        if parts.len() < 2 {
+            return None;
+        }
+        let p2 = parts[1].parse::<u32>().ok()?;
+
+        // Minecraft dropped the "1." prefix with the "26.x" line. NeoForge
+        // mirrors this: versions 20.x–21.x follow the OLD scheme
+        // (`X.Y.Z` → MC `1.X.Y`), while 22+ follow the NEW scheme
+        // (`X.Y.Z.W` → MC `X.Y.Z`). The threshold sits between 21 (last
+        // "1.21.*" release) and 26 (first non-"1." release — see
+        // piston-meta manifest ids like "26.1", "26.1.1", "26.1.2").
+        if p1 <= 21 {
+            // OLD: 1.X.Y mapping.
+            if p2 > 0 {
+                Some(format!("1.{}.{}", p1, p2))
+            } else {
+                Some(format!("1.{}", p1))
             }
-            Err(_) => None, // p1 is not a number
+        } else {
+            // NEW: X.Y.Z mapping. Third segment is the MC patch (or absent
+            // for pre-releases like "26.1.0.x" → MC "26.1").
+            let p3 = parts.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            if p3 > 0 {
+                Some(format!("{}.{}.{}", p1, p2, p3))
+            } else {
+                Some(format!("{}.{}", p1, p2))
+            }
         }
     }
 

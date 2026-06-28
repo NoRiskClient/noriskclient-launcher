@@ -277,9 +277,9 @@ pub async fn read_log_file_content(log_path: &Path) -> Result<String> {
                 Err(AppError::Io(e))
             }
         }
-    } else if filename.ends_with(".log") {
-        // Handle plain text file using existing function, then mask sensitive data
-        log::debug!("Reading plain text log file: {}", log_path.display());
+    } else if filename.ends_with(".log") || filename.ends_with(".txt") {
+        // Handle plain text file (.log or .txt for crash reports) using existing function, then mask sensitive data
+        log::debug!("Reading plain text log/crash file: {}", log_path.display());
         match read_file_content_lossy(log_path).await {
             Ok(raw_content) => {
                 // Mask sensitive information before returning
@@ -296,81 +296,4 @@ pub async fn read_log_file_content(log_path: &Path) -> Result<String> {
         );
         Ok("".to_string()) // Or return an error if preferred
     }
-}
-
-/// Response struct for cape resizing operations
-#[derive(Debug)]
-pub struct CapeResizeResult {
-    /// The image bytes (resized or original)
-    pub image_bytes: Vec<u8>,
-    /// Whether the image was resized
-    pub was_resized: bool,
-    /// Original dimensions if resized (None if already correct size)
-    pub original_dimensions: Option<(u32, u32)>,
-}
-
-/// Resizes a cape image to 512x256 pixels if it doesn't already have that size.
-/// Uses Nearest Neighbor filter for pixel-perfect scaling suitable for capes.
-///
-/// # Arguments
-///
-/// * `image_path` - The path to the image file to resize
-///
-/// # Returns
-///
-/// A `Result` containing a `CapeResizeResult` with image bytes and resize info, or an `AppError` if processing fails.
-pub async fn resize_cape_to_512x256(image_path: &Path) -> Result<CapeResizeResult> {
-    debug!("Attempting to load image for resizing: {}", image_path.display());
-
-    // Load the image from file
-    let img = image::open(image_path).map_err(|e| {
-        debug!("Failed to open image {}: {}", image_path.display(), e);
-        AppError::ImageProcessingError(format!("Failed to open image: {}", e))
-    })?;
-
-    let width = img.width();
-    let height = img.height();
-    debug!("Original image dimensions: {}x{}", width, height);
-
-    // Check if already the correct size
-    if width == 512 && height == 256 {
-        debug!("Image already has correct dimensions 512x256, returning original");
-        // Convert back to bytes without resizing
-        let mut bytes: Vec<u8> = Vec::new();
-        img.write_to(&mut std::io::Cursor::new(&mut bytes), ImageFormat::Png)
-            .map_err(|e| {
-                AppError::ImageProcessingError(format!("Failed to encode image to PNG: {}", e))
-            })?;
-        return Ok(CapeResizeResult {
-            image_bytes: bytes,
-            was_resized: false,
-            original_dimensions: None,
-        });
-    }
-
-    debug!("Resizing image from {}x{} to 512x256", width, height);
-
-    // Resize the image to 512x256 using Nearest Neighbor for pixel-perfect scaling
-    let resized_img = img.resize_exact(512, 256, FilterType::Nearest);
-
-    debug!("Successfully resized image to 512x256");
-
-    // Convert the resized image back to PNG bytes
-    let mut bytes: Vec<u8> = Vec::new();
-    resized_img
-        .write_to(&mut std::io::Cursor::new(&mut bytes), ImageFormat::Png)
-        .map_err(|e| {
-            AppError::ImageProcessingError(format!("Failed to encode resized image to PNG: {}", e))
-        })?;
-
-    debug!(
-        "Successfully encoded resized image to PNG ({} bytes)",
-        bytes.len()
-    );
-
-    Ok(CapeResizeResult {
-        image_bytes: bytes,
-        was_resized: true,
-        original_dimensions: Some((width, height)),
-    })
 }

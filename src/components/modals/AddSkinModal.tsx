@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
@@ -15,6 +16,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
 import { SearchStyleInput } from "../ui/Input";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface AddSkinModalProps {
   skin?: MinecraftSkin;
@@ -30,6 +32,7 @@ interface AddSkinModalProps {
 
 export const AddSkinModal = memo(
   ({ skin, onSave, onAdd, isLoading }: AddSkinModalProps) => {
+    const { t } = useTranslation();
     const [name, setName] = useState<string>(skin?.name ?? "");
     const [isSlimVariant, setIsSlimVariant] = useState<boolean>(
       skin?.variant === "slim",
@@ -60,7 +63,7 @@ export const AddSkinModal = memo(
     const handlePreview = async () => {
       const trimmedInput = skinInput.trim();
       if (!trimmedInput) {
-        toast.error("Skin source (Username, UUID, URL, or File Path) cannot be empty.");
+        toast.error(t('skins.skinSourceEmpty'));
         return;
       }
 
@@ -174,16 +177,16 @@ export const AddSkinModal = memo(
         setPreviewBase64Url(base64Url);
         setPreviewSkinName(targetName);
         setIsPreviewMode(true);
-        toast.success("Skin preview loaded successfully!");
+        toast.success(t('skins.previewLoadedSuccess'));
 
       } catch (error) {
         console.error("Error loading skin preview:", error);
         console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
+          message: parseErrorMessage(error),
           stack: error instanceof Error ? error.stack : undefined,
           input: trimmedInput
         });
-        toast.error(`Failed to load skin preview: ${error instanceof Error ? error.message : String(error)}`);
+        toast.error(t('skins.failedToLoadPreview', { error: parseErrorMessage(error) }));
       } finally {
         setIsPreviewLoading(false);
       }
@@ -202,24 +205,22 @@ export const AddSkinModal = memo(
           directory: false,
           filters: [
             {
-              name: "Skin Image",
+              name: t('skins.skinImage'),
               extensions: ["png"],
             },
           ],
-          title: "Select Skin File (.png)",
+          title: t('skins.selectSkinFile'),
         });
 
         if (typeof selectedFile === "string") {
           setSkinInput(selectedFile);
-          toast.success("File selected: " + selectedFile.split(/[\\/]/).pop());
+          toast.success(t('skins.fileSelected', { name: selectedFile.split(/[\\/]/).pop() }));
         } else if (selectedFile === null) {
           console.log("User cancelled file selection.");
         }
       } catch (error) {
         console.error("Error opening file dialog:", error);
-        toast.error(
-          "Failed to open file dialog. Ensure Tauri dialog plugin is configured.",
-        );
+        toast.error(t('skins.failedToOpenFileDialog'));
       }
     };
 
@@ -234,7 +235,7 @@ export const AddSkinModal = memo(
         } else {
           const trimmedInput = skinInput.trim();
           if (!trimmedInput) {
-            throw new Error("Skin source (Username, UUID, URL, or File Path) cannot be empty.");
+            throw new Error(t('skins.skinSourceEmpty'));
           }
 
           // Use the same name generation logic as in the original code
@@ -302,21 +303,21 @@ export const AddSkinModal = memo(
 
       // Use Promise Toast for better UX
       toast.promise(saveOperation(), {
-        loading: skin ? "Updating skin..." : "Adding skin...",
+        loading: skin ? t('skins.updatingSkin') : t('skins.addingSkin'),
         success: (result) => {
           const skinName = skin ? (previewSkinName || skin.name) : previewSkinName;
-          return `Skin "${skinName}" ${skin ? "updated" : "added"} successfully!`;
+          return skin ? t('skins.skinUpdatedSuccess', { name: skinName }) : t('skins.skinAddedSuccess', { name: skinName });
         },
         error: (err) => {
           console.error("Save error:", err);
-          return err instanceof Error ? err.message : "Failed to save skin";
+          return err instanceof Error ? err.message : t('skins.failedToSaveSkin');
         },
       });
     };
 
     return (
       <Modal
-        title={skin ? "Edit Skin Properties" : (isPreviewMode ? "Add Skin - Preview" : "Add Skin")}
+        title={skin ? t('skins.editSkinProperties') : (isPreviewMode ? t('skins.addSkinPreview') : t('skins.addSkin'))}
         onClose={handleClose}
         variant="flat"
         footer={
@@ -328,7 +329,7 @@ export const AddSkinModal = memo(
                 disabled={isLoading}
                 size="sm"
               >
-                {isLoading ? "Saving..." : (skin ? "Save Changes" : "Save Skin")}
+                {isLoading ? t('skins.saving') : (skin ? t('skins.saveChanges') : t('skins.saveSkin'))}
               </Button>
             ) : (
               <>
@@ -339,7 +340,7 @@ export const AddSkinModal = memo(
                     disabled={isPreviewLoading}
                     size="sm"
                   >
-                    {isPreviewLoading ? "Loading..." : "Preview Skin"}
+                    {isPreviewLoading ? t('skins.loading') : t('skins.previewSkin')}
                   </Button>
                 )}
                 {skin && (
@@ -349,7 +350,7 @@ export const AddSkinModal = memo(
                     disabled={isLoading}
                     size="sm"
                   >
-                    {isLoading ? "Saving..." : "Save Changes"}
+                    {isLoading ? t('skins.saving') : t('skins.saveChanges')}
                   </Button>
                 )}
                 <Button
@@ -358,7 +359,7 @@ export const AddSkinModal = memo(
                   disabled={isLoading || isPreviewLoading}
                   size="sm"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </>
             )}
@@ -373,7 +374,7 @@ export const AddSkinModal = memo(
                 <SearchStyleInput
                   value={previewSkinName}
                   onChange={(e) => setPreviewSkinName(e.target.value)}
-                  placeholder="Enter skin name..."
+                  placeholder={t('skins.enterSkinName')}
                   disabled={isLoading}
                 />
               </div>
@@ -397,14 +398,14 @@ export const AddSkinModal = memo(
                   checked={!isSlimVariant}
                   onChange={(e) => setIsSlimVariant(false)}
                   disabled={isLoading}
-                  label="Classic (Steve)"
+                  label={t('skins.classicSteve')}
                   size="md"
                 />
                 <Checkbox
                   checked={isSlimVariant}
                   onChange={(e) => setIsSlimVariant(true)}
                   disabled={isLoading}
-                  label="Slim (Alex)"
+                  label={t('skins.slimAlex')}
                   size="md"
                 />
               </div>
@@ -430,12 +431,12 @@ export const AddSkinModal = memo(
                 {/* Skin Name Input */}
                 <div>
                   <label className="block font-minecraft text-3xl text-white/80 lowercase mb-2">
-                    Skin Name
+                    {t('skins.skinName')}
                   </label>
                   <SearchStyleInput
                     value={previewSkinName}
                     onChange={(e) => setPreviewSkinName(e.target.value)}
-                    placeholder="Enter skin name..."
+                    placeholder={t('skins.enterSkinName')}
                     disabled={isLoading}
                   />
                 </div>
@@ -443,7 +444,7 @@ export const AddSkinModal = memo(
                 {/* Skin Variant Selection */}
                 <div>
                   <p className="font-minecraft text-3xl text-white/80 lowercase mb-4">
-                    Skin Variant
+                    {t('skins.skinVariant')}
                   </p>
                   <div className="flex justify-center gap-6">
                     <Checkbox
@@ -454,7 +455,7 @@ export const AddSkinModal = memo(
                         }
                       }}
                       disabled={isLoading}
-                      label="Classic (Steve)"
+                      label={t('skins.classicSteve')}
                       size="md"
                     />
                     <Checkbox
@@ -465,7 +466,7 @@ export const AddSkinModal = memo(
                         }
                       }}
                       disabled={isLoading}
-                      label="Slim (Alex)"
+                      label={t('skins.slimAlex')}
                       size="md"
                     />
                   </div>
@@ -476,14 +477,14 @@ export const AddSkinModal = memo(
             {!skin && (
               <div className="space-y-2">
                 <label className="block font-minecraft text-3xl text-white/80 lowercase">
-                  Skin
+                  {t('skins.skin')}
                 </label>
                 <div className="flex gap-2">
                   <Input
                     id="skinInputField"
                     value={skinInput}
                     onChange={(e) => setSkinInput(e.target.value)}
-                    placeholder="Copy by username, UUID or download from URL"
+                    placeholder={t('skins.skinInputPlaceholder')}
                     disabled={isLoading}
                     size="md"
                     variant="flat"
@@ -491,7 +492,7 @@ export const AddSkinModal = memo(
                   />
                   <IconButton
                     onClick={handleOpenFileUpload}
-                    title="Upload Skin from file"
+                    title={t('skins.uploadSkinFromFile')}
                     disabled={isLoading}
                     size="md"
                     variant="flat-secondary"

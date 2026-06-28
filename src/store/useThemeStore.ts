@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setProfileGroupingPreference } from "../services/launcher-config-service";
 import { ModPlatform } from "../types/unified";
+import type { SupportedLanguage } from "../i18n";
 
 export type AccentColor = {
   name: string;
@@ -199,9 +200,11 @@ const calculateColorVariants = (baseColor: string): Partial<AccentColor> => {
   };
 };
 
-export const DEFAULT_BORDER_RADIUS = 0; 
+export const DEFAULT_BORDER_RADIUS = 0;
 export const MIN_BORDER_RADIUS = 0;
 export const MAX_BORDER_RADIUS = 32;
+
+let borderRadiusAnalyticsDebounceId: ReturnType<typeof setTimeout> | null = null;
 
 interface ThemeState {
   accentColor: AccentColor;
@@ -221,6 +224,8 @@ interface ThemeState {
   toggleBackgroundAnimation: () => void;
   hasAcceptedTermsOfService: boolean;
   acceptTermsOfService: () => void;
+  hasAcceptedCapeGuidelines: boolean;
+  acceptCapeGuidelines: () => void;
   borderRadius: number;
   setBorderRadius: (radius: number) => void;
   applyBorderRadiusToDOM: () => void;
@@ -230,11 +235,12 @@ interface ThemeState {
   // ProfilesTabV2 persistent filters
   profilesTabActiveGroup: string;
   profilesTabSortBy: string;
-  profilesTabVersionFilter: string;
+  profilesTabVersionFilters: string[];
   profilesTabLayoutMode: "list" | "grid" | "compact";
   setProfilesTabActiveGroup: (group: string) => void;
   setProfilesTabSortBy: (sortBy: string) => void;
-  setProfilesTabVersionFilter: (filter: string) => void;
+  setProfilesTabVersionFilters: (filters: string[]) => void;
+  toggleProfilesTabVersionFilter: (version: string) => void;
   setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => void;
   // Global context menu management
   openContextMenuId: string | null;
@@ -245,9 +251,24 @@ interface ThemeState {
   // News section width
   newsSectionWidth: number;
   setNewsSectionWidth: (width: number) => void;
-  // Featured profile mode
+  // Featured HugoSMP card on Play tab
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
+  // Language
+  language: SupportedLanguage;
+  setLanguage: (lang: SupportedLanguage) => void;
+  // Analytics consent state
+  analyticsConsent: {
+    hasSeenBanner: boolean;
+    hasMadeDecision: boolean;
+    decision: 'accepted' | 'declined' | null;
+    lastShown: string | null;
+    reminderCount: number;
+    launchCount: number;
+  };
+  setAnalyticsConsent: (consent: Partial<ThemeState['analyticsConsent']>) => void;
+  incrementLaunchCount: () => void;
+  shouldShowAnalyticsBanner: () => boolean;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -259,13 +280,14 @@ export const useThemeStore = create<ThemeState>()(
       profileGroupingCriterion: "group",
       staticBackground: true,
       hasAcceptedTermsOfService: false,
+      hasAcceptedCapeGuidelines: false,
       customColorHistory: [],
       borderRadius: DEFAULT_BORDER_RADIUS,
       collapsedProfileGroups: [],
       // ProfilesTabV2 persistent filters - defaults
       profilesTabActiveGroup: "all",
       profilesTabSortBy: "last_played",
-      profilesTabVersionFilter: "all",
+      profilesTabVersionFilters: [],
       profilesTabLayoutMode: "list",
       // Global context menu management - defaults
       openContextMenuId: null,
@@ -273,18 +295,43 @@ export const useThemeStore = create<ThemeState>()(
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
       newsSectionWidth: 375,
-      // Featured profile mode - defaults
+      // Featured HugoSMP card - defaults
       featureMode: false,
+      // Language - defaults
+      language: "en" as SupportedLanguage,
+      // Analytics consent state - defaults
+      analyticsConsent: {
+        hasSeenBanner: false,
+        hasMadeDecision: false,
+        decision: null,
+        lastShown: null,
+        reminderCount: 0,
+        launchCount: 0,
+      },
 
-      setAccentColor: (color: AccentColor) => {
+      setAccentColor: async (color: AccentColor) => {
         set({ accentColor: color });
         get().applyAccentColorToDOM();
+
+        const { trackEvent } = await import('../services/analytics-service');
+        const name = color.name?.trim() || 'Custom';
+        trackEvent('color_changed', { color: name, color_name: name }).catch(console.error);
       },
 
       setBorderRadius: (radius: number) => {
         const clampedRadius = Math.max(MIN_BORDER_RADIUS, Math.min(MAX_BORDER_RADIUS, radius));
         set({ borderRadius: clampedRadius });
         get().applyBorderRadiusToDOM();
+
+        if (borderRadiusAnalyticsDebounceId !== null) {
+          clearTimeout(borderRadiusAnalyticsDebounceId);
+        }
+        borderRadiusAnalyticsDebounceId = setTimeout(() => {
+          borderRadiusAnalyticsDebounceId = null;
+          void import("../services/analytics-service").then(({ trackEvent }) => {
+            trackEvent('border_radius_changed', { radius: clampedRadius, radius_px: clampedRadius }).catch(console.error);
+          });
+        }, 1000);
       },
 
       setCustomAccentColor: (hexColor: string) => {
@@ -348,7 +395,11 @@ export const useThemeStore = create<ThemeState>()(
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
       },      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });      },      applyAccentColorToDOM: () => {
+        set({ hasAcceptedTermsOfService: true });
+      },
+      acceptCapeGuidelines: () => {
+        set({ hasAcceptedCapeGuidelines: true });
+      },      applyAccentColorToDOM: () => {
         const { accentColor } = get();
 
         const hexToRgb = (hex: string) => {
@@ -419,8 +470,20 @@ export const useThemeStore = create<ThemeState>()(
         set({ profilesTabSortBy: sortBy });
       },
 
-      setProfilesTabVersionFilter: (filter: string) => {
-        set({ profilesTabVersionFilter: filter });
+      setProfilesTabVersionFilters: (filters: string[]) => {
+        set({ profilesTabVersionFilters: filters });
+      },
+
+      toggleProfilesTabVersionFilter: (version: string) => {
+        set((state) => {
+          const current = Array.isArray(state.profilesTabVersionFilters)
+            ? state.profilesTabVersionFilters
+            : [];
+          const next = current.includes(version)
+            ? current.filter((v) => v !== version)
+            : [...current, version];
+          return { profilesTabVersionFilters: next };
+        });
       },
 
       setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => {
@@ -442,9 +505,49 @@ export const useThemeStore = create<ThemeState>()(
         set({ newsSectionWidth: width });
       },
 
-      // Featured profile mode
+      // Featured HugoSMP card
       setFeatureMode: (enabled: boolean) => {
         set({ featureMode: enabled });
+      },
+
+      // Language
+      setLanguage: (lang: SupportedLanguage) => {
+        set({ language: lang });
+        import("../i18n/i18n").then((mod) => mod.default.changeLanguage(lang));
+        void import("../services/analytics-service").then(({ trackEvent }) => {
+          trackEvent("language_changed", { language: lang }).catch(console.error);
+        });
+      },
+
+      // Analytics consent functions
+      setAnalyticsConsent: (consentUpdate) => {
+        set((state) => ({
+          analyticsConsent: { ...state.analyticsConsent, ...consentUpdate }
+        }));
+      },
+
+      incrementLaunchCount: () => {
+        set((state) => ({
+          analyticsConsent: {
+            ...state.analyticsConsent,
+            launchCount: state.analyticsConsent.launchCount + 1
+          }
+        }));
+      },
+
+      shouldShowAnalyticsBanner: () => {
+        const state = get();
+        const consent = state.analyticsConsent;
+
+        if (consent.hasMadeDecision) return false;
+        if (consent.launchCount < 6) return false;
+        if (consent.reminderCount >= 3) return false;
+        if (consent.lastShown) {
+          const lastShown = new Date(consent.lastShown);
+          const daysSinceLastShown = (Date.now() - lastShown.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceLastShown < 30) return false;
+        }
+        return true;
       },
     }),    {
       name: "norisk-theme-storage",
@@ -457,9 +560,38 @@ export const useThemeStore = create<ThemeState>()(
           
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
+          // Apply language on rehydrate
+          if (state.language) {
+            import("../i18n/i18n").then((mod) => mod.default.changeLanguage(state.language));
+          }
           // Ensure collapsedProfileGroups exists after rehydrate
           if (!Array.isArray(state.collapsedProfileGroups)) {
             state.collapsedProfileGroups = [];
+          }
+
+          // Migration: version filter went from single string to multi-select array
+          if (!Array.isArray(state.profilesTabVersionFilters)) {
+            state.profilesTabVersionFilters = [];
+          }
+
+          const legacyFeaturedLaunchMode = (state as { featuredLaunchMode?: string }).featuredLaunchMode;
+          if (legacyFeaturedLaunchMode === "hugo") {
+            state.featureMode = true;
+          } else if (legacyFeaturedLaunchMode) {
+            state.featureMode = false;
+          }
+          delete (state as { featuredLaunchMode?: string }).featuredLaunchMode;
+
+          // Ensure analytics consent state exists for existing users
+          if (!state.analyticsConsent) {
+            state.analyticsConsent = {
+              hasSeenBanner: false,
+              hasMadeDecision: false,
+              decision: null,
+              lastShown: null,
+              reminderCount: 0,
+              launchCount: 0,
+            };
           }
         }
       },

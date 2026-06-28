@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ModrinthSearch } from "../modrinth/ModrinthSearch";
 import type { Profile } from "../../types/profile";
 import { listProfiles } from "../../services/profile-service";
@@ -10,6 +11,7 @@ import { Card } from "../ui/Card";
 import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthFilters } from "../modrinth/ModrinthFilters";
 import type { ModrinthProjectType } from "../../types/modrinth";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ModrinthTabProps {
   profiles?: Profile[];
@@ -18,6 +20,7 @@ interface ModrinthTabProps {
 export function ModrinthTab({
   profiles: initialProfiles = [],
 }: ModrinthTabProps) {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
@@ -38,7 +41,7 @@ export function ModrinthTab({
       } catch (err) {
         console.error("Failed to load profiles:", err);
         setError(
-          `Failed to load profiles: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to load profiles: ${parseErrorMessage(err)}`,
         );
         setProfilesLoaded(true);
       }
@@ -66,7 +69,7 @@ export function ModrinthTab({
       {error && <ErrorMessage message={error} />}
 
       {!profilesLoaded ? (
-        <LoadingState message="Loading profiles..." />
+        <LoadingState message={t('profiles.loadingProfiles')} />
       ) : (
         <div className="flex-1 overflow-hidden flex space-x-4">
           <div className="flex-1 overflow-hidden">

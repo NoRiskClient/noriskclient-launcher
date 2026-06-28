@@ -14,6 +14,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { LaunchButton } from "../ui/buttons/LaunchButton";
 import { gsap } from "gsap";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 import { ModsTabV2 } from "./detail/v2/ModsTabV2";
 import { LocalContentTabV2 } from "./detail/v2/LocalContentTabV2";
 import type { LocalContentItem } from "../../hooks/useLocalContentManager";
@@ -44,6 +45,7 @@ export function ProfileDetailView({
   onOpenScreenshotModal,
   screenshotListRefreshKey,
 }: ProfileDetailViewProps) {
+  const { t } = useTranslation();
   const [activeMainTab, setActiveMainTab] = useState<MainTabType>("content");
   const [activeContentType, setActiveContentType] =
     useState<ContentSubType>("modsv2");
@@ -183,33 +185,33 @@ export function ProfileDetailView({
   };
 
   const mainTabs = [
-    { id: "content", label: "Content", icon: "solar:widget-bold" },
-    { id: "browse" as MainTabType, label: "Browse", icon: "solar:magnifer-bold" },
-    { id: "worlds", label: "Worlds", icon: "solar:planet-bold" },
-    { id: "screenshots", label: "Screenshots", icon: "solar:camera-bold" },
-    { id: "logs", label: "Logs", icon: "solar:code-bold" },
+    { id: "content", label: t('profiles.tabs.content'), icon: "solar:widget-bold" },
+    { id: "browse" as MainTabType, label: t('profiles.tabs.browse'), icon: "solar:magnifer-bold" },
+    { id: "worlds", label: t('profiles.tabs.worlds'), icon: "solar:planet-bold" },
+    { id: "screenshots", label: t('profiles.tabs.screenshots'), icon: "solar:camera-bold" },
+    { id: "logs", label: t('profiles.tabs.logs'), icon: "solar:code-bold" },
   ];
 
   const contentSubTabs = [
-    { id: "modsv2" as ContentSubType, label: "Mods", icon: "solar:bolt-bold" },
+    { id: "modsv2" as ContentSubType, label: t('profiles.content.mods'), icon: "solar:bolt-bold" },
     {
       id: "resourcepacksv2" as ContentSubType,
-      label: "Resource Packs",
+      label: t('profiles.content.resourcePacks'),
       icon: "solar:gallery-bold",
     },
     {
       id: "shaderpacksv2" as ContentSubType,
-      label: "Shaders",
+      label: t('profiles.content.shaders'),
       icon: "solar:sun-bold",
     },
     {
       id: "datapacksv2" as ContentSubType,
-      label: "Data Packs",
+      label: t('profiles.content.dataPacks'),
       icon: "solar:database-bold",
     },
     {
       id: "noriskv2" as ContentSubType,
-      label: "NoRisk Mods",
+      label: t('profiles.content.noriskMods'),
       icon: "solar:shield-check-bold",
     },
   ];
@@ -266,20 +268,20 @@ export function ProfileDetailView({
               iconPosition="left"
               className="flex-1"
             >
-              Back
+              {t('profiles.back')}
             </Button>
 
             <IconButton
               icon={<Icon icon="solar:settings-bold" />}
               onClick={onEdit}
-              title={profile.is_standard_version ? "Java Settings" : "Edit profile"}
+              title={profile.is_standard_version ? t('profiles.javaSettings') : t('profiles.editProfile')}
               size="sm"
             />
 
             <IconButton
               icon={<Icon icon="solar:folder-with-files-bold" />}
               onClick={() => ProfileService.openProfileFolder(profile.id)}
-              title="Open Profile Folder"
+              title={t('profiles.openFolder')}
               size="sm"
             />
           </div>
@@ -289,7 +291,7 @@ export function ProfileDetailView({
         <div className="p-3 flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between px-2 mb-2">
             <div className="text-white/50 text-sm uppercase tracking-wider">
-              Navigation
+              {t('profiles.navigation')}
             </div>
             <IconButton
               icon={
@@ -303,7 +305,7 @@ export function ProfileDetailView({
                 />
               }
               onClick={toggleSidebarPosition}
-              title="Toggle Sidebar Position"
+              title={t('profiles.toggleSidebar')}
               size="xs"
               className="text-white hover:text-white/80"
             />
@@ -428,9 +430,9 @@ export function ProfileDetailView({
                     profile={currentProfile}
                     contentType="Mod"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="mod"
-                    itemTypeNamePlural="mods"
-                    addContentButtonText="Add Mods"
+                    itemTypeName={t('profiles.content.mod')}
+                    itemTypeNamePlural={t('profiles.content.mods')}
+                    addContentButtonText={t('profiles.content.addMods')}
                     emptyStateIconOverride="solar:gallery-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -441,9 +443,9 @@ export function ProfileDetailView({
                     profile={currentProfile}
                     contentType="ResourcePack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="resource pack"
-                    itemTypeNamePlural="resource packs"
-                    addContentButtonText="Add Resource Packs"
+                    itemTypeName={t('profiles.content.resourcePack')}
+                    itemTypeNamePlural={t('profiles.content.resourcePacks')}
+                    addContentButtonText={t('profiles.content.addResourcePacks')}
                     emptyStateIconOverride="solar:gallery-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -454,9 +456,9 @@ export function ProfileDetailView({
                     profile={currentProfile}
                     contentType="ShaderPack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="shader pack"
-                    itemTypeNamePlural="shader packs"
-                    addContentButtonText="Add Shader Packs"
+                    itemTypeName={t('profiles.content.shaderPack')}
+                    itemTypeNamePlural={t('profiles.content.shaderPacks')}
+                    addContentButtonText={t('profiles.content.addShaderPacks')}
                     emptyStateIconOverride="solar:sun-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -467,9 +469,9 @@ export function ProfileDetailView({
                     profile={currentProfile}
                     contentType="DataPack"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="data pack"
-                    itemTypeNamePlural="data packs"
-                    addContentButtonText="Add Data Packs"
+                    itemTypeName={t('profiles.content.dataPack')}
+                    itemTypeNamePlural={t('profiles.content.dataPacks')}
+                    addContentButtonText={t('profiles.content.addDataPacks')}
                     emptyStateIconOverride="solar:database-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}
@@ -480,9 +482,9 @@ export function ProfileDetailView({
                     profile={currentProfile}
                     contentType="NoRiskMod"
                     getDisplayFileName={getGenericDisplayFileName}
-                    itemTypeName="NoRisk Mod"
-                    itemTypeNamePlural="NoRisk Mods"
-                    addContentButtonText="Add NoRisk Mods"
+                    itemTypeName={t('profiles.content.noriskMod')}
+                    itemTypeNamePlural={t('profiles.content.noriskMods')}
+                    addContentButtonText={t('profiles.content.addNoriskMods')}
                     emptyStateIconOverride="solar:shield-check-bold-duotone"
                     onRefreshRequired={handleRefresh}
                     onBrowseContentRequest={handleBrowseContent}

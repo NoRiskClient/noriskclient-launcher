@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -19,6 +20,7 @@ interface ModalProps {
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
+  contentClassName?: string;
 }
 
 export function Modal({
@@ -33,7 +35,9 @@ export function Modal({
   headerActions,
   variant = "default",
   className,
+  contentClassName,
 }: ModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -172,14 +176,14 @@ export function Modal({
               }}
               variant="ghost"
               size="sm"
-              aria-label="Close modal"
+              aria-label={t('common.close_modal')}
             />
           </div>
         </div>
 
         <div
           ref={contentRef}
-          className="flex-1 overflow-y-auto custom-scrollbar"
+          className={cn("flex-1 overflow-y-auto custom-scrollbar", contentClassName)}
         >
           {children}
         </div>
