@@ -147,8 +147,6 @@ export interface ProcessLogCursor {
   cursor: number;
   output: string;
   new_file: boolean;
-  total_bytes: number;
-  truncated: boolean;
 }
 
 export async function getProcessLogCursor(

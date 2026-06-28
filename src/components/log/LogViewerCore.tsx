@@ -104,6 +104,7 @@ export function LogViewerCore({
   const fileDropdownRef = useRef<HTMLDivElement>(null);
   const [isFileDropdownOpen, setIsFileDropdownOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const programmaticScrollRef = useRef(false);
 
   // State for delayed "NO LOGS YET" display
   const [showNoLogs, setShowNoLogs] = useState(false);
@@ -123,6 +124,49 @@ export function LogViewerCore({
       );
     });
   }, [logs, levelFilters, deferredSearchTerm]);
+
+  useEffect(() => {
+    if (!isAutoscrollEnabled || filteredLogs.length === 0) return;
+    programmaticScrollRef.current = true;
+    const lastIndex = filteredLogs.length - 1;
+    const jumpToBottom = () =>
+      virtuosoRef.current?.scrollToIndex({
+        index: lastIndex,
+        align: "end",
+        behavior: "auto",
+      });
+    jumpToBottom();
+    const raf = requestAnimationFrame(jumpToBottom);
+    const id = setTimeout(() => {
+      programmaticScrollRef.current = false;
+    }, 120);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(id);
+    };
+  }, [filteredLogs.length, isAutoscrollEnabled]);
+
+  const userScrollRef = useRef(false);
+  const userScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markUserScroll = useCallback(() => {
+    userScrollRef.current = true;
+    if (userScrollTimer.current) clearTimeout(userScrollTimer.current);
+    userScrollTimer.current = setTimeout(() => {
+      userScrollRef.current = false;
+    }, 400);
+  }, []);
+  useEffect(() => () => {
+    if (userScrollTimer.current) clearTimeout(userScrollTimer.current);
+  }, []);
+
+  const handleAtBottomChange = useCallback((atBottom: boolean) => {
+    if (atBottom) {
+      setIsAutoscrollEnabled(true);
+      return;
+    }
+    if (programmaticScrollRef.current) return;
+    if (userScrollRef.current) setIsAutoscrollEnabled(false);
+  }, []);
 
   // Delay showing "NO LOGS YET" by 1 second to avoid flicker
   useEffect(() => {
@@ -165,21 +209,6 @@ export function LogViewerCore({
 
   const [isUploading, setIsUploading] = useState(false);
 
-  const copyLogs = async (entries: LogEntry[], label: string) => {
-    if (entries.length === 0) {
-      toast.error(t('logs.no_logs_to_upload'));
-      return;
-    }
-
-    try {
-      await writeText(entries.map(formatLogEntry).join("\n"));
-      toast.success(`${label} copied`);
-    } catch (error) {
-      console.error("Failed to copy logs:", error);
-      toast.error("Failed to copy logs");
-    }
-  };
-
   const handleUpload = async () => {
     if (filteredLogs.length === 0) {
       toast.error(t('logs.no_logs_to_upload'));
@@ -210,7 +239,7 @@ export function LogViewerCore({
 
   const scrollToBottom = () => {
     if (virtuosoRef.current && filteredLogs.length > 0) {
-      virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, behavior: "auto" });
+      virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, align: "end", behavior: "auto" });
     }
     setIsAutoscrollEnabled(true);
   };
@@ -284,7 +313,7 @@ export function LogViewerCore({
           >
             <Icon icon="solar:document-text-bold" className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">
-              {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : "Select log..."}
+              {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : t('logs.select_log_placeholder')}
             </span>
             <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3 flex-shrink-0" />
           </button>
@@ -308,8 +337,10 @@ export function LogViewerCore({
 
       {/* Log Content */}
       <div
-        className="flex-1 overflow-hidden p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm"
+        className="flex-1 min-h-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
+        onWheel={markUserScroll}
+        onTouchMove={markUserScroll}
       >
         {filteredLogs.length === 0 ? (
           showNoLogs && showNoLogsMessage && (
@@ -324,16 +355,17 @@ export function LogViewerCore({
         ) : (
           <Virtuoso
             ref={virtuosoRef}
-            className="custom-scrollbar"
-            style={{ height: "100%" }}
+            className="custom-scrollbar overflow-x-hidden"
+            style={{ flex: 1, minHeight: 0 }}
             data={filteredLogs}
-            followOutput={isAutoscrollEnabled ? "auto" : false}
-            atBottomStateChange={setIsAutoscrollEnabled}
+            atBottomStateChange={handleAtBottomChange}
+            increaseViewportBy={400}
             initialTopMostItemIndex={filteredLogs.length > 0 ? filteredLogs.length - 1 : 0}
             itemContent={(_index, log) => {
               const timestamp = formatTimestamp(log.timestamp);
+              const isLast = _index === filteredLogs.length - 1;
               return (
-                <div className="flex flex-nowrap items-start py-0.5 hover:bg-white/5 px-2 -mx-2 rounded">
+                <div className={`flex flex-nowrap items-start py-0.5 hover:bg-white/5 rounded ${isLast ? "pb-2" : ""}`}>
                   {timestamp ? (
                     <>
                       <span className={`pr-2 select-none ${getLevelColorClass(log.level)}`}>
@@ -380,10 +412,12 @@ export function LogViewerCore({
         <div className="flex items-center gap-4 text-white/50 font-minecraft-ten text-xs">
           <span className="flex items-center gap-1.5">
             <Icon icon="solar:document-text-bold" className="w-4 h-4" />
-            {filteredLogs.length} LINES
+            {t('logs.lines', { count: filteredLogs.length })}
           </span>
           <button
-            onClick={() => setIsAutoscrollEnabled(!isAutoscrollEnabled)}
+            onClick={() =>
+              isAutoscrollEnabled ? setIsAutoscrollEnabled(false) : scrollToBottom()
+            }
             className="flex items-center gap-1.5 hover:text-white/70 transition-colors"
             style={{ color: isAutoscrollEnabled ? accentColor.value : undefined }}
           >
@@ -391,7 +425,7 @@ export function LogViewerCore({
               icon={isAutoscrollEnabled ? "solar:arrow-down-bold" : "solar:pause-bold"}
               className="w-4 h-4"
             />
-            {isAutoscrollEnabled ? "FOLLOWING" : "PAUSED"}
+            {isAutoscrollEnabled ? t('logs.following') : t('logs.paused')}
           </button>
           {!isAutoscrollEnabled && (
             <button
@@ -403,35 +437,19 @@ export function LogViewerCore({
               }}
             >
               <Icon icon="solar:arrow-down-bold" className="w-4 h-4" />
-              SCROLL TO BOTTOM
+              {t('logs.scroll_to_bottom')}
             </button>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => copyLogs(filteredLogs, "Visible logs")}
-            disabled={filteredLogs.length === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Icon icon="solar:copy-bold" className="w-4 h-4" />
-            COPY VISIBLE
-          </button>
-          <button
-            onClick={() => copyLogs(logs, "All retained logs")}
-            disabled={logs.length === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Icon icon="solar:copy-bold" className="w-4 h-4" />
-            COPY ALL
-          </button>
           {onClear && (
             <button
               onClick={onClear}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
             >
               <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
-              CLEAR
+              {t('logs.clear')}
             </button>
           )}
           {onOpenFolder && (
@@ -457,7 +475,7 @@ export function LogViewerCore({
             ) : (
               <Icon icon="solar:upload-bold" className="w-4 h-4" />
             )}
-            {isUploading ? "UPLOADING..." : "UPLOAD"}
+            {isUploading ? t('logs.uploading') : t('logs.upload')}
           </button>
         </div>
       </div>
@@ -477,7 +495,7 @@ export function LogViewerCore({
           }}
         >
           <div className="text-xs font-minecraft-ten text-white/70 mb-3 pb-2 border-b border-white/10">
-            LOG SETTINGS
+            {t('logs.settings')}
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer group">
@@ -499,10 +517,10 @@ export function LogViewerCore({
             </div>
             <div className="flex-1">
               <div className="text-sm text-white/90 font-minecraft-ten">
-                Thread Prefix
+                {t('logs.thread_prefix')}
               </div>
               <div className="text-xs text-white/50 font-sans">
-                Show [Thread/LEVEL] prefix
+                {t('logs.thread_prefix_desc')}
               </div>
             </div>
           </label>

@@ -1497,6 +1497,17 @@
   "debug.permissions.empty": "No permissions cached. Click refresh to fetch.",
 
   "logs.no_logs_to_upload": "No logs to upload",
+  "logs.lines": "{{count}} LINES",
+  "logs.following": "FOLLOWING",
+  "logs.paused": "PAUSED",
+  "logs.scroll_to_bottom": "SCROLL TO BOTTOM",
+  "logs.upload": "UPLOAD",
+  "logs.uploading": "UPLOADING...",
+  "logs.select_log_placeholder": "Select log...",
+  "logs.clear": "CLEAR",
+  "logs.settings": "LOG SETTINGS",
+  "logs.thread_prefix": "Thread Prefix",
+  "logs.thread_prefix_desc": "Show [Thread/LEVEL] prefix",
   "logs.uploaded_url_copied": "Uploaded! URL copied to clipboard",
   "logs.upload_failed": "Failed to upload logs",
 

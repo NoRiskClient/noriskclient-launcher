@@ -47,8 +47,6 @@ pub struct ProcessLogCursor {
     pub cursor: u64,
     pub output: String,
     pub new_file: bool,
-    pub total_bytes: u64,
-    pub truncated: bool,
 }
 
 fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
@@ -93,8 +91,6 @@ pub async fn get_process_log_cursor(
             cursor: 0,
             output: String::new(),
             new_file: false,
-            total_bytes: 0,
-            truncated: false,
         });
     }
 
@@ -128,8 +124,6 @@ pub async fn get_process_log_cursor(
         cursor: next_cursor,
         output,
         new_file,
-        total_bytes,
-        truncated: next_cursor < total_bytes,
     })
 }
 
