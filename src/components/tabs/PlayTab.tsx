@@ -15,6 +15,8 @@ import {
 // DISABLED: Snow effect (seasonal feature)
 // import { SnowEffectToggle } from "../ui/SnowEffectToggle";
 import { ReferralBanner } from "../ui/ReferralBanner";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { useQualitySettingsStore } from "../../store/quality-settings-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { setDiscordState } from "../../utils/discordRpc";
 
@@ -31,6 +33,7 @@ export function PlayTab() {
   const { staticBackground, accentColor } = useThemeStore();
   const { currentEffect } = useBackgroundEffectStore();
   const { isThemeActive, selectedTheme } = useLauncherTheme();
+  const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -73,11 +76,15 @@ export function PlayTab() {
           <ReferralBanner />
         </div>
 
-        {/* DISABLED: Snow Effect Toggle - Top Right (seasonal feature)
-        <div className="absolute top-6 right-6 z-20">
-          <SnowEffectToggle variant="compact" size="sm" />
+        {/* 3D Render Toggle - Top Right */}
+        <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+          <span className="text-sm text-white/70 font-minecraft-ten">3D</span>
+          <ToggleSwitch
+            checked={cosmeticRenderer3d}
+            onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
+            size="sm"
+          />
         </div>
-        */}
 
         {/* <VersionInfo
           profileId={currentDisplayProfile?.id || ""}

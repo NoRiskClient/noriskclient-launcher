@@ -212,6 +212,8 @@ export function PlayerActionsDisplay({
               nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
               loading={rigLoading}
               paused={!isWindowFocused}
+              fps={60}
+              maxDpr={1.5}
               skeletonColor={accentColor.value}
               className="bg-transparent"
               style={{
@@ -233,7 +235,7 @@ export function PlayerActionsDisplay({
             width={skinViewerMaxDisplayWidth}
             height={skinViewerDisplayHeight}
             className="bg-transparent flex-shrink-0"
-            style={skinViewerStyles}
+            style={{ ...skinViewerStyles, transform: "translateY(30px)" }}
           />
         )}
 
@@ -241,7 +243,7 @@ export function PlayerActionsDisplay({
           <>
             {/* Featured Server Toggle - above the launch button */}
             <div
-              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-32' : 'bottom-24'}`}
+              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${cosmeticRenderer3d ? (featureMode ? 'bottom-32' : 'bottom-24') : (featureMode ? 'bottom-40' : 'bottom-32')}`}
             >
               {!featureMode && worldCupActive ? (
                 <StaticTooltip
@@ -277,7 +279,7 @@ export function PlayerActionsDisplay({
                 </button>
               )}
             </div>
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center px-4">
+            <div className={`absolute left-0 right-0 flex justify-center px-4 ${cosmeticRenderer3d ? 'bottom-2' : 'bottom-8'}`}>
               {featureMode ? (
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}
