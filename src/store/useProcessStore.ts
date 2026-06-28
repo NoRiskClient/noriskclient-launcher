@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { ProcessMetadata, ProcessState } from "../types/processState";
+import { parseErrorMessage } from "../utils/error-utils";
 
 export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG" | "TRACE" | "UNKNOWN";
 
@@ -13,6 +14,11 @@ export interface LogEntry {
   message: string;
   raw: string;
 }
+
+// Keep the in-memory UI tail bounded. The full session log remains available from
+// the backend log archive; the frontend should not retain unbounded Minecraft spam.
+const MAX_PROCESS_LOG_ENTRIES = 5_000;
+const MAX_LAUNCHER_LOG_ENTRIES = 500;
 
 // Parser state for tracking continuation lines per process
 interface ParserState {
@@ -73,7 +79,7 @@ interface ProcessStore {
 }
 
 // Log format regex patterns (matching log-service.ts)
-const LOG_LEVELS: readonly LogLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'] as const;
+const LOG_LEVELS: readonly LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"] as const;
 
 // Standard format: [HH:MM:SS] [Thread/Level]: Text
 const logLineRegexStandard = /^\s*\[(\d{2}:\d{2}:\d{2})\]\s+\[([^/]+)\/([^\]]+)\]:\s*(.*)$/;
@@ -87,6 +93,31 @@ interface ParsedLine {
   thread: string | null;
   level: LogLevel | null;
   text: string;
+}
+
+function createDefaultParserState(): ParserState {
+  return {
+    lastLevel: "INFO",
+    lastThread: null,
+    nextId: 0,
+  };
+}
+
+function trimLogTail<T>(logs: T[], maxEntries: number): T[] {
+  if (logs.length <= maxEntries) return logs;
+  return logs.slice(logs.length - maxEntries);
+}
+
+function appendBounded<T>(existing: T[], entries: T[], maxEntries: number): T[] {
+  if (entries.length === 0) return existing;
+  if (entries.length >= maxEntries) return entries.slice(entries.length - maxEntries);
+
+  const overflow = existing.length + entries.length - maxEntries;
+  if (overflow > 0) {
+    return existing.slice(overflow).concat(entries);
+  }
+
+  return existing.concat(entries);
 }
 
 // Parse a single log line
@@ -148,6 +179,60 @@ function timestampToDate(timestamp: string): Date {
     return now;
   }
   return new Date();
+}
+
+function parseLogEntry(processId: string, rawMessage: string, parserState: ParserState): {
+  entry: LogEntry;
+  parserState: ParserState;
+} {
+  const parsed = parseLogLine(rawMessage);
+  let level: LogLevel;
+  let thread: string | null;
+
+  const nextParserState: ParserState = {
+    ...parserState,
+    nextId: parserState.nextId + 1,
+  };
+
+  if (parsed.timestamp !== null) {
+    level = parsed.level || "UNKNOWN";
+    thread = parsed.thread;
+    nextParserState.lastLevel = level;
+    nextParserState.lastThread = thread;
+  } else {
+    level = parserState.lastLevel;
+    thread = parserState.lastThread;
+  }
+
+  return {
+    entry: {
+      id: `${processId}-${nextParserState.nextId}`,
+      processId,
+      timestamp: parsed.timestamp ? timestampToDate(parsed.timestamp) : null,
+      level,
+      thread,
+      message: parsed.text,
+      raw: rawMessage,
+    },
+    parserState: nextParserState,
+  };
+}
+
+function parseLogEntriesForProcess(
+  processId: string,
+  rawMessages: string[],
+  parserState: ParserState,
+): { entries: LogEntry[]; parserState: ParserState } {
+  const entries: LogEntry[] = [];
+  let nextParserState = parserState;
+
+  for (const rawMessage of rawMessages) {
+    const parsed = parseLogEntry(processId, rawMessage, nextParserState);
+    nextParserState = parsed.parserState;
+    entries.push(parsed.entry);
+  }
+
+  return { entries, parserState: nextParserState };
 }
 
 export const useProcessStore = create<ProcessStore>((set, get) => ({
@@ -212,7 +297,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         }
       }
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: parseErrorMessage(error), isLoading: false });
       console.error("Failed to fetch processes:", error);
     }
   },
@@ -281,63 +366,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
 
   // Log actions
   addLogEntry: (processId, rawMessage) => {
-    set((state) => {
-      const newLogs = new Map(state.logs);
-      const newParserStates = new Map(state.parserStates);
-      const processLogs = newLogs.get(processId) || [];
-
-      // Get or create parser state for this process
-      let parserState = newParserStates.get(processId) || {
-        lastLevel: "INFO" as LogLevel,
-        lastThread: null,
-        nextId: 0,
-      };
-
-      // Parse the log line
-      const parsed = parseLogLine(rawMessage);
-
-      // Create log entry with inherited values for continuation lines
-      let level: LogLevel;
-      let thread: string | null;
-
-      if (parsed.timestamp !== null) {
-        // Structured line - update parser state
-        level = parsed.level || "UNKNOWN";
-        thread = parsed.thread;
-        parserState = {
-          ...parserState,
-          lastLevel: level,
-          lastThread: thread,
-          nextId: parserState.nextId + 1,
-        };
-      } else {
-        // Continuation line - inherit from last known state
-        level = parserState.lastLevel;
-        thread = parserState.lastThread;
-        parserState = {
-          ...parserState,
-          nextId: parserState.nextId + 1,
-        };
-      }
-
-      const entry: LogEntry = {
-        id: `${processId}-${parserState.nextId}`,
-        processId,
-        timestamp: parsed.timestamp ? timestampToDate(parsed.timestamp) : null,
-        level,
-        thread,
-        message: parsed.text,
-        raw: rawMessage,
-      };
-
-      newParserStates.set(processId, parserState);
-
-      // Limit to last 10000 entries to prevent memory issues
-      const updatedLogs = [...processLogs, entry].slice(-10000);
-      newLogs.set(processId, updatedLogs);
-
-      return { logs: newLogs, parserStates: newParserStates };
-    });
+    get().addLogEntriesBatch([{ processId, rawMessage }]);
   },
 
   // Batch add multiple log entries at once (reduces re-renders)
@@ -351,60 +380,26 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       // Group entries by processId for efficient processing
       const entriesByProcess = new Map<string, string[]>();
       for (const { processId, rawMessage } of entries) {
-        const existing = entriesByProcess.get(processId) || [];
-        existing.push(rawMessage);
-        entriesByProcess.set(processId, existing);
+        if (!rawMessage.trim()) continue;
+        const existing = entriesByProcess.get(processId);
+        if (existing) {
+          existing.push(rawMessage);
+        } else {
+          entriesByProcess.set(processId, [rawMessage]);
+        }
       }
 
       // Process each group
       for (const [processId, messages] of entriesByProcess) {
         const processLogs = newLogs.get(processId) || [];
-        let parserState = newParserStates.get(processId) || {
-          lastLevel: "INFO" as LogLevel,
-          lastThread: null,
-          nextId: 0,
-        };
+        const parserState = newParserStates.get(processId) || createDefaultParserState();
+        const parsed = parseLogEntriesForProcess(processId, messages, parserState);
 
-        const newEntries: LogEntry[] = [];
-
-        for (const rawMessage of messages) {
-          const parsed = parseLogLine(rawMessage);
-
-          let level: LogLevel;
-          let thread: string | null;
-
-          if (parsed.timestamp !== null) {
-            level = parsed.level || "UNKNOWN";
-            thread = parsed.thread;
-            parserState = {
-              ...parserState,
-              lastLevel: level,
-              lastThread: thread,
-              nextId: parserState.nextId + 1,
-            };
-          } else {
-            level = parserState.lastLevel;
-            thread = parserState.lastThread;
-            parserState = {
-              ...parserState,
-              nextId: parserState.nextId + 1,
-            };
-          }
-
-          newEntries.push({
-            id: `${processId}-${parserState.nextId}`,
-            processId,
-            timestamp: parsed.timestamp ? timestampToDate(parsed.timestamp) : null,
-            level,
-            thread,
-            message: parsed.text,
-            raw: rawMessage,
-          });
-        }
-
-        newParserStates.set(processId, parserState);
-        const updatedLogs = [...processLogs, ...newEntries].slice(-10000);
-        newLogs.set(processId, updatedLogs);
+        newParserStates.set(processId, parsed.parserState);
+        newLogs.set(
+          processId,
+          appendBounded(processLogs, parsed.entries, MAX_PROCESS_LOG_ENTRIES),
+        );
       }
 
       return { logs: newLogs, parserStates: newParserStates };
@@ -418,61 +413,19 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       const newParserStates = new Map(state.parserStates);
 
       // Split content into lines (handle both Windows \r\n and Unix \n)
-      const lines = content.split(/\r?\n/);
-      const entries: LogEntry[] = [];
+      const lines = content
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\r$/, ""))
+        .filter((line) => line.trim().length > 0);
 
-      let parserState: ParserState = {
-        lastLevel: "INFO" as LogLevel,
-        lastThread: null,
-        nextId: 0,
-      };
+      const parsed = parseLogEntriesForProcess(
+        processId,
+        trimLogTail(lines, MAX_PROCESS_LOG_ENTRIES),
+        createDefaultParserState(),
+      );
 
-      for (let line of lines) {
-        // Skip empty lines
-        if (!line.trim()) continue;
-
-        // Remove any trailing carriage return (Windows line endings)
-        line = line.replace(/\r$/, '');
-
-        const parsed = parseLogLine(line);
-
-        let level: LogLevel;
-        let thread: string | null;
-
-        if (parsed.timestamp !== null) {
-          // Structured line - update parser state
-          level = parsed.level || "UNKNOWN";
-          thread = parsed.thread;
-          parserState = {
-            ...parserState,
-            lastLevel: level,
-            lastThread: thread,
-            nextId: parserState.nextId + 1,
-          };
-        } else {
-          // Continuation line - inherit from last known state
-          level = parserState.lastLevel;
-          thread = parserState.lastThread;
-          parserState = {
-            ...parserState,
-            nextId: parserState.nextId + 1,
-          };
-        }
-
-        entries.push({
-          id: `${processId}-${parserState.nextId}`,
-          processId,
-          timestamp: parsed.timestamp ? timestampToDate(parsed.timestamp) : null,
-          level,
-          thread,
-          message: parsed.text,
-          raw: line,
-        });
-      }
-
-      // Limit to last 10000 entries to prevent memory issues
-      newLogs.set(processId, entries.slice(-10000));
-      newParserStates.set(processId, parserState);
+      newLogs.set(processId, parsed.entries);
+      newParserStates.set(processId, parsed.parserState);
 
       return { logs: newLogs, parserStates: newParserStates };
     });
@@ -482,14 +435,19 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     set((state) => {
       const newLogs = new Map(state.logs);
       const newParserStates = new Map(state.parserStates);
+      const newCursors = new Map(state.cursors);
       newLogs.delete(processId);
       newParserStates.delete(processId);
-      return { logs: newLogs, parserStates: newParserStates };
+      newCursors.delete(processId);
+      return { logs: newLogs, parserStates: newParserStates, cursors: newCursors };
     });
   },
 
   setCursor: (processId, cursor) => {
     set((state) => {
+      if (state.cursors.get(processId) === cursor) {
+        return {};
+      }
       const newCursors = new Map(state.cursors);
       newCursors.set(processId, cursor);
       return { cursors: newCursors };
@@ -521,7 +479,10 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
         raw: `[Launcher] ${message}`,
       };
 
-      newLauncherLogs.set(profileId, [...profileLogs, entry]);
+      newLauncherLogs.set(
+        profileId,
+        appendBounded(profileLogs, [entry], MAX_LAUNCHER_LOG_ENTRIES),
+      );
       return { launcherLogs: newLauncherLogs };
     });
   },
@@ -541,6 +502,14 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
   // Metrics actions
   updateMetrics: (processId, metrics) => {
     set((state) => {
+      const previous = state.metrics.get(processId);
+      if (
+        previous &&
+        previous.memoryBytes === metrics.memoryBytes &&
+        previous.cpuPercent === metrics.cpuPercent
+      ) {
+        return {};
+      }
       const newMetrics = new Map(state.metrics);
       newMetrics.set(processId, metrics);
       return { metrics: newMetrics };
@@ -557,7 +526,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       await invoke("stop_process", { processId });
     } catch (error) {
       console.error("Failed to stop process:", error);
-      set({ error: String(error) });
+      set({ error: parseErrorMessage(error) });
     }
   },
 }));

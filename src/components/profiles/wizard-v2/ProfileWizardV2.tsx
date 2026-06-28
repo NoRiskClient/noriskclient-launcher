@@ -22,6 +22,7 @@ import { Tooltip } from "../../ui/Tooltip";
 import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
 import { extractNrcCompatibility, type NrcCompatibilityData } from "../../../utils/nrc-compatibility";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 function NrcCompatibleTooltipContent() {
   const { t } = useTranslation();
@@ -204,7 +205,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     return toast.promise(creationPromise(), {
       loading: t('profiles.wizard.creatingProfile'),
       success: (createdProfile) => t('profiles.wizard.createSuccess', { name: createdProfile.name }),
-      error: (err) => t('profiles.wizard.createError', { error: err instanceof Error ? err.message : String(err) }),
+      error: (err) => t('profiles.wizard.createError', { error: parseErrorMessage(err) }),
     });
   };
 

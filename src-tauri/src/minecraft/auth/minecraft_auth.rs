@@ -68,6 +68,10 @@ pub struct Credentials {
     /// The authentication flow used to create this account (optional for backwards compatibility)
     #[serde(default)]
     pub auth_flow: Option<AuthFlow>,
+    /// Absolute expiry of the *Minecraft* access_token (distinct from `expires`, the Microsoft OAuth
+    /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
+    #[serde(default)]
+    pub mc_access_token_expires: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -206,6 +210,7 @@ pub struct DirectOAuthFlow {
     pub authorize_url: String,
 }
 
+#[derive(Clone)]
 pub struct MinecraftAuthStore {
     accounts: Arc<RwLock<Vec<Credentials>>>,
     store_path: PathBuf,
@@ -661,6 +666,7 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         self.update_or_insert(credentials.clone()).await?;
@@ -734,6 +740,7 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         info!(
@@ -938,6 +945,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -990,6 +998,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -1130,8 +1139,14 @@ impl MinecraftAuthStore {
             creds.expires
         );
 
-        if creds.expires <= Utc::now() + Duration::minutes(5) {
-            info!("[Token Check] Microsoft token nearing expiry, initiating proactive refresh");
+        // Refresh on the Minecraft token's own expiry (12h buffer, Prism-style); None = legacy
+        // account → refresh once to populate the field.
+        let mc_stale = match creds.mc_access_token_expires {
+            Some(exp) => exp <= Utc::now() + Duration::hours(12),
+            None => true,
+        };
+        if mc_stale {
+            info!("[Token Check] Minecraft token stale or nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
             let res = self.refresh_token(&old_credentials).await;
@@ -1160,6 +1175,23 @@ impl MinecraftAuthStore {
                     {
                         if source.is_connect() || source.is_timeout() {
                             info!("[Token Check] Connection error during refresh, using old credentials");
+                            return Ok(Some(old_credentials));
+                        }
+                    }
+                    // Transient outage (Mojang/Microsoft rate-limit or server error): the
+                    // endpoint answered but with a non-token body (e.g. HTTP 429 during an
+                    // auth outage). Keep showing the account with its cached credentials
+                    // instead of failing the whole account load — the real token refresh
+                    // happens again at game launch.
+                    if let AppError::MinecraftAuthenticationError(
+                        MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
+                    ) = &err
+                    {
+                        if status_code.as_u16() == 429 || status_code.is_server_error() {
+                            info!(
+                                "[Token Check] Transient outage ({}) during refresh, using cached credentials",
+                                status_code
+                            );
                             return Ok(Some(old_credentials));
                         }
                     }
@@ -1902,7 +1934,17 @@ struct MinecraftToken {
     // pub username: String,
     pub access_token: String,
     // pub token_type: String,
-    // pub expires_in: u64,
+    /// Lifetime of the Minecraft access token in seconds (~86400). Tracked so the refresh
+    /// guard keys on the *Minecraft* token rather than the Microsoft OAuth token.
+    #[serde(default)]
+    pub expires_in: u64,
+}
+
+/// Absolute expiry for a freshly minted Minecraft access token. Mirrors Prism's
+/// `currentTime + expires_in`, with a defensive 24h fallback when the field is absent (0).
+pub(crate) fn mc_token_expiry(expires_in: u64) -> DateTime<Utc> {
+    let secs = if expires_in == 0 { 24 * 3600 } else { expires_in as i64 };
+    Utc::now() + Duration::seconds(secs)
 }
 
 async fn minecraft_token(

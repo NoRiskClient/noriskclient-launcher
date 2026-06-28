@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import {
   getBorderRadiusClass,
   createRadiusStyle,
@@ -15,7 +15,7 @@ import {
 } from "./design-system";
 
 function PlayerToastContent({ message, uuid }: { message: string; uuid: string }) {
-  const avatarUrl = useCrafatarAvatar({ uuid, size: 32 });
+  const avatarUrl = usePlayerAvatar({ uuid, size: 32 });
 
   return (
     <div className="flex items-center gap-3">

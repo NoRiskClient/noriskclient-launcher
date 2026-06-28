@@ -255,6 +255,22 @@ impl DownloadUtils {
         Self::download_file(url, target_path, config).await
     }
 
+    /// Best-effort Maven `.sha1` sidecar fetch; None on any failure (caller falls back to ZIP heuristic).
+    pub async fn try_fetch_sha1_sidecar(file_url: &str) -> Option<String> {
+        let sha1_url = format!("{}.sha1", file_url);
+        let resp = HTTP_CLIENT.get(&sha1_url).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let text = resp.text().await.ok()?;
+        let hash = text.split_whitespace().next()?.trim().to_string();
+        if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            Some(hash)
+        } else {
+            None
+        }
+    }
+
     /// Single download attempt
     async fn download_attempt(
         url: &str,

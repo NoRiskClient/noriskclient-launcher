@@ -13,7 +13,7 @@ import { StatusMessage } from "../ui/StatusMessage";
 import { useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { gsap } from "gsap";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { PlayerHead } from "../common/PlayerHead";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import { MinecraftAuthService } from "../../services/minecraft-auth-service";
@@ -290,11 +290,6 @@ function AccountItem({
   const { t } = useTranslation();
   // Avatar sizes in pixels
   const avatarSizePx = isDropdownItem ? 32 : 40;
-  const avatarUrl = useCrafatarAvatar({
-    uuid: account.id,
-    size: avatarSizePx,
-    overlay: true,
-  });
 
   const handleAccountClick = () => {
     if (
@@ -363,30 +358,12 @@ function AccountItem({
             height: isDropdownItem ? '32px' : '40px',
           }}
         >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl || "/placeholder.svg"}
-              alt={`${account.minecraft_username || account.username}'s avatar`}
-              className="pixelated"
-              style={{
-                width: `${avatarSizePx}px`,
-                height: `${avatarSizePx}px`,
-                objectFit: 'cover',
-                display: 'block',
-                imageRendering: 'pixelated' as const,
-              }}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-              }}
-            />
-          ) : (
-            <span
-              className={`text-white font-minecraft lowercase ${isDropdownItem ? "text-xs" : ""}`}
-            >
-              {account.minecraft_username?.charAt(0) || "?"}
-            </span>
-          )}
+          <PlayerHead
+            uuid={account.id}
+            username={account.minecraft_username || account.username}
+            size={avatarSizePx}
+            className={isDropdownItem ? "text-xs" : ""}
+          />
         </div>
         <div className="min-w-0 flex items-center">
           <h4

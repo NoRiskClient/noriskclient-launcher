@@ -35,6 +35,7 @@ use crate::minecraft::dto::minecraft_profile::{
 use crate::minecraft::dto::skin_payloads::{
     SkinModelVariant, SkinSource,
 }; // Added imports for SkinSource and related types
+use crate::utils::hash_utils::calculate_sha1_from_bytes;
 use crate::utils::path_utils;
 use base64::{decode as base64_decode_str, encode as base64_encode_bytes};
 
@@ -1650,32 +1651,116 @@ pub async fn ping_server_status(address: &str) -> ServerPingInfo {
 // --- Helper functions for add_skin_locally command ---
 
 /// Downloads an image from a URL and encodes it as a Base64 string.
-pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
-    debug!("[MC Utils] Fetching image from URL: {}", url);
-    // Use the global HTTP_CLIENT from config.rs
+async fn download_bytes(url: &str) -> Result<Vec<u8>> {
     let response = crate::config::HTTP_CLIENT
         .get(url)
         .send()
         .await
         .map_err(|e| {
             error!("[MC Utils] Request to {} failed: {}", url, e);
-            AppError::MinecraftApi(e) // Or a more specific error type if suitable
+            AppError::MinecraftApi(e)
         })?;
 
     if !response.status().is_success() {
         error!(
-            "[MC Utils] Failed to download image from {}. Status: {}",
+            "[MC Utils] Failed to download from {}. Status: {}",
             url,
             response.status()
         );
         return Err(AppError::Other(format!(
-            "Failed to download image from URL {}: {}",
+            "Failed to download from URL {}: {}",
             url,
             response.status()
         )));
     }
-    let bytes = response.bytes().await.map_err(AppError::MinecraftApi)?;
+    Ok(response.bytes().await.map_err(AppError::MinecraftApi)?.to_vec())
+}
+
+pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
+    debug!("[MC Utils] Fetching image from URL: {}", url);
+    Ok(base64_encode_bytes(&download_bytes(url).await?))
+}
+
+pub fn normalize_uuid(uuid: &str) -> String {
+    uuid.replace('-', "").to_lowercase()
+}
+
+pub fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let suffix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = path.with_extension(format!("{}.tmp", suffix));
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e
+    })
+}
+
+fn vanilla_skin_cache_path(skin_url: &str) -> Option<PathBuf> {
+    let texture_hash = skin_url.rsplit('/').next()?;
+    if texture_hash.is_empty() {
+        return None;
+    }
+    let utf16le: Vec<u8> = texture_hash.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+    let name = calculate_sha1_from_bytes(&utf16le);
+    if name.len() < 2 {
+        return None;
+    }
+    Some(
+        LAUNCHER_DIRECTORY
+            .meta_dir()
+            .join("assets")
+            .join("skins")
+            .join(&name[0..2])
+            .join(&name),
+    )
+}
+
+pub fn local_cached_skin_base64(skin_url: &str) -> Option<String> {
+    let path = vanilla_skin_cache_path(skin_url)?;
+    let bytes = std::fs::read(&path).ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    Some(base64_encode_bytes(&bytes))
+}
+
+fn write_vanilla_skin_cache(skin_url: &str, bytes: &[u8]) {
+    if bytes.len() < 8 || &bytes[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return;
+    }
+    let path = match vanilla_skin_cache_path(skin_url) {
+        Some(p) => p,
+        None => return,
+    };
+    if path.exists() {
+        return;
+    }
+    let _ = atomic_write(&path, bytes);
+}
+
+pub async fn fetch_skin_base64(skin_url: &str) -> Result<String> {
+    if let Some(local) = local_cached_skin_base64(skin_url) {
+        debug!("[MC Utils] Vanilla skin cache hit for {}", skin_url);
+        return Ok(local);
+    }
+    let bytes = download_bytes(skin_url).await?;
+    write_vanilla_skin_cache(skin_url, &bytes);
     Ok(base64_encode_bytes(&bytes))
+}
+
+pub async fn fetch_skin_base64_for_uuid(uuid: &str) -> Result<(String, SkinModelVariant)> {
+    use crate::minecraft::api::mc_api::MinecraftApiService;
+    let lookup = normalize_uuid(uuid);
+    let profile = MinecraftApiService::new().get_user_profile(&lookup).await?;
+    let (skin_url, variant, _name) = extract_skin_info_from_profile(&profile)?;
+    let base64 = fetch_skin_base64(&skin_url).await?;
+    Ok((base64, variant))
 }
 
 /// Extracts skin URL, variant, and profile name from a MinecraftProfile.

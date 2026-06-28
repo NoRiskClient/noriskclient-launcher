@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
@@ -10,6 +10,7 @@ import { openExternalUrl } from "../../services/tauri-service";
 import { uploadLogToMclogs } from "../../services/log-service";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // Hex colors for filter buttons
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -131,6 +132,7 @@ export function LogViewerCore({
   const accentColor = useThemeStore((state) => state.accentColor);
   const { showThreadPrefix, toggleShowThreadPrefix } = useLogSettingsStore();
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [levelFilters, setLevelFilters] = useState<Record<LogLevel, boolean>>({
     ERROR: true,
     WARN: true,
@@ -148,7 +150,7 @@ export function LogViewerCore({
   const [isFileDropdownOpen, setIsFileDropdownOpen] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const isUserScrollingRef = useRef(false);
+  const programmaticScrollRef = useRef(false);
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const selectionAnchorIndexRef = useRef<number | null>(null);
@@ -164,26 +166,71 @@ export function LogViewerCore({
     return logs.map(logEntryToDisplayLine);
   }, [logs]);
 
-  // Filter logs based on search and level filters
+  // Filter logs based on search and level filters. Search uses React deferred input
+  // so large log tails do not rescan synchronously on every keystroke.
   const filteredLogs = useMemo(() => {
+    const searchLower = deferredSearchTerm.trim().toLowerCase();
     return displayLogs.filter((log) => {
       if (!levelFilters[log.level]) return false;
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          log.message.toLowerCase().includes(searchLower) ||
-          log.thread?.toLowerCase().includes(searchLower) ||
-          log.level.toLowerCase().includes(searchLower)
-        );
-      }
-      return true;
+      if (!searchLower) return true;
+
+      return (
+        log.message.toLowerCase().includes(searchLower) ||
+        log.thread?.toLowerCase().includes(searchLower) ||
+        log.level.toLowerCase().includes(searchLower)
+      );
     });
-  }, [displayLogs, levelFilters, searchTerm]);
+  }, [displayLogs, levelFilters, deferredSearchTerm]);
 
   const filteredLogsRef = useRef(filteredLogs);
   filteredLogsRef.current = filteredLogs;
   const selectionRangeRef = useRef(selectionRange);
   selectionRangeRef.current = selectionRange;
+
+  useEffect(() => {
+    if (isMouseSelectingRef.current) return;
+    if (!isAutoscrollEnabled || filteredLogs.length === 0) return;
+    programmaticScrollRef.current = true;
+    const lastIndex = filteredLogs.length - 1;
+    const jumpToBottom = () =>
+      virtuosoRef.current?.scrollToIndex({
+        index: lastIndex,
+        align: "end",
+        behavior: "auto",
+      });
+    jumpToBottom();
+    const raf = requestAnimationFrame(jumpToBottom);
+    const id = setTimeout(() => {
+      programmaticScrollRef.current = false;
+    }, 120);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(id);
+    };
+  }, [filteredLogs.length, isAutoscrollEnabled]);
+
+  const userScrollRef = useRef(false);
+  const userScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markUserScroll = useCallback(() => {
+    userScrollRef.current = true;
+    if (userScrollTimer.current) clearTimeout(userScrollTimer.current);
+    userScrollTimer.current = setTimeout(() => {
+      userScrollRef.current = false;
+    }, 400);
+  }, []);
+  useEffect(() => () => {
+    if (userScrollTimer.current) clearTimeout(userScrollTimer.current);
+  }, []);
+
+  const handleAtBottomChange = useCallback((atBottom: boolean) => {
+    if (isMouseSelectingRef.current) return;
+    if (atBottom) {
+      setIsAutoscrollEnabled(true);
+      return;
+    }
+    if (programmaticScrollRef.current) return;
+    if (userScrollRef.current) setIsAutoscrollEnabled(false);
+  }, []);
 
   // Delay showing "NO LOGS YET" by 1 second to avoid flicker
   useEffect(() => {
@@ -461,28 +508,6 @@ export function LogViewerCore({
     [selectionRange, showThreadPrefix],
   );
 
-  const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
-    if (isMouseSelectingRef.current) return;
-    if (atBottom) {
-      setIsAutoscrollEnabled(true);
-    } else if (!isUserScrollingRef.current) {
-      setIsAutoscrollEnabled(false);
-    }
-  }, []);
-
-  // Auto-scroll effect — use Virtuoso's API
-  useEffect(() => {
-    if (isMouseSelectingRef.current) return;
-    if (isAutoscrollEnabled && virtuosoRef.current && filteredLogs.length > 0) {
-      isUserScrollingRef.current = true;
-      virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, behavior: "auto" });
-      const timeout = window.setTimeout(() => {
-        isUserScrollingRef.current = false;
-      }, 50);
-      return () => window.clearTimeout(timeout);
-    }
-  }, [filteredLogs, isAutoscrollEnabled]);
-
   const toggleLevelFilter = (level: LogLevel) => {
     setLevelFilters((prev) => ({ ...prev, [level]: !prev[level] }));
   };
@@ -498,14 +523,7 @@ export function LogViewerCore({
     setIsUploading(true);
     try {
       const logText = filteredLogs
-        .map((log) => {
-          // For lines with timestamp, use full format
-          if (log.timestamp) {
-            return `[${log.timestamp}] [${log.thread || "main"}/${log.level}] ${log.message}`;
-          }
-          // For continuation lines (no timestamp), just use the message with indentation
-          return `    ${log.message}`;
-        })
+        .map((log) => formatLogLineForCopy(log, true))
         .join("\n");
 
       // Use Tauri backend command instead of direct fetch (CSP blocked in production)
@@ -519,7 +537,7 @@ export function LogViewerCore({
       // Extract error message properly from Tauri CommandError
       const errorMessage = error && typeof error === 'object' && 'message' in error
         ? (error as { message: string }).message
-        : String(error);
+        : parseErrorMessage(error);
       toast.error(errorMessage || t('logs.upload_failed'));
     } finally {
       setIsUploading(false);
@@ -528,42 +546,46 @@ export function LogViewerCore({
 
   const scrollToBottom = () => {
     if (virtuosoRef.current && filteredLogs.length > 0) {
-      isUserScrollingRef.current = true;
-      virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, behavior: "auto" });
-      window.setTimeout(() => {
-        isUserScrollingRef.current = false;
-      }, 50);
+      virtuosoRef.current.scrollToIndex({ index: filteredLogs.length - 1, align: "end", behavior: "auto" });
     }
     setIsAutoscrollEnabled(true);
   };
 
-
-
   const renderLogLine = (index: number, log: DisplayLogLine) => {
     const isSelected =
       selectionRange !== null && index >= selectionRange.start && index <= selectionRange.end;
+    const isLast = index === filteredLogs.length - 1;
 
     return (
-    <div
-      key={log.id}
-      data-log-id={log.id}
-      data-log-index={index}
-      className={`flex flex-nowrap items-start py-0.5 px-2 -mx-2 rounded ${
-        isSelected ? "bg-sky-500/25" : "hover:bg-white/5"
-      }`}
-    >
-      {log.timestamp ? (
-        <>
-          <span
-            className={`pr-2 select-none ${getLevelColorClass(log.level)}`}
-          >
-            <span className="opacity-80">[{log.timestamp}]</span>
-            {showThreadPrefix && (
-              <span className="opacity-80 ml-1">
-                [{log.thread}/{log.level}]
-              </span>
-            )}
-          </span>
+      <div
+        key={log.id}
+        data-log-id={log.id}
+        data-log-index={index}
+        className={`flex flex-nowrap items-start py-0.5 px-2 -mx-2 rounded ${isLast ? "pb-2" : ""} ${
+          isSelected ? "bg-sky-500/25" : "hover:bg-white/5"
+        }`}
+      >
+        {log.timestamp ? (
+          <>
+            <span className={`pr-2 select-none ${getLevelColorClass(log.level)}`}>
+              <span className="opacity-80">[{log.timestamp}]</span>
+              {showThreadPrefix && (
+                <span className="opacity-80 ml-1">
+                  [{log.thread}/{log.level}]
+                </span>
+              )}
+            </span>
+            <span
+              className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
+                log.level === "ERROR" || log.level === "WARN"
+                  ? getLevelColorClass(log.level)
+                  : "text-white/90"
+              }`}
+            >
+              {log.message}
+            </span>
+          </>
+        ) : (
           <span
             className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
               log.level === "ERROR" || log.level === "WARN"
@@ -573,19 +595,8 @@ export function LogViewerCore({
           >
             {log.message}
           </span>
-        </>
-      ) : (
-        <span
-          className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
-            log.level === "ERROR" || log.level === "WARN"
-              ? getLevelColorClass(log.level)
-              : "text-white/90"
-          }`}
-        >
-          {log.message}
-        </span>
-      )}
-    </div>
+        )}
+      </div>
     );
   };
 
@@ -658,7 +669,7 @@ export function LogViewerCore({
           >
             <Icon icon="solar:document-text-bold" className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">
-              {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : "Select log..."}
+              {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : t('logs.select_log_placeholder')}
             </span>
             <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3 flex-shrink-0" />
           </button>
@@ -688,7 +699,9 @@ export function LogViewerCore({
         aria-label={t("logs.viewer_region", { defaultValue: "Log output" })}
         onCopy={handleLogCopy}
         onMouseDown={() => logContainerRef.current?.focus({ preventScroll: true })}
-        className="flex-1 overflow-hidden p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+        onWheel={markUserScroll}
+        onTouchMove={markUserScroll}
+        className="flex-1 min-h-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
         {filteredLogs.length === 0 ? (
@@ -704,13 +717,12 @@ export function LogViewerCore({
         ) : (
           <Virtuoso
             ref={virtuosoRef}
-            className={`custom-scrollbar ${isPointerSelecting ? "select-none" : "select-text"}`}
-            style={{ height: "100%" }}
+            className={`custom-scrollbar overflow-x-hidden ${isPointerSelecting ? "select-none" : "select-text"}`}
+            style={{ flex: 1, minHeight: 0 }}
             data={filteredLogs}
             computeItemKey={(_index, log) => log.id}
             increaseViewportBy={{ top: 400, bottom: 400 }}
-            atBottomStateChange={handleAtBottomStateChange}
-            followOutput={() => (isAutoscrollEnabled && !isMouseSelectingRef.current ? "auto" : false)}
+            atBottomStateChange={handleAtBottomChange}
             initialTopMostItemIndex={filteredLogs.length > 0 ? filteredLogs.length - 1 : 0}
             itemContent={(index, log) => renderLogLine(index, log)}
           />
@@ -725,10 +737,12 @@ export function LogViewerCore({
         <div className="flex items-center gap-4 text-white/50 font-minecraft-ten text-xs">
           <span className="flex items-center gap-1.5">
             <Icon icon="solar:document-text-bold" className="w-4 h-4" />
-            {filteredLogs.length} LINES
+            {t('logs.lines', { count: filteredLogs.length })}
           </span>
           <button
-            onClick={() => setIsAutoscrollEnabled(!isAutoscrollEnabled)}
+            onClick={() =>
+              isAutoscrollEnabled ? setIsAutoscrollEnabled(false) : scrollToBottom()
+            }
             className="flex items-center gap-1.5 hover:text-white/70 transition-colors"
             style={{ color: isAutoscrollEnabled ? accentColor.value : undefined }}
           >
@@ -736,7 +750,7 @@ export function LogViewerCore({
               icon={isAutoscrollEnabled ? "solar:arrow-down-bold" : "solar:pause-bold"}
               className="w-4 h-4"
             />
-            {isAutoscrollEnabled ? "FOLLOWING" : "PAUSED"}
+            {isAutoscrollEnabled ? t('logs.following') : t('logs.paused')}
           </button>
           {!isAutoscrollEnabled && (
             <button
@@ -748,7 +762,7 @@ export function LogViewerCore({
               }}
             >
               <Icon icon="solar:arrow-down-bold" className="w-4 h-4" />
-              SCROLL TO BOTTOM
+              {t('logs.scroll_to_bottom')}
             </button>
           )}
         </div>
@@ -760,7 +774,7 @@ export function LogViewerCore({
               className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
             >
               <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
-              CLEAR
+              {t('logs.clear')}
             </button>
           )}
           {onOpenFolder && (
@@ -786,7 +800,7 @@ export function LogViewerCore({
             ) : (
               <Icon icon="solar:upload-bold" className="w-4 h-4" />
             )}
-            {isUploading ? "UPLOADING..." : "UPLOAD"}
+            {isUploading ? t('logs.uploading') : t('logs.upload')}
           </button>
           {filteredLogs.length > 0 && (
             <button
@@ -823,7 +837,7 @@ export function LogViewerCore({
           }}
         >
           <div className="text-xs font-minecraft-ten text-white/70 mb-3 pb-2 border-b border-white/10">
-            LOG SETTINGS
+            {t('logs.settings')}
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer group">
@@ -845,10 +859,10 @@ export function LogViewerCore({
             </div>
             <div className="flex-1">
               <div className="text-sm text-white/90 font-minecraft-ten">
-                Thread Prefix
+                {t('logs.thread_prefix')}
               </div>
               <div className="text-xs text-white/50 font-sans">
-                Show [Thread/LEVEL] prefix
+                {t('logs.thread_prefix_desc')}
               </div>
             </div>
           </label>

@@ -13,6 +13,7 @@ import type { ModPackSource } from "../../types/profile";
 import UnifiedService from "../../services/unified-service";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // HTML sanitizer for CurseForge HTML content
 const sanitizeHtml = (html: string) => {
@@ -487,7 +488,7 @@ This release focuses on stability and performance improvements.
         onClose();
 
       } catch (error) {
-        toast.error(t('modpack_versions.toast.switch_failed', { error: String(error) }));
+        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
       }
     } else if (onVersionSwitch) {
       // Fallback to old method if we don't have all required info

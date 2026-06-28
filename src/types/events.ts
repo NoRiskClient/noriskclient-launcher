@@ -34,6 +34,7 @@ export enum EventType {
   ProfileUpdate = "profile_update",
   TriggerProfileUpdate = "trigger_profile_update",
   MinecraftProcessExited = "minecraft_process_exited",
+  MinecraftSkinChanged = "minecraft_skin_changed",
   Error = "error",
   LaunchSuccessful = "launch_successful",
   CrashReportContentAvailable = "crash_report_content_available",

@@ -40,9 +40,9 @@ use commands::minecraft_command::{
     add_skin,
     add_skin_locally,
     apply_skin_from_base64,
+    get_active_skin,
     // Local skin database commands
     get_all_skins,
-    get_crafatar_avatar,
     get_fabric_loader_versions,
     get_forge_versions,
     get_minecraft_versions,
@@ -69,9 +69,9 @@ use commands::profile_command::{
     get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
-    launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
+    launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
-    resolve_loader_version, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
+    resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
@@ -381,6 +381,11 @@ async fn main() {
                     utils::log_archive::cleanup_oversized_logs().await;
                 });
 
+                // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
+                tauri::async_runtime::spawn(async {
+                    utils::mod_cache_cleanup::run_startup_cleanup().await;
+                });
+
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
@@ -509,6 +514,8 @@ async fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
+            utils::mod_cache_cleanup::clean_mod_cache_command,
             create_profile,
             get_profile,
             update_profile,
@@ -516,6 +523,8 @@ async fn main() {
             repair_profile,
             resolve_loader_version,
             list_profiles,
+            list_profile_backups,
+            restore_profile_backup,
             search_profiles,
             get_minecraft_versions,
             launch_profile,
@@ -599,6 +608,7 @@ async fn main() {
             upload_skin,
             reset_skin,
             apply_skin_from_base64,
+            get_active_skin,
             get_all_skins,
             get_skin_by_id,
             add_skin,
@@ -666,14 +676,16 @@ async fn main() {
             install_local_content_to_profile,
             switch_content_version,
             commands::minecraft_command::get_starlight_skin_render,
-            commands::minecraft_command::get_crafatar_avatar,
+            commands::minecraft_command::get_face_avatar,
             commands::nrc_commands::discord_auth_link,
             commands::nrc_commands::discord_auth_status,
             commands::nrc_commands::discord_auth_unlink,
             commands::nrc_commands::github_auth_link,
             commands::nrc_commands::github_auth_status,
             commands::nrc_commands::github_auth_unlink,
-            commands::nrc_commands::submit_crash_log_command,
+            commands::nrc_commands::check_crash_log_command,
+            commands::crash_fix_command::apply_crash_fix,
+            commands::crash_fix_command::revert_crash_fix,
             commands::nrc_commands::log_message_command,
             commands::flagsmith_commands::set_blocked_mods_config,
             commands::flagsmith_commands::get_blocked_mods_config,
@@ -687,6 +699,8 @@ async fn main() {
             commands::pack_rollout_commands::get_effective_pack_id,
             commands::pack_rollout_commands::is_pack_rollout_active,
             commands::pack_rollout_commands::is_pack_aliased,
+            commands::pack_fallback_commands::set_pack_fallback_config,
+            commands::pack_fallback_commands::get_pack_fallback_config,
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,
             commands::permission_commands::has_permission,

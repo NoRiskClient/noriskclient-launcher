@@ -27,6 +27,7 @@ import { toast } from "react-hot-toast";
 // import type { ToggleContentPayload } from "../../../../types/content"; // Not directly needed
 import { Select, type SelectOption } from "../../../ui/Select"; // Import Select and SelectOption
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 // Icons specific to NoRiskModsTabV2 (can be adjusted)
 const NORISK_MODS_TAB_ICONS_TO_PRELOAD = [
@@ -311,7 +312,7 @@ export function NoRiskModsTabV2({
     } catch (err) {
       console.error("Failed to load NoRisk packs or mods:", err);
       setError(
-        `Failed to load NoRisk data: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to load NoRisk data: ${parseErrorMessage(err)}`,
       );
       setNoriskMods([]);
       setLocalIcons({});
@@ -381,7 +382,7 @@ export function NoRiskModsTabV2({
     } catch (err) {
       console.error("Failed to refresh NoRisk packs list:", err);
       setError(
-        `Failed to refresh NoRisk packs: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to refresh NoRisk packs: ${parseErrorMessage(err)}`,
       );
     } finally {
       setIsRefreshingPacks(false);
@@ -425,7 +426,7 @@ export function NoRiskModsTabV2({
       } catch (err) {
         console.error(`Failed to toggle NoRisk mod ${mod.display_name}:`, err);
         toast.error(
-          t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: err instanceof Error ? err.message : String(err) }),
+          t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: parseErrorMessage(err) }),
         );
         setNoriskMods((prevMods) =>
           prevMods.map((m) =>
@@ -531,7 +532,7 @@ export function NoRiskModsTabV2({
           ),
         );
       } catch (err) {
-        const errorDetail = err instanceof Error ? err.message : String(err);
+        const errorDetail = parseErrorMessage(err);
         errors.push(t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: errorDetail }));
         toast.error(t('content.norisk.toast.toggle_failed', { name: mod.display_name, error: errorDetail }));
         // No individual revert here; the full list isn't reverted on partial batch failure.
@@ -564,7 +565,7 @@ export function NoRiskModsTabV2({
     } catch (err) {
       console.error("Failed to update selected NoRisk pack:", err);
       toast.error(
-        t('content.norisk.toast.switch_pack_failed', { error: err instanceof Error ? err.message : String(err) }),
+        t('content.norisk.toast.switch_pack_failed', { error: parseErrorMessage(err) }),
       );
     }
   };

@@ -85,27 +85,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to fetch friends: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Friends API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Response body: {}", &body_text[..body_text.len().min(500)]);
-
-        let api_response: ApiFriendsInformationDto = serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse friends response: {}", e))
-        })?;
+        let api_response = crate::utils::api_utils::parse_response_with_logging::<ApiFriendsInformationDto>(response, "Friends get").await?;
 
         debug!("[Friends API] Raw pending count: {}", api_response.pending.len());
         for (i, val) in api_response.pending.iter().enumerate() {
@@ -226,27 +206,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to fetch user data: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Friends API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] User response body: {}", &body_text[..body_text.len().min(500)]);
-
-        let api_response: ApiFriendsUser = serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse user response: {}", e))
-        })?;
+        let api_response = crate::utils::api_utils::parse_response_with_logging::<ApiFriendsUser>(response, "Friends get user").await?;
 
         Ok(FriendsUser::from_api(api_response, username.to_string()))
     }
@@ -273,17 +233,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to send friend request: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to send friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Friends send request").await
     }
 
     pub async fn accept_friend_request(
@@ -308,17 +258,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to accept friend request: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to accept friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Friends accept request").await
     }
 
     pub async fn deny_friend_request(
@@ -343,17 +283,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to deny friend request: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to deny friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Friends deny request").await
     }
 
     pub async fn remove_friend(
@@ -378,17 +308,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to remove friend: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to remove friend: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Friends remove").await
     }
 
     pub async fn update_status(
@@ -413,27 +333,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to update status: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to update status: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Status response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse status response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<OnlineState>(response, "Friends update status").await
     }
 
     pub async fn update_privacy_setting(
@@ -467,17 +367,7 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to update privacy setting: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to update privacy setting: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
+        crate::utils::api_utils::expect_success_with_logging(response, "Friends update privacy").await
     }
 
     pub async fn toggle_ping(
@@ -502,26 +392,6 @@ impl FriendsApi {
                 AppError::RequestError(format!("Failed to toggle ping: {}", e))
             })?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to toggle ping: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Toggle ping response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse toggle ping response: {}", e))
-        })
+        crate::utils::api_utils::parse_response_with_logging::<bool>(response, "Friends toggle ping").await
     }
 }

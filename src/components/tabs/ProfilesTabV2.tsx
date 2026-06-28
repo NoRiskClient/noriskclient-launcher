@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
@@ -9,6 +10,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { ProfileCardV2 } from "../profiles/ProfileCardV2";
 import { toast } from "react-hot-toast";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
+import { MultiVersionFilter } from "../ui/MultiVersionFilter";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { ActionButtons, type ActionButton } from "../ui/ActionButtons";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +25,12 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
+import { parseErrorMessage } from "../../utils/error-utils";
+
+// A vertical virtualizer row: a version-section divider header, or a row of up to N cards.
+type VirtualRow =
+  | { type: "cards"; profiles: Profile[] }
+  | { type: "header"; version: string };
 
 export function ProfilesTabV2() {
   const { t } = useTranslation();
@@ -35,18 +43,19 @@ export function ProfilesTabV2() {
   const navigate = useNavigate();
   const { confirm, confirmDialog } = useConfirmDialog();
   const { openModal: openWizard } = useProfileWizardStore();
-  const { isPinned } = usePinnedProfilesStore();
+  const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
   const { showModal, hideModal } = useGlobalModal();
   
   // Persistent filters from theme store
   const {
     profilesTabActiveGroup,
     profilesTabSortBy,
-    profilesTabVersionFilter,
+    profilesTabVersionFilters,
     profilesTabLayoutMode,
     setProfilesTabActiveGroup,
     setProfilesTabSortBy,
-    setProfilesTabVersionFilter,
+    setProfilesTabVersionFilters,
+    toggleProfilesTabVersionFilter,
     setProfilesTabLayoutMode,
   } = useThemeStore();
   
@@ -58,7 +67,7 @@ export function ProfilesTabV2() {
   // Use persistent values instead of local state
   const activeGroup = profilesTabActiveGroup;
   const sortBy = profilesTabSortBy;
-  const versionFilter = profilesTabVersionFilter;
+  const selectedVersions = profilesTabVersionFilters;
   const layoutMode = profilesTabLayoutMode;
 
   // Action buttons configuration
@@ -110,6 +119,33 @@ export function ProfilesTabV2() {
     if (!groupName) return false;
     const normalized = groupName.toLowerCase();
     return normalized === "nrc" || normalized === "noriskclient" || normalized === "norisk client";
+  };
+
+  // Reduce a full game version to its major bucket, e.g. "1.21.10" -> "1.21", "26.1.2" -> "26.1"
+  const toVersionMajor = (version?: string | null): string => {
+    if (!version) return "?";
+    const parts = version.split(".");
+    return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : parts[0];
+  };
+
+  // Whether a profile belongs to the currently active group tab.
+  const profileMatchesActiveGroup = (profile: Profile): boolean =>
+    activeGroup === "all" ||
+    (activeGroup === "nrc" && isNrcGroup(profile.group)) ||
+    (activeGroup === "server" && profile.group === "SERVER") ||
+    (activeGroup === "modpacks" && profile.group === "MODPACKS") ||
+    (!!profile.group && profile.group.toLowerCase() === activeGroup);
+
+  // Major version buckets present in the active group, with counts, sorted newest-first.
+  const getVersionFilterOptions = (): { value: string; count: number }[] => {
+    const counts = new Map<string, number>();
+    profiles.filter(profileMatchesActiveGroup).forEach((p) => {
+      const major = toVersionMajor(p.game_version);
+      counts.set(major, (counts.get(major) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }))
+      .map(([value, count]) => ({ value, count }));
   };
 
   // Calculate group counts based on current search/filter
@@ -201,7 +237,7 @@ export function ProfilesTabV2() {
           return t('profiles.deleteSuccess', { name: profileName });
         },
         error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
+          t('profiles.deleteError', { error: parseErrorMessage(err) }),
       });
     }
   };
@@ -213,7 +249,7 @@ export function ProfilesTabV2() {
       loading: t('profiles.openingFolder', { name: profile.name }),
       success: t('profiles.openFolderSuccess', { name: profile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         console.error(`Failed to open folder for ${profile.name}:`, err);
         return t('profiles.openFolderError', { error: message });
       },
@@ -234,6 +270,97 @@ export function ProfilesTabV2() {
     navigate(`/profilesv2/${profile.id}`);
     // Note: The ProfileDetailViewV2 will show the mods tab by default
   };
+
+  // Columns per layout mode (also used by the virtual grid).
+  const columnCount = layoutMode === "grid" ? 2 : layoutMode === "compact" ? 3 : 1;
+
+  // Filter -> sort (memoized; avoids re-running on unrelated re-renders like hover).
+  const filteredProfiles = useMemo(
+    () =>
+      profiles.filter((profile) => {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+          searchQuery === "" ||
+          profile.name.toLowerCase().includes(q) ||
+          (!!profile.group && profile.group.toLowerCase().includes(q));
+        const matchesVersion =
+          selectedVersions.length === 0 ||
+          selectedVersions.includes(toVersionMajor(profile.game_version));
+        return matchesSearch && profileMatchesActiveGroup(profile) && matchesVersion;
+      }),
+    [profiles, searchQuery, activeGroup, selectedVersions],
+  );
+
+  const sortedProfiles = useMemo(
+    () =>
+      [...filteredProfiles].sort((a, b) => {
+        const aPinned = isPinned(a.id);
+        const bPinned = isPinned(b.id);
+        if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+        switch (sortBy) {
+          case "name":
+            return a.name.localeCompare(b.name);
+          case "last_played": {
+            const at = a.last_played ? new Date(a.last_played).getTime() : 0;
+            const bt = b.last_played ? new Date(b.last_played).getTime() : 0;
+            if (bt !== at) return bt - at;
+            const ac = new Date(a.created).getTime();
+            const bc = new Date(b.created).getTime();
+            if (bc !== ac) return bc - ac;
+            return a.name.localeCompare(b.name);
+          }
+          case "date_created":
+            return new Date(b.created).getTime() - new Date(a.created).getTime();
+          case "version_newest":
+            return (
+              (b.game_version || "").localeCompare(a.game_version || "", undefined, { numeric: true }) ||
+              a.name.localeCompare(b.name)
+            );
+          case "version_oldest":
+            return (
+              (a.game_version || "").localeCompare(b.game_version || "", undefined, { numeric: true }) ||
+              a.name.localeCompare(b.name)
+            );
+          default:
+            return a.name.localeCompare(b.name);
+        }
+      }),
+    [filteredProfiles, sortBy, pinnedProfileIds],
+  );
+
+  // Build vertical virtualizer rows: one row = a divider header OR a row of up to `columnCount`
+  // cards. Plain Virtuoso measures each row, so scrolling is reliable for variable-height cards
+  // (VirtuosoGrid's grid measurement was undercounting and blocking scroll).
+  const virtualRows = useMemo<VirtualRow[]>(() => {
+    const chunk = (list: Profile[]): VirtualRow[] => {
+      const out: VirtualRow[] = [];
+      for (let i = 0; i < list.length; i += columnCount) {
+        out.push({ type: "cards", profiles: list.slice(i, i + columnCount) });
+      }
+      return out;
+    };
+
+    if (selectedVersions.length === 0) return chunk(sortedProfiles);
+
+    const sections = new Map<string, Profile[]>();
+    sortedProfiles.forEach((profile) => {
+      const major = toVersionMajor(profile.game_version);
+      if (!sections.has(major)) sections.set(major, []);
+      sections.get(major)!.push(profile);
+    });
+    const ordered = Array.from(sections.entries()).sort((a, b) =>
+      b[0].localeCompare(a[0], undefined, { numeric: true }),
+    );
+    const out: VirtualRow[] = [];
+    ordered.forEach(([version, list]) => {
+      out.push({ type: "header", version });
+      out.push(...chunk(list));
+    });
+    return out;
+  }, [sortedProfiles, selectedVersions, columnCount]);
+
+  const gridColsClass = columnCount === 3 ? "grid-cols-3" : columnCount === 2 ? "grid-cols-2" : "grid-cols-1";
 
   if (loading) {
     return <LoadingState message={t('profiles.loadingProfiles')} />;
@@ -257,80 +384,8 @@ export function ProfilesTabV2() {
     );
   }
 
-  // Filter profiles based on search query, active group, and version filter
-  const filteredProfiles = profiles.filter((profile) => {
-    // Search filter
-    const matchesSearch = searchQuery === "" || 
-      profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (profile.group && profile.group.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    // Group filter
-    const matchesGroup = activeGroup === "all" || 
-      (activeGroup === "nrc" && isNrcGroup(profile.group)) ||
-      (activeGroup === "server" && profile.group === "SERVER") ||
-      (activeGroup === "modpacks" && profile.group === "MODPACKS") ||
-      (profile.group && profile.group.toLowerCase() === activeGroup);
-    
-    // Version filter (simplified for now)
-    const matchesVersion = versionFilter === "all" || 
-      profile.game_version?.includes(versionFilter);
-    
-    return matchesSearch && matchesGroup && matchesVersion;
-  });
-
-  // Sort filtered profiles
-  const sortedProfiles = [...filteredProfiles].sort((a, b) => {
-    const aPinned = isPinned(a.id);
-    const bPinned = isPinned(b.id);
-    if (aPinned !== bPinned) return aPinned ? -1 : 1;
-
-    switch (sortBy) {
-      case "name":
-        return a.name.localeCompare(b.name);
-      case "last_played":
-        // Multi-level sorting: last_played -> date_created -> name
-        const aTimestamp = a.last_played ? new Date(a.last_played).getTime() : 0;
-        const bTimestamp = b.last_played ? new Date(b.last_played).getTime() : 0;
-
-        // Primary sort: by last_played (descending)
-        if (bTimestamp !== aTimestamp) {
-          return bTimestamp - aTimestamp;
-        }
-
-        // Secondary sort: by date_created (descending)
-        const aCreated = new Date(a.created).getTime();
-        const bCreated = new Date(b.created).getTime();
-        if (bCreated !== aCreated) {
-          return bCreated - aCreated;
-        }
-
-        // Tertiary sort: by name (ascending)
-        return a.name.localeCompare(b.name);
-      case "date_created":
-        // Convert string dates to timestamps for comparison
-        const aCreatedTimestamp = new Date(a.created).getTime();
-        const bCreatedTimestamp = new Date(b.created).getTime();
-        return bCreatedTimestamp - aCreatedTimestamp;
-      case "version_newest":
-        // Sort by Minecraft version descending (newest first), name as tiebreaker
-        return (
-          (b.game_version || "").localeCompare(a.game_version || "", undefined, { numeric: true }) ||
-          a.name.localeCompare(b.name)
-        );
-      case "version_oldest":
-        // Sort by Minecraft version ascending (oldest first), name as tiebreaker
-        return (
-          (a.game_version || "").localeCompare(b.game_version || "", undefined, { numeric: true }) ||
-          a.name.localeCompare(b.name)
-        );
-      default:
-        return a.name.localeCompare(b.name);
-    }
-  });
-
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      <div className="flex-1 overflow-y-auto no-scrollbar">
       {/* Group Tabs */}
       <GroupTabs
         groups={groups}
@@ -356,17 +411,18 @@ export function ProfilesTabV2() {
               ]}
               sortValue={sortBy}
               onSortChange={setProfilesTabSortBy}
-              filterOptions={[
-                { value: "all", label: t('profiles.filter.allVersions'), icon: "solar:layers-bold" },
-                { value: "1.21", label: "1.21.x", icon: "solar:gamepad-bold" },
-                { value: "1.20", label: "1.20.x", icon: "solar:gamepad-bold" },
-                { value: "1.19", label: "1.19.x", icon: "solar:gamepad-bold" },
-              ]}
-              filterValue={versionFilter}
-              onFilterChange={setProfilesTabVersionFilter}
               dropdownSize="sm"
+              filterSlot={
+                <MultiVersionFilter
+                  options={getVersionFilterOptions()}
+                  selected={selectedVersions}
+                  onToggle={toggleProfilesTabVersionFilter}
+                  onClear={() => setProfilesTabVersionFilters([])}
+                  size="sm"
+                />
+              }
             />
-            
+
                          {/* Layout Toggle Button - Right next to SearchWithFilters */}
                          <button
               onClick={() => {
@@ -395,28 +451,46 @@ export function ProfilesTabV2() {
         </div>
       </div>
 
-      {/* Profile list */}
-      <div className={
-        layoutMode === "list" 
-          ? "space-y-3"
-          : layoutMode === "grid"
-          ? "grid grid-cols-2 gap-3" 
-          : "grid grid-cols-3 gap-3"
-      }>
-                 {sortedProfiles.map((profile) => (
-           <ProfileCardV2
-             key={profile.id}
-             profile={profile}
-             onSettings={handleSettings}
-             onMods={handleMods}
-             onDelete={handleDeleteProfile}
-             onOpenFolder={handleOpenFolder}
-             layoutMode={layoutMode}
-           />
-         ))}
-      </div>
-
-      {/* Bottom tip */}
+      {/* Virtualized profile list. Version-divider headers appear only while a version filter is active. */}
+      <div className="flex-1 min-h-0 h-full">
+        {virtualRows.length === 0 ? (
+          <EmptyState icon="solar:widget-bold" message={t('profiles.noProfilesFound')} />
+        ) : (
+          <Virtuoso
+            data={virtualRows}
+            className="custom-scrollbar"
+            style={{ height: "100%" }}
+            itemContent={(_index, row) => {
+              if (row.type === "header") {
+                return (
+                  // Version divider header, e.g. "── 26.1 ──────────────"
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-px w-6 bg-white/10" />
+                    <span className="font-minecraft text-2xl lowercase text-white/60 whitespace-nowrap">
+                      {row.version}
+                    </span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+                );
+              }
+              return (
+                <div className={`grid ${gridColsClass} gap-3 mb-3`}>
+                  {row.profiles.map((profile) => (
+                    <ProfileCardV2
+                      key={profile.id}
+                      profile={profile}
+                      onSettings={handleSettings}
+                      onMods={handleMods}
+                      onDelete={handleDeleteProfile}
+                      onOpenFolder={handleOpenFolder}
+                      layoutMode={layoutMode}
+                    />
+                  ))}
+                </div>
+              );
+            }}
+          />
+        )}
       </div>
 
       {/* Modals from ProfilesTab.tsx */}

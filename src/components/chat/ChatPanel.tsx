@@ -7,7 +7,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 function getDateLabel(timestamp: number, t: (key: string) => string): string {
   const date = new Date(timestamp);
@@ -81,7 +81,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const avatarUrl = useCrafatarAvatar({ uuid: friend.uuid, size: 20 });
+  const avatarUrl = usePlayerAvatar({ uuid: friend.uuid, size: 20 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);

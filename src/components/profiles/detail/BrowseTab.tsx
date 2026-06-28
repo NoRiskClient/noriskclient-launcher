@@ -15,6 +15,7 @@ import { ProfileIconV2 } from "../ProfileIconV2";
 import { ActionButtons, type ActionButton } from "../../ui/ActionButtons";
 import * as ProfileService from "../../../services/profile-service";
 import type { ModrinthProjectType } from "../../../types/modrinth";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface BrowseTabProps {
   profile?: Profile;
@@ -70,7 +71,7 @@ export function BrowseTab({
         })
         .catch(err => {
           console.error(`Failed to fetch profile ${profileId}:`, err);
-          setError(`Failed to load profile: ${err instanceof Error ? err.message : String(err)}`);
+          setError(`Failed to load profile: ${parseErrorMessage(err)}`);
           setCurrentProfile(null);
         })
         .finally(() => {

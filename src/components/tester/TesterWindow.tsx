@@ -16,8 +16,9 @@ import type {
   ReviewVote,
   TesterIssue,
 } from "../../types/tester";
+import { parseErrorMessage } from "../../utils/error-utils";
 
-const WEBSITE_BASE = "https://staging.norisk.gg";
+const WEBSITE_BASE = "https://norisk.gg";
 
 function buildIssueUrl(issue: TesterIssue): string {
   const slug = issue.header.slug || issue.header.number || issue.id;
@@ -134,7 +135,7 @@ export function TesterWindow() {
         const msg =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: string }).message)
-            : String(err);
+            : parseErrorMessage(err);
         toast.error(`Vote submission failed: ${msg}`);
       } finally {
         setBusyIssueId(null);
