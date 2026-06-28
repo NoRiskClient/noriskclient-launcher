@@ -154,7 +154,6 @@ export function LogViewerCore({
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const selectionAnchorIndexRef = useRef<number | null>(null);
-  const selectionFocusIndexRef = useRef<number | null>(null);
   const isMouseSelectingRef = useRef(false);
   const isAutoscrollEnabledRef = useRef(isAutoscrollEnabled);
   isAutoscrollEnabledRef.current = isAutoscrollEnabled;
@@ -268,27 +267,10 @@ export function LogViewerCore({
   }, [isSettingsOpen, isFileDropdownOpen]);
 
   const commitSelectionIndices = useCallback((anchorIndex: number, focusIndex: number) => {
-    selectionFocusIndexRef.current = focusIndex;
     setSelectionRange({
       start: Math.min(anchorIndex, focusIndex),
       end: Math.max(anchorIndex, focusIndex),
     });
-  }, []);
-
-  const selectAllFilteredLogs = useCallback(() => {
-    const logs = filteredLogsRef.current;
-    if (logs.length === 0) {
-      selectionAnchorIndexRef.current = null;
-      selectionFocusIndexRef.current = null;
-      setSelectionRange(null);
-      return;
-    }
-
-    const lastIndex = logs.length - 1;
-    selectionAnchorIndexRef.current = 0;
-    selectionFocusIndexRef.current = lastIndex;
-    setSelectionRange({ start: 0, end: lastIndex });
-    window.getSelection()?.removeAllRanges();
   }, []);
 
   const copySelectedLogs = useCallback(() => {
@@ -307,7 +289,6 @@ export function LogViewerCore({
 
   useEffect(() => {
     selectionAnchorIndexRef.current = null;
-    selectionFocusIndexRef.current = null;
     setSelectionRange(null);
     window.getSelection()?.removeAllRanges();
   }, [searchTerm, levelFilters, selectedLogPath]);
@@ -459,15 +440,8 @@ export function LogViewerCore({
 
       if (key === "escape") {
         selectionAnchorIndexRef.current = null;
-        selectionFocusIndexRef.current = null;
         setSelectionRange(null);
         window.getSelection()?.removeAllRanges();
-        return;
-      }
-
-      if (mod && key === "a") {
-        event.preventDefault();
-        selectAllFilteredLogs();
         return;
       }
 
@@ -492,21 +466,7 @@ export function LogViewerCore({
       container.removeEventListener("pointercancel", onPointerUp);
       container.removeEventListener("keydown", onKeyDown);
     };
-  }, [commitSelectionIndices, copySelectedLogs, selectAllFilteredLogs]);
-
-  const handleLogCopy = useCallback(
-    (event: React.ClipboardEvent) => {
-      const range = selectionRange;
-      if (!range) return;
-
-      const text = buildLogCopyText(filteredLogsRef.current, range, showThreadPrefix);
-      if (!text) return;
-
-      event.preventDefault();
-      event.clipboardData.setData("text/plain", text);
-    },
-    [selectionRange, showThreadPrefix],
-  );
+  }, [commitSelectionIndices, copySelectedLogs]);
 
   const toggleLevelFilter = (level: LogLevel) => {
     setLevelFilters((prev) => ({ ...prev, [level]: !prev[level] }));
@@ -562,8 +522,9 @@ export function LogViewerCore({
         data-log-id={log.id}
         data-log-index={index}
         className={`flex flex-nowrap items-start py-0.5 px-2 -mx-2 rounded ${isLast ? "pb-2" : ""} ${
-          isSelected ? "bg-sky-500/25" : "hover:bg-white/5"
+          isSelected ? "" : "hover:bg-white/5"
         }`}
+        style={isSelected ? { backgroundColor: `${accentColor.value}33` } : undefined}
       >
         {log.timestamp ? (
           <>
@@ -697,7 +658,6 @@ export function LogViewerCore({
         tabIndex={0}
         role="region"
         aria-label={t("logs.viewer_region", { defaultValue: "Log output" })}
-        onCopy={handleLogCopy}
         onMouseDown={() => logContainerRef.current?.focus({ preventScroll: true })}
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
@@ -802,23 +762,6 @@ export function LogViewerCore({
             )}
             {isUploading ? t('logs.uploading') : t('logs.upload')}
           </button>
-          {filteredLogs.length > 0 && (
-            <button
-              onClick={selectionRange ? () => {
-                selectionAnchorIndexRef.current = null;
-                selectionFocusIndexRef.current = null;
-                setSelectionRange(null);
-                window.getSelection()?.removeAllRanges();
-              } : selectAllFilteredLogs}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
-            >
-              <Icon
-                icon={selectionRange ? "solar:close-circle-bold" : "solar:check-square-bold"}
-                className="w-4 h-4"
-              />
-              {selectionRange ? "CLEAR SELECTION" : "SELECT ALL"}
-            </button>
-          )}
         </div>
       </div>
 
