@@ -1,11 +1,11 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
+use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, TexturesData};
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
 use log::{debug, error};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{self, Value};
 use sha1::{Digest, Sha1};
 use std::fs;
@@ -218,6 +218,37 @@ impl MinecraftApiService {
 
         debug!("API call completed: get_user_profile");
         Ok(profile)
+    }
+
+    pub async fn resolve_uuid(&self, identifier: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(identifier) {
+            return Ok(uuid);
+        }
+        let profile = self.get_profile_by_name_or_uuid(identifier).await?;
+        Uuid::parse_str(&profile.id).map_err(|_| {
+            AppError::InvalidInput(format!(
+                "Could not resolve player '{}' to a valid UUID.",
+                identifier
+            ))
+        })
+    }
+
+    /// Resolve a player's current skin texture URL via their Mojang profile
+    /// (https-normalized). `None` when the player or skin can't be resolved.
+    pub async fn skin_url_by_name(&self, name: &str) -> Option<String> {
+        if name.is_empty() {
+            return None;
+        }
+        let profile = self.get_profile_by_name_or_uuid(name).await.ok()?;
+        let textures_prop = profile.properties.iter().find(|p| p.name == "textures")?;
+        let decoded = base64::decode(&textures_prop.value).ok()?;
+        let textures: TexturesData = serde_json::from_slice(&decoded).ok()?;
+        let url = textures.textures.SKIN?.url;
+        Some(if let Some(stripped) = url.strip_prefix("http:") {
+            format!("https:{}", stripped)
+        } else {
+            url
+        })
     }
 
     pub async fn get_profile_by_name_or_uuid(

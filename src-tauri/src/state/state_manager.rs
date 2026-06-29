@@ -3,6 +3,7 @@ use crate::error::{AppError, Result};
 use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManager};
 use crate::state::config_state::ConfigManager;
+use crate::state::cosmetic_pack_state::CosmeticPackManager;
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
 use crate::state::friends_state::FriendsState;
@@ -32,6 +33,7 @@ pub struct State {
     pub skin_manager: SkinManager,
     pub active_skin_manager: ActiveSkinManager,
     pub discord_manager: DiscordManager,
+    pub cosmetic_pack_manager: CosmeticPackManager,
     pub friends_state: FriendsState,
     pub io_semaphore: Arc<Semaphore>,
     pub login_server_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
@@ -57,6 +59,7 @@ impl State {
 
                 log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
+                let cosmetic_pack_manager = CosmeticPackManager::new();
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
                     profile_manager,
@@ -69,6 +72,7 @@ impl State {
                     skin_manager,
                     active_skin_manager,
                     discord_manager,
+                    cosmetic_pack_manager,
                     friends_state,
                     io_semaphore,
                     login_server_handle: Arc::new(Mutex::new(None)),
@@ -126,6 +130,23 @@ impl State {
             .on_state_ready(app.clone())
             .await?;
         log::info!("State::init - ProcessManager post-initialization complete.");
+
+        // Apply any token handbacks the in-game client dropped while we were closed, then keep
+        // watching for new ones (mirrors the Discord client-state poller).
+        crate::minecraft::auth::token_handback::consume_pending(
+            &initial_state_arc.minecraft_account_manager_v2,
+        )
+        .await;
+        {
+            let store = initial_state_arc.minecraft_account_manager_v2.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    crate::minecraft::auth::token_handback::consume_pending(&store).await;
+                }
+            });
+        }
+        log::info!("State::init - Auth handback watcher started.");
 
         initial_state_arc
             .skin_manager

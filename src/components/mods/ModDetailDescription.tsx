@@ -50,7 +50,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
         {source === ModPlatform.CurseForge ? (
           // Render HTML for CurseForge (sanitized)
           <div
-            className="prose prose-invert prose-sm max-w-none font-sans
+            className="prose prose-invert prose-sm max-w-none font-sans [overflow-wrap:anywhere]
               [&_*]:font-sans
               [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:first:mt-0 [&_h1]:normal-case [&_h1]:tracking-normal
               [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:normal-case [&_h2]:tracking-normal
@@ -58,17 +58,17 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
               [&_h4]:text-sm [&_h4]:font-bold [&_h4]:mb-2 [&_h4]:mt-3 [&_h4]:normal-case [&_h4]:tracking-normal
               [&_h5]:text-sm [&_h5]:font-bold [&_h5]:mb-2 [&_h5]:mt-3 [&_h5]:normal-case [&_h5]:tracking-normal
               [&_h6]:text-sm [&_h6]:font-bold [&_h6]:mb-2 [&_h6]:mt-3 [&_h6]:normal-case [&_h6]:tracking-normal
-              [&_p]:text-sm [&_p]:text-white/90 [&_p]:mb-3 [&_p]:leading-relaxed
+              [&_p]:text-sm [&_p]:text-white/90 [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:break-words
               [&_summary]:cursor-pointer
               [&_ul]:list-disc [&_ul]:list-inside [&_ul]:text-sm [&_ul]:text-white/90 [&_ul]:mb-3 [&_ul]:space-y-1 [&_ul]:ml-4
               [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:text-sm [&_ol]:text-white/90 [&_ol]:mb-3 [&_ol]:space-y-1 [&_ol]:ml-4
-              [&_li]:leading-relaxed
+              [&_li]:leading-relaxed [&_li]:break-words
               [&_strong]:font-bold [&_strong]:text-white
               [&_em]:italic [&_em]:text-white/80
               [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_code]:text-white/90
               [&_pre]:bg-black/30 [&_pre]:p-3 [&_pre]:rounded [&_pre]:text-xs [&_pre]:font-mono [&_pre]:text-white/90 [&_pre]:overflow-x-auto [&_pre]:mb-3
               [&_blockquote]:border-l-2 [&_blockquote]:border-accent [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-3
-              [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline
+              [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline [&_a]:break-all
               [&_img]:inline [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-1
               [&_hr]:border-white/20 [&_hr]:my-6
               [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3
@@ -78,7 +78,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
           />
         ) : (
           // Render Markdown for Modrinth (with HTML support via rehype-raw)
-          <div className="prose prose-invert prose-sm max-w-none font-sans">
+          <div className="prose prose-invert prose-sm max-w-none font-sans [overflow-wrap:anywhere]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
@@ -114,7 +114,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
                   </h6>
                 ),
                 p: ({ children }) => (
-                  <p className="text-sm text-white/90 mb-3 leading-relaxed font-sans">
+                  <p className="text-sm text-white/90 mb-3 leading-relaxed font-sans [overflow-wrap:anywhere]">
                     {children}
                   </p>
                 ),
@@ -134,7 +134,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
                   </ol>
                 ),
                 li: ({ children }) => (
-                  <li className="leading-relaxed font-sans">{children}</li>
+                  <li className="leading-relaxed font-sans [overflow-wrap:anywhere]">{children}</li>
                 ),
                 strong: ({ children }) => (
                   <strong className="font-bold text-white">{children}</strong>
@@ -171,7 +171,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
                 a: ({ href, children }) => (
                   <a
                     href={href}
-                    className="text-accent hover:text-accent/80 underline font-sans"
+                    className="text-accent hover:text-accent/80 underline font-sans break-all"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

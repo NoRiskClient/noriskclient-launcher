@@ -42,6 +42,30 @@
   </content_rating>
 
   <releases>
+    <release version="0.6.25~beta.8" date="2026-06-29">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.8</url>
+    </release>
+    <release version="0.6.25~beta.7" date="2026-06-29">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.7</url>
+    </release>
+    <release version="0.6.25~beta.6" date="2026-06-28">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.6</url>
+    </release>
+    <release version="0.6.25~beta.5" date="2026-06-25">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.5</url>
+    </release>
+    <release version="0.6.25~beta.4" date="2026-06-22">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.4</url>
+    </release>
+    <release version="0.6.25~beta.3" date="2026-06-21">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.3</url>
+    </release>
+    <release version="0.6.25~beta.2" date="2026-06-20">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.2</url>
+    </release>
+    <release version="0.6.25~beta.1" date="2026-06-12">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.1</url>
+    </release>
     <release version="0.6.24" date="2026-06-11">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.24</url>
     </release>

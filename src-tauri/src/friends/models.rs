@@ -62,25 +62,7 @@ impl Default for FriendsPrivacySettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NoRiskUserMinimal {
-    pub uuid: Uuid,
-    pub ign: String,
-    #[serde(default, rename = "lastSeen")]
-    pub last_seen: Option<String>,
-    #[serde(default, rename = "discordId")]
-    pub discord_id: Option<String>,
-    #[serde(default)]
-    pub rank: Option<String>,
-    #[serde(default, rename = "noRiskPlusExpirationDate")]
-    pub no_risk_plus_expiration_date: Option<i64>,
-    #[serde(default, rename = "nameTag")]
-    pub name_tag: Option<serde_json::Value>,
-    #[serde(default, rename = "loginStreak")]
-    pub login_streak: Option<serde_json::Value>,
-    #[serde(flatten)]
-    pub extra: std::collections::HashMap<String, serde_json::Value>,
-}
+pub use crate::minecraft::dto::norisk_user::NoRiskUserMinimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

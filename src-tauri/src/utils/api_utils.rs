@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
 use crate::error::AppError;
-use crate::utils::string_utils::safe_truncate;
+use crate::utils::security_utils::mask_sensitive_data;
 
 /// Structured error body returned by the NoRisk backend:
 /// `{"translatableKey": "...", "args": [...]}`.
@@ -30,7 +30,8 @@ pub fn api_error_from_body(status: reqwest::StatusCode, error_body: String) -> A
     }
     AppError::RequestError(format!(
         "Request failed with status {}: {}",
-        status, error_body
+        status,
+        mask_sensitive_data(&error_body)
     ))
 }
 
@@ -43,15 +44,20 @@ pub async fn api_error_from_response(response: reqwest::Response, context: &str)
         .text()
         .await
         .unwrap_or_else(|_| "Failed to read error body".to_string());
-    error!("[API Utils] {} error response: {} - {}", context, status, error_body);
+    error!(
+        "[API Utils] {} error response: {} - {}",
+        context,
+        status,
+        mask_sensitive_data(&error_body)
+    );
     api_error_from_body(status, error_body)
 }
 
 /// Read an HTTP response body as text, with status-check + logging.
 ///
 /// On non-2xx returns a structured [`AppError`] (translatable when the backend
-/// sent `{translatableKey, args}`). On success logs the body (first 1000 chars,
-/// UTF-8-safe) and returns it. This is the shared base for
+/// sent `{translatableKey, args}`). The success body is never logged — it can
+/// contain tokens and other sensitive data. This is the shared base for
 /// [`parse_response_with_logging`] (JSON) and the unit/text helpers.
 pub async fn parse_text_response_with_logging(
     response: reqwest::Response,
@@ -69,16 +75,6 @@ pub async fn parse_text_response_with_logging(
         AppError::ParseError(format!("Failed to read {} response: {}", context, e))
     })?;
 
-    debug!(
-        "[API Utils] {} response (first 1000 chars): {}",
-        context,
-        if response_text.len() > 1000 {
-            format!("{}...", safe_truncate(&response_text, 1000))
-        } else {
-            response_text.clone()
-        }
-    );
-
     Ok(response_text)
 }
 
@@ -93,11 +89,12 @@ pub async fn parse_response_with_logging<T: DeserializeOwned>(
     let response_text = parse_text_response_with_logging(response, context).await?;
 
     serde_json::from_str::<T>(&response_text).map_err(|e| {
+        let masked_body = mask_sensitive_data(&response_text);
         error!("[API Utils] Failed to parse {} response: {}", context, e);
-        error!("[API Utils] Full {} response body: {}", context, response_text);
+        error!("[API Utils] Full {} response body: {}", context, masked_body);
         AppError::ParseError(format!(
             "Failed to parse {}: {}. Response: {}",
-            context, e, response_text
+            context, e, masked_body
         ))
     })
 }

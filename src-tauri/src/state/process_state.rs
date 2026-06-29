@@ -982,6 +982,15 @@ impl ProcessManager {
                 }
             };
 
+            log::debug!(
+                "[EXIT-DBG] process={} exit_code={:?} success={} intentional_stop={} has_crash_report={}",
+                process_id,
+                exit_code,
+                success,
+                was_intentionally_stopped,
+                crash_content_for_payload.is_some()
+            );
+
             // Event an UI senden
             if let Ok(state) = &state_for_monitor_res {
                 // Re-access state for this block, or ensure it's still valid

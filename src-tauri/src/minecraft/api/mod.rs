@@ -1,4 +1,8 @@
 pub mod cape_api;
+pub mod core_api;
+pub mod cosmetic_api;
+pub mod cosmetic_icons;
+pub mod cosmetic_pack_api;
 pub mod fabric_api;
 pub mod forge_api;
 pub mod mc_api;
