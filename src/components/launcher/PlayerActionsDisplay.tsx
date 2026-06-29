@@ -10,6 +10,7 @@ import { ServerLaunchCard } from './ServerLaunchCard';
 import { useProfileStore } from '../../store/profile-store';
 import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
 import { SkinRenderer } from '@noriskclient/nrc-skin-renderer/react';
+import type { PromoOutlineConfig } from '@noriskclient/nrc-skin-renderer/postfx';
 import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useSelectedIcon } from '../../hooks/useSelectedIcon';
@@ -54,6 +55,7 @@ interface PlayerActionsDisplayProps {
   }>;
   className?: string;
   displayMode?: 'playerName' | 'logo';
+  outline?: Partial<PromoOutlineConfig>;
 }
 
 function useMinLoading(active: boolean, minMs: number): boolean {
@@ -95,6 +97,7 @@ export function PlayerActionsDisplay({
   launchButtonVersions,
   className,
   displayMode = 'playerName',
+  outline,
 }: PlayerActionsDisplayProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -209,6 +212,7 @@ export function PlayerActionsDisplay({
               variant={rigVariant}
               cosmetics={rigCosmetics}
               emote={idleEmote}
+              outline={outline}
               nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
               loading={rigLoading}
               paused={!isWindowFocused}

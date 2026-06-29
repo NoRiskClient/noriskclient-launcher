@@ -59,6 +59,9 @@ export function PlayTab() {
     profileId: profile.id,
   }));
 
+  // promo-outline shader settings for the 3D player preview
+  const outline = { strength: 4, thickness: 3, sensitivity: 0.1 };
+
   return (
     <div className="flex h-full relative">
       <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
@@ -109,6 +112,7 @@ export function PlayTab() {
             onLaunchVersionChange={handleVersionChange}
             launchButtonVersions={versions}
             className=""
+            outline={outline}
           />
         </div>
       </div>
