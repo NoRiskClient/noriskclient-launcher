@@ -1,3 +1,4 @@
+pub mod cosmetic_icon;
 pub mod cosmetic_outfit;
 pub mod fabric_meta;
 pub mod forge_install_profile;

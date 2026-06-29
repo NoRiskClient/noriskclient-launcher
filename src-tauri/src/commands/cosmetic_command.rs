@@ -1,9 +1,6 @@
 use crate::commands::request_context::account_ctx;
 use crate::error::CommandError;
 use crate::minecraft::api::cosmetic_api::CosmeticApi;
-use crate::minecraft::api::cosmetic_icons::{
-    creator_code_icon_url, icon_url_for_uuid, CREATOR_CODE_ICON_UUID,
-};
 use crate::minecraft::api::cosmetic_pack_api::{
     load_pack_index, local_object_path, resolve_pack_cosmetic as api_resolve_pack_cosmetic,
     resolve_pack_emote as api_resolve_pack_emote, CosmeticAssetUrlsDto, EmoteAssetUrlsDto,
@@ -20,7 +17,6 @@ use serde_json::Value;
 
 const PACK_ID: &str = "norisk-prod";
 const ZERO_UUID: &str = "00000000-0000-0000-0000-000000000000";
-const CREATOR_CODE_VALID_MS: u64 = 14 * 24 * 60 * 60 * 1000;
 
 #[tauri::command]
 pub async fn resolve_pack_cosmetic(
@@ -47,125 +43,6 @@ pub async fn resolve_pack_emote(
         .await
         .map_err(CommandError::from)?;
     Ok(api_resolve_pack_emote(PACK_ID, &pack, &slug))
-}
-
-#[derive(Serialize)]
-pub struct SelectedIconDto {
-    pub url: Option<String>,
-    pub plus: bool,
-}
-
-#[tauri::command]
-pub async fn get_selected_player_icon(
-    player_identifier: String,
-) -> Result<SelectedIconDto, CommandError> {
-    let ctx = account_ctx(None).await?;
-    let uuid = MinecraftApiService::new()
-        .resolve_uuid(&player_identifier)
-        .await?;
-    let cosmetic_api = CosmeticApi::new();
-
-    let current_icon = cosmetic_api
-        .get_player_icon(&ctx.token, &uuid, ctx.is_experimental)
-        .await
-        .ok()
-        .and_then(|v| {
-            v.get("currentIcon")
-                .and_then(|c| c.as_str())
-                .map(|s| s.to_string())
-        });
-
-    let plus = cosmetic_api.get_plus_status(&uuid).await.unwrap_or(false);
-
-    let mut url = current_icon.as_deref().and_then(|i| icon_url_for_uuid(Some(i)));
-
-    if current_icon.as_deref() == Some(CREATOR_CODE_ICON_UUID) {
-        if let Some(code) =
-            active_creator_code_value(&cosmetic_api, &ctx.token, ctx.is_experimental)
-                .await
-                .and_then(|v| v.get("code").and_then(|c| c.as_str()).map(|s| s.to_string()))
-        {
-            if creator_code_icon_unlocked(&cosmetic_api, &code).await {
-                url = Some(creator_code_icon_url(&code));
-            }
-        }
-    }
-
-    Ok(SelectedIconDto { url, plus })
-}
-
-async fn active_creator_code_value(
-    cosmetic_api: &CosmeticApi,
-    token: &str,
-    is_experimental: bool,
-) -> Option<Value> {
-    let shop_user = cosmetic_api.get_shop_user(token, is_experimental).await.ok()?;
-    shop_user.get("supportACreatorCode").cloned()
-}
-
-async fn creator_code_icon_unlocked(cosmetic_api: &CosmeticApi, code: &str) -> bool {
-    cosmetic_api
-        .get_creator_code_rewards(code)
-        .await
-        .ok()
-        .and_then(|v| {
-            v.get("rewards")
-                .and_then(|r| r.get("creatorCodeIcon"))
-                .and_then(|i| i.get("isUnlocked"))
-                .and_then(|u| u.as_bool())
-        })
-        .unwrap_or(false)
-}
-
-#[derive(Serialize)]
-pub struct ActiveCreatorCodeDto {
-    pub code: String,
-    #[serde(rename = "isValid")]
-    pub is_valid: bool,
-    #[serde(rename = "hasValidIcon")]
-    pub has_valid_icon: bool,
-    #[serde(rename = "iconUrl")]
-    pub icon_url: Option<String>,
-}
-
-#[tauri::command]
-pub async fn get_active_creator_code() -> Result<Option<ActiveCreatorCodeDto>, CommandError> {
-    let ctx = account_ctx(None).await?;
-    let cosmetic_api = CosmeticApi::new();
-    let info = match active_creator_code_value(&cosmetic_api, &ctx.token, ctx.is_experimental).await
-    {
-        Some(v) => v,
-        None => return Ok(None),
-    };
-    let code = match info.get("code").and_then(|c| c.as_str()) {
-        Some(c) if !c.is_empty() => c.to_string(),
-        _ => return Ok(None),
-    };
-
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-    let is_valid = info
-        .get("addTimestamp")
-        .and_then(|t| t.as_u64())
-        .map(|ts| now_ms.saturating_sub(ts) < CREATOR_CODE_VALID_MS)
-        .unwrap_or(false);
-    let has_valid_icon = info
-        .get("hasValidIcon")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    Ok(Some(ActiveCreatorCodeDto {
-        icon_url: if has_valid_icon {
-            Some(creator_code_icon_url(&code))
-        } else {
-            None
-        },
-        code,
-        is_valid,
-        has_valid_icon,
-    }))
 }
 
 #[derive(Serialize)]
