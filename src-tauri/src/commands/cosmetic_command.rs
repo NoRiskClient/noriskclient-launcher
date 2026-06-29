@@ -9,6 +9,9 @@ use crate::minecraft::api::cosmetic_pack_api::{
     CosmeticAssetUrlsDto, EmoteAssetUrlsDto, ResolvedCosmeticDto,
 };
 use crate::minecraft::api::mc_api::MinecraftApiService;
+use crate::minecraft::dto::cosmetic_outfit::{
+    CosmeticRealOutfit, CosmeticSettings, CustomTextureSource,
+};
 use crate::minecraft::dto::minecraft_profile::TexturesData;
 use crate::state::state_manager::State;
 use serde::Serialize;
@@ -21,7 +24,7 @@ const CREATOR_CODE_VALID_MS: u64 = 14 * 24 * 60 * 60 * 1000;
 #[tauri::command]
 pub async fn resolve_pack_cosmetic(
     cosmetic_id: String,
-    settings: Option<Value>,
+    settings: Option<CosmeticSettings>,
 ) -> Result<Option<ResolvedCosmeticDto>, CommandError> {
     let state = State::get().await?;
     let pack = state
@@ -180,43 +183,14 @@ pub async fn get_equipped_cosmetics(
         .resolve_uuid(&player_identifier)
         .await?;
 
-    let real = CosmeticApi::new()
+    let real_value = CosmeticApi::new()
         .get_player_outfit(&ctx.token, &uuid, ctx.is_experimental)
         .await
         .map_err(CommandError::from)?;
+    let real: CosmeticRealOutfit = serde_json::from_value(real_value).unwrap_or_default();
 
-    let outfit = match real.get("outfit") {
-        Some(o) if o.is_object() => o,
-        _ => {
-            return Ok(EquippedCosmeticsDto {
-                cosmetics: vec![],
-                custom_cape_hash: None,
-            })
-        }
-    };
-    let settings_by_id = match outfit.get("cosmeticSettings").and_then(|s| s.as_object()) {
-        Some(m) => m,
-        None => {
-            return Ok(EquippedCosmeticsDto {
-                cosmetics: vec![],
-                custom_cape_hash: None,
-            })
-        }
-    };
-    let custom_cape_hash = outfit
-        .get("customCapeHash")
-        .and_then(|h| h.as_str())
-        .map(|s| s.to_string());
-
-    let owned: Vec<String> = real
-        .get("ownedCosmetics")
-        .and_then(|o| o.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
+    let settings_by_id = &real.outfit.cosmetic_settings;
+    let custom_cape_hash = real.outfit.custom_cape_hash.clone();
 
     let all_equipped: Vec<String> = settings_by_id
         .keys()
@@ -225,7 +199,7 @@ pub async fn get_equipped_cosmetics(
         .collect();
     let owned_equipped: Vec<String> = all_equipped
         .iter()
-        .filter(|id| owned.contains(id))
+        .filter(|id| real.owned_cosmetics.contains(id))
         .cloned()
         .collect();
     let cosmetic_ids = if !owned_equipped.is_empty() {
@@ -263,36 +237,32 @@ pub async fn get_equipped_cosmetics(
     })
 }
 
-async fn apply_custom_texture(urls: &mut CosmeticAssetUrlsDto, settings: Option<&Value>) {
+async fn apply_custom_texture(urls: &mut CosmeticAssetUrlsDto, settings: Option<&CosmeticSettings>) {
     if let Some(url) = resolve_custom_skin_url(settings).await {
         urls.texture = url;
     }
 }
 
-async fn resolve_custom_skin_url(settings: Option<&Value>) -> Option<String> {
-    let ct = settings?.get("customTexture")?;
-    if ct.is_null() {
-        return None;
-    }
-    match ct.get("type").and_then(|t| t.as_str()) {
-        Some("playerName") => {
-            let name = ct.get("name").and_then(|n| n.as_str())?;
-            skin_url_for_player_name(name).await
-        }
-        Some("url") => ct
-            .get("url")
-            .and_then(|u| u.as_str())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string()),
-        Some("base64") => {
-            let data = ct.get("data").and_then(|d| d.as_str()).filter(|s| !s.is_empty())?;
-            Some(if data.starts_with("data:") {
-                data.to_string()
+async fn resolve_custom_skin_url(settings: Option<&CosmeticSettings>) -> Option<String> {
+    match settings?.custom_texture.as_ref()? {
+        CustomTextureSource::PlayerName { name } => skin_url_for_player_name(name).await,
+        CustomTextureSource::Url { url } => {
+            if url.is_empty() {
+                None
             } else {
-                format!("data:image/png;base64,{}", data)
-            })
+                Some(url.clone())
+            }
         }
-        _ => None,
+        CustomTextureSource::Base64 { data } => {
+            if data.is_empty() {
+                None
+            } else if data.starts_with("data:") {
+                Some(data.clone())
+            } else {
+                Some(format!("data:image/png;base64,{}", data))
+            }
+        }
+        CustomTextureSource::FileHash { .. } => None,
     }
 }
 

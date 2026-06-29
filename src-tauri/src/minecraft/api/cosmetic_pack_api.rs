@@ -1,5 +1,6 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+use crate::minecraft::dto::cosmetic_outfit::CosmeticSettings;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -88,21 +89,17 @@ pub struct EmoteAssetUrlsDto {
     pub mcmeta: Option<String>,
 }
 
-fn merge_settings(mut meta: Value, settings: Option<&Value>) -> Value {
+fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> Value {
     let mut ds = meta
         .get("defaultSettings")
         .cloned()
         .unwrap_or_else(|| json!({}));
     if let Some(s) = settings {
-        if let Some(scale) = s.get("scale") {
-            if !scale.is_null() {
-                ds["scale"] = scale.clone();
-            }
+        if let Some(scale) = s.scale {
+            ds["scale"] = json!(scale);
         }
-        if let Some(offset) = s.get("offset") {
-            if !offset.is_null() {
-                ds["offset"] = offset.clone();
-            }
+        if let Some(off) = &s.offset {
+            ds["offset"] = json!({ "x": off.x, "y": off.y, "z": off.z });
         }
     }
     if let Some(obj) = meta.as_object_mut() {
@@ -135,7 +132,7 @@ fn particle_entries_for(dir: &str, paths: &HashSet<String>) -> Vec<ParticleAsset
 pub async fn resolve_pack_cosmetic(
     pack: &ParsedPack,
     cosmetic_id: &str,
-    settings: Option<&Value>,
+    settings: Option<&CosmeticSettings>,
 ) -> Option<ResolvedCosmeticDto> {
     let meta_path = pack.by_uuid.get(cosmetic_id)?;
 
