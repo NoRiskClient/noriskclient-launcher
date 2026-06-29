@@ -52,6 +52,11 @@ impl NrcRequest {
         self
     }
 
+    pub fn json_body<T: Serialize + ?Sized>(mut self, body: &T) -> Self {
+        self.builder = self.builder.json(body);
+        self
+    }
+
     pub fn body(mut self, body: impl Into<reqwest::Body>) -> Self {
         self.builder = self.builder.body(body);
         self
