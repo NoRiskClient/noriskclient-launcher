@@ -467,7 +467,6 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     };
 
   const checkForUpdates = async () => {
-    if (import.meta.env.DEV) return;
     try {
       const updateInfo = await checkUpdateAvailable();
       if (updateInfo) {
