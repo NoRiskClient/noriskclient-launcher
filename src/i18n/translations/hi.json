@@ -43,6 +43,7 @@
   "settings.background.title": "पृष्ठभूमि प्रभाव",
   "settings.background.description": "लॉन्चर के लिए एक पृष्ठभूमि प्रभाव चुनें",
   "settings.background.animations": "एनिमेशन",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "निम्न",
   "settings.background.quality_high": "उच्च",
   "settings.background.matrix_rain": "Matrix Rain",

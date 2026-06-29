@@ -43,6 +43,7 @@
   "settings.background.title": "Effet d'Arrière-plan",
   "settings.background.description": "Choisissez un effet d'arrière-plan pour le launcher",
   "settings.background.animations": "Animations",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "Basse",
   "settings.background.quality_high": "Haute",
   "settings.background.matrix_rain": "Pluie Matrix",

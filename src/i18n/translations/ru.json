@@ -43,6 +43,7 @@
   "settings.background.title": "Эффект фона",
   "settings.background.description": "Выберите эффект фона для лаунчера",
   "settings.background.animations": "Анимации",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "Низкое",
   "settings.background.quality_high": "Высокое",
   "settings.background.matrix_rain": "Матричный дождь",

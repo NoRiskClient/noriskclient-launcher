@@ -81,7 +81,7 @@ export function PlayTab() {
 
         {/* 3D Render Toggle - Top Right */}
         <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
-          <span className="text-sm text-white/70 font-minecraft-ten">3D</span>
+          <span className="text-sm text-white/70 font-minecraft-ten">SKIN ANIMATION</span>
           <ToggleSwitch
             checked={cosmeticRenderer3d}
             onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}

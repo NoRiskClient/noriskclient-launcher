@@ -50,6 +50,7 @@
   "settings.background.title": "Hintergrundeffekt",
   "settings.background.description": "Wähle einen Hintergrundeffekt für den Launcher",
   "settings.background.animations": "Animationen",
+  "settings.background.skin_animation": "Skin-Animation",
   "settings.background.quality_low": "Niedrig",
   "settings.background.quality_high": "Hoch",
 
