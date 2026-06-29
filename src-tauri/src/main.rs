@@ -110,13 +110,12 @@ use commands::path_commands::{get_launcher_directory, resolve_image_path};
 use commands::cape_command::{
     browse_capes, check_is_moderator, delete_cape, download_template_and_open_explorer, equip_cape,
     get_player_capes, unequip_cape, upload_cape, add_favorite_cape, remove_favorite_cape,
-    get_capes_by_hashes, get_owned_capes_list, get_player_outfit,
-    get_local_cosmetics, get_player_icon,
+    get_capes_by_hashes, get_owned_capes_list,
 };
 
 use commands::cosmetic_command::{
-    get_active_creator_code, get_equipped_cosmetics, get_selected_player_icon,
-    resolve_pack_cosmetic, resolve_pack_emote,
+    get_active_creator_code, get_equipped_cosmetics, get_local_cosmetics, get_player_icon,
+    get_player_outfit, get_selected_player_icon, resolve_pack_cosmetic, resolve_pack_emote,
 };
 
 // Import vanilla cape commands
