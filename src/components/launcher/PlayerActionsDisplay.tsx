@@ -211,7 +211,9 @@ export function PlayerActionsDisplay({
               textureUrl={rigTextureUrl}
               variant={rigVariant}
               cosmetics={rigCosmetics}
-              emote={idleEmote}
+              emote={idleEmote.urls}
+              emoteLoop={idleEmote.loop}
+              onEmoteEnd={idleEmote.onEnd}
               outline={outline}
               nametag={playerName ? { text: playerName, iconUrl: selectedIcon.url, iconPlus: selectedIcon.plus } : null}
               loading={rigLoading}

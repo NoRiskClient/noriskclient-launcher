@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { EmoteAssetUrls } from "@noriskclient/nrc-skin-renderer/core";
@@ -77,35 +77,70 @@ async function pickRandomLocalEmote(): Promise<EmoteAssetUrls | null> {
   }
 }
 
-async function decideEmote(): Promise<EmoteAssetUrls> {
-  const kind = rollKind();
-  if (kind === "randomLocal") {
-    const local = await pickRandomLocalEmote();
-    if (local) return local;
-  }
-  if (kind === "special") return { animation: SPECIAL_IDLE };
-  return { animation: pickCalm() };
+export interface IdleEmote {
+  urls: EmoteAssetUrls | null;
+  // false = play once, then `onEnd` should swap to a calm idle.
+  loop: boolean;
+  onEnd: () => void;
 }
 
-let sessionEmote: EmoteAssetUrls | null = null;
-let sessionPromise: Promise<EmoteAssetUrls> | null = null;
+interface EmotePlan {
+  // First emote of the session; `rest` (a calm idle, looping) takes over after
+  // the one-shot finishes. rest === null means `first` already loops.
+  first: EmoteAssetUrls;
+  rest: EmoteAssetUrls | null;
+}
 
-export function useIdleEmote(): EmoteAssetUrls | null {
-  const [emote, setEmote] = useState<EmoteAssetUrls | null>(sessionEmote);
+const calmPlan = (): EmotePlan => ({ first: { animation: pickCalm() }, rest: null });
+
+async function buildPlan(): Promise<EmotePlan> {
+  const kind = rollKind();
+  let first: EmoteAssetUrls | null = null;
+  if (kind === "randomLocal") first = await pickRandomLocalEmote();
+  else if (kind === "special") first = { animation: SPECIAL_IDLE };
+
+  if (!first) return calmPlan();
+  return { first, rest: { animation: pickCalm() } };
+}
+
+let planPromise: Promise<EmotePlan> | null = null;
+// Set once the one-shot has played out; later mounts skip straight to calm.
+let restingEmote: EmoteAssetUrls | null = null;
+
+export function useIdleEmote(): IdleEmote {
+  const [emote, setEmote] = useState<{ urls: EmoteAssetUrls | null; loop: boolean }>(
+    restingEmote ? { urls: restingEmote, loop: true } : { urls: null, loop: true },
+  );
+  const restRef = useRef<EmoteAssetUrls | null>(null);
+
   useEffect(() => {
-    if (sessionEmote) {
-      setEmote(sessionEmote);
+    if (restingEmote) {
+      setEmote({ urls: restingEmote, loop: true });
       return;
     }
     let alive = true;
-    if (!sessionPromise) sessionPromise = decideEmote();
-    sessionPromise.then((e) => {
-      sessionEmote = e;
-      if (alive) setEmote(e);
+    if (!planPromise) planPromise = buildPlan();
+    planPromise.then((plan) => {
+      if (!alive) return;
+      if (!plan.rest) {
+        restingEmote = plan.first;
+        setEmote({ urls: plan.first, loop: true });
+      } else {
+        restRef.current = plan.rest;
+        setEmote({ urls: plan.first, loop: false });
+      }
     });
     return () => {
       alive = false;
     };
   }, []);
-  return emote;
+
+  const onEnd = useCallback(() => {
+    const rest = restRef.current;
+    if (!rest) return;
+    restingEmote = rest;
+    setEmote({ urls: rest, loop: true });
+  }, []);
+
+  return { urls: emote.urls, loop: emote.loop, onEnd };
 }
