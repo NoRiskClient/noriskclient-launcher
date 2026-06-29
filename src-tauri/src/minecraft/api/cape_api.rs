@@ -1,6 +1,6 @@
 use crate::{
-    config::HTTP_CLIENT,
     error::{AppError, Result},
+    utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put},
 };
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
@@ -171,22 +171,11 @@ impl CapeApi {
             query_params
         );
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .json::<CapesBrowseResponse>("Cape browse")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send request to Cape API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<CapesBrowseResponse>(
-            response,
-            "Cape browse",
-        )
-        .await
     }
 
     /// Get capes for a specific player
@@ -225,25 +214,11 @@ impl CapeApi {
             query_params
         );
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(&url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .json::<Vec<CosmeticCape>>("Cape get player")
             .await
-            .map_err(|e| {
-                error!("[Cape API get_player_capes] Request failed: {}", e);
-                AppError::RequestError(format!(
-                    "Failed to send request to Cape API for get_player_capes: {}",
-                    e
-                ))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<CosmeticCape>>(
-            response,
-            "Cape get player",
-        )
-        .await
     }
 
     /// Get owned capes grouped by review state
@@ -269,22 +244,11 @@ impl CapeApi {
             query_params.insert("limit", l.to_string());
         }
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .json::<HashMap<String, Vec<CosmeticCape>>>("Cape owned list")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send get owned capes list request: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<HashMap<String, Vec<CosmeticCape>>>(
-            response,
-            "Cape owned list",
-        )
-        .await
     }
 
     /// Equip a specific cape for a player
@@ -319,18 +283,11 @@ impl CapeApi {
             query_params
         );
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .expect_success("Cape equip")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send equip cape request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Cape equip").await
     }
 
     /// Check if the current user is a moderator (team member)
@@ -347,15 +304,7 @@ impl CapeApi {
 
         debug!("[Cape API] Checking moderator status");
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Cape API] Moderator check request failed: {}", e);
-                AppError::RequestError(format!("Failed to check moderator status: {}", e))
-            })?;
+        let response = nrc_get(&url).bearer(norisk_token).send("Moderator check").await?;
 
         let status = response.status();
         debug!("[Cape API] Moderator check response status: {}", status);
@@ -404,18 +353,11 @@ impl CapeApi {
             query_params
         );
 
-        let response = HTTP_CLIENT
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_delete(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .expect_success("Cape delete")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send delete cape request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Cape delete").await
     }
 
     /// Upload a new cape image for a player
@@ -463,21 +405,12 @@ impl CapeApi {
             query_params
         );
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        let cape_hash = nrc_post(url)
+            .bearer(norisk_token)
             .query(&query_params)
             .body(image_data)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send upload cape request: {}", e))
-            })?;
-
-        let cape_hash =
-            crate::utils::api_utils::parse_text_response_with_logging(response, "Cape upload")
-                .await?;
+            .text("Cape upload")
+            .await?;
         Ok(CapeUploadResponse { cape_hash })
     }
 
@@ -500,25 +433,11 @@ impl CapeApi {
         );
         debug!("[Cape API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&[("hash", joined)])
-            .send()
+            .json::<Vec<CosmeticCape>>("Cape get by hashes")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!(
-                    "Failed to send get capes by hashes request: {}",
-                    e
-                ))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<CosmeticCape>>(
-            response,
-            "Cape get by hashes",
-        )
-        .await
     }
 
     /// Add a cape to user's favorites
@@ -545,24 +464,10 @@ impl CapeApi {
         );
         debug!("[Cape API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .put(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_put(url)
+            .bearer(norisk_token)
+            .json::<Vec<String>>("Cape add favorite")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!(
-                    "Failed to send add favorite cape request: {}",
-                    e
-                ))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(
-            response,
-            "Cape add favorite",
-        )
-        .await
     }
 
     /// Remove a cape from user's favorites
@@ -589,24 +494,10 @@ impl CapeApi {
         );
         debug!("[Cape API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(url)
+            .bearer(norisk_token)
+            .json::<Vec<String>>("Cape remove favorite")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!(
-                    "Failed to send remove favorite cape request: {}",
-                    e
-                ))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(
-            response,
-            "Cape remove favorite",
-        )
-        .await
     }
 
     /// Unequip the currently equipped cape for a player
@@ -640,17 +531,10 @@ impl CapeApi {
         );
 
         // Note: Using DELETE method as per the original code for the unequip endpoint
-        let response = HTTP_CLIENT
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_delete(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .expect_success("Cape unequip")
             .await
-            .map_err(|e| {
-                error!("[Cape API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send unequip cape request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Cape unequip").await
     }
 }

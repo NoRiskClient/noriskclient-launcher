@@ -1,7 +1,3 @@
-// Complete request-helper surface; methods land in call sites incrementally
-// across migration batches.
-#![allow(dead_code)]
-
 use log::error;
 use reqwest::{IntoUrl, RequestBuilder};
 use serde::{de::DeserializeOwned, Serialize};
@@ -51,30 +47,8 @@ impl NrcRequest {
         self
     }
 
-    pub fn bearer_opt(self, token: Option<&str>) -> Self {
-        match token {
-            Some(t) => self.bearer(t),
-            None => self,
-        }
-    }
-
-    pub fn header(mut self, key: &str, value: impl AsRef<str>) -> Self {
-        self.builder = self.builder.header(key, value.as_ref());
-        self
-    }
-
     pub fn query<T: Serialize + ?Sized>(mut self, q: &T) -> Self {
         self.builder = self.builder.query(q);
-        self
-    }
-
-    pub fn json_body<T: Serialize + ?Sized>(mut self, body: &T) -> Self {
-        self.builder = self.builder.json(body);
-        self
-    }
-
-    pub fn form<T: Serialize + ?Sized>(mut self, form: &T) -> Self {
-        self.builder = self.builder.form(form);
         self
     }
 
