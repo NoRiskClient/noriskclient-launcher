@@ -1,8 +1,5 @@
-use crate::{
-    config::HTTP_CLIENT,
-    error::{AppError, Result},
-};
-use log::{debug, error};
+use crate::{error::Result, utils::http_client::nrc_get};
+use log::debug;
 use uuid::Uuid;
 
 pub struct CosmeticApi;
@@ -29,21 +26,10 @@ impl CosmeticApi {
         let url = format!("{}/user/{}/outfit", Self::get_api_base(is_experimental), player_uuid);
         debug!("[Cosmetic API get_player_outfit] URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<serde_json::Value>("Player outfit")
             .await
-            .map_err(|e| {
-                error!("[Cosmetic API get_player_outfit] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send get_player_outfit request: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<serde_json::Value>(
-            response,
-            "Player outfit",
-        )
-        .await
     }
 }
 

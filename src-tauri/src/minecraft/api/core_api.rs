@@ -1,9 +1,7 @@
 use crate::{
-    config::HTTP_CLIENT,
-    error::{AppError, Result},
-    minecraft::dto::norisk_user::NoRiskUserMinimal,
+    error::Result, minecraft::dto::norisk_user::NoRiskUserMinimal,
+    utils::http_client::nrc_get,
 };
-use log::error;
 use uuid::Uuid;
 
 pub struct CoreApi;
@@ -30,22 +28,11 @@ impl CoreApi {
     ) -> Result<NoRiskUserMinimal> {
         let url = format!("{}/user/info/{}", Self::get_api_base(is_experimental), target_uuid);
 
-        let response = HTTP_CLIENT
-            .get(&url)
+        nrc_get(&url)
             .query(&[("uuid", requester_uuid.to_string())])
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+            .bearer(norisk_token)
+            .json::<NoRiskUserMinimal>("Minimal user info")
             .await
-            .map_err(|e| {
-                error!("[Core API get_minimal_user_info] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send get_minimal_user_info request: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<NoRiskUserMinimal>(
-            response,
-            "Minimal user info",
-        )
-        .await
     }
 }
 
