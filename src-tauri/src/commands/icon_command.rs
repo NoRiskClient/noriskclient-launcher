@@ -1,16 +1,26 @@
 use crate::commands::request_context::account_ctx;
-use crate::error::CommandError;
-use crate::minecraft::api::cosmetic_api::CosmeticApi;
+use crate::error::{AppError, CommandError};
+use crate::minecraft::api::core_api::CoreApi;
 use crate::minecraft::api::cosmetic_icons::{
     creator_code_icon_url, icon_url_for_uuid, CREATOR_CODE_ICON_UUID,
 };
 use crate::minecraft::api::mc_api::MinecraftApiService;
-use crate::minecraft::dto::cosmetic_icon::{
-    CreatorCodeRewards, CustomIconInfo, SupportACreatorCode,
-};
+use crate::minecraft::dto::norisk_user::NoRiskUserMinimal;
 use serde::Serialize;
+use uuid::Uuid;
 
 const CREATOR_CODE_VALID_MS: u64 = 14 * 24 * 60 * 60 * 1000;
+
+async fn minimal_user(target: &Uuid) -> Result<NoRiskUserMinimal, CommandError> {
+    let ctx = account_ctx(None).await?;
+    let requester = ctx
+        .account_uuid
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+    CoreApi::new()
+        .get_minimal_user_info(&ctx.token, target, &requester, ctx.is_experimental)
+        .await
+        .map_err(CommandError::from)
+}
 
 #[derive(Serialize)]
 pub struct SelectedIconDto {
@@ -22,54 +32,31 @@ pub struct SelectedIconDto {
 pub async fn get_selected_player_icon(
     player_identifier: String,
 ) -> Result<SelectedIconDto, CommandError> {
-    let ctx = account_ctx(None).await?;
-    let uuid = MinecraftApiService::new()
+    let target = MinecraftApiService::new()
         .resolve_uuid(&player_identifier)
         .await?;
-    let api = CosmeticApi::new();
+    let user = match minimal_user(&target).await {
+        Ok(u) => u,
+        Err(_) => return Ok(SelectedIconDto { url: None, plus: false }),
+    };
 
-    let current_icon = api
-        .get_player_icon(&ctx.token, &uuid, ctx.is_experimental)
-        .await
-        .ok()
-        .and_then(|v| serde_json::from_value::<CustomIconInfo>(v).ok())
-        .and_then(|i| i.current_icon);
+    let current_icon = user.custom_icon_info.current_icon.as_deref();
+    let mut url = current_icon.and_then(|i| icon_url_for_uuid(Some(i)));
 
-    let plus = api.get_plus_status(&uuid).await.unwrap_or(false);
-
-    let mut url = current_icon.as_deref().and_then(|i| icon_url_for_uuid(Some(i)));
-
-    if current_icon.as_deref() == Some(CREATOR_CODE_ICON_UUID) {
-        if let Some(code) = active_creator_code(&api, &ctx.token, ctx.is_experimental)
-            .await
-            .and_then(|c| c.code)
-        {
-            if creator_code_icon_unlocked(&api, &code).await {
-                url = Some(creator_code_icon_url(&code));
+    if current_icon == Some(CREATOR_CODE_ICON_UUID) {
+        if let Some(scc) = user.support_a_creator_code.as_ref() {
+            if scc.has_valid_icon {
+                if let Some(code) = scc.code.as_deref() {
+                    url = Some(creator_code_icon_url(code));
+                }
             }
         }
     }
 
-    Ok(SelectedIconDto { url, plus })
-}
-
-async fn active_creator_code(
-    api: &CosmeticApi,
-    token: &str,
-    is_experimental: bool,
-) -> Option<SupportACreatorCode> {
-    let shop_user = api.get_shop_user(token, is_experimental).await.ok()?;
-    let value = shop_user.get("supportACreatorCode")?.clone();
-    serde_json::from_value(value).ok()
-}
-
-async fn creator_code_icon_unlocked(api: &CosmeticApi, code: &str) -> bool {
-    api.get_creator_code_rewards(code)
-        .await
-        .ok()
-        .and_then(|v| serde_json::from_value::<CreatorCodeRewards>(v).ok())
-        .map(|r| r.rewards.creator_code_icon.is_unlocked)
-        .unwrap_or(false)
+    Ok(SelectedIconDto {
+        url,
+        plus: user.is_norisk_plus(),
+    })
 }
 
 #[derive(Serialize)]
@@ -86,12 +73,22 @@ pub struct ActiveCreatorCodeDto {
 #[tauri::command]
 pub async fn get_active_creator_code() -> Result<Option<ActiveCreatorCodeDto>, CommandError> {
     let ctx = account_ctx(None).await?;
-    let info = match active_creator_code(&CosmeticApi::new(), &ctx.token, ctx.is_experimental).await
+    let requester = ctx
+        .account_uuid
+        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
+    let user = match CoreApi::new()
+        .get_minimal_user_info(&ctx.token, &requester, &requester, ctx.is_experimental)
+        .await
     {
-        Some(c) => c,
+        Ok(u) => u,
+        Err(_) => return Ok(None),
+    };
+
+    let scc = match user.support_a_creator_code {
+        Some(s) => s,
         None => return Ok(None),
     };
-    let code = match info.code {
+    let code = match scc.code {
         Some(c) if !c.is_empty() => c,
         _ => return Ok(None),
     };
@@ -100,11 +97,11 @@ pub async fn get_active_creator_code() -> Result<Option<ActiveCreatorCodeDto>, C
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    let is_valid = info
+    let is_valid = scc
         .add_timestamp
         .map(|ts| now_ms.saturating_sub(ts) < CREATOR_CODE_VALID_MS)
         .unwrap_or(false);
-    let has_valid_icon = info.has_valid_icon;
+    let has_valid_icon = scc.has_valid_icon;
 
     Ok(Some(ActiveCreatorCodeDto {
         icon_url: if has_valid_icon {
