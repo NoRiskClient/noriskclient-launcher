@@ -45,32 +45,6 @@ impl CosmeticApi {
         )
         .await
     }
-
-    pub async fn get_player_icon(
-        &self,
-        norisk_token: &str,
-        player_uuid: &Uuid,
-        is_experimental: bool,
-    ) -> Result<serde_json::Value> {
-        let url = format!("{}/icon/{}", Self::get_api_base(is_experimental), player_uuid);
-
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Cosmetic API get_player_icon] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send get_player_icon request: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<serde_json::Value>(
-            response,
-            "Player icon",
-        )
-        .await
-    }
-
 }
 
 impl Default for CosmeticApi {

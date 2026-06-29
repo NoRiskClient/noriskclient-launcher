@@ -5,7 +5,7 @@ use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
 use log::{debug, error};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{self, Value};
 use sha1::{Digest, Sha1};
 use std::fs;
