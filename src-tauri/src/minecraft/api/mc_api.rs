@@ -220,6 +220,19 @@ impl MinecraftApiService {
         Ok(profile)
     }
 
+    pub async fn resolve_uuid(&self, identifier: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(identifier) {
+            return Ok(uuid);
+        }
+        let profile = self.get_profile_by_name_or_uuid(identifier).await?;
+        Uuid::parse_str(&profile.id).map_err(|_| {
+            AppError::InvalidInput(format!(
+                "Could not resolve player '{}' to a valid UUID.",
+                identifier
+            ))
+        })
+    }
+
     pub async fn get_profile_by_name_or_uuid(
         &self,
         name_or_uuid_query: &str,

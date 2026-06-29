@@ -1,5 +1,7 @@
 use crate::error::{AppError, CommandError};
 use crate::minecraft::api::cape_api::{CapeApi, CapeUploadResponse, CapesBrowseResponse, CosmeticCape};
+use crate::minecraft::api::cosmetic_api::CosmeticApi;
+use crate::commands::request_context::account_ctx;
 use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::state::state_manager::State;
 use log::{debug, error};
@@ -273,52 +275,17 @@ pub async fn get_player_outfit(
 ) -> Result<serde_json::Value, CommandError> {
     debug!("[CMD get_player_outfit] payload: {:?}", payload);
 
-    let state = State::get().await?;
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-
-    let active_account_opt = state
-        .minecraft_account_manager_v2
-        .get_active_account()
+    let ctx = account_ctx(payload.norisk_token).await?;
+    let player_uuid = MinecraftApiService::new()
+        .resolve_uuid(&payload.player_identifier)
         .await?;
 
-    let player_uuid_to_use: Uuid = match Uuid::parse_str(&payload.player_identifier) {
-        Ok(uuid) => uuid,
-        Err(_) => {
-            let api_service = MinecraftApiService::new();
-            let profile = api_service
-                .get_profile_by_name_or_uuid(&payload.player_identifier)
-                .await?;
-            Uuid::parse_str(&profile.id).map_err(|e| {
-                error!(
-                    "[CMD get_player_outfit] Failed to parse UUID from resolved profile '{}': {}",
-                    payload.player_identifier, e
-                );
-                CommandError::from(AppError::InvalidInput(format!(
-                    "Could not resolve player '{}' to a valid UUID.",
-                    payload.player_identifier
-                )))
-            })?
-        }
-    };
-
-    let token_to_use = match payload.norisk_token {
-        Some(token) => token,
-        None => {
-            let acc = active_account_opt.as_ref().ok_or_else(|| {
-                error!("[CMD get_player_outfit] NoRisk token required.");
-                CommandError::from(AppError::NoCredentialsError)
-            })?;
-            acc.norisk_credentials.get_token_for_mode(is_experimental)?
-        }
-    };
-
-    let cape_api = CapeApi::new();
-    cape_api
-        .get_player_outfit(&token_to_use, &player_uuid_to_use, is_experimental)
+    CosmeticApi::new()
+        .get_player_outfit(&ctx.token, &player_uuid, ctx.is_experimental)
         .await
         .map_err(|e| {
             error!(
-                "[CMD get_player_outfit] Error from cape_api.get_player_outfit: {:?}",
+                "[CMD get_player_outfit] Error from cosmetic_api.get_player_outfit: {:?}",
                 e
             );
             CommandError::from(e)
@@ -329,67 +296,15 @@ pub async fn get_player_outfit(
 pub async fn get_player_icon(
     payload: GetPlayerOutfitPayload,
 ) -> Result<serde_json::Value, CommandError> {
-    let state = State::get().await?;
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-
-    let active_account_opt = state
-        .minecraft_account_manager_v2
-        .get_active_account()
+    let ctx = account_ctx(payload.norisk_token).await?;
+    let player_uuid = MinecraftApiService::new()
+        .resolve_uuid(&payload.player_identifier)
         .await?;
 
-    let player_uuid_to_use: Uuid = match Uuid::parse_str(&payload.player_identifier) {
-        Ok(uuid) => uuid,
-        Err(_) => {
-            let api_service = MinecraftApiService::new();
-            let profile = api_service
-                .get_profile_by_name_or_uuid(&payload.player_identifier)
-                .await?;
-            Uuid::parse_str(&profile.id).map_err(|_| {
-                CommandError::from(AppError::InvalidInput(format!(
-                    "Could not resolve player '{}' to a valid UUID.",
-                    payload.player_identifier
-                )))
-            })?
-        }
-    };
-
-    let token_to_use = match payload.norisk_token {
-        Some(token) => token,
-        None => {
-            let acc = active_account_opt
-                .as_ref()
-                .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
-            acc.norisk_credentials.get_token_for_mode(is_experimental)?
-        }
-    };
-
-    CapeApi::new()
-        .get_player_icon(&token_to_use, &player_uuid_to_use, is_experimental)
+    CosmeticApi::new()
+        .get_player_icon(&ctx.token, &player_uuid, ctx.is_experimental)
         .await
         .map_err(CommandError::from)
-}
-
-#[tauri::command]
-pub async fn get_active_creator_code() -> Result<serde_json::Value, CommandError> {
-    let state = State::get().await?;
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-
-    let acc = state
-        .minecraft_account_manager_v2
-        .get_active_account()
-        .await?
-        .ok_or_else(|| CommandError::from(AppError::NoCredentialsError))?;
-    let token = acc.norisk_credentials.get_token_for_mode(is_experimental)?;
-
-    let shop_user = CapeApi::new()
-        .get_shop_user(&token, is_experimental)
-        .await
-        .map_err(CommandError::from)?;
-
-    Ok(shop_user
-        .get("supportACreatorCode")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null))
 }
 
 #[derive(Serialize, Debug)]
@@ -497,57 +412,6 @@ pub async fn get_local_cosmetics() -> Result<Vec<LocalCosmetic>, CommandError> {
 
     debug!("[CMD get_local_cosmetics] found {} local cosmetics", out.len());
     Ok(out.into_values().collect())
-}
-
-#[tauri::command]
-pub async fn get_cosmetic_products(
-    cosmetic_ids: Vec<String>,
-) -> Result<serde_json::Value, CommandError> {
-    let state = State::get().await?;
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-    crate::minecraft::api::payload_cms_api::PayloadCmsApi::fetch_products_by_cosmetic_ids(
-        &cosmetic_ids,
-        is_experimental,
-    )
-    .await
-    .map_err(CommandError::from)
-}
-
-#[tauri::command]
-pub async fn fetch_cms_media(url: String) -> Result<Vec<u8>, CommandError> {
-    if !(url.starts_with("https://cms.norisk.gg/")
-        || url.starts_with("https://cms-staging.norisk.gg/"))
-    {
-        return Err(CommandError::from(AppError::InvalidInput(format!(
-            "Refusing to proxy non-CMS url: {}",
-            url
-        ))));
-    }
-
-    let response = crate::config::HTTP_CLIENT
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| CommandError::from(AppError::RequestError(format!(
-            "CMS media request failed: {}",
-            e
-        ))))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        return Err(CommandError::from(AppError::RequestError(format!(
-            "CMS media returned {} for {}",
-            status, url
-        ))));
-    }
-
-    let bytes = response.bytes().await.map_err(|e| {
-        CommandError::from(AppError::RequestError(format!(
-            "Failed to read CMS media bytes: {}",
-            e
-        )))
-    })?;
-    Ok(bytes.to_vec())
 }
 
 /// Get owned capes grouped by review state (ACCEPTED, IN_REVIEW, DENIED)

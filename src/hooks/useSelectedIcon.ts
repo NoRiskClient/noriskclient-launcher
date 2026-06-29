@@ -1,30 +1,19 @@
-import { useEffect, useState } from "react";
-
 import {
   getSelectedIcon,
   type SelectedIcon,
 } from "../services/cosmetic-icon-service";
+import { useAsyncResource } from "./useAsyncResource";
 
 const EMPTY: SelectedIcon = { url: null, plus: false };
 
 export function useSelectedIcon(
   playerIdentifier: string | null | undefined
 ): SelectedIcon {
-  const [icon, setIcon] = useState<SelectedIcon>(EMPTY);
+  const { data } = useAsyncResource<SelectedIcon>(
+    playerIdentifier ? () => getSelectedIcon(playerIdentifier) : null,
+    [playerIdentifier],
+    EMPTY,
+  );
 
-  useEffect(() => {
-    if (!playerIdentifier) {
-      setIcon(EMPTY);
-      return;
-    }
-    let alive = true;
-    getSelectedIcon(playerIdentifier).then((res) => {
-      if (alive) setIcon(res);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [playerIdentifier]);
-
-  return icon;
+  return data;
 }
