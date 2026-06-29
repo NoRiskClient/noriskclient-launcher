@@ -43,6 +43,7 @@
   "settings.background.title": "Arka Plan Efekti",
   "settings.background.description": "Başlatıcı için bir arka plan efekti seçin",
   "settings.background.animations": "Animasyonlar",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "Düşük",
   "settings.background.quality_high": "Yüksek",
   "settings.background.matrix_rain": "Matrix Yağmuru",

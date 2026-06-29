@@ -43,6 +43,7 @@
   "settings.background.title": "Efeito de Fundo",
   "settings.background.description": "Escolha um efeito de fundo para o launcher",
   "settings.background.animations": "Animações",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "Baixa",
   "settings.background.quality_high": "Alta",
   "settings.background.matrix_rain": "Chuva Matrix",

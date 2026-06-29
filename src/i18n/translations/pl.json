@@ -43,6 +43,7 @@
   "settings.background.title": "Efekt tła",
   "settings.background.description": "Wybierz efekt tła dla launchera",
   "settings.background.animations": "Animacje",
+  "settings.background.skin_animation": "Skin Animation",
   "settings.background.quality_low": "Niska",
   "settings.background.quality_high": "Wysoka",
   "settings.background.matrix_rain": "Deszcz Matrix",
