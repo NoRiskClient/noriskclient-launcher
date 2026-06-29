@@ -115,7 +115,7 @@ use commands::cape_command::{
 
 use commands::cosmetic_command::{
     get_equipped_cosmetics, get_local_cosmetics, get_player_icon, get_player_outfit,
-    resolve_pack_cosmetic, resolve_pack_emote,
+    get_random_local_emote, resolve_pack_cosmetic, resolve_pack_emote,
 };
 use commands::icon_command::{get_active_creator_code, get_selected_player_icon};
 
@@ -631,6 +631,7 @@ async fn main() {
             get_equipped_cosmetics,
             resolve_pack_cosmetic,
             resolve_pack_emote,
+            get_random_local_emote,
             get_owned_capes_list,
             equip_cape,
             delete_cape,

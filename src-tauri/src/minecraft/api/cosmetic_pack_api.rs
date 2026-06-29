@@ -274,6 +274,36 @@ pub async fn resolve_pack_cosmetic(
     })
 }
 
+fn is_local_object(pack: &str, parsed: &ParsedPack, path: &str) -> bool {
+    parsed
+        .hash_by_path
+        .get(path)
+        .and_then(|hash| local_object_path(pack, hash))
+        .map(|p| p.is_file())
+        .unwrap_or(false)
+}
+
+/// Slugs of emotes whose animation object is downloaded locally. Emote anims
+/// live at `.../emotes/<slug>.animation.json` or the nested
+/// `.../emotes/<slug>/<slug>.animation.json`.
+pub fn local_emote_slugs(pack: &str, parsed: &ParsedPack) -> Vec<String> {
+    let mut slugs = HashSet::new();
+    for p in &parsed.paths {
+        let Some(idx) = p.find("/emotes/") else {
+            continue;
+        };
+        let after = &p[idx + "/emotes/".len()..];
+        let Some(name) = after.strip_suffix(".animation.json") else {
+            continue;
+        };
+        if is_local_object(pack, parsed, p) {
+            let slug = name.split('/').next().unwrap_or(name);
+            slugs.insert(slug.to_string());
+        }
+    }
+    slugs.into_iter().collect()
+}
+
 pub fn resolve_pack_emote(pack: &str, parsed: &ParsedPack, slug: &str) -> Option<EmoteAssetUrlsDto> {
     let suffix = format!("/emotes/{}.animation.json", slug);
     let nested_suffix = format!("/emotes/{}/{}.animation.json", slug, slug);

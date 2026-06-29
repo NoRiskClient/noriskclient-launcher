@@ -3,9 +3,17 @@ import { useEffect, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { EmoteAssetUrls } from "@noriskclient/nrc-skin-renderer/core";
 
-// Percent chance (0-100), rolled once per launcher open: play a random
-// downloaded cosmetic emote instead of a launcher idle.
-const RANDOM_LOCAL_EMOTE_CHANCE = 20;
+import type { EmoteAssetUrlsDto } from "../types/cosmetic";
+
+type EmoteKind = "randomLocal" | "special" | "calm";
+
+// Relative weights, rolled once per launcher open. Don't need to sum to 100 —
+// the pick is proportional to the weights.
+const PROBABILITY: Record<EmoteKind, number> = {
+  randomLocal: 20,
+  special: 10,
+  calm: 70,
+};
 
 const CALM_IDLES = [
   "/emotes/launcheridle.animation.json",
@@ -13,34 +21,7 @@ const CALM_IDLES = [
 ];
 const SPECIAL_IDLE = "/emotes/launcheridle3.animation.json";
 
-const SPECIAL_MIN = 25;
-const SPECIAL_MAX = 50;
-
-const OPEN_COUNT_KEY = "nrc-launcher-open-count";
-const NEXT_SPECIAL_KEY = "nrc-launcher-next-special";
 const LAST_IDLE_KEY = "nrc-launcher-last-idle";
-
-interface LocalCosmetic {
-  id: string;
-  cosmetic_type: string;
-  slug: string;
-  geo_path?: string | null;
-  animation_path?: string | null;
-  texture_path?: string | null;
-  mcmeta_path?: string | null;
-}
-
-function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function readInt(key: string): number {
-  try {
-    return Number.parseInt(localStorage.getItem(key) ?? "0", 10) || 0;
-  } catch {
-    return 0;
-  }
-}
 
 function write(key: string, value: string) {
   try {
@@ -50,20 +31,16 @@ function write(key: string, value: string) {
   }
 }
 
-function computeSpecialThisOpen(): boolean {
-  const count = readInt(OPEN_COUNT_KEY) + 1;
-  write(OPEN_COUNT_KEY, String(count));
-
-  let next = readInt(NEXT_SPECIAL_KEY);
-  if (next <= 0) {
-    write(NEXT_SPECIAL_KEY, String(count + randInt(SPECIAL_MIN, SPECIAL_MAX)));
-    return false;
+function rollKind(): EmoteKind {
+  const entries = Object.entries(PROBABILITY) as [EmoteKind, number][];
+  const total = entries.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0);
+  if (total <= 0) return "calm";
+  let r = Math.random() * total;
+  for (const [kind, weight] of entries) {
+    r -= Math.max(0, weight);
+    if (r < 0) return kind;
   }
-  if (count >= next) {
-    write(NEXT_SPECIAL_KEY, String(count + randInt(SPECIAL_MIN, SPECIAL_MAX)));
-    return true;
-  }
-  return false;
+  return "calm";
 }
 
 function pickCalm(): string {
@@ -87,15 +64,13 @@ function assetUrl(u?: string | null): string | undefined {
 
 async function pickRandomLocalEmote(): Promise<EmoteAssetUrls | null> {
   try {
-    const all = await invoke<LocalCosmetic[]>("get_local_cosmetics");
-    const emotes = all.filter((c) => c.cosmetic_type === "emote" && c.animation_path);
-    if (emotes.length === 0) return null;
-    const pick = emotes[Math.floor(Math.random() * emotes.length)];
+    const dto = await invoke<EmoteAssetUrlsDto | null>("get_random_local_emote");
+    if (!dto) return null;
     return {
-      animation: assetUrl(pick.animation_path)!,
-      geo: assetUrl(pick.geo_path),
-      texture: assetUrl(pick.texture_path),
-      mcmeta: assetUrl(pick.mcmeta_path),
+      animation: assetUrl(dto.animation)!,
+      geo: assetUrl(dto.geo),
+      texture: assetUrl(dto.texture),
+      mcmeta: assetUrl(dto.mcmeta),
     };
   } catch {
     return null;
@@ -103,11 +78,12 @@ async function pickRandomLocalEmote(): Promise<EmoteAssetUrls | null> {
 }
 
 async function decideEmote(): Promise<EmoteAssetUrls> {
-  if (Math.random() * 100 < RANDOM_LOCAL_EMOTE_CHANCE) {
+  const kind = rollKind();
+  if (kind === "randomLocal") {
     const local = await pickRandomLocalEmote();
     if (local) return local;
   }
-  if (computeSpecialThisOpen()) return { animation: SPECIAL_IDLE };
+  if (kind === "special") return { animation: SPECIAL_IDLE };
   return { animation: pickCalm() };
 }
 

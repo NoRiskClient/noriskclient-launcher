@@ -2,10 +2,12 @@ use crate::commands::request_context::account_ctx;
 use crate::error::CommandError;
 use crate::minecraft::api::cosmetic_api::CosmeticApi;
 use crate::minecraft::api::cosmetic_pack_api::{
-    load_pack_index, local_object_path, resolve_pack_cosmetic as api_resolve_pack_cosmetic,
+    load_pack_index, local_emote_slugs, local_object_path,
+    resolve_pack_cosmetic as api_resolve_pack_cosmetic,
     resolve_pack_emote as api_resolve_pack_emote, CosmeticAssetUrlsDto, EmoteAssetUrlsDto,
     ResolvedCosmeticDto,
 };
+use rand::seq::SliceRandom;
 use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::dto::cosmetic_outfit::{
     CosmeticRealOutfit, CosmeticSettings, CustomTextureSource,
@@ -42,6 +44,22 @@ pub async fn resolve_pack_emote(
         .get_or_load(PACK_ID)
         .await
         .map_err(CommandError::from)?;
+    Ok(api_resolve_pack_emote(PACK_ID, &pack, &slug))
+}
+
+#[tauri::command]
+pub async fn get_random_local_emote() -> Result<Option<EmoteAssetUrlsDto>, CommandError> {
+    let state = State::get().await?;
+    let pack = state
+        .cosmetic_pack_manager
+        .get_or_load(PACK_ID)
+        .await
+        .map_err(CommandError::from)?;
+
+    let slug = match local_emote_slugs(PACK_ID, &pack).choose(&mut rand::thread_rng()) {
+        Some(s) => s.clone(),
+        None => return Ok(None),
+    };
     Ok(api_resolve_pack_emote(PACK_ID, &pack, &slug))
 }
 
