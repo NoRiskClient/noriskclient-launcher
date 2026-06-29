@@ -1,3 +1,5 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+
 import type {
   CosmeticAssetUrls,
   ParticleAssetEntry,
@@ -49,10 +51,20 @@ function particlesFrom(data: ParticleAssetDataDto[]): ParticleAssetEntry[] {
   });
 }
 
+function assetUrl(u: string | undefined): string | undefined {
+  if (!u) return u;
+  return /^https?:\/\//.test(u) ? u : convertFileSrc(u);
+}
+
 export function toRendererCosmetic(dto: ResolvedCosmeticDto): ResolvedCosmetic {
-  const { particleData, ...rest } = dto.urls;
+  const { particleData, metadataJson, geo, texture, animation, mcmeta } =
+    dto.urls;
   const urls: CosmeticAssetUrls = {
-    ...rest,
+    geo: assetUrl(geo) ?? "",
+    texture: assetUrl(texture) ?? "",
+    animation: assetUrl(animation),
+    mcmeta: assetUrl(mcmeta),
+    metadataJson,
     particles: particleData ? particlesFrom(particleData) : undefined,
   };
   return { cosmeticId: dto.cosmeticId, name: dto.name, type: dto.type, urls };

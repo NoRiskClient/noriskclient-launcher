@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::minecraft::api::cosmetic_pack_api::{fetch_pack_index, ParsedPack};
+use crate::minecraft::api::cosmetic_pack_api::{load_pack_index, ParsedPack};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -19,7 +19,7 @@ impl CosmeticPackManager {
         if let Some(pack) = self.cache.read().await.get(pack_id) {
             return Ok(pack.clone());
         }
-        let parsed = Arc::new(fetch_pack_index().await?);
+        let parsed = Arc::new(load_pack_index(pack_id).await?);
         self.cache
             .write()
             .await

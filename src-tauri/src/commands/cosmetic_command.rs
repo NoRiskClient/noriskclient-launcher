@@ -32,7 +32,7 @@ pub async fn resolve_pack_cosmetic(
         .get_or_load(PACK_ID)
         .await
         .map_err(CommandError::from)?;
-    Ok(api_resolve_pack_cosmetic(&pack, &cosmetic_id, settings.as_ref()).await)
+    Ok(api_resolve_pack_cosmetic(PACK_ID, &pack, &cosmetic_id, settings.as_ref()).await)
 }
 
 #[tauri::command]
@@ -45,7 +45,7 @@ pub async fn resolve_pack_emote(
         .get_or_load(PACK_ID)
         .await
         .map_err(CommandError::from)?;
-    Ok(api_resolve_pack_emote(&pack, &slug))
+    Ok(api_resolve_pack_emote(PACK_ID, &pack, &slug))
 }
 
 #[derive(Serialize)]
@@ -225,7 +225,7 @@ pub async fn get_equipped_cosmetics(
     let mut cosmetics: Vec<ResolvedCosmeticDto> = Vec::new();
     for id in &cosmetic_ids {
         let settings = settings_by_id.get(id);
-        if let Some(mut dto) = api_resolve_pack_cosmetic(&pack, id, settings).await {
+        if let Some(mut dto) = api_resolve_pack_cosmetic(PACK_ID, &pack, id, settings).await {
             apply_custom_texture(&mut dto.urls, settings).await;
             cosmetics.push(dto);
         }

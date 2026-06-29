@@ -319,41 +319,30 @@ pub struct LocalCosmetic {
     pub metadata: serde_json::Value,
 }
 
-fn path_if_exists(p: std::path::PathBuf) -> Option<String> {
-    if p.is_file() {
-        Some(p.to_string_lossy().to_string())
-    } else {
-        None
-    }
-}
+#[tauri::command]
+pub async fn get_local_cosmetics() -> Result<Vec<LocalCosmetic>, CommandError> {
+    use crate::minecraft::api::cosmetic_pack_api::{load_pack_index, local_object_path};
+    const PACK: &str = "norisk-prod";
 
-fn collect_norisk_jsons(
-    dir: &std::path::Path,
-    out: &mut std::collections::HashMap<String, LocalCosmetic>,
-) {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
+    let parsed = load_pack_index(PACK).await.map_err(CommandError::from)?;
+
+    let object = |path: &str| -> Option<String> {
+        let hash = parsed.hash_by_path.get(path)?;
+        let p = local_object_path(PACK, hash)?;
+        p.is_file().then(|| p.to_string_lossy().to_string())
     };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_norisk_jsons(&path, out);
+
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for path in &parsed.paths {
+        if !path.ends_with(".norisk.json") {
             continue;
         }
-        let file_name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n,
-            None => continue,
-        };
-        if !file_name.ends_with(".norisk.json") {
-            continue;
-        }
-        let base = &file_name[..file_name.len() - ".norisk.json".len()];
-        let parent = match path.parent() {
+        let meta_obj = match object(path) {
             Some(p) => p,
             None => continue,
         };
-        let metadata: serde_json::Value = match std::fs::read_to_string(&path)
+        let metadata: serde_json::Value = match std::fs::read_to_string(&meta_obj)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
         {
@@ -364,9 +353,12 @@ fn collect_norisk_jsons(
             Some(s) => s.to_string(),
             None => continue,
         };
-        if out.contains_key(&id) {
+        if !seen.insert(id.clone()) {
             continue;
         }
+
+        let dir = &path[..path.rfind('/').map(|i| i + 1).unwrap_or(0)];
+        let base = &path[dir.len()..path.len() - ".norisk.json".len()];
         let cosmetic_type = metadata
             .get("type")
             .and_then(|v| v.as_str())
@@ -377,41 +369,21 @@ fn collect_norisk_jsons(
             .and_then(|v| v.as_str())
             .unwrap_or(base)
             .to_string();
-        out.insert(
-            id.clone(),
-            LocalCosmetic {
-                id,
-                cosmetic_type,
-                slug,
-                geo_path: path_if_exists(parent.join(format!("{}.geo.json", base))),
-                animation_path: path_if_exists(parent.join(format!("{}.animation.json", base))),
-                texture_path: path_if_exists(parent.join(format!("{}.png", base))),
-                mcmeta_path: path_if_exists(parent.join(format!("{}.png.mcmeta", base))),
-                metadata,
-            },
-        );
-    }
-}
 
-#[tauri::command]
-pub async fn get_local_cosmetics() -> Result<Vec<LocalCosmetic>, CommandError> {
-    let profiles_root = crate::config::LAUNCHER_DIRECTORY.data_dir().join("profiles");
-    let mut out: std::collections::HashMap<String, LocalCosmetic> =
-        std::collections::HashMap::new();
-
-    if let Ok(profiles) = std::fs::read_dir(&profiles_root) {
-        for prof in profiles.flatten() {
-            let cosmetics_dir = prof.path().join(
-                "NoRiskClient/assets/nrc-cosmetics/assets/noriskclient-cosmetics/cosmetics",
-            );
-            if cosmetics_dir.is_dir() {
-                collect_norisk_jsons(&cosmetics_dir, &mut out);
-            }
-        }
+        out.push(LocalCosmetic {
+            id,
+            cosmetic_type,
+            slug,
+            geo_path: object(&format!("{}{}.geo.json", dir, base)),
+            animation_path: object(&format!("{}{}.animation.json", dir, base)),
+            texture_path: object(&format!("{}{}.png", dir, base)),
+            mcmeta_path: object(&format!("{}{}.png.mcmeta", dir, base)),
+            metadata,
+        });
     }
 
     debug!("[CMD get_local_cosmetics] found {} local cosmetics", out.len());
-    Ok(out.into_values().collect())
+    Ok(out)
 }
 
 /// Get owned capes grouped by review state (ACCEPTED, IN_REVIEW, DENIED)
