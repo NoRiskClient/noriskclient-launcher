@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "Вход и кэш",
   "settings.background.snow": "Эффект снега",
   "settings.background.quality": "Качество",
+  "settings.nav_labels": "Подписи боковой панели",
+  "settings.nav_labels.tooltip": "Показывать текст под значками боковой панели.",
   "common.no_results": "Нет результатов",
   "debug.tabs.launcher": "Логи лаунчера",
   "debug.tabs.minecraft": "Логи MC",

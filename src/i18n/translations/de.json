@@ -59,6 +59,8 @@
   "settings.background.quality_high": "Hoch",
   "settings.background.snow": "Schnee-Effekt",
   "settings.background.quality": "Qualität",
+  "settings.nav_labels": "Sidebar-Beschriftung",
+  "settings.nav_labels.tooltip": "Text unter den Sidebar-Icons anzeigen.",
 
   "settings.background.matrix_rain": "Matrix Regen",
   "settings.background.enchantment_table": "Zaubertisch",

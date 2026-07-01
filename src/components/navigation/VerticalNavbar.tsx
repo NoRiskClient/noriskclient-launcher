@@ -41,6 +41,7 @@ export function VerticalNavbar({
   const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
+  const showNavLabels = useThemeStore((state) => state.showNavLabels);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [isMounted, setIsMounted] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -127,7 +128,7 @@ export function VerticalNavbar({
     >
       <NavButton
         icon={<Icon icon={item.icon} className="w-8 h-8" />}
-        label={item.isAction ? undefined : item.label}
+        label={!item.isAction && showNavLabels ? item.label : undefined}
         isActive={active === item.id}
         onClick={() => handleItemClick(item.id, item.isAction)}
         onMouseEnter={() => handleMouseEnter(item.id)}

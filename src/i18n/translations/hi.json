@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "लॉगिन और कैश",
   "settings.background.snow": "बर्फ़ प्रभाव",
   "settings.background.quality": "गुणवत्ता",
+  "settings.nav_labels": "साइडबार लेबल",
+  "settings.nav_labels.tooltip": "साइडबार आइकनों के नीचे टेक्स्ट दिखाएँ।",
   "common.no_results": "कोई परिणाम नहीं",
   "debug.tabs.launcher": "लॉन्चर लॉग",
   "debug.tabs.minecraft": "MC लॉग",

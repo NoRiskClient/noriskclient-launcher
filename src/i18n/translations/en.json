@@ -59,6 +59,8 @@
   "settings.background.quality_high": "High",
   "settings.background.snow": "Snow Effect",
   "settings.background.quality": "Quality",
+  "settings.nav_labels": "Sidebar labels",
+  "settings.nav_labels.tooltip": "Show the text labels under the sidebar icons.",
 
   "settings.background.matrix_rain": "Matrix Rain",
   "settings.background.enchantment_table": "Enchantment Table",

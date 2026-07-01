@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "Connexion et cache",
   "settings.background.snow": "Effet de neige",
   "settings.background.quality": "Qualité",
+  "settings.nav_labels": "Libellés de la barre latérale",
+  "settings.nav_labels.tooltip": "Afficher le texte sous les icônes de la barre latérale.",
   "common.no_results": "Aucun résultat",
   "debug.tabs.launcher": "Journaux du launcher",
   "debug.tabs.minecraft": "Journaux MC",

@@ -16,7 +16,8 @@ export function AppearanceTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { saving } = useSettingsConfig();
-  const { staticBackground, toggleStaticBackground, toggleBackgroundAnimation } = useThemeStore();
+  const { staticBackground, toggleStaticBackground, toggleBackgroundAnimation, showNavLabels, toggleNavLabels } =
+    useThemeStore();
   const { currentEffect, setCurrentEffect } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } =
     useQualitySettingsStore();
@@ -73,6 +74,9 @@ export function AppearanceTab() {
             disabled={saving}
             size="md"
           />
+        </SettingRow>
+        <SettingRow label={t("settings.nav_labels")} description={t("settings.nav_labels.tooltip")} searchKeywords={kw("settings.nav_labels", "sidebar", "labels", "text", "beschriftung", "navigation", "nav", "icons")}>
+          <ToggleSwitch checked={showNavLabels} onChange={toggleNavLabels} size="md" />
         </SettingRow>
         <SettingRow label={t("settings.background.snow")} searchKeywords={kw("settings.background.snow", "snow", "schnee", "winter")} disabled={saving}>
           <SnowEffectToggle showLabel={false} size="md" disabled={saving} />

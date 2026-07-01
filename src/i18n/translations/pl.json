@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "Logowanie i pamięć podręczna",
   "settings.background.snow": "Efekt śniegu",
   "settings.background.quality": "Jakość",
+  "settings.nav_labels": "Etykiety paska bocznego",
+  "settings.nav_labels.tooltip": "Pokaż tekst pod ikonami paska bocznego.",
   "common.no_results": "Brak wyników",
   "debug.tabs.launcher": "Logi launchera",
   "debug.tabs.minecraft": "Logi MC",

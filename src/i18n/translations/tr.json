@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "Giriş ve önbellek",
   "settings.background.snow": "Kar efekti",
   "settings.background.quality": "Kalite",
+  "settings.nav_labels": "Kenar çubuğu etiketleri",
+  "settings.nav_labels.tooltip": "Kenar çubuğu simgelerinin altındaki metni göster.",
   "common.no_results": "Sonuç yok",
   "debug.tabs.launcher": "Başlatıcı günlükleri",
   "debug.tabs.minecraft": "MC günlükleri",

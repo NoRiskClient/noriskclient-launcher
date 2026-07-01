@@ -10,6 +10,8 @@
   "settings.sections.login_cache": "Login e cache",
   "settings.background.snow": "Efeito de neve",
   "settings.background.quality": "Qualidade",
+  "settings.nav_labels": "Rótulos da barra lateral",
+  "settings.nav_labels.tooltip": "Mostrar o texto sob os ícones da barra lateral.",
   "common.no_results": "Sem resultados",
   "debug.tabs.launcher": "Registros do launcher",
   "debug.tabs.minecraft": "Registros do MC",
