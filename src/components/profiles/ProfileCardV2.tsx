@@ -115,14 +115,6 @@ export function ProfileCardV2({
   // Settings context menu items
   const contextMenuItems: ContextMenuItem[] = [
     {
-      id: "pin",
-      label: pinned ? "Unpin" : "Pin to Top",
-      icon: pinned ? "solar:pin-bold" : "solar:pin-bold-duotone",
-      onClick: () => {
-        togglePin(profile.id);
-      },
-    },
-    {
       id: "edit",
       label: t('profiles.editProfile'),
       icon: "solar:settings-bold",
