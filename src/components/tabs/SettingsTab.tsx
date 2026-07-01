@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import { Card } from ".././ui/Card";
@@ -24,11 +24,12 @@ import {
 import { SnowEffectToggle } from "../ui/SnowEffectToggle";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
-import { GroupTabs, type GroupTab } from ".././ui/GroupTabs";
 import { ActionButton } from ".././ui/ActionButton";
-import { Tooltip } from ".././ui/Tooltip";
-import { SimpleTooltip } from ".././ui/Tooltip";
-import { CompactSettingsGrid } from ".././ui/CompactSettingsGrid";
+import { Modal } from ".././ui/Modal";
+import { SettingsSection } from ".././ui/settings/SettingsSection";
+import { SettingRow } from ".././ui/settings/SettingRow";
+import { SearchWithFilters } from ".././ui/SearchWithFilters";
+import { SettingsSearchContext } from ".././ui/settings/SettingsSearchContext";
 import EffectPreviewCard from ".././EffectPreviewCard";
 import { RangeSlider } from ".././ui/RangeSlider";
 import { openExternalUrl } from "../../services/tauri-service";
@@ -40,58 +41,140 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ColorPickerModal } from "../modals/ColorPickerModal";
 import { ThemeSelector } from "../ThemeSelector";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
-import { DebugSection } from "./DebugSection";
+import { DebugSection, getDebugTabs } from "./DebugSection";
 import { useTranslation } from "react-i18next";
 import { LANGUAGE_OPTIONS } from "../../i18n";
 import type { SupportedLanguage } from "../../i18n";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 
-export function SettingsTab() {
-  const { t } = useTranslation();
+type SettingsTabId = "general" | "appearance" | "advanced" | "debug";
+
+interface SettingsTabProps {
+  onClose: () => void;
+}
+
+export function SettingsTab({ onClose }: SettingsTabProps) {
+  const { t, i18n } = useTranslation();
+  const kw = useCallback(
+    (key: string, ...extra: string[]) => [
+      i18n.getFixedT("en")(key),
+      i18n.getFixedT("de")(key),
+      ...extra,
+    ],
+    [i18n],
+  );
   const { language, setLanguage } = useThemeStore();
   const [config, setConfig] = useState<LauncherConfig | null>(null);
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<"general" | "appearance" | "advanced" | "debug">(
+  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<SettingsTabId>(
     "general",
   );
 
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(sidebarSearch), 150);
+    return () => clearTimeout(id);
+  }, [sidebarSearch]);
+  const sidebarQuery = debouncedSearch.trim().toLowerCase();
+
   useEffect(() => { setDiscordState("Configuring Settings"); }, []);
 
-  // Create groups array for tabs
-  const createGroups = (): GroupTab[] => {
-    const groups: GroupTab[] = [
-      {
-        id: "general",
-        name: t("settings.tabs.general"),
-        count: undefined,
-      },
-      {
-        id: "appearance",
-        name: t("settings.tabs.appearance"),
-        count: undefined,
-      },
-      {
-        id: "advanced",
-        name: t("settings.tabs.advanced"),
-        count: undefined,
-      },
-      {
-        id: "debug",
-        name: t("settings.tabs.debug"),
-        count: undefined,
-      },
-    ];
-    return groups;
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [activeTab, sidebarQuery]);
+
+  const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
+    general: [
+      { id: "language", label: t("settings.language") },
+      { id: "accent", label: t("settings.accent_color.title") },
+      { id: "behaviour", label: t("settings.sections.behaviour") },
+      { id: "interface", label: t("settings.sections.interface") },
+    ],
+    appearance: [
+      { id: "theme", label: t("settings.theme.title") },
+      { id: "background", label: t("settings.background.title") },
+    ],
+    advanced: [
+      { id: "login_cache", label: t("settings.sections.login_cache") },
+      { id: "gamedir", label: t("settings.game_data_dir.title") },
+      { id: "hooks", label: t("settings.hooks.title") },
+      { id: "licenses", label: t("settings.licenses.title") },
+    ],
+    debug: getDebugTabs(t),
   };
 
-  const groups = createGroups();
+  const tabConfig: {
+    id: SettingsTabId;
+    label: string;
+    icon: string;
+    children?: { id: string; label: string }[];
+  }[] = [
+    { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
+    { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
+    { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
+    { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
+  ];
+
+  const selectTab = (id: SettingsTabId) => {
+    setSidebarSearch("");
+    setActiveTab(id);
+  };
   const [customColor, setCustomColor] = useState("#4f8eff");
   const contentRef = useRef<HTMLDivElement>(null);
-  const tabRef = useRef<HTMLDivElement>(null);
+  const sidebarListRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!activeSection) return;
+    const el = sidebarListRef.current?.querySelector(`[data-section-id="${activeSection}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeSection]);
+
+  const spySuppressRef = useRef(false);
+  const spyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(`settings-section-${id}`);
+    if (!el) return;
+    spySuppressRef.current = true;
+    setActiveSection(id);
+    if (spyTimeoutRef.current) clearTimeout(spyTimeoutRef.current);
+    spyTimeoutRef.current = setTimeout(() => {
+      spySuppressRef.current = false;
+    }, 500);
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  useEffect(() => {
+    if (sidebarQuery) return;
+    const root = contentRef.current;
+    const defs = sectionDefs[activeTab];
+    if (!root || !defs) {
+      setActiveSection(null);
+      return;
+    }
+    const onScroll = () => {
+      if (spySuppressRef.current) return;
+      const rootTop = root.getBoundingClientRect().top;
+      const line = 80;
+      let current = defs[0].id;
+      for (const d of defs) {
+        const el = document.getElementById(`settings-section-${d.id}`);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top - rootTop <= line) current = d.id;
+      }
+      setActiveSection(current);
+    };
+    onScroll();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, sidebarQuery, config, tempConfig]);
 
   const [isHooksExpanded, setIsHooksExpanded] = useState<boolean>(false);
   const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState<boolean>(false);
@@ -298,326 +381,326 @@ export function SettingsTab() {
 
   const renderGeneralTab = () => (
     <div className="space-y-6">
-      {/* Language Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Icon icon="solar:global-bold" className="w-6 h-6 text-white" />
-          <h3 className="text-3xl font-minecraft text-white">
-            {t("settings.language")}
-          </h3>
-        </div>
-        <p className="text-base text-white/70 font-minecraft-ten mt-2">
-          {t("settings.language.description")}
-        </p>
-        <div className="mt-4 max-w-xs">
-          <Select
-            value={language}
-            onChange={(value) => setLanguage(value as SupportedLanguage)}
-            options={LANGUAGE_OPTIONS.map((opt) => ({
-              value: opt.value,
-              label: opt.label,
-              icon: <Icon icon={opt.flag} className="w-5 h-5" />,
-            }))}
-            size="sm"
-            variant="flat"
-          />
-        </div>
-      </div>
-
-      <div>
-      {/* Accent Color Section */}
-        <div className="flex items-center gap-2 mb-2">
-          <Icon icon="solar:palette-bold" className="w-6 h-6 text-white" />
-          <h3 className="text-3xl font-minecraft text-white">
-            {t("settings.accent_color.title")}
-          </h3>
-        </div>
-        <p className="text-base text-white/70 font-minecraft-ten mt-2">
-          {t("settings.accent_color.description")}
-          {isThemeActive && (
-            <span className="text-white/50 ml-2">{t("settings.accent_color.disabled_theme")}</span>
-          )}
-        </p>
-      </div>
-
-      <div className="mt-6 flex items-center gap-6">
-        <div className="flex-1">
-          <ColorPicker shape="square" size="md" showCustomOption={false} disabled={isAccentColorDisabled} />
-        </div>
-
-        <button
-          onClick={() => {
-            if (!isAccentColorDisabled) {
-              showModal('color-picker-modal',
-                <ColorPickerModal
-                  onClose={() => hideModal('color-picker-modal')}
-                />
-              );
-            }
-          }}
-          className={cn(
-            "group flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed border-[#ffffff30] transition-all duration-200",
-            isAccentColorDisabled
-              ? "opacity-40 cursor-not-allowed"
-              : "hover:border-[#ffffff50] cursor-pointer"
-          )}
-          title={isAccentColorDisabled ? t("settings.accent_color.custom_tooltip_disabled") : t("settings.accent_color.custom_tooltip")}
-          disabled={isAccentColorDisabled}
-        >
-          <div
-            className="w-8 h-8 rounded-md border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform"
-            style={{ backgroundColor: accentColor.value }}
-          />
-          <div className="flex flex-col items-start">
-            <span className="font-minecraft-ten text-base text-white/80 group-hover:text-white transition-colors">
-              {t("settings.accent_color.custom")}
-            </span>
-            <span className="text-xs text-white/60 font-minecraft-ten">
-              {accentColor.value}
-            </span>
+      <SettingsSection
+        id="settings-section-language"
+        title={t("settings.language")}
+        icon="solar:global-bold"
+        keywords={kw("settings.language", "sprache", "language", "locale")}
+        description={t("settings.language.description")}
+      >
+        <SettingRow label={t("settings.language")} searchKeywords={kw("settings.language", "sprache", "locale")}>
+          <div className="w-56">
+            <Select
+              value={language}
+              onChange={(value) => setLanguage(value as SupportedLanguage)}
+              options={LANGUAGE_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+                icon: <Icon icon={opt.flag} className="w-5 h-5" />,
+              }))}
+              size="sm"
+              variant="flat"
+            />
           </div>
-          <Icon
-            icon="solar:palette-bold"
-            className="w-5 h-5 text-white/60 group-hover:text-white transition-colors"
-          />
-        </button>
-      </div>
+        </SettingRow>
+      </SettingsSection>
 
+      <SettingsSection
+        id="settings-section-accent"
+        title={t("settings.accent_color.title")}
+        icon="solar:palette-bold"
+        keywords={kw("settings.accent_color.title", "color", "colour", "farbe", "akzent", "accent", "theme")}
+        description={
+          <>
+            {t("settings.accent_color.description")}
+            {isThemeActive && (
+              <span className="text-white/50 ml-2">{t("settings.accent_color.disabled_theme")}</span>
+            )}
+          </>
+        }
+      >
+        <div className="flex items-center gap-6 py-3">
+          <div className="flex-1">
+            <ColorPicker shape="square" size="md" showCustomOption={false} disabled={isAccentColorDisabled} />
+          </div>
 
-      {/* Settings Grid */}
-      <CompactSettingsGrid
-        settings={[
-          {
-            id: "auto-updates",
-            label: t("settings.auto_updates"),
-            tooltip: t("settings.auto_updates.tooltip"),
-            type: "toggle",
-            value: tempConfig?.auto_check_updates || false,
-            onChange: (checked) =>
-              tempConfig &&
-              setTempConfig({ ...tempConfig, auto_check_updates: checked }),
-          },
-          {
-            id: "discord-presence",
-            label: t("settings.discord_presence"),
-            tooltip: t("settings.discord_presence.tooltip"),
-            type: "toggle",
-            value: tempConfig?.enable_discord_presence || false,
-            onChange: (checked) =>
-              tempConfig &&
-              setTempConfig({
-                ...tempConfig,
-                enable_discord_presence: checked,
-              }),
-          },
-          {
-            id: "beta-updates",
-            label: t("settings.beta_updates"),
-            tooltip: t("settings.beta_updates.tooltip"),
-            type: "toggle",
-            value: tempConfig?.check_beta_channel || false,
-            onChange: (checked) =>
-              tempConfig &&
-              setTempConfig({ ...tempConfig, check_beta_channel: checked }),
-          },
-          ...(canShowExperimental ? [{
-            id: "experimental-mode",
-            label: t("settings.experimental_mode"),
-            tooltip: t("settings.experimental_mode.tooltip"),
-            type: "toggle" as const,
-            value: tempConfig?.is_experimental || false,
-            onChange: (checked: boolean) => {
-              if (tempConfig) {
-                setTempConfig({
-                  ...tempConfig,
-                  is_experimental: checked,
-                });
+          <button
+            onClick={() => {
+              if (!isAccentColorDisabled) {
+                showModal('color-picker-modal',
+                  <ColorPickerModal
+                    onClose={() => hideModal('color-picker-modal')}
+                  />
+                );
               }
-            },
-          }] : []),
-          {
-            id: "open-logs",
-            label: t("settings.open_logs"),
-            tooltip: t("settings.open_logs.tooltip"),
-            type: "toggle",
-            value: tempConfig?.open_logs_after_starting || false,
-            onChange: (checked) =>
-              tempConfig &&
-              setTempConfig({
-                ...tempConfig,
-                open_logs_after_starting: checked,
-              }),
-          },
-          {
-            id: "hide-window",
-            label: t("settings.hide_window"),
-            tooltip: t("settings.hide_window.tooltip"),
-            type: "toggle",
-            value: tempConfig?.hide_on_process_start || false,
-            onChange: (checked) =>
-              tempConfig &&
-              setTempConfig({
-                ...tempConfig,
-                hide_on_process_start: checked,
-              }),
-          },
-          {
-            id: "analytics",
-            label: t('analytics.settings.label'),
-            tooltip: t('analytics.settings.tooltip'),
-            type: "toggle",
-            value: tempConfig?.enable_analytics || false,
-            onChange: (checked) => {
+            }}
+            className={cn(
+              "group flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed border-[#ffffff30] transition-all duration-200",
+              isAccentColorDisabled
+                ? "opacity-40 cursor-not-allowed"
+                : "hover:border-[#ffffff50] cursor-pointer"
+            )}
+            title={isAccentColorDisabled ? t("settings.accent_color.custom_tooltip_disabled") : t("settings.accent_color.custom_tooltip")}
+            disabled={isAccentColorDisabled}
+          >
+            <div
+              className="w-8 h-8 rounded-md border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform"
+              style={{ backgroundColor: accentColor.value }}
+            />
+            <div className="flex flex-col items-start">
+              <span className="font-minecraft-ten text-base text-white/80 group-hover:text-white transition-colors">
+                {t("settings.accent_color.custom")}
+              </span>
+              <span className="text-xs text-white/60 font-minecraft-ten">
+                {accentColor.value}
+              </span>
+            </div>
+            <Icon
+              icon="solar:palette-bold"
+              className="w-5 h-5 text-white/60 group-hover:text-white transition-colors"
+            />
+          </button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection id="settings-section-behaviour" title={t("settings.sections.behaviour")} icon="solar:tuning-2-bold" keywords={kw("settings.sections.behaviour", "behaviour", "behavior", "verhalten")}>
+        <SettingRow
+          label={t("settings.auto_updates")}
+          description={t("settings.auto_updates.tooltip")}
+          searchKeywords={kw("settings.auto_updates", "update", "updates", "aktualisierung")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.auto_check_updates || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, auto_check_updates: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.discord_presence")}
+          description={t("settings.discord_presence.tooltip")}
+          searchKeywords={kw("settings.discord_presence", "discord", "presence", "status", "rich")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.enable_discord_presence || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, enable_discord_presence: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.beta_updates")}
+          description={t("settings.beta_updates.tooltip")}
+          searchKeywords={kw("settings.beta_updates", "beta", "update", "channel", "kanal")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.check_beta_channel || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, check_beta_channel: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        {canShowExperimental && (
+          <SettingRow
+            label={t("settings.experimental_mode")}
+            description={t("settings.experimental_mode.tooltip")}
+            searchKeywords={kw("settings.experimental_mode", "experimental", "experimentell", "beta")}
+            disabled={saving}
+          >
+            <ToggleSwitch
+              checked={tempConfig?.is_experimental || false}
+              onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, is_experimental: checked })}
+              disabled={saving}
+              size="md"
+            />
+          </SettingRow>
+        )}
+        <SettingRow
+          label={t("settings.open_logs")}
+          description={t("settings.open_logs.tooltip")}
+          searchKeywords={kw("settings.open_logs", "logs", "log", "protokoll")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.open_logs_after_starting || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, open_logs_after_starting: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.hide_window")}
+          description={t("settings.hide_window.tooltip")}
+          searchKeywords={kw("settings.hide_window", "window", "fenster", "hide", "verstecken", "minimize")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.hide_on_process_start || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, hide_on_process_start: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("analytics.settings.label")}
+          description={t("analytics.settings.tooltip")}
+          searchKeywords={kw("analytics.settings.label", "analytics", "analyse", "telemetry", "telemetrie", "tracking")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.enable_analytics || false}
+            onChange={(checked) => {
               if (tempConfig) {
-                setTempConfig({
-                  ...tempConfig,
-                  enable_analytics: checked,
-                });
-                // Update ThemeStore state
+                setTempConfig({ ...tempConfig, enable_analytics: checked });
                 setAnalyticsConsent({
                   hasMadeDecision: true,
                   decision: checked ? 'accepted' : 'declined',
                 });
-                // Invalidate analytics cache when setting changes
                 invalidateAnalyticsCache();
               }
-            },
-          },
-        ]}
-        disabled={saving}
-      />
+            }}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+      </SettingsSection>
 
-      <CompactSettingsGrid
-        settings={[
-          {
-            id: "concurrent-downloads",
-            label: t("settings.concurrent_downloads"),
-            tooltip: t("settings.concurrent_downloads.tooltip"),
-            type: "range",
-            value: tempConfig?.concurrent_downloads || 3,
-            onChange: handleConcurrentDownloadsChange,
-            min: 1,
-            max: 10,
-            step: 1,
-            icon: "solar:multiple-forward-right-bold",
-            minLabel: "1",
-            maxLabel: "10",
-          },
-          {
-            id: "concurrent-io",
-            label: t("settings.concurrent_io"),
-            tooltip: t("settings.concurrent_io.tooltip"),
-            type: "range",
-            value: tempConfig?.concurrent_io_limit || 10,
-            onChange: handleConcurrentIoLimitChange,
-            min: 1,
-            max: 20,
-            step: 1,
-            icon: "solar:server-bold",
-            minLabel: "1",
-            maxLabel: "20",
-          },
-          {
-            id: "border-radius",
-            label: t("settings.border_radius"),
-            tooltip: t("settings.border_radius.tooltip"),
-            type: "range",
-            value: borderRadius,
-            onChange: setBorderRadius,
-            min: 0,
-            max: 20,
-            step: 1,
-            icon: "solar:widget-bold",
-            minLabel: "0px",
-            maxLabel: "20px",
-          },
-        ]}
-        disabled={saving}
-      />
+      <SettingsSection id="settings-section-interface" title={t("settings.sections.interface")} icon="solar:slider-horizontal-bold" keywords={kw("settings.sections.interface", "downloads", "interface", "oberfläche", "performance")}>
+        <SettingRow
+          label={t("settings.concurrent_downloads")}
+          description={t("settings.concurrent_downloads.tooltip")}
+          searchKeywords={kw("settings.concurrent_downloads", "download", "downloads", "herunterladen", "parallel")}
+          disabled={saving}
+          vertical
+        >
+          <RangeSlider
+            value={tempConfig?.concurrent_downloads || 3}
+            onChange={handleConcurrentDownloadsChange}
+            min={1}
+            max={10}
+            step={1}
+            disabled={saving}
+            variant="flat"
+            size="sm"
+            minLabel="1"
+            maxLabel="10"
+            icon={<Icon icon="solar:multiple-forward-right-bold" className="w-3 h-3" />}
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.concurrent_io")}
+          description={t("settings.concurrent_io.tooltip")}
+          searchKeywords={kw("settings.concurrent_io", "io", "disk", "parallel", "festplatte")}
+          disabled={saving}
+          vertical
+        >
+          <RangeSlider
+            value={tempConfig?.concurrent_io_limit || 10}
+            onChange={handleConcurrentIoLimitChange}
+            min={1}
+            max={20}
+            step={1}
+            disabled={saving}
+            variant="flat"
+            size="sm"
+            minLabel="1"
+            maxLabel="20"
+            icon={<Icon icon="solar:server-bold" className="w-3 h-3" />}
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.border_radius")}
+          description={t("settings.border_radius.tooltip")}
+          searchKeywords={kw("settings.border_radius", "border", "rand", "ecken", "eckenradius", "corner", "radius", "rounding", "rundung")}
+          disabled={saving}
+          vertical
+        >
+          <RangeSlider
+            value={borderRadius}
+            onChange={setBorderRadius}
+            min={0}
+            max={20}
+            step={1}
+            disabled={saving}
+            variant="flat"
+            size="sm"
+            minLabel="0px"
+            maxLabel="20px"
+            icon={<Icon icon="solar:widget-bold" className="w-3 h-3" />}
+          />
+        </SettingRow>
+      </SettingsSection>
     </div>
   );
 
   const renderAppearanceTab = () => (
     <div className="space-y-6">
-      {/* Theme Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Icon icon="solar:star-bold" className="w-6 h-6 text-white" />
-          <h3 className="text-3xl font-minecraft text-white">
-            {t("settings.theme.title")}
-          </h3>
+      <SettingsSection
+        id="settings-section-theme"
+        title={t("settings.theme.title")}
+        icon="solar:star-bold"
+        keywords={kw("settings.theme.title", "color", "colour", "farbe", "theme", "thema", "design", "skin", "aussehen")}
+        description={t("settings.theme.description")}
+      >
+        <div className="py-3">
+          <ThemeSelector />
         </div>
-        <p className="text-base text-white/70 font-minecraft-ten mt-2">
-          {t("settings.theme.description")}
-        </p>
-      </div>
-      <div className="mt-4">
-        <ThemeSelector />
-      </div>
+      </SettingsSection>
 
-      {/* Background Effect Section */}
-      <div className="mt-8">
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Icon icon="solar:stars-bold" className="w-6 h-6 text-white" />
-              <h3 className="text-3xl font-minecraft text-white">
-                {t("settings.background.title")}
-              </h3>
-            </div>
-            <div className="flex flex-col items-end gap-2" style={{ transform: 'translateY(16px)' }}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white/70 font-minecraft-ten">{t("settings.background.animations")}</span>
-                <ToggleSwitch
-                  checked={!staticBackground}
-                  onChange={() => {
-                    toggleStaticBackground();
-                    toggleBackgroundAnimation();
-                  }}
-                  disabled={saving}
-                  size="sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white/70 font-minecraft-ten">{t("settings.background.skin_animation")}</span>
-                <ToggleSwitch
-                  checked={cosmeticRenderer3d}
-                  onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-                  disabled={saving}
-                  size="sm"
-                />
-              </div>
-              <SnowEffectToggle
-                showLabel={true}
-                size="sm"
-                disabled={saving}
-              />
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_low")}</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="1"
-                  value={qualityLevel === "low" ? 0 : qualityLevel === "medium" ? 1 : 2}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    const levels = ["low", "medium", "high"] as const;
-                    setQualityLevel(levels[value] || "medium");
-                  }}
-                  className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
-                  disabled={saving}
-                />
-                <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_high")}</span>
-              </div>
-            </div>
+      <SettingsSection
+        id="settings-section-background"
+        title={t("settings.background.title")}
+        icon="solar:stars-bold"
+        keywords={kw("settings.background.title", "color", "colour", "farbe", "hintergrund", "background", "effekt", "effect", "animation", "animationen")}
+        description={t("settings.background.description")}
+      >
+        <SettingRow label={t("settings.background.animations")} searchKeywords={kw("settings.background.animations", "animation", "animationen", "motion")} disabled={saving}>
+          <ToggleSwitch
+            checked={!staticBackground}
+            onChange={() => {
+              toggleStaticBackground();
+              toggleBackgroundAnimation();
+            }}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow label={t("settings.background.skin_animation")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving}>
+          <ToggleSwitch
+            checked={cosmeticRenderer3d}
+            onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow label={t("settings.background.snow")} searchKeywords={kw("settings.background.snow", "snow", "schnee", "winter")} disabled={saving}>
+          <SnowEffectToggle showLabel={false} size="md" disabled={saving} />
+        </SettingRow>
+        <SettingRow label={t("settings.background.quality")} searchKeywords={kw("settings.background.quality", "quality", "qualität", "performance", "leistung", "fps")} disabled={saving}>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_low")}</span>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="1"
+              value={qualityLevel === "low" ? 0 : qualityLevel === "medium" ? 1 : 2}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                const levels = ["low", "medium", "high"] as const;
+                setQualityLevel(levels[value] || "medium");
+              }}
+              className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+              disabled={saving}
+            />
+            <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_high")}</span>
           </div>
-          <p className="text-base text-white/70 font-minecraft-ten mt-2">
-            {t("settings.background.description")}
-          </p>
-        </div>
+        </SettingRow>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
           {backgroundOptions.map((option) => (
             <EffectPreviewCard
               key={option.id}
@@ -629,143 +712,128 @@ export function SettingsTab() {
             />
           ))}
         </div>
-      </div>
-
+      </SettingsSection>
     </div>
   );
 
   const renderAdvancedTab = () => (
     <div className="space-y-6">
-      {/* Browser-Based Login Section */}
-      <div>
-        <CompactSettingsGrid
-          settings={[
-            {
-              id: "browser-based-login",
-              label: t("settings.browser_login"),
-              tooltip: t("settings.browser_login.tooltip"),
-              type: "toggle",
-              value: tempConfig?.use_browser_based_login || false,
-              onChange: (checked) =>
-                tempConfig &&
-                setTempConfig({ ...tempConfig, use_browser_based_login: checked }),
-            },
-            {
-              id: "cache-natives-extraction",
-              label: t("settings.cache_natives"),
-              tooltip: t("settings.cache_natives.tooltip"),
-              type: "toggle",
-              value: tempConfig?.cache_natives_extraction ?? true,
-              onChange: (checked) =>
-                tempConfig &&
-                setTempConfig({ ...tempConfig, cache_natives_extraction: checked }),
-            },
-          ]}
+      <SettingsSection id="settings-section-login_cache" title={t("settings.sections.login_cache")} icon="solar:login-3-bold" keywords={kw("settings.sections.login_cache", "login", "cache", "anmeldung")}>
+        <SettingRow
+          label={t("settings.browser_login")}
+          description={t("settings.browser_login.tooltip")}
+          searchKeywords={kw("settings.browser_login", "browser", "login", "anmeldung", "auth", "microsoft")}
           disabled={saving}
-        />
-      </div>
+        >
+          <ToggleSwitch
+            checked={tempConfig?.use_browser_based_login || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, use_browser_based_login: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.cache_natives")}
+          description={t("settings.cache_natives.tooltip")}
+          searchKeywords={kw("settings.cache_natives", "cache", "natives", "extraction", "performance")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.cache_natives_extraction ?? true}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, cache_natives_extraction: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+      </SettingsSection>
 
-      <div>
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon icon="solar:folder-bold" className="w-6 h-6 text-white" />
-            <SimpleTooltip content={t("settings.game_data_dir.tooltip")}>
-              <h3 className="text-3xl font-minecraft text-white lowercase cursor-help">
-                {t("settings.game_data_dir.title")}
-              </h3>
-            </SimpleTooltip>
-          </div>
-          <p className="text-base text-white/70 font-minecraft-ten mt-2">
-            {t("settings.game_data_dir.description")}
-          </p>
-
-          <div className="flex gap-3 mt-4">
-            <input
-              type="text"
-              value={tempConfig?.custom_game_directory || ""}
-              placeholder={t("settings.game_data_dir.placeholder")}
-              className="flex-1 p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
-              disabled={saving}
-              readOnly
-            />
-            {tempConfig?.custom_game_directory && (
-              <Button
-                variant="ghost"
-                className="px-4 py-3 border border-[#ffffff20] hover:bg-red-500/20 hover:border-red-500/30 transition-colors"
-                disabled={saving}
-                onClick={() => {
-                  if (tempConfig) {
-                    setTempConfig({
-                      ...tempConfig,
-                      custom_game_directory: null,
-                    });
-                  }
-                }}
-                title={t("settings.game_data_dir.reset_tooltip")}
-              >
-                <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-red-400" />
-              </Button>
-            )}
+      <SettingsSection
+        id="settings-section-gamedir"
+        title={t("settings.game_data_dir.title")}
+        icon="solar:folder-bold"
+        keywords={kw("settings.game_data_dir.title", "game", "data", "directory", "ordner", "verzeichnis", "pfad", "path", "folder")}
+        description={t("settings.game_data_dir.description")}
+      >
+        <div className="flex gap-3 py-3">
+          <input
+            type="text"
+            value={tempConfig?.custom_game_directory || ""}
+            placeholder={t("settings.game_data_dir.placeholder")}
+            className="flex-1 p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+            disabled={saving}
+            readOnly
+          />
+          {tempConfig?.custom_game_directory && (
             <Button
               variant="ghost"
-              className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+              className="px-4 py-3 border border-[#ffffff20] hover:bg-red-500/20 hover:border-red-500/30 transition-colors"
               disabled={saving}
-              onClick={async () => {
-                try {
-                  const { open } = await import('@tauri-apps/plugin-dialog');
-                  const directory = await open({
-                    multiple: false,
-                    directory: true,
+              onClick={() => {
+                if (tempConfig) {
+                  setTempConfig({
+                    ...tempConfig,
+                    custom_game_directory: null,
                   });
-
-                  if (directory && tempConfig) {
-                    setTempConfig({
-                      ...tempConfig,
-                      custom_game_directory: directory,
-                    });
-                  }
-                } catch (error) {
-                  console.error('Fehler beim Ordner-Dialog:', error);
                 }
               }}
-              title={t("settings.game_data_dir.select_tooltip")}
+              title={t("settings.game_data_dir.reset_tooltip")}
             >
-              <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
+              <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-red-400" />
             </Button>
-          </div>
-        </div>
-      </div>
+          )}
+          <Button
+            variant="ghost"
+            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+            disabled={saving}
+            onClick={async () => {
+              try {
+                const { open } = await import('@tauri-apps/plugin-dialog');
+                const directory = await open({
+                  multiple: false,
+                  directory: true,
+                });
 
-      <div>
-        <div className="mb-4">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              <Icon icon="solar:code-bold" className="w-6 h-6 text-white" />
-              <h3 className="text-3xl font-minecraft text-white lowercase">
-                {t("settings.hooks.title")}
-              </h3>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsHooksExpanded((v) => !v)}
-              icon={
-                <Icon
-                  icon={isHooksExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
-                  className="w-5 h-5"
-                />
+                if (directory && tempConfig) {
+                  setTempConfig({
+                    ...tempConfig,
+                    custom_game_directory: directory,
+                  });
+                }
+              } catch (error) {
+                console.error('Fehler beim Ordner-Dialog:', error);
               }
-            >
-              {isHooksExpanded ? t("settings.hooks.hide") : t("settings.hooks.show")}
-            </Button>
-          </div>
-          <p className="text-base text-white/70 font-minecraft-ten mt-2">
-            {t("settings.hooks.description")}
-          </p>
+            }}
+            title={t("settings.game_data_dir.select_tooltip")}
+          >
+            <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
+          </Button>
         </div>
+      </SettingsSection>
 
+      <SettingsSection
+        id="settings-section-hooks"
+        title={t("settings.hooks.title")}
+        icon="solar:code-bold"
+        keywords={kw("settings.hooks.title", "hook", "hooks", "script", "skript", "command", "befehl", "wrapper")}
+        description={t("settings.hooks.description")}
+        headerActions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsHooksExpanded((v) => !v)}
+            icon={
+              <Icon
+                icon={isHooksExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                className="w-5 h-5"
+              />
+            }
+          >
+            {isHooksExpanded ? t("settings.hooks.hide") : t("settings.hooks.show")}
+          </Button>
+        }
+      >
         {isHooksExpanded && (
-          <div className="space-y-6 mt-6">
+          <div className="space-y-6 py-3">
             <div className="p-4 rounded-lg border border-[#ffffff20] hover:bg-black/30 transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -983,33 +1051,29 @@ export function SettingsTab() {
             </div>
           </div>
         )}
-      </div>
+      </SettingsSection>
 
-      <div>
-        <div className="mb-4">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              <Icon icon="solar:document-text-bold" className="w-6 h-6 text-white" />
-              <h3 className="text-3xl font-minecraft text-white lowercase">
-                {t("settings.licenses.title")}
-              </h3>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                openExternalUrl("https://norisk.gg/licenses")
-              }}
-              icon={<Icon icon="solar:external-link-bold" className="w-5 h-5" />}
-            >
-              {t("settings.licenses.view")}
-            </Button>
-          </div>
-          <p className="text-base text-white/70 font-minecraft-ten mt-2">
-            {t("settings.licenses.description")}
-          </p>
-        </div>
-      </div>
+      <SettingsSection
+        id="settings-section-licenses"
+        title={t("settings.licenses.title")}
+        icon="solar:document-text-bold"
+        keywords={kw("settings.licenses.title", "license", "licenses", "lizenz", "lizenzen", "credits")}
+        description={t("settings.licenses.description")}
+        headerActions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              openExternalUrl("https://norisk.gg/licenses")
+            }}
+            icon={<Icon icon="solar:external-link-bold" className="w-5 h-5" />}
+          >
+            {t("settings.licenses.view")}
+          </Button>
+        }
+      >
+        <div className="py-1" />
+      </SettingsSection>
 
     </div>
   );
@@ -1070,6 +1134,25 @@ export function SettingsTab() {
       );
     }
 
+    if (sidebarQuery) {
+      const bodyOf: Partial<Record<SettingsTabId, () => ReactNode>> = {
+        general: renderGeneralTab,
+        appearance: renderAppearanceTab,
+        advanced: renderAdvancedTab,
+      };
+      const order: SettingsTabId[] = ["general", "appearance", "advanced"];
+      const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
+        (id) => bodyOf[id],
+      ) as SettingsTabId[];
+      return (
+        <div className="space-y-6">
+          {ordered.map((id) => (
+            <Fragment key={id}>{bodyOf[id]!()}</Fragment>
+          ))}
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "general":
         return renderGeneralTab();
@@ -1086,46 +1169,120 @@ export function SettingsTab() {
 
 
   return (
-    <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      {/* Header with Group Tabs and Actions */}
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
-        {/* Group Tabs */}
-        <GroupTabs
-          groups={groups}
-          activeGroup={activeTab}
-          onGroupChange={(groupId) => setActiveTab(groupId as "general" | "appearance" | "advanced" | "debug")}
-          showAddButton={false}
+    <Modal
+      title={t("nav.settings")}
+      titleIcon={<Icon icon="solar:settings-bold" className="w-8 h-8" />}
+      onClose={onClose}
+      width="xl"
+      className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
+      headerActions={
+        <ActionButton
+          id="open-directory"
+          label={t("settings.open_directory")}
+          icon="solar:folder-bold"
+          variant="highlight"
+          tooltip={t("settings.open_directory.tooltip")}
+          size="sm"
+          onClick={async () => {
+            try {
+              await openLauncherDirectory();
+            } catch (err) {
+              console.error("Failed to open launcher directory:", err);
+              toast.error(t("settings.open_directory.error", { error: parseErrorMessage(err) }));
+            }
+          }}
         />
+      }
+    >
+      <div className="flex h-full p-4 gap-2">
+        <div className="w-64 flex flex-col flex-shrink-0">
+          <div className="px-1 pb-3">
+            <SearchWithFilters
+              placeholder={t("common.search")}
+              searchValue={sidebarSearch}
+              onSearchChange={setSidebarSearch}
+              showSort={false}
+              showFilter={false}
+              compact
+              className="w-full"
+            />
+          </div>
+          <div ref={sidebarListRef} className="space-y-0 flex-1 overflow-y-auto custom-scrollbar">
+            {tabConfig.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <div key={tab.id}>
+                  <button
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                      isActive
+                        ? "text-white"
+                        : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
+                    )}
+                    style={isActive ? { backgroundColor: `${accentColor.value}26` } : undefined}
+                    onClick={() => selectTab(tab.id)}
+                  >
+                    <Icon
+                      icon={tab.icon}
+                      className="w-6 h-6 transition-colors duration-200"
+                      style={{ color: isActive ? accentColor.value : undefined }}
+                    />
+                    <span
+                      className={cn(
+                        "font-minecraft text-3xl lowercase transition-colors duration-200",
+                        isActive && "font-medium",
+                      )}
+                    >
+                      {tab.label}
+                    </span>
+                  </button>
 
-        {/* Header Actions */}
-        <div style={{ transform: 'translateY(-3px)' }}>
-          <ActionButton
-            id="open-directory"
-            label={t("settings.open_directory")}
-            icon="solar:folder-bold"
-            variant="highlight"
-            tooltip={t("settings.open_directory.tooltip")}
-            size="sm"
-            onClick={async () => {
-              try {
-                await openLauncherDirectory();
-              } catch (err) {
-                console.error("Failed to open launcher directory:", err);
-                toast.error(t("settings.open_directory.error", { error: parseErrorMessage(err) }));
-              }
-            }}
-          />
+                  {isActive && !sidebarQuery && tab.children && (
+                    <div className="flex flex-col mt-1 ml-5 border-l border-white/10">
+                      {tab.children.map((child) => {
+                        const childActive = activeSection === child.id;
+                        return (
+                          <button
+                            key={child.id}
+                            data-section-id={child.id}
+                            className={cn(
+                              "w-full text-left pl-4 pr-2 py-1.5 -ml-px border-l-2 outline-none font-minecraft text-2xl lowercase transition-[color,border-color] duration-150",
+                              childActive
+                                ? "text-white"
+                                : "border-transparent text-white/40 hover:text-white/75",
+                            )}
+                            style={childActive ? { borderColor: accentColor.value } : undefined}
+                            onClick={() => scrollToSection(child.id)}
+                          >
+                            {child.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Content */}
-        <div ref={contentRef}>
-          {renderTabContent()}
+        <div className="flex items-center">
+          <div className="border-l border-white/10 mx-4 my-3 h-[85%]"></div>
+        </div>
+
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div
+            ref={contentRef}
+            className="flex-1 py-2 px-5 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
+          >
+            <SettingsSearchContext.Provider value={sidebarQuery}>
+              {renderTabContent()}
+            </SettingsSearchContext.Provider>
+          </div>
         </div>
       </div>
 
       {confirmDialog}
-    </div>
+    </Modal>
   );
 }

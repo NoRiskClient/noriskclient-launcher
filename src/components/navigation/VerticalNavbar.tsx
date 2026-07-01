@@ -17,6 +17,7 @@ interface NavItem {
   icon: string;
   label: string;
   action?: () => void;
+  isAction?: boolean;
 }
 
 interface VerticalNavbarProps {
@@ -87,8 +88,8 @@ export function VerticalNavbar({
     return () => ctx.revert();
   }, []);
 
-  const handleItemClick = (id: string) => {
-    setActive(id);
+  const handleItemClick = (id: string, isAction?: boolean) => {
+    if (!isAction) setActive(id);
     if (onItemClick) {
       onItemClick(id);
     }
@@ -118,6 +119,24 @@ export function VerticalNavbar({
     setShowTooltip(null);
   };
 
+  const renderItem = (item: NavItem) => (
+    <div
+      key={item.id}
+      className="relative group nav-item flex flex-col items-center"
+      ref={(el) => (buttonRefs.current[item.id] = el)}
+    >
+      <NavButton
+        icon={<Icon icon={item.icon} className="w-8 h-8" />}
+        label={item.isAction ? undefined : item.label}
+        isActive={active === item.id}
+        onClick={() => handleItemClick(item.id, item.isAction)}
+        onMouseEnter={() => handleMouseEnter(item.id)}
+        onMouseLeave={handleMouseLeave}
+        aria-label={item.label}
+      />
+    </div>
+  );
+
   return (
     <>
       <div
@@ -137,23 +156,14 @@ export function VerticalNavbar({
         </div>
 
         <div className="flex-1 flex flex-col items-center space-y-4 min-h-[400px]">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="relative group nav-item"
-              ref={(el) => (buttonRefs.current[item.id] = el)}
-            >
-              <NavButton
-                icon={<Icon icon={item.icon} className="w-8 h-8" />}
-                isActive={active === item.id}
-                onClick={() => handleItemClick(item.id)}
-                onMouseEnter={() => handleMouseEnter(item.id)}
-                onMouseLeave={handleMouseLeave}
-                aria-label={item.label}
-              />
-            </div>
-          ))}
+          {items.filter((item) => !item.isAction).map(renderItem)}
         </div>
+
+        {items.some((item) => item.isAction) && (
+          <div className="flex flex-col items-center space-y-4 mt-4">
+            {items.filter((item) => item.isAction).map(renderItem)}
+          </div>
+        )}
       </div>      {isMounted &&
         showTooltip &&
         document.body &&

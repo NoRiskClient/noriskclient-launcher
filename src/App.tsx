@@ -49,6 +49,7 @@ import ChildProtectionModal from "./components/modals/ChildProtectionModal";
 import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
+import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
 import { hasPermission, refreshPermissions } from "./services/permission-service";
 import {
@@ -512,6 +513,14 @@ export function App() {
   }, [incrementLaunchCount]);
 
   const handleNavChange = async (tabId: string) => {
+    if (tabId === "settings") {
+      useSettingsModalStore.getState().open();
+      if (analyticsConsent.decision === 'accepted') {
+        trackEvent('sidebar_tab_clicked', { tab_name: 'settings' }).catch(console.error);
+      }
+      return;
+    }
+
     navigate(`/${tabId}`);
 
     // Track tab clicked only if analytics are enabled
