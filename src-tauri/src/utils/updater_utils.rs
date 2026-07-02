@@ -1,8 +1,16 @@
-use crate::error::{AppError, Result as AppResult};
-use log::{error, info, warn};
+#[cfg(desktop)]
+use crate::error::AppError;
+use crate::error::Result as AppResult;
+#[cfg(desktop)]
+use log::warn;
+use log::{error, info};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+#[cfg(desktop)]
+use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter};
+#[cfg(desktop)]
 use tauri_plugin_updater::UpdaterExt;
+#[cfg(desktop)]
 use tokio::time::{sleep, Duration};
 
 /// Checks if the application is running inside a Flatpak environment.
@@ -35,6 +43,7 @@ pub fn is_flatpak() -> bool {
 /// # Returns
 ///
 /// * `Result<Option<UpdateCheckResult>>` - Detailed update information with updater instance, or None if up to date.
+#[cfg(desktop)]
 pub async fn check_update_available_detailed(
     app_handle: &AppHandle,
     is_beta_channel: bool,
@@ -139,6 +148,7 @@ pub async fn check_update_available_detailed(
 /// # Returns
 ///
 /// * `Result<Option<UpdateInfo>>` - Information about the available update, or None if up to date.
+#[cfg(desktop)]
 pub async fn check_update_available(
     app_handle: &AppHandle,
     is_beta_channel: bool,
@@ -148,6 +158,15 @@ pub async fn check_update_available(
         Some(result) => Ok(Some(result.update_info)),
         None => Ok(None),
     }
+}
+
+// Mobile builds ship via app stores, the desktop self-updater does not apply.
+#[cfg(mobile)]
+pub async fn check_update_available(
+    _app_handle: &AppHandle,
+    _is_beta_channel: bool,
+) -> AppResult<Option<UpdateInfo>> {
+    Ok(None)
 }
 
 // Define the payload structure for updater status events
@@ -170,6 +189,7 @@ pub struct UpdateInfo {
 }
 
 // Structure to hold update information along with the updater instance
+#[cfg(desktop)]
 pub struct UpdateCheckResult {
     pub update_info: UpdateInfo,
     pub updater: tauri_plugin_updater::Updater,
@@ -204,6 +224,7 @@ pub fn emit_status(
 /// # Returns
 ///
 /// * `Result<WebviewWindow>` - The created Tauri webview window instance or an error.
+#[cfg(desktop)]
 pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
     info!("Creating updater window...");
     let window = WebviewWindowBuilder::new(
@@ -236,6 +257,17 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
 /// # Returns
 ///
 /// * `Result<(), AppError>` - Ok if update was successful, Error otherwise.
+#[cfg(mobile)]
+pub async fn download_and_install_update(
+    _app_handle: &AppHandle,
+    _is_beta_channel: bool,
+) -> AppResult<()> {
+    Err(crate::error::AppError::Other(
+        "Self-update is not supported on mobile".to_string(),
+    ))
+}
+
+#[cfg(desktop)]
 pub async fn download_and_install_update(
     app_handle: &AppHandle,
     is_beta_channel: bool,
@@ -258,6 +290,7 @@ pub async fn download_and_install_update(
 }
 
 /// Versucht, ein gefundenes Update herunterzuladen, zu installieren und ggf. die App neu zu starten.
+#[cfg(desktop)]
 async fn handle_update(
     update: tauri_plugin_updater::Update,
     app_handle: AppHandle,
@@ -400,6 +433,7 @@ async fn handle_update(
 /// * `app_handle` - The Tauri AppHandle.
 /// * `is_beta_channel` - `true` to check the beta channel, `false` for stable.
 /// * `updater_window` - An optional WebviewWindow handle to show the updater window.
+#[cfg(desktop)]
 pub async fn check_for_updates(
     app_handle: AppHandle,
     is_beta_channel: bool,

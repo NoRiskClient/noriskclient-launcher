@@ -1,13 +1,23 @@
+#[cfg(desktop)]
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
-use crate::error::{AppError, Result};
+#[cfg(desktop)]
+use crate::error::AppError;
+use crate::error::Result;
 use crate::state;
+#[cfg(desktop)]
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
-use log::{debug, error, info, warn};
+#[cfg(desktop)]
+use log::warn;
+use log::{debug, error, info};
 use std::sync::Arc;
+#[cfg(desktop)]
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::{Mutex, RwLock};
+#[cfg(desktop)]
+use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
+#[cfg(desktop)]
 const DISCORD_APP_ID: &str = "1237087999104122981";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +30,7 @@ pub enum DiscordState {
     },
 }
 
+#[cfg(desktop)]
 #[derive(Clone)]
 pub struct DiscordManager {
     client: Arc<Mutex<Option<DiscordIpcClient>>>,
@@ -29,6 +40,65 @@ pub struct DiscordManager {
     last_client_state: Arc<RwLock<Option<String>>>,
 }
 
+// Discord IPC needs a local Discord desktop client; on mobile the manager is a no-op shell.
+#[cfg(mobile)]
+#[derive(Clone)]
+pub struct DiscordManager {
+    current_state: Arc<RwLock<DiscordState>>,
+    enabled: Arc<RwLock<bool>>,
+}
+
+#[cfg(mobile)]
+impl DiscordManager {
+    pub async fn new(enabled: bool) -> Result<Self> {
+        info!("Discord Rich Presence not supported on mobile, using no-op manager (enabled flag: {})", enabled);
+        Ok(Self {
+            current_state: Arc::new(RwLock::new(DiscordState::Idle)),
+            enabled: Arc::new(RwLock::new(enabled)),
+        })
+    }
+
+    pub async fn set_state(&self, state: DiscordState, _force: bool) -> Result<()> {
+        debug!("Discord (mobile no-op): set_state {:?}", state);
+        *self.current_state.write().await = state;
+        Ok(())
+    }
+
+    pub fn cleanup_launcher_file() {}
+
+    pub async fn set_enabled(&self, enabled: bool) -> Result<()> {
+        *self.enabled.write().await = enabled;
+        Ok(())
+    }
+
+    pub async fn clear_idle_timestamp(&self) {}
+
+    pub async fn get_current_state(&self) -> DiscordState {
+        self.current_state.read().await.clone()
+    }
+
+    pub async fn is_enabled(&self) -> bool {
+        *self.enabled.read().await
+    }
+
+    pub async fn handle_focus_event(&self) -> Result<()> {
+        Ok(())
+    }
+
+    pub async fn set_custom_state(&self, _text: String) {}
+
+    pub async fn notify_game_start(
+        &self,
+        _process_id: Uuid,
+        _profile_name: Option<String>,
+        _mc_version: Option<String>,
+    ) {
+    }
+
+    pub async fn notify_game_stop(&self, _process_id: Uuid) {}
+}
+
+#[cfg(desktop)]
 impl DiscordManager {
     pub async fn new(enabled: bool) -> Result<Self> {
         info!(

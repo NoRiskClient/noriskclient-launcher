@@ -156,9 +156,17 @@ pub async fn set_discord_state(
 
 #[tauri::command]
 pub async fn open_minecraft_log_window<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    crashed_process: Option<String>, // JSON-encoded ProcessMetadata for crashed process
+    #[allow(unused_variables)] app: tauri::AppHandle<R>,
+    #[allow(unused_variables)] crashed_process: Option<String>, // JSON-encoded ProcessMetadata for crashed process
 ) -> Result<(), CommandError> {
+    #[cfg(mobile)]
+    {
+        Err(CommandError::from(crate::error::AppError::Other(
+            "Log windows are not supported on mobile".to_string(),
+        )))
+    }
+    #[cfg(desktop)]
+    {
     let window_label = "minecraft_log_window";
 
     if let Some(window) = app.get_webview_window(window_label) {
@@ -208,9 +216,11 @@ pub async fn open_minecraft_log_window<R: tauri::Runtime>(
     .map_err(|e| CommandError::from(crate::error::AppError::Other(e.to_string())))?;
 
     Ok(())
+    }
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn open_single_log_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     instance_id: String,
@@ -219,6 +229,14 @@ pub async fn open_single_log_window<R: tauri::Runtime>(
     account_name: Option<String>,
     start_time: Option<i64>,
 ) -> Result<(), CommandError> {
+    #[cfg(mobile)]
+    {
+        Err(CommandError::from(crate::error::AppError::Other(
+            "Log windows are not supported on mobile".to_string(),
+        )))
+    }
+    #[cfg(desktop)]
+    {
     let window_label = format!("single_log_window_{}", instance_id);
 
     if let Some(window) = app.get_webview_window(&window_label) {
@@ -269,12 +287,16 @@ pub async fn open_single_log_window<R: tauri::Runtime>(
     .map_err(|e| CommandError::from(crate::error::AppError::Other(e.to_string())))?;
 
     Ok(())
+    }
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn focus_main_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
+    // Mobile has a single fullscreen activity, nothing to focus.
+    #[cfg(desktop)]
     if let Some(window) = app.get_webview_window("main") {
         window.show().map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(

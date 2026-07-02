@@ -22,7 +22,16 @@ pub async fn get_news_and_changelogs_command() -> Result<Vec<BlogPost>, CommandE
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
+    #[cfg(mobile)]
+    {
+        return Err(CommandError::from(AppError::Other(
+            "Discord linking is not supported on mobile yet".to_string(),
+        )));
+    }
+    #[cfg(desktop)]
+    {
     debug!("Executing discord_auth_link command");
     let state = State::get().await?;
 
@@ -137,6 +146,7 @@ pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
         )))
     })?;
     Ok(())
+    }
 }
 
 #[tauri::command]
@@ -193,7 +203,16 @@ pub async fn discord_auth_unlink() -> Result<(), CommandError> {
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
+    #[cfg(mobile)]
+    {
+        return Err(CommandError::from(AppError::Other(
+            "GitHub linking is not supported on mobile yet".to_string(),
+        )));
+    }
+    #[cfg(desktop)]
+    {
     debug!("Executing github_auth_link command");
     let state = State::get().await?;
 
@@ -308,6 +327,7 @@ pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
         )))
     })?;
     Ok(())
+    }
 }
 
 #[tauri::command]

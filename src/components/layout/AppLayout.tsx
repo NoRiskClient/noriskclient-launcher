@@ -6,6 +6,8 @@ import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
 
 import { VerticalNavbar } from ".././navigation/VerticalNavbar";
+import { MobileBottomNav } from ".././navigation/MobileBottomNav";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import { UserProfileBar } from ".././header/UserProfileBar";
 import { NavigationHistory } from "../ui/NavigationHistory";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -63,6 +65,7 @@ export function AppLayout({
   onNavChange,
 }: AppLayoutProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const launcherRef = useRef<HTMLDivElement>(null);
   const backgroundPatternRef = useRef<HTMLDivElement>(null);
   const minimizeRef = useRef<HTMLDivElement>(null);
@@ -315,7 +318,7 @@ export function AppLayout({
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]"
+      className={`h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)] ${isMobile ? "flex-col" : ""}`}
       style={{
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
@@ -327,19 +330,22 @@ export function AppLayout({
     >
       <BorderGlowEffects accentColor={themeAccentColor.value} />
 
-      <VerticalNavbar
-        items={navItems}
-        activeItem={activeTab}
-        onItemClick={onNavChange}
-        className="h-full border-r-2 z-10"
-        version={appConfig.version}
-      />
+      {!isMobile && (
+        <VerticalNavbar
+          items={navItems}
+          activeItem={activeTab}
+          onItemClick={onNavChange}
+          className="h-full border-r-2 z-10"
+          version={appConfig.version}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden ${isMobile ? "min-h-0" : "h-full"}`}>
         <HeaderBar
           minimizeRef={minimizeRef}
           maximizeRef={maximizeRef}
           closeRef={closeRef}
+          isMobile={isMobile}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -352,6 +358,14 @@ export function AppLayout({
           </div>
         </div>
       </div>
+
+      {isMobile && (
+        <MobileBottomNav
+          items={navItems}
+          activeItem={activeTab}
+          onItemClick={onNavChange}
+        />
+      )}
       {/* Global Modals Portal */}
       <SocialsModal />
       <ProfileWizardV2Modal />
@@ -398,9 +412,10 @@ interface HeaderBarProps {
   minimizeRef: React.RefObject<HTMLDivElement>;
   maximizeRef: React.RefObject<HTMLDivElement>;
   closeRef: React.RefObject<HTMLDivElement>;
+  isMobile?: boolean;
 }
 
-function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
+function HeaderBar({ minimizeRef, maximizeRef, closeRef, isMobile }: HeaderBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -497,7 +512,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
 
   return (
     <div
-      className="h-20 flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between px-8 z-10"
+      className={`flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between z-10 ${isMobile ? "h-14 px-3 pt-[env(safe-area-inset-top)]" : "h-20 px-8"}`}
       style={{
         borderColor: `${accentColor.value}40`,
         backgroundColor: `rgba(${Number.parseInt(accentColor.value.slice(1, 3), 16)}, ${Number.parseInt(
@@ -507,13 +522,13 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       }}
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-4" data-tauri-drag-region>
-        <NavigationHistory />
+      <div className={`flex items-center ${isMobile ? "gap-2 min-w-0" : "gap-4"}`} data-tauri-drag-region>
+        {!isMobile && <NavigationHistory />}
 
-        <div className="flex flex-col items-start -mt-2.5">
+        <div className={`flex flex-col items-start ${isMobile ? "" : "-mt-2.5"}`}>
           <div className="flex items-center gap-3">
             <h1
-              className="font-minecraft text-4xl tracking-wider font-bold lowercase text-shadow"
+              className={`font-minecraft tracking-wider font-bold lowercase text-shadow ${isMobile ? "text-2xl" : "text-4xl"}`}
               data-tauri-drag-region
             >
               noriskclient
@@ -535,18 +550,20 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               </Tooltip>
             )}
           </div>
-          <HeaderInfoCarousel version={appVersion} />
+          {!isMobile && <HeaderInfoCarousel version={appVersion} />}
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <UserProfileBar />
+      <div className={`flex items-center ${isMobile ? "gap-2" : "gap-4"}`}>
+        <UserProfileBar compact={isMobile} />
 
-        <WindowControls
-          minimizeRef={minimizeRef}
-          maximizeRef={maximizeRef}
-          closeRef={closeRef}
-        />
+        {!isMobile && (
+          <WindowControls
+            minimizeRef={minimizeRef}
+            maximizeRef={maximizeRef}
+            closeRef={closeRef}
+          />
+        )}
       </div>
     </div>
   );

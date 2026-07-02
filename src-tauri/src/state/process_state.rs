@@ -817,6 +817,7 @@ impl ProcessManager {
             let launcher_config = global_state.config_manager.get_config().await;
             if launcher_config.hide_on_process_start {
                 log::info!("Hiding main window as configured (hide_on_process_start = true)");
+                #[cfg(desktop)]
                 if let Some(main_window) = self.app_handle.get_webview_window("main") {
                     if let Err(e) = main_window.hide() {
                         log::error!("Failed to hide main window: {}", e);
@@ -1049,6 +1050,7 @@ impl ProcessManager {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
                     log::info!("Showing main window after process exit (hide_on_process_start = true)");
+                    #[cfg(desktop)]
                     if let Some(main_window) = app_handle_clone_for_monitor.get_webview_window("main") {
                         if let Err(e) = main_window.show() {
                             log::error!("Failed to show main window after process exit: {}", e);

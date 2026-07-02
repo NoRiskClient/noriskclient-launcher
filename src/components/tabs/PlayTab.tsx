@@ -18,6 +18,7 @@ import { ReferralBanner } from "../ui/ReferralBanner";
 import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import { setDiscordState } from "../../utils/discordRpc";
 
 export function PlayTab() {
@@ -34,6 +35,7 @@ export function PlayTab() {
   const { currentEffect } = useBackgroundEffectStore();
   const { isThemeActive, selectedTheme } = useLauncherTheme();
   const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
+  const isMobile = useIsMobile();
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -64,7 +66,7 @@ export function PlayTab() {
 
   return (
     <div className="flex h-full relative">
-      <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
+      <div className={`flex-grow flex flex-col items-center justify-center relative z-15 ${isMobile ? "p-4" : "p-8"}`}>
         {/* Only show RetroGrid effect if no theme background is active */}
         {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && !(isThemeActive && selectedTheme?.backgroundImage) && (
           <RetroGridEffect
@@ -79,7 +81,8 @@ export function PlayTab() {
           <ReferralBanner />
         </div>
 
-        {/* 3D Render Toggle - Top Right */}
+        {/* 3D Render Toggle - Top Right (desktop only, too cramped on phones) */}
+        {!isMobile && (
         <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
           <span className="text-sm text-white/70 font-minecraft-ten">SKIN ANIMATION</span>
           <ToggleSwitch
@@ -88,6 +91,7 @@ export function PlayTab() {
             size="sm"
           />
         </div>
+        )}
 
         {/* <VersionInfo
           profileId={currentDisplayProfile?.id || ""}
@@ -117,7 +121,9 @@ export function PlayTab() {
         </div>
       </div>
 
-      <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />
+      {!isMobile && (
+        <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />
+      )}
     </div>
   );
 }

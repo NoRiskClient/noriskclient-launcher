@@ -739,6 +739,7 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
                     Ok(profile_id) => {
                         info!("Profile {} imported successfully.", profile_id);
                         // Attempt to bring the main window to the front and focus it.
+                        #[cfg(desktop)]
                         if let Some(window) = import_app_handle.get_webview_window("main") {
                             if let Err(e) = window.unminimize() {
                                 warn!("Failed to unminimize window: {:?}", e);

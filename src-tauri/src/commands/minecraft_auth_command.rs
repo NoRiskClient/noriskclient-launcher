@@ -232,6 +232,14 @@ pub async fn begin_login<R: Runtime>(
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
     } else {
+        #[cfg(mobile)]
+        {
+            return Err(CommandError::from(AppError::Other(
+                "Webview login window is not supported on mobile yet".to_string(),
+            )));
+        }
+        #[cfg(desktop)]
+        {
         // Non-Flatpak: Use Tauri webview window (existing behavior)
         info!("[Login] Using Tauri webview flow (non-Flatpak)");
 
@@ -305,6 +313,7 @@ pub async fn begin_login<R: Runtime>(
 
         window.close().map_err(|e| AppError::Other(e.to_string()))?;
         Ok(None)
+        }
     }
 }
 

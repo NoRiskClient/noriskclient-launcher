@@ -10,6 +10,7 @@ use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::error;
 use log::info;
+#[cfg(desktop)]
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
@@ -805,10 +806,16 @@ impl MinecraftAuthStore {
         if force_update || maybe_update {
             // Generate privacy-friendly hashed system identifier
             // Hash a salt string with HWID for consistent but anonymous identification
+            #[cfg(desktop)]
             let hwid = IdBuilder::new(Encryption::SHA256)
                 .add_component(HWIDComponent::SystemID)
                 .build("NRC")
                 .map_err(|e| AppError::Other(format!("HWID Error {:?}", e)))?;
+
+            // machineid-rs has no Android backend; PoC fallback keeps the token
+            // refresh flow working with a static per-platform identifier.
+            #[cfg(mobile)]
+            let hwid = String::from("nrc-mobile-poc-device");
 
             // Create deterministic hash by combining salt with HWID
             use sha2::{Sha256, Digest};

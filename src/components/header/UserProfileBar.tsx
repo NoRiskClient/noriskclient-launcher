@@ -17,9 +17,11 @@ import { NotificationBell } from "./NotificationBell";
 
 interface UserProfileBarProps {
   className?: string;
+  /** Mobile header: only account switcher + notifications, no instances/friends/socials. */
+  compact?: boolean;
 }
 
-export function UserProfileBar({ className }: UserProfileBarProps) {
+export function UserProfileBar({ className, compact }: UserProfileBarProps) {
   const { t } = useTranslation();
   const profileButtonRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -60,7 +62,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
     <div className={cn("relative flex items-center gap-3", className)}>
       <div className="profile-bar-container flex items-center gap-2">
         <NotificationBell />
-        <RunningInstancesIndicator />
+        {!compact && <RunningInstancesIndicator />}
 
         <div ref={profileButtonRef}>
           <CurrentAccountDisplay
@@ -69,23 +71,27 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
           />
         </div>
 
-        <IconButton
-          icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
-          onClick={toggleFriendsSidebar}
-          variant="flat"
-          size="sm"
-          aria-label={t('header.toggle_friends')}
-          className="text-white/70 hover:text-white h-10 w-10"
-        />
+        {!compact && (
+          <>
+            <IconButton
+              icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
+              onClick={toggleFriendsSidebar}
+              variant="flat"
+              size="sm"
+              aria-label={t('header.toggle_friends')}
+              className="text-white/70 hover:text-white h-10 w-10"
+            />
 
-        <IconButton
-          icon={<Icon icon="solar:link-linear" className="w-5 h-5" />}
-          onClick={openSocialsModal}
-          variant="flat"
-          size="sm"
-          aria-label={t('header.open_socials')}
-          className="text-white/70 hover:text-white h-10 w-10"
-        />
+            <IconButton
+              icon={<Icon icon="solar:link-linear" className="w-5 h-5" />}
+              onClick={openSocialsModal}
+              variant="flat"
+              size="sm"
+              aria-label={t('header.open_socials')}
+              className="text-white/70 hover:text-white h-10 w-10"
+            />
+          </>
+        )}
       </div>
 
   

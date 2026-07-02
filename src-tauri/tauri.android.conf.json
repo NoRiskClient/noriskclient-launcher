@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "NoRiskClient",
+        "width": 1280,
+        "height": 800,
+        "decorations": false,
+        "transparent": false,
+        "visible": true,
+        "shadow": false
+      }
+    ]
+  }
+}

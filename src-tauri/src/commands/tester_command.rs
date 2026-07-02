@@ -93,9 +93,18 @@ pub async fn submit_tester_vote(
 }
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn open_tester_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
+    #[cfg(mobile)]
+    {
+        return Err(CommandError::from(AppError::Other(
+            "Tester window is not supported on mobile".to_string(),
+        )));
+    }
+    #[cfg(desktop)]
+    {
     let other = |action: &str, e: tauri::Error| {
         CommandError::from(AppError::Other(format!(
             "Failed to {} tester window: {}",
@@ -128,4 +137,5 @@ pub async fn open_tester_window<R: tauri::Runtime>(
     .map_err(|e| CommandError::from(AppError::Other(e.to_string())))?;
 
     Ok(())
+    }
 }
