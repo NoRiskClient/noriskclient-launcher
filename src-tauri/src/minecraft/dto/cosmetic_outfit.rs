@@ -27,6 +27,7 @@ pub struct CosmeticSettings {
     pub scale: Option<f64>,
     pub offset: Option<Vector3f>,
     pub custom_texture: Option<CustomTextureSource>,
+    pub selected_texture: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
