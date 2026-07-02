@@ -1,31 +1,25 @@
+use crate::commands::request_context::account_ctx;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, CommandError};
 use crate::minecraft::api::mcreal_api::{
     McRealApi, McRealCommentWithRating, McRealCommentsHolder, McRealPostWithRating, McRealProfile,
     McRealRating, McRealUserClient,
 };
-use crate::state::state_manager::State;
 use log::debug;
 use std::path::PathBuf;
 
 /// Resolves (norisk_token, account_uuid, is_experimental) for the active account.
+/// McReal routes always need the uuid as query param, hence the thin wrapper
+/// around the shared account_ctx helper.
 async fn mcreal_auth() -> Result<(String, String, bool), CommandError> {
-    let state = State::get().await?;
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-
-    let account = state
-        .minecraft_account_manager_v2
-        .get_active_account()
-        .await?
+    let ctx = account_ctx(None).await?;
+    let uuid = ctx
+        .account_uuid
         .ok_or(AppError::AccountError(
             "No active account found for McReal.".to_string(),
-        ))?;
-
-    let token = account
-        .norisk_credentials
-        .get_token_for_mode(is_experimental)?;
-
-    Ok((token, account.id.to_string(), is_experimental))
+        ))?
+        .to_string();
+    Ok((ctx.token, uuid, ctx.is_experimental))
 }
 
 #[tauri::command]
