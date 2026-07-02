@@ -1,4 +1,12 @@
 {
+  "build": {
+    "devUrl": "http://localhost:1431"
+  },
+  "bundle": {
+    "android": {
+      "versionCode": 6025
+    }
+  },
   "app": {
     "windows": [
       {

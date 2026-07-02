@@ -73,7 +73,7 @@ export function AppLayout({
   const closeRef = useRef<HTMLDivElement>(null);
   const { currentEffect } = useBackgroundEffectStore();
 
-  const navItems = [
+  const allNavItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
@@ -84,6 +84,11 @@ export function AppLayout({
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
+  // Mobile: no local Minecraft install, so profile/mod management stays desktop-only.
+  const MOBILE_NAV_IDS = ["play", "mcreal", "skins", "capes", "settings"];
+  const navItems = isMobile
+    ? allNavItems.filter((item) => MOBILE_NAV_IDS.includes(item.id))
+    : allNavItems;
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();

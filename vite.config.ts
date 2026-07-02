@@ -14,8 +14,10 @@ export default defineConfig(async () => ({
   // 1. prevent vite from obscuring rust errors
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
+  // Mobile dev (TAURI_DEV_HOST set by the tauri CLI) uses its own port so a
+  // desktop `tauri dev` can run in parallel.
   server: {
-    port: 1430,
+    port: host ? 1431 : 1430,
     strictPort: true,
     host: host || false,
     hmr: host
