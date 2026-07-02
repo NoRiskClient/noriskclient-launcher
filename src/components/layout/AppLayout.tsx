@@ -79,6 +79,7 @@ export function AppLayout({
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    { id: "mcreal", icon: "solar:camera-bold", label: t("nav.mcreal") },
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
