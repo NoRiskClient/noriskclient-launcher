@@ -7,6 +7,7 @@ pub mod fabric_api;
 pub mod forge_api;
 pub mod mc_api;
 pub mod mclogs_api;
+pub mod mcreal_api;
 pub mod neo_forge_api;
 pub mod norisk_api;
 pub mod payload_cms_api;
