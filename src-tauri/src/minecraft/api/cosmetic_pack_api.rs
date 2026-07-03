@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
-use crate::error::{AppError, Result};
+use crate::error::Result;
+use crate::utils::http_client::nrc_get;
 use crate::minecraft::dto::cosmetic_outfit::CosmeticSettings;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -79,12 +80,7 @@ pub async fn load_pack_index(pack: &str) -> Result<ParsedPack> {
     }
 
     let url = format!("https://api.norisk.gg/api/v1/launcher/pack/{}", pack);
-    let response = HTTP_CLIENT.get(url).send().await.map_err(|e| {
-        AppError::RequestError(format!("Failed to fetch cosmetic pack index: {}", e))
-    })?;
-    let index: Value =
-        crate::utils::api_utils::parse_response_with_logging(response, "Cosmetic pack index")
-            .await?;
+    let index: Value = nrc_get(url).json::<Value>("Cosmetic pack index").await?;
     Ok(parse_index(&index))
 }
 

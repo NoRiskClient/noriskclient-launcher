@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -104,6 +104,21 @@ export function Tooltip({
       }
     };
   }, []);
+
+  // Static mode: once the tooltip is measurable, clamp its centered x so it never
+  // overflows the viewport edges (e.g. buttons near the right border).
+  useLayoutEffect(() => {
+    if (!isStatic || !isVisible) return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    const tip = tooltipRef.current;
+    if (!rect || !tip) return;
+    const margin = 8;
+    const half = tip.offsetWidth / 2;
+    let x = rect.left + rect.width / 2;
+    x = Math.min(x, window.innerWidth - margin - half);
+    x = Math.max(x, margin + half);
+    setTooltipPosition((prev) => (prev.x === x ? prev : { x, y: rect.top - 8 }));
+  }, [isVisible, isStatic]);
 
   const getTooltipClasses = () => {
     // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
-import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useTranslation } from "react-i18next";
@@ -30,73 +29,72 @@ import {
 } from "../../services/profile-service";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileStore } from "../../store/profile-store";
+import { SettingsSection } from "../ui/settings/SettingsSection";
 
-type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
+export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
 
-export function DebugSection() {
+export function getDebugTabs(t: (key: string) => string): { id: DebugTab; label: string }[] {
+  return [
+    { id: "launcher", label: t("debug.tabs.launcher") },
+    { id: "minecraft", label: t("debug.tabs.minecraft") },
+    { id: "process", label: t("debug.tabs.process") },
+    { id: "crashes", label: t("debug.tabs.crashes") },
+    { id: "permissions", label: t("debug.permissions.tab") },
+    { id: "testing", label: t("debug.tabs.testing") },
+  ];
+}
+
+function getErrorMessage(e: unknown): string {
+  if (e && typeof e === "object" && "message" in e) {
+    return (e as { message: string }).message;
+  }
+  return String(e);
+}
+
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return "-";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatDate = (timestamp: number) => {
+  if (timestamp === 0) return "-";
+  return new Date(timestamp * 1000).toLocaleString();
+};
+
+interface LogFileSectionProps {
+  id: DebugTab;
+  title: string;
+  icon: string;
+  crash?: boolean;
+  loader: () => Promise<FileInfo[]>;
+}
+
+function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<DebugTab>("launcher");
   const [files, setFiles] = useState<FileInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<PermissionCacheState | null>(null);
-  const [refreshingPerms, setRefreshingPerms] = useState(false);
 
-  // Load files when tab changes
   useEffect(() => {
-    if (activeTab === "permissions") {
-      getCachedPermissions().then(setPermissions).catch(() => setPermissions(null));
-    } else if (activeTab === "testing") {
-      // no auto-load; user triggers actions manually
-    } else {
-      loadFiles();
-    }
-  }, [activeTab]);
-
-  async function loadFiles() {
-    setLoading(true);
-    try {
-      if (activeTab === "launcher") {
-        const logs = await listLauncherLogs();
-        setFiles(logs);
-      } else if (activeTab === "minecraft") {
-        const logs = await listAllMcLogs();
-        setFiles(logs);
-      } else if (activeTab === "process") {
-        const logs = await listProcessLogs();
-        setFiles(logs);
-      } else if (activeTab === "crashes") {
-        const crashes = await listCrashReports();
-        setFiles(crashes);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const f = await loader();
+        if (!cancelled) setFiles(f);
+      } catch (e) {
+        console.error("Failed to load files:", e);
+        if (!cancelled) setFiles([]);
       }
-    } catch (e) {
-      console.error("Failed to load files:", e);
-      setFiles([]);
-    }
-    setLoading(false);
-  }
-
-  async function handleRefreshPermissions() {
-    setRefreshingPerms(true);
-    try {
-      await refreshPermissions();
-      const cached = await getCachedPermissions();
-      setPermissions(cached);
-      toast.success(t('debug.permissions.refreshed'));
-    } catch (e) {
-      console.error("Failed to refresh permissions:", e);
-      toast.error(t('debug.permissions.refresh_failed', { error: getErrorMessage(e) }));
-    }
-    setRefreshingPerms(false);
-  }
-
-  // Helper to extract error message from Tauri CommandError or any error
-  function getErrorMessage(e: unknown): string {
-    if (e && typeof e === 'object' && 'message' in e) {
-      return (e as { message: string }).message;
-    }
-    return String(e);
-  }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleUpload(file: FileInfo) {
     setUploadingFile(file.path);
@@ -104,10 +102,10 @@ export function DebugSection() {
       const content = await getLogFileContent(file.path);
       const url = await uploadLogToMclogs(content);
       await writeText(url);
-      toast.success(t('debug.uploaded_copied'));
+      toast.success(t("debug.uploaded_copied"));
     } catch (e) {
       console.error("Failed to upload:", e);
-      toast.error(t('debug.upload_failed', { error: getErrorMessage(e) }));
+      toast.error(t("debug.upload_failed", { error: getErrorMessage(e) }));
     }
     setUploadingFile(null);
   }
@@ -116,123 +114,118 @@ export function DebugSection() {
     try {
       const content = await getLogFileContent(file.path);
       await writeText(content);
-      toast.success(t('debug.copied'));
+      toast.success(t("debug.copied"));
     } catch (e) {
       console.error("Failed to copy:", e);
-      toast.error(t('debug.copy_failed', { error: getErrorMessage(e) }));
+      toast.error(t("debug.copy_failed", { error: getErrorMessage(e) }));
     }
   }
 
-  const groups: GroupTab[] = [
-    { id: "launcher", name: "Launcher Logs", count: 0 },
-    { id: "minecraft", name: "MC Logs", count: 0 },
-    { id: "process", name: "Process Logs", count: 0 },
-    { id: "crashes", name: "Crash Reports", count: 0 },
-    { id: "permissions", name: t('debug.permissions.tab'), count: permissions?.nodes.length ?? 0 },
-    { id: "testing", name: "TESTING", count: 0 },
-  ];
+  return (
+    <SettingsSection id={`settings-section-${id}`} title={title} icon={icon}>
+      <div className="py-2">
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center text-white/50">
+              <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin mx-auto mb-2" />
+              {t("common.loading")}
+            </div>
+          ) : files.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">{t("debug.no_files")}</div>
+          ) : (
+            <div className="divide-y divide-white/10">
+              {files.map((file, i) => (
+                <div key={i} className="p-3 hover:bg-white/5 flex items-center gap-4">
+                  <Icon
+                    icon={crash ? "solar:danger-triangle-bold" : "solar:document-text-bold"}
+                    className={`w-5 h-5 flex-shrink-0 ${crash ? "text-red-400" : "text-white/60"}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-minecraft-ten truncate">{file.name}</div>
+                    <div className="text-xs text-white/40 font-sans truncate">{file.path}</div>
+                  </div>
+                  <div className="text-sm text-white/50 font-sans whitespace-nowrap">
+                    {formatSize(file.size)}
+                  </div>
+                  <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
+                    {formatDate(file.modified)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopyContent(file)}
+                      className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
+                      title={t("debug.copy_content")}
+                    >
+                      <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
+                    </button>
+                    <button
+                      onClick={() => handleUpload(file)}
+                      disabled={uploadingFile === file.path}
+                      className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+                      title={t("debug.upload_mclogs")}
+                    >
+                      {uploadingFile === file.path ? (
+                        <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />
+                      ) : (
+                        <Icon icon="solar:upload-bold" className="w-4 h-4 text-white/70" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </SettingsSection>
+  );
+}
 
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "-";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+export function DebugSection() {
+  const { t } = useTranslation();
+  const [permissions, setPermissions] = useState<PermissionCacheState | null>(null);
+  const [refreshingPerms, setRefreshingPerms] = useState(false);
 
-  const formatDate = (timestamp: number) => {
-    if (timestamp === 0) return "-";
-    return new Date(timestamp * 1000).toLocaleString();
-  };
+  useEffect(() => {
+    getCachedPermissions().then(setPermissions).catch(() => setPermissions(null));
+  }, []);
+
+  async function handleRefreshPermissions() {
+    setRefreshingPerms(true);
+    try {
+      await refreshPermissions();
+      const cached = await getCachedPermissions();
+      setPermissions(cached);
+      toast.success(t("debug.permissions.refreshed"));
+    } catch (e) {
+      console.error("Failed to refresh permissions:", e);
+      toast.error(t("debug.permissions.refresh_failed", { error: getErrorMessage(e) }));
+    }
+    setRefreshingPerms(false);
+  }
 
   return (
-    <div className="space-y-4">
-      <GroupTabs
-        groups={groups}
-        activeGroup={activeTab}
-        onGroupChange={(id) => setActiveTab(id as DebugTab)}
-        showAddButton={false}
-      />
+    <div className="space-y-6">
+      <LogFileSection id="launcher" title={t("debug.tabs.launcher")} icon="solar:document-text-bold" loader={listLauncherLogs} />
+      <LogFileSection id="minecraft" title={t("debug.tabs.minecraft")} icon="solar:document-text-bold" loader={listAllMcLogs} />
+      <LogFileSection id="process" title={t("debug.tabs.process")} icon="solar:document-text-bold" loader={listProcessLogs} />
+      <LogFileSection id="crashes" title={t("debug.tabs.crashes")} icon="solar:danger-triangle-bold" crash loader={listCrashReports} />
 
-      {activeTab === "testing" ? (
-        <TestingPanel />
-      ) : activeTab === "permissions" ? (
-        <PermissionsList
-          permissions={permissions}
-          refreshing={refreshingPerms}
-          onRefresh={handleRefreshPermissions}
-        />
-      ) : (
-      /* File List */
-      <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-white/50">
-            <Icon
-              icon="solar:refresh-bold"
-              className="w-6 h-6 animate-spin mx-auto mb-2"
-            />
-            Loading...
-          </div>
-        ) : files.length === 0 ? (
-          <div className="p-8 text-center text-white/50 font-minecraft-ten">
-            No files found
-          </div>
-        ) : (
-          <div className="divide-y divide-white/10">
-            {files.map((file, i) => (
-              <div
-                key={i}
-                className="p-3 hover:bg-white/5 flex items-center gap-4"
-              >
-                <Icon
-                  icon={
-                    activeTab === "crashes"
-                      ? "solar:danger-triangle-bold"
-                      : "solar:document-text-bold"
-                  }
-                  className={`w-5 h-5 flex-shrink-0 ${activeTab === "crashes" ? "text-red-400" : "text-white/60"}`}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-minecraft-ten truncate">
-                    {file.name}
-                  </div>
-                  <div className="text-xs text-white/40 font-sans truncate">
-                    {file.path}
-                  </div>
-                </div>
-                <div className="text-sm text-white/50 font-sans whitespace-nowrap">
-                  {formatSize(file.size)}
-                </div>
-                <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
-                  {formatDate(file.modified)}
-                </div>
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleCopyContent(file)}
-                    className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
-                    title={t('debug.copy_content')}
-                  >
-                    <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
-                  </button>
-                  <button
-                    onClick={() => handleUpload(file)}
-                    disabled={uploadingFile === file.path}
-                    className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
-                    title={t('debug.upload_mclogs')}
-                  >
-                    {uploadingFile === file.path ? (
-                      <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />
-                    ) : (
-                      <Icon icon="solar:upload-bold" className="w-4 h-4 text-white/70" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      )}
+      <SettingsSection id="settings-section-permissions" title={t("debug.permissions.tab")} icon="solar:shield-keyhole-bold">
+        <div className="py-2">
+          <PermissionsList
+            permissions={permissions}
+            refreshing={refreshingPerms}
+            onRefresh={handleRefreshPermissions}
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection id="settings-section-testing" title={t("debug.tabs.testing")} icon="solar:test-tube-bold">
+        <div className="py-2">
+          <TestingPanel />
+        </div>
+      </SettingsSection>
     </div>
   );
 }
@@ -301,10 +294,10 @@ function TestingPanel() {
     try {
       const result = await invoke<string[]>("debug_list_expected_cache_filenames");
       setFilenames(result);
-      toast.success(`Keep-set: ${result.length} filenames (also dumped to launcher log)`);
+      toast.success(t("debug.testing.keepset_result", { count: result.length }));
     } catch (e) {
       console.error("Failed to list expected cache filenames:", e);
-      toast.error(`Failed: ${String(e)}`);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setLoading(false);
   }
@@ -315,14 +308,14 @@ function TestingPanel() {
       const stats = await invoke<ModCacheCleanupStats>("clean_mod_cache_command");
       setCleanStats(stats);
       if (stats.skipped_empty_keepset) {
-        toast.error("Skipped: keep-set empty (config not loaded) — nothing deleted");
+        toast.error(t("debug.testing.clean_skipped"));
       } else {
         const mb = (stats.freed_bytes / (1024 * 1024)).toFixed(1);
-        toast.success(`Removed ${stats.deleted.length} orphans, freed ${mb} MB`);
+        toast.success(t("debug.testing.clean_result", { count: stats.deleted.length, mb }));
       }
     } catch (e) {
       console.error("Failed to clean mod_cache:", e);
-      toast.error(`Failed: ${String(e)}`);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setCleaning(false);
   }
@@ -332,9 +325,9 @@ function TestingPanel() {
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:database-bold" className="w-5 h-5 text-amber-300 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">mod_cache keep-set</div>
+          <div className="text-white font-minecraft-ten">{t("debug.testing.keepset_title")}</div>
           <div className="text-xs text-white/40 font-sans truncate">
-            Every filename any profile/pack could place in mod_cache (step 1 of cache cleanup)
+            {t("debug.testing.keepset_desc")}
           </div>
         </div>
         <button
@@ -348,17 +341,17 @@ function TestingPanel() {
           ) : (
             <Icon icon="solar:play-bold" className="w-4 h-4" />
           )}
-          Run
+          {t("debug.testing.run")}
         </button>
       </div>
 
       {filenames !== null && (
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
-            {filenames.length} filenames
+            {t("debug.testing.filenames_count", { count: filenames.length })}
           </div>
           {filenames.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">Empty</div>
+            <div className="p-8 text-center text-white/50 font-minecraft-ten">{t("debug.testing.empty")}</div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
               {filenames.map((name) => (
@@ -374,9 +367,9 @@ function TestingPanel() {
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5 text-red-300 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">Clean mod_cache</div>
+          <div className="text-white font-minecraft-ten">{t("debug.testing.clean_title")}</div>
           <div className="text-xs text-white/40 font-sans truncate">
-            Delete cached jars not in the keep-set (orphans = stale/unused versions)
+            {t("debug.testing.clean_desc")}
           </div>
         </div>
         <button
@@ -390,19 +383,23 @@ function TestingPanel() {
           ) : (
             <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           )}
-          Clean
+          {t("debug.testing.clean")}
         </button>
       </div>
 
       {cleanStats !== null && (
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
-            scanned {cleanStats.scanned} · deleted {cleanStats.deleted.length} · failed{" "}
-            {cleanStats.failed.length} · freed {(cleanStats.freed_bytes / (1024 * 1024)).toFixed(1)} MB
-            {cleanStats.skipped_empty_keepset && " · SKIPPED (empty keep-set)"}
+            {t("debug.testing.stats", {
+              scanned: cleanStats.scanned,
+              deleted: cleanStats.deleted.length,
+              failed: cleanStats.failed.length,
+              mb: (cleanStats.freed_bytes / (1024 * 1024)).toFixed(1),
+            })}
+            {cleanStats.skipped_empty_keepset && t("debug.testing.stats_skipped")}
           </div>
           {cleanStats.deleted.length === 0 ? (
-            <div className="p-6 text-center text-white/50 font-minecraft-ten">No orphans</div>
+            <div className="p-6 text-center text-white/50 font-minecraft-ten">{t("debug.testing.no_orphans")}</div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
               {cleanStats.deleted.map((name) => (
@@ -520,7 +517,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
       await openTesterWindow();
     } catch (e) {
       console.error("Failed to open tester window:", e);
-      toast.error(`Failed to open tester window: ${String(e)}`);
+      toast.error(t("debug.testing.tester_open_failed", { error: String(e) }));
     } finally {
       setOpening(false);
     }
@@ -557,27 +554,27 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
         <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
           <Icon icon="solar:test-tube-bold" className="w-5 h-5 text-amber-300 shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-white font-minecraft-ten">Tester Queue</div>
+            <div className="text-white font-minecraft-ten">{t("debug.testing.tester_queue")}</div>
             <div className="text-xs text-white/40 font-sans truncate">
               {queueCount === null
-                ? "Click to open the tester window"
+                ? t("debug.testing.tester_open_hint")
                 : queueCount === 0
-                  ? "All caught up — open anyway"
-                  : `${queueCount} issue${queueCount === 1 ? "" : "s"} waiting on you`}
+                  ? t("debug.testing.tester_caught_up")
+                  : t("debug.testing.tester_waiting", { count: queueCount })}
             </div>
           </div>
           <button
             onClick={handleOpenTester}
             disabled={opening}
             className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-            title="Open tester window"
+            title={t("debug.testing.tester_open_title")}
           >
             {opening ? (
               <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
             ) : (
               <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
             )}
-            Open
+            {t("debug.testing.tester_open")}
           </button>
         </div>
       )}

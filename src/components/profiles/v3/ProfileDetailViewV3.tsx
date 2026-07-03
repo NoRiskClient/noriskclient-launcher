@@ -404,7 +404,7 @@ export function ProfileDetailViewV3({
         </button>
 
         <div className="flex items-center gap-1 relative">
-          <Tooltip content={t('profiles.openFolder')}>
+          <Tooltip content={t('profiles.openFolder')} position="top" delay={0}>
             <button
               onClick={handleOpenFolder}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -412,7 +412,7 @@ export function ProfileDetailViewV3({
               <Icon icon="solar:folder-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
-          <Tooltip content={t('profiles.duplicate')}>
+          <Tooltip content={t('profiles.duplicate')} position="top" delay={0}>
             <button
               onClick={handleDuplicateProfile}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -420,7 +420,7 @@ export function ProfileDetailViewV3({
               <Icon icon="solar:copy-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
-          <Tooltip content={t('profiles.export')}>
+          <Tooltip content={t('profiles.export')} position="top" delay={0}>
             <button
               onClick={handleOpenExportModal}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -429,7 +429,7 @@ export function ProfileDetailViewV3({
             </button>
           </Tooltip>
           <div className="w-px h-5 bg-white/10 mx-1" />
-          <Tooltip content={t('profiles.moreOptions')}>
+          <Tooltip content={t('profiles.moreOptions')} position="top" delay={0}>
             <button
               ref={moreButtonRef}
               onClick={toggleContextMenu}

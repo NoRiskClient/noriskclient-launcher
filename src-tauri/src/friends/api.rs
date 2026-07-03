@@ -1,8 +1,9 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+use crate::utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put};
 use crate::friends::models::{
-    ApiFriendsInformationDto, ApiFriendsFriendUser, ApiFriendsUser, FriendRequestState,
-    FriendRequestUser, FriendRequestWithUsers, FriendsFriendUser, FriendsUser, OnlineState,
+    ApiFriendsInformationDto, ApiFriendsUser, FriendRequestState, FriendRequestUser,
+    FriendRequestWithUsers, FriendsFriendUser, FriendsUser, OnlineState,
 };
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use log::{debug, error};
@@ -75,17 +76,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Fetching friends for {}", uuid);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch friends: {}", e))
-            })?;
-
-        let api_response = crate::utils::api_utils::parse_response_with_logging::<ApiFriendsInformationDto>(response, "Friends get").await?;
+        let api_response = nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<ApiFriendsInformationDto>("Friends get")
+            .await?;
 
         debug!("[Friends API] Raw pending count: {}", api_response.pending.len());
         for (i, val) in api_response.pending.iter().enumerate() {
@@ -196,17 +190,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Fetching current user data");
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch user data: {}", e))
-            })?;
-
-        let api_response = crate::utils::api_utils::parse_response_with_logging::<ApiFriendsUser>(response, "Friends get user").await?;
+        let api_response = nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<ApiFriendsUser>("Friends get user")
+            .await?;
 
         Ok(FriendsUser::from_api(api_response, username.to_string()))
     }
@@ -223,17 +210,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Sending friend request to {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends send request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send friend request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Friends send request").await
     }
 
     pub async fn accept_friend_request(
@@ -248,17 +228,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Accepting friend request from {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends accept request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to accept friend request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Friends accept request").await
     }
 
     pub async fn deny_friend_request(
@@ -273,17 +246,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Denying friend request from {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends deny request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to deny friend request: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Friends deny request").await
     }
 
     pub async fn remove_friend(
@@ -298,17 +264,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Removing friend {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends remove")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to remove friend: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Friends remove").await
     }
 
     pub async fn update_status(
@@ -321,19 +280,11 @@ impl FriendsApi {
 
         debug!("[Friends API] Updating status to {:?}", new_status);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .header("Content-Type", "application/json")
-            .json(&new_status)
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&new_status)
+            .json::<OnlineState>("Friends update status")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to update status: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<OnlineState>(response, "Friends update status").await
     }
 
     pub async fn update_privacy_setting(
@@ -355,19 +306,11 @@ impl FriendsApi {
 
         debug!("[Friends API] Updating privacy {} to {}", endpoint, value);
 
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .header("Content-Type", "application/json")
-            .json(&value)
-            .send()
+        nrc_put(&url)
+            .bearer(norisk_token)
+            .json_body(&value)
+            .expect_success("Friends update privacy")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to update privacy setting: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Friends update privacy").await
     }
 
     pub async fn toggle_ping(
@@ -382,16 +325,9 @@ impl FriendsApi {
 
         debug!("[Friends API] Toggling ping for {} ({})", friend_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json::<bool>("Friends toggle ping")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to toggle ping: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<bool>(response, "Friends toggle ping").await
     }
 }

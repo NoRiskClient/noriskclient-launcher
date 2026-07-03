@@ -38,6 +38,7 @@ pub mod symlink_utils; // <-- Symlink utilities for profile folder sharing
 pub mod referral_utils; // Referral tracking for affiliate/friend links
 pub mod serde_utils; // Serde helpers for flexible deserialization
 pub mod api_utils; // API response parsing helpers with detailed logging
+pub mod http_client; // NrcRequest: fluent request builder over HTTP_CLIENT
 
 // Füge hier ggf. andere Util-Module hinzu
 // pub mod network_utils;

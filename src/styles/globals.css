@@ -318,6 +318,33 @@
     background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.8);
 }
 
+/* Scrollbar hidden by default, revealed (accent-tinted) only while hovering the area */
+.scrollbar-hover {
+    scrollbar-width: none;
+}
+.scrollbar-hover::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+.scrollbar-hover:hover {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4) transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4);
+    border-radius: 3px;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.6);
+}
+
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
