@@ -9,6 +9,8 @@ pub mod friends;
 pub mod integrations;
 pub mod logging;
 pub mod minecraft;
+#[cfg(target_os = "android")]
+pub mod mobile;
 pub mod state;
 
 use log::{debug, error, info};
@@ -751,6 +753,7 @@ pub fn run() {
             commands::mcreal_commands::follow_mcreal_user,
             commands::mcreal_commands::unfollow_mcreal_user,
             commands::mcreal_commands::upload_mcreal_post,
+            commands::mobile_commands::test_mobile_jvm,
             commands::nrc_commands::get_advent_calendar_command,
             commands::nrc_commands::claim_advent_calendar_day_command,
             commands::nrc_commands::get_unique_players_24h_command,

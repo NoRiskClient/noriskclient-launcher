@@ -14,6 +14,7 @@ pub mod friends_command;
 pub mod java_command;
 pub mod mcreal_commands;
 pub mod minecraft_auth_command;
+pub mod mobile_commands;
 pub mod minecraft_command;
 pub mod modrinth_commands;
 pub mod nrc_commands;

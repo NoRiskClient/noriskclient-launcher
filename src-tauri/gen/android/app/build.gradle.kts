@@ -23,6 +23,11 @@ android {
         targetSdk = 34
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        // PoC: emulator is x86_64 only. Restrict ABIs so the debug APK stays
+        // small (unstripped debug .so is ~500MB per ABI).
+        ndk {
+            abiFilters.add("x86_64")
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -30,11 +35,8 @@ android {
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
-            packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
-            }
+            // PoC: let gradle strip native debug symbols so the x86_64 debug
+            // APK stays small enough to install on the emulator (~100MB vs 1GB).
         }
         getByName("release") {
             isMinifyEnabled = true

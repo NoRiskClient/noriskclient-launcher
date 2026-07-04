@@ -101,7 +101,10 @@ pub const OS: OperatingSystem = if cfg!(target_os = "windows") {
     OperatingSystem::WINDOWS
 } else if cfg!(target_os = "macos") {
     OperatingSystem::OSX
-} else if cfg!(target_os = "linux") {
+} else if cfg!(any(target_os = "linux", target_os = "android")) {
+    // Android is Linux-based: it uses the same piston library classifiers
+    // and path separators. Native libs are swapped for the Pojav fork at
+    // launch time (see mobile::launch), so linux-native entries are harmless.
     OperatingSystem::LINUX
 } else {
     OperatingSystem::UNKNOWN

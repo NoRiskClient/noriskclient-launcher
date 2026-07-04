@@ -210,6 +210,11 @@ pub async fn install_minecraft_version(
     // Get Java version from Minecraft version manifest
     let java_version = piston_meta.java_version.major_version as u32;
     info!("\nChecking Java {} for Minecraft...", java_version);
+    info!(
+        "[PlatformProbe] OS const resolves to: {} (android-branch active: {})",
+        crate::utils::system_info::OS.get_simple_name().unwrap_or("INVALID"),
+        cfg!(target_os = "android")
+    );
 
     // Emit Java installation event
     let event_id = emit_progress_event(
@@ -284,7 +289,14 @@ pub async fn install_minecraft_version(
         std::path::PathBuf::new()
     };
 
+    // Android: use the bundled in-process JRE instead of downloading a
+    // desktop Java build (which has no Android target - "Invalid OS"). The
+    // actual launch runs in-process via JNI, so this path is only a marker.
+    #[cfg(target_os = "android")]
+    let java_path = crate::mobile::runtime::runtime_dir().join("bin/java");
+
     // Download and setup Java if necessary
+    #[cfg(not(target_os = "android"))]
     let java_path = if custom_java_valid {
         info!("Using verified custom Java path: {:?}", java_path);
 

@@ -563,6 +563,27 @@ impl MinecraftLauncher {
         let loggable_command_view = Self::create_loggable_command_string(&command);
         info!("Executing command: {}", loggable_command_view);
 
+        // Android: no java subprocess possible - hand the fully built argument
+        // list to the in-process JVM (PojavLauncher approach) and skip the
+        // desktop process manager entirely.
+        #[cfg(target_os = "android")]
+        {
+            let all_args: Vec<String> = command
+                .get_args()
+                .map(|a| a.to_string_lossy().to_string())
+                .collect();
+            let main_idx = all_args
+                .iter()
+                .position(|a| a == &params.main_class)
+                .ok_or_else(|| {
+                    crate::error::AppError::Other("main class not found in command args".to_string())
+                })?;
+            let jvm_args = all_args[..main_idx].to_vec();
+            let game_args = all_args[main_idx + 1..].to_vec();
+            crate::mobile::launch::launch_in_process(jvm_args, params.main_class.clone(), game_args)?;
+            return Ok(());
+        }
+
         // Extract account information from credentials
         let (account_uuid, account_name) = if let Some(creds) = &self.credentials {
             (Some(creds.id.to_string()), Some(creds.username.clone()))

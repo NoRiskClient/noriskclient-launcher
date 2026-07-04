@@ -2816,6 +2816,27 @@ fn apply_overrides(profile: &mut Profile, ov: LaunchOverrides) -> Result<(), Com
 
 /// Credential resolution for a profile (preferred account → fallback to active).
 /// Extracted from `launch_profile`; both launch paths share this helper.
+/// Static offline credentials for `launch_temp_profile` with `account: "offline"`.
+/// Far-future expiries so no token refresh is attempted anywhere in the pipeline.
+fn offline_test_credentials() -> Credentials {
+    let far_future = chrono::Utc::now() + chrono::Duration::days(3650);
+    Credentials {
+        id: Uuid::parse_str("00000000-0000-0000-0000-000000000042").unwrap(),
+        username: "OfflineTester".to_string(),
+        access_token: "0".to_string(),
+        refresh_token: String::new(),
+        expires: far_future,
+        norisk_credentials: crate::minecraft::auth::minecraft_auth::NoRiskCredentials {
+            production: None,
+            experimental: None,
+        },
+        active: false,
+        ignore_child_protection_warning: true,
+        auth_flow: None,
+        mc_access_token_expires: Some(far_future),
+    }
+}
+
 async fn resolve_credentials_for_profile(
     state: &State,
     profile: &Profile,
@@ -2957,6 +2978,32 @@ pub struct TempLaunchArgs {
 #[tauri::command]
 pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandError> {
     let state = State::get().await?;
+
+    // PoC (Android): allow overriding the MC test version via a marker file
+    // (`adb push` a version string into files/mc_test_version.txt), so different
+    // vanilla versions can be tried without rebuilding the APK. Old versions
+    // (<=1.12, LWJGL2, fixed-function GL) render on the emulator's GLES 3.0 via
+    // gl4es, where 1.21's GL 3.2 shader system does not.
+    #[cfg(target_os = "android")]
+    let args = {
+        let mut args = args;
+        let marker = std::path::PathBuf::from(
+            "/data/data/gg.norisk.NoRiskClientLauncherV3/files/mc_test_version.txt",
+        );
+        if let Ok(v) = std::fs::read_to_string(&marker) {
+            let v = v.trim();
+            if !v.is_empty() && v != args.game_version {
+                log::info!(
+                    "[TempLaunch] MC version overridden by marker: {} -> {}",
+                    args.game_version,
+                    v
+                );
+                args.game_version = v.to_string();
+            }
+        }
+        args
+    };
+
     let id = Uuid::new_v4();
     let short: String = id.to_string().chars().take(8).collect();
     let display_name = args
@@ -3017,6 +3064,9 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
 
     let is_experimental = state.config_manager.is_experimental_mode().await;
     let credentials = match &args.account {
+        // Dev/testing escape hatch: launch without a real account (offline
+        // mode). No Microsoft/NoRisk tokens, static player identity.
+        Some(acc) if acc == "offline" => Some(offline_test_credentials()),
         Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
         None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
     };

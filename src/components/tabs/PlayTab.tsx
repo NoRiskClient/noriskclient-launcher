@@ -20,6 +20,11 @@ import { useQualitySettingsStore } from "../../store/quality-settings-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { setDiscordState } from "../../utils/discordRpc";
+// TODO(mobile-poc): remove temporary JVM test wiring
+import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
+import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function PlayTab() {
   const {
@@ -36,6 +41,56 @@ export function PlayTab() {
   const { isThemeActive, selectedTheme } = useLauncherTheme();
   const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
   const isMobile = useIsMobile();
+  // TODO(mobile-poc): remove temporary JVM test state
+  const [jvmTesting, setJvmTesting] = useState(false);
+  const [mcTesting, setMcTesting] = useState(false);
+
+  const runJvmTest = async () => {
+    if (jvmTesting) return;
+    setJvmTesting(true);
+    try {
+      const result = await invoke<string>("test_mobile_jvm", {
+        runtimeUrl:
+          "/data/data/gg.norisk.NoRiskClientLauncherV3/files/nrc-jre21.tar.gz",
+      });
+      toast.success(result, { duration: 10000 });
+    } catch (e) {
+      toast.error(parseErrorMessage(e), { duration: 10000 });
+    } finally {
+      setJvmTesting(false);
+    }
+  };
+
+  // TODO(mobile-poc): temporary vanilla launch test (downloads + boots MC in-process)
+  const runMcTest = async () => {
+    if (mcTesting) return;
+    setMcTesting(true);
+    toast("MC-Launch gestartet - Pipeline laedt, Fortschritt in mc-android.log", {
+      duration: 8000,
+    });
+    try {
+      await invoke("launch_temp_profile", {
+        args: {
+          game_version: "1.21.11",
+          loader: "vanilla",
+          loader_version: null,
+          pack: null,
+          name: "android-poc",
+          quick_play_singleplayer: null,
+          quick_play_multiplayer: null,
+          local_mods: [],
+          account: "offline",
+        },
+      });
+      toast.success("Launch-Pipeline fertig - JVM-Thread gestartet", {
+        duration: 12000,
+      });
+    } catch (e) {
+      toast.error(parseErrorMessage(e), { duration: 15000 });
+    } finally {
+      setMcTesting(false);
+    }
+  };
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -80,6 +135,26 @@ export function PlayTab() {
         <div className="absolute top-3 left-3 z-20">
           <ReferralBanner />
         </div>
+
+        {/* TODO(mobile-poc): temporary JVM/MC test buttons */}
+        {isMobile && (
+          <div className="absolute top-3 right-3 z-30 flex gap-2">
+            <button
+              onClick={runJvmTest}
+              disabled={jvmTesting}
+              className="border border-white/30 rounded-md bg-black/60 text-white font-minecraft-ten text-[11px] px-3 py-2 cursor-pointer disabled:opacity-50"
+            >
+              {jvmTesting ? "JVM..." : "JVM TEST"}
+            </button>
+            <button
+              onClick={runMcTest}
+              disabled={mcTesting}
+              className="border border-green-400/40 rounded-md bg-black/60 text-green-300 font-minecraft-ten text-[11px] px-3 py-2 cursor-pointer disabled:opacity-50"
+            >
+              {mcTesting ? "MC..." : "MC TEST"}
+            </button>
+          </div>
+        )}
 
         {/* 3D Render Toggle - Top Right (desktop only, too cramped on phones) */}
         {!isMobile && (
