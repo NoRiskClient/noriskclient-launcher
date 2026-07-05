@@ -49,7 +49,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
             type="text"
             placeholder={placeholder}
             className={cn(
-              "bg-transparent text-white placeholder-white/50 font-minecraft-ten text-lg flex-1 outline-none",
+              "no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-lg flex-1 outline-none",
               className
             )}
             spellCheck={false}
@@ -90,7 +90,7 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
             ref={ref}
             placeholder={placeholder}
             className={cn(
-              "bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none resize-none",
+              "no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none resize-none",
               className
             )}
             style={{ minHeight }}
@@ -241,7 +241,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             )}            <input
               ref={ref}
               className={cn(
-                "flex-1 h-full bg-transparent border-none outline-none px-3 text-white font-minecraft placeholder:text-white/50 lowercase",
+                "no-radius flex-1 h-full bg-transparent border-none outline-none px-3 text-white font-minecraft placeholder:text-white/50 lowercase",
                 "flex items-center"
               )}
               style={{

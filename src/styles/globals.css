@@ -513,6 +513,10 @@ input[type="text"]:not(.no-radius) {
   border-radius: var(--border-radius) !important;
 }
 
+.no-radius {
+  border-radius: 0px !important;
+}
+
 /* Backdrop blur which also works on Linux */
 .backdrop-blur-md-anyos {
     backdrop-filter: blur(12px);
