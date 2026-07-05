@@ -100,7 +100,7 @@ export function SearchWithFilters({
             value={searchValue}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
-            className="no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 min-w-0 outline-none"
+            className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 min-w-0 outline-none"
           />
           {hasSearchValue && (
             <button

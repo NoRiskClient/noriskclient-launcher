@@ -246,7 +246,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              "no-radius flex-1 h-full bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+              "flex-1 h-full bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
               sizeStyles[size].text,
             )}
             style={{
@@ -318,7 +318,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                   placeholder={placeholder}
                   disabled={disabled}
                   className={cn(
-                    "no-radius bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+                    "bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
                     sizeStyles[size].text,
                   )}
                   style={{
