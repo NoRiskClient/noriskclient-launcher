@@ -334,7 +334,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                   placeholder={t('placeholders.search_version')}
                   value={gameVersionSearchTerm}
                   onChange={(e) => onGameVersionSearchTermChange(e.target.value)}
-                  className="no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-xs flex-1 outline-none min-w-0"
+                  className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-xs flex-1 outline-none min-w-0"
                 />
               </div>
             </div>

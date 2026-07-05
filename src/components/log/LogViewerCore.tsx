@@ -582,7 +582,7 @@ export function LogViewerCore({
             placeholder={t('placeholders.search_logs')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="no-radius bg-transparent text-sm font-minecraft-ten text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"
+            className="bg-transparent text-sm font-minecraft-ten text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"
           />
           {searchTerm && (
             <button

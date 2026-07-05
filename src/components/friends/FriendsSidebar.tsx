@@ -225,7 +225,7 @@ export function FriendsSidebar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('friends.search_placeholder')}
-                  className="no-radius flex-1 bg-transparent text-white text-sm font-minecraft-ten placeholder:text-white/30 focus:outline-none"
+                  className="flex-1 bg-transparent text-white text-sm font-minecraft-ten placeholder:text-white/30 focus:outline-none"
                 />
               </div>
             )}

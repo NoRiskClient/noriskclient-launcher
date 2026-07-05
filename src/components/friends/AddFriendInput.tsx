@@ -61,7 +61,7 @@ export function AddFriendInput() {
           onBlur={() => setIsFocused(false)}
           placeholder={t('friends.enter_username')}
           className={cn(
-            "no-radius flex-1 bg-transparent py-3 pr-3 text-white font-minecraft-ten",
+            "flex-1 bg-transparent py-3 pr-3 text-white font-minecraft-ten",
             "placeholder:text-white/30 focus:outline-none"
           )}
           style={{ fontSize: "14px" }}
