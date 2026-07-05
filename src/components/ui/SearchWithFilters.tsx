@@ -38,6 +38,7 @@ export interface SearchWithFiltersProps {
   /** Custom filter control rendered in the filter slot (inside the search bar), replacing the default dropdown. */
   filterSlot?: React.ReactNode;
   dropdownSize?: 'sm' | 'md';
+  compact?: boolean;
 }
 
 export function SearchWithFilters({
@@ -57,6 +58,7 @@ export function SearchWithFilters({
   showFilter = true,
   filterSlot,
   dropdownSize = 'md',
+  compact = false,
 }: SearchWithFiltersProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -84,9 +86,13 @@ export function SearchWithFilters({
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       {/* Search with integrated filters */}
-      <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors flex-1 max-w-md">
-        <div className="flex items-center gap-2 flex-1">
-          <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50" />
+      <div
+        className={`flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 hover:border-white/20 transition-colors ${
+          compact ? "px-3 py-2 w-full" : "px-4 py-3 flex-1 max-w-md"
+        }`}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -94,14 +100,14 @@ export function SearchWithFilters({
             value={searchValue}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
-            className="no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none"
+            className="no-radius bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 min-w-0 outline-none"
           />
           {hasSearchValue && (
             <button
               type="button"
               onClick={handleClearSearch}
               aria-label="Clear search"
-              className="text-white/60 hover:text-white transition-colors duration-200"
+              className="text-white/60 hover:text-white transition-colors duration-200 shrink-0"
             >
               <Icon icon="lucide:x" className="w-4 h-4" />
             </button>

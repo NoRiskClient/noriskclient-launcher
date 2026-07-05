@@ -12,7 +12,7 @@
   "dependencies": {
     "@flasham/react-skinview3d": "^3.0.1",
     "@iconify/react": "^5.2.1",
-    "@noriskclient/nrc-skin-renderer": "0.2.4",
+    "@noriskclient/nrc-skin-renderer": "0.2.6",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "8.13.7",
     "@sfirew/minecraft-motd-parser": "^1.1.4",

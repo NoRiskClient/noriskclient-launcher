@@ -215,6 +215,8 @@ interface ThemeState {
   addToCustomColorHistory: (hexColor: string) => void;
   clearCustomColorHistory: () => void;
   isBackgroundAnimationEnabled: boolean;
+  showNavLabels: boolean;
+  toggleNavLabels: () => void;
   isDetailViewSidebarOnLeft: boolean;
   toggleDetailViewSidebarPosition: () => void;
   profileGroupingCriterion: string;
@@ -276,6 +278,7 @@ export const useThemeStore = create<ThemeState>()(
     (set, get) => ({
       accentColor: ACCENT_COLORS.blue,
       isBackgroundAnimationEnabled: false,
+      showNavLabels: true,
       isDetailViewSidebarOnLeft: true,
       profileGroupingCriterion: "group",
       staticBackground: true,
@@ -373,6 +376,10 @@ export const useThemeStore = create<ThemeState>()(
         set((state) => ({
           isBackgroundAnimationEnabled: !state.isBackgroundAnimationEnabled,
         }));
+      },
+
+      toggleNavLabels: () => {
+        set((state) => ({ showNavLabels: !state.showNavLabels }));
       },
 
       toggleDetailViewSidebarPosition: () => {

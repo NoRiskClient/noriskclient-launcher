@@ -58,21 +58,11 @@ pub async fn get_equipped_cosmetics(
     let settings_by_id = &real.outfit.cosmetic_settings;
     let custom_cape_hash = real.outfit.custom_cape_hash.clone();
 
-    let all_equipped: Vec<String> = settings_by_id
+    let cosmetic_ids: Vec<String> = settings_by_id
         .keys()
-        .filter(|id| id.as_str() != ZERO_UUID)
+        .filter(|id| id.as_str() != ZERO_UUID && real.owned_cosmetics.contains(id))
         .cloned()
         .collect();
-    let owned_equipped: Vec<String> = all_equipped
-        .iter()
-        .filter(|id| real.owned_cosmetics.contains(id))
-        .cloned()
-        .collect();
-    let cosmetic_ids = if !owned_equipped.is_empty() {
-        owned_equipped
-    } else {
-        all_equipped
-    };
 
     if cosmetic_ids.is_empty() {
         return Ok(EquippedCosmeticsDto {
@@ -104,6 +94,9 @@ pub async fn get_equipped_cosmetics(
 }
 
 async fn apply_custom_texture(urls: &mut CosmeticAssetUrlsDto, settings: Option<&CosmeticSettings>) {
+    if settings.and_then(|s| s.selected_texture.as_ref()).is_some() {
+        return;
+    }
     if let Some(url) = resolve_custom_skin_url(settings).await {
         urls.texture = url;
     }
@@ -130,6 +123,9 @@ async fn resolve_custom_skin_url(settings: Option<&CosmeticSettings>) -> Option<
                 Some(format!("data:image/png;base64,{}", data))
             }
         }
-        CustomTextureSource::FileHash { .. } => None,
+        CustomTextureSource::FileHash { hash } => Some(format!(
+            "https://cdn.norisk.gg/cosmetic-textures/prod/{}.png",
+            hash.to_lowercase()
+        )),
     }
 }

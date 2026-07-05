@@ -159,22 +159,7 @@ pub struct EmoteAssetUrlsDto {
     pub mcmeta: Option<String>,
 }
 
-fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> Value {
-    let mut ds = meta
-        .get("defaultSettings")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-    if let Some(s) = settings {
-        if let Some(scale) = s.scale {
-            ds["scale"] = json!(scale);
-        }
-        if let Some(off) = &s.offset {
-            ds["offset"] = json!({ "x": off.x, "y": off.y, "z": off.z });
-        }
-    }
-    if let Some(obj) = meta.as_object_mut() {
-        obj.insert("defaultSettings".to_string(), ds);
-    }
+fn merge_settings(meta: Value, _settings: Option<&CosmeticSettings>) -> Value {
     meta
 }
 
@@ -232,6 +217,12 @@ pub async fn resolve_pack_cosmetic(
         return None;
     }
 
+    let texture_path = settings
+        .and_then(|s| s.selected_texture.as_ref())
+        .map(|sel| format!("{}textures/{}.png", dir, sel.to_lowercase()))
+        .filter(|p| parsed.paths.contains(p))
+        .unwrap_or_else(|| tex_path.clone());
+
     let particles = particle_entries_for(pack, dir, &parsed.paths);
     let name = metadata_json
         .get("name")
@@ -249,7 +240,7 @@ pub async fn resolve_pack_cosmetic(
             } else {
                 String::new()
             },
-            texture: asset_ref(pack, parsed, &tex_path),
+            texture: asset_ref(pack, parsed, &texture_path),
             animation: if parsed.paths.contains(&anim_path) {
                 Some(asset_ref(pack, parsed, &anim_path))
             } else {
