@@ -498,9 +498,11 @@
   border-radius: 0px !important;
 }
 
+/* Themed radius is opt-in for inputs/textareas: a bare <input>/<textarea> is
+   usually transparent chrome inside an already-rounded wrapper, so rounding the
+   element itself only clips its text. Inputs that ARE the visible box opt in via
+   a rounded-* utility (mapped to var(--border-radius) above) or an inline style. */
 button:not(.no-radius),
-input:not(.no-radius),
-textarea:not(.no-radius),
 select:not(.no-radius),
 .btn:not(.no-radius) {
   border-radius: var(--border-radius) !important;
@@ -522,9 +524,7 @@ nav button:not(.no-radius),
 }
 
 .search-input:not(.no-radius),
-.filter-input:not(.no-radius),
-input[type="search"]:not(.no-radius),
-input[type="text"]:not(.no-radius) {
+.filter-input:not(.no-radius) {
   border-radius: var(--border-radius) !important;
 }
 
@@ -535,9 +535,12 @@ input[type="text"]:not(.no-radius) {
 
 .dark [class*="rounded"],
 .dark button:not(.no-radius),
-.dark input:not(.no-radius),
 .dark .card:not(.no-radius) {
   border-radius: var(--border-radius) !important;
+}
+
+.no-radius {
+  border-radius: 0px !important;
 }
 
 /* Backdrop blur which also works on Linux */
