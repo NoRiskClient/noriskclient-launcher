@@ -136,7 +136,9 @@
           "'self'",
           "https://www.youtube.com",
           "https://www.youtube-nocookie.com",
-          "https://player.vimeo.com"
+          "https://player.vimeo.com",
+          "https://api.norisk.gg",
+          "https://api-staging.norisk.gg"
         ]
       },
       "assetProtocol": {
