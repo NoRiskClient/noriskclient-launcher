@@ -9,8 +9,8 @@ interface TooltipProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
-  // "cursor" (default): follows the mouse. "top": static, centered above the trigger element.
-  position?: "cursor" | "top";
+  // "cursor" (default): follows the mouse. "top"/"bottom": static, centered above/below the trigger.
+  position?: "cursor" | "top" | "bottom";
 }
 
 export function Tooltip({
@@ -20,7 +20,8 @@ export function Tooltip({
   className = "",
   position = "cursor",
 }: TooltipProps) {
-  const isStatic = position === "top";
+  const isStatic = position === "top" || position === "bottom";
+  const isBottom = position === "bottom";
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -52,12 +53,12 @@ export function Tooltip({
     setTooltipPosition({ x, y });
   };
 
-  // Static mode: anchor centered above the trigger. The `translate(-50%, -100%)` on the
-  // tooltip element handles centering + sitting above, so we only need the top-center point.
+  // Static mode: anchor centered above/below the trigger. The transform on the tooltip element
+  // handles centering + vertical placement, so we only need the center-edge point.
   const positionAboveTrigger = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+    setTooltipPosition({ x: rect.left + rect.width / 2, y: isBottom ? rect.bottom + 8 : rect.top - 8 });
   };
 
   const showTooltip = (e: React.MouseEvent) => {
@@ -117,7 +118,8 @@ export function Tooltip({
     let x = rect.left + rect.width / 2;
     x = Math.min(x, window.innerWidth - margin - half);
     x = Math.max(x, margin + half);
-    setTooltipPosition((prev) => (prev.x === x ? prev : { x, y: rect.top - 8 }));
+    const y = isBottom ? rect.bottom + 8 : rect.top - 8;
+    setTooltipPosition((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
   }, [isVisible, isStatic]);
 
   const getTooltipClasses = () => {
@@ -152,8 +154,8 @@ export function Tooltip({
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             position: 'fixed',
-            // static mode: center horizontally on the anchor point and sit above it
-            transform: isStatic ? 'translate(-50%, -100%)' : undefined,
+            // static mode: center horizontally on the anchor point and sit above/below it
+            transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
             textAlign: isStatic ? 'center' : undefined,
             backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
             borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
