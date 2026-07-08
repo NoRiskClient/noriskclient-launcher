@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,8 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { openExternalUrl } from "../../../services/tauri-service";
+import { isApplixirEnabled } from "../../../services/flagsmith-service";
+import { showApplixirAd } from "../../../services/nrc-service";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 export function AdvancedTab() {
@@ -22,9 +24,41 @@ export function AdvancedTab() {
   const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState(false);
   const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState(false);
   const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState(false);
+  const [adsEnabled, setAdsEnabled] = useState(false);
+
+  useEffect(() => {
+    isApplixirEnabled().then(setAdsEnabled).catch(() => setAdsEnabled(false));
+  }, []);
 
   return (
     <div className="space-y-6">
+      {adsEnabled && (
+        <SettingsSection
+          id="settings-section-ads"
+          title={t("settings.sections.ads")}
+          icon="solar:play-circle-bold"
+          keywords={kw("settings.sections.ads", "ads", "werbung", "consent", "privacy", "gdpr", "dsgvo")}
+        >
+          <SettingRow
+            label={t("settings.ads.reset_consent")}
+            description={t("settings.ads.reset_consent.tooltip")}
+            searchKeywords={kw("settings.ads.reset_consent", "consent", "werbung", "privacy", "reset", "widerruf")}
+          >
+            <Button
+              variant="ghost"
+              className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+              onClick={() => {
+                showApplixirAd(true).catch((error) => {
+                  console.error("[AdvancedTab] Failed to open ad window for consent reset:", error);
+                  toast.error(t("applixir.failed"));
+                });
+              }}
+            >
+              {t("settings.ads.reset_consent.button")}
+            </Button>
+          </SettingRow>
+        </SettingsSection>
+      )}
       <SettingsSection id="settings-section-login_cache" title={t("settings.sections.login_cache")} icon="solar:login-3-bold" keywords={kw("settings.sections.login_cache", "login", "cache", "anmeldung")}>
         <SettingRow
           label={t("settings.browser_login")}
