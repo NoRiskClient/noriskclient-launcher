@@ -1931,7 +1931,7 @@
   "time.remaining_hours_minutes": "{{hours}}ч {{minutes}}м",
   "time.remaining_minutes": "{{minutes}}м",
   "applixir.watch_ad": "Смотреть рекламу",
-  "applixir.daily_points": "Daily Points",
+  "applixir.daily_points": "Ежедневные очки",
   "applixir.disable_hint": "Это можно отключить в настройках.",
   "applixir.playing": "Реклама идёт...",
   "applixir.completed": "Спасибо за просмотр!",

@@ -1931,7 +1931,7 @@
   "time.remaining_hours_minutes": "{{hours}}h {{minutes}}min",
   "time.remaining_minutes": "{{minutes}}min",
   "applixir.watch_ad": "Ver anúncio",
-  "applixir.daily_points": "Daily Points",
+  "applixir.daily_points": "Pontos diários",
   "applixir.disable_hint": "Pode desativar isto nas definições.",
   "applixir.playing": "Anúncio a decorrer...",
   "applixir.completed": "Obrigado por assistir!",

@@ -1931,7 +1931,7 @@
   "time.remaining_hours_minutes": "{{hours}}h {{minutes}}min",
   "time.remaining_minutes": "{{minutes}}min",
   "applixir.watch_ad": "Guarda annuncio",
-  "applixir.daily_points": "Daily Points",
+  "applixir.daily_points": "Punti giornalieri",
   "applixir.disable_hint": "Puoi disattivarlo nelle impostazioni.",
   "applixir.playing": "Annuncio in corso...",
   "applixir.completed": "Grazie per aver guardato!",

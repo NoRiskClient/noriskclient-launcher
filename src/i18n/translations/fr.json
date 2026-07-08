@@ -1931,7 +1931,7 @@
   "time.remaining_hours_minutes": "{{hours}}h {{minutes}}min",
   "time.remaining_minutes": "{{minutes}}min",
   "applixir.watch_ad": "Regarder une pub",
-  "applixir.daily_points": "Daily Points",
+  "applixir.daily_points": "Points quotidiens",
   "applixir.disable_hint": "Vous pouvez le désactiver dans les paramètres.",
   "applixir.playing": "Pub en cours...",
   "applixir.completed": "Merci d'avoir regardé !",
