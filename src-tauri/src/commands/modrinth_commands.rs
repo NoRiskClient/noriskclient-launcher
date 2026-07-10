@@ -9,7 +9,7 @@ use crate::integrations::modrinth::{
 };
 use crate::integrations::mrpack;
 use crate::integrations::unified_mod::{
-    get_mod_versions_unified, get_modpack_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
+    get_mod_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
     UnifiedModSearchParams, UnifiedModSearchResponse, UnifiedModVersionsParams, UnifiedModpackVersionsResponse,
     UnifiedProjectType, UnifiedSortType, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersionResponse,
     ModpackSwitchRequest, ModpackSwitchResponse,
@@ -466,13 +466,17 @@ pub async fn get_mod_versions_unified_command(
 #[tauri::command]
 pub async fn get_modpack_versions_unified_command(
     modpack_source: ModPackSource,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<UnifiedModpackVersionsResponse, CommandError> {
     log::debug!(
         "Received get_modpack_versions_unified command: modpack_source={:?}",
         modpack_source
     );
 
-    let result = get_modpack_versions_unified(&modpack_source)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let result = state
+        .content_cache
+        .get_modpack_versions(&modpack_source, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 

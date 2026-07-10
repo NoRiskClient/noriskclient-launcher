@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { UnifiedVersion } from "../types/unified";
+import type { UnifiedModpackVersionsResponse, UnifiedVersion } from "../types/unified";
 
 
 const MAX_ENTRIES = 50;
@@ -24,6 +24,9 @@ interface ContentCacheState {
   invalidate: (key: string) => void;
   invalidateProfile: (profileId: string) => void;
 
+  modpackVersions: Record<string, UnifiedModpackVersionsResponse>;
+  getModpackVersions: (sourceKey: string) => UnifiedModpackVersionsResponse | undefined;
+  setModpackVersions: (sourceKey: string, versions: UnifiedModpackVersionsResponse) => void;
 }
 
 const emptyEntry = (): ContentCacheEntry => ({
@@ -74,4 +77,12 @@ export const useContentCacheStore = create<ContentCacheState>((set, get) => ({
       return { entries };
     }),
 
+  modpackVersions: {},
+
+  getModpackVersions: (sourceKey) => get().modpackVersions[sourceKey],
+
+  setModpackVersions: (sourceKey, versions) =>
+    set((state) => ({
+      modpackVersions: { ...state.modpackVersions, [sourceKey]: versions },
+    })),
 }));

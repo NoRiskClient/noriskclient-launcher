@@ -4,8 +4,10 @@ use crate::state::post_init::PostInitializationHandler;
 use crate::integrations::curseforge::{self, CurseForgeMod, CurseForgeModsResponse};
 use crate::integrations::modrinth::{self, ModrinthProject, ModrinthVersion};
 use crate::integrations::unified_mod::{
-    self, ModPlatform, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersion,
+    self, ModPlatform, UnifiedModpackVersionsResponse, UnifiedUpdateCheckRequest,
+    UnifiedUpdateCheckResponse, UnifiedVersion,
 };
+use crate::state::profile_state::ModPackSource;
 use async_trait::async_trait;
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,8 @@ pub struct ContentCacheData {
     pub curseforge_mods: HashMap<u32, CacheEntry<CurseForgeMod>>,
     #[serde(default)]
     pub unified_updates: HashMap<String, CacheEntry<Option<UnifiedVersion>>>,
+    #[serde(default)]
+    pub modpack_versions: HashMap<String, CacheEntry<UnifiedModpackVersionsResponse>>,
 }
 
 impl ContentCacheData {
@@ -89,6 +93,7 @@ impl ContentCacheData {
         self.modrinth_projects.retain(|_, e| e.expires_at_ms > cutoff);
         self.curseforge_mods.retain(|_, e| e.expires_at_ms > cutoff);
         self.unified_updates.retain(|_, e| e.expires_at_ms > cutoff);
+        self.modpack_versions.retain(|_, e| e.expires_at_ms > cutoff);
     }
 }
 
@@ -96,6 +101,7 @@ struct Inner {
     data: RwLock<ContentCacheData>,
     save_lock: Mutex<()>,
     save_scheduled: AtomicBool,
+    modpack_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
 #[derive(Clone)]
@@ -110,6 +116,7 @@ impl ContentCacheManager {
                 data: RwLock::new(ContentCacheData::default()),
                 save_lock: Mutex::new(()),
                 save_scheduled: AtomicBool::new(false),
+                modpack_fetch_locks: Mutex::new(HashMap::new()),
             }),
         })
     }
@@ -559,6 +566,81 @@ impl ContentCacheManager {
     }
 
 
+    pub async fn get_modpack_versions(
+        &self,
+        source: &ModPackSource,
+        behaviour: CacheBehaviour,
+    ) -> Result<UnifiedModpackVersionsResponse> {
+        let key = modpack_cache_key(source);
+
+        if behaviour != CacheBehaviour::Bypass {
+            if let Some(entry) = self.read_modpack_versions(&key).await {
+                if entry.is_fresh() {
+                    return Ok(entry.data);
+                }
+                if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                    let this = self.clone();
+                    let source = source.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = this.fetch_modpack_versions(&source).await {
+                            warn!("Background refresh of modpack versions failed: {}", e);
+                        }
+                    });
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        self.fetch_modpack_versions(source).await
+    }
+
+    async fn read_modpack_versions(
+        &self,
+        key: &str,
+    ) -> Option<CacheEntry<UnifiedModpackVersionsResponse>> {
+        self.inner.data.read().await.modpack_versions.get(key).cloned()
+    }
+
+    async fn fetch_modpack_versions(
+        &self,
+        source: &ModPackSource,
+    ) -> Result<UnifiedModpackVersionsResponse> {
+        let key = modpack_cache_key(source);
+
+        let fetch_lock = {
+            let mut locks = self.inner.modpack_fetch_locks.lock().await;
+            locks.entry(key.clone()).or_default().clone()
+        };
+        let _guard = fetch_lock.lock().await;
+
+        if let Some(entry) = self.read_modpack_versions(&key).await {
+            if entry.is_fresh() {
+                return Ok(entry.data);
+            }
+        }
+
+        let fetched = unified_mod::get_modpack_versions_unified(source).await?;
+        {
+            let mut data = self.inner.data.write().await;
+            data.modpack_versions
+                .insert(key, CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
+        }
+        self.schedule_save();
+        Ok(fetched)
+    }
+}
+
+fn modpack_cache_key(source: &ModPackSource) -> String {
+    match source {
+        ModPackSource::Modrinth {
+            project_id,
+            version_id,
+        } => format!("modrinth:{}:{}", project_id, version_id),
+        ModPackSource::CurseForge {
+            project_id,
+            file_id,
+        } => format!("curseforge:{}:{}", project_id, file_id),
+    }
 }
 
 #[async_trait]

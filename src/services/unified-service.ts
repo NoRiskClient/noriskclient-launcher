@@ -31,9 +31,10 @@ class UnifiedService {
         return invoke<UnifiedUpdateCheckResponse>("check_mod_updates_unified_command", { request, cacheBehaviour });
     }
 
-    static async getModpackVersions(modpackSource: ModPackSource): Promise<UnifiedModpackVersionsResponse> {
+    static async getModpackVersions(modpackSource: ModPackSource, cacheBehaviour?: CacheBehaviour): Promise<UnifiedModpackVersionsResponse> {
         return invoke<UnifiedModpackVersionsResponse>("get_modpack_versions_unified_command", {
-            modpackSource
+            modpackSource,
+            cacheBehaviour
         });
     }
 

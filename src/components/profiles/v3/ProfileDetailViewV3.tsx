@@ -69,6 +69,7 @@ import { ScreenshotsTabV3 } from "./tabs/ScreenshotsTabV3";
 import { LogsTabV3 } from "./tabs/LogsTabV3";
 import type { LocalContentItem } from "../../../hooks/useLocalContentManager";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import { useContentCacheStore } from "../../../store/content-cache-store";
 
 const mainTabFor = (k: NavKey): string =>
   CONTENT_NAV_KEYS.includes(k) ? "content" : k;
@@ -126,8 +127,11 @@ export function ProfileDetailViewV3({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Modpack versions state
-  const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(null);
+  const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
+    const source = profile.modpack_info?.source;
+    if (!source) return null;
+    return useContentCacheStore.getState().getModpackVersions(JSON.stringify(source)) ?? null;
+  });
 
   const { showModal, hideModal } = useGlobalModal();
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
@@ -345,10 +349,10 @@ export function ProfileDetailViewV3({
     (async () => {
       try {
         const versions = await UnifiedService.getModpackVersions(modpackSource);
+        if (modpackSourceKey) useContentCacheStore.getState().setModpackVersions(modpackSourceKey, versions);
         if (!cancelled) setModpackVersions(versions);
       } catch (err) {
         console.error("[V3] Failed to refresh modpack versions:", err);
-        if (!cancelled) setModpackVersions(null);
       }
     })();
     return () => { cancelled = true; };

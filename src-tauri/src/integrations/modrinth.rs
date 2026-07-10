@@ -484,7 +484,7 @@ pub async fn get_mod_versions(
     loaders: Option<Vec<String>>,
     game_versions: Option<Vec<String>>,
 ) -> Result<Vec<ModrinthVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/project/{}/version",
         MODRINTH_API_BASE_URL, project_id_or_slug

@@ -17,7 +17,6 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "./ExportProfileModal";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch.tsx";
 import { Tooltip } from "../ui/Tooltip";
-import UnifiedService from "../../services/unified-service";
 import { useProfileStore } from "../../store/profile-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
@@ -83,10 +82,6 @@ export function ProfileCardV2({
   const { isPinned, togglePin } = usePinnedProfilesStore();
   const pinned = isPinned(profile.id);
 
-  // Modpack versions state for conditional rendering
-  const [modpackVersions, setModpackVersions] = useState(null);
-  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
-  
   // Profile settings store
   const { openModal } = useProfileSettingsStore();
   
@@ -159,8 +154,7 @@ export function ProfileCardV2({
         }
       },
     },
-    // Show modpack versions only if modpack info exists and versions are loaded
-    ...(profile.modpack_info?.source && modpackVersions ? [{
+    ...(profile.modpack_info?.source ? [{
       id: "switch_modpack",
       label: t('profiles.modpackVersions'),
       icon: "solar:refresh-circle-bold",
@@ -173,7 +167,7 @@ export function ProfileCardV2({
               <ModpackVersionsModal
                 isOpen={true}
                 onClose={() => hideModal(`modpack-versions-${profile.id}`)}
-                versions={modpackVersions}
+                versions={null}
                 modpackName={profile.name}
                 profileId={profile.id}
                 onSwitchComplete={async () => {
@@ -230,21 +224,6 @@ export function ProfileCardV2({
     }
   }, [openContextMenuId, contextMenuId, isContextMenuOpen]);
 
-  // Load modpack versions when profile has modpack info
-  useEffect(() => {
-    if (profile.modpack_info?.source) {
-      setIsLoadingVersions(true);
-      UnifiedService.getModpackVersions(profile.modpack_info.source)
-        .then(setModpackVersions)
-        .catch(err => {
-          console.error("Failed to load modpack versions:", err);
-          setModpackVersions(null);
-        })
-        .finally(() => setIsLoadingVersions(false));
-    } else {
-      setModpackVersions(null);
-    }
-  }, [profile.modpack_info?.source]);
 
 
 
