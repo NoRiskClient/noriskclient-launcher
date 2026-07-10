@@ -4,10 +4,10 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { gsap } from "gsap";
 import { PlayerHead } from "../common/PlayerHead";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface CurrentAccountDisplayProps {
   onClick?: () => void;
@@ -27,20 +27,11 @@ export function CurrentAccountDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  useEffect(() => {
-    if (buttonRef.current) {
-      gsap.fromTo(
-        buttonRef.current,
-        { scale: 0.95, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    buttonRef,
+    { scale: 0.95, opacity: 0 },
+    { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" },
+  );
 
   // Get border classes based on variant
   const getBorderClasses = () => {

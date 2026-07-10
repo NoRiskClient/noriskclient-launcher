@@ -21,6 +21,7 @@ import { NebulaLightning } from "../effects/NebulaLightning";
 import { NebulaLiquidChrome } from "../effects/NebulaLiquidChrome";
 import { MatrixRainEffect } from "../effects/MatrixRainEffect";
 import { EnchantmentParticlesEffect } from "../effects/EnchantmentParticlesEffect";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface UpdaterStatusPayload {
   message: string;
@@ -67,15 +68,11 @@ export default function Updater() {
     checkThemeLoaded();
   }, [accentColor]);
 
-  useEffect(() => {
-    if (containerRef.current) {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0, y: 20, scale: 0.95 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.2)" },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    containerRef,
+    { opacity: 0, y: 20, scale: 0.95 },
+    { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.2)" },
+  );
 
   useEffect(() => {
     if (closeTimerRef.current) {

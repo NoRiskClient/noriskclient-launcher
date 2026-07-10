@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type ReactNode, useEffect, useRef } from "react";
+import React, { type ReactNode, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -8,6 +8,7 @@ import { Checkbox } from "./Checkbox";
 import { Label } from "./Label";
 import { gsap } from "gsap";
 import { cn } from "../../lib/utils";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { 
   getVariantColors,
   getBorderRadiusClass,
@@ -70,20 +71,11 @@ export function ContentTable({
   const tableRef = useRef<HTMLDivElement>(null);
   const headerRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  useEffect(() => {
-    if (tableRef.current) {
-      gsap.fromTo(
-        tableRef.current,
-        { scale: 0.98, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    tableRef,
+    { scale: 0.98, opacity: 0 },
+    { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" },
+  );
 
   const handleHeaderClick = (header: ContentTableHeader, index: number) => {
     if (!header.sortable || !onSort) return;
