@@ -780,7 +780,7 @@ pub async fn get_versions_by_hashes(
         )));
     }
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version_files", MODRINTH_API_BASE_URL); // POST endpoint
 
     let request_body = HashesRequestBody {
@@ -983,7 +983,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
     // Modrinth expects the IDs as a JSON array string in the query parameter
     let ids_json = serde_json::to_string(&ids).map_err(|e| AppError::Json(e))?; // Use appropriate error type
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     // Note: No trailing slash needed for the base URL when using parse_with_params
     let base_url = format!("{}/projects", MODRINTH_API_BASE_URL);
 

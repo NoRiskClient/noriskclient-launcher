@@ -3,6 +3,7 @@ use crate::error::{AppError, Result};
 use crate::integrations::modrinth::{ModrinthProjectType, ModrinthVersion};
 use crate::integrations::norisk_packs;
 use crate::integrations::unified_mod::ModPlatform;
+use crate::state::content_cache_state::{CacheBehaviour, FileHashEntry};
 use crate::state::profile_state::ModSource;
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
@@ -1655,6 +1656,7 @@ async fn process_mod_requests(
         content_type: ContentType::Mod,
         calculate_hashes: true,
         fetch_modrinth_data: true,
+        cache_behaviour: Default::default(),
     }).await {
         Ok(mods) => mods,
         Err(e) => {
@@ -2210,6 +2212,8 @@ pub struct LoadItemsParams {
     pub content_type: ContentType,
     pub calculate_hashes: bool,
     pub fetch_modrinth_data: bool,
+    #[serde(default)]
+    pub cache_behaviour: CacheBehaviour,
 }
 
 pub struct LocalContentLoader; // No longer holds profile_id, becomes a namespace/utility struct
@@ -2254,6 +2258,7 @@ impl LocalContentLoader {
         };
 
         let mut preliminary_items: Vec<LocalContentItem> = Vec::new();
+        let mut file_mtimes: HashMap<String, u64> = HashMap::new();
 
         if params.content_type == ContentType::NoRiskMod {
             // Special handling for NoRisk mods - fetch them from the NoRisk pack system
@@ -2591,6 +2596,13 @@ impl LocalContentLoader {
                 let file_name_str = file_name_os.to_string_lossy().to_string();
                 let metadata = fs::metadata(&path).await.map_err(|e| AppError::Io(e))?;
                 let file_size = metadata.len();
+                let mtime_ms = metadata
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                file_mtimes.insert(path.to_string_lossy().into_owned(), mtime_ms);
                 let is_disabled = file_name_str.ends_with(".disabled");
                 let base_filename = if is_disabled {
                     file_name_str
@@ -2649,8 +2661,6 @@ impl LocalContentLoader {
         }
 
         if params.calculate_hashes {
-            let mut hash_tasks: Vec<JoinHandle<(usize, std::result::Result<String, AppError>)>> =
-                Vec::new();
             // Collect indices of items that need hashing (files only, or non-Modrinth mods if hash not present)
             let items_to_hash_indices: Vec<usize> = final_items
                 .iter()
@@ -2669,7 +2679,8 @@ impl LocalContentLoader {
                 .map(|(index, _)| index)
                 .collect();
 
-            let mut hash_tasks = Vec::new();
+            let mut hash_tasks: Vec<JoinHandle<(usize, std::result::Result<String, AppError>)>> =
+                Vec::new();
 
             // Create a vector of (index, path, filename) to avoid borrowing final_items in the async tasks
             let hash_items_info: Vec<(usize, String, String)> = items_to_hash_indices
@@ -2683,7 +2694,41 @@ impl LocalContentLoader {
                 })
                 .collect();
 
+            let mut items_to_hash = Vec::new();
             for (index_in_final_items, path_str, filename) in hash_items_info {
+                let file_size = final_items[index_in_final_items].file_size;
+                let mtime_ms = file_mtimes.get(&path_str).copied();
+
+                if params.cache_behaviour != CacheBehaviour::Bypass {
+                    if let Some(mtime_ms) = mtime_ms {
+                        if let Some(cached_hash) = state
+                            .content_cache
+                            .get_file_hash(&path_str, file_size, mtime_ms)
+                            .await
+                        {
+                            final_items[index_in_final_items].sha1_hash = Some(cached_hash);
+                            continue;
+                        }
+                    }
+                }
+                items_to_hash.push((index_in_final_items, path_str, filename, file_size, mtime_ms));
+            }
+
+            debug!(
+                "Hashing {} of {} items ({} served from cache)",
+                items_to_hash.len(),
+                items_to_hash_indices.len(),
+                items_to_hash_indices.len() - items_to_hash.len()
+            );
+
+            let hash_meta: HashMap<usize, (String, u64, u64)> = items_to_hash
+                .iter()
+                .filter_map(|(idx, path, _, size, mtime)| {
+                    mtime.map(|mtime| (*idx, (path.clone(), *size, mtime)))
+                })
+                .collect();
+
+            for (index_in_final_items, path_str, filename, _, _) in items_to_hash {
                 let path_buf = PathBuf::from(&path_str);
                 let semaphore_clone = Arc::clone(&state.io_semaphore);
 
@@ -2717,9 +2762,22 @@ impl LocalContentLoader {
             }
 
             let hash_calculation_results = join_all(hash_tasks).await;
+            let mut new_cache_entries: Vec<(String, FileHashEntry)> = Vec::new();
             for task_result in hash_calculation_results {
                 match task_result {
                     Ok((item_idx, Ok(sha1))) => {
+                        if sha1 != "0" {
+                            if let Some((path_str, size, mtime_ms)) = hash_meta.get(&item_idx) {
+                                new_cache_entries.push((
+                                    path_str.clone(),
+                                    FileHashEntry {
+                                        size: *size,
+                                        mtime_ms: *mtime_ms,
+                                        sha1: sha1.clone(),
+                                    },
+                                ));
+                            }
+                        }
                         if let Some(item_to_update) = final_items.get_mut(item_idx) {
                             item_to_update.sha1_hash = Some(sha1);
                         }
@@ -2740,6 +2798,8 @@ impl LocalContentLoader {
                     }
                 }
             }
+
+            state.content_cache.put_file_hashes(new_cache_entries).await;
         }
 
         if params.fetch_modrinth_data {
@@ -2747,7 +2807,7 @@ impl LocalContentLoader {
             let mut hashes_for_modrinth_lookup: HashMap<String, Vec<usize>> = HashMap::new(); // sha1 -> Vec of indices in final_items
             for (index, item) in final_items.iter().enumerate() {
                 if let Some(hash) = &item.sha1_hash {
-                    if !item.is_directory {
+                    if !item.is_directory && hash != "0" {
                         // Only fetch for files with hashes
                         hashes_for_modrinth_lookup
                             .entry(hash.clone())
@@ -2768,7 +2828,9 @@ impl LocalContentLoader {
                         .sum::<usize>()
                 );
 
-                match crate::integrations::modrinth::get_versions_by_hashes(hashes_vec, "sha1")
+                match state
+                    .content_cache
+                    .get_modrinth_versions_by_hashes(hashes_vec, params.cache_behaviour)
                     .await
                 {
                     Ok(version_map) => {

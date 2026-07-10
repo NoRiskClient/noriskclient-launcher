@@ -9,12 +9,14 @@ use crate::integrations::modrinth::{
 };
 use crate::integrations::mrpack;
 use crate::integrations::unified_mod::{
-    check_mod_updates_unified, get_mod_versions_unified, get_modpack_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
+    get_mod_versions_unified, get_modpack_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
     UnifiedModSearchParams, UnifiedModSearchResponse, UnifiedModVersionsParams, UnifiedModpackVersionsResponse,
     UnifiedProjectType, UnifiedSortType, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersionResponse,
     ModpackSwitchRequest, ModpackSwitchResponse,
 };
+use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::profile_state::ModPackSource;
+use crate::state::State;
 use serde::Serialize;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -259,13 +261,18 @@ pub async fn download_and_install_modrinth_modpack(
 #[tauri::command]
 pub async fn get_modrinth_project_details(
     ids: Vec<String>,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<modrinth::ModrinthProject>, CommandError> {
     log::debug!(
         "Received get_modrinth_project_details_bulk command for {} project IDs/slugs",
         ids.len()
     );
 
-    let result = modrinth::get_multiple_projects(ids).await?;
+    let state = State::get().await.map_err(CommandError::from)?;
+    let result = state
+        .content_cache
+        .get_modrinth_projects(ids, cache_behaviour.unwrap_or_default())
+        .await?;
     Ok(result)
 }
 
@@ -296,6 +303,7 @@ pub async fn check_modrinth_updates(
 #[tauri::command]
 pub async fn check_mod_updates_unified_command(
     request: UnifiedUpdateCheckRequest,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<UnifiedUpdateCheckResponse, CommandError> {
     log::debug!(
         "Received check_mod_updates_unified_command for {} hashes using algorithm {}",
@@ -303,7 +311,10 @@ pub async fn check_mod_updates_unified_command(
         request.algorithm
     );
 
-    let updates = check_mod_updates_unified(request)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let updates = state
+        .content_cache
+        .check_mod_updates_unified(request, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
@@ -366,6 +377,7 @@ pub async fn get_modrinth_game_versions_command(
 #[tauri::command]
 pub async fn get_modrinth_versions_by_hashes(
     hashes: Vec<String>,
+    cache_behaviour: Option<CacheBehaviour>,
     // hash_algorithm: String, // Modrinth API for versions by hash is specific to SHA1 currently
 ) -> Result<HashMap<String, ModrinthVersion>, CommandError> {
     log::debug!(
@@ -377,8 +389,10 @@ pub async fn get_modrinth_versions_by_hashes(
         return Ok(HashMap::new()); // Return empty map if no hashes are provided
     }
 
-    // The modrinth::get_versions_by_hashes function expects "sha1" as the algorithm.
-    let versions_map = modrinth::get_versions_by_hashes(hashes, "sha1")
+    let state = State::get().await.map_err(CommandError::from)?;
+    let versions_map = state
+        .content_cache
+        .get_modrinth_versions_by_hashes(hashes, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 

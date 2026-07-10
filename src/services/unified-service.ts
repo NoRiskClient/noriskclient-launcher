@@ -13,7 +13,7 @@ import {
   type ModpackSwitchRequest,
   type ModpackSwitchResponse,
 } from "../types/unified";
-import type { ModPackSource } from "../types/profile";
+import type { CacheBehaviour, ModPackSource } from "../types/profile";
 import type { SwitchContentVersionPayload, ContentType } from "../types/content";
 import type { LocalContentItem } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
@@ -27,8 +27,8 @@ class UnifiedService {
         return invoke<UnifiedVersionResponse>("get_mod_versions_unified_command", { params });
     }
 
-    static async checkModUpdates(request: UnifiedUpdateCheckRequest): Promise<UnifiedUpdateCheckResponse> {
-        return invoke<UnifiedUpdateCheckResponse>("check_mod_updates_unified_command", { request });
+    static async checkModUpdates(request: UnifiedUpdateCheckRequest, cacheBehaviour?: CacheBehaviour): Promise<UnifiedUpdateCheckResponse> {
+        return invoke<UnifiedUpdateCheckResponse>("check_mod_updates_unified_command", { request, cacheBehaviour });
     }
 
     static async getModpackVersions(modpackSource: ModPackSource): Promise<UnifiedModpackVersionsResponse> {
