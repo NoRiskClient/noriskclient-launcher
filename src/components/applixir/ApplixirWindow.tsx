@@ -473,6 +473,7 @@ export function ApplixirWindow() {
                 src={pageUrl}
                 title="AppLixir"
                 className="w-full h-full border-0"
+                sandbox="allow-scripts allow-same-origin allow-forms"
                 allow="autoplay; fullscreen"
                 onLoad={() => {
                   log("info", "[ApplixirWindow] iframe loaded");
