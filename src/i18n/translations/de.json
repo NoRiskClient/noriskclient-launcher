@@ -953,6 +953,21 @@
 
   "content.update_check_error": "Update-Prüfungsfehler: {{error}}",
 
+  "content.update.available": "Update verfügbar",
+  "content.update.ready_title": "Bereit zum Aktualisieren",
+  "content.update.ready_desc": "Diese eigenständige Mod kann automatisch aktualisiert werden.",
+  "content.update.update_to_version": "Aktualisieren auf Version",
+  "content.update.from_version": "von {{version}}",
+  "content.update.modpack_mod": "Modpack-Mod",
+  "content.update.managed_mod": "Verwaltete Mod",
+  "content.update.checks_disabled_title": "Automatische Update-Prüfung deaktiviert",
+  "content.update.checks_disabled_short_title": "Update-Prüfung deaktiviert",
+  "content.update.disabled_modpack_desc": "Diese Mod ist Teil eines Modpacks. Einzelne Update-Prüfungen sind deaktiviert, um inkompatible Änderungen und Konflikte zu vermeiden.",
+  "content.update.disabled_managed_desc": "Diese Mod wird extern verwaltet. Einzelne Update-Prüfungen sind deaktiviert, um Konflikte zu vermeiden.",
+  "content.update.disabled_regular_desc": "Für diese Mod ist ein Update verfügbar ({{version}}), aber die automatische Update-Prüfung ist deaktiviert. Aktiviere die Update-Prüfung, um automatische Updates zu erlauben.",
+  "content.update.manual_available_title": "Manuelles Update verfügbar",
+  "content.update.manual_available_desc": "Du kannst diese Mod trotzdem manuell aktualisieren, wenn du weißt, was du tust.",
+
   "content.profile_unavailable": "Profildaten sind nicht verfügbar. {{itemType}} können nicht angezeigt werden.",
   "content.standard_readonly": "Standardprofile sind schreibgeschützt.",
   "content.clone_to_edit": "Klone, um Änderungen vorzunehmen und Inhalte zu verwalten.",

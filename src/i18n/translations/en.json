@@ -953,6 +953,21 @@
 
   "content.update_check_error": "Update Check Error: {{error}}",
 
+  "content.update.available": "Update Available",
+  "content.update.ready_title": "Ready to Update",
+  "content.update.ready_desc": "This standalone mod can be automatically updated.",
+  "content.update.update_to_version": "Update to version",
+  "content.update.from_version": "from {{version}}",
+  "content.update.modpack_mod": "ModPack Mod",
+  "content.update.managed_mod": "Managed Mod",
+  "content.update.checks_disabled_title": "Automatic Update Checks Disabled",
+  "content.update.checks_disabled_short_title": "Update Checks Disabled",
+  "content.update.disabled_modpack_desc": "This mod is part of a modpack. Individual update checks are disabled to prevent breaking changes and compatibility issues.",
+  "content.update.disabled_managed_desc": "This mod is managed externally. Individual update checks are disabled to prevent conflicts.",
+  "content.update.disabled_regular_desc": "An update is available for this mod ({{version}}) but automatic update checks are disabled. Enable update checks to allow automatic updates.",
+  "content.update.manual_available_title": "Manual Update Available",
+  "content.update.manual_available_desc": "You can still update this mod manually if you know what you're doing.",
+
   "content.profile_unavailable": "Profile data is not available. Cannot display {{itemType}}.",
   "content.standard_readonly": "Standard profiles are read-only.",
   "content.clone_to_edit": "Clone to make changes and manage content.",
