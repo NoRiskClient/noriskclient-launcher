@@ -155,14 +155,16 @@ export function ContentTile({
           {onNameClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onNameClick(); }}
-              className="text-sm text-white font-minecraft-ten truncate normal-case hover:underline decoration-white/40 underline-offset-2 text-left"
+              className={`text-sm text-white font-minecraft-ten truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
+              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
             </button>
           ) : (
             <div
-              className="text-sm text-white font-minecraft-ten truncate normal-case"
+              className={`text-sm text-white font-minecraft-ten truncate normal-case ${!enabled ? "line-through" : ""}`}
+              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
