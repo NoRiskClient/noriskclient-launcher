@@ -228,8 +228,8 @@ export function TesterWindow() {
           {loading && issues.length === 0 && (
             <div className="text-center py-16">
               <Icon
-                icon="solar:refresh-bold"
-                className="w-7 h-7 mx-auto animate-spin mb-3"
+                icon="svg-spinners:ring-resize"
+                className="w-7 h-7 mx-auto mb-3"
                 style={{ color: accentColor.value }}
               />
               <div className="font-minecraft-ten text-xs uppercase tracking-wider text-white/50">

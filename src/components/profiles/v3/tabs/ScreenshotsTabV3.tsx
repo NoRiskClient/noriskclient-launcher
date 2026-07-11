@@ -247,7 +247,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         {loading && screenshots.length === 0 ? (
           shouldShowLoading ? (
             <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : (

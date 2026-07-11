@@ -241,8 +241,8 @@ const SkinPreview = memo(
             {isDisabled && (
               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-8 h-8 animate-spin mb-1"
+                  icon="svg-spinners:ring-resize"
+                  className="w-8 h-8 mb-1"
                   style={{ color: accentColor.value }}
                 />
                 <span className="font-minecraft text-xs text-white lowercase">

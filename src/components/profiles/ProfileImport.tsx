@@ -154,8 +154,8 @@ export function ProfileImport({
         {isImporting ? (
           <>
             <Icon
-              icon="solar:refresh-bold"
-              className="w-5 h-5 animate-spin text-white"
+              icon="svg-spinners:ring-resize"
+              className="w-5 h-5 text-white"
             />
             <span>{t('profiles.importing')}</span>
           </>

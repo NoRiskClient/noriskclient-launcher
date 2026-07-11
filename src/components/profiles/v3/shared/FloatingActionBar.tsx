@@ -48,7 +48,7 @@ export function FloatingActionBar({
         <div className="flex items-center gap-2 pl-3.5 pr-2 whitespace-nowrap">
           {batchProgress ? (
             <span className="flex items-center gap-1.5 text-xs font-minecraft-ten text-white tabular-nums whitespace-nowrap">
-              <Icon icon="solar:refresh-bold" className="w-3 h-3 animate-spin" style={{ color: accent }} />
+              <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" style={{ color: accent }} />
               <span style={{ color: accent }}>{batchProgress.current}</span>
               <span className="text-white/40">/ {batchProgress.total}</span>
             </span>

@@ -284,7 +284,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             disabled={!rawContent || isUploading}
             className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center justify-center transition-colors"
           >
-            <Icon icon={isUploading ? "solar:refresh-bold" : "solar:cloud-upload-bold"} className={`w-4 h-4 ${isUploading ? "animate-spin" : ""}`} />
+            <Icon icon={isUploading ? "svg-spinners:ring-resize" : "solar:cloud-upload-bold"} className="w-4 h-4" />
           </button>
         </Tooltip>
         <Tooltip content={t("profiles.v3.logs.openFolderTitle")}>
@@ -343,7 +343,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
 
         {isLoadingList && logFiles.length === 0 && !error ? (
           <div className="flex items-center justify-center h-full text-white/40 font-minecraft-ten text-sm">
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
             {t("profiles.v3.content.loading")}
           </div>
         ) : logFiles.length === 0 && !isLoadingList ? (
@@ -355,7 +355,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         ) : isLoadingContent && parsedLines.length === 0 ? (
           shouldShowLoading ? (
             <div className="flex items-center justify-center h-full text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : null

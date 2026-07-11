@@ -656,7 +656,7 @@ export function ProfileDetailViewV3({
         <div className="flex items-center gap-2 flex-wrap mt-5">
           {isLaunching && statusMessage ? (
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-400/25 min-w-[160px] animate-in fade-in duration-200">
-              <Icon icon="solar:refresh-bold" className="w-5 h-5 text-emerald-300 animate-spin flex-shrink-0" />
+              <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-emerald-300 flex-shrink-0" />
               <div className="flex flex-col leading-tight min-w-0">
                 <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft-ten">
                   {t("profiles.card.starting")}

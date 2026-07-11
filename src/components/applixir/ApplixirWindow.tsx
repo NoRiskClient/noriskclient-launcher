@@ -251,7 +251,7 @@ function runCatchingJson(s: unknown): { points: number; balance: number; streakD
 }
 
 const STATE_META: Record<AdState, { icon: string; labelKey: string; spin?: boolean }> = {
-  loading: { icon: "solar:refresh-bold", labelKey: "applixir.window.loading", spin: true },
+  loading: { icon: "svg-spinners:ring-resize", labelKey: "applixir.window.loading" },
   playing: { icon: "solar:play-circle-bold", labelKey: "applixir.playing" },
   completed: { icon: "solar:check-circle-bold", labelKey: "applixir.completed" },
   finished: { icon: "solar:info-circle-bold", labelKey: "applixir.window.no_ad" },
@@ -484,10 +484,9 @@ export function ApplixirWindow() {
 
             {state === "loading" && (
               <Overlay
-                icon="solar:refresh-bold"
+                icon="svg-spinners:ring-resize"
                 color={accentColor.value}
                 text={t("applixir.window.loading")}
-                spin
               />
             )}
             {state === "completed" && (

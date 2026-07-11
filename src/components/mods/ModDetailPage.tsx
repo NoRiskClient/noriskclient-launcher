@@ -393,7 +393,7 @@ export function ModDetailPage({
         )}
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white/50 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white/50" />
             <span className="text-white/50 font-minecraft-ten">{t('mod_detail.loading_project')}</span>
           </div>
         </div>

@@ -459,7 +459,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         {loading && worlds.length === 0 && servers.length === 0 ? (
           shouldShowLoading ? (
             <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : (
@@ -742,7 +742,7 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
           </div>
         ) : isPending ? (
           <div className="mt-1 text-xs text-white/35 font-minecraft-ten flex items-center gap-1.5">
-            <Icon icon="solar:refresh-bold" className="w-3 h-3 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
             {t("profiles.v3.servers.pinging")}
           </div>
         ) : motdInput ? (

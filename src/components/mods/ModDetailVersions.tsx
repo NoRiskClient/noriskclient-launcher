@@ -392,7 +392,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white/50 animate-spin" />
+        <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white/50" />
         <span className="ml-2 text-white/50 font-minecraft-ten">{t('modrinth.loading_versions')}</span>
       </div>
     );

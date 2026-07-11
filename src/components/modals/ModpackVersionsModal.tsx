@@ -179,7 +179,7 @@ function VersionItem({
               disabled={isLoadingChangelog}
             >
               {isLoadingChangelog ? (
-                <Icon icon="solar:refresh-circle-bold" className="w-3 h-3 animate-spin" />
+                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
               ) : (
                 <Icon
                   icon={isExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
@@ -203,7 +203,7 @@ function VersionItem({
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {isLoadingChangelog ? (
               <div className="flex items-center justify-center py-4">
-                <Icon icon="solar:refresh-circle-bold" className="w-5 h-5 animate-spin text-white/50" />
+                <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" />
                 <span className="ml-2 text-sm text-white/50 font-minecraft-ten">{t('modpack_versions.loading_changelog')}</span>
               </div>
             ) : displayChangelog ? (
@@ -523,7 +523,7 @@ This release focuses on stability and performance improvements.
             variant="default"
             onClick={handleSwitchVersion}
             disabled={!selectedVersion || isSwitching}
-            icon={isSwitching ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
+            icon={isSwitching ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
           >
             {isSwitching ? t('modpack_versions.button.switching') : selectedVersion ? t('modpack_versions.button.switch_version') : t('modpack_versions.button.select_version')}
           </Button>

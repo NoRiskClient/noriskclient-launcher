@@ -221,7 +221,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     if (showLoadingIndicator) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white animate-spin mb-4" />
+          <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
           <p className="text-xl font-minecraft text-white lowercase">{t('profiles.wizard.loadingVersions')}</p>
         </div>
       );

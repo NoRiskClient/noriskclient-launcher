@@ -229,8 +229,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           >
             {loading ? (
               <Icon
-                icon="solar:refresh-bold"
-                className="animate-spin text-white"
+                icon="svg-spinners:ring-resize"
+                className="text-white"
               />
             ) : (
               <Icon icon="solar:magnifer-bold" className="text-white" />
@@ -301,8 +301,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                 >
                   {loading ? (
                     <Icon
-                      icon="solar:refresh-bold"
-                      className="animate-spin text-white"
+                      icon="svg-spinners:ring-resize"
+                      className="text-white"
                     />
                   ) : (
                     <Icon icon="solar:magnifer-bold" className="text-white" />

@@ -127,7 +127,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-white/50">
-              <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 mx-auto mb-2" />
               {t("common.loading")}
             </div>
           ) : files.length === 0 ? (
@@ -165,7 +165,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
                       title={t("debug.upload_mclogs")}
                     >
                       {uploadingFile === file.path ? (
-                        <Icon icon="solar:refresh-bold" className="w-4 h-4 text-white/70 animate-spin" />
+                        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 text-white/70" />
                       ) : (
                         <Icon icon="solar:upload-bold" className="w-4 h-4 text-white/70" />
                       )}
@@ -337,7 +337,7 @@ function TestingPanel() {
           title="Run debug_list_expected_cache_filenames"
         >
           {loading ? (
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
           ) : (
             <Icon icon="solar:play-bold" className="w-4 h-4" />
           )}
@@ -379,7 +379,7 @@ function TestingPanel() {
           title="Run clean_mod_cache_command"
         >
           {cleaning ? (
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
           ) : (
             <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           )}
@@ -427,7 +427,7 @@ function TestingPanel() {
           title="Run list_profile_backups"
         >
           {loadingBackups ? (
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
           ) : (
             <Icon icon="solar:list-bold" className="w-4 h-4" />
           )}
@@ -466,7 +466,7 @@ function TestingPanel() {
                     className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {restoringPath === b.path ? (
-                      <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                      <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                     ) : (
                       <Icon icon="solar:restart-bold" className="w-4 h-4" />
                     )}
@@ -570,7 +570,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
             title={t("debug.testing.tester_open_title")}
           >
             {opening ? (
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
             ) : (
               <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
             )}

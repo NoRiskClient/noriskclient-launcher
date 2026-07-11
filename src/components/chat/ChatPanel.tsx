@@ -458,8 +458,8 @@ export function ChatPanel({ friend }: ChatPanelProps) {
             {isLoadingMore && (
               <div className="flex justify-center py-3">
                 <Icon
-                  icon="solar:refresh-linear"
-                  className="w-5 h-5 animate-spin"
+                  icon="svg-spinners:ring-resize"
+                  className="w-5 h-5"
                   style={{ color: accentColor.value }}
                 />
               </div>

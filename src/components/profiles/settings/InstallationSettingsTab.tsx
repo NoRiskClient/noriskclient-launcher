@@ -435,8 +435,8 @@ export function InstallationSettingsTab({
               >
                 <div className="flex items-center justify-center">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-6 h-6 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-6 h-6 mr-2"
                   />
                   <span className="font-minecraft text-2xl">
                     {t('profiles.settings.loadingVersions')}
@@ -567,8 +567,8 @@ export function InstallationSettingsTab({
               >
                 <div className="flex items-center justify-center">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-6 h-6 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-6 h-6 mr-2"
                   />
                   <span className="font-minecraft text-2xl">
                     {t('profiles.settings.loadingLoaderVersions', { loader: editedProfile.loader })}

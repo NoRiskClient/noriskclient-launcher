@@ -202,7 +202,7 @@ export function ContentTile({
               }`}
             >
               {isSwitchingVersion && (
-                <Icon icon="solar:refresh-bold" className="w-3 h-3 flex-shrink-0 animate-spin" />
+                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3 flex-shrink-0" />
               )}
               {!isSwitchingVersion && updateAvailable && (() => {
                 const isFromModPack = !!item.modpack_origin;
@@ -236,7 +236,7 @@ export function ContentTile({
               <ThemedDropdownHeader>{t("profiles.v3.versions.selectVersion")}</ThemedDropdownHeader>
               {isLoadingVersions && (
                 <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft-ten gap-2">
-                  <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5 animate-spin" />
+                  <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
                   {t("profiles.v3.versions.loading")}
                 </div>
               )}

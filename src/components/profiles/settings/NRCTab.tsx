@@ -163,8 +163,8 @@ export function NRCTab({
           {loading ? (
             <div className="flex items-center gap-2 text-white/70">
               <Icon
-                icon="solar:refresh-bold"
-                className="w-4 h-4 animate-spin"
+                icon="svg-spinners:ring-resize"
+                className="w-4 h-4"
               />
               <span className="text-sm font-minecraft-ten">
                 {t('nrc.loading_packs')}
@@ -225,8 +225,8 @@ export function NRCTab({
               {checkingCompatibility && (
                 <div className="flex items-center gap-2 text-white/70">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-4 h-4 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-4 h-4"
                   />
                   <span className="text-sm font-minecraft-ten">
                     {t('nrc.checking_compatibility')}
@@ -268,8 +268,8 @@ export function NRCTab({
               icon={
                 isRepairing ? (
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-4 h-4 animate-spin text-white"
+                    icon="svg-spinners:ring-resize"
+                    className="w-4 h-4 text-white"
                   />
                 ) : (
                   <Icon icon="solar:shield-check-bold" className="w-4 h-4 text-white" />

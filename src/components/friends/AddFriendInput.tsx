@@ -82,7 +82,7 @@ export function AddFriendInput() {
           }}
         >
           {isLoading ? (
-            <Icon icon="solar:refresh-bold" className="w-5 h-5 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
           ) : (
             <Icon icon="solar:arrow-right-bold" className="w-5 h-5" />
           )}

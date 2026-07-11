@@ -94,8 +94,8 @@ export function ProfileDuplicateModal() {
             {isLoading ? (
               <div className="flex items-center gap-3">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-6 h-6 animate-spin text-white"
+                  icon="svg-spinners:ring-resize"
+                  className="w-6 h-6 text-white"
                 />
                 <span>{t('profile_duplicate.button.duplicating')}</span>
               </div>

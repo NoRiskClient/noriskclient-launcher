@@ -497,7 +497,7 @@ export function ModrinthQuickInstallProfilesModal({
                         disabled
                         className="flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
                       >
-                        <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                         <span>{t('modrinth.uninstalling')}</span>
                       </button>
                     );
@@ -567,7 +567,7 @@ export function ModrinthQuickInstallProfilesModal({
                           </>
                         ) : isInstalling ? (
                           <>
-                            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                             <span>{t('modrinth.installing')}</span>
                           </>
                         ) : (

@@ -195,7 +195,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
                           variant="success"
                           size="xs"
                           disabled={isBusy}
-                          icon={<Icon icon={isBusy ? "solar:refresh-bold" : "solar:arrow-up-bold"} className={`w-4 h-4 ${isBusy ? "animate-spin" : ""}`} />}
+                          icon={<Icon icon={isBusy ? "svg-spinners:ring-resize" : "solar:arrow-up-bold"} className="w-4 h-4" />}
                           onClick={() => onAction(a, i, "upgrade")}
                         >
                           {t("crash_analysis.upgrade")}
@@ -218,8 +218,8 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
                         disabled={isBusy}
                         icon={
                           <Icon
-                            icon={isBusy ? "solar:refresh-bold" : isApplied ? "solar:check-circle-bold" : "solar:arrow-right-bold"}
-                            className={`w-4 h-4 ${isBusy ? "animate-spin" : ""}`}
+                            icon={isBusy ? "svg-spinners:ring-resize" : isApplied ? "solar:check-circle-bold" : "solar:arrow-right-bold"}
+                            className="w-4 h-4"
                           />
                         }
                         onClick={() => onAction(a, i)}

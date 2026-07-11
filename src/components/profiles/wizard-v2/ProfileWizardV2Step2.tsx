@@ -298,7 +298,7 @@ export function ProfileWizardV2Step2({
     if (loading) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white animate-spin mb-4" />
+          <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
           <p className="text-xl font-minecraft text-white lowercase">{t('profiles.wizard.loading')}</p>
         </div>
       );
@@ -388,7 +388,7 @@ export function ProfileWizardV2Step2({
             </div>
           ) : showLoadingIndicator ? (
             <div className="flex items-center justify-center w-full">
-              <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white animate-spin mr-3" />
+              <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
               <p className="text-lg font-minecraft text-white lowercase">{t('profiles.wizard.loadingVersions')}</p>
             </div>
           ) : loaderVersions.length > 0 ? (

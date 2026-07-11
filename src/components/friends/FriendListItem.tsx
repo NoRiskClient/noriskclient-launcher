@@ -100,7 +100,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
             }}
           >
             {isRemoving ? (
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
             ) : (
               t('common.confirm')
             )}

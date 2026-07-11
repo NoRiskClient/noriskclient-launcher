@@ -432,7 +432,7 @@ export function JavaSettingsTab({
           >
             {(editedProfile.is_standard_version && (isLoadingGlobalMemory || !globalMemorySettings)) || !isSystemRamLoaded ? (
               <div className="flex items-center justify-center py-8">
-                <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
+                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
                 <span className="text-white font-minecraft">
                   {t('profiles.settings.loadingSettings')}
                 </span>
@@ -502,8 +502,8 @@ export function JavaSettingsTab({
               {isDetectingJava && (
                 <div className="flex items-center text-white/70 font-minecraft">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-5 h-5 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-5 h-5 mr-2"
                   />
                   <span>{t('profiles.settings.detectingJava')}</span>
                 </div>
@@ -589,8 +589,8 @@ export function JavaSettingsTab({
                 icon={
                   isValidatingJavaPath ? (
                     <Icon
-                      icon="solar:refresh-bold"
-                      className="w-5 h-5 animate-spin"
+                      icon="svg-spinners:ring-resize"
+                      className="w-5 h-5"
                     />
                   ) : (
                     <Icon icon="solar:test-tube-bold" className="w-5 h-5" />
@@ -623,7 +623,7 @@ export function JavaSettingsTab({
           <div className="custom-args-textarea">
             {editedProfile.is_standard_version && isLoadingGlobalJvmArgs ? (
               <div className="flex items-center justify-center py-8">
-                <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
+                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
                 <span className="text-white font-minecraft">{t('profiles.settings.loadingSettings')}</span>
               </div>
             ) : (

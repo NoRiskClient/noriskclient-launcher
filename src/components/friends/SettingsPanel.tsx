@@ -72,8 +72,8 @@ export function SettingsPanel() {
       <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Icon
-            icon="solar:refresh-linear"
-            className="w-6 h-6 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-6 h-6"
             style={{ color: accentColor.value }}
           />
           <span className="text-white/60 text-xs">{t('common.loading')}</span>

@@ -161,7 +161,7 @@ export default function Updater() {
     switch (status) {
       case "checking":
         return (
-          <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+          <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
         );
       case "downloading":
         return <Icon icon="solar:download-bold" className="w-4 h-4" />;

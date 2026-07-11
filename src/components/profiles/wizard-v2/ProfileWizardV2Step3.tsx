@@ -408,8 +408,8 @@ export function ProfileWizardV2Step3({
                                 {loadingPacks ? (
                                     <div className="flex items-center gap-2 text-white/70">
                                         <Icon
-                                            icon="solar:refresh-bold"
-                                            className="w-4 h-4 animate-spin"
+                                            icon="svg-spinners:ring-resize"
+                                            className="w-4 h-4"
                                         />
                                         <span className="text-sm font-minecraft-ten">
                                             {t('profiles.wizard.loadingPacks')}
@@ -468,8 +468,8 @@ export function ProfileWizardV2Step3({
                                         {checkingCompatibility && (
                                             <div className="flex items-center gap-2 text-white/70">
                                                 <Icon
-                                                    icon="solar:refresh-bold"
-                                                    className="w-4 h-4 animate-spin"
+                                                    icon="svg-spinners:ring-resize"
+                                                    className="w-4 h-4"
                                                 />
                                                 <span className="text-sm font-minecraft-ten">
                                                     {t('profiles.wizard.checkingCompatibility')}
@@ -530,7 +530,7 @@ export function ProfileWizardV2Step3({
                 className="min-w-[180px] text-xl"
                 icon={
                     creating ? (
-                        <Icon icon="solar:refresh-bold" className="w-5 h-5 animate-spin" />
+                        <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
                     ) : (
                         <Icon icon="solar:check-circle-bold" className="w-5 h-5" />
                     )

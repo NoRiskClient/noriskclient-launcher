@@ -293,8 +293,8 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         {isSaving ? (
           <div className="flex items-center gap-3">
             <Icon
-              icon="solar:refresh-bold"
-              className="w-6 h-6 animate-spin text-white"
+              icon="svg-spinners:ring-resize"
+              className="w-6 h-6 text-white"
             />
             <span>{t('profiles.settings.saving')}</span>
           </div>

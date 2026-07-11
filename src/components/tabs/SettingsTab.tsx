@@ -216,8 +216,8 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Icon
-              icon="solar:refresh-bold"
-              className="w-10 h-10 text-white/70 animate-spin mx-auto mb-4"
+              icon="svg-spinners:ring-resize"
+              className="w-10 h-10 text-white/70 mx-auto mb-4"
             />
             <p className="text-2xl text-white/70 font-minecraft">
               {t("settings.loading")}

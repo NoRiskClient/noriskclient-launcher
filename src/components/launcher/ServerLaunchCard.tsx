@@ -198,13 +198,13 @@ export function ServerLaunchCard({
       <div className="relative w-16 h-16 flex-shrink-0 rounded flex items-center justify-center overflow-hidden">
         {isLaunching ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/70 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/70"
           />
         ) : isLoading ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/50 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/50"
           />
         ) : serverInfo?.favicon_base64 ? (
           <img

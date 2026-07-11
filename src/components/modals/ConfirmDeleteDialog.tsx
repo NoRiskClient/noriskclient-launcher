@@ -49,7 +49,7 @@ export function ConfirmDeleteDialog({
         variant="destructive"
         onClick={onConfirm}
         disabled={isDeleting}
-        icon={isDeleting ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : null}
+        icon={isDeleting ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : null}
       >
         {isDeleting ? t('confirm_delete.button.deleting') : t('confirm_delete.button.delete')}
       </Button>

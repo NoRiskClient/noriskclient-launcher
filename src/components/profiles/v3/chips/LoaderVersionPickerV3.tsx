@@ -67,7 +67,7 @@ export function LoaderVersionPickerV3({
       <div className="py-1 max-h-[220px] overflow-y-auto custom-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft-ten">
-            <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
             {t("profiles.v3.chips.loaderVersion.loading")}
           </div>
         ) : !versions || versions.length === 0 ? (

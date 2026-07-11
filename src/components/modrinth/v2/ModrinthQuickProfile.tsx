@@ -160,7 +160,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
 
           {profilesLoading ? (
             <div className="flex items-center justify-center gap-2 p-3 bg-black/20 rounded-lg">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin text-white/50" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 text-white/50" />
               <span className="text-sm text-white/50 font-minecraft-ten">{t('profiles.loadingProfiles')}</span>
             </div>
           ) : storeProfiles.length === 0 ? (
