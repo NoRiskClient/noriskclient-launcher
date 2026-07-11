@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-hot-toast';
 import i18n from '../i18n/i18n';
-import type { Profile, LocalContentItem as ProfileLocalContentItem, GenericModrinthInfo as ProfileGenericModrinthInfo, LoadItemsParams, CacheBehaviour } from '../types/profile';
+import type { Profile, LocalContentItem as ProfileLocalContentItem, LoadItemsParams, CacheBehaviour } from '../types/profile';
 import type { ModrinthVersion, ModrinthBulkUpdateRequestBody, ModrinthHashAlgorithm, ResourcePackModrinthInfo, ShaderPackModrinthInfo, DataPackModrinthInfo } from '../types/modrinth';
 import type { UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersion } from '../types/unified';
 import { ModPlatform } from '../types/unified';
@@ -46,7 +46,6 @@ interface UseLocalContentManagerReturn<T extends LocalContentItem> {
   isLoading: boolean;
   isRevalidating: boolean;
   isFetchingHashes: boolean;
-  isFetchingModrinthDetails: boolean;
   isAnyTaskRunning: boolean;
   error: string | null;
   searchQuery: string;
@@ -243,7 +242,6 @@ export function useLocalContentManager<T extends LocalContentItem>({
   const [isInitialLoadingState, setIsInitialLoadingState] = useState(() => !!profile?.id && !initialEntry);
   const [isRevalidating, setIsRevalidating] = useState(() => !!initialEntry);
   const [isFetchingHashesState, setIsFetchingHashesState] = useState(false);
-  const [isFetchingModrinthDetailsState, setIsFetchingModrinthDetailsState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -321,7 +319,6 @@ export function useLocalContentManager<T extends LocalContentItem>({
       default: return 'Unknown';
     }
   }, [getItemPlatform]);
-  const [hashesToFetchModrinthDetailsFor, setHashesToFetchModrinthDetailsFor] = useState<string[] | null>(null);
 
   const [contentUpdates, setContentUpdates] = useState<Record<string, UnifiedVersion>>(() => initialEntry?.contentUpdates ?? {});
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
@@ -367,23 +364,20 @@ export function useLocalContentManager<T extends LocalContentItem>({
       setIsInitialLoadingState(true);
     }
     setIsFetchingHashesState(false);
-    setIsFetchingModrinthDetailsState(false);
     setError(null);
     // Note: contentUpdates wird hier NICHT geleert (stale-while-revalidate).
-    // Der Check nach Phase 3 ersetzt sie natuerlich mit frischen Daten. Bei
-    // manuellem Refresh oder Tab-Switch flackert sonst die Update-Info kurz
+    // Bei manuellem Refresh oder Tab-Switch flackert sonst die Update-Info kurz
     // weg. Hard-Reset passiert weiter via fetchData(initialFetch=true).
     setContentUpdateError(null);
-    setHashesToFetchModrinthDetailsFor(null); // Reset this here
 
     const backendContentType = mapUiContentTypeToBackend(contentType);
-    console.log(`[${contentType}] Phase 1: Fetching local content...`, new Date().toISOString());
+    console.log(`[${contentType}] Loading local content...`, new Date().toISOString());
     try {
       const serviceParams: LoadItemsParams = {
         profile_id: profile.id,
         content_type: backendContentType,
         calculate_hashes: true,
-        fetch_modrinth_data: false, // Modrinth details via JS in Phase 3
+        fetch_modrinth_data: true, // Rust resolves modrinth_info in the same call (cache-backed)
         cache_behaviour: behaviour,
       };
       const fetchedBackendItems = await getLocalContent(serviceParams) as ProfileLocalContentItem[];
@@ -401,23 +395,15 @@ export function useLocalContentManager<T extends LocalContentItem>({
         };
       });
       setItems(processedBasicItems as T[]);
-      console.log(`[${contentType}] Phase 1: Items set (count: ${processedBasicItems.length})`, new Date().toISOString());
+      console.log(`[${contentType}] Items set (count: ${processedBasicItems.length})`, new Date().toISOString());
       if (!cached) setSelectedItemIds(new Set());
 
-      const allKnownHashes = processedBasicItems
-        .map(item => item.sha1_hash)
-        .filter((hash): hash is string => hash != null && hash !== "0");
-
-      if (allKnownHashes.length > 0) {
-        setHashesToFetchModrinthDetailsFor(allKnownHashes);
-      } else {
-        setIsInitialLoadProcessComplete(true);
-        setIsRevalidating(false);
-      }
+      setIsInitialLoadProcessComplete(true);
+      setIsRevalidating(false);
 
       if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
     } catch (err) {
-      console.error(`[${contentType}] Phase 1: Error fetching local content:`, err);
+      console.error(`[${contentType}] Error loading local content:`, err);
       setError(parseErrorMessage(err));
       setIsRevalidating(false);
     } finally {
@@ -444,57 +430,6 @@ export function useLocalContentManager<T extends LocalContentItem>({
     fetchBasicInfo();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchBasicInfo, profile?.selected_norisk_pack_id]); // Added profile.selected_norisk_pack_id to ensure refetch on pack change
-
-  // Phase 3: Fetch Modrinth project details based on hashes (existing logic, should be fine)
-  useEffect(() => {
-    let isMounted = true; // To prevent state updates on unmounted component
-    if (hashesToFetchModrinthDetailsFor && hashesToFetchModrinthDetailsFor.length > 0 && profile?.id && !isFetchingModrinthDetailsState) {
-      console.log(`[${contentType}] Phase 3: Triggering Modrinth project details fetch for hashes`, new Date().toISOString(), hashesToFetchModrinthDetailsFor);
-      setIsFetchingModrinthDetailsState(true);
-      const loadId = loadIdRef.current;
-      const behaviour = cacheBehaviourRef.current;
-      const fetchModrinthDataByHashes = async () => {
-        try {
-          const modrinthVersionsMap = await ModrinthService.getVersionsByHashes(hashesToFetchModrinthDetailsFor!, behaviour);
-          if (!isMounted || loadIdRef.current !== loadId) return;
-          console.log(`[${contentType}] Phase 3: Modrinth data received`, new Date().toISOString(), modrinthVersionsMap);
-          setItems(currentItems =>
-            currentItems.map(item => {
-              if (item.sha1_hash && modrinthVersionsMap[item.sha1_hash]) {
-                const modrinthVersion = modrinthVersionsMap[item.sha1_hash];
-                const primaryFile = modrinthVersion.files.find(f => f.primary) || modrinthVersion.files[0];
-                const newModrinthInfo: ProfileGenericModrinthInfo | null = primaryFile ? {
-                  project_id: modrinthVersion.project_id,
-                  version_id: modrinthVersion.id,
-                  name: modrinthVersion.name, 
-                  version_number: modrinthVersion.version_number,
-                  download_url: primaryFile.url,
-                } : null;
-                return { ...item, modrinth_info: newModrinthInfo } as T;
-              }
-              return item;
-            })
-          );
-          console.log(`[${contentType}] Phase 3: Items updated with Modrinth data`, new Date().toISOString());
-        } catch (modrinthError) {
-          if (!isMounted) return;
-          console.warn(`[${contentType}] Phase 3: Failed to fetch Modrinth details by hashes:`, modrinthError);
-          const errorMsg = parseErrorMessage(modrinthError);
-          setError(prevError => prevError ? `${prevError}; Failed to fetch Modrinth details (${errorMsg})` : `Failed to fetch Modrinth details (${errorMsg})`);
-        } finally {
-          if (!isMounted) return;
-          setIsFetchingModrinthDetailsState(false);
-          if (loadIdRef.current !== loadId) return; // a newer load owns the state now
-          setHashesToFetchModrinthDetailsFor(null);
-          setIsInitialLoadProcessComplete(true); // Set the flag indicating Phase 3 completion
-          setIsRevalidating(false);
-        }
-      };
-      fetchModrinthDataByHashes();
-    }
-    return () => { isMounted = false; }; // Cleanup function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hashesToFetchModrinthDetailsFor, profile?.id, contentType]); // Dependencies should NOT include isInitialLoadProcessComplete
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -1429,8 +1364,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     isLoading: isInitialLoadingState,
     isRevalidating,
     isFetchingHashes: isFetchingHashesState,
-    isFetchingModrinthDetails: isFetchingModrinthDetailsState,
-    isAnyTaskRunning: isInitialLoadingState || isFetchingHashesState || isFetchingModrinthDetailsState || isCheckingUpdates || isUpdatingAll, 
+    isAnyTaskRunning: isInitialLoadingState || isFetchingHashesState || isCheckingUpdates || isUpdatingAll, 
     error,
     searchQuery,
     setSearchQuery,
