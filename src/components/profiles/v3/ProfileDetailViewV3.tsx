@@ -367,15 +367,18 @@ export function ProfileDetailViewV3({
 
   // Disk usage: fetch once per profile, also refetch when a session ends
   // (Playtime-Wert hat sich dann geändert, plausibel dass sich auch Dateien änderten).
-  const [diskSize, setDiskSize] = useState<number | null>(null);
+  const [diskSize, setDiskSize] = useState<number | null>(
+    () => useContentCacheStore.getState().getDiskSize(profile.id) ?? null,
+  );
   useEffect(() => {
     let cancelled = false;
-    setDiskSize(null);
     ProfileService.getProfileDiskSize(currentProfile.id)
-      .then((size) => { if (!cancelled) setDiskSize(size); })
+      .then((size) => {
+        useContentCacheStore.getState().setDiskSize(currentProfile.id, size);
+        if (!cancelled) setDiskSize(size);
+      })
       .catch((err) => {
         console.warn("[V3] Failed to fetch disk size:", err);
-        if (!cancelled) setDiskSize(null);
       });
     return () => { cancelled = true; };
   }, [currentProfile.id, currentProfile.playtime_seconds]);

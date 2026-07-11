@@ -27,6 +27,10 @@ interface ContentCacheState {
   modpackVersions: Record<string, UnifiedModpackVersionsResponse>;
   getModpackVersions: (sourceKey: string) => UnifiedModpackVersionsResponse | undefined;
   setModpackVersions: (sourceKey: string, versions: UnifiedModpackVersionsResponse) => void;
+
+  diskSizes: Record<string, number>;
+  getDiskSize: (profileId: string) => number | undefined;
+  setDiskSize: (profileId: string, bytes: number) => void;
 }
 
 const emptyEntry = (): ContentCacheEntry => ({
@@ -85,4 +89,11 @@ export const useContentCacheStore = create<ContentCacheState>((set, get) => ({
     set((state) => ({
       modpackVersions: { ...state.modpackVersions, [sourceKey]: versions },
     })),
+
+  diskSizes: {},
+
+  getDiskSize: (profileId) => get().diskSizes[profileId],
+
+  setDiskSize: (profileId, bytes) =>
+    set((state) => ({ diskSizes: { ...state.diskSizes, [profileId]: bytes } })),
 }));
