@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { useAnimationsEnabled, useEntranceAnimation } from "../../hooks/useEntranceAnimation";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { gsap } from "gsap";
 
 interface ToggleSwitchProps {
@@ -57,8 +57,6 @@ export function ToggleSwitch({
 
   const sizeConfig = getSizeConfig();
 
-  const animationsEnabled = useAnimationsEnabled();
-
   useEntranceAnimation(
     containerRef,
     { opacity: 0, scale: 0.95 },
@@ -66,32 +64,31 @@ export function ToggleSwitch({
   );
 
   useEffect(() => {
-    const move = animationsEnabled
-      ? (target: Element, vars: gsap.TweenVars) =>
-          gsap.to(target, { ...vars, duration: 0.3, ease: "power2.inOut" })
-      : (target: Element, vars: gsap.TweenVars) => gsap.set(target, vars);
-
     if (knobRef.current) {
-      move(knobRef.current, {
+      gsap.to(knobRef.current, {
         x: checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0,
         backgroundColor: checked ? "#ffffff" : "#f0f0f0",
         boxShadow: checked
           ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
           : "0 1px 3px rgba(0,0,0,0.3)",
+        duration: 0.3,
+        ease: "power2.inOut",
       });
     }
 
     if (trackRef.current) {
-      move(trackRef.current, {
+      gsap.to(trackRef.current, {
         backgroundColor: checked
           ? `${accentColor.value}80`
           : `${accentColor.value}30`,
         borderColor: checked
           ? `${accentColor.value}CC`
           : `${accentColor.value}50`,
+        duration: 0.3,
+        ease: "power2.inOut",
       });
     }
-  }, [checked, accentColor.value, size, animationsEnabled]);
+  }, [checked, accentColor.value, size]);
 
   const handleMouseEnter = () => {
     if (disabled) return;
