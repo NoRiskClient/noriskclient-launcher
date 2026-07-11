@@ -495,11 +495,12 @@ impl ContentCacheManager {
         if request.hashes.is_empty() {
             return Ok(UnifiedUpdateCheckResponse {
                 updates: HashMap::new(),
+                failed_platforms: Vec::new(),
             });
         }
         if behaviour == CacheBehaviour::Bypass {
             let fetched = unified_mod::check_mod_updates_unified(request.clone()).await?;
-            self.put_unified_updates(&request, &request.hashes, &fetched.updates)
+            self.put_unified_updates(&request, &request.hashes, &fetched)
                 .await;
             return Ok(fetched);
         }
@@ -534,13 +535,15 @@ impl ContentCacheManager {
             }
         }
 
+        let mut failed_platforms = Vec::new();
         if !missing.is_empty() {
             let sub_request = subset_request(&request, &missing);
             match unified_mod::check_mod_updates_unified(sub_request).await {
                 Ok(fetched) => {
-                    self.put_unified_updates(&request, &missing, &fetched.updates)
+                    self.put_unified_updates(&request, &missing, &fetched)
                         .await;
                     updates.extend(fetched.updates);
+                    failed_platforms = fetched.failed_platforms;
                 }
                 Err(e) if serve_stale => {
                     warn!("Unified update check failed, serving cached subset: {}", e)
@@ -555,7 +558,7 @@ impl ContentCacheManager {
             tokio::spawn(async move {
                 match unified_mod::check_mod_updates_unified(sub_request.clone()).await {
                     Ok(fetched) => {
-                        this.put_unified_updates(&sub_request, &stale, &fetched.updates)
+                        this.put_unified_updates(&sub_request, &stale, &fetched)
                             .await
                     }
                     Err(e) => warn!("Background refresh of unified updates failed: {}", e),
@@ -563,19 +566,42 @@ impl ContentCacheManager {
             });
         }
 
-        Ok(UnifiedUpdateCheckResponse { updates })
+        Ok(UnifiedUpdateCheckResponse {
+            updates,
+            failed_platforms,
+        })
     }
 
     async fn put_unified_updates(
         &self,
         request: &UnifiedUpdateCheckRequest,
         requested: &[String],
-        fetched: &HashMap<String, UnifiedVersion>,
+        fetched: &UnifiedUpdateCheckResponse,
     ) {
+        let cacheable: Vec<&String> = requested
+            .iter()
+            .filter(|identifier| {
+                fetched.failed_platforms.is_empty()
+                    || !fetched
+                        .failed_platforms
+                        .contains(&identifier_platform(request, identifier))
+            })
+            .collect();
+        let skipped = requested.len() - cacheable.len();
+        if skipped > 0 {
+            warn!(
+                "Skipping negative-cache write for {} identifiers on failed platforms {:?}",
+                skipped, fetched.failed_platforms
+            );
+        }
+        if cacheable.is_empty() {
+            return;
+        }
         {
             let mut data = self.inner.data.write().await;
-            for identifier in requested {
-                let entry = CacheEntry::new(fetched.get(identifier).cloned(), TTL_METADATA_MS);
+            for identifier in cacheable {
+                let entry =
+                    CacheEntry::new(fetched.updates.get(identifier).cloned(), TTL_METADATA_MS);
                 data.unified_updates
                     .insert(update_cache_key(request, identifier), entry);
             }
@@ -669,13 +695,17 @@ impl PostInitializationHandler for ContentCacheManager {
     }
 }
 
-fn update_cache_key(request: &UnifiedUpdateCheckRequest, identifier: &str) -> String {
-    let platform = request
+fn identifier_platform(request: &UnifiedUpdateCheckRequest, identifier: &str) -> ModPlatform {
+    request
         .hash_platforms
         .as_ref()
         .and_then(|map| map.get(identifier))
         .cloned()
-        .unwrap_or(ModPlatform::Modrinth);
+        .unwrap_or(ModPlatform::Modrinth)
+}
+
+fn update_cache_key(request: &UnifiedUpdateCheckRequest, identifier: &str) -> String {
+    let platform = identifier_platform(request, identifier);
 
     let mut game_versions = request.game_versions.clone();
     game_versions.sort();

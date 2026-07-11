@@ -990,6 +990,8 @@ pub struct InstalledFileInfo {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnifiedUpdateCheckResponse {
     pub updates: std::collections::HashMap<String, UnifiedVersion>,
+    #[serde(default)]
+    pub failed_platforms: Vec<ModPlatform>,
 }
 
 /// Check for updates across all supported platforms
@@ -1021,6 +1023,7 @@ pub async fn check_mod_updates_unified(
 
     // Combine results
     let mut all_updates = std::collections::HashMap::new();
+    let mut failed_platforms = Vec::new();
 
     // Handle Modrinth results
     match modrinth_updates {
@@ -1032,6 +1035,7 @@ pub async fn check_mod_updates_unified(
         Err(e) => {
             error!("Failed to check Modrinth updates: {}", e);
             // Continue with CurseForge results even if Modrinth fails
+            failed_platforms.push(ModPlatform::Modrinth);
         }
     }
 
@@ -1045,6 +1049,7 @@ pub async fn check_mod_updates_unified(
         Err(e) => {
             error!("Failed to check CurseForge updates: {}", e);
             // Continue with Modrinth results even if CurseForge fails
+            failed_platforms.push(ModPlatform::CurseForge);
         }
     }
 
@@ -1052,6 +1057,7 @@ pub async fn check_mod_updates_unified(
 
     Ok(UnifiedUpdateCheckResponse {
         updates: all_updates,
+        failed_platforms,
     })
 }
 
