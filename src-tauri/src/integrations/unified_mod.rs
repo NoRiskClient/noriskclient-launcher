@@ -592,6 +592,10 @@ pub async fn search_mods_unified(
             ).await {
                 Ok(response) => {
                     log::info!("CurseForge search successful: {} mods", response.data.len());
+                    if let Ok(state) = crate::state::state_manager::State::get().await {
+                        log::info!("[cache-warm] browse seeding {} curseforge mods into cache", response.data.len());
+                        state.content_cache.put_curseforge_mods(&response.data).await;
+                    }
                     let unified_results: Vec<UnifiedModSearchResult> = response.data
                         .into_iter()
                         .map(|mod_info| mod_info.into())

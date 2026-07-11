@@ -298,6 +298,24 @@ impl ContentCacheManager {
         self.schedule_save();
     }
 
+    pub async fn cache_modrinth_version(&self, version: &ModrinthVersion) {
+        let sha1 = version
+            .files
+            .iter()
+            .find(|f| f.primary)
+            .or_else(|| version.files.first())
+            .and_then(|f| f.hashes.sha1.clone());
+        let Some(sha1) = sha1 else { return };
+        {
+            let mut data = self.inner.data.write().await;
+            data.modrinth_versions.insert(
+                sha1,
+                CacheEntry::new(Some(version.clone()), TTL_IMMUTABLE_MS),
+            );
+        }
+        self.schedule_save();
+    }
+
 
     pub async fn get_modrinth_projects(
         &self,
@@ -454,7 +472,7 @@ impl ContentCacheManager {
         Ok(CurseForgeModsResponse { data: result })
     }
 
-    async fn put_curseforge_mods(&self, fetched: &[CurseForgeMod]) {
+    pub async fn put_curseforge_mods(&self, fetched: &[CurseForgeMod]) {
         if fetched.is_empty() {
             return;
         }

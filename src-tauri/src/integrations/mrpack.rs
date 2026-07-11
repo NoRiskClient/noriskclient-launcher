@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth;
+use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
     Mod, ModLoader, ModSource, ModPackInfo, ModPackSource, Profile, ProfileSettings, ProfileState,
@@ -296,15 +296,22 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
         "Looking up Modrinth info for {} sha1 hashes...",
         hashes_to_lookup.len()
     );
-    let versions_map =
-        match modrinth::get_versions_by_hashes(hashes_to_lookup.clone(), "sha1").await {
-            Ok(map) => map,
-            Err(e) => {
-                error!("Failed to get version info by hashes: {}", e);
-                return Err(e);
-            }
-        };
-    info!("Received Modrinth info for {} hashes.", versions_map.len());
+    let state = State::get().await?;
+    let versions_map = match state
+        .content_cache
+        .get_modrinth_versions_by_hashes(hashes_to_lookup.clone(), CacheBehaviour::StaleWhileRevalidate)
+        .await
+    {
+        Ok(map) => map,
+        Err(e) => {
+            error!("Failed to get version info by hashes: {}", e);
+            return Err(e);
+        }
+    };
+    info!(
+        "[cache-warm] mrpack install resolved {} modrinth versions through the cache",
+        versions_map.len()
+    );
 
     // 3. Create Mod structs from the results
     for (hash, version_info) in versions_map {
