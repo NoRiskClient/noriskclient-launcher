@@ -77,11 +77,10 @@ function getDonationIcon(platform: string): string {
 // Helper to get loader icon
 function getLoaderIcon(loader: string): string {
   const lower = loader.toLowerCase();
-  if (lower === "fabric") return "simple-icons:fabric";
   if (lower === "forge") return "simple-icons:curseforge"; // No dedicated forge icon, use curseforge
   if (lower === "neoforge") return "simple-icons:curseforge";
-  if (lower === "quilt") return "simple-icons:quilted-fabric-api";
-  return "solar:cpu-bolt-bold";
+  return "solar:cpu-bolt-bold"; // simple-icons has no fabric or quilt brand
+
 }
 
 // Helper to format environment support
@@ -383,7 +382,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
           <div className="space-y-2">
             <LinkItem
-              icon="solar:globe-bold"
+              icon="solar:global-bold"
               label={t('mod_detail.links.website')}
               url={project.links.website}
             />

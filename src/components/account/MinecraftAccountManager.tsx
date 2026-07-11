@@ -126,7 +126,7 @@ export function MinecraftAccountManager({
           {isLoading && accounts.length === 0 ? (
             <div className="py-3 px-3 text-center">
               <Icon
-                icon="solar:spinner-bold"
+                icon="solar:refresh-bold"
                 className="w-5 h-5 animate-spin mx-auto text-white/70"
               />
               <p className="mt-1 text-white/70 text-sm font-minecraft-ten">{t('auth.loadingAccounts')}</p>
@@ -172,7 +172,7 @@ export function MinecraftAccountManager({
             {isLoading ? (
               <>
                 <Icon
-                  icon="solar:spinner-bold"
+                  icon="solar:refresh-bold"
                   className="w-3 h-3 animate-spin"
                 />
                 <span className="ml-1">{t('auth.processing')}</span>
@@ -210,7 +210,7 @@ export function MinecraftAccountManager({
               {isLoading && accounts.length === 0 ? (
                 <div className="py-4 text-center">
                   <Icon
-                    icon="solar:spinner-bold"
+                    icon="solar:refresh-bold"
                     className="w-8 h-8 animate-spin mx-auto text-white/70"
                   />
                   <p className="mt-2 text-white/70 text-xl">
@@ -253,7 +253,7 @@ export function MinecraftAccountManager({
               {isLoading ? (
                 <>
                   <Icon
-                    icon="solar:spinner-bold"
+                    icon="solar:refresh-bold"
                     className="w-5 h-5 animate-spin"
                   />
                   <span className="ml-2">{t('auth.processing')}</span>
@@ -374,7 +374,7 @@ function AccountItem({
           </h4>
           {isActivating && (
             <Icon
-              icon="solar:spinner-bold"
+              icon="solar:refresh-bold"
               className={`animate-spin ${isDropdownItem ? "w-4 h-4" : "w-5 h-5"} text-white/80 ml-2`}
             />
           )}
@@ -390,7 +390,7 @@ function AccountItem({
             icon={
               isRemoving ? (
                 <Icon
-                  icon="solar:spinner-bold"
+                  icon="solar:refresh-bold"
                   className="w-3 h-3 animate-spin"
                 />
               ) : (
@@ -411,7 +411,7 @@ function AccountItem({
             {isRemoving ? (
               <>
                 <Icon
-                  icon="solar:spinner-bold"
+                  icon="solar:refresh-bold"
                   className="w-5 h-5 animate-spin"
                 />
                 <span className="ml-2">{t('auth.removing')}</span>

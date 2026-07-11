@@ -56,7 +56,7 @@ function getVersionTypeIcon(type: UnifiedVersionType): string {
     case UnifiedVersionType.Beta:
       return "solar:test-tube-bold";
     case UnifiedVersionType.Alpha:
-      return "solar:flask-bold";
+      return "solar:test-tube-bold";
     default:
       return "solar:tag-bold";
   }

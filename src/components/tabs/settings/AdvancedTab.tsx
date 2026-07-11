@@ -407,7 +407,7 @@ export function AdvancedTab() {
             onClick={() => {
               openExternalUrl("https://norisk.gg/licenses")
             }}
-            icon={<Icon icon="solar:external-link-bold" className="w-5 h-5" />}
+            icon={<Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />}
           >
             {t("settings.licenses.view")}
           </Button>

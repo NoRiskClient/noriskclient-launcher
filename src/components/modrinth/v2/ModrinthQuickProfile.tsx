@@ -244,7 +244,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
 
               {filteredProfiles.length === 0 && profileSearchValue && (
                 <div className="text-center py-2">
-                  <Icon icon="solar:search-bold" className="w-4 h-4 text-white/30 mx-auto mb-1" />
+                  <Icon icon="solar:magnifer-bold" className="w-4 h-4 text-white/30 mx-auto mb-1" />
                   <span className="text-xs text-white/50 font-minecraft-ten">{t('profiles.noProfilesFound')}</span>
                 </div>
               )}

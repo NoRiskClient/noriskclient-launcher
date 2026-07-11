@@ -31,7 +31,7 @@ export function ModUpdateText({
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center gap-2">
           <Icon
-            icon="solar:package-bold-duotone"
+            icon="solar:box-bold-duotone"
             className="w-4 h-4 text-purple-400 flex-shrink-0"
           />
           <span className="text-sm font-semibold text-purple-300">

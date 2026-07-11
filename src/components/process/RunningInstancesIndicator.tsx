@@ -175,7 +175,7 @@ export function RunningInstancesIndicator({
           {isLoading && processes.length === 0 ? (
             <div className="p-6 text-center">
               <Icon
-                icon="solar:spinner-bold"
+                icon="solar:refresh-bold"
                 className="w-6 h-6 animate-spin mx-auto text-white/70 mb-2"
               />
               <p className="text-white/70 font-minecraft text-xl">
@@ -195,7 +195,7 @@ export function RunningInstancesIndicator({
           ) : processes.length === 0 ? (
             <div className="p-6 text-center">
               <Icon
-                icon="solar:monitor-slash-bold"
+                icon="solar:monitor-bold"
                 className="w-8 h-8 mx-auto text-white/50 mb-3"
               />
               <p className="text-white/60 font-minecraft text-xl">
@@ -300,7 +300,7 @@ export function RunningInstancesIndicator({
                           icon={
                             viewingLogsId === process.id ? (
                               <Icon
-                                icon="solar:spinner-bold"
+                                icon="solar:refresh-bold"
                                 className="w-4 h-4 animate-spin"
                               />
                             ) : (
@@ -322,7 +322,7 @@ export function RunningInstancesIndicator({
                         icon={
                           stoppingId === process.id ? (
                             <Icon
-                              icon="solar:spinner-bold"
+                              icon="solar:refresh-bold"
                               className="w-4 h-4 animate-spin"
                             />
                           ) : (

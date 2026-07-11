@@ -66,7 +66,7 @@ export function ProfileWizardV2Step2({
   const modLoaders: { key: ModLoader; label: string; icon: string; backgroundImage: string }[] = [
     { key: "vanilla", label: "Vanilla", icon: "solar:gamepad-bold", backgroundImage: "/icons/minecraft.png" },
     { key: "fabric", label: "Fabric", icon: "solar:box-bold", backgroundImage: "/icons/fabric.png" },
-    { key: "forge", label: "Forge", icon: "solar:hammer-bold", backgroundImage: "/icons/forge.png" },
+    { key: "forge", label: "Forge", icon: "solar:sledgehammer-bold", backgroundImage: "/icons/forge.png" },
     { key: "neoforge", label: "NeoForge", icon: "solar:shield-bold", backgroundImage: "/icons/neoforge.png" },
     { key: "quilt", label: "Quilt", icon: "solar:widget-bold", backgroundImage: "/icons/quilt.png" },
   ];

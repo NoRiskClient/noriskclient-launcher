@@ -118,7 +118,7 @@ export function MultiVersionFilter({
                       backgroundColor: checked ? accentColor.value : "transparent",
                     }}
                   >
-                    {checked && <Icon icon="solar:check-bold" className="w-3 h-3 text-black" />}
+                    {checked && <Icon icon="solar:check-circle-bold" className="w-3 h-3 text-black" />}
                   </span>
                   <span className="flex-1">{option.value}</span>
                   <span className="text-white/40 text-xs">{option.count}</span>

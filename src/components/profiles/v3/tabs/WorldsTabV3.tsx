@@ -55,7 +55,7 @@ const SORT_OPTIONS: { value: SortKey; labelKey: string; icon: string }[] = [
 ];
 
 const GAME_MODE_ICONS = [
-  "solar:swords-bold",        // 0 Survival
+  "solar:bolt-bold",        // 0 Survival
   "solar:pallete-2-bold",     // 1 Creative
   "solar:compass-big-bold",   // 2 Adventure
   "solar:eye-bold",           // 3 Spectator

@@ -318,7 +318,7 @@ export function IrisRequiredModal({
         {/* Main warning section */}
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
-            <Icon icon="solar:warning-triangle-bold" className="w-8 h-8 text-yellow-400" />
+            <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-yellow-400" />
           </div>
           <div className="flex-1 space-y-3">
             <p className="text-white/80 font-minecraft-ten leading-relaxed">

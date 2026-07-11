@@ -415,7 +415,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                 disabled={isCreatingProfile || !quickProfileName.trim()}
                 shadowDepth="short"
                 size="sm"
-                icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : <Icon icon="solar:disk-bold-duotone" className="w-4 h-4" />}
+                icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold-duotone" className="w-4 h-4" />}
               >
                 {isCreatingProfile ? (sourceProfileToCopyId ? t('modrinth.copying') : t('modrinth.creating')) : (sourceProfileToCopyId ? t('modrinth.copy_and_install') : t('modrinth.create_and_install'))}
               </Button>

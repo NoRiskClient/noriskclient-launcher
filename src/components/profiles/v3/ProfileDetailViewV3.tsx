@@ -27,7 +27,7 @@ preloadIcons([
   "solar:refresh-bold",
   "solar:arrow-left-linear", "solar:folder-linear", "solar:copy-linear",
   "solar:upload-linear", "solar:menu-dots-bold",
-  "solar:clock-circle-bold", "solar:hourglass-bold", "solar:hard-drive-bold",
+  "solar:clock-circle-bold", "solar:hourglass-bold", "solar:ssd-round-bold",
   "solar:copy-bold", "solar:download-bold", "solar:archive-bold",
   "solar:trash-bin-trash-bold",
 ]);
@@ -677,7 +677,7 @@ export function ProfileDetailViewV3({
                 muted={!currentProfile.playtime_seconds}
               />
               <Stat
-                icon="solar:hard-drive-bold"
+                icon="solar:ssd-round-bold"
                 label={t("profiles.v3.stats.disk")}
                 value={diskSize == null ? "…" : formatBytes(diskSize)}
                 muted={diskSize == null || diskSize === 0}

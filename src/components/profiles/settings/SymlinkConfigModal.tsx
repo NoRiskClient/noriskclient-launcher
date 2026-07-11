@@ -165,7 +165,7 @@ export function SymlinkConfigModal({
                 className="w-full font-minecraft-ten text-sm"
               >
                 <span className="flex items-center gap-2">
-                  <Icon icon="solar:folder-path-bold" className="w-4 h-4" />
+                  <Icon icon="solar:folder-path-connect-bold" className="w-4 h-4" />
                   <span>{targetDirectory ? `Current: ${targetDirectory}/` : "Select Custom Location"}</span>
                 </span>
               </Button>

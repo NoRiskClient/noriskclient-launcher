@@ -390,7 +390,7 @@ export function ProfileWizardV2Step3({
                             {t('profiles.wizard.advancedSettings')}
                         </span>
                         <Icon
-                            icon={showAdvancedSettings ? "solar:chevron-up-bold" : "solar:chevron-down-bold"}
+                            icon={showAdvancedSettings ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
                             className="w-5 h-5 text-white/60"
                         />
                     </button>

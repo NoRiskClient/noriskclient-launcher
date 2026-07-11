@@ -48,8 +48,8 @@ function getProjectTypeIcon(type: string): string {
     case "modpack": return "pixel:folder-open-solid";
     case "resourcepack": return "pixel:image-solid";
     case "shader": return "pixel:sun-solid";
-    case "datapack": return "pixel:cube-solid";
-    default: return "pixel:cube-solid";
+    case "datapack": return "pixel:archive-solid";
+    default: return "pixel:archive-solid";
   }
 }
 

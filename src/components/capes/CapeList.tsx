@@ -612,7 +612,7 @@ export function CapeList({
     return (
       <div className="flex-grow flex items-center justify-center p-5">
         <EmptyState
-          icon="solar:hanger-wave-line-duotone"
+          icon="solar:hanger-2-line-duotone"
           message={
             isVanilla
               ? searchQuery

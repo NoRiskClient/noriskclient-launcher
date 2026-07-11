@@ -115,7 +115,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
               onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
             >
-              <Icon icon="solar:external-link-bold" className="w-5 h-5" />
+              <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
               <span className="font-minecraft text-lg lowercase">{t('credits_modal.view_licenses')}</span>
             </Button>
           </div>

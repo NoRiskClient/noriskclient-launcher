@@ -77,13 +77,17 @@ for (const prefix of COLLECTIONS) {
   );
   const subset = getIcons(collection, names);
 
-  if (!subset || subset.not_found?.length) {
+  const resolved = new Set([
+    ...Object.keys(subset?.icons ?? {}),
+    ...Object.keys(subset?.aliases ?? {}),
+  ]);
+  const missing = names.filter((name) => !resolved.has(name));
+  if (!subset || missing.length) {
     console.error(`Icons missing from @iconify-json/${prefix}:`);
-    for (const name of subset?.not_found ?? names) console.error(`  ${prefix}:${name}`);
+    for (const name of missing) console.error(`  ${prefix}:${name}`);
     process.exit(1);
   }
 
-  delete subset.not_found;
   delete subset.lastModified;
   total += names.length;
   chunks.push(`addCollection(${JSON.stringify(subset)});`);
