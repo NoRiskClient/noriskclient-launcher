@@ -28,6 +28,7 @@ use utils::debug_utils;
 use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
+use crate::commands::font_command::list_system_fonts;
 use crate::commands::process_command::{
     fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
     get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
@@ -519,6 +520,7 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
             utils::mod_cache_cleanup::clean_mod_cache_command,
+            list_system_fonts,
             create_profile,
             get_profile,
             update_profile,

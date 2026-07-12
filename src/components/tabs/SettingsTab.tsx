@@ -62,6 +62,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     ],
     appearance: [
       { id: "theme", label: t("settings.theme.title") },
+      { id: "font", label: t("settings.font.title") },
       { id: "background", label: t("settings.background.title") },
     ],
     advanced: [
@@ -219,7 +220,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
               icon="svg-spinners:ring-resize"
               className="w-10 h-10 text-white/70 mx-auto mb-4"
             />
-            <p className="text-2xl text-white/70 font-minecraft">
+            <p className="text-base text-white/70 font-smallcaps">
               {t("settings.loading")}
             </p>
           </div>
@@ -236,10 +237,10 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
               className="w-8 h-8 text-red-400 flex-shrink-0 mt-1"
             />
             <div>
-              <h3 className="text-2xl text-red-300 font-minecraft mb-2">
+              <h3 className="text-base text-red-300 font-smallcaps mb-2">
                 {t("settings.error.title")}
               </h3>
-              <p className="text-xl text-red-200/80 font-minecraft mb-4">
+              <p className="text-sm text-red-200/80 font-smallcaps mb-4">
                 {error}
               </p>
               <Button
@@ -259,7 +260,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (!config || !tempConfig) {
       return (
         <div className="text-center p-8">
-          <p className="text-2xl text-white/70 font-minecraft">
+          <p className="text-base text-white/70 font-smallcaps">
             {t("settings.error.no_config")}
           </p>
         </div>
@@ -352,7 +353,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
                     />
                     <span
                       className={cn(
-                        "font-minecraft text-3xl lowercase transition-colors duration-200",
+                        "font-smallcaps text-lg transition-colors duration-200",
                         isActive && "font-medium",
                       )}
                     >
@@ -369,7 +370,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
                             key={child.id}
                             data-section-id={child.id}
                             className={cn(
-                              "w-full text-left pl-4 pr-2 py-1.5 -ml-px border-l-2 outline-none font-minecraft text-2xl lowercase transition-[color,border-color] duration-150",
+                              "w-full text-left pl-4 pr-2 py-1.5 -ml-px border-l-2 outline-none font-smallcaps text-base transition-[color,border-color] duration-150",
                               childActive
                                 ? "text-white"
                                 : "border-transparent text-white/40 hover:text-white/75",
