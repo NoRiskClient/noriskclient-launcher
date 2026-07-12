@@ -1979,5 +1979,7 @@
   "settings.sections.ads": "Reklam",
   "settings.ads.reset_consent": "Reklam izni",
   "settings.ads.reset_consent.tooltip": "Kişiselleştirilmiş reklam iznini geri çek. Reklam penceresi açılır ve izin iletişim kutusunu tekrar gösterir.",
-  "settings.ads.reset_consent.button": "Sıfırla"
+  "settings.ads.reset_consent.button": "Sıfırla",
+  "settings.font.title": "Yazı Tipi",
+  "settings.font.description": "Başlatıcı genelinde kullanılan yazı tipini seçin"
 }
