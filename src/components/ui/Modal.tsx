@@ -152,9 +152,9 @@ export function Modal({
             backgroundColor: `${accentColor.value}30`,
           }}
         >
-          <div className="flex items-start space-x-3">
+          <div className="flex items-center space-x-3">
             {titleIcon && (
-              <span className="text-white flex-shrink-0 pt-1.5">
+              <span className="text-white flex-shrink-0 flex items-center">
                 {titleIcon}
               </span>
             )}
