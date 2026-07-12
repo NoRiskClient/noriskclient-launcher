@@ -105,7 +105,7 @@ export function useConfirmDialog() {
         variant="secondary"
         onClick={handleClose}
         size="md"
-        className="text-2xl"
+        className="text-base"
       >
         {options.cancelText || t('common.cancel')}
       </Button>
@@ -115,7 +115,7 @@ export function useConfirmDialog() {
         onClick={handleConfirm}
         disabled={options.type === "input" && !isValid}
         size="md"
-        className="text-2xl"
+        className="text-base"
       >
         {options.confirmText || t('common.confirm')}
       </Button>
@@ -145,13 +145,13 @@ export function useConfirmDialog() {
       {options.type === "input" && (
         <div className="space-y-4">
           {options.inputLabel && (
-            <p className="text-lg font-minecraft-ten">{options.inputLabel}</p>
+            <p className="text-lg font-minecraft">{options.inputLabel}</p>
           )}
           <Input
             value={inputValue}
             onChange={handleInputChange}
             placeholder={options.inputPlaceholder}
-            className="text-2xl py-3"
+            className="text-base py-3"
             error={!isValid ? t('common.field_required') : undefined}
             autoFocus
             onClick={(e) => e.stopPropagation()}

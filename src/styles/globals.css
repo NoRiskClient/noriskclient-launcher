@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 @font-face {
-    font-family: "Minecraft";
-    src: url("/fonts/minecraft.ttf") format("truetype");
+    font-family: "SmallCaps";
+    src: url("/fonts/smallcaps.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -49,8 +49,8 @@
     --radius-xl: 16px;
     --radius-2xl: 24px;
     --border-radius: 0px; 
-    --font-minecraft: "Minecraft", monospace;
-    --font-minecraft-ten: "MinecraftTen", sans-serif;
+    --font-smallcaps: "SmallCaps", monospace;
+    --font-minecraft: "MinecraftTen", sans-serif;
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -238,7 +238,7 @@
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        font-family: var(--font-minecraft), monospace;
+        font-family: var(--font-smallcaps), monospace;
         letter-spacing: 0.03em;
     }
 
@@ -248,7 +248,7 @@
     h4,
     h5,
     h6 {
-        @apply font-minecraft tracking-wider lowercase;
+        @apply font-smallcaps tracking-wider;
         font-weight: normal;
         user-select: none;
     }
@@ -269,13 +269,13 @@
     }
 }
 
-.font-minecraft {
-    font-family: var(--font-minecraft), monospace;
+.font-smallcaps {
+    font-family: var(--font-smallcaps), monospace;
     letter-spacing: 0.05em;
 }
 
-.font-minecraft-ten {
-    font-family: var(--font-minecraft-ten), sans-serif;
+.font-minecraft {
+    font-family: var(--font-minecraft), sans-serif;
     letter-spacing: 0.03em;
 }
 

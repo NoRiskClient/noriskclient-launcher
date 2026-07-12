@@ -129,7 +129,7 @@ export function MinecraftAccountManager({
                 icon="svg-spinners:ring-resize"
                 className="w-5 h-5 mx-auto text-white/70"
               />
-              <p className="mt-1 text-white/70 text-sm font-minecraft-ten">{t('auth.loadingAccounts')}</p>
+              <p className="mt-1 text-white/70 text-sm font-minecraft">{t('auth.loadingAccounts')}</p>
             </div>
           ) : accounts.length === 0 ? (
             <div className="py-4 px-3 text-center">
@@ -137,8 +137,8 @@ export function MinecraftAccountManager({
                 icon="solar:user-cross-bold"
                 className="w-6 h-6 mx-auto text-white/50 mb-1"
               />
-              <p className="text-white/70 text-sm font-minecraft-ten">{t('auth.noAccountsFound')}</p>
-              <p className="mt-1 text-white/50 text-[0.6em] font-minecraft-ten">
+              <p className="text-white/70 text-sm font-minecraft">{t('auth.noAccountsFound')}</p>
+              <p className="mt-1 text-white/50 text-[0.6em] font-minecraft">
                 {t('auth.addAccountToGetStarted')}
               </p>
             </div>
@@ -188,16 +188,16 @@ export function MinecraftAccountManager({
 
         <div className="space-y-6">
           <div>
-            <h3 className="text-2xl font-minecraft text-white mb-5 lowercase select-none">
+            <h3 className="text-base font-smallcaps text-white mb-5 select-none">
               {t('auth.manageAccounts')}
             </h3>
-            <p className="text-xl text-white/70 mb-6 font-minecraft tracking-wide select-none">
+            <p className="text-sm text-white/70 mb-6 font-smallcaps tracking-wide select-none">
               {t('auth.manageAccountsDescription')}
             </p>
           </div>
 
           <div className="bg-black/30 backdrop-blur-md border-2 border-white/20 p-5 rounded-md">
-            <h3 className="text-2xl text-white font-medium mb-3 select-none">
+            <h3 className="text-base text-white font-medium mb-3 select-none">
               {t('auth.yourAccounts')}
             </h3>
 
@@ -208,7 +208,7 @@ export function MinecraftAccountManager({
                     icon="svg-spinners:ring-resize"
                     className="w-8 h-8 mx-auto text-white/70"
                   />
-                  <p className="mt-2 text-white/70 text-xl">
+                  <p className="mt-2 text-white/70 text-sm">
                     {t('auth.loadingAccounts')}
                   </p>
                 </div>
@@ -218,7 +218,7 @@ export function MinecraftAccountManager({
                     icon="solar:user-cross-bold"
                     className="w-12 h-12 mx-auto text-white/50 mb-3"
                   />
-                  <p className="text-white/70 text-xl">{t('auth.noAccountsFound')}</p>
+              <p className="text-white/70 text-sm">{t('auth.noAccountsFound')}</p>
                   <p className="mt-1 text-white/50 text-lg">
                     {t('auth.addAccountToGetStarted')}
                   </p>
@@ -357,7 +357,7 @@ function AccountItem({
         </div>
         <div className="min-w-0 flex items-center">
           <h4
-            className={`${isDropdownItem ? "text-3xl" : "text-2xl"} text-white font-minecraft truncate`}
+            className={`${isDropdownItem ? "text-lg" : "text-base"} text-white font-smallcaps truncate`}
             title={account.minecraft_username || account.username}
           >
             {account.minecraft_username || account.username}
@@ -477,10 +477,10 @@ function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
         <div className="flex items-center gap-3 mb-4">
           <Icon icon="solar:global-bold" className="w-8 h-8 text-white" />
           <div>
-            <h3 className="text-2xl font-minecraft text-white lowercase">
+            <h3 className="text-base font-smallcaps text-white">
               {t('auth.signInViaBrowser')}
             </h3>
-            <p className="text-sm text-white/70 font-minecraft-ten mt-1">
+            <p className="text-sm text-white/70 font-minecraft mt-1">
               {t('auth.browserLoginDescription')}
             </p>
           </div>
@@ -491,7 +491,7 @@ function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
           <div className="bg-red-500/20 backdrop-blur-md border border-red-500/40 p-4 rounded-md">
             <div className="flex items-start gap-2">
               <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-200 font-minecraft-ten">
+              <div className="text-sm text-red-200 font-minecraft">
                 <p className="font-semibold mb-1">{t('auth.loginError')}</p>
                 <p className="text-red-300">{error}</p>
               </div>
@@ -502,11 +502,11 @@ function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between items-center text-sm">
-            <span className={`font-minecraft-ten ${error ? 'text-red-300' : 'text-white/80'}`}>
+            <span className={`font-minecraft ${error ? 'text-red-300' : 'text-white/80'}`}>
               {loginStatus}
             </span>
             {!error && (
-              <span className="text-white/60 font-minecraft-ten">{Math.round(progress)}%</span>
+              <span className="text-white/60 font-minecraft">{Math.round(progress)}%</span>
             )}
           </div>
           {!error && (

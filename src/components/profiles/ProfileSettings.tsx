@@ -279,7 +279,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         variant="secondary"
         onClick={onClose}
         size="md"
-        className="text-2xl"
+        className="text-base"
       >
         {t('profiles.settings.cancel')}
       </Button>
@@ -288,7 +288,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         onClick={handleSave}
         disabled={isSaving}
         size="md"
-        className="text-2xl"
+        className="text-base"
       >
         {isSaving ? (
           <div className="flex items-center gap-3">
@@ -357,7 +357,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
                   />
                   <span
                     className={cn(
-                      "font-minecraft text-3xl lowercase transition-colors duration-200",
+                      "font-smallcaps text-lg transition-colors duration-200",
                       isActive && "font-medium",
                     )}
                   >

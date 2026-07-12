@@ -33,7 +33,7 @@ export function ConfirmDeleteDialog({
 
   const dialogTitle = title || t('confirm_delete.title', { name: itemName });
   const dialogMessage = message || (
-    <p className="text-white/80 font-minecraft-ten">
+    <p className="text-white/80 font-minecraft">
       {t('confirm_delete.message', { name: itemName })}
       <br />
       {t('confirm_delete.cannot_undo')}

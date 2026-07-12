@@ -131,7 +131,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
               {t("common.loading")}
             </div>
           ) : files.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">{t("debug.no_files")}</div>
+            <div className="p-8 text-center text-white/50 font-minecraft">{t("debug.no_files")}</div>
           ) : (
             <div className="divide-y divide-white/10">
               {files.map((file, i) => (
@@ -141,7 +141,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
                     className={`w-5 h-5 flex-shrink-0 ${crash ? "text-red-400" : "text-white/60"}`}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-minecraft-ten truncate">{file.name}</div>
+                    <div className="text-white font-minecraft truncate">{file.name}</div>
                     <div className="text-xs text-white/40 font-sans truncate">{file.path}</div>
                   </div>
                   <div className="text-sm text-white/50 font-sans whitespace-nowrap">
@@ -325,7 +325,7 @@ function TestingPanel() {
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:database-bold" className="w-5 h-5 text-amber-300 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">{t("debug.testing.keepset_title")}</div>
+          <div className="text-white font-minecraft">{t("debug.testing.keepset_title")}</div>
           <div className="text-xs text-white/40 font-sans truncate">
             {t("debug.testing.keepset_desc")}
           </div>
@@ -333,7 +333,7 @@ function TestingPanel() {
         <button
           onClick={runExpectedCacheFilenames}
           disabled={loading}
-          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
           title="Run debug_list_expected_cache_filenames"
         >
           {loading ? (
@@ -351,7 +351,7 @@ function TestingPanel() {
             {t("debug.testing.filenames_count", { count: filenames.length })}
           </div>
           {filenames.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">{t("debug.testing.empty")}</div>
+            <div className="p-8 text-center text-white/50 font-minecraft">{t("debug.testing.empty")}</div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
               {filenames.map((name) => (
@@ -367,7 +367,7 @@ function TestingPanel() {
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5 text-red-300 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">{t("debug.testing.clean_title")}</div>
+          <div className="text-white font-minecraft">{t("debug.testing.clean_title")}</div>
           <div className="text-xs text-white/40 font-sans truncate">
             {t("debug.testing.clean_desc")}
           </div>
@@ -375,7 +375,7 @@ function TestingPanel() {
         <button
           onClick={runCleanModCache}
           disabled={cleaning}
-          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
           title="Run clean_mod_cache_command"
         >
           {cleaning ? (
@@ -399,7 +399,7 @@ function TestingPanel() {
             {cleanStats.skipped_empty_keepset && t("debug.testing.stats_skipped")}
           </div>
           {cleanStats.deleted.length === 0 ? (
-            <div className="p-6 text-center text-white/50 font-minecraft-ten">{t("debug.testing.no_orphans")}</div>
+            <div className="p-6 text-center text-white/50 font-minecraft">{t("debug.testing.no_orphans")}</div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
               {cleanStats.deleted.map((name) => (
@@ -415,7 +415,7 @@ function TestingPanel() {
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:history-bold" className="w-5 h-5 text-emerald-300 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">{t("settings.backups.title")}</div>
+          <div className="text-white font-minecraft">{t("settings.backups.title")}</div>
           <div className="text-xs text-white/40 font-sans truncate">
             {t("settings.backups.description")}
           </div>
@@ -423,7 +423,7 @@ function TestingPanel() {
         <button
           onClick={loadBackups}
           disabled={loadingBackups}
-          className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
           title="Run list_profile_backups"
         >
           {loadingBackups ? (
@@ -441,7 +441,7 @@ function TestingPanel() {
             {t("settings.backups.count", { count: backups.length })}
           </div>
           {backups.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">
+            <div className="p-8 text-center text-white/50 font-minecraft">
               {t("settings.backups.empty")}
             </div>
           ) : (
@@ -450,7 +450,7 @@ function TestingPanel() {
                 <div key={b.path} className="p-3 px-4 hover:bg-white/5 flex items-center gap-4">
                   <Icon icon="solar:archive-bold" className="w-5 h-5 text-white/50 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-minecraft-ten truncate">
+                    <div className="text-white font-minecraft truncate">
                       {new Date(b.backup_time * 1000).toLocaleString()}
                     </div>
                     <div className="text-xs text-white/40 font-sans truncate">
@@ -463,7 +463,7 @@ function TestingPanel() {
                   <button
                     onClick={() => handleRestore(b)}
                     disabled={restoringPath !== null}
-                    className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {restoringPath === b.path ? (
                       <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
@@ -528,7 +528,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:shield-keyhole-bold" className="w-5 h-5 text-white/60 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">
+          <div className="text-white font-minecraft">
             {t('debug.permissions.count', { n: nodes.length })}
           </div>
           {lastFetched && (
@@ -554,7 +554,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
         <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
           <Icon icon="solar:test-tube-bold" className="w-5 h-5 text-amber-300 shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-white font-minecraft-ten">{t("debug.testing.tester_queue")}</div>
+            <div className="text-white font-minecraft">{t("debug.testing.tester_queue")}</div>
             <div className="text-xs text-white/40 font-sans truncate">
               {queueCount === null
                 ? t("debug.testing.tester_open_hint")
@@ -566,7 +566,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
           <button
             onClick={handleOpenTester}
             disabled={opening}
-            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
             title={t("debug.testing.tester_open_title")}
           >
             {opening ? (
@@ -581,7 +581,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
 
       <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
         {nodes.length === 0 ? (
-          <div className="p-8 text-center text-white/50 font-minecraft-ten">
+          <div className="p-8 text-center text-white/50 font-minecraft">
             {t('debug.permissions.empty')}
           </div>
         ) : (

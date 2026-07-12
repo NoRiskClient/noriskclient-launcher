@@ -155,7 +155,7 @@ export function ContentTile({
           {onNameClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onNameClick(); }}
-              className={`text-sm text-white font-minecraft-ten truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
+              className={`text-sm text-white font-minecraft truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
               style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
@@ -163,7 +163,7 @@ export function ContentTile({
             </button>
           ) : (
             <div
-              className={`text-sm text-white font-minecraft-ten truncate normal-case ${!enabled ? "line-through" : ""}`}
+              className={`text-sm text-white font-minecraft truncate normal-case ${!enabled ? "line-through" : ""}`}
               style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
@@ -184,7 +184,7 @@ export function ContentTile({
             </Tooltip>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft-ten">
+        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft">
           <div className="relative min-w-0">
             <button
               ref={versionButtonRef}
@@ -235,16 +235,16 @@ export function ContentTile({
             >
               <ThemedDropdownHeader>{t("profiles.v3.versions.selectVersion")}</ThemedDropdownHeader>
               {isLoadingVersions && (
-                <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft-ten gap-2">
+                <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft gap-2">
                   <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
                   {t("profiles.v3.versions.loading")}
                 </div>
               )}
               {!isLoadingVersions && versionError && (
-                <div className="px-3 py-4 text-xs text-rose-300 font-minecraft-ten">{versionError}</div>
+                <div className="px-3 py-4 text-xs text-rose-300 font-minecraft">{versionError}</div>
               )}
               {!isLoadingVersions && !versionError && availableVersions && availableVersions.length === 0 && (
-                <div className="px-3 py-4 text-xs text-white/40 font-minecraft-ten">{t("profiles.v3.versions.none")}</div>
+                <div className="px-3 py-4 text-xs text-white/40 font-minecraft">{t("profiles.v3.versions.none")}</div>
               )}
               {!isLoadingVersions && !versionError && availableVersions && availableVersions.map((v) => {
                 const isCurrent = v.id === currentVersionId;
@@ -255,7 +255,7 @@ export function ContentTile({
                     disabled={isCurrent}
                     onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = `${accentColor.value}40`; }}
                     onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = "transparent"; }}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft-ten text-left transition-colors ${
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
                       isCurrent ? "text-white/40 cursor-default" : "text-white/85 hover:text-white cursor-pointer"
                     }`}
                   >

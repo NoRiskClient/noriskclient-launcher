@@ -56,17 +56,17 @@ export function ActionButton({
   const getSizeClasses = () => {
     switch (size) {
       case "sm":
-        return effectiveVariant === "icon-only" 
-          ? "py-[0.6rem] px-[0.6rem] text-xl" 
-          : "px-2 py-0.5 text-2xl";
+        return effectiveVariant === "icon-only"
+          ? "py-1.5 px-1.5 text-sm"
+          : "px-2 py-0.5 text-base";
       case "lg":
-        return effectiveVariant === "icon-only" 
-          ? "py-[0.57rem] px-[0.57rem] text-3xl" 
-          : "px-4 py-1.5 text-3xl";
+        return effectiveVariant === "icon-only"
+          ? "py-[0.57rem] px-[0.57rem] text-lg"
+          : "px-4 py-1.5 text-lg";
       default: // md
-        return effectiveVariant === "icon-only" 
-          ? "py-[0.57rem] px-[0.57rem] text-2xl" 
-          : "px-3 py-1 text-2xl";
+        return effectiveVariant === "icon-only"
+          ? "py-[0.57rem] px-[0.57rem] text-base"
+          : "px-3 py-1 text-base";
     }
   };
 
@@ -83,8 +83,8 @@ export function ActionButton({
 
   const getButtonStyles = () => {
     const baseClasses = (effectiveVariant === "text" || effectiveVariant === "highlight")
-      ? `transition-all duration-200 font-minecraft lowercase flex items-center gap-2 ${getSizeClasses()}`
-      : `transition-all duration-200 hover:scale-105 border font-minecraft lowercase rounded-lg flex items-center gap-2 ${getSizeClasses()}`;
+      ? `transition-all duration-200 font-smallcaps flex items-center gap-2 ${getSizeClasses()}`
+      : `transition-all duration-200 hover:scale-105 border font-smallcaps rounded-lg flex items-center gap-2 ${getSizeClasses()}`;
     
     switch (effectiveVariant) {
       case "primary":

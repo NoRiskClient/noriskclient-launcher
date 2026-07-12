@@ -134,12 +134,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     
     const getButtonSizeClasses = () => {
       switch (size) {
-        case "xs": return "h-[36px] px-5 py-2 text-xl";
-        case "sm": return "h-[42px] px-6 py-2 text-2xl"; 
-        case "md": return "h-[50px] px-8 py-2.5 text-2xl";
-        case "lg": return "h-[58px] px-10 py-3 text-3xl";
-        case "xl": return "h-[66px] px-12 py-4 text-3xl";
-        default: return "h-[50px] px-8 py-2.5 text-2xl";
+        case "xs": return "h-[36px] px-5 py-2 text-xs";
+        case "sm": return "h-[42px] px-6 py-2 text-sm";
+        case "md": return "h-[50px] px-8 py-2.5 text-sm";
+        case "lg": return "h-[58px] px-10 py-3 text-base";
+        case "xl": return "h-[66px] px-12 py-4 text-lg";
+        default: return "h-[50px] px-8 py-2.5 text-sm";
       }
     };
     
@@ -221,7 +221,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={mergedRef}
         type="button"
         disabled={disabled}        className={cn(
-          "relative overflow-hidden lowercase font-minecraft transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
+          "relative overflow-hidden font-smallcaps transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
           "flex items-center justify-center gap-2 backdrop-blur-md whitespace-nowrap",
           radiusClass,
           sizeClasses,

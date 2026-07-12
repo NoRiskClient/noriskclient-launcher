@@ -36,21 +36,21 @@ export function ToggleSwitch({
           track: "w-8 h-4",
           knob: "w-3 h-3",
           knobTranslate: "translate-x-4",
-          label: "text-base",
+          label: "text-xs",
         };
       case "lg":
         return {
           track: "w-14 h-7",
           knob: "w-5 h-5",
           knobTranslate: "translate-x-7",
-          label: "text-2xl",
+          label: "text-base",
         };
       default:
         return {
           track: "w-10 h-5",
           knob: "w-4 h-4",
           knobTranslate: "translate-x-5",
-          label: "text-lg",
+          label: "text-sm",
         };
     }
   };
@@ -188,7 +188,7 @@ export function ToggleSwitch({
       {label && (
         <span
           className={cn(
-            "font-minecraft lowercase text-white",
+            "font-smallcaps text-white",
             sizeConfig.label,
           )}
         >

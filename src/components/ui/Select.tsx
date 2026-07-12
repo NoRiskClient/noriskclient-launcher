@@ -101,19 +101,19 @@ export function Select({
     sm: {
       container: "h-[42px]",
       padding: "py-2 px-6",
-      text: "text-xl",
+      text: "text-sm",
       icon: "w-5 h-5",
     },
     md: {
       container: "h-[50px]",
       padding: "py-2.5 px-8",
-      text: "text-2xl",
+      text: "text-base",
       icon: "w-6 h-6",
     },
     lg: {
       container: "h-[58px]",
       padding: "py-3 px-10",
-      text: "text-3xl",
+      text: "text-lg",
       icon: "w-7 h-7",
     },
   };
@@ -187,7 +187,7 @@ export function Select({
           className={cn(
             "w-full h-full flex items-center justify-between",
             disabled ? "cursor-not-allowed" : "cursor-pointer",
-            "font-minecraft lowercase text-white",
+            "font-smallcaps text-white",
             sizeStyles[size].container,
             sizeStyles[size].padding,
             sizeStyles[size].text,
@@ -235,8 +235,8 @@ export function Select({
         onMouseUp={handleMouseUp}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}        className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md",
-          "text-white tracking-wider lowercase",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          "text-white tracking-wider",
           "flex items-center justify-between w-full",
           "text-shadow-sm",
           getBorderClasses(),

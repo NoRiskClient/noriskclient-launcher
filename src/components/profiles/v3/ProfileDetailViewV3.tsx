@@ -82,7 +82,7 @@ interface ProfileDetailViewV3Props {
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
 const Chip: React.FC<{ icon?: string; children: React.ReactNode }> = ({ icon, children }) => (
-  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft-ten">
+  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft">
     {icon && <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />}
     {children}
   </span>
@@ -92,8 +92,8 @@ const Stat: React.FC<{ icon: string; label: string; value: string; muted?: boole
   <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-colors min-w-[160px] max-w-[240px]">
     <Icon icon={icon} className={`w-5 h-5 flex-shrink-0 ${muted ? "text-white/25" : "text-white/60"}`} />
     <div className="flex flex-col leading-tight min-w-0">
-      <span className="text-xs uppercase tracking-wider text-white/50 font-minecraft-ten">{label}</span>
-      <span className={`text-sm font-minecraft-ten truncate ${muted ? "text-white/40" : "text-white/95"}`} title={value}>{value}</span>
+      <span className="text-xs uppercase tracking-wider text-white/50 font-minecraft">{label}</span>
+      <span className={`text-sm font-minecraft truncate ${muted ? "text-white/40" : "text-white/95"}`} title={value}>{value}</span>
     </div>
   </div>
 );
@@ -402,10 +402,10 @@ export function ProfileDetailViewV3({
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
           <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-          <span className="text-xs font-minecraft-ten uppercase tracking-wider">{t('profiles.back')}</span>
+          <span className="text-xs font-minecraft uppercase tracking-wider">{t('profiles.back')}</span>
           <span className="text-white/30">/</span>
           <span
-            className="text-xs font-minecraft-ten text-white/80 normal-case max-w-[240px] truncate"
+            className="text-xs font-minecraft text-white/80 normal-case max-w-[240px] truncate"
             dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
           />
         </button>
@@ -477,7 +477,7 @@ export function ProfileDetailViewV3({
           {/* Identity + chips */}
           <div className="flex-1 min-w-0 pt-1">
             <h1
-              className="font-minecraft-ten text-3xl text-white normal-case truncate"
+              className="font-minecraft text-3xl text-white normal-case truncate"
               dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
             />
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -568,7 +568,7 @@ export function ProfileDetailViewV3({
                       onChange={(e) => setGroupDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
                       placeholder={t("profiles.v3.chips.group.placeholder")}
-                      className="w-full h-7 px-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft-ten"
+                      className="w-full h-7 px-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft"
                     />
                   </div>
                 )}
@@ -586,7 +586,7 @@ export function ProfileDetailViewV3({
                       type="button"
                       disabled={!versionsReady}
                       onClick={() => versionsReady && handleOpenModpackVersionsModal()}
-                      className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft-ten transition-colors max-w-[280px] ${
+                      className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors max-w-[280px] ${
                         !versionsReady
                           ? "bg-black/20 border-white/5 text-white/30 cursor-wait"
                           : "bg-black/30 border-white/10 text-white/75 hover:bg-black/40 hover:border-white/20 hover:text-white cursor-pointer"
@@ -607,7 +607,7 @@ export function ProfileDetailViewV3({
               })()}
               {preferredAccount && (
                 <Tooltip content={t('profiles.launchWith', { account: preferredAccount.username })}>
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft-ten">
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft">
                     {preferredAccountAvatarUrl ? (
                       <img
                         src={preferredAccountAvatarUrl}
@@ -658,10 +658,10 @@ export function ProfileDetailViewV3({
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-400/25 min-w-[160px] animate-in fade-in duration-200">
               <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-emerald-300 flex-shrink-0" />
               <div className="flex flex-col leading-tight min-w-0">
-                <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft-ten">
+                <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft">
                   {t("profiles.card.starting")}
                 </span>
-                <span className="text-sm text-emerald-100/95 font-minecraft-ten truncate" title={statusMessage}>
+                <span className="text-sm text-emerald-100/95 font-minecraft truncate" title={statusMessage}>
                   {statusMessage}
                 </span>
               </div>
@@ -801,7 +801,7 @@ export function ProfileDetailViewV3({
         isDeleting={isDeleting}
         title={t('profiles.deleteProfileTitle')}
         message={
-          <p className="text-white/80 font-minecraft-ten">
+          <p className="text-white/80 font-minecraft">
             {t('profiles.deleteConfirmMessage', { name: currentProfile.name })}
           </p>
         }

@@ -393,7 +393,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
     return (
       <div className="flex items-center justify-center py-12">
         <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white/50" />
-        <span className="ml-2 text-white/50 font-minecraft-ten">{t('modrinth.loading_versions')}</span>
+        <span className="ml-2 text-white/50 font-minecraft">{t('modrinth.loading_versions')}</span>
       </div>
     );
   }
@@ -403,7 +403,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
     return (
       <div className="text-center py-12">
         <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-red-400 font-minecraft-ten text-sm">{error}</p>
+        <p className="text-red-400 font-minecraft text-sm">{error}</p>
       </div>
     );
   }
@@ -449,7 +449,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
           )}
 
           {/* Results count */}
-          <div className="ml-auto text-xs text-white/50 font-minecraft-ten">
+          <div className="ml-auto text-xs text-white/50 font-minecraft">
             {filteredVersions.length} version{filteredVersions.length !== 1 ? "s" : ""}
           </div>
         </div>
@@ -540,7 +540,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
           {filteredVersions.length > displayedCount && (
             <button
               onClick={() => setDisplayedCount(prev => prev + 10)}
-              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft-ten transition-colors"
+              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft transition-colors"
               style={{
                 backgroundColor: `${accentColor.value}15`,
                 borderColor: `${accentColor.value}30`,

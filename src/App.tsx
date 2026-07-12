@@ -248,7 +248,7 @@ export function App() {
               </div>
             }
           >
-            <div className="p-6 text-white/80 font-minecraft-ten">
+            <div className="p-6 text-white/80 font-minecraft">
               <p>{t("deep_link.auth.description", { username })}</p>
             </div>
           </Modal>,

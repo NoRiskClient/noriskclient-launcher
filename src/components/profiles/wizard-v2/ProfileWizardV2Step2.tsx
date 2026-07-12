@@ -299,7 +299,7 @@ export function ProfileWizardV2Step2({
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
-          <p className="text-xl font-minecraft text-white lowercase">{t('profiles.wizard.loading')}</p>
+          <p className="text-sm font-smallcaps text-white">{t('profiles.wizard.loading')}</p>
         </div>
       );
     }
@@ -364,11 +364,11 @@ export function ProfileWizardV2Step2({
 
                 {/* Content */}
                 <div className="relative z-10 flex flex-col items-center text-center justify-center h-full">
-                  <h4 className="font-minecraft text-4xl text-white lowercase drop-shadow-lg">
+                  <h4 className="font-smallcaps text-xl text-white drop-shadow-lg">
                     {loader.label}
                   </h4>
                   {isDisabled && (
-                    <p className="font-minecraft text-2xl text-white/70 lowercase mt-1">
+                    <p className="font-smallcaps text-base text-white/70 mt-1">
                       {t('profiles.wizard.notAvailable')}
                     </p>
                   )}
@@ -382,14 +382,14 @@ export function ProfileWizardV2Step2({
         <div className="h-20 flex items-center flex-shrink-0">
           {selectedLoader === "vanilla" ? (
             <div className="text-center w-full">
-              <p className="text-lg font-minecraft text-white/50 lowercase">
+              <p className="text-xs font-smallcaps text-white/50">
                 {t('profiles.wizard.noAdditionalVersion')}
               </p>
             </div>
           ) : showLoadingIndicator ? (
             <div className="flex items-center justify-center w-full">
               <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
-              <p className="text-lg font-minecraft text-white lowercase">{t('profiles.wizard.loadingVersions')}</p>
+              <p className="text-xs font-smallcaps text-white">{t('profiles.wizard.loadingVersions')}</p>
             </div>
           ) : loaderVersions.length > 0 ? (
             <Select
@@ -406,7 +406,7 @@ export function ProfileWizardV2Step2({
           ) : showNoVersionsFound ? (
             <div className="text-center w-full">
               <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-white/50 mx-auto mb-2" />
-              <p className="text-base font-minecraft text-white/70 lowercase">
+              <p className="text-xs font-smallcaps text-white/70">
                 {t('profiles.wizard.noLoaderVersions', { loader: selectedLoader, version: selectedMinecraftVersion })}
               </p>
             </div>
@@ -423,7 +423,7 @@ export function ProfileWizardV2Step2({
         onClick={onBack}
         disabled={loading || loadingVersions}
         size="md"
-        className="text-xl"
+        className="text-sm"
         icon={<Icon icon="solar:arrow-left-bold" className="w-5 h-5" />}
         iconPosition="left"
       >
@@ -435,7 +435,7 @@ export function ProfileWizardV2Step2({
         onClick={handleNext}
         disabled={loading || loadingVersions || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
         size="md"
-        className="min-w-[180px] text-xl"
+        className="min-w-[180px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
         iconPosition="right"
       >

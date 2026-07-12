@@ -179,16 +179,16 @@ export function ProfileImport({
 
         <div className="space-y-6">
           <div>
-            <p className="text-lg text-white/70 mb-6 font-minecraft-ten tracking-wide select-none">
+            <p className="text-lg text-white/70 mb-6 font-minecraft tracking-wide select-none">
               {t('profiles.import_description')}
             </p>
 
             <div className="mb-6">
-              <h3 className="text-2xl text-white font-minecraft mb-4 select-none lowercase">
+              <h3 className="text-base text-white font-smallcaps mb-4 select-none">
                 {t('profiles.supported_formats')}
               </h3>
               <ul
-                className="text-2xl text-white/80 space-y-4 select-none lowercase font-minecraft"
+                className="text-base text-white/80 space-y-4 select-none font-smallcaps"
                 ref={formatItemsRef}
               >
                 <li className="flex items-center">

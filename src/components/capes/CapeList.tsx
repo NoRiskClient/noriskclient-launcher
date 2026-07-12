@@ -285,7 +285,7 @@ function CapeItemDisplay({
                 className="w-8 h-8 mb-1"
                 style={{ color: accentColor.value }}
               />
-              <span className="font-minecraft text-xs text-white lowercase">
+              <span className="font-smallcaps text-xs text-white">
                 {t('capes.equipping')}
               </span>
             </div>
@@ -302,13 +302,13 @@ function CapeItemDisplay({
                 <Tooltip content={(cape as CosmeticCape).moderatorMessage}>
                   <div className="flex items-center gap-1.5">
                     <Icon icon="solar:close-circle-bold" className="w-4 h-4 text-red-400" />
-                    <span className="text-[11px] font-minecraft-ten lowercase text-red-400">{t('capes.denied')}</span>
+                    <span className="text-[11px] font-minecraft lowercase text-red-400">{t('capes.denied')}</span>
                   </div>
                 </Tooltip>
               ) : (
                 <>
                   <Icon icon="solar:clock-circle-bold" className="w-4 h-4 text-yellow-400" />
-                  <span className="text-[11px] font-minecraft-ten lowercase text-yellow-400">{t('capes.inReview')}</span>
+                  <span className="text-[11px] font-minecraft lowercase text-yellow-400">{t('capes.inReview')}</span>
                 </>
               )}
             </div>
@@ -318,7 +318,7 @@ function CapeItemDisplay({
 
         <div className="flex-grow min-w-0 w-full text-center">
           <h3
-            className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+            className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
             title={
               isVanilla
                 ? (cape as VanillaCape).name
@@ -334,7 +334,7 @@ function CapeItemDisplay({
           </h3>
 
           {!isVanilla && (
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:download-minimalistic-outline"
@@ -777,7 +777,7 @@ export function CapeList({
               onClick={handlePreview3D}
             >
               <Icon icon="ph:eye-bold" className="w-5 h-5 text-white" />
-              <span className="font-minecraft-ten text-base text-white/80">
+              <span className="font-minecraft text-base text-white/80">
                 {t('capes.preview')}
               </span>
             </li>

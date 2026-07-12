@@ -58,13 +58,13 @@ export function TabHeader({
     >      <div className="flex items-center gap-3">        {icon && (
           <Icon
             icon={icon}
-            className="text-xl"
+            className="text-sm"
             style={{ color: colors.light }}
             aria-hidden="true"
           />
         )}
         <h1
-          className="text-xl font-minecraft font-bold"
+          className="text-sm font-smallcaps font-bold"
           style={{ color: "#ffffff" }}
         >
           {title}

@@ -247,7 +247,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         onConfirm={doDelete}
         isDeleting={false}
         title={t("worlds.delete_title")}
-        message={<p className="text-white/80 font-minecraft-ten">{t("worlds.delete_confirm", { name: displayName })}</p>}
+        message={<p className="text-white/80 font-minecraft">{t("worlds.delete_confirm", { name: displayName })}</p>}
       />
     ));
   }, [profile.id, showModal, hideModal, loadData, t]);
@@ -343,7 +343,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         onConfirm={doBatchDelete}
         isDeleting={isBatchDeleting}
         title={t("worlds.batch_delete_title")}
-        message={<p className="text-white/80 font-minecraft-ten">{t("worlds.batch_delete_confirm", { count: targets.length })}</p>}
+        message={<p className="text-white/80 font-minecraft">{t("worlds.batch_delete_confirm", { count: targets.length })}</p>}
       />
     ));
   }, [selectedIds, worlds, profile.id, showModal, hideModal, loadData, isBatchDeleting, t]);
@@ -394,14 +394,14 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("worlds.search_placeholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft-ten"
+            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
 
         <div className="relative">
           <button
             onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft-ten text-white/70 flex items-center gap-1.5"
+            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
           >
             <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
             {activeSortLabel}
@@ -434,7 +434,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
         <button
           onClick={handleImport}
-          className="h-8 px-3 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft-ten uppercase tracking-wider flex items-center gap-1.5"
+          className="h-8 px-3 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5"
         >
           <Icon icon="solar:import-bold" className="w-4 h-4" />
           {t("worlds.import_world")}
@@ -446,10 +446,10 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         {error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft-ten text-rose-100 break-words">{error}</div>
+            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={() => loadData()}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -458,7 +458,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
         {loading && worlds.length === 0 && servers.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
+            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
               <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
@@ -603,7 +603,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
       {/* Identity + meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <div className="text-sm text-white font-minecraft-ten truncate normal-case" title={displayName}>
+          <div className="text-sm text-white font-minecraft truncate normal-case" title={displayName}>
             {displayName}
           </div>
           {world.difficulty_locked && (
@@ -613,7 +613,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 mt-1 text-[11px] font-minecraft-ten">
+        <div className="flex items-center gap-1.5 mt-1 text-[11px] font-minecraft">
           <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-white/70 bg-white/5">
             <Icon icon={GAME_MODE_ICONS[gameMode]} className="w-3 h-3" />
             {gameModeLabel}
@@ -628,7 +628,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft-ten text-white/40">
+        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft text-white/40">
           <Icon icon="solar:clock-circle-linear" className="w-3 h-3 flex-shrink-0" />
           <span>{formatRelativeTime(lastPlayedIso)}</span>
         </div>
@@ -637,7 +637,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
       <button
         onClick={onPlay}
         disabled={isLaunching}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft-ten uppercase tracking-wider ${
+        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
           isLaunching
             ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
             : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
@@ -732,28 +732,28 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="text-sm text-white font-minecraft-ten truncate normal-case" title={name}>{name}</div>
-          {address && <span className="text-xs text-white/35 font-minecraft-ten truncate">· {address}</span>}
+          <div className="text-sm text-white font-minecraft truncate normal-case" title={name}>{name}</div>
+          {address && <span className="text-xs text-white/35 font-minecraft truncate">· {address}</span>}
         </div>
 
         {isError ? (
-          <div className="mt-1 text-xs text-rose-300/80 font-minecraft-ten truncate">
+          <div className="mt-1 text-xs text-rose-300/80 font-minecraft truncate">
             {t("profiles.v3.servers.offline")}
           </div>
         ) : isPending ? (
-          <div className="mt-1 text-xs text-white/35 font-minecraft-ten flex items-center gap-1.5">
+          <div className="mt-1 text-xs text-white/35 font-minecraft flex items-center gap-1.5">
             <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
             {t("profiles.v3.servers.pinging")}
           </div>
         ) : motdInput ? (
           <div
-            className="mt-1 text-xs font-minecraft-ten whitespace-pre-line line-clamp-2 leading-snug"
+            className="mt-1 text-xs font-minecraft whitespace-pre-line line-clamp-2 leading-snug"
             dangerouslySetInnerHTML={{ __html: parseMotdToHtml(motdInput) }}
           />
         ) : null}
 
         {ping && !isError && (
-          <div className="flex items-center gap-2 mt-1 text-xs font-minecraft-ten">
+          <div className="flex items-center gap-2 mt-1 text-xs font-minecraft">
             {ping.players_online != null && ping.players_max != null && (
               <>
                 <span className="inline-flex items-center gap-1 text-white/60">
@@ -782,7 +782,7 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
       <button
         onClick={onJoin}
         disabled={!!isError || isLaunching || !address}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft-ten uppercase tracking-wider ${
+        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
           isError || !address
             ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
             : isLaunching

@@ -510,18 +510,18 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       <div className="flex items-center gap-4" data-tauri-drag-region>
         <NavigationHistory />
 
-        <div className="flex flex-col items-start -mt-2.5">
+        <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
             <h1
-              className="font-minecraft text-4xl tracking-wider font-bold lowercase text-shadow"
+              className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
-              noriskclient
+              NoRiskClient
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
                 <div
-                  className={`mt-2.5 ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                   onClick={handleUpdateClick}
                 >
                   <Icon

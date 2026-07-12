@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useFontStore } from "../../store/font-store";
 import { getAfkPointsBalance, mintApplixirSession } from "../../services/nrc-service";
 import { Button } from "../ui/buttons/Button";
 import { Tooltip } from "../ui/Tooltip";
@@ -54,7 +55,7 @@ function Titlebar({ points }: { points: number }) {
     >
       <div className="flex items-center gap-3" data-tauri-drag-region>
         <h1
-          className="font-minecraft text-2xl tracking-wider font-bold lowercase text-shadow"
+          className="font-smallcaps text-base tracking-wider font-bold text-shadow"
           data-tauri-drag-region
         >
           {t("applixir.window.title")}
@@ -77,7 +78,7 @@ function Titlebar({ points }: { points: number }) {
               style={{ color: accentColor.value, filter: `drop-shadow(0 0 4px ${accentColor.shadowValue})` }}
             />
             <span
-              className="font-minecraft-ten text-xs"
+              className="font-minecraft text-xs"
               style={{ color: accentColor.light, transform: "translateY(-1px)" }}
             >
               {points}
@@ -117,7 +118,7 @@ function Overlay({
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-black/80">
       <Icon icon={icon} className={`w-12 h-12${spin ? " animate-spin" : ""}`} style={{ color }} />
-      <span className="font-minecraft-ten text-sm text-white/80 tracking-wide">
+      <span className="font-minecraft text-sm text-white/80 tracking-wide">
         {text}
       </span>
       {action && (
@@ -151,7 +152,7 @@ function StreakTrack({ streakDays }: { streakDays: number }) {
           }}
         />
         <span
-          className="font-minecraft-ten text-xs uppercase tracking-wider whitespace-nowrap"
+          className="font-minecraft text-xs tracking-wider whitespace-nowrap"
           style={{ color: active ? accentColor.value : accentColor.dark }}
         >
           {streakDays} {t("applixir.window.streak_days")}
@@ -221,12 +222,12 @@ function RewardPop({ points, balance }: { points: number; balance: number }) {
       >
         <Icon icon="solar:bolt-circle-bold" className="w-5 h-5" style={{ color: accentColor.value }} />
         <span
-          className="font-minecraft text-2xl lowercase leading-none"
+          className="font-smallcaps text-base leading-none"
           style={{ color: accentColor.value, transform: "translateY(-2px)" }}
         >
           +{points} {t("applixir.window.afk_points")}
         </span>
-        <span className="font-minecraft-ten text-[10px] text-white/60 leading-none">
+        <span className="font-minecraft text-[10px] text-white/60 leading-none">
           {t("applixir.window.balance", { balance })}
         </span>
       </div>
@@ -272,7 +273,7 @@ function Sidebar({ state }: { state: AdState }) {
       }}
     >
       <div className="flex flex-col gap-2">
-        <span className="font-minecraft-ten text-xs uppercase tracking-wider text-white/50">
+        <span className="font-minecraft text-xs tracking-wider text-white/50">
           {t("applixir.window.status")}
         </span>
         <div
@@ -287,17 +288,17 @@ function Sidebar({ state }: { state: AdState }) {
             className={`w-4 h-4 flex-shrink-0${meta.spin ? " animate-spin" : ""}`}
             style={{ color: state === "error" ? "#ef4444" : accentColor.value }}
           />
-          <span className="font-minecraft-ten text-xs text-white/80 tracking-wide">
+          <span className="font-minecraft text-xs text-white/80 tracking-wide">
             {t(meta.labelKey)}
           </span>
         </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="font-minecraft-ten text-xs uppercase tracking-wider text-white/50">
+        <span className="font-minecraft text-xs tracking-wider text-white/50">
           {t("applixir.window.about_title")}
         </span>
-        <p className="font-minecraft-ten text-xs text-white/70 leading-relaxed">
+        <p className="font-minecraft text-xs text-white/70 leading-relaxed">
           {t("applixir.window.about_text")}
         </p>
       </div>
@@ -309,7 +310,7 @@ function Sidebar({ state }: { state: AdState }) {
             className="w-4 h-4 flex-shrink-0 mt-0.5"
             style={{ color: accentColor.value }}
           />
-          <span className="font-minecraft-ten text-xs text-white/60 leading-relaxed">
+          <span className="font-minecraft text-xs text-white/60 leading-relaxed">
             {t("applixir.window.rewards_soon")}
           </span>
         </div>
@@ -394,6 +395,7 @@ export function ApplixirWindow() {
     const themeStore = useThemeStore.getState();
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
+    useFontStore.getState().applyFontToDOM();
   }, []);
 
   useEffect(() => {

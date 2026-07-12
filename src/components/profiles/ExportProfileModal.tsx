@@ -55,7 +55,7 @@ export function ExportProfileModal({
           disabled={exportAction.isDisabled()}
           icon={<Icon icon="solar:export-bold" className="w-5 h-5" />}
           size="md"
-          className="text-xl"
+          className="text-sm"
         >
           {exportAction.isExporting ? t('export.exporting') : t('export.export_profile')}
         </Button>

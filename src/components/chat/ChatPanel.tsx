@@ -410,7 +410,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
               />
             </div>
           )}
-          <span className="text-sm font-medium text-white font-minecraft-ten truncate">
+          <span className="text-sm font-medium text-white font-minecraft truncate">
             {friend.username}
           </span>
         </div>
@@ -446,8 +446,8 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                 style={{ color: accentColor.value }}
               />
             </div>
-            <p className="text-white/50 text-xs font-minecraft-ten">{t('chat.no_messages_title')}</p>
-            <p className="text-white/30 text-xl mt-1 font-minecraft">{t('chat.no_messages_desc')}</p>
+            <p className="text-white/50 text-xs font-minecraft">{t('chat.no_messages_title')}</p>
+            <p className="text-white/30 text-sm mt-1 font-smallcaps">{t('chat.no_messages_desc')}</p>
           </div>
         ) : (
           <>
@@ -466,7 +466,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
             )}
             {!hasMore && !isLoadingMore && (
               <div className="flex justify-center py-2">
-                <span className="text-xs font-minecraft-ten text-white/30">
+                <span className="text-xs font-minecraft text-white/30">
                   {t('chat.start_of_conversation')}
                 </span>
               </div>
@@ -490,7 +490,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                   {showDateSeparator && (
                     <div className="flex items-center justify-center py-3 my-1">
                       <div
-                        className="px-3 py-1 rounded-full text-[10px] font-minecraft-ten uppercase tracking-wider"
+                        className="px-3 py-1 rounded-full text-[10px] font-minecraft uppercase tracking-wider"
                         style={{
                           backgroundColor: `${accentColor.value}15`,
                           color: `${accentColor.value}90`,

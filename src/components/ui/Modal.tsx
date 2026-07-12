@@ -159,7 +159,7 @@ export function Modal({
               </span>
             )}
             <div className="flex flex-col">
-              <h2 className="text-3xl font-minecraft text-white lowercase">
+              <h2 className="text-lg font-smallcaps text-white">
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}

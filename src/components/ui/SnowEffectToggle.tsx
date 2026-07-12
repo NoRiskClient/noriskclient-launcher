@@ -49,7 +49,7 @@ export function SnowEffectToggle({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {showLabel && (
-        <span className="text-sm text-white/70 font-minecraft-ten">
+        <span className="text-sm text-white/70 font-minecraft">
           Snow Effect
         </span>
       )}

@@ -140,16 +140,16 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         >
           <Icon icon={l.icon} className="w-8 h-8 shrink-0 mt-0.5" style={{ color: l.color }} />
           <div className="min-w-0">
-            <p className="text-2xl font-minecraft lowercase leading-tight" style={{ color: l.color }}>
+            <p className="text-base font-smallcaps leading-tight" style={{ color: l.color }}>
               {t(l.headlineKey)}
             </p>
             {summary && (
-              <p className="text-base font-minecraft-ten text-gray-200 mt-1 leading-snug">
+              <p className="text-base font-minecraft text-gray-200 mt-1 leading-snug">
                 {summary}
               </p>
             )}
             {result.module && (
-              <span className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-minecraft-ten text-white/80">
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-minecraft text-white/80">
                 <Icon icon="solar:widget-2-bold" className="w-4 h-4" style={{ color: l.color }} />
                 {t("crash_analysis.affected_feature")}: {result.module}
               </span>
@@ -161,7 +161,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         {result.workaround && (
           <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
             <Icon icon="solar:adhesive-plaster-bold" className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
-            <p className="font-minecraft-ten text-base text-white/85 leading-snug">
+            <p className="font-minecraft text-base text-white/85 leading-snug">
               <span className="text-white/45">{t("crash_analysis.workaround_label")}: </span>
               {result.workaround}
             </p>
@@ -171,7 +171,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         {/* fixes checklist (same render for 1 or many) */}
         {hasActions && (
           <div>
-            <p className="px-1 pb-1.5 text-sm font-minecraft-ten text-white/40">{t("crash_analysis.fixes_heading")}</p>
+            <p className="px-1 pb-1.5 text-sm font-minecraft text-white/40">{t("crash_analysis.fixes_heading")}</p>
             <div className="rounded-lg border border-white/10 bg-black/20 divide-y divide-white/5 overflow-hidden">
               {result.actions.map((a, i) => {
                 const isApplied = applied.has(i);
@@ -186,7 +186,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
                     >
                       <Icon icon={isApplied ? "solar:check-circle-bold" : actionIcon(a)} className="w-4 h-4" />
                     </span>
-                    <span className={`flex-1 font-minecraft-ten text-base ${isApplied ? "text-white/45 line-through" : "text-white/90"}`}>
+                    <span className={`flex-1 font-minecraft text-base ${isApplied ? "text-white/45 line-through" : "text-white/90"}`}>
                       {actionLabel(a, t)}
                     </span>
                     {isConflict && !isApplied ? (
@@ -237,14 +237,14 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         )}
 
         {(statusMsg || result.issueUrl) && (
-          <p className="text-base font-minecraft-ten text-gray-300 px-1">
+          <p className="text-base font-minecraft text-gray-300 px-1">
             {statusMsg}
             {result.issueUrl && (
               <>
                 {statusMsg ? " " : null}
                 <button
                   onClick={() => openExternalUrl(result.issueUrl!).catch(() => {})}
-                  className="inline font-minecraft-ten hover:underline underline-offset-2 whitespace-nowrap"
+                  className="inline font-minecraft hover:underline underline-offset-2 whitespace-nowrap"
                   style={{ color: l.color }}
                 >
                   {t("crash_analysis.view_issue")}
@@ -267,7 +267,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         <div className="pt-1">
           <button
             onClick={() => setShowDetails((s) => !s)}
-            className="flex items-center gap-1.5 text-white/40 hover:text-white/70 font-minecraft-ten text-sm transition-colors"
+            className="flex items-center gap-1.5 text-white/40 hover:text-white/70 font-minecraft text-sm transition-colors"
           >
             <Icon icon={showDetails ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} className="w-4 h-4" />
             {t("crash_analysis.technical_details")}
@@ -316,7 +316,7 @@ function LinkRow({ icon, text, onClick }: { icon: string; text: string; onClick:
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white font-minecraft-ten text-sm"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white font-minecraft text-sm"
     >
       <Icon icon={icon} className="w-4 h-4" />
       {text}

@@ -152,19 +152,19 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       sm: {
         container: "h-[42px]",
         padding: "px-6",
-        text: "text-xl",
+        text: "text-sm",
         icon: "w-5 h-5",
       },
       md: {
         container: "h-[50px]",
         padding: "px-8",
-        text: "text-2xl",
+        text: "text-base",
         icon: "w-6 h-6",
       },
       lg: {
         container: "h-[58px]",
         padding: "px-10",
-        text: "text-3xl",
+        text: "text-lg",
         icon: "w-7 h-7",
       },
     };    const getVariantColors = () => {
@@ -246,7 +246,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              "flex-1 h-full bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+              "flex-1 h-full bg-transparent border-none outline-none text-white font-smallcaps placeholder:text-white/50 truncate",
               sizeStyles[size].text,
             )}
             style={{
@@ -318,7 +318,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                   placeholder={placeholder}
                   disabled={disabled}
                   className={cn(
-                    "bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+                    "bg-transparent border-none outline-none text-white font-smallcaps placeholder:text-white/50 truncate",
                     sizeStyles[size].text,
                   )}
                   style={{
@@ -353,8 +353,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       <div
         ref={containerRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md",
-          "text-white tracking-wider lowercase",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          "text-white tracking-wider",
           "flex items-center justify-center w-full",
           "text-shadow-sm",
           getBorderClasses(),

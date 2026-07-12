@@ -178,7 +178,7 @@ export function RunningInstancesIndicator({
                 icon="svg-spinners:ring-resize"
                 className="w-6 h-6 mx-auto text-white/70 mb-2"
               />
-              <p className="text-white/70 font-minecraft text-xl">
+              <p className="text-white/70 font-smallcaps text-sm">
                 {t('instances.loading_instances')}
               </p>
             </div>
@@ -188,7 +188,7 @@ export function RunningInstancesIndicator({
                 icon="solar:danger-triangle-bold"
                 className="w-6 h-6 mx-auto text-red-400 mb-2"
               />
-              <p className="text-red-400 font-minecraft text-xl">
+              <p className="text-red-400 font-smallcaps text-sm">
                 Error: {error}
               </p>
             </div>
@@ -198,10 +198,10 @@ export function RunningInstancesIndicator({
                 icon="solar:monitor-bold"
                 className="w-8 h-8 mx-auto text-white/50 mb-3"
               />
-              <p className="text-white/60 font-minecraft text-xl">
+              <p className="text-white/60 font-smallcaps text-sm">
                 {t('instances.no_running')}
               </p>
-              <p className="text-white/40 font-minecraft text-lg mt-2">
+              <p className="text-white/40 font-smallcaps text-xs mt-2">
                 {t('instances.launch_to_start')}
               </p>
             </div>
@@ -248,21 +248,19 @@ export function RunningInstancesIndicator({
                         </div>
                         <div className="h-12 flex flex-col justify-center">
                           <p
-                            className="text-xl font-minecraft text-white truncate mb-0 leading-none"
+                            className="text-sm font-smallcaps text-white truncate mb-0 leading-none"
                             title={process.profile_name || process.profile_id}
                           >
-                            {(
-                              process.profile_name ||
-                              `Profile ${process.profile_id.substring(0, 6)}...`
-                            ).toLowerCase()}
+                            {process.profile_name ||
+                              `Profile ${process.profile_id.substring(0, 6)}...`}
                           </p>
-                          <div className="flex items-center text-lg text-white/60 font-minecraft leading-none">
+                          <div className="flex items-center text-xs text-white/60 font-smallcaps leading-none">
                             <Icon
                               icon="solar:clock-circle-bold"
                               className="w-3.5 h-3.5 mr-1.5"
                             />
                             <span
-                              className="font-minecraft-ten"
+                              className="font-minecraft"
                               style={{ fontSize: "8px" }}
                             >
                               {timeAgo(new Date(process.start_time).getTime())}
@@ -352,7 +350,7 @@ export function RunningInstancesIndicator({
                 {t('instances.count_running', { count: processes.length })}
               </Label>
             ) : (
-              <span className="text-white/40 text-xs font-minecraft">
+              <span className="text-white/40 text-xs font-smallcaps">
                 {t('instances.none')}
               </span>
             )}

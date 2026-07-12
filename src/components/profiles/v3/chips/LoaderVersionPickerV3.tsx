@@ -60,18 +60,18 @@ export function LoaderVersionPickerV3({
 
   return (
     <div className="flex flex-col">
-      <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft-ten border-b border-white/10">
+      <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft border-b border-white/10">
         {t("profiles.v3.chips.loaderVersion.header", { loader })}
       </div>
 
       <div className="py-1 max-h-[220px] overflow-y-auto custom-scrollbar">
         {isLoading ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft-ten">
+          <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft">
             <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
             {t("profiles.v3.chips.loaderVersion.loading")}
           </div>
         ) : !versions || versions.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-white/30 font-minecraft-ten">
+          <div className="px-3 py-4 text-center text-xs text-white/30 font-minecraft">
             {t("profiles.v3.chips.loaderVersion.empty")}
           </div>
         ) : (
@@ -90,12 +90,12 @@ export function LoaderVersionPickerV3({
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
               >
-                <span className={`flex-1 text-xs font-minecraft-ten ${isCurrent ? "text-white" : "text-white/80"}`}>
+                <span className={`flex-1 text-xs font-minecraft ${isCurrent ? "text-white" : "text-white/80"}`}>
                   {v}
                 </span>
                 {isCurrent && sourceKey && (
                   <span
-                    className="text-[9px] uppercase tracking-[0.1em] font-minecraft-ten px-1.5 py-0.5 rounded"
+                    className="text-[9px] uppercase tracking-[0.1em] font-minecraft px-1.5 py-0.5 rounded"
                     style={{
                       backgroundColor: `${accent.value}22`,
                       color: accent.light,

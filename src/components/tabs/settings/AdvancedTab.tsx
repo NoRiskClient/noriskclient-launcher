@@ -100,7 +100,7 @@ export function AdvancedTab() {
             type="text"
             value={tempConfig?.custom_game_directory || ""}
             placeholder={t("settings.game_data_dir.placeholder")}
-            className="flex-1 p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+            className="flex-1 p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
             disabled={saving}
             readOnly
           />
@@ -179,7 +179,7 @@ export function AdvancedTab() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Icon icon="solar:play-circle-bold" className="w-5 h-5 text-white" />
-                  <h5 className="font-minecraft text-2xl lowercase text-white">{t("settings.hooks.pre_launch.title")}</h5>
+                  <h5 className="font-smallcaps text-base text-white">{t("settings.hooks.pre_launch.title")}</h5>
                 </div>
                 <Button
                   variant={isPreLaunchEditEnabled ? "secondary" : "ghost"}
@@ -213,7 +213,7 @@ export function AdvancedTab() {
                   {isPreLaunchEditEnabled ? t("settings.hooks.disable_editing") : t("settings.hooks.enable_editing")}
                 </Button>
               </div>
-              <p className="text-sm text-white/60 font-minecraft-ten mb-4">
+              <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.pre_launch.description")}
               </p>
               <input
@@ -231,7 +231,7 @@ export function AdvancedTab() {
                   }
                 }}
                 placeholder={t("settings.hooks.pre_launch.placeholder")}
-                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isPreLaunchEditEnabled}
                 title={!isPreLaunchEditEnabled ? t("settings.hooks.pre_launch.disabled_tooltip") : undefined}
               />
@@ -241,7 +241,7 @@ export function AdvancedTab() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Icon icon="solar:shield-bold" className="w-5 h-5 text-white" />
-                  <h5 className="font-minecraft text-2xl lowercase text-white">{t("settings.hooks.wrapper.title")}</h5>
+                  <h5 className="font-smallcaps text-base text-white">{t("settings.hooks.wrapper.title")}</h5>
                 </div>
                 <Button
                   variant={isWrapperEditEnabled ? "secondary" : "ghost"}
@@ -275,7 +275,7 @@ export function AdvancedTab() {
                   {isWrapperEditEnabled ? t("settings.hooks.disable_editing") : t("settings.hooks.enable_editing")}
                 </Button>
               </div>
-              <p className="text-sm text-white/60 font-minecraft-ten mb-4">
+              <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.wrapper.description")}
               </p>
               <input
@@ -293,7 +293,7 @@ export function AdvancedTab() {
                   }
                 }}
                 placeholder={t("settings.hooks.wrapper.placeholder")}
-                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isWrapperEditEnabled}
                 title={!isWrapperEditEnabled ? t("settings.hooks.wrapper.disabled_tooltip") : undefined}
               />
@@ -303,7 +303,7 @@ export function AdvancedTab() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Icon icon="solar:stop-circle-bold" className="w-5 h-5 text-white" />
-                  <h5 className="font-minecraft text-2xl lowercase text-white">{t("settings.hooks.post_exit.title")}</h5>
+                  <h5 className="font-smallcaps text-base text-white">{t("settings.hooks.post_exit.title")}</h5>
                 </div>
                 <Button
                   variant={isPostExitEditEnabled ? "secondary" : "ghost"}
@@ -337,7 +337,7 @@ export function AdvancedTab() {
                   {isPostExitEditEnabled ? t("settings.hooks.disable_editing") : t("settings.hooks.enable_editing")}
                 </Button>
               </div>
-              <p className="text-sm text-white/60 font-minecraft-ten mb-4">
+              <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.post_exit.description")}
               </p>
               <input
@@ -355,7 +355,7 @@ export function AdvancedTab() {
                   }
                 }}
                 placeholder={t("settings.hooks.post_exit.placeholder")}
-                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isPostExitEditEnabled}
                 title={!isPostExitEditEnabled ? t("settings.hooks.post_exit.disabled_tooltip") : undefined}
               />
@@ -365,10 +365,10 @@ export function AdvancedTab() {
               <div className="flex items-start gap-3">
                 <Icon icon="solar:danger-triangle-bold" className="w-6 h-6 text-orange-400 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="text-xl font-minecraft text-orange-300 mb-2 lowercase">
+                  <h4 className="text-sm font-smallcaps text-orange-300 mb-2">
                     {t("settings.hooks.warning.title")}
                   </h4>
-                  <p className="text-sm text-orange-200/80 font-minecraft-ten">
+                  <p className="text-sm text-orange-200/80 font-minecraft">
                     {t("settings.hooks.warning.description")}
                   </p>
                 </div>
@@ -379,10 +379,10 @@ export function AdvancedTab() {
               <div className="flex items-start gap-3">
                 <Icon icon="solar:info-circle-bold" className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
                 <div>
-                  <h4 className="text-xl font-minecraft text-blue-300 mb-2 lowercase">
+                  <h4 className="text-sm font-smallcaps text-blue-300 mb-2">
                     {t("settings.hooks.examples.title")}
                   </h4>
-                  <div className="space-y-2 text-sm text-blue-200/80 font-minecraft-ten">
+                  <div className="space-y-2 text-sm text-blue-200/80 font-minecraft">
                     <p><strong>Pre-Launch:</strong> <code>echo "Starting game..."</code></p>
                     <p><strong>Wrapper:</strong> <code>firejail</code> or <code>gamemoderun</code></p>
                     <p><strong>Post-Exit:</strong> <code>notify-send "Game finished"</code></p>

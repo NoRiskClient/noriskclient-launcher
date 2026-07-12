@@ -30,7 +30,7 @@ export function DesignerSettingsTab({
   return (
     <div className="space-y-4 pt-2">
       <div>
-        <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+        <h3 className="text-lg font-smallcaps text-white mb-3">
           {t('designer.asset_management')}
         </h3>
         <div className="p-0">
@@ -43,10 +43,10 @@ export function DesignerSettingsTab({
               }
               onChange={handleKeepLocalAssetsChange}
               variant="flat"
-              className="text-2xl"
+              className="text-base"
             />
           </div>
-          <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none pl-1">
+          <p className="text-xs text-white/70 font-minecraft tracking-wide select-none pl-1">
             {t('designer.keep_local_assets_description')}
           </p>
         </div>

@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useFontStore } from "../../store/font-store";
 import {
   BACKGROUND_EFFECTS,
   useBackgroundEffectStore,
@@ -67,6 +68,10 @@ export default function Updater() {
     };
     checkThemeLoaded();
   }, [accentColor]);
+
+  useEffect(() => {
+    useFontStore.getState().applyFontToDOM();
+  }, []);
 
   useEntranceAnimation(
     containerRef,
@@ -211,7 +216,7 @@ export default function Updater() {
   if (!isThemeLoaded || !accentColor || !accentColor.value) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-black">
-        <div className="animate-pulse text-white text-lg font-minecraft">
+        <div className="animate-pulse text-white text-xs font-smallcaps">
           {t('updater.loading_theme')}
         </div>
       </div>
@@ -246,7 +251,7 @@ export default function Updater() {
               alt="NoRiskClient Logo"
               className="w-32 h-32 object-contain mb-1"
             />
-            <p className="text-lg font-minecraft text-white/70 lowercase">
+            <p className="text-xs font-smallcaps text-white/70">
               {t('updater.title')}
             </p>
           </div>
@@ -267,7 +272,7 @@ export default function Updater() {
                   icon="solar:check-circle-bold"
                   className="w-5 h-5 text-green-400"
                 />
-                <span className="font-minecraft text-lg text-white">
+                <span className="font-smallcaps text-xs text-white">
                   {t('updater.complete')}
                 </span>
               </div>
@@ -286,7 +291,7 @@ export default function Updater() {
                   icon="solar:danger-triangle-bold"
                   className="w-5 h-5 text-red-400"
                 />
-                <span className="font-minecraft text-lg text-white">
+                <span className="font-smallcaps text-xs text-white">
                   {statusMessage}
                 </span>
               </div>
@@ -302,7 +307,7 @@ export default function Updater() {
                 }}
               >
                 {getStatusIcon()}
-                <span className="font-minecraft text-lg text-white">
+                <span className="font-smallcaps text-xs text-white">
                   {statusMessage || t('updater.initializing')}
                 </span>
               </div>

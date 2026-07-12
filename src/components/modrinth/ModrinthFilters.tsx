@@ -13,7 +13,7 @@ import { parseErrorMessage } from "../../utils/error-utils";
 // Simple FilterGroup component
 const FilterGroup = ({ title, children }: { title: string, children: React.ReactNode }) => (
   <div className="space-y-2">
-    <h3 className="font-minecraft-ten text-lg mb-1 text-white/80 uppercase tracking-wide">{title}</h3>
+    <h3 className="font-minecraft text-lg mb-1 text-white/80 uppercase tracking-wide">{title}</h3>
     <div className="pl-2 space-y-1.5">{children}</div>
   </div>
 );
@@ -27,7 +27,7 @@ const Accordion = ({ title, defaultOpen = false, children }: { title: string, de
         className="flex justify-between items-center cursor-pointer py-2 border-b border-white/10"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <h3 className="font-minecraft text-2xl text-white/80 tracking-wide lowercase select-none">{title}</h3>
+        <h3 className="font-smallcaps text-base text-white/80 tracking-wide select-none">{title}</h3>
         <button>
           <Icon icon={isOpen ? "pixel:chevron-up" : "pixel:chevron-down"} className="w-5 h-5 text-white/70" />
         </button>
@@ -68,7 +68,7 @@ const CheckboxItem = ({
       >
         {checked && <Icon icon="pixel:check" className="w-3 h-3" style={{ color: accentColor.value }} />}
       </div>
-      <span className="text-white/70 font-minecraft-ten tracking-wider">{label}</span>
+      <span className="text-white/70 font-minecraft tracking-wider">{label}</span>
     </label>
   );
 };
@@ -289,7 +289,7 @@ export const ModrinthFilters: React.FC<ModrinthFiltersProps> = ({
         borderBottomColor: `${accentColor.value}60`
       }}
     >
-      <h2 className="font-minecraft text-3xl mb-4 tracking-wide text-white/90 lowercase select-none">{t('modrinth.filters')}</h2>
+      <h2 className="font-smallcaps text-lg mb-4 tracking-wide text-white/90 select-none">{t('modrinth.filters')}</h2>
 
       <Accordion title={t('modrinth.categories')} defaultOpen>
         {categoriesLoading ? (

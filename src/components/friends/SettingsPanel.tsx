@@ -34,8 +34,8 @@ function PrivacyToggle({ label, description, enabled, loading, onToggle, accentC
       }}
     >
       <div className="flex-1 min-w-0 mr-3">
-        <div className="text-sm font-medium text-white font-minecraft-ten">{label}</div>
-        <div className="text-lg text-white/50 font-minecraft mt-0.5">{description}</div>
+        <div className="text-sm font-medium text-white font-minecraft">{label}</div>
+        <div className="text-xs text-white/50 font-smallcaps mt-0.5">{description}</div>
       </div>
       <button
         onClick={onToggle}
@@ -105,7 +105,7 @@ export function SettingsPanel() {
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white font-minecraft-ten">{t('common.settings')}</span>
+          <span className="text-sm font-medium text-white font-minecraft">{t('common.settings')}</span>
         </div>
         <button
           onClick={closeSettings}
@@ -163,20 +163,20 @@ export function SettingsPanel() {
             />
           </div>
           <div className="text-center">
-            <div className="text-white font-minecraft-ten text-sm mb-1">{t('friends.settings.your_profile')}</div>
-            <div className="text-white/50 font-minecraft text-2xl">{status.label}</div>
+            <div className="text-white font-minecraft text-sm mb-1">{t('friends.settings.your_profile')}</div>
+            <div className="text-white/50 font-smallcaps text-base">{status.label}</div>
           </div>
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft-ten px-1">
+          <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft px-1">
             {t('friends.settings.status')}
           </div>
           <StatusSelector currentStatus={currentUser.state} />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft-ten px-1">
+          <div className="text-xs font-medium text-white/40 uppercase tracking-wider font-minecraft px-1">
             {t('friends.settings.privacy')}
           </div>
           <div className="space-y-2">

@@ -153,10 +153,10 @@ export function NRCTab({
         {/* NoRisk Pack Selection */}
         <div className="space-y-3">
           <div className="space-y-2">
-            <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+            <label className="block text-lg font-smallcaps text-white mb-2">
               {t('nrc.info_title')}
             </label>
-            <p className="text-sm text-white/60 font-minecraft-ten">
+            <p className="text-sm text-white/60 font-minecraft">
               {t('nrc.info_description')}
             </p>
           </div>
@@ -166,7 +166,7 @@ export function NRCTab({
                 icon="svg-spinners:ring-resize"
                 className="w-4 h-4"
               />
-              <span className="text-sm font-minecraft-ten">
+              <span className="text-sm font-minecraft">
                 {t('nrc.loading_packs')}
               </span>
             </div>
@@ -201,20 +201,20 @@ export function NRCTab({
               {/* Show warning or description */}
               {showYellowWarning ? (
                 <div className="text-center">
-                  <p className="text-base text-yellow-400 font-minecraft-ten">
+                  <p className="text-base text-yellow-400 font-minecraft">
                     {t('nrc.incompatible_warning')}
                   </p>
                 </div>
               ) : editedProfile.selected_norisk_pack_id === null || editedProfile.selected_norisk_pack_id === "" ? (
                 <div className="text-center">
-                  <p className="text-sm text-amber-400 font-minecraft-ten">
+                  <p className="text-sm text-amber-400 font-minecraft">
                     {t('nrc.no_features_warning')}
                   </p>
                 </div>
               ) : (
                 editedProfile.selected_norisk_pack_id && noriskPacks[editedProfile.selected_norisk_pack_id] && (
                   <div className="text-center">
-                    <p className="text-sm text-white/70 font-minecraft-ten">
+                    <p className="text-sm text-white/70 font-minecraft">
                       {noriskPacks[editedProfile.selected_norisk_pack_id].description}
                     </p>
                   </div>
@@ -228,7 +228,7 @@ export function NRCTab({
                     icon="svg-spinners:ring-resize"
                     className="w-4 h-4"
                   />
-                  <span className="text-sm font-minecraft-ten">
+                  <span className="text-sm font-minecraft">
                     {t('nrc.checking_compatibility')}
                   </span>
                 </div>
@@ -242,7 +242,7 @@ export function NRCTab({
                       icon="solar:danger-triangle-bold"
                       className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5"
                     />
-                    <p className="text-xs text-red-300 font-minecraft-ten">
+                    <p className="text-xs text-red-300 font-minecraft">
                       {packCompatibilityWarning}
                     </p>
                   </div>
@@ -254,11 +254,11 @@ export function NRCTab({
 
         {/* Repair Profile Section */}
         <div className="space-y-3">
-          <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+          <label className="block text-lg font-smallcaps text-white mb-2">
             {t('nrc.repair_title')}
           </label>
           <div className="flex flex-col space-y-2 max-w-xs">
-            <p className="text-xs text-white/60 font-minecraft-ten select-none leading-relaxed whitespace-normal break-words overflow-wrap-anywhere">
+            <p className="text-xs text-white/60 font-minecraft select-none leading-relaxed whitespace-normal break-words overflow-wrap-anywhere">
               {t('nrc.repair_description')}
             </p>
             <Button
@@ -276,7 +276,7 @@ export function NRCTab({
                 )
               }
               size="sm"
-              className="text-xl"
+                    className="text-sm"
             >
               {isRepairing ? t('nrc.repairing') : t('nrc.repair')}
             </Button>

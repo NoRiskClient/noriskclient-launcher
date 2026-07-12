@@ -321,10 +321,10 @@ export function IrisRequiredModal({
             <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-yellow-400" />
           </div>
           <div className="flex-1 space-y-3">
-            <p className="text-white/80 font-minecraft-ten leading-relaxed">
+            <p className="text-white/80 font-minecraft leading-relaxed">
               {t('iris.warning_title', { projectTitle })}
             </p>
-            <p className="text-white/70 font-minecraft-ten leading-relaxed">
+            <p className="text-white/70 font-minecraft leading-relaxed">
               {t('iris.warning_need_iris')}
             </p>
           </div>
@@ -334,7 +334,7 @@ export function IrisRequiredModal({
         <div className="p-4 rounded-lg bg-yellow-500/10 border-2 border-yellow-500/30">
           <div className="flex items-center gap-3">
             <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-yellow-400 flex-shrink-0" />
-            <p className="text-yellow-200 font-minecraft-ten text-sm leading-relaxed">
+            <p className="text-yellow-200 font-minecraft text-sm leading-relaxed">
               {t('iris.performance_warning')}
             </p>
           </div>

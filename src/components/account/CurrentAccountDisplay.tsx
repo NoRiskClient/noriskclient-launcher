@@ -94,7 +94,7 @@ export function CurrentAccountDisplay({
       <div
         ref={buttonRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
           "rounded-md text-white tracking-wider",
           "flex items-center gap-3 px-4 py-1",
           "text-shadow-sm",
@@ -141,11 +141,11 @@ export function CurrentAccountDisplay({
             backgroundColor: `${accentColor.value}20`,
           }}
         >
-          <span className="text-white font-minecraft text-xs">+</span>
+          <span className="text-white font-smallcaps text-xs">+</span>
         </div>
 
         <div className="flex items-center gap-1 min-w-0">
-          <span className="text-xl text-white font-minecraft lowercase">
+          <span className="text-sm text-white font-smallcaps">
             {t('auth.addAccount')}
           </span>
         </div>
@@ -165,7 +165,7 @@ export function CurrentAccountDisplay({
     <div
       ref={buttonRef}
       className={cn(
-        "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+        "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
         "rounded-md text-white tracking-wider",
         "flex items-center gap-3 px-4 py-1",
         "text-shadow-sm",
@@ -224,7 +224,7 @@ export function CurrentAccountDisplay({
       {!compact && (
         <div className="flex flex-col min-w-0">
           <span
-            className="text-2xl text-white font-minecraft uppercase truncate"
+            className="text-base text-white font-smallcaps truncate"
             title={username}
           >
             {username}

@@ -582,7 +582,7 @@ export function LogViewerCore({
             placeholder={t('placeholders.search_logs')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-transparent text-sm font-minecraft-ten text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"
+            className="bg-transparent text-sm font-minecraft text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"
           />
           {searchTerm && (
             <button
@@ -600,7 +600,7 @@ export function LogViewerCore({
             <button
               key={level}
               onClick={() => toggleLevelFilter(level)}
-              className="px-2.5 py-1 text-xs font-minecraft-ten rounded transition-all"
+              className="px-2.5 py-1 text-xs font-minecraft rounded transition-all"
               style={{
                 backgroundColor: levelFilters[level]
                   ? `${LEVEL_COLORS[level]}25`
@@ -621,7 +621,7 @@ export function LogViewerCore({
           <button
             ref={fileDropdownButtonRef}
             onClick={() => setIsFileDropdownOpen(!isFileDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-minecraft-ten transition-all max-w-[250px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-minecraft transition-all max-w-[250px]"
             style={{
               backgroundColor: isFileDropdownOpen ? `${accentColor.value}25` : `${accentColor.value}15`,
               border: `1px solid ${accentColor.value}30`,
@@ -669,7 +669,7 @@ export function LogViewerCore({
             <div className="flex items-center justify-center h-full text-white/30">
               <div className="text-center">
                 <Icon icon={noLogsIcon} className="w-12 h-12 mx-auto mb-2" />
-                <p className="font-minecraft-ten">{noLogsTitle}</p>
+                <p className="font-minecraft">{noLogsTitle}</p>
                 <p className="text-xs mt-1">{noLogsSubtitle}</p>
               </div>
             </div>
@@ -694,7 +694,7 @@ export function LogViewerCore({
         className="px-4 py-2 flex items-center justify-between rounded-lg bg-black/60 backdrop-blur-sm"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
-        <div className="flex items-center gap-4 text-white/50 font-minecraft-ten text-xs">
+        <div className="flex items-center gap-4 text-white/50 font-minecraft text-xs">
           <span className="flex items-center gap-1.5">
             <Icon icon="solar:document-text-bold" className="w-4 h-4" />
             {t('logs.lines', { count: filteredLogs.length })}
@@ -731,7 +731,7 @@ export function LogViewerCore({
           {onClear && (
             <button
               onClick={onClear}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft text-xs"
             >
               <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
               {t('logs.clear')}
@@ -740,7 +740,7 @@ export function LogViewerCore({
           {onOpenFolder && (
             <button
               onClick={onOpenFolder}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft-ten text-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white/90 font-minecraft text-xs"
             >
               <Icon icon="solar:folder-open-bold" className="w-4 h-4" />
               OPEN FOLDER
@@ -749,7 +749,7 @@ export function LogViewerCore({
           <button
             onClick={handleUpload}
             disabled={isUploading}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors font-minecraft-ten text-xs ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors font-minecraft text-xs ${
               isUploading
                 ? "bg-white/5 text-white/40 cursor-wait"
                 : "hover:bg-white/10 text-white/60 hover:text-white/90"
@@ -779,7 +779,7 @@ export function LogViewerCore({
             zIndex: 9999,
           }}
         >
-          <div className="text-xs font-minecraft-ten text-white/70 mb-3 pb-2 border-b border-white/10">
+          <div className="text-xs font-minecraft text-white/70 mb-3 pb-2 border-b border-white/10">
             {t('logs.settings')}
           </div>
 
@@ -801,7 +801,7 @@ export function LogViewerCore({
               />
             </div>
             <div className="flex-1">
-              <div className="text-sm text-white/90 font-minecraft-ten">
+              <div className="text-sm text-white/90 font-minecraft">
                 {t('logs.thread_prefix')}
               </div>
               <div className="text-xs text-white/50 font-sans">
@@ -833,7 +833,7 @@ export function LogViewerCore({
               <button
                 key={path}
                 onClick={() => { onLogSelect?.(path); setIsFileDropdownOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs font-minecraft-ten rounded transition-all hover:bg-white/5"
+                className="w-full text-left px-3 py-2 text-xs font-minecraft rounded transition-all hover:bg-white/5"
                 style={{
                   backgroundColor: isSelected ? `${accentColor.value}20` : undefined,
                   color: isSelected ? accentColor.value : "rgba(255,255,255,0.7)",

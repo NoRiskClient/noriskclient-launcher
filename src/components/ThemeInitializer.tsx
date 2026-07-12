@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useThemeStore } from "../store/useThemeStore";
+import { useFontStore } from "../store/font-store";
 import { useLauncherTheme } from "../hooks/useLauncherTheme";
 
 export function ThemeInitializer() {
@@ -11,12 +12,14 @@ export function ThemeInitializer() {
   const applyBorderRadiusToDOM = useThemeStore(
     (state) => state.applyBorderRadiusToDOM,
   );
+  const applyFontToDOM = useFontStore((state) => state.applyFontToDOM);
   useLauncherTheme();
 
   useEffect(() => {
     applyAccentColorToDOM();
     applyBorderRadiusToDOM();
-  }, [applyAccentColorToDOM, applyBorderRadiusToDOM]);
+    applyFontToDOM();
+  }, [applyAccentColorToDOM, applyBorderRadiusToDOM, applyFontToDOM]);
 
   return null;
 }

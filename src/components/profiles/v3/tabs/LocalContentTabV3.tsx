@@ -486,7 +486,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         {/* Update-Check-Error: auffaellig weil kritisch (Netzwerk/API-Problem). */}
         {manager.contentUpdateError && (
           <Tooltip content={manager.contentUpdateError}>
-            <div className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/30 text-white flex items-center gap-2 font-minecraft lowercase text-2xl">
+            <div className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/30 text-white flex items-center gap-2 font-smallcaps text-base">
               <Icon icon="solar:danger-triangle-bold" className="w-4 h-4" />
               <span style={{ transform: 'translateY(-0.075em)' }}>{t("profiles.v3.toolbar.checkFailed")}</span>
             </div>
@@ -501,12 +501,12 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         {manager.error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft-ten text-rose-100 break-words">
+            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">
               {manager.error}
             </div>
             <button
               onClick={() => manager.fetchData(true)}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
               title={t("profiles.v3.content.retry")}
             >
               {t("profiles.v3.content.retry")}
@@ -521,7 +521,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           />
         ) : manager.isLoading && visibleItems.length === 0 ? (
           shouldShowLoadingSpinner ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
+            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
               <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>

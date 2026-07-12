@@ -77,7 +77,7 @@ export function EditableChipV3({
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
         title={disabled ? disabledReason : undefined}
-        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft-ten transition-colors
+        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors
           ${disabled
             ? "bg-black/20 border-white/5 text-white/30 cursor-not-allowed"
             : open
@@ -112,7 +112,7 @@ export function EditableChipV3({
             <div className="flex items-center justify-end gap-1 px-2 py-1">
               <button
                 onClick={close}
-                className="px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-minecraft-ten text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                className="px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-minecraft text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {t("profiles.v3.chips.cancel")}
               </button>
@@ -125,7 +125,7 @@ export function EditableChipV3({
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${accent.value}66`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `${accent.value}40`; }}
-                className="px-2.5 py-1 rounded border text-[10px] uppercase tracking-wider font-minecraft-ten transition-colors"
+                className="px-2.5 py-1 rounded border text-[10px] uppercase tracking-wider font-minecraft transition-colors"
               >
                 {t("profiles.v3.chips.save")}
               </button>

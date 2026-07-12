@@ -6,7 +6,7 @@
  * Deliberately NOT styled like the shared `Modal`: a sheet is a docked
  * surface that extends the parent view, not a floating card demanding
  * focus. So the header uses the V3 profile-detail top-bar vocabulary
- * (h-11 toolbar, font-minecraft-ten uppercase breadcrumb, thin accent
+ * (h-11 toolbar, font-minecraft uppercase breadcrumb, thin accent
  * indicator on the docked edge) and the backdrop is lighter, signalling
  * "non-blocking side task" instead of "stop everything".
  *
@@ -171,7 +171,7 @@ export function BrowseContentSideSheetV3({
         />
 
         {/* Header uses the V3 detail-view top-bar spec (h-11, px-5, border-
-            white/5, font-minecraft-ten uppercase tracking-wider) so the sheet
+            white/5, font-minecraft uppercase tracking-wider) so the sheet
             reads as an extension of the detail view's chrome rather than a
             foreign dialog with its own type scale.
             When a mod detail is stacked on top, the header morphs into a
@@ -186,7 +186,7 @@ export function BrowseContentSideSheetV3({
                 title={t("common.back")}
               >
                 <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span className="text-xs font-minecraft-ten uppercase tracking-wider">
+                <span className="text-xs font-minecraft uppercase tracking-wider">
                   {title}
                 </span>
               </button>
@@ -197,17 +197,17 @@ export function BrowseContentSideSheetV3({
                   className="w-4 h-4 flex-shrink-0"
                   style={{ color: accent }}
                 />
-                <span className="text-xs font-minecraft-ten uppercase tracking-wider text-white/90 truncate">
+                <span className="text-xs font-minecraft uppercase tracking-wider text-white/90 truncate">
                   {title}
                 </span>
               </>
             )}
             <span className="text-white/25">/</span>
-            <span className="text-xs font-minecraft-ten text-white/55 normal-case truncate max-w-[280px]">
+            <span className="text-xs font-minecraft text-white/55 normal-case truncate max-w-[280px]">
               {profile.name || profile.id}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-minecraft-ten uppercase tracking-wider text-white/30">
+          <div className="flex items-center gap-2 text-[10px] font-minecraft uppercase tracking-wider text-white/30">
             <span className="hidden sm:inline-flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/50">esc</kbd>
               <span>{t("common.close")}</span>
