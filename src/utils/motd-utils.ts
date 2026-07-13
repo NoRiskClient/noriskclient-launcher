@@ -1,19 +1,8 @@
 import motdParser from "@sfirew/minecraft-motd-parser";
-import DOMPurify, { type Config } from "dompurify";
+import { sanitizeMotdHtml } from "./html-sanitize";
 
 const EMPTY_MOTD_HTML = '<span class="text-white/50">No description</span>';
 const INVALID_MOTD_HTML = '<span class="text-red-400">Invalid MOTD format</span>';
-
-/** Parser output is only spans + br; keep the allowlist tight. */
-const MOTD_SANITIZE_CONFIG: Config = {
-  ALLOWED_TAGS: ["span", "br"],
-  ALLOWED_ATTR: ["style", "class"],
-  ALLOW_UNKNOWN_PROTOCOLS: false,
-};
-
-function sanitizeMotdHtml(html: string): string {
-  return DOMPurify.sanitize(html, MOTD_SANITIZE_CONFIG) as string;
-}
 
 function escapeHtml(text: string): string {
   return text
