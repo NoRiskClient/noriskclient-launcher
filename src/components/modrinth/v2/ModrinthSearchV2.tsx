@@ -23,6 +23,7 @@ import type {
   ModrinthVersion
 } from '../../../types/modrinth';
 import { useContentCacheStore } from '../../../store/content-cache-store';
+import { useDebounce } from '../../../hooks/useDebounce';
 import { traceMark } from '../../../utils/perf-trace';
 
 // Helper function to convert ModrinthProjectType to UnifiedProjectType
@@ -245,6 +246,8 @@ export function ModrinthSearchV2({
   // Internal state for profiles, synced with the prop
   const [internalProfiles, setInternalProfiles] = useState<Profile[]>(initialProfiles);
   const justInstalledOrToggledRef = useRef(false); // New ref to prevent re-check loops
+  const searchVersionRef = useRef(0);
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
   useEffect(() => {
     setInternalProfiles(initialProfiles);
@@ -371,6 +374,9 @@ export function ModrinthSearchV2({
   }, [allCategoriesData, projectType]);
 
   const performSearch = useCallback(async (newSearch = false) => {
+    const version = ++searchVersionRef.current;
+    const isStale = () => version !== searchVersionRef.current;
+
     console.log('[ModrinthSearchV2] performSearch ENTRY:', {
       newSearch,
       projectType,
@@ -430,6 +436,8 @@ export function ModrinthSearchV2({
         server_side_filter: filterServerRequired ? "required" : undefined
       });
       traceMark(traceScope, `search: ${response.results.length} hits returned`);
+      if (isStale()) return;
+
       setSearchResults(prevResults => newSearch ? response.results : [...prevResults, ...response.results]);
       setTotalHits(response.pagination.total_count);
       if (!newSearch) {
@@ -438,6 +446,8 @@ export function ModrinthSearchV2({
         setOffset(response.results.length);
       }
     } catch (err) {
+      if (isStale()) return;
+
       console.error("Failed to search Modrinth projects:", err);
       setError(`${err.message}`);
       if (newSearch) {
@@ -446,13 +456,15 @@ export function ModrinthSearchV2({
         setOffset(0);
       }
     } finally {
-      setLoading(false);
-      
-      // Set up delayed "No results found" message only for new searches
-      if (newSearch) {
-        noResultsTimeoutRef.current = setTimeout(() => {
-          setShowNoResultsMessage(true);
-        }, 250); // Show message after 1.5 seconds
+      if (!isStale()) {
+        setLoading(false);
+
+        // Set up delayed "No results found" message only for new searches
+        if (newSearch) {
+          noResultsTimeoutRef.current = setTimeout(() => {
+            setShowNoResultsMessage(true);
+          }, 250); // Show message after 1.5 seconds
+        }
       }
     }
   }, [
@@ -512,7 +524,7 @@ export function ModrinthSearchV2({
 
     performSearch(true);
   }, [
-    searchTerm, projectType, sortOrder, modSource,
+    debouncedSearchTerm, projectType, sortOrder, modSource,
     currentSelectedCategories, selectedGameVersions, currentSelectedLoaders,
     filterClientRequired, filterServerRequired
   ]);
