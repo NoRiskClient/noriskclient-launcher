@@ -28,6 +28,7 @@ use utils::debug_utils;
 use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
+use crate::commands::font_command::list_system_fonts;
 use crate::commands::process_command::{
     fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
     get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
@@ -69,9 +70,9 @@ use commands::profile_command::{
     get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
-    launch_profile, list_profile_screenshots, list_profiles, open_profile_folder,
+    launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
-    resolve_loader_version, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
+    resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
@@ -112,6 +113,9 @@ use commands::cape_command::{
     get_player_capes, unequip_cape, upload_cape, add_favorite_cape, remove_favorite_cape,
     get_capes_by_hashes, get_owned_capes_list,
 };
+
+use commands::cosmetic_command::{get_equipped_cosmetics, get_random_local_emote};
+use commands::icon_command::{get_active_creator_code, get_selected_player_icon};
 
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
@@ -516,6 +520,7 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
             utils::mod_cache_cleanup::clean_mod_cache_command,
+            list_system_fonts,
             create_profile,
             get_profile,
             update_profile,
@@ -523,6 +528,8 @@ async fn main() {
             repair_profile,
             resolve_loader_version,
             list_profiles,
+            list_profile_backups,
+            restore_profile_backup,
             search_profiles,
             get_minecraft_versions,
             launch_profile,
@@ -615,6 +622,10 @@ async fn main() {
             set_discord_state,
             browse_capes,
             get_player_capes,
+            get_active_creator_code,
+            get_selected_player_icon,
+            get_equipped_cosmetics,
+            get_random_local_emote,
             get_owned_capes_list,
             equip_cape,
             delete_cape,
@@ -675,6 +686,9 @@ async fn main() {
             switch_content_version,
             commands::minecraft_command::get_starlight_skin_render,
             commands::minecraft_command::get_face_avatar,
+            commands::applixir_command::applixir_show_ad,
+            commands::applixir_command::applixir_mint_session,
+            commands::applixir_command::get_afkpoints_balance,
             commands::nrc_commands::discord_auth_link,
             commands::nrc_commands::discord_auth_status,
             commands::nrc_commands::discord_auth_unlink,

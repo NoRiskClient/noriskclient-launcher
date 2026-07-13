@@ -60,7 +60,7 @@ export function GroupTabs({
           <button
             key={group.id}
             onClick={() => handleGroupClick(group.id)}
-                         className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                         className={`px-3 py-1 rounded-lg font-smallcaps text-lg transition-all duration-200 flex items-center gap-2 border-2 ${
               activeGroup === group.id
                 ? 'text-white'
                 : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -73,7 +73,7 @@ export function GroupTabs({
             {group.icon && (
               <Icon icon={group.icon} className="w-4 h-4" />
             )}
-            <span className="lowercase">{group.name}</span>
+            <span>{group.name}</span>
           </button>
         ))}
         
@@ -84,7 +84,7 @@ export function GroupTabs({
             className="px-3 py-1 rounded-lg border border-dashed border-white/30 hover:border-white/50 text-white/50 hover:text-white/70 transition-all duration-200 flex items-center gap-2"
           >
             <Icon icon={addButtonIcon} className="w-4 h-4" />
-            <span className="font-minecraft lowercase text-2xl transform -translate-y-0.5">{addButtonText}</span>
+            <span className="font-smallcaps text-lg transform -translate-y-0.5">{addButtonText}</span>
           </button>
         )}
       </div>

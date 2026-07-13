@@ -38,6 +38,7 @@ import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/n
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
+import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
 import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
@@ -77,7 +78,7 @@ export function AppLayout({
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
-    { id: "settings", icon: "solar:settings-bold", label: t("nav.settings") },
+    { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
@@ -355,6 +356,7 @@ export function AppLayout({
       <SocialsModal />
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
+      <SettingsModal />
       <ProfileDuplicateModal />
       <FriendsSidebar />
     </div>
@@ -508,18 +510,18 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       <div className="flex items-center gap-4" data-tauri-drag-region>
         <NavigationHistory />
 
-        <div className="flex flex-col items-start -mt-2.5">
+        <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
             <h1
-              className="font-minecraft text-4xl tracking-wider font-bold lowercase text-shadow"
+              className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
-              noriskclient
+              NoRiskClient
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
                 <div
-                  className={`mt-2.5 ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                   onClick={handleUpdateClick}
                 >
                   <Icon

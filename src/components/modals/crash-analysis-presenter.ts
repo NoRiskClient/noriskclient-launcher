@@ -13,7 +13,7 @@ export type Look = {
 
 export function look(r: CrashCheckResult): Look {
   if (r.status === "investigating")
-    return { color: "#f59e0b", icon: "solar:hammer-bold", headlineKey: "crash_analysis.headline.investigating", btn: "warning" };
+    return { color: "#f59e0b", icon: "solar:sledgehammer-bold", headlineKey: "crash_analysis.headline.investigating", btn: "warning" };
   // our bug, not yet in the wiki -> a genuinely new find. Celebrate + thank the reporter.
   if (r.classification === "nrc-own" && !r.known)
     return { color: "#fbbf24", icon: "solar:cup-star-bold", headlineKey: "crash_analysis.headline.new_bug", btn: "warning" };

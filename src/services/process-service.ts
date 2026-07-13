@@ -152,8 +152,13 @@ export interface ProcessLogCursor {
 export async function getProcessLogCursor(
   sessionId: string,
   cursor: number,
+  maxBytes?: number,
 ): Promise<ProcessLogCursor> {
-  return invoke<ProcessLogCursor>("get_process_log_cursor", { sessionId, cursor });
+  return invoke<ProcessLogCursor>("get_process_log_cursor", {
+    sessionId,
+    cursor,
+    maxBytes,
+  });
 }
 
 /**

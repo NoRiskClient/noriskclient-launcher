@@ -293,7 +293,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         )}
 
         {/* Stats - absolute oben rechts */}
-        <div className="absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft-ten">
+        <div className="absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft">
           {/* Downloads */}
           <div className="text-white/50 flex items-center gap-0.5">
             <svg
@@ -333,7 +333,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         <div className="flex-1 min-w-0">
           <div className="flex flex-row items-baseline space-x-1.5 mb-1">
             <span
-              className="text-white font-minecraft-ten text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
+              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
               title={`View ${hit.title} details`}
             >
               {hit.title}
@@ -360,7 +360,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                 }}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-gray-400 truncate font-minecraft-ten flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
+                className="text-xs text-gray-400 truncate font-minecraft flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
                 title={`Open ${hit.author}'s profile on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
               >
                 by {hit.author}
@@ -369,11 +369,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
           </div>
 
           {/* Description */}
-          <p className="text-xs text-gray-300 line-clamp-2 font-minecraft-ten leading-tight mb-2 min-h-[2rem]">
+          <p className="text-xs text-gray-300 line-clamp-2 font-minecraft leading-tight mb-2 min-h-[2rem]">
             {hit.description}
           </p>
 
-          <div className="flex items-center gap-1 text-sm font-minecraft-ten">
+          <div className="flex items-center gap-1 text-sm font-minecraft">
             {/* Status badges */}
             {installStatus && (
               <>

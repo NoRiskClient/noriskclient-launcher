@@ -3288,7 +3288,7 @@ export function ModrinthSearchV2({
             <p className="p-4 text-red-500 text-center">{t('content.search.error', { error })}</p>
           )}
           {searchResults.length === 0 && !loading && !error && showNoResultsMessage && (
-            <p className="p-4 text-center text-xl lowercase text-gray-400">{t('content.search.no_results')}</p>
+            <p className="p-4 text-center text-sm text-gray-400">{t('content.search.no_results')}</p>
           )}
 
           {searchResults.length > 0 && (
@@ -3354,7 +3354,7 @@ export function ModrinthSearchV2({
                   <div className="flex justify-center p-4">
                     <button
                       onClick={loadMoreResults}
-                      className="px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                      className="px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                     >
                       {t('content.search.load_more', { remaining: totalHits - searchResults.length })}
                     </button>
@@ -3370,7 +3370,7 @@ export function ModrinthSearchV2({
 
                 {/* End of results */}
                 {!loading && searchResults.length > 0 && searchResults.length >= totalHits && (
-                  <div className="p-4 text-center text-xl text-gray-400">
+                  <div className="p-4 text-center text-sm text-gray-400">
                     {t('content.search.no_more_results')}
                   </div>
                 )}
@@ -3452,7 +3452,7 @@ export function ModrinthSearchV2({
                     }
                     if (!loading && searchResults.length > 0 && searchResults.length >= totalHits) {
                        return (
-                        <div className="p-4 text-center text-xl lowercase text-gray-400">
+                        <div className="p-4 text-center text-sm text-gray-400">
                           {t('content.search.no_more_results')}
                         </div>
                       );

@@ -160,7 +160,7 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
     const baseProps = {
       ref: mergedRef,
       className: cn(
-        "inline-flex items-center justify-center relative overflow-hidden",        "w-fit font-minecraft transition-all duration-200",
+        "inline-flex items-center justify-center relative overflow-hidden", "w-fit font-smallcaps transition-all duration-200",
         sizeClasses,
         isClickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20" : "",
         disabled ? "opacity-50 cursor-not-allowed" : "",
@@ -180,7 +180,7 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
 
     const content = (
       <>        <span          className={cn(
-            "relative z-10 flex items-center font-minecraft-ten",
+            "relative z-10 flex items-center font-minecraft",
             iconElement ? "gap-x-1.5" : "",
             getTextSizeClass(),
           )}

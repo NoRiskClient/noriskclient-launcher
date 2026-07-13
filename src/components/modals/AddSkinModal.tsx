@@ -430,7 +430,7 @@ export const AddSkinModal = memo(
 
                 {/* Skin Name Input */}
                 <div>
-                  <label className="block font-minecraft text-3xl text-white/80 lowercase mb-2">
+                  <label className="block font-smallcaps text-lg text-white/80 mb-2">
                     {t('skins.skinName')}
                   </label>
                   <SearchStyleInput
@@ -443,7 +443,7 @@ export const AddSkinModal = memo(
 
                 {/* Skin Variant Selection */}
                 <div>
-                  <p className="font-minecraft text-3xl text-white/80 lowercase mb-4">
+                  <p className="font-smallcaps text-lg text-white/80 mb-4">
                     {t('skins.skinVariant')}
                   </p>
                   <div className="flex justify-center gap-6">
@@ -476,7 +476,7 @@ export const AddSkinModal = memo(
 
             {!skin && (
               <div className="space-y-2">
-                <label className="block font-minecraft text-3xl text-white/80 lowercase">
+                <label className="block font-smallcaps text-lg text-white/80">
                   {t('skins.skin')}
                 </label>
                 <div className="flex gap-2">

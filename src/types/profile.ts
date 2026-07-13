@@ -457,11 +457,17 @@ export interface LocalContentItem {
 }
 
 // --- Params for get_local_content command ---
+export type CacheBehaviour =
+  | "stale_while_revalidate"
+  | "must_revalidate"
+  | "bypass";
+
 export interface LoadItemsParams {
   profile_id: string; // UUID
   content_type: ContentType; // Enum: ResourcePack, ShaderPack, DataPack
   calculate_hashes: boolean;
   fetch_modrinth_data: boolean;
+  cache_behaviour?: CacheBehaviour;
 }
 
 // --- Migration types ---

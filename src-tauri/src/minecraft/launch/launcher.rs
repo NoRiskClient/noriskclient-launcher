@@ -441,6 +441,10 @@ impl MinecraftLauncher {
                     "-Dnorisk.experimental={}",
                     params.is_experimental_mode
                 ));
+
+                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
+                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
+                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
             } else {
                 info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
             }

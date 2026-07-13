@@ -46,7 +46,7 @@ export function NotificationModal() {
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-white/50">
             <Icon icon="solar:bell-off-outline" className="w-12 h-12 mb-2" />
-            <p className="font-minecraft-ten text-sm">{t('notification_modal.no_notifications')}</p>
+            <p className="font-minecraft text-sm">{t('notification_modal.no_notifications')}</p>
           </div>
         ) : (
           notifications.map((notification) => (

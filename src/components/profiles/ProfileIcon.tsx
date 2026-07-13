@@ -61,12 +61,16 @@ export function ProfileIcon({
 }: ProfileIconProps) {
   const { t } = useTranslation();
   const { showModal, hideModal } = useGlobalModal();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const cachedUrl = banner?.source
+    ? (imageUrlCache.get(getCacheKey(profileId, banner))?.url ?? null)
+    : null;
+
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
-  const [hasLoadedImage, setHasLoadedImage] = useState(false);
-  const [imageOpacity, setImageOpacity] = useState(0);
+  const [hasLoadedImage, setHasLoadedImage] = useState(!!cachedUrl);
+  const [imageOpacity, setImageOpacity] = useState(cachedUrl ? 1 : 0);
   const cacheVersion = useRef(0);
 
   useEffect(() => {

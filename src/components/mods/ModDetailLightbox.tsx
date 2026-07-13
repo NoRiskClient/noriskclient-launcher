@@ -131,10 +131,10 @@ export function ModDetailLightbox({
         <div className="max-w-4xl mx-auto">
           {/* Counter */}
           <div className="flex items-center justify-between mb-2">
-            <span className="text-white/70 font-minecraft-ten text-sm">
+            <span className="text-white/70 font-minecraft text-sm">
               {t('lightbox.counter', { current: currentIndex + 1, total: images.length })}
             </span>
-            <div className="flex items-center gap-2 text-white/50 text-xs font-minecraft-ten">
+            <div className="flex items-center gap-2 text-white/50 text-xs font-minecraft">
               <span>{t('lightbox.press_space_zoom')}</span>
               <span>|</span>
               <span>{t('lightbox.arrow_keys_navigate')}</span>
@@ -147,12 +147,12 @@ export function ModDetailLightbox({
           {(currentImage.title || currentImage.description) && (
             <div className="mt-2">
               {currentImage.title && (
-                <h3 className="text-lg font-minecraft-ten text-white">
+                <h3 className="text-lg font-minecraft text-white">
                   {currentImage.title}
                 </h3>
               )}
               {currentImage.description && (
-                <p className="text-sm text-white/70 font-minecraft-ten mt-1">
+                <p className="text-sm text-white/70 font-minecraft mt-1">
                   {currentImage.description}
                 </p>
               )}

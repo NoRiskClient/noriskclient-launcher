@@ -531,6 +531,7 @@ pub async fn toggle_content_from_profile(
                     content_type: profile_utils::ContentType::Mod,
                     calculate_hashes: true,
                     fetch_modrinth_data: false, // Don't need Modrinth data for toggling
+                    cache_behaviour: Default::default(),
                 }).await {
                     Ok(local_mods) => {
                         for mod_item in local_mods {

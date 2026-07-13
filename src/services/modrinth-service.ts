@@ -17,6 +17,7 @@ import type {
   UnifiedModVersionsParams,
   UnifiedVersionResponse,
 } from "../types/unified";
+import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 
 export class ModrinthService {
@@ -83,9 +84,13 @@ export class ModrinthService {
     );
   }
 
-  static async getProjectDetails(ids: string[]): Promise<ModrinthProject[]> {
+  static async getProjectDetails(
+    ids: string[],
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthProject[]> {
     return invoke<ModrinthProject[]>("get_modrinth_project_details", {
       ids,
+      cacheBehaviour,
     });
   }
 
@@ -137,12 +142,14 @@ export class ModrinthService {
 
   static async getVersionsByHashes(
     hashes: string[],
+    cacheBehaviour?: CacheBehaviour,
   ): Promise<Record<string, ModrinthVersion>> {
     // The backend command `get_modrinth_versions_by_hashes` implicitly uses "sha1"
     return invoke<Record<string, ModrinthVersion>>(
       "get_modrinth_versions_by_hashes",
       {
         hashes,
+        cacheBehaviour,
         // hashAlgorithm: "sha1", // Not needed as backend command defaults/is specific to sha1
       },
     );

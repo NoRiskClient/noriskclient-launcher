@@ -226,7 +226,7 @@ const SkinPreview = memo(
             {isRenderLoading && canShowSpinner ? (
               <div className="flex flex-col items-center justify-center space-y-2">
                 <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
-                <p className="font-minecraft text-xs text-white/70 lowercase">{t('skins.loading')}</p>
+                <p className="font-smallcaps text-xs text-white/70">{t('skins.loading')}</p>
               </div>
             ) : !isRenderLoading ? (
               <SkinViewer
@@ -241,11 +241,11 @@ const SkinPreview = memo(
             {isDisabled && (
               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-8 h-8 animate-spin mb-1"
+                  icon="svg-spinners:ring-resize"
+                  className="w-8 h-8 mb-1"
                   style={{ color: accentColor.value }}
                 />
-                <span className="font-minecraft text-xs text-white lowercase">
+                <span className="font-smallcaps text-xs text-white">
                   {t('skins.applying')}
                 </span>
               </div>
@@ -256,14 +256,14 @@ const SkinPreview = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={skin.name}
             >
               {skin.name}
             </h3>
 
             {/* Skin Variant & Applied Status */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:palette-bold"
@@ -351,14 +351,14 @@ const AddSkinCard = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={t('skins.addNewSkin')}
             >
               {t('skins.addNewSkin')}
             </h3>
 
             {/* Description */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:upload-bold"
@@ -634,7 +634,7 @@ export function SkinsTab() {
   const addSkinButton = (
     <button
       onClick={() => startEditSkin(null)}
-      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
       title={t('skins.addSkin')}
       disabled={!activeAccount}
     >
@@ -670,37 +670,37 @@ export function SkinsTab() {
         {/* Content */}
         <div className="space-y-8">
         {accountLoading ? (
-          <p className="text-white/70 font-minecraft text-xl text-center py-4">
+          <p className="text-white/70 font-smallcaps text-sm text-center py-4">
             {t('skins.loadingAccount')}
           </p>
         ) : accountError ? (
           <StatusMessage
             type="error"
-            className="font-minecraft text-lg"
+            className="font-smallcaps text-xs"
             message={t('skins.accountError', { error: accountError })}
           />
         ) : !activeAccount ? (
-          <p className="text-white/70 italic font-minecraft text-xl text-center py-10">
+          <p className="text-white/70 italic font-smallcaps text-sm text-center py-10">
             {t('skins.pleaseLogIn')}
           </p>
         ) : (
           <>
             <div className="space-y-5 text-center">
               {localSkinsLoading ? (
-                <p className="text-white/70 font-minecraft text-xl text-center py-4">
+                <p className="text-white/70 font-smallcaps text-sm text-center py-4">
                   {t('skins.loadingSkins')}
                 </p>
               ) : localSkinsError ? (
                 <StatusMessage
                   type="error"
-                  className="font-minecraft text-lg"
+                  className="font-smallcaps text-xs"
                   message={localSkinsError}
                 />
               ) : !localSkinsLoading &&
                 localSkins.length > 0 &&
                 filteredSkins.length === 0 &&
                 !localSkinsError ? (
-                <p className="text-white/70 italic font-minecraft text-lg">
+                <p className="text-white/70 italic font-smallcaps text-xs">
                   {t('skins.noSkinsMatchSearch')}
                 </p>
               ) : (

@@ -1394,6 +1394,11 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     let mods_response = get_mods_by_ids(project_ids, Some(true)).await?;
     info!("Received mod information for {} projects.", mods_response.data.len());
 
+    if let Ok(state) = crate::state::state_manager::State::get().await {
+        info!("[cache-warm] CF modpack install seeding {} curseforge mods into cache", mods_response.data.len());
+        state.content_cache.put_curseforge_mods(&mods_response.data).await;
+    }
+
     // Collect all file IDs for bulk request
     let file_ids: Vec<u32> = file_mapping.values().cloned().collect();
 

@@ -1,6 +1,10 @@
+pub mod applixir_command;
 pub mod assets_command;
 pub mod deep_link_handler;
 pub mod cape_command;
+pub mod cosmetic_command;
+pub mod icon_command;
+pub mod request_context;
 pub mod config_commands;
 pub mod content_command;
 pub mod crash_fix_command;
@@ -24,3 +28,4 @@ pub mod profile_command;
 pub mod tester_command;
 pub mod vanilla_cape_command;
 pub mod analytics_command;
+pub mod font_command;

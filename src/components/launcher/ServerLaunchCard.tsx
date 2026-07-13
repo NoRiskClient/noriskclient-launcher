@@ -117,18 +117,18 @@ export function ServerLaunchCard({
     if (isLaunching && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-white font-minecraft-ten text-sm">
+          <span className="text-white font-minecraft text-sm">
             {statusMessage}
           </span>
         </div>
       );
     }
 
-    if (statusMessage === "STARTING!") {
+    if (statusMessage === t('launch.starting')) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-green-400 font-minecraft-ten text-lg">
-            STARTING!
+          <span className="text-green-400 font-minecraft text-lg">
+            {t('launch.starting')}
           </span>
         </div>
       );
@@ -137,7 +137,7 @@ export function ServerLaunchCard({
     if (launchState === LaunchState.ERROR && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-red-400 font-minecraft-ten text-sm">
+          <span className="text-red-400 font-minecraft text-sm">
             {statusMessage}
           </span>
         </div>
@@ -147,7 +147,7 @@ export function ServerLaunchCard({
     return (
       <>
         <div
-          className="text-xs leading-tight motd-container font-minecraft-ten w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
+          className="text-xs leading-tight motd-container font-minecraft w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
           style={{ textShadow: '2px 2px 0px rgba(0, 0, 0, 0.4)' }}
           title={serverInfo?.description || serverAddress}
         >
@@ -164,7 +164,7 @@ export function ServerLaunchCard({
 
         {serverInfo && (
           <div className="flex items-center justify-center gap-3 mt-1">
-            <span className="text-xs text-white/60 font-minecraft-ten">
+            <span className="text-xs text-white/60 font-minecraft">
               {serverInfo.players_online ?? "?"}/{serverInfo.players_max ?? "?"} {t('server.players')}
             </span>
             <img
@@ -198,13 +198,13 @@ export function ServerLaunchCard({
       <div className="relative w-16 h-16 flex-shrink-0 rounded flex items-center justify-center overflow-hidden">
         {isLaunching ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/70 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/70"
           />
         ) : isLoading ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/50 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/50"
           />
         ) : serverInfo?.favicon_base64 ? (
           <img
@@ -243,7 +243,7 @@ export function ServerLaunchCard({
             icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"}
             className="w-4 h-4 text-white"
           />
-          <span className="font-minecraft-ten text-xs text-white uppercase">
+          <span className="font-minecraft text-xs text-white uppercase">
             {isLaunching ? t('server.stop') : t('server.join')}
           </span>
         </button>
@@ -261,7 +261,7 @@ export function ServerLaunchCard({
           }}
         >
           <Icon icon="solar:box-bold" className="w-4 h-4 text-white" />
-          <span className="font-minecraft-ten text-xs text-white uppercase">{t('server.mods')}</span>
+          <span className="font-minecraft text-xs text-white uppercase">{t('server.mods')}</span>
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
 import type { AdventCalendarDay, Reward } from '../types/advent';
 import type { UserNotification } from '../types/notification';
+import type { AfkPointsBalance } from '../types/afkpoints';
 import { useProfileStore } from '../store/profile-store';
 import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './flagsmith-service';
 import { refreshPermissions } from './permission-service';
@@ -132,6 +133,18 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
   }
   // Kein expliziter finally-Block hier nötig, um loading auf false zu setzen,
   // da dies entweder durch fetchProfiles() oder den catch-Block oben abgedeckt wird.
+};
+
+export const showApplixirAd = (resetConsent = false): Promise<void> => {
+  return invoke('applixir_show_ad', { resetConsent });
+};
+
+export const mintApplixirSession = (): Promise<string | null> => {
+  return invoke('applixir_mint_session');
+};
+
+export const getAfkPointsBalance = (): Promise<AfkPointsBalance | null> => {
+  return invoke('get_afkpoints_balance');
 };
 
 /**

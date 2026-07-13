@@ -15,10 +15,15 @@ import {
 // DISABLED: Snow effect (seasonal feature)
 // import { SnowEffectToggle } from "../ui/SnowEffectToggle";
 import { ReferralBanner } from "../ui/ReferralBanner";
+import { ApplixirAdButton } from "../ui/ApplixirAdButton";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { useQualitySettingsStore } from "../../store/quality-settings-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { setDiscordState } from "../../utils/discordRpc";
+import { useTranslation } from "react-i18next";
 
 export function PlayTab() {
+  const { t } = useTranslation();
   const {
     profiles,
     selectedProfile: storeSelectedProfile,
@@ -31,6 +36,7 @@ export function PlayTab() {
   const { staticBackground, accentColor } = useThemeStore();
   const { currentEffect } = useBackgroundEffectStore();
   const { isThemeActive, selectedTheme } = useLauncherTheme();
+  const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -56,6 +62,9 @@ export function PlayTab() {
     profileId: profile.id,
   }));
 
+  // promo-outline shader settings for the 3D player preview
+  const outline = { strength: 4, thickness: 3, sensitivity: 0.1 };
+
   return (
     <div className="flex h-full relative">
       <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
@@ -73,11 +82,18 @@ export function PlayTab() {
           <ReferralBanner />
         </div>
 
-        {/* DISABLED: Snow Effect Toggle - Top Right (seasonal feature)
-        <div className="absolute top-6 right-6 z-20">
-          <SnowEffectToggle variant="compact" size="sm" />
+        {/* Watch Ad + 3D Render Toggle - Top Right */}
+        <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-3">
+          <ApplixirAdButton />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
+            <ToggleSwitch
+              checked={cosmeticRenderer3d}
+              onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
+              size="sm"
+            />
+          </div>
         </div>
-        */}
 
         {/* <VersionInfo
           profileId={currentDisplayProfile?.id || ""}
@@ -102,6 +118,7 @@ export function PlayTab() {
             onLaunchVersionChange={handleVersionChange}
             launchButtonVersions={versions}
             className=""
+            outline={outline}
           />
         </div>
       </div>

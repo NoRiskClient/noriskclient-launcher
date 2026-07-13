@@ -47,6 +47,7 @@ sha2 = "0.10.8"
 p256 = "0.13.2"
 base64 = "0.21.7"
 jsonwebtoken = "9.3.0"
+fontdb = "0.18"
 machineid-rs = "1.2.4"
 byteorder = { version = "1.4" }
 tempfile = "3.8"
