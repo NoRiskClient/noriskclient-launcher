@@ -94,16 +94,24 @@ pub async fn get_modrinth_mod_versions(
     project_id_or_slug: String,
     loaders: Option<Vec<String>>,
     game_versions: Option<Vec<String>>,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<ModrinthVersion>, CommandError> {
-    // Return CommandError for Tauri
     log::debug!(
         "Received get_modrinth_mod_versions command: project_id={}, loaders={:?}, game_versions={:?}",
         project_id_or_slug,
         loaders,
         game_versions
     );
-    // Call the actual API function and map error to CommandError
-    get_modrinth_versions_api(project_id_or_slug, loaders, game_versions)
+
+    let state = State::get().await.map_err(CommandError::from)?;
+    state
+        .content_cache
+        .get_modrinth_project_versions(
+            &project_id_or_slug,
+            loaders,
+            game_versions,
+            cache_behaviour.unwrap_or_default(),
+        )
         .await
         .map_err(CommandError::from)
 }
@@ -491,16 +499,20 @@ pub async fn switch_modpack_version_command(
 #[tauri::command]
 pub async fn get_modrinth_project_members(
     project_id_or_slug: String,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<modrinth::ModrinthTeamMember>, CommandError> {
     log::debug!(
         "Received get_modrinth_project_members command for project: {}",
         project_id_or_slug
     );
 
-    let members = modrinth::get_project_members(project_id_or_slug)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let members = state
+        .content_cache
+        .get_modrinth_project_members(&project_id_or_slug, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
-    log::info!("Successfully fetched {} team members", members.len());
+    log::debug!("Serving {} team members", members.len());
     Ok(members)
 }

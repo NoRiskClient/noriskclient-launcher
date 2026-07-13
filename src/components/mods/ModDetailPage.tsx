@@ -234,30 +234,39 @@ export function ModDetailPage({
           if (projects.length > 0) {
             const modrinthProject = projects[0];
 
-            // Fetch author name from search (this returns org names correctly, e.g., "Cobble Studios")
             let authorName: string | undefined;
             let authorAvatarUrl: string | null = null;
             let teamMembers: UnifiedTeamMember[] = [];
 
-            // First, try to get the author from search results (handles orgs correctly)
-            try {
-              const searchResponse = await ModrinthService.searchProjects(
-                modrinthProject.slug,
-                modrinthProject.project_type,
-                undefined,
-                undefined,
-                1
-              );
-              if (searchResponse.hits.length > 0 && searchResponse.hits[0].project_id === modrinthProject.id) {
-                authorName = searchResponse.hits[0].author || undefined;
+            if (modrinthProject.organization) {
+              try {
+                const searchResponse = await ModrinthService.searchProjects(
+                  modrinthProject.slug,
+                  modrinthProject.project_type,
+                  undefined,
+                  undefined,
+                  1
+                );
+                if (searchResponse.hits.length > 0 && searchResponse.hits[0].project_id === modrinthProject.id) {
+                  authorName = searchResponse.hits[0].author || undefined;
+                }
+              } catch (searchErr) {
+                console.warn("Failed to fetch author from search:", searchErr);
               }
-            } catch (searchErr) {
-              console.warn("Failed to fetch author from search:", searchErr);
             }
+
+            const membersPromise = ModrinthService.getProjectMembers(projectId).catch((err) => {
+              console.warn("Failed to fetch team members:", err);
+              return [];
+            });
+            const versionsPromise = ModrinthService.getModVersions(projectId).catch((err) => {
+              console.warn("Failed to fetch versions:", err);
+              return [];
+            });
 
             // Also fetch team members for the team list in sidebar
             try {
-              const members = await ModrinthService.getProjectMembers(projectId);
+              const members = await membersPromise;
               if (members.length > 0) {
                 // Sort by ordering for display
                 const sortedMembers = [...members].sort((a, b) => a.ordering - b.ordering);
@@ -292,7 +301,7 @@ export function ModDetailPage({
             // Fetch dependencies from the latest version
             let dependencies: UnifiedProjectDependency[] = [];
             try {
-              const versions = await ModrinthService.getModVersions(projectId);
+              const versions = await versionsPromise;
               if (versions.length > 0) {
                 // Get dependencies from the first (featured/latest) version
                 const latestVersion = versions[0];

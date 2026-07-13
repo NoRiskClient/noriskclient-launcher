@@ -2,7 +2,9 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::post_init::PostInitializationHandler;
 use crate::integrations::curseforge::{self, CurseForgeMod, CurseForgeModsResponse};
-use crate::integrations::modrinth::{self, ModrinthProject, ModrinthTags, ModrinthVersion};
+use crate::integrations::modrinth::{
+    self, ModrinthProject, ModrinthTags, ModrinthTeamMember, ModrinthVersion,
+};
 use crate::integrations::unified_mod::{
     self, ModPlatform, UnifiedModpackVersionsResponse, UnifiedUpdateCheckRequest,
     UnifiedUpdateCheckResponse, UnifiedVersion,
@@ -84,6 +86,12 @@ pub struct ContentCacheData {
     pub modpack_versions: HashMap<String, CacheEntry<UnifiedModpackVersionsResponse>>,
     #[serde(default)]
     pub modrinth_tags: Option<CacheEntry<ModrinthTags>>,
+    #[serde(default)]
+    pub modrinth_project_members: HashMap<String, CacheEntry<Vec<ModrinthTeamMember>>>,
+    #[serde(default)]
+    pub modrinth_project_versions: HashMap<String, CacheEntry<Vec<ModrinthVersion>>>,
+    #[serde(default)]
+    pub curseforge_descriptions: HashMap<u32, CacheEntry<String>>,
 }
 
 impl ContentCacheData {
@@ -100,6 +108,12 @@ impl ContentCacheData {
             .modrinth_tags
             .take()
             .filter(|e| e.expires_at_ms > cutoff);
+        self.modrinth_project_members
+            .retain(|_, e| e.expires_at_ms > cutoff);
+        self.modrinth_project_versions
+            .retain(|_, e| e.expires_at_ms > cutoff);
+        self.curseforge_descriptions
+            .retain(|_, e| e.expires_at_ms > cutoff);
     }
 }
 
@@ -109,6 +123,7 @@ struct Inner {
     save_scheduled: AtomicBool,
     modpack_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     tags_fetch_lock: Mutex<()>,
+    project_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
 #[derive(Clone)]
@@ -125,6 +140,7 @@ impl ContentCacheManager {
                 save_scheduled: AtomicBool::new(false),
                 modpack_fetch_locks: Mutex::new(HashMap::new()),
                 tags_fetch_lock: Mutex::new(()),
+                project_fetch_locks: Mutex::new(HashMap::new()),
             }),
         })
     }
@@ -723,6 +739,250 @@ impl ContentCacheManager {
         self.schedule_save();
         Ok(fetched)
     }
+
+
+    pub async fn get_modrinth_project_members(
+        &self,
+        project_id_or_slug: &str,
+        behaviour: CacheBehaviour,
+    ) -> Result<Vec<ModrinthTeamMember>> {
+        let key = project_id_or_slug.to_string();
+
+        if behaviour != CacheBehaviour::Bypass {
+            let cached = self
+                .inner
+                .data
+                .read()
+                .await
+                .modrinth_project_members
+                .get(&key)
+                .cloned();
+
+            if let Some(entry) = cached {
+                if entry.is_fresh() {
+                    return Ok(entry.data);
+                }
+                if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                    let this = self.clone();
+                    let key = key.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = this.fetch_project_members(&key).await {
+                            warn!("Background refresh of project members failed: {}", e);
+                        }
+                    });
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        self.fetch_project_members(&key).await
+    }
+
+    async fn fetch_project_members(&self, key: &str) -> Result<Vec<ModrinthTeamMember>> {
+        let _guard = self.project_fetch_lock(&format!("members:{}", key)).await;
+
+        let cached = self
+            .inner
+            .data
+            .read()
+            .await
+            .modrinth_project_members
+            .get(key)
+            .cloned();
+        if let Some(entry) = cached {
+            if entry.is_fresh() {
+                return Ok(entry.data);
+            }
+        }
+
+        let fetched = modrinth::get_project_members(key.to_string()).await?;
+        {
+            let mut data = self.inner.data.write().await;
+            data.modrinth_project_members.insert(
+                key.to_string(),
+                CacheEntry::new(fetched.clone(), TTL_METADATA_MS),
+            );
+        }
+        self.schedule_save();
+        Ok(fetched)
+    }
+
+
+    pub async fn get_modrinth_project_versions(
+        &self,
+        project_id_or_slug: &str,
+        loaders: Option<Vec<String>>,
+        game_versions: Option<Vec<String>>,
+        behaviour: CacheBehaviour,
+    ) -> Result<Vec<ModrinthVersion>> {
+        let key = project_versions_cache_key(project_id_or_slug, &loaders, &game_versions);
+
+        if behaviour != CacheBehaviour::Bypass {
+            let cached = self
+                .inner
+                .data
+                .read()
+                .await
+                .modrinth_project_versions
+                .get(&key)
+                .cloned();
+
+            if let Some(entry) = cached {
+                if entry.is_fresh() {
+                    return Ok(entry.data);
+                }
+                if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                    let this = self.clone();
+                    let (id, key) = (project_id_or_slug.to_string(), key.clone());
+                    let (loaders, game_versions) = (loaders.clone(), game_versions.clone());
+                    tokio::spawn(async move {
+                        if let Err(e) = this
+                            .fetch_project_versions(&id, &key, loaders, game_versions)
+                            .await
+                        {
+                            warn!("Background refresh of project versions failed: {}", e);
+                        }
+                    });
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        self.fetch_project_versions(project_id_or_slug, &key, loaders, game_versions)
+            .await
+    }
+
+    async fn fetch_project_versions(
+        &self,
+        project_id_or_slug: &str,
+        key: &str,
+        loaders: Option<Vec<String>>,
+        game_versions: Option<Vec<String>>,
+    ) -> Result<Vec<ModrinthVersion>> {
+        let _guard = self.project_fetch_lock(&format!("versions:{}", key)).await;
+
+        let cached = self
+            .inner
+            .data
+            .read()
+            .await
+            .modrinth_project_versions
+            .get(key)
+            .cloned();
+        if let Some(entry) = cached {
+            if entry.is_fresh() {
+                return Ok(entry.data);
+            }
+        }
+
+        let fetched =
+            modrinth::get_mod_versions(project_id_or_slug.to_string(), loaders, game_versions)
+                .await?;
+        {
+            let mut data = self.inner.data.write().await;
+            data.modrinth_project_versions.insert(
+                key.to_string(),
+                CacheEntry::new(fetched.clone(), TTL_METADATA_MS),
+            );
+        }
+        self.schedule_save();
+        Ok(fetched)
+    }
+
+
+    pub async fn get_curseforge_description(
+        &self,
+        mod_id: u32,
+        behaviour: CacheBehaviour,
+    ) -> Result<String> {
+        if behaviour != CacheBehaviour::Bypass {
+            let cached = self
+                .inner
+                .data
+                .read()
+                .await
+                .curseforge_descriptions
+                .get(&mod_id)
+                .cloned();
+
+            if let Some(entry) = cached {
+                if entry.is_fresh() {
+                    return Ok(entry.data);
+                }
+                if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                    let this = self.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = this.fetch_curseforge_description(mod_id).await {
+                            warn!("Background refresh of CurseForge description failed: {}", e);
+                        }
+                    });
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        self.fetch_curseforge_description(mod_id).await
+    }
+
+    async fn fetch_curseforge_description(&self, mod_id: u32) -> Result<String> {
+        let _guard = self
+            .project_fetch_lock(&format!("cf-description:{}", mod_id))
+            .await;
+
+        let cached = self
+            .inner
+            .data
+            .read()
+            .await
+            .curseforge_descriptions
+            .get(&mod_id)
+            .cloned();
+        if let Some(entry) = cached {
+            if entry.is_fresh() {
+                return Ok(entry.data);
+            }
+        }
+
+        let fetched = curseforge::get_mod_description(mod_id).await?;
+        {
+            let mut data = self.inner.data.write().await;
+            data.curseforge_descriptions
+                .insert(mod_id, CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
+        }
+        self.schedule_save();
+        Ok(fetched)
+    }
+
+    async fn project_fetch_lock(&self, key: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        let lock = {
+            let mut locks = self.inner.project_fetch_locks.lock().await;
+            locks.entry(key.to_string()).or_default().clone()
+        };
+        lock.lock_owned().await
+    }
+}
+
+fn project_versions_cache_key(
+    project_id_or_slug: &str,
+    loaders: &Option<Vec<String>>,
+    game_versions: &Option<Vec<String>>,
+) -> String {
+    let sorted = |v: &Option<Vec<String>>| {
+        v.as_ref()
+            .map(|list| {
+                let mut list = list.clone();
+                list.sort();
+                list.join(",")
+            })
+            .unwrap_or_default()
+    };
+
+    format!(
+        "{}:{}:{}",
+        project_id_or_slug,
+        sorted(loaders),
+        sorted(game_versions)
+    )
 }
 
 fn modpack_cache_key(source: &ModPackSource) -> String {

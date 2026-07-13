@@ -147,13 +147,17 @@ pub async fn get_curseforge_file_changelog_command(
 #[tauri::command]
 pub async fn get_curseforge_mod_description_command(
     mod_id: u32,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<String, CommandError> {
     log::debug!(
         "Received get_curseforge_mod_description command: mod_id={}",
         mod_id
     );
 
-    let description = get_mod_description(mod_id)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let description = state
+        .content_cache
+        .get_curseforge_description(mod_id, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 

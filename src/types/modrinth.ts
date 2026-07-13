@@ -192,6 +192,7 @@ export interface ModrinthProject {
     slug: string;
     project_type: ModrinthProjectType; // Reuse existing enum
     team: string;
+    organization: string | null; // Org ID, not its display name
     title: string;
     description: string; // Short description
     body: string; // Long description

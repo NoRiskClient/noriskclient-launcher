@@ -65,11 +65,13 @@ export class ModrinthService {
     projectIdOrSlug: string,
     loaders?: string[],
     gameVersions?: string[],
+    cacheBehaviour?: CacheBehaviour,
   ): Promise<ModrinthVersion[]> {
     return invoke<ModrinthVersion[]>("get_modrinth_mod_versions", {
       projectIdOrSlug,
       loaders,
       gameVersions,
+      cacheBehaviour,
     });
   }
 
@@ -94,9 +96,13 @@ export class ModrinthService {
     });
   }
 
-  static async getProjectMembers(projectIdOrSlug: string): Promise<ModrinthTeamMember[]> {
+  static async getProjectMembers(
+    projectIdOrSlug: string,
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthTeamMember[]> {
     return invoke<ModrinthTeamMember[]>("get_modrinth_project_members", {
       projectIdOrSlug,
+      cacheBehaviour,
     });
   }
 
