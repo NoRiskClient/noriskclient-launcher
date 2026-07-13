@@ -8,6 +8,7 @@ use base64::Engine;
 
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use log::debug;
 use log::error;
 use log::info;
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
@@ -24,7 +25,7 @@ use serde_json::json;
 use sha2::Digest;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 use axum::{
     extract::Query,
@@ -36,6 +37,7 @@ use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
+use crate::utils::file_utils::write_atomic;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NoRiskTokenClaims {
@@ -215,6 +217,7 @@ pub struct MinecraftAuthStore {
     accounts: Arc<RwLock<Vec<Credentials>>>,
     store_path: PathBuf,
     token: Arc<RwLock<Option<SaveDeviceToken>>>,
+    save_lock: Arc<Mutex<()>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -236,6 +239,7 @@ impl MinecraftAuthStore {
             accounts: Arc::new(RwLock::new(Vec::new())),
             store_path: store_path,
             token: Arc::new(RwLock::new(None)),
+            save_lock: Arc::new(Mutex::new(())),
         };
 
         manager.load().await?;
@@ -305,36 +309,28 @@ impl MinecraftAuthStore {
     }
 
     async fn save(&self) -> Result<()> {
-        info!("[Storage] Starting save operation");
-        info!("[Storage] Acquiring read locks for accounts and device token");
+        // Serialize saves so concurrent callers can't interleave writes to accounts.json
+        let _save_guard = self.save_lock.lock().await;
+        debug!("[Storage] Starting save operation");
 
-        let accounts = self.accounts.read().await;
-        info!("[Storage] Successfully acquired accounts read lock");
-
-        let device_token = self.token.read().await;
-        info!("[Storage] Successfully acquired device token read lock");
-
-        info!(
-            "[Storage] Creating AccountStore with {} accounts",
-            accounts.len()
-        );
-        let store = AccountStore {
-            accounts: accounts.clone(),
-            token: device_token.clone(),
+        let store = {
+            let accounts = self.accounts.read().await;
+            let device_token = self.token.read().await;
+            AccountStore {
+                accounts: accounts.clone(),
+                token: device_token.clone(),
+            }
         };
-
-        info!("[Storage] Serializing data to JSON");
-        let data = serde_json::to_string_pretty(&store)?;
-        info!("[Storage] Successfully serialized data");
-
-        info!(
-            "[Storage] Writing data to file: {}",
+        debug!(
+            "[Storage] Saving AccountStore with {} accounts to: {}",
+            store.accounts.len(),
             self.store_path.display()
         );
-        fs::write(&self.store_path, data).await?;
-        info!("[Storage] Successfully wrote data to file");
 
-        info!("[Storage] Save operation completed successfully");
+        let data = serde_json::to_string_pretty(&store)?;
+        write_atomic(&self.store_path, data).await?;
+
+        debug!("[Storage] Save operation completed successfully");
         Ok(())
     }
 
@@ -753,12 +749,14 @@ impl MinecraftAuthStore {
         Ok(credentials)
     }
 
+    /// Returns the (possibly refreshed) credentials plus whether they actually changed,
+    /// so callers can skip redundant persistence when nothing was updated.
     pub(crate) async fn refresh_norisk_token_if_necessary(
         &self,
         creds: &Credentials,
         force_update: bool,
         experimental_mode: bool,
-    ) -> Result<Credentials> {
+    ) -> Result<(Credentials, bool)> {
         info!(
             "[Token Refresh] Starting NoRisk token refresh check for user: {}",
             creds.username
@@ -867,23 +865,25 @@ impl MinecraftAuthStore {
                     self.update_or_insert(copied_credentials.clone()).await?;
 
                     info!("[Token Refresh] Token refresh completed successfully");
-                    Ok(copied_credentials)
+                    Ok((copied_credentials, true))
                 }
                 Err(e) => {
                     info!("[NoRisk Token] Token refresh failed: {:?}", e);
                     info!("[NoRisk Token] Falling back to original credentials");
                     // Return the original credentials if token refresh fails
                     let creds_mut =  &mut creds.clone();
+                    let mut changed = false;
                     if e.to_string().contains("InsufficientPrivilegesException") && e.to_string().contains("/session/minecraft/join") {
                         info!("[NoRisk Token] Detected child protection restriction, setting ignore_child_protection_warning to true");
+                        changed = !creds_mut.ignore_child_protection_warning;
                         creds_mut.ignore_child_protection_warning = true;
                     }
-                    Ok(creds_mut.clone())
+                    Ok((creds_mut.clone(), changed))
                 }
             }
         } else {
             info!("[Token Refresh] Token is still valid, no refresh needed");
-            Ok(creds.clone())
+            Ok((creds.clone(), false))
         }
     }
 
@@ -1053,11 +1053,11 @@ impl MinecraftAuthStore {
             if let Some(updated) = updated_account {
                 // Update account in storage after refresh
                 {
-                    info!("[Account Manager] Acquiring write lock to update account");
+                    debug!("[Account Manager] Acquiring write lock to update account");
                     let mut accounts = self.accounts.write().await;
-                    info!("[Account Manager] Successfully acquired write lock");
+                    debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
-                        info!("[Account Manager] Updating account in list");
+                        debug!("[Account Manager] Updating account in list");
                         // Preserve ignore flag from in-memory existing account to avoid
                         // overwriting a recent user 'ignore' action performed concurrently.
                         let existing_flag = existing.ignore_child_protection_warning;
@@ -1065,7 +1065,7 @@ impl MinecraftAuthStore {
                         merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
                         *existing = merged;
                     }
-                    info!("[Account Manager] Releasing write lock");
+                    debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
                 info!("[Account Manager] Saving updated account");
@@ -1155,14 +1155,15 @@ impl MinecraftAuthStore {
                 Ok(val) => {
                     return if val.is_some() {
                         info!("[Token Check] Successfully refreshed Microsoft token");
-                        Ok(Some(
-                            self.refresh_norisk_token_if_necessary(
+                        // Microsoft token was refreshed, so credentials changed either way
+                        let (refreshed, _) = self
+                            .refresh_norisk_token_if_necessary(
                                 &val.unwrap().clone(),
                                 false,
                                 experimental_mode,
                             )
-                            .await?,
-                        ))
+                            .await?;
+                        Ok(Some(refreshed))
                     } else {
                         info!("[Token Check] Failed to refresh Microsoft token - No credentials found");
                         Err(AppError::NoCredentialsError)
@@ -1175,7 +1176,8 @@ impl MinecraftAuthStore {
                     {
                         if source.is_connect() || source.is_timeout() {
                             info!("[Token Check] Connection error during refresh, using old credentials");
-                            return Ok(Some(old_credentials));
+                            // Credentials unchanged — None tells callers to keep them without saving
+                            return Ok(None);
                         }
                     }
                     // Transient outage (Mojang/Microsoft rate-limit or server error): the
@@ -1192,7 +1194,8 @@ impl MinecraftAuthStore {
                                 "[Token Check] Transient outage ({}) during refresh, using cached credentials",
                                 status_code
                             );
-                            return Ok(Some(old_credentials));
+                            // Credentials unchanged — None tells callers to keep them without saving
+                            return Ok(None);
                         }
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
@@ -1206,10 +1209,15 @@ impl MinecraftAuthStore {
                 Ok(None)
             } else {
                 info!("[Token Check] Checking NoRisk token status");
-                Ok(Some(
-                    self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
-                        .await?,
-                ))
+                let (refreshed, changed) = self
+                    .refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
+                    .await?;
+                if changed {
+                    Ok(Some(refreshed))
+                } else {
+                    // Nothing changed — signal callers to skip the redundant save
+                    Ok(None)
+                }
             }
         }
     }
@@ -1251,11 +1259,11 @@ impl MinecraftAuthStore {
             if let Some(updated) = updated_account {
                 // Aktualisiere den Account in der Liste
                 {
-                    info!("[Account Manager] Acquiring write lock to update account");
+                    debug!("[Account Manager] Acquiring write lock to update account");
                     let mut accounts = self.accounts.write().await;
-                    info!("[Account Manager] Successfully acquired write lock");
+                    debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
-                        info!("[Account Manager] Updating account in list");
+                        debug!("[Account Manager] Updating account in list");
                         // Preserve ignore flag from in-memory existing account to avoid
                         // overwriting a recent user 'ignore' action performed concurrently.
                         let existing_flag = existing.ignore_child_protection_warning;
@@ -1263,7 +1271,7 @@ impl MinecraftAuthStore {
                         merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
                         *existing = merged;
                     }
-                    info!("[Account Manager] Releasing write lock");
+                    debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
                 info!("[Account Manager] Saving updated account");
