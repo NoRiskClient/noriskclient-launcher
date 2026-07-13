@@ -7,20 +7,12 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Icon } from "@iconify/react";
 import { ModPlatform } from "../../types/unified";
+import { sanitizeRichHtml } from "../../utils/html-sanitize";
 
 interface ModDetailDescriptionProps {
   body: string;
   source: ModPlatform;
 }
-
-// HTML sanitizer for CurseForge HTML content
-const sanitizeHtml = (html: string) => {
-  return html
-    .replace(/<script[^>]*>.*?<\/script>/gi, "")
-    .replace(/<style[^>]*>.*?<\/style>/gi, "")
-    .replace(/javascript:/gi, "")
-    .replace(/on\w+="[^"]*"/gi, "");
-};
 
 export function ModDetailDescription({ body, source }: ModDetailDescriptionProps) {
   const { t } = useTranslation();
@@ -74,7 +66,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
               [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3
               [&_th]:bg-black/30 [&_th]:p-2 [&_th]:border [&_th]:border-white/20 [&_th]:text-left
               [&_td]:p-2 [&_td]:border [&_td]:border-white/20"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(body) }}
           />
         ) : (
           // Render Markdown for Modrinth (with HTML support via rehype-raw)
