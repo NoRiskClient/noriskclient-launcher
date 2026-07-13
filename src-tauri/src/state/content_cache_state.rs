@@ -2,7 +2,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::post_init::PostInitializationHandler;
 use crate::integrations::curseforge::{self, CurseForgeMod, CurseForgeModsResponse};
-use crate::integrations::modrinth::{self, ModrinthProject, ModrinthVersion};
+use crate::integrations::modrinth::{self, ModrinthProject, ModrinthTags, ModrinthVersion};
 use crate::integrations::unified_mod::{
     self, ModPlatform, UnifiedModpackVersionsResponse, UnifiedUpdateCheckRequest,
     UnifiedUpdateCheckResponse, UnifiedVersion,
@@ -82,6 +82,8 @@ pub struct ContentCacheData {
     pub unified_updates: HashMap<String, CacheEntry<Option<UnifiedVersion>>>,
     #[serde(default)]
     pub modpack_versions: HashMap<String, CacheEntry<UnifiedModpackVersionsResponse>>,
+    #[serde(default)]
+    pub modrinth_tags: Option<CacheEntry<ModrinthTags>>,
 }
 
 impl ContentCacheData {
@@ -94,6 +96,10 @@ impl ContentCacheData {
         self.curseforge_mods.retain(|_, e| e.expires_at_ms > cutoff);
         self.unified_updates.retain(|_, e| e.expires_at_ms > cutoff);
         self.modpack_versions.retain(|_, e| e.expires_at_ms > cutoff);
+        self.modrinth_tags = self
+            .modrinth_tags
+            .take()
+            .filter(|e| e.expires_at_ms > cutoff);
     }
 }
 
@@ -102,6 +108,7 @@ struct Inner {
     save_lock: Mutex<()>,
     save_scheduled: AtomicBool,
     modpack_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    tags_fetch_lock: Mutex<()>,
 }
 
 #[derive(Clone)]
@@ -117,6 +124,7 @@ impl ContentCacheManager {
                 save_lock: Mutex::new(()),
                 save_scheduled: AtomicBool::new(false),
                 modpack_fetch_locks: Mutex::new(HashMap::new()),
+                tags_fetch_lock: Mutex::new(()),
             }),
         })
     }
@@ -668,6 +676,49 @@ impl ContentCacheManager {
             let mut data = self.inner.data.write().await;
             data.modpack_versions
                 .insert(key, CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
+        }
+        self.schedule_save();
+        Ok(fetched)
+    }
+
+
+    pub async fn get_modrinth_tags(&self, behaviour: CacheBehaviour) -> Result<ModrinthTags> {
+        if behaviour != CacheBehaviour::Bypass {
+            let cached = self.inner.data.read().await.modrinth_tags.clone();
+
+            if let Some(entry) = cached {
+                if entry.is_fresh() {
+                    return Ok(entry.data);
+                }
+                if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                    let this = self.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = this.fetch_modrinth_tags().await {
+                            warn!("Background refresh of Modrinth tags failed: {}", e);
+                        }
+                    });
+                    return Ok(entry.data);
+                }
+            }
+        }
+
+        self.fetch_modrinth_tags().await
+    }
+
+    async fn fetch_modrinth_tags(&self) -> Result<ModrinthTags> {
+        let _guard = self.inner.tags_fetch_lock.lock().await;
+
+        let cached = self.inner.data.read().await.modrinth_tags.clone();
+        if let Some(entry) = cached {
+            if entry.is_fresh() {
+                return Ok(entry.data);
+            }
+        }
+
+        let fetched = modrinth::get_modrinth_tags().await?;
+        {
+            let mut data = self.inner.data.write().await;
+            data.modrinth_tags = Some(CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
         }
         self.schedule_save();
         Ok(fetched)

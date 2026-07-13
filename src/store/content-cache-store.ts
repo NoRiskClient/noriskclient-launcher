@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { UnifiedModpackVersionsResponse, UnifiedVersion } from "../types/unified";
+import type { ModrinthTags } from "../types/modrinth";
 
 
 const MAX_ENTRIES = 50;
@@ -27,6 +28,9 @@ interface ContentCacheState {
   modpackVersions: Record<string, UnifiedModpackVersionsResponse>;
   getModpackVersions: (sourceKey: string) => UnifiedModpackVersionsResponse | undefined;
   setModpackVersions: (sourceKey: string, versions: UnifiedModpackVersionsResponse) => void;
+
+  modrinthTags: ModrinthTags | null;
+  setModrinthTags: (tags: ModrinthTags) => void;
 
   diskSizes: Record<string, number>;
   getDiskSize: (profileId: string) => number | undefined;
@@ -89,6 +93,10 @@ export const useContentCacheStore = create<ContentCacheState>((set, get) => ({
     set((state) => ({
       modpackVersions: { ...state.modpackVersions, [sourceKey]: versions },
     })),
+
+  modrinthTags: null,
+
+  setModrinthTags: (tags) => set({ modrinthTags: tags }),
 
   diskSizes: {},
 

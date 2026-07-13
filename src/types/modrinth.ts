@@ -188,10 +188,10 @@ export interface ModrinthGalleryImage {
 // Corresponds to ModrinthProject in Rust (from bulk /projects endpoint)
 // Based on https://docs.modrinth.com/api/operations/getprojects/
 export interface ModrinthProject {
-    id: string; 
+    id: string;
     slug: string;
     project_type: ModrinthProjectType; // Reuse existing enum
-    team: string; 
+    team: string;
     title: string;
     description: string; // Short description
     body: string; // Long description
@@ -252,6 +252,12 @@ export interface ModrinthGameVersion {
     version_type: ModrinthGameVersionType; // Type of the game version
     date: string;                      // The date of the game version release (ISO-8601)
     major: boolean;                    // Whether or not this is a major version
+}
+
+export interface ModrinthTags {
+    categories: ModrinthCategory[];
+    loaders: ModrinthLoader[];
+    game_versions: ModrinthGameVersion[];
 }
 
 // --- Team Members ---

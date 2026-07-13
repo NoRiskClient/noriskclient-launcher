@@ -19,8 +19,10 @@ import type {
   ModrinthGameVersion,
   ModrinthLoader,
   ModrinthSortType,
+  ModrinthTags,
   ModrinthVersion
 } from '../../../types/modrinth';
+import { useContentCacheStore } from '../../../store/content-cache-store';
 
 // Helper function to convert ModrinthProjectType to UnifiedProjectType
 const convertToUnifiedProjectType = (modrinthType: ModrinthProjectType): UnifiedProjectType => {
@@ -260,16 +262,26 @@ export function ModrinthSearchV2({
     return selectedLoadersByProjectType[projectType] || [];
   }, [selectedLoadersByProjectType, projectType]);
 
-  // Fetch filter data on mount
   useEffect(() => {
-    const fetchFilterData = async () => {
-      try {
-        setAllCategoriesData(await ModrinthService.getModrinthCategories());
-        setGameVersionsData(await ModrinthService.getModrinthGameVersions());
-        setAllLoadersData(await ModrinthService.getModrinthLoaders());
-      } catch (err) { console.error("Failed to load filter data:", err); }
+
+    const applyTags = (tags: ModrinthTags) => {
+      setAllCategoriesData(tags.categories);
+      setGameVersionsData(tags.game_versions);
+      setAllLoadersData(tags.loaders);
     };
-    fetchFilterData();
+
+    const cached = useContentCacheStore.getState().modrinthTags;
+    if (cached) {
+      applyTags(cached);
+      return;
+    }
+
+    ModrinthService.getModrinthTags()
+      .then((tags) => {
+        useContentCacheStore.getState().setModrinthTags(tags);
+        applyTags(tags);
+      })
+      .catch((err) => console.error("Failed to load filter data:", err));
   }, []);
 
   // Load blocked mods config on mount (cached from nrc-service if already loaded)
@@ -2024,7 +2036,7 @@ export function ModrinthSearchV2({
 
         // Process results into the same state format
         const newInstalledState: Record<string, ContentInstallStatus | null> = {};
-        
+
         batchResults.results.forEach(result => {
           if (result.request_id) {
             newInstalledState[result.request_id] = result.status;

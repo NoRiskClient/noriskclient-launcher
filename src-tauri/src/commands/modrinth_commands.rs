@@ -323,54 +323,26 @@ pub async fn check_mod_updates_unified_command(
     Ok(updates)
 }
 
-/// Fetches a list of all categories from Modrinth.
 #[tauri::command]
-pub async fn get_modrinth_categories_command(
-) -> Result<Vec<modrinth::ModrinthCategory>, CommandError> {
-    log::debug!("Received get_modrinth_categories_command");
+pub async fn get_modrinth_tags_command(
+    cache_behaviour: Option<CacheBehaviour>,
+) -> Result<modrinth::ModrinthTags, CommandError> {
+    log::debug!("Received get_modrinth_tags_command");
 
-    let categories = modrinth::get_modrinth_categories()
+    let state = State::get().await.map_err(CommandError::from)?;
+    let tags = state
+        .content_cache
+        .get_modrinth_tags(cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
-    log::info!(
-        "Successfully fetched {} categories for frontend",
-        categories.len()
+    log::debug!(
+        "Serving Modrinth tags: {} categories, {} loaders, {} game versions",
+        tags.categories.len(),
+        tags.loaders.len(),
+        tags.game_versions.len()
     );
-    Ok(categories)
-}
-
-/// Fetches a list of all loaders from Modrinth.
-#[tauri::command]
-pub async fn get_modrinth_loaders_command() -> Result<Vec<modrinth::ModrinthLoader>, CommandError> {
-    log::debug!("Received get_modrinth_loaders_command");
-
-    let loaders = modrinth::get_modrinth_loaders()
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!(
-        "Successfully fetched {} loaders for frontend",
-        loaders.len()
-    );
-    Ok(loaders)
-}
-
-/// Fetches a list of all game versions from Modrinth.
-#[tauri::command]
-pub async fn get_modrinth_game_versions_command(
-) -> Result<Vec<modrinth::ModrinthGameVersion>, CommandError> {
-    log::debug!("Received get_modrinth_game_versions_command");
-
-    let game_versions = modrinth::get_modrinth_game_versions()
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!(
-        "Successfully fetched {} game versions for frontend",
-        game_versions.len()
-    );
-    Ok(game_versions)
+    Ok(tags)
 }
 
 /// Fetches Modrinth version details for a given list of SHA1 hashes.

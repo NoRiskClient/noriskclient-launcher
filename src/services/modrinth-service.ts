@@ -8,9 +8,7 @@ import type {
   ModrinthSearchResponse,
   ModrinthSortType,
   ModrinthVersion,
-  ModrinthCategory,
-  ModrinthLoader,
-  ModrinthGameVersion,
+  ModrinthTags,
   ModrinthTeamMember,
 } from "../types/modrinth";
 import type {
@@ -19,6 +17,8 @@ import type {
 } from "../types/unified";
 import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
+
+let inFlightTags: Promise<ModrinthTags> | null = null;
 
 export class ModrinthService {
   static async searchProjects(
@@ -128,16 +128,21 @@ export class ModrinthService {
     });
   }
 
-  static async getModrinthCategories(): Promise<ModrinthCategory[]> {
-    return invoke<ModrinthCategory[]>("get_modrinth_categories_command");
-  }
+  static async getModrinthTags(
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthTags> {
+    if (cacheBehaviour) {
+      return invoke<ModrinthTags>("get_modrinth_tags_command", { cacheBehaviour });
+    }
 
-  static async getModrinthLoaders(): Promise<ModrinthLoader[]> {
-    return invoke<ModrinthLoader[]>("get_modrinth_loaders_command");
-  }
-
-  static async getModrinthGameVersions(): Promise<ModrinthGameVersion[]> {
-    return invoke<ModrinthGameVersion[]>("get_modrinth_game_versions_command");
+    if (!inFlightTags) {
+      inFlightTags = invoke<ModrinthTags>("get_modrinth_tags_command", {}).finally(
+        () => {
+          inFlightTags = null;
+        },
+      );
+    }
+    return inFlightTags;
   }
 
   static async getVersionsByHashes(

@@ -226,6 +226,27 @@ pub struct ModrinthGameVersion {
     pub date: String,         // ISO 8601 date string
     pub major: bool,          // Whether it's a major version
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModrinthTags {
+    pub categories: Vec<ModrinthCategory>,
+    pub loaders: Vec<ModrinthLoader>,
+    pub game_versions: Vec<ModrinthGameVersion>,
+}
+
+pub async fn get_modrinth_tags() -> Result<ModrinthTags> {
+    let (categories, loaders, game_versions) = tokio::try_join!(
+        get_modrinth_categories(),
+        get_modrinth_loaders(),
+        get_modrinth_game_versions()
+    )?;
+
+    Ok(ModrinthTags {
+        categories,
+        loaders,
+        game_versions,
+    })
+}
 // --- End Structures for Tags/Categories ---
 
 // --- Structures for Team Members ---
@@ -1085,7 +1106,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
 /// Fetches a list of all categories from Modrinth.
 /// https://docs.modrinth.com/api/operations/categorylist/
 pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/category", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth categories from: {}", url);
@@ -1142,7 +1163,7 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
 /// Fetches a list of all loaders from Modrinth.
 /// https://docs.modrinth.com/api/operations/loaderlist/
 pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/loader", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth loaders from: {}", url);
@@ -1193,7 +1214,7 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
 /// Fetches a list of all game versions from Modrinth.
 /// https://docs.modrinth.com/api/operations/versionlist/
 pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/game_version", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth game versions from: {}", url);
@@ -1252,7 +1273,7 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
 /// Fetches team members for a specific project from Modrinth.
 /// https://docs.modrinth.com/api/operations/getprojectteammembers/
 pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<ModrinthTeamMember>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/project/{}/members",
         MODRINTH_API_BASE_URL, project_id_or_slug

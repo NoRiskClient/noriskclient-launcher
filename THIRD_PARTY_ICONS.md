@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 280 icons from the sets below. The artwork is redistributed
+The launcher bundles 277 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -14,7 +14,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Pixel Icon (`pixel`)
 
-- 13 icons used of 578
+- 10 icons used of 578
 - Author: [HackerNoon](https://github.com/hackernoon/pixel-icon-library)
 - Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`CC-BY-4.0`)
 
