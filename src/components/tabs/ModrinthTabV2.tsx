@@ -6,6 +6,7 @@ import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { setDiscordState } from "../../utils/discordRpc";
+import { traceStart, traceMark } from "../../utils/perf-trace";
 
 interface ModrinthTabV2Props {
   profiles?: Profile[];
@@ -25,6 +26,12 @@ export function ModrinthTabV2({
 
   useEffect(() => { setDiscordState("Browsing Mods"); }, []);
 
+  useEffect(() => { traceStart('modstab'); }, []);
+
+  useEffect(() => {
+    traceMark('modstab', `profiles: ${profiles.length} from store (loading=${loading})`);
+  }, [profiles.length, loading]);
+
   useEffect(() => {
     if (initialProfiles.length === 0 && storeProfiles.length === 0 && !loading) {
       fetchProfiles();
@@ -39,6 +46,7 @@ export function ModrinthTabV2({
         profiles={profiles}
         onInstallSuccess={handleInstallSuccess}
         className="h-full"
+        traceScope="modstab"
       />
     ),
     [profiles, handleInstallSuccess],

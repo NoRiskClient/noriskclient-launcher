@@ -23,6 +23,7 @@ import type {
   ModrinthVersion
 } from '../../../types/modrinth';
 import { useContentCacheStore } from '../../../store/content-cache-store';
+import { traceMark } from '../../../utils/perf-trace';
 
 // Helper function to convert ModrinthProjectType to UnifiedProjectType
 const convertToUnifiedProjectType = (modrinthType: ModrinthProjectType): UnifiedProjectType => {
@@ -101,6 +102,7 @@ export interface ModrinthSearchV2Props {
   initialProjectType?: ModrinthProjectType; // Added new prop
   allowedProjectTypes?: ModrinthProjectType[]; // New prop for allowed project types
   disableVirtualization?: boolean; // New prop to disable Virtuoso and use infinite div scrolling
+  traceScope?: string; // Only the instance owning the scope emits perf marks
   /**
    * Override the default title-click navigation on each project card.
    * Used by the V3 Add-content sheet to render the mod detail as a stacked
@@ -134,6 +136,7 @@ export function ModrinthSearchV2({
   allowedProjectTypes, // Destructure new prop
   disableVirtualization = false, // Default to false (use Virtuoso by default)
   onProjectClick,
+  traceScope,
 }: ModrinthSearchV2Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -263,6 +266,7 @@ export function ModrinthSearchV2({
   }, [selectedLoadersByProjectType, projectType]);
 
   useEffect(() => {
+    traceMark(traceScope, 'search: component mounted');
 
     const applyTags = (tags: ModrinthTags) => {
       setAllCategoriesData(tags.categories);
@@ -272,12 +276,14 @@ export function ModrinthSearchV2({
 
     const cached = useContentCacheStore.getState().modrinthTags;
     if (cached) {
+      traceMark(traceScope, 'tags: from in-session store (no IPC)');
       applyTags(cached);
       return;
     }
 
     ModrinthService.getModrinthTags()
       .then((tags) => {
+        traceMark(traceScope, 'tags: received from backend');
         useContentCacheStore.getState().setModrinthTags(tags);
         applyTags(tags);
       })
@@ -409,6 +415,7 @@ export function ModrinthSearchV2({
     }
 
     try {
+      traceMark(traceScope, `search: firing request (source=${modSource})`);
       const response: UnifiedModSearchResponse = await UnifiedService.searchMods({
         query: searchTerm,
         source: modSource,
@@ -422,6 +429,7 @@ export function ModrinthSearchV2({
         client_side_filter: filterClientRequired ? "required" : undefined,
         server_side_filter: filterServerRequired ? "required" : undefined
       });
+      traceMark(traceScope, `search: ${response.results.length} hits returned`);
       setSearchResults(prevResults => newSearch ? response.results : [...prevResults, ...response.results]);
       setTotalHits(response.pagination.total_count);
       if (!newSearch) {
@@ -457,10 +465,19 @@ export function ModrinthSearchV2({
   const isInitialMount = useRef(true);
   const restoredScrollTop = useRef(searchResults.length > 0 ? scrollPosition : 0);
 
+  const paintedRef = useRef(false);
+  useEffect(() => {
+    if (!paintedRef.current && searchResults.length > 0) {
+      paintedRef.current = true;
+      traceMark(traceScope, `PAINTED ${searchResults.length} results`);
+    }
+  }, [searchResults]);
+
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       if (searchResults.length > 0) {
+        traceMark(traceScope, 'search: restored from session store, no fetch');
         console.log('[ModrinthSearchV2] Restoring cached results from store, skipping initial fetch.');
         if (disableVirtualization && searchResultsAreaRef.current && scrollPosition > 0) {
           requestAnimationFrame(() => {
@@ -2028,11 +2045,13 @@ export function ModrinthSearchV2({
       }));
 
       try {
+        traceMark(traceScope, `install-check: batch of ${requests.length}`);
         // Use batch check instead of individual checks
         const batchResults = await ProfileService.batchCheckContentInstalled({
           profile_id: selectedProfile.id,
           requests
         });
+        traceMark(traceScope, 'install-check: done');
 
         // Process results into the same state format
         const newInstalledState: Record<string, ContentInstallStatus | null> = {};
