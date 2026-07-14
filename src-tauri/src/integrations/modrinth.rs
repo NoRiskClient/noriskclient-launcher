@@ -1,4 +1,5 @@
 use crate::error::{AppError, Result};
+use crate::integrations::lenient;
 use futures::future::join_all;
 use log::{self, error, info};
 use reqwest;
@@ -11,11 +12,31 @@ use crate::utils::string_utils::safe_truncate;
 // Base URL for Modrinth API v2
 const MODRINTH_API_BASE_URL: &str = "https://api.modrinth.com/v2";
 
+async fn read_list<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+    context: &str,
+) -> Result<Vec<T>> {
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!(
+            "Failed to read Modrinth {} response: {}",
+            context, e
+        ))
+    })?;
+
+    lenient::list_from_str::<T>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth {} response: {}",
+            context, e
+        ))
+    })
+}
+
 // Structures for deserializing Modrinth API responses (Search)
 // Based on https://docs.modrinth.com/api-spec/#tag/projects/operation/searchProjects
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ModrinthSearchResponse {
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub hits: Vec<ModrinthSearchHit>,
     pub offset: u32,
     pub limit: u32,
@@ -58,10 +79,12 @@ pub struct ModrinthVersion {
     pub name: String,                          // Version title/name
     pub version_number: String,                // Version number (e.g., "0.100.0+1.21.5")
     pub changelog: Option<String>,             // Changelog text (or null)
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub dependencies: Vec<ModrinthDependency>, // List of dependencies
     pub game_versions: Vec<String>,            // Compatible game versions
     pub version_type: ModrinthVersionType,     // alpha, beta, release
     pub loaders: Vec<String>,                  // Compatible loaders
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub files: Vec<ModrinthFile>,              // Files associated with this version
     pub date_published: String,                // ISO 8601 timestamp
     #[serde(default)]
@@ -162,7 +185,9 @@ pub struct ModrinthProject {
     pub source_url: Option<String>,
     pub wiki_url: Option<String>,
     pub discord_url: Option<String>,
+    #[serde(default, deserialize_with = "lenient::opt_vec")]
     pub donation_urls: Option<Vec<ModrinthDonationUrl>>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub gallery: Vec<ModrinthGalleryImage>,
     #[serde(default)]
     pub game_versions: Option<Vec<String>>,
@@ -577,11 +602,7 @@ pub async fn get_mod_versions(
         )));
     }
 
-    let versions_result = response.json::<Vec<ModrinthVersion>>().await.map_err(|e| {
-        AppError::Other(format!("Failed to parse Modrinth versions response: {}", e))
-    })?;
-
-    Ok(versions_result)
+    read_list::<ModrinthVersion>(response, "versions").await
 }
 
 // Function to get details for a specific Modrinth version ID
@@ -856,15 +877,19 @@ pub async fn get_versions_by_hashes(
 
     // The response is a map where keys are the *input* hashes and values are the Version objects.
     // Hashes not found are simply omitted from the response map.
-    let versions_map = response
-        .json::<HashMap<String, ModrinthVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth versions by hashes response: {}",
-                e
-            ))
-        })?;
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!(
+            "Failed to read Modrinth versions by hashes response: {}",
+            e
+        ))
+    })?;
+
+    let versions_map = lenient::map_from_str::<ModrinthVersion>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth versions by hashes response: {}",
+            e
+        ))
+    })?;
 
     log::info!(
         "Successfully retrieved version info for {} out of {} requested hashes.",
@@ -974,15 +999,16 @@ pub async fn check_bulk_updates(
 
     // The response is a map where keys are the input hashes and values are the latest Version objects.
     // Hashes without updates available are omitted from the response map.
-    let updates_map = response
-        .json::<HashMap<String, ModrinthVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth bulk update response: {}",
-                e
-            ))
-        })?;
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!("Failed to read Modrinth bulk update response: {}", e))
+    })?;
+
+    let updates_map = lenient::map_from_str::<ModrinthVersion>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth bulk update response: {}",
+            e
+        ))
+    })?;
 
     let update_count = updates_map.len();
     log::info!(
@@ -1081,36 +1107,23 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
         logged_response_body_display
     );
 
-    let raw = serde_json::from_str::<Vec<serde_json::Value>>(&response_body_text).map_err(|e| {
-        let error_message = format!(
-            "Failed to parse Modrinth bulk projects response: {}. Body (logged version): {}",
-            e, logged_response_body_display
-        );
-        log::error!(
-            "JSON Parsing Error in get_multiple_projects: {}",
-            error_message
-        );
-        AppError::RequestError(error_message)
-    })?;
-
-    let total = raw.len();
-    let mut projects = Vec::with_capacity(total);
-    for value in raw {
-        let id = value
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("<unknown>")
-            .to_string();
-        match serde_json::from_value::<ModrinthProject>(value) {
-            Ok(project) => projects.push(project),
-            Err(e) => log::warn!("Skipping unparseable Modrinth project {}: {}", id, e),
-        }
-    }
+    let projects =
+        lenient::list_from_str::<ModrinthProject>(&response_body_text).map_err(|e| {
+            let error_message = format!(
+                "Failed to parse Modrinth bulk projects response: {}. Body (logged version): {}",
+                e, logged_response_body_display
+            );
+            log::error!(
+                "JSON Parsing Error in get_multiple_projects: {}",
+                error_message
+            );
+            AppError::RequestError(error_message)
+        })?;
 
     log::info!(
         "Successfully retrieved details for {}/{} projects.",
         projects.len(),
-        total
+        ids.len()
     );
 
     Ok(projects)
@@ -1159,15 +1172,7 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
         )));
     }
 
-    let categories = response
-        .json::<Vec<ModrinthCategory>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth categories response: {}",
-                e
-            ))
-        })?;
+    let categories = read_list::<ModrinthCategory>(response, "categories").await?;
 
     log::info!("Successfully fetched {} categories.", categories.len());
     Ok(categories)
@@ -1216,9 +1221,7 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
         )));
     }
 
-    let loaders = response.json::<Vec<ModrinthLoader>>().await.map_err(|e| {
-        AppError::Other(format!("Failed to parse Modrinth loaders response: {}", e))
-    })?;
+    let loaders = read_list::<ModrinthLoader>(response, "loaders").await?;
 
     log::info!("Successfully fetched {} loaders.", loaders.len());
     Ok(loaders)
@@ -1266,15 +1269,7 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
         )));
     }
 
-    let game_versions = response
-        .json::<Vec<ModrinthGameVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth game versions response: {}",
-                e
-            ))
-        })?;
+    let game_versions = read_list::<ModrinthGameVersion>(response, "game versions").await?;
 
     log::info!(
         "Successfully fetched {} game versions.",
@@ -1329,15 +1324,7 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
         )));
     }
 
-    let members = response
-        .json::<Vec<ModrinthTeamMember>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth project members response: {}",
-                e
-            ))
-        })?;
+    let members = read_list::<ModrinthTeamMember>(response, "project members").await?;
 
     log::info!(
         "Successfully fetched {} team members for project {}.",
