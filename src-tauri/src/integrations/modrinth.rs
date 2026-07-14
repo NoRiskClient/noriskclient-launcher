@@ -155,7 +155,7 @@ pub struct ModrinthProject {
     pub additional_categories: Option<Vec<String>>, // Added: Can be an array or missing
     pub versions: Vec<String>,    // List of version IDs
     pub icon_url: Option<String>, // The field we often need
-    pub color: Option<i32>,
+    pub color: Option<i64>,
     pub thread_id: Option<String>, // Ensured Option: Can be present as string or null
     pub monetization_status: Option<String>, // Ensured Option: Can be present as string or null
     pub issues_url: Option<String>,
@@ -197,7 +197,7 @@ pub struct ModrinthGalleryImage {
     pub title: Option<String>,
     pub description: Option<String>,
     pub created: String, // ISO 8601
-    pub ordering: i32,
+    pub ordering: i64,
     pub raw_url: Option<String>, // Added: Can be present as string or null
 }
 
@@ -255,7 +255,7 @@ pub struct ModrinthTeamMember {
     pub team_id: String,
     pub user: ModrinthUser,
     pub role: String,
-    pub ordering: i32,
+    pub ordering: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1081,23 +1081,36 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
         logged_response_body_display
     );
 
-    // Now parse the original, full text
-    let projects =
-        serde_json::from_str::<Vec<ModrinthProject>>(&response_body_text).map_err(|e| {
-            let error_message = format!(
-                "Failed to parse Modrinth bulk projects response: {}. Body (logged version): {}",
-                e, logged_response_body_display
-            );
-            log::error!(
-                "JSON Parsing Error in get_multiple_projects: {}",
-                error_message
-            ); // Added explicit error log
-            AppError::RequestError(error_message)
-        })?;
+    let raw = serde_json::from_str::<Vec<serde_json::Value>>(&response_body_text).map_err(|e| {
+        let error_message = format!(
+            "Failed to parse Modrinth bulk projects response: {}. Body (logged version): {}",
+            e, logged_response_body_display
+        );
+        log::error!(
+            "JSON Parsing Error in get_multiple_projects: {}",
+            error_message
+        );
+        AppError::RequestError(error_message)
+    })?;
+
+    let total = raw.len();
+    let mut projects = Vec::with_capacity(total);
+    for value in raw {
+        let id = value
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("<unknown>")
+            .to_string();
+        match serde_json::from_value::<ModrinthProject>(value) {
+            Ok(project) => projects.push(project),
+            Err(e) => log::warn!("Skipping unparseable Modrinth project {}: {}", id, e),
+        }
+    }
 
     log::info!(
-        "Successfully retrieved details for {} projects.",
-        projects.len()
+        "Successfully retrieved details for {}/{} projects.",
+        projects.len(),
+        total
     );
 
     Ok(projects)
