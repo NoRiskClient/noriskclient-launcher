@@ -362,7 +362,7 @@ pub async fn search_projects(
     client_side_filter: Option<String>,
     server_side_filter: Option<String>,
 ) -> Result<ModrinthSearchResponse> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let base_url = format!("{}/search", MODRINTH_API_BASE_URL);
 
     let mut query_params: Vec<(String, String)> = Vec::new();
@@ -468,15 +468,6 @@ pub async fn search_projects(
 
     let response = client
         .get(final_url)
-        // It's good practice to set a User-Agent
-        // Use format! correctly and ensure CARGO_PKG_VERSION is available
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
@@ -574,13 +565,6 @@ pub async fn get_mod_versions(
 
     let response = client
         .get(final_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
@@ -608,20 +592,13 @@ pub async fn get_mod_versions(
 // Function to get details for a specific Modrinth version ID
 // Based on https://docs.modrinth.com/api-spec/#tag/versions/operation/getVersion
 pub async fn get_version_details(version_id: String) -> Result<ModrinthVersion> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version/{}", MODRINTH_API_BASE_URL, version_id);
 
     log::info!("Getting Modrinth version details: {}", url);
 
     let response = client
         .get(url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -676,11 +653,8 @@ pub async fn get_all_versions_for_projects(
         contexts.len()
     );
 
-    let client = reqwest::Client::new();
-
     // Create a list of futures, one for each context
     let futures = contexts.into_iter().map(|context| {
-        let client = client.clone();
         let original_context = context.clone();
 
         async move {
@@ -741,7 +715,7 @@ pub async fn get_version_by_hash(file_hash: String) -> Result<ModrinthVersion> {
         }
     };
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/version_file/{}?algorithm={}", // Correct endpoint path
         MODRINTH_API_BASE_URL, file_hash, algorithm
@@ -755,13 +729,6 @@ pub async fn get_version_by_hash(file_hash: String) -> Result<ModrinthVersion> {
 
     let response = client
         .get(&url) // Pass URL by reference
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -839,13 +806,6 @@ pub async fn get_versions_by_hashes(
 
     let response = client
         .post(&url) // Use POST
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .header("Content-Type", "application/json") // Set content type
         .json(&request_body) // Send the serialized request body
         .send()
@@ -951,7 +911,7 @@ impl ModrinthBulkUpdateRequestBody {
 pub async fn check_bulk_updates(
     request: ModrinthBulkUpdateRequestBody,
 ) -> Result<HashMap<String, ModrinthVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version_files/update", MODRINTH_API_BASE_URL); // Update check endpoint
 
     log::info!(
@@ -961,13 +921,6 @@ pub async fn check_bulk_updates(
 
     let response = client
         .post(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .header("Content-Type", "application/json")
         .json(&request)
         .send()
@@ -1047,13 +1000,6 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
 
     let response = client
         .get(final_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1139,13 +1085,6 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1188,13 +1127,6 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1237,13 +1169,6 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1291,13 +1216,6 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {

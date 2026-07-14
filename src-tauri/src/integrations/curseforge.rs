@@ -2056,13 +2056,6 @@ pub async fn download_and_install_curseforge_modpack(
     let client = HTTP_CLIENT.clone();
     let response = client
         .get(&download_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {

@@ -9,7 +9,6 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
-use reqwest::Client;
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,7 +17,6 @@ use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -1015,19 +1013,11 @@ pub async fn download_and_process_mrpack(
         temp_file_path
     );
 
-    // Create HTTP client
-    let client = Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
 
     // Download the file
     let response = client
         .get(download_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
