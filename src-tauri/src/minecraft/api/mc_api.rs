@@ -360,7 +360,7 @@ impl MinecraftApiService {
             .unwrap_or("skin.png");
         debug!("Using filename: {}", filename);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -422,7 +422,7 @@ impl MinecraftApiService {
         let url = format!("{}/user/profile/{}/skin", MOJANG_API_URL, uuid);
         debug!("Request URL: {}", url);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending skin reset request to Minecraft API");
 
         let response_result = client
@@ -490,7 +490,7 @@ impl MinecraftApiService {
             }
         };
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -568,7 +568,7 @@ impl MinecraftApiService {
 
         debug!("Join request - selected_profile: {}, server_id: {}", selected_profile, server_id);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending join server request to Minecraft Session API");
 
         let response_result = client
