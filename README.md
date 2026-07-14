@@ -1,6 +1,6 @@
 ## Issues
 
-If you notice any bugs or missing features, you can let us know by opening an issue [here](https://github.com/NoRiskClient/issues/issues/new/choose).
+If you notice any bugs or missing features, you can let us know by opening an issue [here](https://norisk.gg/issues).
 
 ## License
 This code is originally forked and still uses a small amount of code from [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher).
