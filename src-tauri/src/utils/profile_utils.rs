@@ -2909,25 +2909,6 @@ impl LocalContentLoader {
             }
         }
 
-        for (idx, item) in final_items.iter().enumerate() {
-            info!(
-                "Final item [{}]: filename='{}', path_str='{}', sha1_hash={:?}, file_size={}, is_disabled={}, is_directory={}, content_type={:?}, source_type={:?}, norisk_info={:?}, id={:?}, associated_loader={:?}, fallback_version={:?}, modrinth_info={:?}",
-                idx,
-                item.filename,
-                item.path_str,
-                item.sha1_hash,
-                item.file_size,
-                item.is_disabled,
-                item.is_directory,
-                item.content_type,
-                item.source_type,
-                item.norisk_info,
-                item.id,
-                item.associated_loader,
-                item.fallback_version,
-                item.modrinth_info
-            );
-        }
         info!(
             "Successfully loaded {} items of type {:?} for profile {}",
             final_items.len(),
