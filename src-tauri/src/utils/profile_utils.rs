@@ -2694,22 +2694,28 @@ impl LocalContentLoader {
                 })
                 .collect();
 
+            let cached_hashes = if params.cache_behaviour != CacheBehaviour::Bypass {
+                let requests: Vec<(String, u64, u64)> = hash_items_info
+                    .iter()
+                    .filter_map(|(idx, path_str, _)| {
+                        file_mtimes
+                            .get(path_str)
+                            .map(|mtime| (path_str.clone(), final_items[*idx].file_size, *mtime))
+                    })
+                    .collect();
+                state.content_cache.get_file_hashes(&requests).await
+            } else {
+                HashMap::new()
+            };
+
             let mut items_to_hash = Vec::new();
             for (index_in_final_items, path_str, filename) in hash_items_info {
                 let file_size = final_items[index_in_final_items].file_size;
                 let mtime_ms = file_mtimes.get(&path_str).copied();
 
-                if params.cache_behaviour != CacheBehaviour::Bypass {
-                    if let Some(mtime_ms) = mtime_ms {
-                        if let Some(cached_hash) = state
-                            .content_cache
-                            .get_file_hash(&path_str, file_size, mtime_ms)
-                            .await
-                        {
-                            final_items[index_in_final_items].sha1_hash = Some(cached_hash);
-                            continue;
-                        }
-                    }
+                if let Some(cached_hash) = cached_hashes.get(&path_str) {
+                    final_items[index_in_final_items].sha1_hash = Some(cached_hash.clone());
+                    continue;
                 }
                 items_to_hash.push((index_in_final_items, path_str, filename, file_size, mtime_ms));
             }

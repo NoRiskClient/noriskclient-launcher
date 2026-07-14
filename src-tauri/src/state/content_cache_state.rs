@@ -1,6 +1,5 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::state::post_init::PostInitializationHandler;
 use crate::integrations::curseforge::{self, CurseForgeMod, CurseForgeModsResponse};
 use crate::integrations::modrinth::{
     self, ModrinthProject, ModrinthTags, ModrinthTeamMember, ModrinthVersion,
@@ -9,26 +8,38 @@ use crate::integrations::unified_mod::{
     self, ModPlatform, UnifiedModpackVersionsResponse, UnifiedUpdateCheckRequest,
     UnifiedUpdateCheckResponse, UnifiedVersion,
 };
+use crate::state::post_init::PostInitializationHandler;
 use crate::state::profile_state::ModPackSource;
 use async_trait::async_trait;
 use log::{debug, info, warn};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use crate::state::db::DbHandle;
+use sqlx::Row;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::Path;
 use std::sync::Arc;
-use tokio::fs;
-use tokio::sync::{Mutex, RwLock};
-
-const CONTENT_CACHE_FILENAME: &str = "content_cache.json";
+use tokio::sync::{Mutex, OnceCell};
 
 const TTL_METADATA_MS: u64 = 30 * 60 * 1000;
 const TTL_IMMUTABLE_MS: u64 = 30 * 24 * 60 * 60 * 1000;
 const STALE_GRACE_MS: u64 = 30 * 24 * 60 * 60 * 1000;
-const SAVE_DEBOUNCE_MS: u64 = 2000;
 
-fn content_cache_path() -> PathBuf {
-    LAUNCHER_DIRECTORY.meta_dir().join(CONTENT_CACHE_FILENAME)
+const NEVER_EXPIRES_MS: u64 = i64::MAX as u64;
+
+const SINGLETON: &str = "__singleton__";
+
+mod kind {
+    pub const FILE_HASH: &str = "file_hash";
+    pub const MODRINTH_VERSION: &str = "modrinth_version";
+    pub const MODRINTH_PROJECT: &str = "modrinth_project";
+    pub const CURSEFORGE_MOD: &str = "curseforge_mod";
+    pub const UNIFIED_UPDATE: &str = "unified_update";
+    pub const MODPACK_VERSIONS: &str = "modpack_versions";
+    pub const MODRINTH_TAGS: &str = "modrinth_tags";
+    pub const MODRINTH_MEMBERS: &str = "modrinth_project_members";
+    pub const MODRINTH_PROJECT_VERSIONS: &str = "modrinth_project_versions";
+    pub const CURSEFORGE_DESCRIPTION: &str = "curseforge_description";
 }
 
 fn now_ms() -> u64 {
@@ -51,13 +62,6 @@ pub struct CacheEntry<T> {
 }
 
 impl<T> CacheEntry<T> {
-    fn new(data: T, ttl_ms: u64) -> Self {
-        Self {
-            data,
-            expires_at_ms: now_ms() + ttl_ms,
-        }
-    }
-
     fn is_fresh(&self) -> bool {
         self.expires_at_ms > now_ms()
     }
@@ -70,57 +74,15 @@ pub struct FileHashEntry {
     pub sha1: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct ContentCacheData {
-    #[serde(default)]
-    pub file_hashes: HashMap<String, FileHashEntry>,
-    #[serde(default)]
-    pub modrinth_versions: HashMap<String, CacheEntry<Option<ModrinthVersion>>>,
-    #[serde(default)]
-    pub modrinth_projects: HashMap<String, CacheEntry<ModrinthProject>>,
-    #[serde(default)]
-    pub curseforge_mods: HashMap<u32, CacheEntry<CurseForgeMod>>,
-    #[serde(default)]
-    pub unified_updates: HashMap<String, CacheEntry<Option<UnifiedVersion>>>,
-    #[serde(default)]
-    pub modpack_versions: HashMap<String, CacheEntry<UnifiedModpackVersionsResponse>>,
-    #[serde(default)]
-    pub modrinth_tags: Option<CacheEntry<ModrinthTags>>,
-    #[serde(default)]
-    pub modrinth_project_members: HashMap<String, CacheEntry<Vec<ModrinthTeamMember>>>,
-    #[serde(default)]
-    pub modrinth_project_versions: HashMap<String, CacheEntry<Vec<ModrinthVersion>>>,
-    #[serde(default)]
-    pub curseforge_descriptions: HashMap<u32, CacheEntry<String>>,
-}
-
-impl ContentCacheData {
-    fn prune(&mut self) {
-        let cutoff = now_ms().saturating_sub(STALE_GRACE_MS);
-        self.file_hashes
-            .retain(|path, _| Path::new(path).exists());
-        self.modrinth_versions.retain(|_, e| e.expires_at_ms > cutoff);
-        self.modrinth_projects.retain(|_, e| e.expires_at_ms > cutoff);
-        self.curseforge_mods.retain(|_, e| e.expires_at_ms > cutoff);
-        self.unified_updates.retain(|_, e| e.expires_at_ms > cutoff);
-        self.modpack_versions.retain(|_, e| e.expires_at_ms > cutoff);
-        self.modrinth_tags = self
-            .modrinth_tags
-            .take()
-            .filter(|e| e.expires_at_ms > cutoff);
-        self.modrinth_project_members
-            .retain(|_, e| e.expires_at_ms > cutoff);
-        self.modrinth_project_versions
-            .retain(|_, e| e.expires_at_ms > cutoff);
-        self.curseforge_descriptions
-            .retain(|_, e| e.expires_at_ms > cutoff);
-    }
+struct Row2Write<T> {
+    id: String,
+    alias: Option<String>,
+    data: Option<T>,
+    ttl_ms: u64,
 }
 
 struct Inner {
-    data: RwLock<ContentCacheData>,
-    save_lock: Mutex<()>,
-    save_scheduled: AtomicBool,
+    db: DbHandle,
     modpack_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     tags_fetch_lock: Mutex<()>,
     project_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
@@ -132,12 +94,10 @@ pub struct ContentCacheManager {
 }
 
 impl ContentCacheManager {
-    pub fn new() -> Result<Self> {
+    pub fn new(db: DbHandle) -> Result<Self> {
         Ok(Self {
             inner: Arc::new(Inner {
-                data: RwLock::new(ContentCacheData::default()),
-                save_lock: Mutex::new(()),
-                save_scheduled: AtomicBool::new(false),
+                db,
                 modpack_fetch_locks: Mutex::new(HashMap::new()),
                 tags_fetch_lock: Mutex::new(()),
                 project_fetch_locks: Mutex::new(HashMap::new()),
@@ -145,95 +105,287 @@ impl ContentCacheManager {
         })
     }
 
-    async fn load(&self) {
-        let path = content_cache_path();
-        if !path.exists() {
-            info!("Content cache file not found, starting empty");
+    async fn pool(&self) -> Option<sqlx::SqlitePool> {
+        crate::state::db::pool_of(&self.inner.db).await
+    }
+
+    async fn get_entries<T: DeserializeOwned + Clone>(
+        &self,
+        kind: &str,
+        keys: &[String],
+    ) -> HashMap<String, CacheEntry<Option<T>>> {
+        let mut out = HashMap::new();
+        if keys.is_empty() {
+            return out;
+        }
+        let Some(pool) = self.pool().await else { return out };
+
+        let keys_json = match serde_json::to_string(keys) {
+            Ok(j) => j,
+            Err(e) => {
+                warn!("Could not encode cache keys: {}", e);
+                return out;
+            }
+        };
+
+        let rows = sqlx::query(
+            r#"
+            SELECT id, alias, data, expires FROM cache
+             WHERE data_type = ?1
+               AND ( id IN (SELECT value FROM json_each(?2))
+                  OR (alias IS NOT NULL AND alias IN (SELECT value FROM json_each(?2))) )
+            "#,
+        )
+        .bind(kind)
+        .bind(&keys_json)
+        .fetch_all(&pool)
+        .await;
+
+        let rows = match rows {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Cache read for '{}' failed: {}", kind, e);
+                return out;
+            }
+        };
+
+        let mut poisoned: Vec<String> = Vec::new();
+
+        for row in rows {
+            let id: String = row.get("id");
+            let alias: Option<String> = row.get("alias");
+            let raw: Option<String> = row.get("data");
+            let expires: i64 = row.get("expires");
+
+            let data = match raw {
+                None => None, // negative cache entry
+                Some(json) => match serde_json::from_str::<T>(&json) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        debug!("Dropping undeserializable '{}' row {}: {}", kind, id, e);
+                        poisoned.push(id.clone());
+                        continue;
+                    }
+                },
+            };
+
+            let entry = CacheEntry {
+                data,
+                expires_at_ms: expires.max(0) as u64,
+            };
+
+            for key in keys {
+                let matches_id = key.eq_ignore_ascii_case(&id);
+                let matches_alias = alias
+                    .as_ref()
+                    .is_some_and(|a| key.eq_ignore_ascii_case(a));
+                if matches_id || matches_alias {
+                    out.insert(key.clone(), entry.clone());
+                }
+            }
+        }
+
+        if !poisoned.is_empty() {
+            self.delete_ids(kind, &poisoned).await;
+        }
+
+        out
+    }
+
+    async fn get_entry<T: DeserializeOwned + Clone>(
+        &self,
+        kind: &str,
+        key: &str,
+    ) -> Option<CacheEntry<Option<T>>> {
+        let mut found = self.get_entries::<T>(kind, &[key.to_string()]).await;
+        found.remove(key)
+    }
+
+    async fn put_entries<T: Serialize>(&self, kind: &str, rows: Vec<Row2Write<T>>) {
+        if rows.is_empty() {
             return;
         }
-        match fs::read_to_string(&path).await {
-            Ok(raw) => match serde_json::from_str::<ContentCacheData>(&raw) {
-                Ok(loaded) => {
-                    info!(
-                        "Loaded content cache: {} file hashes, {} modrinth versions, {} modrinth projects, {} curseforge mods, {} updates",
-                        loaded.file_hashes.len(),
-                        loaded.modrinth_versions.len(),
-                        loaded.modrinth_projects.len(),
-                        loaded.curseforge_mods.len(),
-                        loaded.unified_updates.len()
-                    );
-                    *self.inner.data.write().await = loaded;
+        let Some(pool) = self.pool().await else { return };
+
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                warn!("Cache write for '{}' could not begin: {}", kind, e);
+                return;
+            }
+        };
+
+        let now = now_ms();
+        for row in rows {
+            let json = match row.data.as_ref().map(serde_json::to_string).transpose() {
+                Ok(j) => j,
+                Err(e) => {
+                    warn!("Could not encode '{}' entry {}: {}", kind, row.id, e);
+                    continue;
                 }
-                Err(e) => warn!("Failed to parse content cache, starting empty: {}", e),
-            },
-            Err(e) => warn!("Failed to read content cache, starting empty: {}", e),
+            };
+            let expires = now.saturating_add(row.ttl_ms).min(i64::MAX as u64) as i64;
+
+            let res = sqlx::query(
+                "INSERT OR REPLACE INTO cache (id, data_type, alias, data, expires)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )
+            .bind(&row.id)
+            .bind(kind)
+            .bind(&row.alias)
+            .bind(&json)
+            .bind(expires)
+            .execute(&mut *tx)
+            .await;
+
+            if let Err(e) = res {
+                warn!("Cache write for '{}' entry {} failed: {}", kind, row.id, e);
+            }
         }
+
+        if let Err(e) = tx.commit().await {
+            warn!("Cache write for '{}' could not commit: {}", kind, e);
+        }
+    }
+
+    async fn put_entry<T: Serialize>(
+        &self,
+        kind: &str,
+        id: &str,
+        alias: Option<String>,
+        data: Option<T>,
+        ttl_ms: u64,
+    ) {
+        self.put_entries(
+            kind,
+            vec![Row2Write {
+                id: id.to_string(),
+                alias,
+                data,
+                ttl_ms,
+            }],
+        )
+        .await;
+    }
+
+    async fn delete_ids(&self, kind: &str, ids: &[String]) {
+        let Some(pool) = self.pool().await else { return };
+        let Ok(ids_json) = serde_json::to_string(ids) else {
+            return;
+        };
+
+        let res = sqlx::query(
+            "DELETE FROM cache WHERE data_type = ?1 AND id IN (SELECT value FROM json_each(?2))",
+        )
+        .bind(kind)
+        .bind(&ids_json)
+        .execute(&pool)
+        .await;
+
+        if let Err(e) = res {
+            warn!("Could not delete '{}' rows: {}", kind, e);
+        }
+    }
+
+    async fn delete_expired(&self, grace_ms: u64) -> Result<u64> {
+        let Some(pool) = self.pool().await else { return Ok(0) };
+        let cutoff = now_ms().saturating_sub(grace_ms) as i64;
+
+        let res = sqlx::query("DELETE FROM cache WHERE expires < ?1 AND data_type <> ?2")
+            .bind(cutoff)
+            .bind(kind::FILE_HASH)
+            .execute(&pool)
+            .await
+            .map_err(|e| AppError::Other(format!("Cache expiry sweep failed: {}", e)))?;
+
+        Ok(res.rows_affected())
+    }
+
+    async fn prune_missing_files(&self) -> Result<u64> {
+        let Some(pool) = self.pool().await else { return Ok(0) };
+
+        let rows = sqlx::query("SELECT id FROM cache WHERE data_type = ?1")
+            .bind(kind::FILE_HASH)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| AppError::Other(format!("Could not list file hashes: {}", e)))?;
+
+        let paths: Vec<String> = rows.iter().map(|r| r.get::<String, _>("id")).collect();
+        if paths.is_empty() {
+            return Ok(0);
+        }
+
+        let gone = tokio::task::spawn_blocking(move || {
+            paths
+                .into_iter()
+                .filter(|p| !Path::new(p).exists())
+                .collect::<Vec<_>>()
+        })
+        .await
+        .map_err(|e| AppError::Other(format!("File-hash prune task failed: {}", e)))?;
+
+        if gone.is_empty() {
+            return Ok(0);
+        }
+        let n = gone.len() as u64;
+        self.delete_ids(kind::FILE_HASH, &gone).await;
+        Ok(n)
     }
 
     pub async fn save(&self) -> Result<()> {
-        let _guard = self.inner.save_lock.lock().await;
-
-        let data = self.inner.data.read().await.clone();
-        let snapshot = tokio::task::spawn_blocking(move || {
-            let mut data = data;
-            data.prune();
-            data
-        })
-        .await
-        .map_err(|e| AppError::Other(format!("Content cache prune task failed: {}", e)))?;
-
-        let path = content_cache_path();
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).await?;
-            }
+        if let Some(pool) = self.pool().await {
+            let _ = sqlx::query("PRAGMA wal_checkpoint(PASSIVE)")
+                .execute(&pool)
+                .await;
         }
-        fs::write(&path, serde_json::to_string(&snapshot)?).await?;
-        debug!("Saved content cache to {:?}", path);
         Ok(())
     }
 
-    fn schedule_save(&self) {
-        if self
-            .inner
-            .save_scheduled
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
-        {
-            return;
-        }
-        let this = self.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(SAVE_DEBOUNCE_MS)).await;
-            this.inner.save_scheduled.store(false, Ordering::SeqCst);
-            if let Err(e) = this.save().await {
-                warn!("Failed to save content cache: {}", e);
-            }
-        });
+    pub async fn get_file_hash(&self, path: &str, size: u64, mtime_ms: u64) -> Option<String> {
+        self.get_file_hashes(&[(path.to_string(), size, mtime_ms)])
+            .await
+            .remove(path)
     }
 
+    pub async fn get_file_hashes(
+        &self,
+        requests: &[(String, u64, u64)],
+    ) -> HashMap<String, String> {
+        let mut out = HashMap::new();
+        if requests.is_empty() {
+            return out;
+        }
 
-    pub async fn get_file_hash(&self, path: &str, size: u64, mtime_ms: u64) -> Option<String> {
-        let data = self.inner.data.read().await;
-        data.file_hashes
-            .get(path)
-            .filter(|e| e.size == size && e.mtime_ms == mtime_ms)
-            .map(|e| e.sha1.clone())
+        let paths: Vec<String> = requests.iter().map(|(p, _, _)| p.clone()).collect();
+        let cached = self
+            .get_entries::<FileHashEntry>(kind::FILE_HASH, &paths)
+            .await;
+
+        for (path, size, mtime_ms) in requests {
+            if let Some(entry) = cached.get(path) {
+                if let Some(hash) = &entry.data {
+                    if hash.size == *size && hash.mtime_ms == *mtime_ms {
+                        out.insert(path.clone(), hash.sha1.clone());
+                    }
+                }
+            }
+        }
+
+        out
     }
 
     pub async fn put_file_hashes(&self, entries: Vec<(String, FileHashEntry)>) {
-        if entries.is_empty() {
-            return;
-        }
-        {
-            let mut data = self.inner.data.write().await;
-            for (path, entry) in entries {
-                data.file_hashes.insert(path, entry);
-            }
-        }
-        self.schedule_save();
+        let rows = entries
+            .into_iter()
+            .map(|(path, entry)| Row2Write {
+                id: path,
+                alias: None,
+                data: Some(entry),
+                ttl_ms: NEVER_EXPIRES_MS,
+            })
+            .collect();
+        self.put_entries(kind::FILE_HASH, rows).await;
     }
-
 
     pub async fn get_modrinth_versions_by_hashes(
         &self,
@@ -254,27 +406,28 @@ impl ContentCacheManager {
         let mut missing = Vec::new();
         let mut stale = Vec::new();
 
-        {
-            let data = self.inner.data.read().await;
-            for hash in &hashes {
-                match data.modrinth_versions.get(hash) {
-                    Some(entry) if entry.is_fresh() => {
+        let cached = self
+            .get_entries::<ModrinthVersion>(kind::MODRINTH_VERSION, &hashes)
+            .await;
+
+        for hash in &hashes {
+            match cached.get(hash) {
+                Some(entry) if entry.is_fresh() => {
+                    if let Some(version) = &entry.data {
+                        result.insert(hash.clone(), version.clone());
+                    }
+                }
+                Some(entry) => {
+                    if serve_stale {
                         if let Some(version) = &entry.data {
                             result.insert(hash.clone(), version.clone());
                         }
+                        stale.push(hash.clone());
+                    } else {
+                        missing.push(hash.clone());
                     }
-                    Some(entry) => {
-                        if serve_stale {
-                            if let Some(version) = &entry.data {
-                                result.insert(hash.clone(), version.clone());
-                            }
-                            stale.push(hash.clone());
-                        } else {
-                            missing.push(hash.clone());
-                        }
-                    }
-                    None => missing.push(hash.clone()),
                 }
+                None => missing.push(hash.clone()),
             }
         }
 
@@ -309,17 +462,24 @@ impl ContentCacheManager {
         requested: &[String],
         fetched: &HashMap<String, ModrinthVersion>,
     ) {
-        {
-            let mut data = self.inner.data.write().await;
-            for hash in requested {
-                let entry = match fetched.get(hash) {
-                    Some(version) => CacheEntry::new(Some(version.clone()), TTL_IMMUTABLE_MS),
-                    None => CacheEntry::new(None, TTL_METADATA_MS),
-                };
-                data.modrinth_versions.insert(hash.clone(), entry);
-            }
-        }
-        self.schedule_save();
+        let rows = requested
+            .iter()
+            .map(|hash| match fetched.get(hash) {
+                Some(version) => Row2Write {
+                    id: hash.clone(),
+                    alias: None,
+                    data: Some(version.clone()),
+                    ttl_ms: TTL_IMMUTABLE_MS,
+                },
+                None => Row2Write {
+                    id: hash.clone(),
+                    alias: None,
+                    data: None,
+                    ttl_ms: TTL_METADATA_MS,
+                },
+            })
+            .collect();
+        self.put_entries(kind::MODRINTH_VERSION, rows).await;
     }
 
     pub async fn cache_modrinth_version(&self, version: &ModrinthVersion) {
@@ -330,16 +490,16 @@ impl ContentCacheManager {
             .or_else(|| version.files.first())
             .and_then(|f| f.hashes.sha1.clone());
         let Some(sha1) = sha1 else { return };
-        {
-            let mut data = self.inner.data.write().await;
-            data.modrinth_versions.insert(
-                sha1,
-                CacheEntry::new(Some(version.clone()), TTL_IMMUTABLE_MS),
-            );
-        }
-        self.schedule_save();
-    }
 
+        self.put_entry(
+            kind::MODRINTH_VERSION,
+            &sha1,
+            None,
+            Some(version.clone()),
+            TTL_IMMUTABLE_MS,
+        )
+        .await;
+    }
 
     pub async fn get_modrinth_projects(
         &self,
@@ -351,7 +511,7 @@ impl ContentCacheManager {
         }
         if behaviour == CacheBehaviour::Bypass {
             let fetched = modrinth::get_multiple_projects(ids.clone()).await?;
-            self.put_modrinth_projects(&ids, &fetched).await;
+            self.put_modrinth_projects(&fetched).await;
             return Ok(fetched);
         }
 
@@ -360,28 +520,33 @@ impl ContentCacheManager {
         let mut missing = Vec::new();
         let mut stale = Vec::new();
 
-        {
-            let data = self.inner.data.read().await;
-            for id in &ids {
-                match data.modrinth_projects.get(id) {
-                    Some(entry) if entry.is_fresh() => result.push(entry.data.clone()),
-                    Some(entry) => {
-                        if serve_stale {
-                            result.push(entry.data.clone());
-                            stale.push(id.clone());
-                        } else {
-                            missing.push(id.clone());
-                        }
+        let cached = self
+            .get_entries::<ModrinthProject>(kind::MODRINTH_PROJECT, &ids)
+            .await;
+
+        for id in &ids {
+            match cached.get(id).and_then(|e| {
+                e.data
+                    .as_ref()
+                    .map(|d| (d.clone(), e.expires_at_ms, e.is_fresh()))
+            }) {
+                Some((project, _, true)) => result.push(project),
+                Some((project, _, false)) => {
+                    if serve_stale {
+                        result.push(project);
+                        stale.push(id.clone());
+                    } else {
+                        missing.push(id.clone());
                     }
-                    None => missing.push(id.clone()),
                 }
+                None => missing.push(id.clone()),
             }
         }
 
         if !missing.is_empty() {
             match modrinth::get_multiple_projects(missing.clone()).await {
                 Ok(fetched) => {
-                    self.put_modrinth_projects(&missing, &fetched).await;
+                    self.put_modrinth_projects(&fetched).await;
                     result.extend(fetched);
                 }
                 Err(e) if serve_stale => {
@@ -394,8 +559,8 @@ impl ContentCacheManager {
         if !stale.is_empty() {
             let this = self.clone();
             tokio::spawn(async move {
-                match modrinth::get_multiple_projects(stale.clone()).await {
-                    Ok(fetched) => this.put_modrinth_projects(&stale, &fetched).await,
+                match modrinth::get_multiple_projects(stale).await {
+                    Ok(fetched) => this.put_modrinth_projects(&fetched).await,
                     Err(e) => warn!("Background refresh of Modrinth projects failed: {}", e),
                 }
             });
@@ -404,31 +569,18 @@ impl ContentCacheManager {
         Ok(result)
     }
 
-    async fn put_modrinth_projects(&self, requested: &[String], fetched: &[ModrinthProject]) {
-        if fetched.is_empty() {
-            return;
-        }
-        {
-            let mut data = self.inner.data.write().await;
-            for project in fetched {
-                let aliases = requested.iter().filter(|id| {
-                    id.eq_ignore_ascii_case(&project.id) || id.eq_ignore_ascii_case(&project.slug)
-                });
-                for alias in aliases {
-                    data.modrinth_projects.insert(
-                        alias.clone(),
-                        CacheEntry::new(project.clone(), TTL_METADATA_MS),
-                    );
-                }
-                data.modrinth_projects.insert(
-                    project.id.clone(),
-                    CacheEntry::new(project.clone(), TTL_METADATA_MS),
-                );
-            }
-        }
-        self.schedule_save();
+    async fn put_modrinth_projects(&self, fetched: &[ModrinthProject]) {
+        let rows = fetched
+            .iter()
+            .map(|project| Row2Write {
+                id: project.id.clone(),
+                alias: Some(project.slug.clone()),
+                data: Some(project.clone()),
+                ttl_ms: TTL_METADATA_MS,
+            })
+            .collect();
+        self.put_entries(kind::MODRINTH_PROJECT, rows).await;
     }
-
 
     pub async fn get_curseforge_mods(
         &self,
@@ -452,21 +604,26 @@ impl ContentCacheManager {
         let mut missing = Vec::new();
         let mut stale = Vec::new();
 
-        {
-            let data = self.inner.data.read().await;
-            for id in &mod_ids {
-                match data.curseforge_mods.get(id) {
-                    Some(entry) if entry.is_fresh() => result.push(entry.data.clone()),
-                    Some(entry) => {
-                        if serve_stale {
-                            result.push(entry.data.clone());
-                            stale.push(*id);
-                        } else {
-                            missing.push(*id);
-                        }
+        let keys: Vec<String> = mod_ids.iter().map(|id| id.to_string()).collect();
+        let cached = self
+            .get_entries::<CurseForgeMod>(kind::CURSEFORGE_MOD, &keys)
+            .await;
+
+        for id in &mod_ids {
+            let key = id.to_string();
+            match cached.get(&key).and_then(|e| {
+                e.data.as_ref().map(|d| (d.clone(), e.is_fresh()))
+            }) {
+                Some((cf_mod, true)) => result.push(cf_mod),
+                Some((cf_mod, false)) => {
+                    if serve_stale {
+                        result.push(cf_mod);
+                        stale.push(*id);
+                    } else {
+                        missing.push(*id);
                     }
-                    None => missing.push(*id),
                 }
+                None => missing.push(*id),
             }
         }
 
@@ -497,19 +654,17 @@ impl ContentCacheManager {
     }
 
     pub async fn put_curseforge_mods(&self, fetched: &[CurseForgeMod]) {
-        if fetched.is_empty() {
-            return;
-        }
-        {
-            let mut data = self.inner.data.write().await;
-            for cf_mod in fetched {
-                data.curseforge_mods
-                    .insert(cf_mod.id, CacheEntry::new(cf_mod.clone(), TTL_METADATA_MS));
-            }
-        }
-        self.schedule_save();
+        let rows = fetched
+            .iter()
+            .map(|cf_mod| Row2Write {
+                id: cf_mod.id.to_string(),
+                alias: None,
+                data: Some(cf_mod.clone()),
+                ttl_ms: TTL_METADATA_MS,
+            })
+            .collect();
+        self.put_entries(kind::CURSEFORGE_MOD, rows).await;
     }
-
 
     pub async fn check_mod_updates_unified(
         &self,
@@ -534,28 +689,34 @@ impl ContentCacheManager {
         let mut missing = Vec::new();
         let mut stale = Vec::new();
 
-        {
-            let data = self.inner.data.read().await;
-            for identifier in &request.hashes {
-                let key = update_cache_key(&request, identifier);
-                match data.unified_updates.get(&key) {
-                    Some(entry) if entry.is_fresh() => {
+        let keys: Vec<String> = request
+            .hashes
+            .iter()
+            .map(|identifier| update_cache_key(&request, identifier))
+            .collect();
+        let cached = self
+            .get_entries::<UnifiedVersion>(kind::UNIFIED_UPDATE, &keys)
+            .await;
+
+        for identifier in &request.hashes {
+            let key = update_cache_key(&request, identifier);
+            match cached.get(&key) {
+                Some(entry) if entry.is_fresh() => {
+                    if let Some(version) = &entry.data {
+                        updates.insert(identifier.clone(), version.clone());
+                    }
+                }
+                Some(entry) => {
+                    if serve_stale {
                         if let Some(version) = &entry.data {
                             updates.insert(identifier.clone(), version.clone());
                         }
+                        stale.push(identifier.clone());
+                    } else {
+                        missing.push(identifier.clone());
                     }
-                    Some(entry) => {
-                        if serve_stale {
-                            if let Some(version) = &entry.data {
-                                updates.insert(identifier.clone(), version.clone());
-                            }
-                            stale.push(identifier.clone());
-                        } else {
-                            missing.push(identifier.clone());
-                        }
-                    }
-                    None => missing.push(identifier.clone()),
                 }
+                None => missing.push(identifier.clone()),
             }
         }
 
@@ -564,8 +725,7 @@ impl ContentCacheManager {
             let sub_request = subset_request(&request, &missing);
             match unified_mod::check_mod_updates_unified(sub_request).await {
                 Ok(fetched) => {
-                    self.put_unified_updates(&request, &missing, &fetched)
-                        .await;
+                    self.put_unified_updates(&request, &missing, &fetched).await;
                     updates.extend(fetched.updates);
                     failed_platforms = fetched.failed_platforms;
                 }
@@ -618,21 +778,18 @@ impl ContentCacheManager {
                 skipped, fetched.failed_platforms
             );
         }
-        if cacheable.is_empty() {
-            return;
-        }
-        {
-            let mut data = self.inner.data.write().await;
-            for identifier in cacheable {
-                let entry =
-                    CacheEntry::new(fetched.updates.get(identifier).cloned(), TTL_METADATA_MS);
-                data.unified_updates
-                    .insert(update_cache_key(request, identifier), entry);
-            }
-        }
-        self.schedule_save();
-    }
 
+        let rows = cacheable
+            .into_iter()
+            .map(|identifier| Row2Write {
+                id: update_cache_key(request, identifier),
+                alias: None,
+                data: fetched.updates.get(identifier).cloned(),
+                ttl_ms: TTL_METADATA_MS,
+            })
+            .collect();
+        self.put_entries(kind::UNIFIED_UPDATE, rows).await;
+    }
 
     pub async fn get_modpack_versions(
         &self,
@@ -642,31 +799,29 @@ impl ContentCacheManager {
         let key = modpack_cache_key(source);
 
         if behaviour != CacheBehaviour::Bypass {
-            if let Some(entry) = self.read_modpack_versions(&key).await {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
-                }
-                if behaviour == CacheBehaviour::StaleWhileRevalidate {
-                    let this = self.clone();
-                    let source = source.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = this.fetch_modpack_versions(&source).await {
-                            warn!("Background refresh of modpack versions failed: {}", e);
-                        }
-                    });
-                    return Ok(entry.data);
+            if let Some(entry) = self
+                .get_entry::<UnifiedModpackVersionsResponse>(kind::MODPACK_VERSIONS, &key)
+                .await
+            {
+                if let Some(data) = entry.data {
+                    if entry.expires_at_ms > now_ms() {
+                        return Ok(data);
+                    }
+                    if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                        let this = self.clone();
+                        let source = source.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = this.fetch_modpack_versions(&source).await {
+                                warn!("Background refresh of modpack versions failed: {}", e);
+                            }
+                        });
+                        return Ok(data);
+                    }
                 }
             }
         }
 
         self.fetch_modpack_versions(source).await
-    }
-
-    async fn read_modpack_versions(
-        &self,
-        key: &str,
-    ) -> Option<CacheEntry<UnifiedModpackVersionsResponse>> {
-        self.inner.data.read().await.modpack_versions.get(key).cloned()
     }
 
     async fn fetch_modpack_versions(
@@ -681,39 +836,48 @@ impl ContentCacheManager {
         };
         let _guard = fetch_lock.lock().await;
 
-        if let Some(entry) = self.read_modpack_versions(&key).await {
+        if let Some(entry) = self
+            .get_entry::<UnifiedModpackVersionsResponse>(kind::MODPACK_VERSIONS, &key)
+            .await
+        {
             if entry.is_fresh() {
-                return Ok(entry.data);
+                if let Some(data) = entry.data {
+                    return Ok(data);
+                }
             }
         }
 
         let fetched = unified_mod::get_modpack_versions_unified(source).await?;
-        {
-            let mut data = self.inner.data.write().await;
-            data.modpack_versions
-                .insert(key, CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
-        }
-        self.schedule_save();
+        self.put_entry(
+            kind::MODPACK_VERSIONS,
+            &key,
+            None,
+            Some(fetched.clone()),
+            TTL_METADATA_MS,
+        )
+        .await;
         Ok(fetched)
     }
 
-
     pub async fn get_modrinth_tags(&self, behaviour: CacheBehaviour) -> Result<ModrinthTags> {
         if behaviour != CacheBehaviour::Bypass {
-            let cached = self.inner.data.read().await.modrinth_tags.clone();
-
-            if let Some(entry) = cached {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
-                }
-                if behaviour == CacheBehaviour::StaleWhileRevalidate {
-                    let this = self.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = this.fetch_modrinth_tags().await {
-                            warn!("Background refresh of Modrinth tags failed: {}", e);
-                        }
-                    });
-                    return Ok(entry.data);
+            if let Some(entry) = self
+                .get_entry::<ModrinthTags>(kind::MODRINTH_TAGS, SINGLETON)
+                .await
+            {
+                if let Some(data) = entry.data {
+                    if entry.expires_at_ms > now_ms() {
+                        return Ok(data);
+                    }
+                    if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                        let this = self.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = this.fetch_modrinth_tags().await {
+                                warn!("Background refresh of Modrinth tags failed: {}", e);
+                            }
+                        });
+                        return Ok(data);
+                    }
                 }
             }
         }
@@ -724,22 +888,28 @@ impl ContentCacheManager {
     async fn fetch_modrinth_tags(&self) -> Result<ModrinthTags> {
         let _guard = self.inner.tags_fetch_lock.lock().await;
 
-        let cached = self.inner.data.read().await.modrinth_tags.clone();
-        if let Some(entry) = cached {
+        if let Some(entry) = self
+            .get_entry::<ModrinthTags>(kind::MODRINTH_TAGS, SINGLETON)
+            .await
+        {
             if entry.is_fresh() {
-                return Ok(entry.data);
+                if let Some(data) = entry.data {
+                    return Ok(data);
+                }
             }
         }
 
         let fetched = modrinth::get_modrinth_tags().await?;
-        {
-            let mut data = self.inner.data.write().await;
-            data.modrinth_tags = Some(CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
-        }
-        self.schedule_save();
+        self.put_entry(
+            kind::MODRINTH_TAGS,
+            SINGLETON,
+            None,
+            Some(fetched.clone()),
+            TTL_METADATA_MS,
+        )
+        .await;
         Ok(fetched)
     }
-
 
     pub async fn get_modrinth_project_members(
         &self,
@@ -749,28 +919,24 @@ impl ContentCacheManager {
         let key = project_id_or_slug.to_string();
 
         if behaviour != CacheBehaviour::Bypass {
-            let cached = self
-                .inner
-                .data
-                .read()
+            if let Some(entry) = self
+                .get_entry::<Vec<ModrinthTeamMember>>(kind::MODRINTH_MEMBERS, &key)
                 .await
-                .modrinth_project_members
-                .get(&key)
-                .cloned();
-
-            if let Some(entry) = cached {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
-                }
-                if behaviour == CacheBehaviour::StaleWhileRevalidate {
-                    let this = self.clone();
-                    let key = key.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = this.fetch_project_members(&key).await {
-                            warn!("Background refresh of project members failed: {}", e);
-                        }
-                    });
-                    return Ok(entry.data);
+            {
+                if let Some(data) = entry.data {
+                    if entry.expires_at_ms > now_ms() {
+                        return Ok(data);
+                    }
+                    if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                        let this = self.clone();
+                        let key = key.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = this.fetch_project_members(&key).await {
+                                warn!("Background refresh of project members failed: {}", e);
+                            }
+                        });
+                        return Ok(data);
+                    }
                 }
             }
         }
@@ -781,32 +947,28 @@ impl ContentCacheManager {
     async fn fetch_project_members(&self, key: &str) -> Result<Vec<ModrinthTeamMember>> {
         let _guard = self.project_fetch_lock(&format!("members:{}", key)).await;
 
-        let cached = self
-            .inner
-            .data
-            .read()
+        if let Some(entry) = self
+            .get_entry::<Vec<ModrinthTeamMember>>(kind::MODRINTH_MEMBERS, key)
             .await
-            .modrinth_project_members
-            .get(key)
-            .cloned();
-        if let Some(entry) = cached {
+        {
             if entry.is_fresh() {
-                return Ok(entry.data);
+                if let Some(data) = entry.data {
+                    return Ok(data);
+                }
             }
         }
 
         let fetched = modrinth::get_project_members(key.to_string()).await?;
-        {
-            let mut data = self.inner.data.write().await;
-            data.modrinth_project_members.insert(
-                key.to_string(),
-                CacheEntry::new(fetched.clone(), TTL_METADATA_MS),
-            );
-        }
-        self.schedule_save();
+        self.put_entry(
+            kind::MODRINTH_MEMBERS,
+            key,
+            None,
+            Some(fetched.clone()),
+            TTL_METADATA_MS,
+        )
+        .await;
         Ok(fetched)
     }
-
 
     pub async fn get_modrinth_project_versions(
         &self,
@@ -818,32 +980,28 @@ impl ContentCacheManager {
         let key = project_versions_cache_key(project_id_or_slug, &loaders, &game_versions);
 
         if behaviour != CacheBehaviour::Bypass {
-            let cached = self
-                .inner
-                .data
-                .read()
+            if let Some(entry) = self
+                .get_entry::<Vec<ModrinthVersion>>(kind::MODRINTH_PROJECT_VERSIONS, &key)
                 .await
-                .modrinth_project_versions
-                .get(&key)
-                .cloned();
-
-            if let Some(entry) = cached {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
-                }
-                if behaviour == CacheBehaviour::StaleWhileRevalidate {
-                    let this = self.clone();
-                    let (id, key) = (project_id_or_slug.to_string(), key.clone());
-                    let (loaders, game_versions) = (loaders.clone(), game_versions.clone());
-                    tokio::spawn(async move {
-                        if let Err(e) = this
-                            .fetch_project_versions(&id, &key, loaders, game_versions)
-                            .await
-                        {
-                            warn!("Background refresh of project versions failed: {}", e);
-                        }
-                    });
-                    return Ok(entry.data);
+            {
+                if let Some(data) = entry.data {
+                    if entry.expires_at_ms > now_ms() {
+                        return Ok(data);
+                    }
+                    if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                        let this = self.clone();
+                        let (id, key) = (project_id_or_slug.to_string(), key.clone());
+                        let (loaders, game_versions) = (loaders.clone(), game_versions.clone());
+                        tokio::spawn(async move {
+                            if let Err(e) = this
+                                .fetch_project_versions(&id, &key, loaders, game_versions)
+                                .await
+                            {
+                                warn!("Background refresh of project versions failed: {}", e);
+                            }
+                        });
+                        return Ok(data);
+                    }
                 }
             }
         }
@@ -861,62 +1019,56 @@ impl ContentCacheManager {
     ) -> Result<Vec<ModrinthVersion>> {
         let _guard = self.project_fetch_lock(&format!("versions:{}", key)).await;
 
-        let cached = self
-            .inner
-            .data
-            .read()
+        if let Some(entry) = self
+            .get_entry::<Vec<ModrinthVersion>>(kind::MODRINTH_PROJECT_VERSIONS, key)
             .await
-            .modrinth_project_versions
-            .get(key)
-            .cloned();
-        if let Some(entry) = cached {
+        {
             if entry.is_fresh() {
-                return Ok(entry.data);
+                if let Some(data) = entry.data {
+                    return Ok(data);
+                }
             }
         }
 
         let fetched =
             modrinth::get_mod_versions(project_id_or_slug.to_string(), loaders, game_versions)
                 .await?;
-        {
-            let mut data = self.inner.data.write().await;
-            data.modrinth_project_versions.insert(
-                key.to_string(),
-                CacheEntry::new(fetched.clone(), TTL_METADATA_MS),
-            );
-        }
-        self.schedule_save();
+        self.put_entry(
+            kind::MODRINTH_PROJECT_VERSIONS,
+            key,
+            None,
+            Some(fetched.clone()),
+            TTL_METADATA_MS,
+        )
+        .await;
         Ok(fetched)
     }
-
 
     pub async fn get_curseforge_description(
         &self,
         mod_id: u32,
         behaviour: CacheBehaviour,
     ) -> Result<String> {
-        if behaviour != CacheBehaviour::Bypass {
-            let cached = self
-                .inner
-                .data
-                .read()
-                .await
-                .curseforge_descriptions
-                .get(&mod_id)
-                .cloned();
+        let key = mod_id.to_string();
 
-            if let Some(entry) = cached {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
-                }
-                if behaviour == CacheBehaviour::StaleWhileRevalidate {
-                    let this = self.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = this.fetch_curseforge_description(mod_id).await {
-                            warn!("Background refresh of CurseForge description failed: {}", e);
-                        }
-                    });
-                    return Ok(entry.data);
+        if behaviour != CacheBehaviour::Bypass {
+            if let Some(entry) = self
+                .get_entry::<String>(kind::CURSEFORGE_DESCRIPTION, &key)
+                .await
+            {
+                if let Some(data) = entry.data {
+                    if entry.expires_at_ms > now_ms() {
+                        return Ok(data);
+                    }
+                    if behaviour == CacheBehaviour::StaleWhileRevalidate {
+                        let this = self.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = this.fetch_curseforge_description(mod_id).await {
+                                warn!("Background refresh of CurseForge description failed: {}", e);
+                            }
+                        });
+                        return Ok(data);
+                    }
                 }
             }
         }
@@ -925,31 +1077,31 @@ impl ContentCacheManager {
     }
 
     async fn fetch_curseforge_description(&self, mod_id: u32) -> Result<String> {
+        let key = mod_id.to_string();
         let _guard = self
-            .project_fetch_lock(&format!("cf-description:{}", mod_id))
+            .project_fetch_lock(&format!("cf-description:{}", key))
             .await;
 
-        let cached = self
-            .inner
-            .data
-            .read()
+        if let Some(entry) = self
+            .get_entry::<String>(kind::CURSEFORGE_DESCRIPTION, &key)
             .await
-            .curseforge_descriptions
-            .get(&mod_id)
-            .cloned();
-        if let Some(entry) = cached {
+        {
             if entry.is_fresh() {
-                return Ok(entry.data);
+                if let Some(data) = entry.data {
+                    return Ok(data);
+                }
             }
         }
 
         let fetched = curseforge::get_mod_description(mod_id).await?;
-        {
-            let mut data = self.inner.data.write().await;
-            data.curseforge_descriptions
-                .insert(mod_id, CacheEntry::new(fetched.clone(), TTL_METADATA_MS));
-        }
-        self.schedule_save();
+        self.put_entry(
+            kind::CURSEFORGE_DESCRIPTION,
+            &key,
+            None,
+            Some(fetched.clone()),
+            TTL_METADATA_MS,
+        )
+        .await;
         Ok(fetched)
     }
 
@@ -995,14 +1147,6 @@ fn modpack_cache_key(source: &ModPackSource) -> String {
             project_id,
             file_id,
         } => format!("curseforge:{}:{}", project_id, file_id),
-    }
-}
-
-#[async_trait]
-impl PostInitializationHandler for ContentCacheManager {
-    async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        self.load().await;
-        Ok(())
     }
 }
 
@@ -1058,5 +1202,38 @@ fn subset_request(
         hash_platforms: subset_map(&request.hash_platforms, &wanted),
         hash_fingerprints: subset_map(&request.hash_fingerprints, &wanted),
         hash_installed_info: subset_map(&request.hash_installed_info, &wanted),
+    }
+}
+
+#[cfg(test)]
+#[path = "content_cache_state_test.rs"]
+mod tests;
+
+#[async_trait]
+impl PostInitializationHandler for ContentCacheManager {
+    async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
+        let legacy = LAUNCHER_DIRECTORY.meta_dir().join("content_cache.json");
+        if legacy.exists() {
+            match tokio::fs::remove_file(&legacy).await {
+                Ok(()) => info!("Removed legacy content_cache.json (superseded by app.db)"),
+                Err(e) => warn!("Could not remove legacy content_cache.json: {}", e),
+            }
+        }
+
+        let this = self.clone();
+        tokio::spawn(async move {
+            match this.delete_expired(STALE_GRACE_MS).await {
+                Ok(n) if n > 0 => info!("Cache sweep removed {} expired rows", n),
+                Err(e) => warn!("Cache expiry sweep failed: {}", e),
+                _ => {}
+            }
+            match this.prune_missing_files().await {
+                Ok(n) if n > 0 => info!("Cache sweep removed {} stale file hashes", n),
+                Err(e) => warn!("File-hash prune failed: {}", e),
+                _ => {}
+            }
+        });
+
+        Ok(())
     }
 }

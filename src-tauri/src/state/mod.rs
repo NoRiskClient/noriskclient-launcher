@@ -2,6 +2,7 @@ pub mod active_skin_state;
 pub mod config_state;
 pub mod content_cache_state;
 pub mod cosmetic_pack_state;
+pub mod db;
 pub mod discord_state;
 pub mod event_state;
 pub mod friends_state;
