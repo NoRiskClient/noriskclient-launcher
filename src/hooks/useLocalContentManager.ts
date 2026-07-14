@@ -292,12 +292,20 @@ export function useLocalContentManager<T extends LocalContentItem>({
     switch (platform) {
       case 'modrinth':
         if (item.modrinth_info?.project_id) {
-          return modrinthIcons[item.modrinth_info.project_id] || null;
+          return (
+            item.modrinth_info.icon_url ||
+            modrinthIcons[item.modrinth_info.project_id] ||
+            null
+          );
         }
         break;
       case 'curseforge':
         if (item.curseforge_info?.project_id) {
-          return curseforgeIcons[item.curseforge_info.project_id] || null;
+          return (
+            item.curseforge_info.icon_url ||
+            curseforgeIcons[item.curseforge_info.project_id] ||
+            null
+          );
         }
         break;
       case 'local':
@@ -456,7 +464,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
       const projectIdsToFetch = items
         .filter(item => {
           const platform = getItemPlatform(item);
-          return platform === 'modrinth' && item.modrinth_info?.project_id && cached[item.modrinth_info.project_id] === undefined;
+          if (platform !== 'modrinth' || !item.modrinth_info?.project_id) return false;
+          if (item.modrinth_info.icon_url) return false;
+          return cached[item.modrinth_info.project_id] === undefined;
         })
         .map(item => item.modrinth_info!.project_id!)
       const uniqueProjectIds = [...new Set(projectIdsToFetch)];
@@ -492,7 +502,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
       const projectIdsToFetch = items
         .filter(item => {
           const platform = getItemPlatform(item);
-          return platform === 'curseforge' && item.curseforge_info?.project_id && cached[item.curseforge_info.project_id] === undefined;
+          if (platform !== 'curseforge' || !item.curseforge_info?.project_id) return false;
+          if (item.curseforge_info.icon_url) return false;
+          return cached[item.curseforge_info.project_id] === undefined;
         })
         .map(item => item.curseforge_info!.project_id!)
         .map(id => parseInt(id, 10)) // Convert string to number

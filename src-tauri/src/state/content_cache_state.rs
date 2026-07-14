@@ -626,6 +626,17 @@ impl ContentCacheManager {
         Ok(result)
     }
 
+    pub async fn peek_modrinth_projects(
+        &self,
+        ids: Vec<String>,
+    ) -> HashMap<String, ModrinthProject> {
+        self.get_entries::<ModrinthProject>(kind::MODRINTH_PROJECT, &ids)
+            .await
+            .into_iter()
+            .filter_map(|(key, entry)| entry.data.map(|project| (key, project)))
+            .collect()
+    }
+
     async fn put_modrinth_projects(&self, fetched: &[ModrinthProject]) {
         let rows = fetched
             .iter()
@@ -708,6 +719,18 @@ impl ContentCacheManager {
         }
 
         Ok(CurseForgeModsResponse { data: result })
+    }
+
+    pub async fn peek_curseforge_mods(&self, mod_ids: Vec<u32>) -> HashMap<u32, CurseForgeMod> {
+        let keys: Vec<String> = mod_ids.iter().map(|id| id.to_string()).collect();
+        self.get_entries::<CurseForgeMod>(kind::CURSEFORGE_MOD, &keys)
+            .await
+            .into_iter()
+            .filter_map(|(key, entry)| {
+                let id = key.parse::<u32>().ok()?;
+                entry.data.map(|cf_mod| (id, cf_mod))
+            })
+            .collect()
     }
 
     pub async fn put_curseforge_mods(&self, fetched: &[CurseForgeMod]) {

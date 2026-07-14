@@ -2170,6 +2170,8 @@ pub struct GenericModrinthInfo {
     pub name: String, // Name des Modrinth-Projekts oder der Version
     pub version_number: String,
     pub download_url: Option<String>,
+    #[serde(default)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2323,6 +2325,7 @@ impl LocalContentLoader {
                                     name: norisk_mod.display_name.clone().unwrap_or_else(|| norisk_mod.id.clone()),
                                     version_number: "".to_string(), // Not directly available
                                     download_url: None,
+                                    icon_url: None,
                                 })
                             } else {
                                 None
@@ -2474,6 +2477,7 @@ impl LocalContentLoader {
                             .clone()
                             .unwrap_or_else(|| version_id.clone()),
                         download_url: None,
+                        icon_url: None,
                     }),
                     _ => None,
                 };
@@ -2496,7 +2500,7 @@ impl LocalContentLoader {
                             .clone()
                             .unwrap_or_else(|| file_id.clone()),
                         download_url: None,
-                        icon_url: None, // Will be populated later by frontend
+                        icon_url: None,
                         fingerprint: *file_fingerprint,
                     }),
                     _ => None,
@@ -2879,6 +2883,7 @@ impl LocalContentLoader {
                                                         .version_number
                                                         .clone(),
                                                     download_url: Some(file_info.url.clone()),
+                                                    icon_url: None,
                                                 });
                                         } else if !modrinth_version.files.is_empty() {
                                             // Fallback to first file if no primary, but log this
@@ -2893,6 +2898,7 @@ impl LocalContentLoader {
                                                         .version_number
                                                         .clone(),
                                                     download_url: Some(first_file.url.clone()),
+                                                    icon_url: None,
                                                 });
                                         } else {
                                             debug!("No files found for Modrinth version {} (project {}) to determine download URL.", modrinth_version.id, modrinth_version.project_id);
@@ -2909,6 +2915,10 @@ impl LocalContentLoader {
             }
         }
 
+        if params.fetch_modrinth_data {
+            Self::attach_icon_urls(&state, &mut final_items).await;
+        }
+
         info!(
             "Successfully loaded {} items of type {:?} for profile {}",
             final_items.len(),
@@ -2916,5 +2926,49 @@ impl LocalContentLoader {
             params.profile_id
         );
         Ok(final_items)
+    }
+
+    async fn attach_icon_urls(state: &Arc<State>, items: &mut [LocalContentItem]) {
+        let modrinth_ids: Vec<String> = items
+            .iter()
+            .filter_map(|i| i.modrinth_info.as_ref().map(|m| m.project_id.clone()))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if !modrinth_ids.is_empty() {
+            let projects = state.content_cache.peek_modrinth_projects(modrinth_ids).await;
+            for item in items.iter_mut() {
+                if let Some(info) = item.modrinth_info.as_mut() {
+                    if let Some(project) = projects.get(&info.project_id) {
+                        info.icon_url = project.icon_url.clone();
+                    }
+                }
+            }
+        }
+
+        let curseforge_ids: Vec<u32> = items
+            .iter()
+            .filter_map(|i| {
+                i.curseforge_info
+                    .as_ref()
+                    .and_then(|c| c.project_id.parse::<u32>().ok())
+            })
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if !curseforge_ids.is_empty() {
+            let mods = state.content_cache.peek_curseforge_mods(curseforge_ids).await;
+            for item in items.iter_mut() {
+                if let Some(info) = item.curseforge_info.as_mut() {
+                    if let Ok(id) = info.project_id.parse::<u32>() {
+                        if let Some(cf_mod) = mods.get(&id) {
+                            info.icon_url = cf_mod.logo.as_ref().map(|l| l.url.clone());
+                        }
+                    }
+                }
+            }
+        }
     }
 }

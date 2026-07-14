@@ -422,6 +422,7 @@ export interface GenericModrinthInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
 }
 
 export interface GenericCurseForgeInfo {
@@ -430,6 +431,7 @@ export interface GenericCurseForgeInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
   fingerprint?: number; // CurseForge file fingerprint for update checking
 }
 
