@@ -943,8 +943,12 @@ pub async fn get_mods_by_ids(
         )));
     }
 
-    // Try to parse the JSON response
-    let mods_response: CurseForgeModsResponse = match serde_json::from_str(&response_text) {
+    #[derive(Deserialize)]
+    struct RawModsResponse {
+        data: Vec<serde_json::Value>,
+    }
+
+    let raw: RawModsResponse = match serde_json::from_str(&response_text) {
         Ok(parsed) => parsed,
         Err(parse_err) => {
             log::error!(
@@ -953,7 +957,6 @@ pub async fn get_mods_by_ids(
                 safe_truncate(&response_text, 500)
             );
 
-            // Try to parse as error response
             if let Ok(error_response) = serde_json::from_str::<serde_json::Value>(&response_text) {
                 log::error!("Parsed response as generic JSON: {}", error_response);
             }
@@ -966,12 +969,22 @@ pub async fn get_mods_by_ids(
         }
     };
 
-    log::info!(
-        "Successfully retrieved {} mods by IDs",
-        mods_response.data.len()
-    );
+    let total = raw.data.len();
+    let mut mods = Vec::with_capacity(total);
+    for value in raw.data {
+        let id = value
+            .get("id")
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "<unknown>".to_string());
+        match serde_json::from_value::<CurseForgeMod>(value) {
+            Ok(cf_mod) => mods.push(cf_mod),
+            Err(e) => log::warn!("Skipping unparseable CurseForge mod {}: {}", id, e),
+        }
+    }
 
-    Ok(mods_response)
+    log::info!("Successfully retrieved {}/{} mods by IDs", mods.len(), total);
+
+    Ok(CurseForgeModsResponse { data: mods })
 }
 
 /// Get multiple files by their IDs in bulk
