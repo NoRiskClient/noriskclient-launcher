@@ -12,6 +12,10 @@ jobs:
   # --- JOB 0: Rust tests ---
   test:
     runs-on: ubuntu-22.04
+    # cargo test executes every dependency's build.rs, so this job must not hold a
+    # write-scoped token — actions/checkout persists it into .git/config.
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
