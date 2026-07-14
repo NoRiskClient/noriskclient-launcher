@@ -82,7 +82,8 @@ use commands::curseforge_commands::{get_curseforge_mods_by_ids, import_curseforg
 
 use commands::modrinth_commands::{
     check_modrinth_updates, check_mod_updates_unified_command, download_and_install_modrinth_modpack,
-    get_all_modrinth_versions_for_contexts, get_modrinth_tags_command, get_modrinth_mod_versions,
+    clear_content_cache_command, get_all_modrinth_versions_for_contexts, get_modrinth_tags_command,
+    get_modrinth_mod_versions,
     get_modpack_versions_unified_command, get_modrinth_project_details, get_modrinth_project_members,
     get_modrinth_versions_by_hashes, search_modrinth_mods,
     search_modrinth_projects, search_mods_unified_command, get_mod_versions_unified_command,
@@ -665,6 +666,7 @@ async fn main() {
             check_update_available_command,
             download_and_install_update_command,
             get_modrinth_tags_command,
+            clear_content_cache_command,
             get_modrinth_versions_by_hashes,
             switch_modpack_version_command,
             uninstall_content_from_profile,

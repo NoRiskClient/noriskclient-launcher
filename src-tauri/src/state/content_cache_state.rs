@@ -81,6 +81,29 @@ struct Row2Write<T> {
     ttl_ms: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct CacheClearStats {
+    pub rows_deleted: u64,
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+}
+
+async fn db_size_bytes() -> u64 {
+    let base = crate::state::db::db_path();
+    let mut total = 0;
+    for suffix in ["", "-wal", "-shm"] {
+        let path = if suffix.is_empty() {
+            base.clone()
+        } else {
+            base.with_extension(format!("db{}", suffix))
+        };
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            total += meta.len();
+        }
+    }
+    total
+}
+
 struct Inner {
     db: DbHandle,
     modpack_fetch_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
@@ -299,6 +322,40 @@ impl ContentCacheManager {
             .map_err(|e| AppError::Other(format!("Cache expiry sweep failed: {}", e)))?;
 
         Ok(res.rows_affected())
+    }
+
+    pub async fn clear(&self) -> Result<CacheClearStats> {
+        let Some(pool) = self.pool().await else {
+            return Ok(CacheClearStats::default());
+        };
+
+        let bytes_before = db_size_bytes().await;
+
+        let deleted = sqlx::query("DELETE FROM cache")
+            .execute(&pool)
+            .await
+            .map_err(|e| AppError::Other(format!("Could not clear the cache: {}", e)))?
+            .rows_affected();
+
+        let _ = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&pool)
+            .await;
+        if let Err(e) = sqlx::query("VACUUM").execute(&pool).await {
+            warn!("Cache VACUUM failed, the file will not shrink: {}", e);
+        }
+
+        let bytes_after = db_size_bytes().await;
+        info!(
+            "Cleared {} cache rows, {} KB freed",
+            deleted,
+            bytes_before.saturating_sub(bytes_after) / 1024
+        );
+
+        Ok(CacheClearStats {
+            rows_deleted: deleted,
+            bytes_before,
+            bytes_after,
+        })
     }
 
     async fn prune_missing_files(&self) -> Result<u64> {
@@ -1222,15 +1279,36 @@ impl PostInitializationHandler for ContentCacheManager {
 
         let this = self.clone();
         tokio::spawn(async move {
+            let mut removed = 0;
+
             match this.delete_expired(STALE_GRACE_MS).await {
-                Ok(n) if n > 0 => info!("Cache sweep removed {} expired rows", n),
+                Ok(n) => {
+                    if n > 0 {
+                        info!("Cache sweep removed {} expired rows", n);
+                    }
+                    removed += n;
+                }
                 Err(e) => warn!("Cache expiry sweep failed: {}", e),
-                _ => {}
             }
             match this.prune_missing_files().await {
-                Ok(n) if n > 0 => info!("Cache sweep removed {} stale file hashes", n),
+                Ok(n) => {
+                    if n > 0 {
+                        info!("Cache sweep removed {} stale file hashes", n);
+                    }
+                    removed += n;
+                }
                 Err(e) => warn!("File-hash prune failed: {}", e),
-                _ => {}
+            }
+
+            if removed > 0 {
+                if let Some(pool) = this.pool().await {
+                    let _ = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+                        .execute(&pool)
+                        .await;
+                    if let Err(e) = sqlx::query("VACUUM").execute(&pool).await {
+                        warn!("Cache VACUUM after sweep failed: {}", e);
+                    }
+                }
             }
         });
 

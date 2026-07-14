@@ -29,6 +29,7 @@ import {
 } from "../../services/profile-service";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileStore } from "../../store/profile-store";
+import { useContentCacheStore } from "../../store/content-cache-store";
 import { SettingsSection } from "../ui/settings/SettingsSection";
 
 export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
@@ -238,12 +239,19 @@ interface ModCacheCleanupStats {
   skipped_empty_keepset: boolean;
 }
 
+interface CacheClearStats {
+  rows_deleted: number;
+  bytes_before: number;
+  bytes_after: number;
+}
+
 function TestingPanel() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [filenames, setFilenames] = useState<string[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanStats, setCleanStats] = useState<ModCacheCleanupStats | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
   const [backups, setBackups] = useState<ProfileBackupInfo[] | null>(null);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [restoringPath, setRestoringPath] = useState<string | null>(null);
@@ -320,6 +328,39 @@ function TestingPanel() {
     setCleaning(false);
   }
 
+  async function runClearContentCache() {
+    const ok = await confirm({
+      title: t("debug.testing.clear_cache_confirm_title"),
+      message: t("debug.testing.clear_cache_confirm_message"),
+      confirmText: t("debug.testing.clear_cache"),
+      cancelText: t("common.cancel"),
+      type: "warning",
+      fullscreen: true,
+    });
+    if (!ok) return;
+
+    setClearingCache(true);
+    try {
+      const stats = await invoke<CacheClearStats>("clear_content_cache_command");
+
+      useContentCacheStore.setState({
+        entries: {},
+        modpackVersions: {},
+        modrinthTags: null,
+        diskSizes: {},
+      });
+
+      const mb = ((stats.bytes_before - stats.bytes_after) / (1024 * 1024)).toFixed(1);
+      toast.success(
+        t("debug.testing.clear_cache_result", { count: stats.rows_deleted, mb }),
+      );
+    } catch (e) {
+      console.error("Failed to clear the content cache:", e);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
+    }
+    setClearingCache(false);
+  }
+
   return (
     <div className="space-y-3">
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
@@ -384,6 +425,29 @@ function TestingPanel() {
             <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           )}
           {t("debug.testing.clean")}
+        </button>
+      </div>
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon icon="solar:database-bold" className="w-5 h-5 text-red-300 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft">{t("debug.testing.clear_cache_title")}</div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            {t("debug.testing.clear_cache_desc")}
+          </div>
+        </div>
+        <button
+          onClick={runClearContentCache}
+          disabled={clearingCache}
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run clear_content_cache_command"
+        >
+          {clearingCache ? (
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+          ) : (
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+          )}
+          {t("debug.testing.clear_cache")}
         </button>
       </div>
 

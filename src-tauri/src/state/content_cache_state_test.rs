@@ -217,3 +217,37 @@ async fn no_pool_means_miss_not_panic() {
     assert!(m.get_file_hash("/p", 1, 1).await.is_none());
     assert!(m.save().await.is_ok());
 }
+
+#[tokio::test]
+async fn clear_removes_every_row() {
+    let m = manager().await;
+
+    let rows: Vec<Row2Write<String>> = (0..50)
+        .map(|i| Row2Write {
+            id: format!("k{i}"),
+            alias: None,
+            data: Some("x".repeat(500)),
+            ttl_ms: TTL_METADATA_MS,
+        })
+        .collect();
+    m.put_entries(K, rows).await;
+    m.put_file_hashes(vec![(
+        "/p".to_string(),
+        FileHashEntry { size: 1, mtime_ms: 1, sha1: "h".to_string() },
+    )])
+    .await;
+
+    let stats = m.clear().await.unwrap();
+    assert_eq!(stats.rows_deleted, 51, "file hashes go too — clear means clear");
+
+    let keys: Vec<String> = (0..50).map(|i| format!("k{i}")).collect();
+    assert!(m.get_entries::<String>(K, &keys).await.is_empty());
+    assert!(m.get_file_hash("/p", 1, 1).await.is_none());
+}
+
+#[tokio::test]
+async fn clear_without_a_pool_is_harmless() {
+    let m = ContentCacheManager::new(db::new_handle()).unwrap();
+    let stats = m.clear().await.unwrap();
+    assert_eq!(stats.rows_deleted, 0);
+}

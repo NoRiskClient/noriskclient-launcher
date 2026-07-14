@@ -516,3 +516,18 @@ pub async fn get_modrinth_project_members(
     log::debug!("Serving {} team members", members.len());
     Ok(members)
 }
+
+#[tauri::command]
+pub async fn clear_content_cache_command(
+) -> Result<crate::state::content_cache_state::CacheClearStats, CommandError> {
+    log::info!("Received clear_content_cache_command");
+
+    let state = State::get().await.map_err(CommandError::from)?;
+    let stats = state
+        .content_cache
+        .clear()
+        .await
+        .map_err(CommandError::from)?;
+
+    Ok(stats)
+}
