@@ -15,7 +15,7 @@ pub static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
 pub static CUSTOM_GAME_DIR_CACHE: Lazy<RwLock<Option<Option<PathBuf>>>> = 
     Lazy::new(|| RwLock::new(None));
 
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"), " (support@norisk.gg)");
 
 /// HTTP Client with launcher agent
 pub static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
