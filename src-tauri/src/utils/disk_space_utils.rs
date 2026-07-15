@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
 use log::{debug, error, info, warn};
 use std::path::Path;
-use sysinfo::{Disks, RefreshKind};
+use sysinfo::Disks;
 
 /// Disk space information
 #[derive(Debug, Clone)]
@@ -42,64 +42,158 @@ impl DiskSpaceInfo {
 pub struct DiskSpaceUtils;
 
 impl DiskSpaceUtils {
-    /// Get disk space information for a given path using sysinfo
+    /// Get disk space information for a given path.
+    ///
+    /// Uses a multi-strategy approach for reliability across platforms:
+    /// 1. Try sysinfo mount-point matching on the path and its parents
+    /// 2. Fall back to libc statvfs which queries the filesystem directly
     pub async fn get_disk_space<P: AsRef<Path>>(path: P) -> Result<DiskSpaceInfo> {
         let path = path.as_ref();
         debug!("Getting disk space for path: {:?}", path);
 
-        // Create a new Disks instance and refresh the list
+        // Strategy 1: Try sysinfo by walking up parent directories
+        if let Some(info) = Self::try_sysinfo(path) {
+            return Ok(info);
+        }
+
+        debug!("sysinfo failed for {:?}, trying statvfs fallback", path);
+
+        // Strategy 2: statvfs on the path itself, then walk up parents
+        if let Some(info) = Self::try_statvfs(path) {
+            return Ok(info);
+        }
+
+        let error_msg = format!("No disk found for path: {:?}", path);
+        error!("{}", error_msg);
+        Err(AppError::Other(error_msg))
+    }
+
+    /// Try to get disk space via sysinfo by walking up parent directories
+    fn try_sysinfo(path: &Path) -> Option<DiskSpaceInfo> {
         let mut disks = Disks::new_with_refreshed_list();
-        
-        // Find the disk that contains the given path
-        let mut target_disk = None;
-        let mut longest_match = 0;
-        
-        for disk in disks.list() {
-            let mount_point = disk.mount_point();
-            
-            // Check if the path starts with this mount point
-            if path.starts_with(mount_point) {
-                let match_length = mount_point.as_os_str().len();
-                if match_length > longest_match {
-                    longest_match = match_length;
-                    target_disk = Some(disk);
+        disks.refresh(true);
+
+        let mut search_path = Some(path);
+        while let Some(current) = search_path {
+            let mut target_disk = None;
+            let mut longest_match = 0;
+
+            for disk in disks.list() {
+                let mount_point = disk.mount_point();
+                if current.starts_with(mount_point) {
+                    let match_length = mount_point.as_os_str().len();
+                    if match_length > longest_match {
+                        longest_match = match_length;
+                        target_disk = Some(disk);
+                    }
                 }
             }
+
+            if let Some(disk) = target_disk {
+                let available = disk.available_space();
+                let total = disk.total_space();
+                // Sanity check: skip disks that report 0 total space or
+                // available > total (can happen with wrong mount match)
+                if total > 0 && available <= total {
+                    debug!(
+                        "sysinfo matched disk for {:?} via mount {:?}: {} available / {} total",
+                        path,
+                        disk.mount_point(),
+                        format_bytes(available),
+                        format_bytes(total)
+                    );
+                    return Some(DiskSpaceInfo {
+                        available_bytes: available,
+                        total_bytes: total,
+                        used_bytes: total.saturating_sub(available),
+                    });
+                }
+                debug!(
+                    "sysinfo found disk for {:?} but sanity check failed (total={}, available={}), trying parent",
+                    path, total, available
+                );
+            }
+
+            search_path = current.parent();
         }
-        
-        let disk = target_disk.ok_or_else(|| {
-            let error_msg = format!("No disk found for path: {:?}", path);
-            error!("{}", error_msg);
-            AppError::Other(error_msg)
-        })?;
 
-        let available_bytes = disk.available_space();
-        let total_bytes = disk.total_space();
-        let used_bytes = total_bytes.saturating_sub(available_bytes);
+        debug!("sysinfo could not find a valid disk for {:?}", path);
+        None
+    }
 
-        debug!(
-            "Disk space for {:?}: {} available / {} total",
-            path,
-            format_bytes(available_bytes),
-            format_bytes(total_bytes)
-        );
+    /// Try to get disk space via statvfs, walking up parent directories
+    fn try_statvfs(path: &Path) -> Option<DiskSpaceInfo> {
+        let mut search_path = Some(path);
+        while let Some(current) = search_path {
+            if let Some(info) = Self::statvfs_single(current) {
+                debug!(
+                    "statvfs succeeded for {:?}: {} available / {} total",
+                    current,
+                    format_bytes(info.available_bytes),
+                    format_bytes(info.total_bytes)
+                );
+                return Some(info);
+            }
+            search_path = current.parent();
+        }
+        None
+    }
 
-        Ok(DiskSpaceInfo {
+    /// Query filesystem stats for a single path using statvfs
+    #[cfg(unix)]
+    fn statvfs_single(path: &Path) -> Option<DiskSpaceInfo> {
+        use std::ffi::CString;
+
+        let c_path = CString::new(path.to_str()?).ok()?;
+        let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+        let result = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
+
+        if result != 0 {
+            debug!(
+                "statvfs failed for {:?}: {}",
+                path,
+                std::io::Error::last_os_error()
+            );
+            return None;
+        }
+
+        let block_size = if stat.f_frsize > 0 {
+            stat.f_frsize as u64
+        } else {
+            stat.f_bsize as u64
+        };
+
+        let total_bytes = (stat.f_blocks as u64).saturating_mul(block_size);
+        let available_bytes = (stat.f_bavail as u64).saturating_mul(block_size);
+        let free_bytes = (stat.f_bfree as u64).saturating_mul(block_size);
+        let used_bytes = total_bytes.saturating_sub(free_bytes);
+
+        if total_bytes == 0 {
+            debug!("statvfs returned 0 total bytes for {:?}", path);
+            return None;
+        }
+
+        Some(DiskSpaceInfo {
             available_bytes,
             total_bytes,
             used_bytes,
         })
     }
 
+    #[cfg(not(unix))]
+    fn statvfs_single(_path: &Path) -> Option<DiskSpaceInfo> {
+        None
+    }
+
     /// Check if there's enough space for a download with buffer
     pub async fn check_space_for_download<P: AsRef<Path>>(
-        path: P, 
+        path: P,
         required_bytes: u64,
         buffer_percentage: f64,
     ) -> Result<bool> {
         let space_info = Self::get_disk_space(path).await?;
         let has_space = space_info.has_enough_space(required_bytes, buffer_percentage);
-        
+
         if has_space {
             info!(
                 "Disk space check passed: {} available, {} required (+{}% buffer)",
@@ -115,7 +209,7 @@ impl DiskSpaceUtils {
                 (buffer_percentage * 100.0) as u32
             );
         }
-        
+
         Ok(has_space)
     }
 
@@ -127,12 +221,12 @@ impl DiskSpaceUtils {
     ) -> Result<()> {
         let path = path.as_ref();
         let space_info = Self::get_disk_space(path).await?;
-        
+
         if !space_info.has_enough_space(required_bytes, buffer_percentage) {
             let buffer_bytes = (required_bytes as f64 * buffer_percentage) as u64;
             let total_required = required_bytes + buffer_bytes;
             let shortfall = total_required - space_info.available_bytes;
-            
+
             let error_msg = format!(
                 "Insufficient disk space on {:?}. Required: {} (+{}% buffer = {}), Available: {}, Shortfall: {}",
                 path,
@@ -142,7 +236,7 @@ impl DiskSpaceUtils {
                 space_info.available_human(),
                 format_bytes(shortfall)
             );
-            
+
             error!("{}", error_msg);
             return Err(AppError::InsufficientDiskSpace {
                 path: path.to_path_buf(),
@@ -151,7 +245,7 @@ impl DiskSpaceUtils {
                 shortfall_mb: shortfall / 1024 / 1024,
             });
         }
-        
+
         Ok(())
     }
 }
