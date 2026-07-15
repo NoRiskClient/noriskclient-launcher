@@ -78,7 +78,8 @@ jobs:
             export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${{ secrets.TAURI_KEY_PASSWORD }}"
             yarn tauri build --verbose $TARGET_FLAG
           else
-            yarn tauri build --verbose $TARGET_FLAG --config '{"updater":{"active":false}}'
+            jq 'del(.tauri.updater.pubkey)' src-tauri/tauri.conf.json > /tmp/tauri.conf.json && mv /tmp/tauri.conf.json src-tauri/tauri.conf.json
+            yarn tauri build --verbose $TARGET_FLAG
           fi
       
       - name: Fix AppImage (Remove Wayland libs & Resign)
