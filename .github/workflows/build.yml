@@ -66,17 +66,18 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: yarn install --frozen-lockfile # Use yarn install
 
-      # Tauri Action now handles build and sign
-      - name: Build and Sign Tauri App
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri App
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
-        with:
-          args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }} ${{ !startsWith(github.ref, 'refs/tags/') && '--config updater.active=false' || '' }}
-          packageManager: yarn
+        run: |
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            export TAURI_SIGNING_PRIVATE_KEY="${{ secrets.TAURI_PRIVATE_KEY }}"
+            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${{ secrets.TAURI_KEY_PASSWORD }}"
+          fi
+          TARGET_FLAG="${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}"
+          yarn tauri build --verbose $TARGET_FLAG
       
       - name: Fix AppImage (Remove Wayland libs & Resign)
         if: matrix.platform == 'ubuntu-22.04'
