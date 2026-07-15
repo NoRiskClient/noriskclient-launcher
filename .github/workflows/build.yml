@@ -72,12 +72,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
         run: |
+          TARGET_FLAG="${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}"
           if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
             export TAURI_SIGNING_PRIVATE_KEY="${{ secrets.TAURI_PRIVATE_KEY }}"
             export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${{ secrets.TAURI_KEY_PASSWORD }}"
+            yarn tauri build --verbose $TARGET_FLAG
+          else
+            yarn tauri build --verbose $TARGET_FLAG --config '{"updater":{"active":false}}'
           fi
-          TARGET_FLAG="${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}"
-          yarn tauri build --verbose $TARGET_FLAG
       
       - name: Fix AppImage (Remove Wayland libs & Resign)
         if: matrix.platform == 'ubuntu-22.04'
