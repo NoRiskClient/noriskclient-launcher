@@ -1927,12 +1927,12 @@
   "time.remaining_days_hours": "{{days}}g {{hours}}sa",
   "time.remaining_hours_minutes": "{{hours}}sa {{minutes}}dk",
   "time.remaining_minutes": "{{minutes}}dk",
-  "settings.custom_background.title": "Custom Background",
-  "settings.custom_background.description": "Choose a custom image or video as your background.",
-  "settings.custom_background.select": "Select File",
-  "settings.custom_background.clear": "Remove",
-  "settings.custom_background.change": "Change",
-  "settings.custom_background.opacity": "Visibility",
-  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
-  "settings.custom_background.hide_effects": "Hide other effects"
+  "settings.custom_background.title": "Özel Arka Plan",
+  "settings.custom_background.description": "Arka planınız olarak özel bir resim veya video seçin.",
+  "settings.custom_background.select": "Dosya Seç",
+  "settings.custom_background.clear": "Kaldır",
+  "settings.custom_background.change": "Değiştir",
+  "settings.custom_background.opacity": "Görünürlük",
+  "settings.custom_background.only_on_play": "Sadece 'Play' sekmesinde göster",
+  "settings.custom_background.hide_effects": "Diğer efektleri gizle"
 }

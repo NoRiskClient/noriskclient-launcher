@@ -1942,12 +1942,12 @@
   "time.remaining_days_hours": "{{days}}दि {{hours}}घं",
   "time.remaining_hours_minutes": "{{hours}}घं {{minutes}}मि",
   "time.remaining_minutes": "{{minutes}}मि",
-  "settings.custom_background.title": "Custom Background",
-  "settings.custom_background.description": "Choose a custom image or video as your background.",
-  "settings.custom_background.select": "Select File",
-  "settings.custom_background.clear": "Remove",
-  "settings.custom_background.change": "Change",
-  "settings.custom_background.opacity": "Visibility",
-  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
-  "settings.custom_background.hide_effects": "Hide other effects"
+  "settings.custom_background.title": "कस्टम पृष्ठभूमि",
+  "settings.custom_background.description": "अपनी पृष्ठभूमि के रूप में एक कस्टम छवि या वीडियो चुनें।",
+  "settings.custom_background.select": "फ़ाइल चुनें",
+  "settings.custom_background.clear": "हटाएं",
+  "settings.custom_background.change": "बदलें",
+  "settings.custom_background.opacity": "दृश्यता",
+  "settings.custom_background.only_on_play": "केवल 'Play' टैब पर दिखाएं",
+  "settings.custom_background.hide_effects": "अन्य प्रभाव छुपाएं"
 }

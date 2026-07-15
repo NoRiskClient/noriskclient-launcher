@@ -1927,12 +1927,12 @@
   "time.remaining_days_hours": "{{days}}d {{hours}}godz",
   "time.remaining_hours_minutes": "{{hours}}godz {{minutes}}min",
   "time.remaining_minutes": "{{minutes}}min",
-  "settings.custom_background.title": "Custom Background",
-  "settings.custom_background.description": "Choose a custom image or video as your background.",
-  "settings.custom_background.select": "Select File",
-  "settings.custom_background.clear": "Remove",
-  "settings.custom_background.change": "Change",
-  "settings.custom_background.opacity": "Visibility",
-  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
-  "settings.custom_background.hide_effects": "Hide other effects"
+  "settings.custom_background.title": "Niestandardowe tło",
+  "settings.custom_background.description": "Wybierz własne zdjęcie lub film jako tło.",
+  "settings.custom_background.select": "Wybierz plik",
+  "settings.custom_background.clear": "Usuń",
+  "settings.custom_background.change": "Zmień",
+  "settings.custom_background.opacity": "Widoczność",
+  "settings.custom_background.only_on_play": "Pokaż tylko w zakładce 'Play'",
+  "settings.custom_background.hide_effects": "Ukryj inne efekty"
 }

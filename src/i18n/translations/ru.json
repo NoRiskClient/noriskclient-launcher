@@ -1927,12 +1927,12 @@
   "time.remaining_days_hours": "{{days}}д {{hours}}ч",
   "time.remaining_hours_minutes": "{{hours}}ч {{minutes}}м",
   "time.remaining_minutes": "{{minutes}}м",
-  "settings.custom_background.title": "Custom Background",
-  "settings.custom_background.description": "Choose a custom image or video as your background.",
-  "settings.custom_background.select": "Select File",
-  "settings.custom_background.clear": "Remove",
-  "settings.custom_background.change": "Change",
-  "settings.custom_background.opacity": "Visibility",
-  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
-  "settings.custom_background.hide_effects": "Hide other effects"
+  "settings.custom_background.title": "Пользовательский фон",
+  "settings.custom_background.description": "Выберите собственное изображение или видео в качестве фона.",
+  "settings.custom_background.select": "Выбрать файл",
+  "settings.custom_background.clear": "Удалить",
+  "settings.custom_background.change": "Изменить",
+  "settings.custom_background.opacity": "Видимость",
+  "settings.custom_background.only_on_play": "Показывать только на вкладке 'Play'",
+  "settings.custom_background.hide_effects": "Скрыть другие эффекты"
 }
