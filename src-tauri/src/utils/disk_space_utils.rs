@@ -42,23 +42,17 @@ impl DiskSpaceInfo {
 pub struct DiskSpaceUtils;
 
 impl DiskSpaceUtils {
-    /// Get disk space information for a given path.
-    ///
-    /// Uses a multi-strategy approach for reliability across platforms:
-    /// 1. Try sysinfo mount-point matching on the path and its parents
-    /// 2. Fall back to libc statvfs which queries the filesystem directly
+    /// Get disk space information for a given path
     pub async fn get_disk_space<P: AsRef<Path>>(path: P) -> Result<DiskSpaceInfo> {
         let path = path.as_ref();
         debug!("Getting disk space for path: {:?}", path);
 
-        // Strategy 1: Try sysinfo by walking up parent directories
         if let Some(info) = Self::try_sysinfo(path) {
             return Ok(info);
         }
 
         debug!("sysinfo failed for {:?}, trying statvfs fallback", path);
 
-        // Strategy 2: statvfs on the path itself, then walk up parents
         if let Some(info) = Self::try_statvfs(path) {
             return Ok(info);
         }
@@ -68,7 +62,6 @@ impl DiskSpaceUtils {
         Err(AppError::Other(error_msg))
     }
 
-    /// Try to get disk space via sysinfo by walking up parent directories
     fn try_sysinfo(path: &Path) -> Option<DiskSpaceInfo> {
         let mut disks = Disks::new_with_refreshed_list();
         disks.refresh(true);
@@ -92,8 +85,6 @@ impl DiskSpaceUtils {
             if let Some(disk) = target_disk {
                 let available = disk.available_space();
                 let total = disk.total_space();
-                // Sanity check: skip disks that report 0 total space or
-                // available > total (can happen with wrong mount match)
                 if total > 0 && available <= total {
                     debug!(
                         "sysinfo matched disk for {:?} via mount {:?}: {} available / {} total",
@@ -121,7 +112,6 @@ impl DiskSpaceUtils {
         None
     }
 
-    /// Try to get disk space via statvfs, walking up parent directories
     fn try_statvfs(path: &Path) -> Option<DiskSpaceInfo> {
         let mut search_path = Some(path);
         while let Some(current) = search_path {
@@ -139,7 +129,6 @@ impl DiskSpaceUtils {
         None
     }
 
-    /// Query filesystem stats for a single path using statvfs
     #[cfg(unix)]
     fn statvfs_single(path: &Path) -> Option<DiskSpaceInfo> {
         use std::ffi::CString;
