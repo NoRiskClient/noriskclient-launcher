@@ -942,12 +942,10 @@
   "server.stop": "Стоп",
   "server.join": "Войти",
   "server.mods": "Моды",
-
   "wm.public_viewing": "Просмотр ЧМ",
   "wm.tooltip": "Совместный просмотр ЧМ на HugoSMP.net! Нужна {{version}}!",
   "wm.switch_to_main": "вернуться к обычному запуску",
   "wm.switch_to_hugo": "Переключиться на {{server}}",
-
   "radius.title": "Радиус скругления",
   "radius.square": "Квадратный",
   "radius.minimal": "Минимальный",
@@ -1713,7 +1711,6 @@
   "placeholders.profile_name_awesome": "Мой крутой профиль",
   "placeholders.group_name": "например, модпаки, ванилла+",
   "referral.loading": "Загрузка реферала...",
-
   "rollout.popover.title": "Вы тестируете новую версию NRC",
   "rollout.popover.title_opted_out": "Тестирование отключено",
   "rollout.popover.body_intro_before": "Вы один из",
@@ -1929,5 +1926,13 @@
   "time.until_remaining": "до {{date}} (осталось {{remaining}})",
   "time.remaining_days_hours": "{{days}}д {{hours}}ч",
   "time.remaining_hours_minutes": "{{hours}}ч {{minutes}}м",
-  "time.remaining_minutes": "{{minutes}}м"
+  "time.remaining_minutes": "{{minutes}}м",
+  "settings.custom_background.title": "Custom Background",
+  "settings.custom_background.description": "Choose a custom image or video as your background.",
+  "settings.custom_background.select": "Select File",
+  "settings.custom_background.clear": "Remove",
+  "settings.custom_background.change": "Change",
+  "settings.custom_background.opacity": "Visibility",
+  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
+  "settings.custom_background.hide_effects": "Hide other effects"
 }

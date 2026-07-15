@@ -831,12 +831,10 @@
   "server.stop": "रोकें",
   "server.join": "जुड़ें",
   "server.mods": "Mods",
-
   "wm.public_viewing": "वर्ल्ड कप पब्लिक व्यूइंग",
   "wm.tooltip": "HugoSMP.net पर वर्ल्ड कप पब्लिक व्यूइंग! आपको {{version}} चाहिए!",
   "wm.switch_to_main": "मुख्य लॉन्च पर लौटें",
   "wm.switch_to_hugo": "{{server}} पर जाएं",
-
   "radius.title": "बॉर्डर रेडियस",
   "radius.square": "वर्गाकार",
   "radius.minimal": "न्यूनतम",
@@ -1529,7 +1527,6 @@
   "placeholders.profile_name_awesome": "मेरी शानदार प्रोफ़ाइल",
   "placeholders.group_name": "जैसे modpacks, vanilla+",
   "referral.loading": "रेफरल लोड हो रहा है...",
-
   "rollout.popover.title": "आप नया NRC संस्करण टेस्ट कर रहे हैं",
   "rollout.popover.title_opted_out": "टेस्टिंग बंद",
   "rollout.popover.body_intro_before": "आप उन",
@@ -1944,5 +1941,13 @@
   "time.until_remaining": "{{date}} तक ({{remaining}} शेष)",
   "time.remaining_days_hours": "{{days}}दि {{hours}}घं",
   "time.remaining_hours_minutes": "{{hours}}घं {{minutes}}मि",
-  "time.remaining_minutes": "{{minutes}}मि"
+  "time.remaining_minutes": "{{minutes}}मि",
+  "settings.custom_background.title": "Custom Background",
+  "settings.custom_background.description": "Choose a custom image or video as your background.",
+  "settings.custom_background.select": "Select File",
+  "settings.custom_background.clear": "Remove",
+  "settings.custom_background.change": "Change",
+  "settings.custom_background.opacity": "Visibility",
+  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
+  "settings.custom_background.hide_effects": "Hide other effects"
 }

@@ -822,12 +822,10 @@
   "server.stop": "Zatrzymaj",
   "server.join": "Dołącz",
   "server.mods": "Mody",
-
   "wm.public_viewing": "Strefa Kibica MŚ",
   "wm.tooltip": "Strefa kibica mistrzostw świata na HugoSMP.net! Potrzebujesz {{version}}!",
   "wm.switch_to_main": "wróć do głównego uruchamiania",
   "wm.switch_to_hugo": "Przełącz na {{server}}",
-
   "radius.title": "Promień zaokrąglenia",
   "radius.square": "Kwadratowy",
   "radius.minimal": "Minimalny",
@@ -1520,7 +1518,6 @@
   "placeholders.profile_name_awesome": "Mój super profil",
   "placeholders.group_name": "np. modpacki, vanilla+",
   "referral.loading": "Ładowanie polecenia...",
-
   "rollout.popover.title": "Testujesz nową wersję NRC",
   "rollout.popover.title_opted_out": "Testy wyłączone",
   "rollout.popover.body_intro_before": "Jesteś jednym z",
@@ -1929,5 +1926,13 @@
   "time.until_remaining": "do {{date}} (pozostało {{remaining}})",
   "time.remaining_days_hours": "{{days}}d {{hours}}godz",
   "time.remaining_hours_minutes": "{{hours}}godz {{minutes}}min",
-  "time.remaining_minutes": "{{minutes}}min"
+  "time.remaining_minutes": "{{minutes}}min",
+  "settings.custom_background.title": "Custom Background",
+  "settings.custom_background.description": "Choose a custom image or video as your background.",
+  "settings.custom_background.select": "Select File",
+  "settings.custom_background.clear": "Remove",
+  "settings.custom_background.change": "Change",
+  "settings.custom_background.opacity": "Visibility",
+  "settings.custom_background.only_on_play": "Show only on 'Play' tab",
+  "settings.custom_background.hide_effects": "Hide other effects"
 }
