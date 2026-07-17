@@ -63,53 +63,50 @@ impl DiskSpaceUtils {
     }
 
     fn try_sysinfo(path: &Path) -> Option<DiskSpaceInfo> {
-        let mut disks = Disks::new_with_refreshed_list();
-        disks.refresh(true);
+        let disks = Disks::new_with_refreshed_list();
 
-        let mut search_path = Some(path);
-        while let Some(current) = search_path {
-            let mut target_disk = None;
-            let mut longest_match = 0;
+        let mut target_disk = None;
+        let mut longest_match = 0;
 
-            for disk in disks.list() {
-                let mount_point = disk.mount_point();
-                if current.starts_with(mount_point) {
-                    let match_length = mount_point.as_os_str().len();
-                    if match_length > longest_match {
-                        longest_match = match_length;
-                        target_disk = Some(disk);
-                    }
+        for disk in disks.list() {
+            let mount_point = disk.mount_point();
+            if path.starts_with(mount_point) {
+                let match_length = mount_point.as_os_str().len();
+                if match_length > longest_match {
+                    longest_match = match_length;
+                    target_disk = Some(disk);
                 }
             }
-
-            if let Some(disk) = target_disk {
-                let available = disk.available_space();
-                let total = disk.total_space();
-                if total > 0 && available <= total {
-                    debug!(
-                        "sysinfo matched disk for {:?} via mount {:?}: {} available / {} total",
-                        path,
-                        disk.mount_point(),
-                        format_bytes(available),
-                        format_bytes(total)
-                    );
-                    return Some(DiskSpaceInfo {
-                        available_bytes: available,
-                        total_bytes: total,
-                        used_bytes: total.saturating_sub(available),
-                    });
-                }
-                debug!(
-                    "sysinfo found disk for {:?} but sanity check failed (total={}, available={}), trying parent",
-                    path, total, available
-                );
-            }
-
-            search_path = current.parent();
         }
 
-        debug!("sysinfo could not find a valid disk for {:?}", path);
-        None
+        let disk = target_disk?;
+        let available = disk.available_space();
+        let total = disk.total_space();
+
+        if total == 0 || available > total {
+            debug!(
+                "sysinfo matched mount {:?} for {:?} but reported total={} available={}; deferring to statvfs",
+                disk.mount_point(),
+                path,
+                total,
+                available
+            );
+            return None;
+        }
+
+        debug!(
+            "sysinfo matched disk for {:?} via mount {:?}: {} available / {} total",
+            path,
+            disk.mount_point(),
+            format_bytes(available),
+            format_bytes(total)
+        );
+
+        Some(DiskSpaceInfo {
+            available_bytes: available,
+            total_bytes: total,
+            used_bytes: total.saturating_sub(available),
+        })
     }
 
     fn try_statvfs(path: &Path) -> Option<DiskSpaceInfo> {
@@ -132,8 +129,9 @@ impl DiskSpaceUtils {
     #[cfg(unix)]
     fn statvfs_single(path: &Path) -> Option<DiskSpaceInfo> {
         use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
 
-        let c_path = CString::new(path.to_str()?).ok()?;
+        let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
         let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
         let result = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
 
@@ -263,34 +261,5 @@ fn format_bytes(bytes: u64) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_format_bytes() {
-        assert_eq!(format_bytes(0), "0 B");
-        assert_eq!(format_bytes(512), "512 B");
-        assert_eq!(format_bytes(1024), "1.0 KB");
-        assert_eq!(format_bytes(1536), "1.5 KB");
-        assert_eq!(format_bytes(1048576), "1.0 MB");
-        assert_eq!(format_bytes(1073741824), "1.0 GB");
-    }
-
-    #[test]
-    fn test_has_enough_space() {
-        let disk_info = DiskSpaceInfo {
-            available_bytes: 1000,
-            total_bytes: 2000,
-            used_bytes: 1000,
-        };
-        
-        // Without buffer should work
-        assert!(disk_info.has_enough_space(800, 0.0));
-        
-        // With 25% buffer: 800 + 200 = 1000, exactly available
-        assert!(disk_info.has_enough_space(800, 0.25));
-        
-        // With 25% buffer: 850 + 212.5 = 1062.5, exceeds available
-        assert!(!disk_info.has_enough_space(850, 0.25));
-    }
-} 
+#[path = "disk_space_utils_test.rs"]
+mod tests; 

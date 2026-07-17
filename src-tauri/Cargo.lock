@@ -3596,6 +3596,7 @@ dependencies = [
  "image",
  "jsonwebtoken",
  "lazy_static",
+ "libc",
  "log",
  "log4rs",
  "machineid-rs",
