@@ -47,21 +47,21 @@ export function FloatingActionBar({
       >
         <div className="flex items-center gap-2 pl-3.5 pr-2 whitespace-nowrap">
           {batchProgress ? (
-            <span className="flex items-center gap-1.5 text-xs font-minecraft-ten text-white tabular-nums whitespace-nowrap">
-              <Icon icon="solar:refresh-bold" className="w-3 h-3 animate-spin" style={{ color: accent }} />
+            <span className="flex items-center gap-1.5 text-xs font-minecraft text-white tabular-nums whitespace-nowrap">
+              <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" style={{ color: accent }} />
               <span style={{ color: accent }}>{batchProgress.current}</span>
               <span className="text-white/40">/ {batchProgress.total}</span>
             </span>
           ) : (
             <>
-              <span className="text-xs font-minecraft-ten text-white tabular-nums whitespace-nowrap">
+              <span className="text-xs font-minecraft text-white tabular-nums whitespace-nowrap">
                 <span style={{ color: accent }}>{count}</span>
                 <span className="text-white/40"> / {totalCount}</span>
               </span>
               {!allSelected && (
                 <button
                   onClick={onSelectAll}
-                  className="h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-white/55 hover:text-white hover:bg-white/10 transition-colors"
+                  className="h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-white/55 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   {t("profiles.v3.fab.all")}
                 </button>
@@ -98,7 +98,7 @@ const FabButton: React.FC<FABActionConfig> = ({ icon, label, tone, onClick, disa
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`relative h-8 px-2.5 mx-0.5 rounded-md flex items-center gap-1.5 text-xs font-minecraft-ten transition-colors disabled:opacity-50 ${toneClass}`}
+      className={`relative h-8 px-2.5 mx-0.5 rounded-md flex items-center gap-1.5 text-xs font-minecraft transition-colors disabled:opacity-50 ${toneClass}`}
     >
       <Icon icon={icon} className="w-3.5 h-3.5" />
       <span>{label}</span>

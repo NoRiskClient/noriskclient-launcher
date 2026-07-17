@@ -50,7 +50,7 @@ function AccountLinkRow({
     <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
       <div className="flex items-center">
         <Icon icon={icon} className="w-6 h-6 mr-3 text-white/80" />
-        <span className="text-white/90 font-minecraft-ten text-xs">{name}</span>
+        <span className="text-white/90 font-minecraft text-xs">{name}</span>
       </div>
       <div className="flex items-center gap-2">
         {isLinked ? (
@@ -310,7 +310,7 @@ export function SocialsModal() {
             icon="mdi:gift-outline"
             className="w-16 h-16 text-accent"
           />
-          <p className="text-white/90 font-minecraft-ten text-sm select-none">
+          <p className="text-white/90 font-minecraft text-sm select-none">
             {t('socials.referral_text')}{" "}
             <span
               className="text-accent underline cursor-pointer hover:text-accent/80"
@@ -346,7 +346,7 @@ export function SocialsModal() {
               <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
                 <div className="flex items-center">
                   <Icon icon="material-symbols:phone-android" className="w-6 h-6 mr-3 text-white/80" />
-                  <span className="text-white/90 font-minecraft-ten text-xs">{t('socials.mobile_app')}</span>
+                  <span className="text-white/90 font-minecraft text-xs">{t('socials.mobile_app')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {mobileAppToken || isLoadingMobileApp ? (
@@ -395,7 +395,7 @@ export function SocialsModal() {
               {showQrCode && mobileAppToken && (
                 <div className="flex justify-center p-3 bg-black/10 rounded-md">
                   <div className="text-center space-y-2">
-                    <p className="text-white/70 font-minecraft-ten text-xs select-none">
+                    <p className="text-white/70 font-minecraft text-xs select-none">
                       {t('socials.scan_qr')}
                     </p>
                     <img

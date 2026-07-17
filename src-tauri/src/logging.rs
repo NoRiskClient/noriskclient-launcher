@@ -5,7 +5,7 @@ use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWin
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 use log4rs::append::rolling_file::RollingFileAppender;
-use log4rs::config::{Appender, Config, Root};
+use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use tokio::fs;
 
@@ -56,6 +56,7 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::builder()
         .appender(Appender::builder().build("file", Box::new(file_appender)))
         .appender(Appender::builder().build("stdout", Box::new(console_appender))) // Add console appender
+        .logger(Logger::builder().build("sqlx::query", LevelFilter::Warn))
         .build(
             Root::builder()
                 .appender("file") // Log to file

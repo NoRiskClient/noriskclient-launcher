@@ -4,17 +4,15 @@ use crate::minecraft::auth::minecraft_auth::NoRiskToken;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
 use crate::state::process_state::ProcessMetadata;
 use crate::{
-    config::HTTP_CLIENT,
     error::{AppError, Result},
+    utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put},
 };
 use crate::state::state_manager::State;
 use crate::state::event_state::{EventPayload, EventType};
-use chrono::Utc;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
-use rand;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -156,16 +154,9 @@ impl NoRiskApi {
         debug!("[NoRisk API] Requesting new server ID");
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[NoRisk API] Server ID request failed: {}", e);
-                AppError::RequestError(format!("Failed to request server ID from NoRisk API: {}", e))
-            })?;
-
-        let server_response = crate::utils::api_utils::parse_response_with_logging::<ServerIdResponse>(response, "NoRisk server-id").await?;
+        let server_response = nrc_post(url)
+            .json::<ServerIdResponse>("NoRisk server-id")
+            .await?;
 
         let server_id = &server_response.server_id;
         if !server_id.starts_with("nrc-") {
@@ -210,18 +201,11 @@ impl NoRiskApi {
             "[NoRisk API] Sending POST request with {} parameters",
             query_params.len()
         );
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&query_params)
-            .send()
+            .json::<T>(endpoint)
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send request to NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<T>(response, endpoint).await
     }
 
     pub async fn get_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
@@ -236,9 +220,7 @@ impl NoRiskApi {
         debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let mut request = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
+        let mut request = nrc_get(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
             debug!("[NoRisk API] Adding {} query parameters", extra.len());
@@ -246,12 +228,7 @@ impl NoRiskApi {
         }
 
         debug!("[NoRisk API] Sending GET request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] GET request failed: {}", e);
-            AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
-        })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<T>(response, endpoint).await
+        request.json::<T>(endpoint).await
     }
 
     pub async fn delete_from_norisk_endpoint_text_with_parameters(
@@ -269,9 +246,7 @@ impl NoRiskApi {
         );
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let mut request = HTTP_CLIENT
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
+        let mut request = nrc_delete(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
             debug!("[NoRisk API] Adding {} query parameters", extra.len());
@@ -279,15 +254,7 @@ impl NoRiskApi {
         }
 
         debug!("[NoRisk API] Sending DELETE request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] DELETE request failed: {}", e);
-            AppError::RequestError(format!(
-                "Failed to send DELETE request to NoRisk API: {}",
-                e
-            ))
-        })?;
-
-        crate::utils::api_utils::parse_text_response_with_logging(response, endpoint).await
+        request.text(endpoint).await
     }
 
     /// Secure version of token refresh using server-provided server ID
@@ -368,17 +335,10 @@ impl NoRiskApi {
         query_params.insert("server_id", server_id);
 
         debug!("[NoRisk API] Sending POST request with server-provided server ID");
-        let response = HTTP_CLIENT
-            .post(url)
+        nrc_post(url)
             .query(&query_params)
-            .send()
+            .json::<NoRiskToken>("NoRisk token refresh v3")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] v3 token refresh request failed: {}", e);
-                AppError::RequestError(format!("Failed to send v3 token refresh request to NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<NoRiskToken>(response, "NoRisk token refresh v3").await
     }
 
     pub async fn request_from_norisk_endpoint<T: for<'de> Deserialize<'de>>(
@@ -570,19 +530,12 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] Checking crash log at: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .json(crash_log_data)
-            .send()
+            .json_body(crash_log_data)
+            .json::<serde_json::Value>(endpoint)
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Crash log check request failed: {}", e);
-                AppError::RequestError(format!("Failed to send crash log check to NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<serde_json::Value>(response, endpoint).await
     }
 
     pub async fn get_mcreal_app_token(
@@ -597,18 +550,11 @@ impl NoRiskApi {
         info!("[NoRisk API] Requesting mcreal app token");
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .text("McReal app token")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] McReal app token request failed: {}", e);
-                AppError::RequestError(format!("Failed to get mobile app token from NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_text_response_with_logging(response, "McReal app token").await
     }
 
     pub async fn get_user_permissions(
@@ -623,18 +569,11 @@ impl NoRiskApi {
         debug!("[NoRisk API] Requesting user permissions for {}", player_uuid);
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&[("uuid", player_uuid)])
-            .send()
+            .json::<Vec<String>>("NoRisk permissions")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Permissions request failed: {}", e);
-                AppError::RequestError(format!("Failed to get permissions from NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<String>>(response, "NoRisk permissions").await
     }
 
     pub async fn reset_mcreal_app_token(
@@ -649,18 +588,11 @@ impl NoRiskApi {
         info!("[NoRisk API] Resetting mcreal app token");
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .text("McReal app token reset")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] McReal app token reset request failed: {}", e);
-                AppError::RequestError(format!("Failed to reset mobile app token from NoRisk API: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_text_response_with_logging(response, "McReal app token reset").await
     }
 
     /// Fetches the advent calendar data from the NoRisk API.
@@ -683,20 +615,11 @@ impl NoRiskApi {
         let mut extra_params = HashMap::new();
         extra_params.insert("uuid", request_uuid);
 
-        let mut request = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
-
-        debug!("[NoRisk API] Adding UUID query parameter: {}", request_uuid);
-        request = request.query(&extra_params);
-
-        debug!("[NoRisk API] Sending GET request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] GET request failed: {}", e);
-            AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
-        })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<AdventCalendarDay>>(response, "Advent calendar").await
+        nrc_get(url)
+            .bearer(norisk_token)
+            .query(&extra_params)
+            .json::<Vec<AdventCalendarDay>>("Advent calendar")
+            .await
     }
 
     /// Claims a reward for a specific day in the advent calendar.
@@ -717,18 +640,11 @@ impl NoRiskApi {
         debug!("[NoRisk API] Full URL: {}", url);
         debug!("[NoRisk API] With request UUID: {}", request_uuid);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .json::<AdventCalendarDay>("Advent calendar claim")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Advent calendar claim request failed: {}", e);
-                AppError::RequestError(format!("Failed to claim advent calendar day: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<AdventCalendarDay>(response, "Advent calendar claim").await
     }
 
     /// Report a referral code to the backend for tracking.
@@ -755,19 +671,12 @@ impl NoRiskApi {
 
         let request_body = ReferralReportRequest { code };
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", account_id.to_string())])
-            .json(&request_body)
-            .send()
+            .json_body(&request_body)
+            .expect_success("Referral report")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Referral report request failed: {}", e);
-                AppError::RequestError(format!("Failed to report referral code: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Referral report").await
     }
 
     /// Get information about a referral code (public endpoint, no auth required).
@@ -779,17 +688,10 @@ impl NoRiskApi {
         info!("[NoRisk API] Fetching referral info for code: {}", code);
         debug!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(&url)
+        nrc_get(&url)
             .query(&[("code", code)])
-            .send()
+            .json::<ReferralInfo>("Referral info")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Referral info request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch referral info: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<ReferralInfo>(response, "Referral info").await
     }
 
     /// Get all notifications for the current user
@@ -803,18 +705,11 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] Fetching notifications from: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .json::<Vec<UserNotification>>("Notifications")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Notifications request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch notifications: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging(response, "Notifications").await
     }
 
     /// Mark all notifications as read
@@ -828,15 +723,11 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] Marking all notifications as read");
 
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_put(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .expect_success("Mark all notifications read")
             .await
-            .map_err(|e| AppError::RequestError(e.to_string()))?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Mark all notifications read").await
     }
 
     /// Mark a specific notification as read
@@ -854,15 +745,11 @@ impl NoRiskApi {
             "[NoRisk API] Marking notification {} as read",
             notification_id
         );
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_put(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid), ("notificationId", notification_id)])
-            .send()
+            .expect_success("Mark notification read")
             .await
-            .map_err(|e| AppError::RequestError(e.to_string()))?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Mark notification read").await
     }
 
     /// Confirm an auth bridge session for website authentication.
@@ -877,15 +764,11 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] Confirming auth bridge session: {}", session_id);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(&url)
+            .bearer(norisk_token)
             .query(&[("sessionId", session_id)])
-            .send()
+            .expect_success("Auth bridge confirm")
             .await
-            .map_err(|e| AppError::RequestError(format!("Auth bridge request failed: {}", e)))?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Auth bridge confirm").await
     }
 
     /// Fetches the unique players (last 24h) stat from the NoRisk API.
@@ -897,12 +780,9 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] GET {}", url);
 
-        let response = HTTP_CLIENT.get(&url).send().await.map_err(|e| {
-            error!("[NoRisk API] uniquePlayers24h request failed: {}", e);
-            AppError::RequestError(format!("Failed to GET {}: {}", url, e))
-        })?;
-
-        crate::utils::api_utils::parse_response_with_logging(response, "UniquePlayers24h").await
+        nrc_get(&url)
+            .json::<UniquePlayersResponse>("UniquePlayers24h")
+            .await
     }
 }
 

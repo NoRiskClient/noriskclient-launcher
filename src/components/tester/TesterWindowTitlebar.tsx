@@ -26,14 +26,14 @@ export function TesterWindowTitlebar({ remaining }: TesterWindowTitlebarProps) {
           style={{ color: accentColor.value }}
         />
         <span
-          className="font-minecraft-ten text-xs uppercase tracking-wider"
+          className="font-minecraft text-xs tracking-wider"
           style={{ color: accentColor.value }}
         >
           NoRisk Tester Queue
         </span>
         {remaining > 0 && (
           <span
-            className="px-2 py-0.5 rounded font-minecraft-ten text-[10px] uppercase tracking-wider"
+            className="px-2 py-0.5 rounded font-minecraft text-[10px] tracking-wider"
             style={{
               background: `${accentColor.value}25`,
               color: accentColor.value,

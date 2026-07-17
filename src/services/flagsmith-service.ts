@@ -205,6 +205,21 @@ export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
   return launcherNoticesFetchPromise;
 };
 
+let cachedApplixirEnabled: boolean | null = null;
+
+export const isApplixirEnabled = async (): Promise<boolean> => {
+  if (cachedApplixirEnabled !== null) return cachedApplixirEnabled;
+  try {
+    if (!flagsmithInitialized) await initPromise;
+    cachedApplixirEnabled = flagsmith.hasFeature('applixir_rewarded_video');
+    log('info', `AppLixir rewarded video enabled: ${cachedApplixirEnabled}`);
+  } catch (error) {
+    log('error', `Failed to fetch applixir_rewarded_video flag: ${error}`);
+    cachedApplixirEnabled = false;
+  }
+  return cachedApplixirEnabled;
+};
+
 /**
  * Fetches the blocked mods configuration from Flagsmith.
  *

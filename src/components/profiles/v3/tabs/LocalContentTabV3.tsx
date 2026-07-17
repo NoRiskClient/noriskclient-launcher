@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import { VirtuosoGrid } from "react-virtuoso";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -160,6 +161,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
 
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
 
   // ── Version-Switcher-State (pro Item) ─────────────────────────────────────
@@ -486,7 +488,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         {/* Update-Check-Error: auffaellig weil kritisch (Netzwerk/API-Problem). */}
         {manager.contentUpdateError && (
           <Tooltip content={manager.contentUpdateError}>
-            <div className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/30 text-white flex items-center gap-2 font-minecraft lowercase text-2xl">
+            <div className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/30 text-white flex items-center gap-2 font-smallcaps text-base">
               <Icon icon="solar:danger-triangle-bold" className="w-4 h-4" />
               <span style={{ transform: 'translateY(-0.075em)' }}>{t("profiles.v3.toolbar.checkFailed")}</span>
             </div>
@@ -497,16 +499,19 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       </div>
 
       {/* ── Content area ───────────────────────────────────────────────── */}
-      <div className={`flex-1 min-h-0 overflow-y-auto p-5 ${manager.selectedItemIds.size > 0 ? "pb-24" : ""}`}>
+      <div
+        ref={setScrollParent}
+        className={`flex-1 min-h-0 overflow-y-auto p-5 ${manager.selectedItemIds.size > 0 ? "pb-24" : ""}`}
+      >
         {manager.error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft-ten text-rose-100 break-words">
+            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">
               {manager.error}
             </div>
             <button
               onClick={() => manager.fetchData(true)}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
               title={t("profiles.v3.content.retry")}
             >
               {t("profiles.v3.content.retry")}
@@ -521,8 +526,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           />
         ) : manager.isLoading && visibleItems.length === 0 ? (
           shouldShowLoadingSpinner ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : (
@@ -539,8 +544,12 @@ export function LocalContentTabV3<T extends LocalContentItem>({
               : undefined}
           />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {visibleItems.map((item) => {
+          <VirtuosoGrid
+            data={visibleItems}
+            customScrollParent={scrollParent ?? undefined}
+            listClassName="grid grid-cols-1 lg:grid-cols-2 gap-3"
+            computeItemKey={(_, item) => tileKey(item)}
+            itemContent={(_, item) => {
               const key = tileKey(item);
               const updateKey = getUpdateIdentifier(item);
               const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
@@ -603,8 +612,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
                   isSwitchingVersion={switchingVersionFor === item.filename}
                 />
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 

@@ -1,6 +1,6 @@
-use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
-use log::{debug, error, info};
+use crate::utils::http_client::{nrc_get, nrc_post};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -57,36 +57,11 @@ impl PayloadCmsApi {
 
         debug!("[Payload CMS] Fetching needs-testing for uuid={}", uuid);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", token))
+        nrc_get(&url)
+            .bearer(token)
             .query(&[("uuid", uuid)])
-            .send()
+            .json::<NeedsTestingResponse>("Payload CMS needs-testing")
             .await
-            .map_err(|e| {
-                error!("[Payload CMS] needs-testing request failed: {}", e);
-                AppError::RequestError(format!("Payload CMS needs-testing request failed: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "<failed to read body>".to_string());
-            return Err(AppError::RequestError(format!(
-                "Payload CMS needs-testing returned {}: {}",
-                status, body
-            )));
-        }
-
-        response.json::<NeedsTestingResponse>().await.map_err(|e| {
-            error!("[Payload CMS] Failed to parse needs-testing response: {}", e);
-            AppError::ParseError(format!(
-                "Failed to parse Payload CMS needs-testing response: {}",
-                e
-            ))
-        })
     }
 
     pub async fn submit_test_vote(
@@ -102,19 +77,11 @@ impl PayloadCmsApi {
             body.kind, body.vote, body.issue_id
         );
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Payload CMS] submit-test-vote request failed: {}", e);
-                AppError::RequestError(format!(
-                    "Payload CMS submit-test-vote request failed: {}",
-                    e
-                ))
-            })?;
+        let response = nrc_post(&url)
+            .bearer(token)
+            .json_body(&body)
+            .send("Payload CMS submit-test-vote")
+            .await?;
 
         let status = response.status();
         // Payload error responses are `{error: "..."}` without ok/kind — fall

@@ -20,7 +20,7 @@ export function DropdownHeader({
 
   return (    <div
       className={cn(
-        "px-4 py-3 font-minecraft text-xl text-white border-b-2 relative",
+        "px-4 py-3 font-smallcaps text-sm text-white border-b-2 relative",
         "flex items-center justify-between",
         className,
       )}

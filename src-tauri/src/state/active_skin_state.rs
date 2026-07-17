@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, OnceCell, RwLock};
 
 const ACTIVE_SKINS_FILENAME: &str = "active_skins.json";
 
@@ -34,6 +34,7 @@ pub struct ActiveSkinManager {
     db: Arc<RwLock<ActiveSkinDatabase>>,
     path: PathBuf,
     save_lock: Mutex<()>,
+    loaded: OnceCell<()>,
 }
 
 impl ActiveSkinManager {
@@ -43,7 +44,13 @@ impl ActiveSkinManager {
             db: Arc::new(RwLock::new(ActiveSkinDatabase::default())),
             path,
             save_lock: Mutex::new(()),
+            loaded: OnceCell::new(),
         })
+    }
+
+    async fn ensure_loaded(&self) -> Result<()> {
+        self.loaded.get_or_try_init(|| self.load_internal()).await?;
+        Ok(())
     }
 
     async fn load_internal(&self) -> Result<()> {
@@ -85,15 +92,20 @@ impl ActiveSkinManager {
     }
 
     pub async fn get(&self, uuid: &str) -> Option<ActiveSkin> {
+        if let Err(e) = self.ensure_loaded().await {
+            warn!("Failed to load active skins database: {}", e);
+        }
         self.db.read().await.skins.get(&normalize_uuid(uuid)).cloned()
     }
 
     pub async fn clear(&self, uuid: &str) -> Result<()> {
+        self.ensure_loaded().await?;
         self.db.write().await.skins.remove(&normalize_uuid(uuid));
         self.save().await
     }
 
     pub async fn set(&self, uuid: &str, base64_data: String, variant: String, source: &str) -> Result<bool> {
+        self.ensure_loaded().await?;
         let key = normalize_uuid(uuid);
         let changed = {
             let db = self.db.read().await;
@@ -126,7 +138,7 @@ impl ActiveSkinManager {
 impl PostInitializationHandler for ActiveSkinManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         info!("ActiveSkinManager: on_state_ready called. Loading active skins...");
-        self.load_internal().await?;
+        self.ensure_loaded().await?;
         Ok(())
     }
 }

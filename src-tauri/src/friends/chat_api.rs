@@ -1,8 +1,8 @@
-use crate::config::HTTP_CLIENT;
-use crate::error::{AppError, Result};
+use crate::error::Result;
 use crate::friends::models::{Chat, ChatMessage, ComputedChat, CreateChatMessageRequest};
 use crate::minecraft::api::norisk_api::NoRiskApi;
-use log::{debug, error};
+use crate::utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put};
+use log::debug;
 use uuid::Uuid;
 
 pub struct ChatApi;
@@ -18,17 +18,10 @@ impl ChatApi {
 
         debug!("[Chat API] Getting or creating chat with {}", friend_uuid);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<Chat>("Chat get/create private")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to get chat: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Chat>(response, "Chat get/create private").await
     }
 
     pub async fn get_private_chats(
@@ -40,17 +33,10 @@ impl ChatApi {
 
         debug!("[Chat API] Fetching all private chats");
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<Vec<ComputedChat>>("Chat get private list")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to get chats: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<ComputedChat>>(response, "Chat get private list").await
     }
 
     pub async fn get_messages(
@@ -65,18 +51,11 @@ impl ChatApi {
 
         debug!("[Chat API] Fetching messages for chat {} page {} limit {}", chat_id, page, limit);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(&url)
+            .bearer(norisk_token)
             .query(&[("page", page.to_string()), ("limit", limit.to_string())])
-            .send()
+            .json::<Vec<ChatMessage>>("Chat get messages")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to get messages: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<Vec<ChatMessage>>(response, "Chat get messages").await
     }
 
     pub async fn send_message(
@@ -96,18 +75,11 @@ impl ChatApi {
             relates_to,
         };
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .json(&request)
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&request)
+            .json::<ChatMessage>("Chat send message")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send message: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<ChatMessage>(response, "Chat send message").await
     }
 
     pub async fn edit_message(
@@ -124,18 +96,11 @@ impl ChatApi {
         let mut body = std::collections::HashMap::new();
         body.insert("content", content);
 
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .json(&body)
-            .send()
+        nrc_put(&url)
+            .bearer(norisk_token)
+            .json_body(&body)
+            .json::<ChatMessage>("Chat edit message")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to edit message: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging::<ChatMessage>(response, "Chat edit message").await
     }
 
     pub async fn delete_message(
@@ -148,17 +113,10 @@ impl ChatApi {
 
         debug!("[Chat API] Deleting message {}", message_id);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(&url)
+            .bearer(norisk_token)
+            .expect_success("Chat delete message")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to delete message: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Chat delete message").await
     }
 
     pub async fn mark_message_received(
@@ -175,18 +133,11 @@ impl ChatApi {
         let mut body = std::collections::HashMap::new();
         body.insert("messageId", message_id);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .json(&body)
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&body)
+            .expect_success("Chat mark received")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to mark message received: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Chat mark received").await
     }
 
     pub async fn add_reaction(
@@ -203,18 +154,11 @@ impl ChatApi {
         let mut body = std::collections::HashMap::new();
         body.insert("emoji", emoji);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .json(&body)
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&body)
+            .expect_success("Chat add reaction")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to add reaction: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Chat add reaction").await
     }
 
     pub async fn remove_reaction(
@@ -228,17 +172,10 @@ impl ChatApi {
 
         debug!("[Chat API] Removing reaction {} from message {}", emoji, message_id);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_delete(&url)
+            .bearer(norisk_token)
             .query(&[("emoji", emoji)])
-            .send()
+            .expect_success("Chat remove reaction")
             .await
-            .map_err(|e| {
-                error!("[Chat API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to remove reaction: {}", e))
-            })?;
-
-        crate::utils::api_utils::expect_success_with_logging(response, "Chat remove reaction").await
     }
 }

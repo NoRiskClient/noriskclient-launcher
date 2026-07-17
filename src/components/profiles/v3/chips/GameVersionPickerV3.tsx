@@ -56,7 +56,7 @@ export function GameVersionPickerV3({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("profiles.v3.chips.gameVersion.search")}
-            className="w-full h-7 pl-7 pr-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft-ten"
+            className="w-full h-7 pl-7 pr-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
       </div>
@@ -76,7 +76,7 @@ export function GameVersionPickerV3({
               onMouseLeave={(e) => {
                 if (!active) e.currentTarget.style.backgroundColor = "transparent";
               }}
-              className={`flex-1 h-6 rounded text-[10px] uppercase tracking-wider font-minecraft-ten transition-colors ${
+              className={`flex-1 h-6 rounded text-[10px] uppercase tracking-wider font-minecraft transition-colors ${
                 active ? "" : "text-white/50"
               }`}
             >
@@ -93,12 +93,12 @@ export function GameVersionPickerV3({
       {/* List */}
       <div className="max-h-[220px] overflow-y-auto py-1 custom-scrollbar">
         {isLoading ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft-ten">
-            <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5 animate-spin" />
+          <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft">
+            <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
             {t("profiles.v3.chips.gameVersion.loading")}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-white/30 font-minecraft-ten">
+          <div className="px-3 py-6 text-center text-xs text-white/30 font-minecraft">
             {t("profiles.v3.chips.gameVersion.empty")}
           </div>
         ) : (
@@ -117,7 +117,7 @@ export function GameVersionPickerV3({
                 }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors"
               >
-                <span className={`flex-1 text-xs font-minecraft-ten ${isCurrent ? "text-white" : "text-white/80"}`}>
+                <span className={`flex-1 text-xs font-minecraft ${isCurrent ? "text-white" : "text-white/80"}`}>
                   {v.id}
                 </span>
                 {isCurrent && (

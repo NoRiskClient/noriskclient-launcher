@@ -79,7 +79,7 @@ export function ProfileDuplicateModal() {
             variant="secondary"
             onClick={handleClose}
             size="md"
-            className="text-2xl"
+            className="text-base"
             disabled={isLoading}
           >
             {t('common.cancel')}
@@ -89,13 +89,13 @@ export function ProfileDuplicateModal() {
             onClick={handleDuplicate}
             disabled={isLoading || !newProfileName.trim()}
             size="md"
-            className="text-2xl"
+            className="text-base"
           >
             {isLoading ? (
               <div className="flex items-center gap-3">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-6 h-6 animate-spin text-white"
+                  icon="svg-spinners:ring-resize"
+                  className="w-6 h-6 text-white"
                 />
                 <span>{t('profile_duplicate.button.duplicating')}</span>
               </div>
@@ -111,16 +111,16 @@ export function ProfileDuplicateModal() {
     >
       <div className="space-y-6 p-6">
         <div className="text-center">
-          <p className="text-2xl font-minecraft text-white/80 mb-4 lowercase">
+          <p className="text-base font-smallcaps text-white/80 mb-4">
             {t('profile_duplicate.description', { name: sourceProfile.name })}
           </p>
-          <p className="text-xs text-white/60 font-minecraft-ten tracking-wide">
+          <p className="text-xs text-white/60 font-minecraft tracking-wide">
             {t('profile_duplicate.copy_notice')}
           </p>
         </div>
 
         <div>
-          <label className="block text-2xl font-minecraft text-white mb-2 lowercase">
+          <label className="block text-base font-smallcaps text-white mb-2">
             {t('profile_duplicate.new_name_label')}
           </label>
           <SearchStyleInput

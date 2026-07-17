@@ -61,7 +61,7 @@ export function AddFriendInput() {
           onBlur={() => setIsFocused(false)}
           placeholder={t('friends.enter_username')}
           className={cn(
-            "flex-1 bg-transparent py-3 pr-3 text-white font-minecraft-ten",
+            "flex-1 bg-transparent py-3 pr-3 text-white font-minecraft",
             "placeholder:text-white/30 focus:outline-none"
           )}
           style={{ fontSize: "14px" }}
@@ -82,7 +82,7 @@ export function AddFriendInput() {
           }}
         >
           {isLoading ? (
-            <Icon icon="solar:refresh-bold" className="w-5 h-5 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
           ) : (
             <Icon icon="solar:arrow-right-bold" className="w-5 h-5" />
           )}
@@ -90,14 +90,14 @@ export function AddFriendInput() {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg font-minecraft-ten text-xs text-red-400 bg-red-500/10 border border-red-500/20">
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg font-minecraft text-xs text-red-400 bg-red-500/10 border border-red-500/20">
           <Icon icon="solar:danger-circle-bold" className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg font-minecraft-ten text-xs text-green-400 bg-green-500/10 border border-green-500/20">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg font-minecraft text-xs text-green-400 bg-green-500/10 border border-green-500/20">
           <Icon icon="solar:check-circle-bold" className="w-4 h-4 flex-shrink-0" />
           {t('friends.request_sent')}
         </div>

@@ -9,12 +9,14 @@ use crate::integrations::modrinth::{
 };
 use crate::integrations::mrpack;
 use crate::integrations::unified_mod::{
-    check_mod_updates_unified, get_mod_versions_unified, get_modpack_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
+    get_mod_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
     UnifiedModSearchParams, UnifiedModSearchResponse, UnifiedModVersionsParams, UnifiedModpackVersionsResponse,
     UnifiedProjectType, UnifiedSortType, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersionResponse,
     ModpackSwitchRequest, ModpackSwitchResponse,
 };
+use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::profile_state::ModPackSource;
+use crate::state::State;
 use serde::Serialize;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -92,16 +94,24 @@ pub async fn get_modrinth_mod_versions(
     project_id_or_slug: String,
     loaders: Option<Vec<String>>,
     game_versions: Option<Vec<String>>,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<ModrinthVersion>, CommandError> {
-    // Return CommandError for Tauri
     log::debug!(
         "Received get_modrinth_mod_versions command: project_id={}, loaders={:?}, game_versions={:?}",
         project_id_or_slug,
         loaders,
         game_versions
     );
-    // Call the actual API function and map error to CommandError
-    get_modrinth_versions_api(project_id_or_slug, loaders, game_versions)
+
+    let state = State::get().await.map_err(CommandError::from)?;
+    state
+        .content_cache
+        .get_modrinth_project_versions(
+            &project_id_or_slug,
+            loaders,
+            game_versions,
+            cache_behaviour.unwrap_or_default(),
+        )
         .await
         .map_err(CommandError::from)
 }
@@ -259,13 +269,18 @@ pub async fn download_and_install_modrinth_modpack(
 #[tauri::command]
 pub async fn get_modrinth_project_details(
     ids: Vec<String>,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<modrinth::ModrinthProject>, CommandError> {
     log::debug!(
         "Received get_modrinth_project_details_bulk command for {} project IDs/slugs",
         ids.len()
     );
 
-    let result = modrinth::get_multiple_projects(ids).await?;
+    let state = State::get().await.map_err(CommandError::from)?;
+    let result = state
+        .content_cache
+        .get_modrinth_projects(ids, cache_behaviour.unwrap_or_default())
+        .await?;
     Ok(result)
 }
 
@@ -296,6 +311,7 @@ pub async fn check_modrinth_updates(
 #[tauri::command]
 pub async fn check_mod_updates_unified_command(
     request: UnifiedUpdateCheckRequest,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<UnifiedUpdateCheckResponse, CommandError> {
     log::debug!(
         "Received check_mod_updates_unified_command for {} hashes using algorithm {}",
@@ -303,7 +319,10 @@ pub async fn check_mod_updates_unified_command(
         request.algorithm
     );
 
-    let updates = check_mod_updates_unified(request)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let updates = state
+        .content_cache
+        .check_mod_updates_unified(request, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
@@ -312,60 +331,33 @@ pub async fn check_mod_updates_unified_command(
     Ok(updates)
 }
 
-/// Fetches a list of all categories from Modrinth.
 #[tauri::command]
-pub async fn get_modrinth_categories_command(
-) -> Result<Vec<modrinth::ModrinthCategory>, CommandError> {
-    log::debug!("Received get_modrinth_categories_command");
+pub async fn get_modrinth_tags_command(
+    cache_behaviour: Option<CacheBehaviour>,
+) -> Result<modrinth::ModrinthTags, CommandError> {
+    log::debug!("Received get_modrinth_tags_command");
 
-    let categories = modrinth::get_modrinth_categories()
+    let state = State::get().await.map_err(CommandError::from)?;
+    let tags = state
+        .content_cache
+        .get_modrinth_tags(cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
-    log::info!(
-        "Successfully fetched {} categories for frontend",
-        categories.len()
+    log::debug!(
+        "Serving Modrinth tags: {} categories, {} loaders, {} game versions",
+        tags.categories.len(),
+        tags.loaders.len(),
+        tags.game_versions.len()
     );
-    Ok(categories)
-}
-
-/// Fetches a list of all loaders from Modrinth.
-#[tauri::command]
-pub async fn get_modrinth_loaders_command() -> Result<Vec<modrinth::ModrinthLoader>, CommandError> {
-    log::debug!("Received get_modrinth_loaders_command");
-
-    let loaders = modrinth::get_modrinth_loaders()
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!(
-        "Successfully fetched {} loaders for frontend",
-        loaders.len()
-    );
-    Ok(loaders)
-}
-
-/// Fetches a list of all game versions from Modrinth.
-#[tauri::command]
-pub async fn get_modrinth_game_versions_command(
-) -> Result<Vec<modrinth::ModrinthGameVersion>, CommandError> {
-    log::debug!("Received get_modrinth_game_versions_command");
-
-    let game_versions = modrinth::get_modrinth_game_versions()
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!(
-        "Successfully fetched {} game versions for frontend",
-        game_versions.len()
-    );
-    Ok(game_versions)
+    Ok(tags)
 }
 
 /// Fetches Modrinth version details for a given list of SHA1 hashes.
 #[tauri::command]
 pub async fn get_modrinth_versions_by_hashes(
     hashes: Vec<String>,
+    cache_behaviour: Option<CacheBehaviour>,
     // hash_algorithm: String, // Modrinth API for versions by hash is specific to SHA1 currently
 ) -> Result<HashMap<String, ModrinthVersion>, CommandError> {
     log::debug!(
@@ -377,8 +369,10 @@ pub async fn get_modrinth_versions_by_hashes(
         return Ok(HashMap::new()); // Return empty map if no hashes are provided
     }
 
-    // The modrinth::get_versions_by_hashes function expects "sha1" as the algorithm.
-    let versions_map = modrinth::get_versions_by_hashes(hashes, "sha1")
+    let state = State::get().await.map_err(CommandError::from)?;
+    let versions_map = state
+        .content_cache
+        .get_modrinth_versions_by_hashes(hashes, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
@@ -452,13 +446,17 @@ pub async fn get_mod_versions_unified_command(
 #[tauri::command]
 pub async fn get_modpack_versions_unified_command(
     modpack_source: ModPackSource,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<UnifiedModpackVersionsResponse, CommandError> {
     log::debug!(
         "Received get_modpack_versions_unified command: modpack_source={:?}",
         modpack_source
     );
 
-    let result = get_modpack_versions_unified(&modpack_source)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let result = state
+        .content_cache
+        .get_modpack_versions(&modpack_source, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
@@ -501,16 +499,35 @@ pub async fn switch_modpack_version_command(
 #[tauri::command]
 pub async fn get_modrinth_project_members(
     project_id_or_slug: String,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<Vec<modrinth::ModrinthTeamMember>, CommandError> {
     log::debug!(
         "Received get_modrinth_project_members command for project: {}",
         project_id_or_slug
     );
 
-    let members = modrinth::get_project_members(project_id_or_slug)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let members = state
+        .content_cache
+        .get_modrinth_project_members(&project_id_or_slug, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
-    log::info!("Successfully fetched {} team members", members.len());
+    log::debug!("Serving {} team members", members.len());
     Ok(members)
+}
+
+#[tauri::command]
+pub async fn clear_content_cache_command(
+) -> Result<crate::state::content_cache_state::CacheClearStats, CommandError> {
+    log::info!("Received clear_content_cache_command");
+
+    let state = State::get().await.map_err(CommandError::from)?;
+    let stats = state
+        .content_cache
+        .clear()
+        .await
+        .map_err(CommandError::from)?;
+
+    Ok(stats)
 }

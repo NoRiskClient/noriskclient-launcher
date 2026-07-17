@@ -62,7 +62,7 @@ export function ColorPicker({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 p-1">
         {Object.values(ACCENT_COLORS).map((color) => (
           <button
             key={color.name}
@@ -129,7 +129,7 @@ export function ColorPicker({
 
       {showCustomPicker && (
         <div className="mt-4 p-4 bg-black/30 rounded-lg border border-white/10">
-          <h5 className="font-minecraft text-xl lowercase text-white/80 mb-3">
+          <h5 className="font-smallcaps text-sm text-white/80 mb-3">
             Custom Color
           </h5>          <div className="flex items-center gap-3">
             <div className="flex-1">              <Input
@@ -169,7 +169,7 @@ export function ColorPicker({
 
           {customColorHistory.length > 0 && (
             <div className="mt-4 pt-4 border-t border-white/10">
-              <h6 className="font-minecraft text-lg lowercase text-white/70 mb-2">
+              <h6 className="font-smallcaps text-xs text-white/70 mb-2">
                 Recent Colors
               </h6>
               <div className="flex flex-wrap gap-2">

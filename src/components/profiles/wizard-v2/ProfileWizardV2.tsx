@@ -221,8 +221,8 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
     if (showLoadingIndicator) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="solar:refresh-bold" className="w-12 h-12 text-white animate-spin mb-4" />
-          <p className="text-xl font-minecraft text-white lowercase">{t('profiles.wizard.loadingVersions')}</p>
+          <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
+          <p className="text-sm font-smallcaps text-white">{t('profiles.wizard.loadingVersions')}</p>
         </div>
       );
     }
@@ -292,10 +292,10 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
                   </div>
                 )}
                 <div className="flex flex-col items-center text-center">
-                  <h4 className="font-minecraft text-3xl text-white lowercase">
+                  <h4 className="font-smallcaps text-lg text-white">
                     {version.id}
                   </h4>
-                  <p className="text-xs text-white/60 font-minecraft-ten capitalize mt-1">
+                  <p className="text-xs text-white/60 font-minecraft capitalize mt-1">
                     {version.type}
                   </p>
                 </div>
@@ -307,7 +307,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         {filteredVersions.length === 0 && !loading && (
           <div className="col-span-3 text-center py-8">
             <Icon icon="solar:magnifer-bold" className="w-12 h-12 text-white/50 mx-auto mb-2" />
-            <p className="text-lg font-minecraft text-white/70 lowercase">{t('profiles.wizard.noVersionsFound')}</p>
+            <p className="text-xs font-smallcaps text-white/70">{t('profiles.wizard.noVersionsFound')}</p>
           </div>
         )}
       </div>
@@ -321,7 +321,7 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
         onClick={handleStep1Next}
         disabled={loading || !selectedVersion}
         size="md"
-        className="min-w-[120px] text-xl"
+        className="min-w-[120px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
         iconPosition="right"
       >

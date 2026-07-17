@@ -35,7 +35,7 @@ function ChoiceButton({ icon, label, tone, busy, onClick }: ChoiceButtonProps) {
       type="button"
       disabled={busy}
       onClick={onClick}
-      className={`flex items-center gap-2 px-2 py-0.5 text-2xl rounded-lg border font-minecraft lowercase transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${toneClasses[tone]}`}
+      className={`flex items-center gap-2 px-2 py-0.5 text-base rounded-lg border font-smallcaps transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${toneClasses[tone]}`}
     >
       <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />
       <span style={{ transform: "translateY(-0.075em)" }}>{label}</span>

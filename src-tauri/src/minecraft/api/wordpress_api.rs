@@ -1,12 +1,8 @@
-use crate::{
-    config::HTTP_CLIENT,
-    error::{AppError, Result},
-};
-use log::{debug, error, info};
+use crate::error::Result;
+use crate::utils::http_client::nrc_get;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
-use crate::utils::string_utils::safe_truncate;
 
 pub struct WordPressApi;
 
@@ -84,61 +80,10 @@ impl WordPressApi {
         }
 
         debug!("[WordPress API] Sending GET request");
-        let response = HTTP_CLIENT
-            .get(url)
+        nrc_get(url)
             .query(&query_params)
-            .send()
+            .json::<Vec<BlogPost>>("WordPress blog posts")
             .await
-            .map_err(|e| {
-                error!("[WordPress API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send request to WordPress API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[WordPress API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[WordPress API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "WordPress API returned error status: {}",
-                status
-            )));
-        }
-
-        // Read the response body as text first for debugging
-        let response_text = response.text().await.map_err(|e| {
-            error!(
-                "[WordPress API] Failed to read response body as text: {}",
-                e
-            );
-            AppError::RequestError(format!("Failed to read WordPress API response body: {}", e))
-        })?;
-
-        debug!(
-            "[WordPress API] Received response body ({} bytes). Attempting to parse as JSON...",
-            response_text.len()
-        );
-        // Log the first 1000 characters for brevity in logs, or the full response if shorter
-        let log_preview = if response_text.len() > 1000 {
-            format!("{}... (truncated)", safe_truncate(&response_text, 1000))
-        } else {
-            response_text.clone()
-        };
-        debug!("[WordPress API] Response preview: {}", log_preview);
-
-        // Now attempt to parse the text into the target structure
-        serde_json::from_str::<Vec<BlogPost>>(&response_text).map_err(|e| {
-            error!(
-                "[WordPress API] Failed to parse JSON response: {}. Raw response: {}",
-                e,
-                log_preview // Log the preview again on error
-            );
-            AppError::ParseError(format!(
-                "Failed to parse WordPress API JSON response: {}. Response: {}",
-                e,
-                log_preview // Include preview in the AppError as well
-            ))
-        })
     }
 
     /// Fetches news posts (category 21) and changelog posts (category 2)

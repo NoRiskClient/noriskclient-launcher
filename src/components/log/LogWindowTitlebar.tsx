@@ -39,10 +39,10 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
           style={{ color: accentColor.value }}
         />
         <span
-          className="font-minecraft-ten text-sm tracking-wider"
+          className="font-minecraft text-sm tracking-wider"
           style={{ color: accentColor.value }}
         >
-          {displayTitle.toUpperCase()}
+          {displayTitle}
         </span>
       </div>
 

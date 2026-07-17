@@ -9,11 +9,12 @@ interface NavButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ReactNode;
   isActive?: boolean;
   variant?: "default" | "secondary" | "ghost";
+  label?: React.ReactNode;
 }
 
 export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
   (
-    { className, icon, isActive = false, variant = "default", ...props },
+    { className, icon, isActive = false, variant = "default", label, ...props },
     ref,
   ) => {
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -48,8 +49,10 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
     const colors = getVariantColors();
 
     const baseClasses = cn(
-      "font-minecraft relative overflow-hidden transition-all duration-300",
-      "w-16 h-16 rounded-md text-white flex items-center justify-center",
+      "font-smallcaps relative overflow-hidden transition-all duration-300",
+      "w-16 rounded-md text-white flex items-center justify-center",
+      label ? "py-2" : "h-16",
+      variant !== "ghost" && "border-2 border-b-4 border-transparent",
       "text-shadow-sm",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/20",
     );
@@ -107,8 +110,13 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
               : "opacity-0 transition-opacity duration-300",
           )}
         />
-        <span className="relative z-10 flex items-center justify-center w-8 h-8">
-          {icon}
+        <span className="relative z-10 flex flex-col items-center justify-center gap-1">
+          <span className="flex items-center justify-center w-8 h-8">{icon}</span>
+          {label && (
+            <span className="font-smallcaps text-xs leading-tight text-center whitespace-nowrap [text-shadow:none]">
+              {label}
+            </span>
+          )}
         </span>
       </button>
     );

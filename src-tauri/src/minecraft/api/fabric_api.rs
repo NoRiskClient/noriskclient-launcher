@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::minecraft::dto::fabric_meta::FabricVersionInfo;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error};
 use serde_json;
 use std::path::PathBuf;
@@ -59,7 +60,7 @@ impl FabricApi {
             crate::error::AppError::FabricError(format!("Failed to serialize versions: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Fabric cache: {}", e);
         } else {
             debug!("Cached Fabric versions for {}: {:?}", minecraft_version, cache_path);

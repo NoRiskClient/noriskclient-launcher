@@ -10,7 +10,8 @@ use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
+    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
+    ProfileState,
 };
 use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
@@ -860,6 +861,22 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
     let state = State::get().await?;
     let profiles = state.profile_manager.search_profiles(&query).await?;
     Ok(profiles)
+}
+
+#[tauri::command]
+pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.list_profile_backups().await?)
+}
+
+#[tauri::command]
+pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state
+        .profile_manager
+        .restore_profile_backup(backup_path.into())
+        .await?;
+    Ok(())
 }
 
 /// Loads and returns the list of standard profiles from the local configuration file.

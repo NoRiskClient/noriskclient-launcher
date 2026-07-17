@@ -120,7 +120,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
       <div className="p-6 space-y-6">
         {/* Blocks */}
         <section className="space-y-3">
-          <h3 className="font-minecraft text-2xl text-white lowercase">
+          <h3 className="font-smallcaps text-base text-white">
             {t("profiles.iconPicker.blocks")}
           </h3>
           <div style={GRID_STYLE}>
@@ -150,7 +150,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
 
         {/* Custom */}
         <section className="space-y-3">
-          <h3 className="font-minecraft text-2xl text-white lowercase">
+          <h3 className="font-smallcaps text-base text-white">
             {t("profiles.iconPicker.custom")}
           </h3>
 
@@ -166,7 +166,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
                   if (e.key === "Escape") setShowUrlInput(false);
                 }}
                 placeholder={t("profiles.iconPicker.addUrlPlaceholder")}
-                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/40 font-minecraft-ten text-sm outline-none focus:border-white/25"
+                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/40 font-minecraft text-sm outline-none focus:border-white/25"
               />
               <Button size="sm" variant="flat" onClick={handleAddUrl}>
                 {t("profiles.iconPicker.add")}
@@ -183,7 +183,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
               <Icon icon="solar:upload-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft-ten text-[10px] text-white/50 lowercase">
+              <span className="font-minecraft text-[10px] text-white/50 lowercase">
                 {t("profiles.iconPicker.uploadFile")}
               </span>
             </button>
@@ -196,7 +196,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
               <Icon icon="solar:link-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft-ten text-[10px] text-white/50 lowercase">
+              <span className="font-minecraft text-[10px] text-white/50 lowercase">
                 {t("profiles.iconPicker.addUrl")}
               </span>
             </button>
