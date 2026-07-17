@@ -46,6 +46,7 @@ pub enum EventType {
     StarlightSkinUpdated,
     MinecraftSkinChanged,
     Error,
+    OfflineMode,
     LaunchSuccessful,
     CrashReportContentAvailable,
     MigrationStarted,

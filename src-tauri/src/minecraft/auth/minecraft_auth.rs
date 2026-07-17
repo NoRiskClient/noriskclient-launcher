@@ -37,6 +37,8 @@ use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
+use crate::state::event_state::{EventPayload, EventType};
+use crate::state::state_manager::State;
 use crate::utils::file_utils::write_atomic;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -912,6 +914,10 @@ impl MinecraftAuthStore {
                 match self.refresh_token_sisu(creds, cred_id, profile_name.clone()).await {
                     Ok(result) => Ok(result),
                     Err(sisu_err) => {
+                        if let Some(reason) = unreachable_reason(&sisu_err) {
+                            info!("[Token Refresh] SISU flow failed ({}); skipping Direct fallback", reason);
+                            return Err(sisu_err);
+                        }
                         info!("[Token Refresh] SISU flow failed: {:?}, trying Direct...", sisu_err);
                         self.refresh_token_direct(creds, cred_id, profile_name).await
                     }
@@ -1170,33 +1176,13 @@ impl MinecraftAuthStore {
                     };
                 }
                 Err(err) => {
-                    if let AppError::MinecraftAuthenticationError(
-                        MinecraftAuthenticationError::Request { ref source, .. },
-                    ) = err
-                    {
-                        if source.is_connect() || source.is_timeout() {
-                            info!("[Token Check] Connection error during refresh, using old credentials");
-                            // Credentials unchanged — None tells callers to keep them without saving
-                            return Ok(None);
-                        }
-                    }
-                    // Transient outage (Mojang/Microsoft rate-limit or server error): the
-                    // endpoint answered but with a non-token body (e.g. HTTP 429 during an
-                    // auth outage). Keep showing the account with its cached credentials
-                    // instead of failing the whole account load — the real token refresh
-                    // happens again at game launch.
-                    if let AppError::MinecraftAuthenticationError(
-                        MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
-                    ) = &err
-                    {
-                        if status_code.as_u16() == 429 || status_code.is_server_error() {
-                            info!(
-                                "[Token Check] Transient outage ({}) during refresh, using cached credentials",
-                                status_code
-                            );
-                            // Credentials unchanged — None tells callers to keep them without saving
-                            return Ok(None);
-                        }
+                    if let Some(reason) = unreachable_reason(&err) {
+                        info!(
+                            "[Token Check] {} during refresh, using cached credentials",
+                            reason
+                        );
+                        emit_offline_mode(&creds.username).await;
+                        return Ok(None);
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
                     Err(err)
@@ -1400,6 +1386,8 @@ const DIRECT_OAUTH_CLIENT_ID: &str = "e16699bb-2aa8-46da-b5e3-45cbcce29091";
 const DIRECT_OAUTH_AUTHORIZE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
 const DIRECT_OAUTH_TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 
+const AUTH_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 pub struct RequestWithDate<T> {
     pub date: DateTime<Utc>,
     pub value: T,
@@ -1535,6 +1523,7 @@ async fn oauth_token(code: &str, verifier: &str) -> Result<RequestWithDate<OAuth
         HTTP_CLIENT
             .post("https://login.live.com/oauth20_token.srf")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1586,6 +1575,7 @@ async fn direct_oauth_token(
         HTTP_CLIENT
             .post(DIRECT_OAUTH_TOKEN_URL)
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1627,6 +1617,7 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
             .post("https://user.auth.xboxlive.com/user/authenticate")
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "Properties": {
                     "AuthMethod": "RPS",
@@ -1711,6 +1702,7 @@ async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
             .post("https://xsts.auth.xboxlive.com/xsts/authorize")
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "Properties": {
                     "SandboxId": "RETAIL",
@@ -1772,6 +1764,7 @@ async fn oauth_refresh(refresh_token: &str) -> Result<RequestWithDate<OAuthToken
         HTTP_CLIENT
             .post("https://login.live.com/oauth20_token.srf")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1819,6 +1812,7 @@ async fn oauth_refresh_direct(refresh_token: &str) -> Result<RequestWithDate<OAu
         HTTP_CLIENT
             .post(DIRECT_OAUTH_TOKEN_URL)
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1972,6 +1966,7 @@ async fn minecraft_token(
         HTTP_CLIENT
             .post("https://api.minecraftservices.com/launcher/login")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "platform": "PC_LAUNCHER",
                 "xtoken": format!("XBL3.0 x={uhs};{token}"),
@@ -2016,6 +2011,7 @@ async fn minecraft_profile(
         HTTP_CLIENT
             .get("https://api.minecraftservices.com/minecraft/profile")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .bearer_auth(token)
             .send()
     })
@@ -2066,6 +2062,7 @@ async fn minecraft_entitlements(
                 Uuid::new_v4()
             ))
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .bearer_auth(token)
             .send()
     })
@@ -2107,6 +2104,52 @@ async fn minecraft_entitlements(
     Ok(entitlements)
 }
 
+fn unreachable_reason(err: &AppError) -> Option<&'static str> {
+    match err {
+        AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
+            source,
+            ..
+        }) => {
+            if source.is_connect() {
+                Some("Connection error")
+            } else if source.is_timeout() {
+                Some("Timeout")
+            } else {
+                None
+            }
+        }
+        AppError::MinecraftAuthenticationError(
+            MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
+        ) => {
+            if status_code.as_u16() == 429 || status_code.is_server_error() {
+                Some("Transient outage")
+            } else if status_code.is_success() {
+                Some("Unparseable response on a success status (captive portal?)")
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+async fn emit_offline_mode(username: &str) {
+    let Ok(state) = State::get().await else {
+        return;
+    };
+    let payload = EventPayload {
+        event_id: uuid::Uuid::new_v4(),
+        event_type: EventType::OfflineMode,
+        target_id: None,
+        message: String::from(username),
+        progress: None,
+        error: None,
+    };
+    if let Err(e) = state.emit_event(payload).await {
+        error!("[Token Check] Failed to emit offline-mode event: {}", e);
+    }
+}
+
 // auth utils
 async fn auth_retry<F>(
     reqwest_request: impl Fn() -> F,
@@ -2116,7 +2159,9 @@ where
 {
     const RETRY_COUNT: usize = 5; // Does command 9 times
     const RETRY_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+    const RETRY_BUDGET: std::time::Duration = std::time::Duration::from_secs(15);
 
+    let start = std::time::Instant::now();
     let mut resp = reqwest_request().await;
     for i in 0..RETRY_COUNT {
         match &resp {
@@ -2124,15 +2169,22 @@ where
                 break;
             }
             Err(err) => {
-                if err.is_connect() || err.is_timeout() {
-                    if i < RETRY_COUNT - 1 {
-                        info!("Request failed with connect error, retrying...",);
-                        tokio::time::sleep(RETRY_WAIT).await;
-                        resp = reqwest_request().await;
-                    } else {
-                        break;
-                    }
+                if !(err.is_connect() || err.is_timeout()) {
+                    break;
                 }
+                if i >= RETRY_COUNT - 1 {
+                    break;
+                }
+                if start.elapsed() >= RETRY_BUDGET {
+                    info!(
+                        "Request still failing after {:?} of retries; treating as unreachable.",
+                        start.elapsed()
+                    );
+                    break;
+                }
+                info!("Request failed with connect error, retrying...",);
+                tokio::time::sleep(RETRY_WAIT).await;
+                resp = reqwest_request().await;
             }
         }
     }
@@ -2221,7 +2273,8 @@ async fn send_signed_request<T: DeserializeOwned>(
             .post(url)
             .header("Content-Type", "application/json; charset=utf-8")
             .header("Accept", "application/json")
-            .header("Signature", &signature);
+            .header("Signature", &signature)
+            .timeout(AUTH_REQUEST_TIMEOUT);
 
         if url != "https://sisu.xboxlive.com/authorize" {
             request = request.header("x-xbl-contract-version", "1");
@@ -2391,3 +2444,7 @@ pub async fn start_oauth_callback_server(
 
     Ok((handle, rx))
 }
+
+#[cfg(test)]
+#[path = "minecraft_auth_test.rs"]
+mod tests;

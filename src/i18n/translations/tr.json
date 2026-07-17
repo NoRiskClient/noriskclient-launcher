@@ -1221,6 +1221,7 @@
   "iris.installation_error": "Kurulum başarısız. Detaylar için konsolu kontrol edin.",
   "iris.installed_optimal": "Iris gölgelendirici modu kurulu - gölgelendirici paketleri optimal çalışacak",
   "iris.required_optimal": "Optimal gölgelendirici paketi performansı için Iris gölgelendirici modu gerekli",
+  "app.offline_mode": "Giriş sunucularına bağlantı yok. Tek oyuncu modunda oynayabilirsin, ancak çok oyunculu mod kullanılamıyor.",
   "app.errors.process_status": "Minecraft işlem durumu global olarak işlenemedi.",
   "app.errors.save_grouping": "Gruplama tercihi kaydedilemedi.",
   "java.no_installations_found": "Sisteminizde Java kurulumu bulunamadı. Özel Java kurulumu kullanıyorsanız yolu manuel olarak belirtmeniz gerekebilir.",

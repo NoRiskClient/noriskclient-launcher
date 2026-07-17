@@ -150,6 +150,15 @@ export function App() {
             useSkinStore.getState().bumpSkinRevision();
             return;
           }
+          if (event.payload.event_type === FrontendEventType.OfflineMode) {
+            console.log("[App.tsx] Global OfflineMode event");
+            toast(t('app.offline_mode'), {
+              id: 'offline-mode',
+              duration: 8000,
+              icon: '📡',
+            });
+            return;
+          }
           if (
               event.payload.event_type === FrontendEventType.MinecraftProcessExited
           ) {

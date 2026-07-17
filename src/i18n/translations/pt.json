@@ -1338,6 +1338,7 @@
   "iris.installation_error": "Instalação falhou. Verifique o console para detalhes.",
   "iris.installed_optimal": "Mod de shader Iris está instalado - pacotes de shader funcionarão otimamente",
   "iris.required_optimal": "Mod de shader Iris é necessário para desempenho ótimo de pacotes de shader",
+  "app.offline_mode": "Sem ligação aos servidores de início de sessão. Podes jogar um jogador, mas o multijogador não está disponível.",
   "app.errors.process_status": "Não foi possível processar globalmente o status do processo Minecraft.",
   "app.errors.save_grouping": "Falha ao salvar preferência de agrupamento.",
   "java.no_installations_found": "Nenhuma instalação Java encontrada no seu sistema. Você pode precisar especificar o caminho manualmente se usar uma configuração Java personalizada.",

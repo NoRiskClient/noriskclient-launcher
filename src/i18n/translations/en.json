@@ -1288,6 +1288,7 @@
   "iris.installed_optimal": "Iris shader mod is installed - shader packs will work optimally",
   "iris.required_optimal": "Iris shader mod is required for optimal shader pack performance",
 
+  "app.offline_mode": "No connection to the login servers. You can play singleplayer, but multiplayer is unavailable.",
   "app.errors.process_status": "Could not globally process Minecraft process status.",
   "app.errors.save_grouping": "Failed to save grouping preference.",
 

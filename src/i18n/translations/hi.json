@@ -1230,6 +1230,7 @@
   "iris.installation_error": "इंस्टॉलेशन विफल। विवरण के लिए कंसोल देखें।",
   "iris.installed_optimal": "Iris shader mod इंस्टॉल है - shader packs बेहतर काम करेंगे",
   "iris.required_optimal": "बेहतर shader pack प्रदर्शन के लिए Iris shader mod आवश्यक है",
+  "app.offline_mode": "लॉगिन सर्वर से कोई कनेक्शन नहीं। आप सिंगलप्लेयर खेल सकते हैं, लेकिन मल्टीप्लेयर उपलब्ध नहीं है।",
   "app.errors.process_status": "Minecraft प्रक्रिया स्थिति को विश्व स्तर पर संसाधित नहीं कर सकते।",
   "app.errors.save_grouping": "ग्रुपिंग प्राथमिकता सहेजने में विफल।",
   "java.no_installations_found": "आपके सिस्टम पर कोई Java इंस्टॉलेशन नहीं मिला। यदि आप कस्टम Java सेटअप का उपयोग करते हैं तो आपको पथ को manually निर्दिष्ट करने की आवश्यकता हो सकती है।",

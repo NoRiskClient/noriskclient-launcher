@@ -3,6 +3,7 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::RwLock;
+use std::time::Duration;
 
 pub static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
     Lazy::new(
@@ -17,10 +18,13 @@ pub static CUSTOM_GAME_DIR_CACHE: Lazy<RwLock<Option<Option<PathBuf>>>> =
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"), " (support@norisk.gg)");
 
+pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// HTTP Client with launcher agent
 pub static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
     let client = reqwest::ClientBuilder::new()
         .user_agent(APP_USER_AGENT)
+        .connect_timeout(HTTP_CONNECT_TIMEOUT)
         .build()
         .unwrap_or_else(|_| Client::new());
     client

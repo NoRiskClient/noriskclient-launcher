@@ -1221,6 +1221,7 @@
   "iris.installation_error": "Instalacja nie powiodła się. Sprawdź konsolę po szczegóły.",
   "iris.installed_optimal": "Mod shaderów Iris jest zainstalowany - paczki shaderów będą działać optymalnie",
   "iris.required_optimal": "Mod shaderów Iris jest wymagany dla optymalnej wydajności paczek shaderów",
+  "app.offline_mode": "Brak połączenia z serwerami logowania. Możesz grać w trybie jednoosobowym, ale tryb wieloosobowy jest niedostępny.",
   "app.errors.process_status": "Nie udało się globalnie przetworzyć statusu procesu Minecraft.",
   "app.errors.save_grouping": "Nie udało się zapisać preferencji grupowania.",
   "java.no_installations_found": "Nie znaleziono instalacji Java w systemie. Może być konieczne ręczne podanie ścieżki, jeśli używasz niestandardowej instalacji Java.",

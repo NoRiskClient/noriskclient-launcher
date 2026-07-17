@@ -1285,6 +1285,7 @@
   "iris.installed_optimal": "Iris Shader Mod ist installiert - Shader Packs werden optimal funktionieren",
   "iris.required_optimal": "Iris Shader Mod wird für optimale Shader Pack Leistung benötigt",
 
+  "app.offline_mode": "Keine Verbindung zu den Login-Servern. Singleplayer funktioniert, Multiplayer nicht.",
   "app.errors.process_status": "Minecraft-Prozessstatus konnte nicht verarbeitet werden.",
   "app.errors.save_grouping": "Gruppierungseinstellung konnte nicht gespeichert werden.",
 

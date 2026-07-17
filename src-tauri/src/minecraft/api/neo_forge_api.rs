@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::neo_forge_maven_meta::NeoForgeMavenMetadata;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error, info};
 use quick_xml::de::from_str;
 use std::path::PathBuf;
@@ -51,7 +52,7 @@ impl NeoForgeApi {
         let metadata: NeoForgeMavenMetadata = from_str(&xml_content)
             .map_err(|e| AppError::ForgeError(format!("Failed to parse NeoForge metadata: {}", e)))?;
 
-        if let Err(e) = tokio_fs::write(cache_path, &xml_content).await {
+        if let Err(e) = write_atomic(cache_path, &xml_content).await {
             error!("Failed to write NeoForge cache: {}", e);
         } else {
             debug!("Cached NeoForge metadata: {:?}", cache_path);

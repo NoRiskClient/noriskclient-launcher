@@ -1,10 +1,13 @@
 use log::error;
 use reqwest::{IntoUrl, RequestBuilder};
 use serde::{de::DeserializeOwned, Serialize};
+use std::time::Duration;
 
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 use crate::utils::api_utils;
+
+const NRC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Fluent wrapper over [`reqwest::RequestBuilder`] for the NoRisk backend lane:
 /// build → header/query/body → send → uniform `AppError::RequestError` mapping →
@@ -16,30 +19,28 @@ pub struct NrcRequest {
 }
 
 pub fn nrc_get(url: impl IntoUrl) -> NrcRequest {
-    NrcRequest {
-        builder: HTTP_CLIENT.get(url),
-    }
+    NrcRequest::new(HTTP_CLIENT.get(url))
 }
 
 pub fn nrc_post(url: impl IntoUrl) -> NrcRequest {
-    NrcRequest {
-        builder: HTTP_CLIENT.post(url),
-    }
+    NrcRequest::new(HTTP_CLIENT.post(url))
 }
 
 pub fn nrc_put(url: impl IntoUrl) -> NrcRequest {
-    NrcRequest {
-        builder: HTTP_CLIENT.put(url),
-    }
+    NrcRequest::new(HTTP_CLIENT.put(url))
 }
 
 pub fn nrc_delete(url: impl IntoUrl) -> NrcRequest {
-    NrcRequest {
-        builder: HTTP_CLIENT.delete(url),
-    }
+    NrcRequest::new(HTTP_CLIENT.delete(url))
 }
 
 impl NrcRequest {
+    fn new(builder: RequestBuilder) -> Self {
+        Self {
+            builder: builder.timeout(NRC_REQUEST_TIMEOUT),
+        }
+    }
+
     pub fn bearer(mut self, token: &str) -> Self {
         self.builder = self
             .builder
