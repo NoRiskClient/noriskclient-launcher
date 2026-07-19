@@ -115,7 +115,7 @@ export function AppearanceTab() {
                 const levels = ["low", "medium", "high"] as const;
                 setQualityLevel(levels[value] || "medium");
               }}
-              className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+              className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
               disabled={saving}
             />
             <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_high")}</span>
@@ -163,12 +163,12 @@ export function AppearanceTab() {
                   multiple: false,
                   filters: [{
                     name: 'Media',
-                    extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4']
+                    extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm']
                   }]
                 });
                 if (selected && typeof selected === 'string') {
                   const ext = selected.split('.').pop()?.toLowerCase();
-                  const type = ext === 'mp4' ? 'video' : 'image';
+                  const type = ext === 'mp4' || ext === 'webm' ? 'video' : 'image';
                   setCustomMedia(selected, type);
                 }
               }}
@@ -191,7 +191,7 @@ export function AppearanceTab() {
                   step="1"
                   value={Math.round(customMediaOpacity * 100)}
                   onChange={(e) => setCustomMediaOpacity(parseInt(e.target.value) / 100)}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
                 />
                 <span className="text-xs text-white/60 font-minecraft-ten">100%</span>
               </div>
@@ -207,7 +207,7 @@ export function AppearanceTab() {
                   step="1"
                   value={customMediaBlur}
                   onChange={(e) => setCustomMediaBlur(parseInt(e.target.value))}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
                 />
                 <span className="text-xs text-white/60 font-minecraft-ten">20</span>
               </div>
@@ -227,7 +227,7 @@ export function AppearanceTab() {
                     const levels = ["low", "medium", "high"] as const;
                     setCustomMediaQuality(levels[value] || "medium");
                   }}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
                 />
                 <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_high")}</span>
               </div>
