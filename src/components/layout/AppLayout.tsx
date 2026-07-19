@@ -71,7 +71,7 @@ export function AppLayout({
   const closeRef = useRef<HTMLDivElement>(null);
   const { currentEffect, customMediaUrl, customMediaOnlyOnPlay, customMediaHideEffects } = useBackgroundEffectStore();
   const isCustomMediaVisible = Boolean(customMediaUrl) && (!customMediaOnlyOnPlay || activeTab === 'play');
-  const shouldShowEffects = !(customMediaUrl && customMediaHideEffects);
+  const shouldShowEffects = !(isCustomMediaVisible && customMediaHideEffects);
 
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
@@ -131,6 +131,11 @@ export function AppLayout({
     const finalB = Math.min(darkB, 30);
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
+  };
+
+  const getComplementaryBackgroundWithAlpha = (alpha: number) => {
+    const rgb = getComplementaryBackground();
+    return rgb.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
   };
 
   const backgroundColor = getComplementaryBackground();
@@ -324,7 +329,7 @@ export function AppLayout({
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundImage: isCustomMediaVisible 
-          ? `linear-gradient(to bottom right, ${backgroundColor.replace(')', ', 0.3)').replace('rgb', 'rgba')}, rgba(0,0,0,0.5))`
+          ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
           : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         borderColor: `${themeAccentColor.value}30`,
         boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,

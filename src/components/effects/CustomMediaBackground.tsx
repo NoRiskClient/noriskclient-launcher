@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useBackgroundEffectStore } from "../../store/background-effect-store";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Window } from "@tauri-apps/api/window";
+import { logError } from "../../utils/logging-utils";
 
 interface Props {
   activeTab: string;
@@ -10,38 +10,43 @@ interface Props {
 export default function CustomMediaBackground({ activeTab }: Props) {
   const { customMediaUrl, customMediaType, customMediaOpacity, customMediaQuality, customMediaOnlyOnPlay } = useBackgroundEffectStore();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mediaError, setMediaError] = useState(false);
+
+  const hiddenByTab = customMediaOnlyOnPlay && activeTab !== "play";
+
+  useEffect(() => {
+    setMediaError(false);
+  }, [customMediaUrl]);
 
   useEffect(() => {
     if (customMediaType !== "video") return;
 
-    const handleFocus = () => {
-      if (videoRef.current) {
-        videoRef.current.play().catch(e => console.error("Video play error:", e));
+    const tryPlay = () => {
+      if (videoRef.current && !hiddenByTab && document.hasFocus()) {
+        videoRef.current.play().catch((e) => logError(`[CustomMediaBackground] video play failed: ${e}`));
       }
     };
 
     const handleBlur = () => {
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }
+      videoRef.current?.pause();
     };
 
-    window.addEventListener("focus", handleFocus);
+    window.addEventListener("focus", tryPlay);
     window.addEventListener("blur", handleBlur);
 
-    // Ensure it plays when mounted or url changes, if window is focused
-    if (document.hasFocus() && videoRef.current) {
-      videoRef.current.play().catch(e => console.error("Video play error:", e));
+    if (hiddenByTab) {
+      videoRef.current?.pause();
+    } else {
+      tryPlay();
     }
 
     return () => {
-      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("focus", tryPlay);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [customMediaType, customMediaUrl]);
+  }, [customMediaType, customMediaUrl, hiddenByTab]);
 
-  if (!customMediaUrl || !customMediaType) return null;
-  if (customMediaOnlyOnPlay && activeTab !== "play") return null;
+  if (!customMediaUrl || !customMediaType || mediaError) return null;
 
   const getQualityStyles = (): React.CSSProperties => {
     switch (customMediaQuality) {
@@ -71,10 +76,19 @@ export default function CustomMediaBackground({ activeTab }: Props) {
 
   const mediaStyles = getQualityStyles();
 
+  const handleMediaError = () => {
+    logError(`[CustomMediaBackground] failed to load media: ${customMediaUrl}`);
+    setMediaError(true);
+  };
+
   return (
-    <div 
-      className="absolute inset-0 z-0 pointer-events-none" 
-      style={{ opacity: customMediaOpacity, transition: "opacity 0.3s ease" }}
+    <div
+      className="absolute inset-0 z-0 pointer-events-none"
+      style={{
+        opacity: customMediaOpacity,
+        transition: "opacity 0.3s ease",
+        display: hiddenByTab ? "none" : undefined,
+      }}
     >
       {customMediaType === "video" ? (
         <video
@@ -84,6 +98,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
           loop
           muted
           playsInline
+          onError={handleMediaError}
           className="object-cover"
           style={mediaStyles}
         />
@@ -91,6 +106,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
         <img
           src={convertFileSrc(customMediaUrl)}
           alt="Custom Background"
+          onError={handleMediaError}
           className="object-cover"
           style={mediaStyles}
         />
