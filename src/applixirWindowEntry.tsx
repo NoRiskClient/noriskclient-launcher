@@ -17,6 +17,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    getCurrentWindow().show().catch(() => {});
+    const win = getCurrentWindow();
+    win
+      .show()
+      .then(() => win.setFocus())
+      .catch(() => {});
   });
 });

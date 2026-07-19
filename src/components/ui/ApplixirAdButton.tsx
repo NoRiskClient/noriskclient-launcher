@@ -5,25 +5,20 @@ import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "./buttons/Button";
 import { Tooltip } from "./Tooltip";
-import { isApplixirEnabled } from "../../services/flagsmith-service";
 import { getAfkPointsBalance, showApplixirAd } from "../../services/nrc-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { log } from "../../utils/logging-utils";
 
+const APPLIXIR_ENABLED = false;
+
 export function ApplixirAdButton() {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const [enabled, setEnabled] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
-    isApplixirEnabled()
-      .then(setEnabled)
-      .catch(() => setEnabled(false));
-  }, []);
-
-  useEffect(() => {
+    if (!APPLIXIR_ENABLED) return;
     const refresh = () => {
       getAfkPointsBalance()
         .then((b) => setStreak(b?.streakDays ?? 0))
@@ -34,7 +29,7 @@ export function ApplixirAdButton() {
     return () => window.removeEventListener("focus", refresh);
   }, []);
 
-  if (!enabled) return null;
+  if (!APPLIXIR_ENABLED) return null;
 
   const handleClick = async () => {
     if (playing) return;

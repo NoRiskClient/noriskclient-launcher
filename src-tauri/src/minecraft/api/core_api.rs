@@ -1,6 +1,8 @@
 use crate::{
-    error::Result, minecraft::dto::afkpoints::AfkPointsBalance,
-    minecraft::dto::norisk_user::NoRiskUserMinimal, utils::http_client::nrc_get,
+    error::Result,
+    minecraft::dto::afkpoints::{AfkPointsBalance, DailyClaimResult, DailyClaimState},
+    minecraft::dto::norisk_user::NoRiskUserMinimal,
+    utils::http_client::{nrc_get, nrc_post},
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -63,6 +65,30 @@ impl CoreApi {
         nrc_get(&url)
             .bearer(norisk_token)
             .json::<AfkPointsBalance>("AFK Points balance")
+            .await
+    }
+
+    pub async fn get_daily_claim_state(
+        &self,
+        norisk_token: &str,
+        is_experimental: bool,
+    ) -> Result<DailyClaimState> {
+        let url = format!("{}/afkpoints/daily", Self::get_api_base(is_experimental));
+        nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<DailyClaimState>("AFK daily state")
+            .await
+    }
+
+    pub async fn claim_daily(
+        &self,
+        norisk_token: &str,
+        is_experimental: bool,
+    ) -> Result<DailyClaimResult> {
+        let url = format!("{}/afkpoints/daily/claim", Self::get_api_base(is_experimental));
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json::<DailyClaimResult>("AFK daily claim")
             .await
     }
 }

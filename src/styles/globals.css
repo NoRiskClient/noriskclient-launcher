@@ -547,3 +547,19 @@ nav button:not(.no-radius),
 .backdrop-blur-md-anyos {
     backdrop-filter: blur(12px);
 }
+
+@keyframes nrc-claim-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 79, 142, 255), 0.55);
+        border-color: rgba(var(--accent-rgb, 79, 142, 255), 0.9);
+    }
+    50% {
+        box-shadow: 0 0 14px 3px rgba(var(--accent-rgb, 79, 142, 255), 0.45);
+        border-color: rgba(var(--accent-rgb, 79, 142, 255), 0.45);
+    }
+}
+
+.animate-claim-glow {
+    animation: nrc-claim-glow 1.6s ease-in-out infinite;
+}

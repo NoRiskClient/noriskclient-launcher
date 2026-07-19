@@ -4,14 +4,17 @@ import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
-import { getAfkPointsBalance, mintApplixirSession } from "../../services/nrc-service";
+import { claimAfkDaily, getAfkDailyState, getAfkPointsBalance, mintApplixirSession } from "../../services/nrc-service";
+import type { DailyClaimState } from "../../types/afkpoints";
 import { Button } from "../ui/buttons/Button";
 import { Tooltip } from "../ui/Tooltip";
+import { AfkShop } from "./AfkShop";
 import { log } from "../../utils/logging-utils";
 
 const appWindow = getCurrentWindow();
 
 type AdState = "loading" | "playing" | "completed" | "finished" | "error";
+type WindowView = "ads" | "shop";
 
 function complementaryBackground(hex: string): string {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -39,7 +42,47 @@ function BorderGlowEffects({ accent }: { accent: string }) {
   );
 }
 
-function Titlebar({ points }: { points: number }) {
+function ViewToggle({ view, onChange }: { view: WindowView; onChange: (v: WindowView) => void }) {
+  const { t } = useTranslation();
+  const accentColor = useThemeStore((s) => s.accentColor);
+  const tabs: { id: WindowView; labelKey: string; icon: string }[] = [
+    { id: "ads", labelKey: "applixir.window.tab_watch", icon: "solar:play-circle-bold" },
+    { id: "shop", labelKey: "applixir.window.tab_shop", icon: "solar:shop-bold" },
+  ];
+
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-lg border border-white/10 bg-black/30">
+      {tabs.map((tab) => {
+        const active = view === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-minecraft text-[10px] tracking-wide transition-all duration-150 cursor-pointer"
+            style={{
+              color: active ? accentColor.light : "rgba(255,255,255,0.4)",
+              backgroundColor: active ? `${accentColor.value}30` : "transparent",
+              border: `1px solid ${active ? `${accentColor.value}70` : "transparent"}`,
+            }}
+          >
+            <Icon icon={tab.icon} className="w-3.5 h-3.5" />
+            <span style={{ transform: "translateY(-1px)" }}>{t(tab.labelKey)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Titlebar({
+  points,
+  view,
+  onViewChange,
+}: {
+  points: number;
+  view: WindowView;
+  onViewChange: (v: WindowView) => void;
+}) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
   const rgb = accentColor.value;
@@ -53,13 +96,14 @@ function Titlebar({ points }: { points: number }) {
       }}
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-3" data-tauri-drag-region>
+      <div className="flex items-center gap-4" data-tauri-drag-region>
         <h1
           className="font-smallcaps text-base tracking-wider font-bold text-shadow"
           data-tauri-drag-region
         >
           {t("applixir.window.title")}
         </h1>
+        <ViewToggle view={view} onChange={onViewChange} />
       </div>
 
       <div className="flex items-center gap-4">
@@ -130,15 +174,105 @@ function Overlay({
   );
 }
 
-function StreakTrack({ streakDays }: { streakDays: number }) {
+const MOCK_DAILY_CLAIM = false;
+const MOCK_STATE: DailyClaimState = {
+  claimable: false,
+  alreadyClaimed: false,
+  adWatchedToday: false,
+  streakDays: 7,
+  bonus: 250,
+  milestoneBonus: 1000,
+  streakFreezes: 1,
+};
+
+type DailyPhase = "loading" | "locked" | "ready" | "claiming" | "claimed";
+
+interface DailyClaim {
+  daily: DailyClaimState | null;
+  phase: DailyPhase;
+  days: number;
+  rewardTotal: number;
+  claim: () => void;
+}
+
+function useDailyClaim(
+  refreshKey: number,
+  onClaimed: (points: number, balance: number, streakDays: number) => void,
+): DailyClaim {
+  const [daily, setDaily] = useState<DailyClaimState | null>(null);
+  const [phase, setPhase] = useState<DailyPhase>("loading");
+  const [days, setDays] = useState(0);
+
+  useEffect(() => {
+    if (phase === "claiming" || phase === "claimed") return;
+    if (MOCK_DAILY_CLAIM) {
+      setDaily(MOCK_STATE);
+      setDays(MOCK_STATE.streakDays);
+      setPhase("locked");
+      const timer = window.setTimeout(() => setPhase("ready"), 2500);
+      return () => window.clearTimeout(timer);
+    }
+    getAfkDailyState()
+      .then((s) => {
+        if (!s) {
+          setPhase("claimed");
+          return;
+        }
+        setDaily(s);
+        setDays(s.streakDays);
+        setPhase(s.claimable ? "ready" : s.alreadyClaimed ? "claimed" : "locked");
+      })
+      .catch((e) => {
+        log("error", `[useDailyClaim] state load failed: ${JSON.stringify(e)}`);
+        setPhase("claimed");
+      });
+  }, [refreshKey]);
+
+  const claim = () => {
+    if (phase !== "ready") return;
+    setPhase("claiming");
+    if (MOCK_DAILY_CLAIM) {
+      window.setTimeout(() => {
+        setDays(MOCK_STATE.streakDays);
+        onClaimed(MOCK_STATE.bonus + MOCK_STATE.milestoneBonus, 1337, MOCK_STATE.streakDays);
+        setPhase("claimed");
+      }, 800);
+      return;
+    }
+    claimAfkDaily()
+      .then((r) => {
+        if (r.granted) {
+          setDays(r.streakDays);
+          onClaimed(r.bonus + r.milestoneBonus, r.balance, r.streakDays);
+        }
+        setPhase("claimed");
+      })
+      .catch((e) => {
+        log("error", `[useDailyClaim] claim failed: ${JSON.stringify(e)}`);
+        setPhase("ready");
+      });
+  };
+
+  return {
+    daily,
+    phase,
+    days,
+    rewardTotal: (daily?.bonus ?? 0) + (daily?.milestoneBonus ?? 0),
+    claim,
+  };
+}
+
+function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
-  const accent = accentColor.value;
-  const bgColor = complementaryBackground(accent);
-  const filled = streakDays === 0 ? 0 : ((streakDays - 1) % 7) + 1;
-  const progressPct = (Math.min(filled, 7) / 6) * 100;
+  const bgColor = complementaryBackground(accentColor.value);
 
-  const active = streakDays > 0;
+  const { phase, days } = claimState;
+  const pendingToday = phase === "locked" || phase === "ready" || phase === "claiming";
+  const filled = days === 0 ? 0 : ((days - 1) % 7) + 1;
+  const doneCount = pendingToday ? filled - 1 : filled;
+  const progressPct = (Math.min(Math.max(doneCount, 0), 6) / 6) * 100;
+  const active = days > 0;
 
   return (
     <div className="shrink-0 mt-3 flex items-center gap-4 px-1">
@@ -155,7 +289,7 @@ function StreakTrack({ streakDays }: { streakDays: number }) {
           className="font-minecraft text-xs tracking-wider whitespace-nowrap"
           style={{ color: active ? accentColor.value : accentColor.dark }}
         >
-          {streakDays} {t("applixir.window.streak_days")}
+          {days} {t("applixir.window.streak_days")}
         </span>
       </div>
 
@@ -167,17 +301,15 @@ function StreakTrack({ streakDays }: { streakDays: number }) {
           />
         </div>
         {Array.from({ length: 7 }, (_, i) => {
-          const isDone = i < filled;
-          const isToday = i === filled;
+          const isDone = i < doneCount;
+          const isToday = i === doneCount && pendingToday;
           const isBonus = i === 6;
           const on = isDone || isToday;
           const icon = isBonus
             ? "solar:cup-star-bold"
-            : isDone
+            : on
               ? "solar:fire-bold"
-              : isToday
-                ? "solar:fire-bold"
-                : "solar:lock-keyhole-minimalistic-bold";
+              : "solar:lock-keyhole-minimalistic-bold";
           return (
             <Tooltip
               key={i}
@@ -191,10 +323,10 @@ function StreakTrack({ streakDays }: { streakDays: number }) {
               >
                 <Icon
                   icon={icon}
-                  className={isToday ? "w-6 h-6" : "w-5 h-5"}
+                  className={`${isToday ? "w-6 h-6" : "w-5 h-5"}${isToday ? " animate-pulse" : ""}`}
                   style={{
                     color: on ? accentColor.value : accentColor.dark,
-                    filter: isDone || isToday ? `drop-shadow(0 0 5px ${accentColor.shadowValue})` : undefined,
+                    filter: on ? `drop-shadow(0 0 5px ${accentColor.shadowValue})` : undefined,
                     opacity: on ? 1 : 0.55,
                   }}
                 />
@@ -204,6 +336,84 @@ function StreakTrack({ streakDays }: { streakDays: number }) {
         })}
       </div>
     </div>
+  );
+}
+
+function DailyClaimPanel({ claimState }: { claimState: DailyClaim }) {
+  const { t } = useTranslation();
+  const accentColor = useThemeStore((s) => s.accentColor);
+  const { phase, rewardTotal, claim } = claimState;
+
+  if (phase === "loading") {
+    return (
+      <div className="flex items-center justify-center px-3 py-3 rounded-lg border border-white/10 bg-black/30">
+        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" style={{ color: accentColor.dark }} />
+      </div>
+    );
+  }
+
+  if (phase === "locked") {
+    return (
+      <div className="flex flex-col gap-2 px-3 py-3 rounded-lg border border-white/10 bg-black/30">
+        <div className="flex items-center gap-2">
+          <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-4 h-4 text-white/40" />
+          <span className="font-minecraft text-xs text-white/40" style={{ transform: "translateY(-1px)" }}>
+            +{rewardTotal.toLocaleString()}
+          </span>
+        </div>
+        <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
+          {t("applixir.daily.watch_first")}
+        </span>
+      </div>
+    );
+  }
+
+  if (phase === "claimed") {
+    return (
+      <div
+        className="flex flex-col gap-1.5 px-3 py-3 rounded-lg border"
+        style={{ borderColor: `${accentColor.value}45`, backgroundColor: `${accentColor.value}12` }}
+      >
+        <div className="flex items-center gap-2">
+          <Icon
+            icon="solar:check-circle-bold"
+            className="w-4 h-4"
+            style={{ color: accentColor.value, filter: `drop-shadow(0 0 3px ${accentColor.shadowValue})` }}
+          />
+          <span
+            className="font-smallcaps text-sm tracking-wider"
+            style={{ color: `${accentColor.light}b0`, transform: "translateY(-1px)" }}
+          >
+            {t("applixir.daily.claimed_label")}
+          </span>
+        </div>
+        <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
+          {t("applixir.daily.claimed")}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={claim}
+      disabled={phase === "claiming"}
+      className="animate-claim-glow w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-minecraft text-xs tracking-wide cursor-pointer border"
+      style={{ color: accentColor.light, backgroundColor: `${accentColor.value}25` }}
+    >
+      {phase === "claiming" ? (
+        <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
+      ) : (
+        <Icon
+          icon="solar:gift-bold"
+          className="w-5 h-5"
+          style={{ color: accentColor.value, filter: `drop-shadow(0 0 5px ${accentColor.shadowValue})` }}
+        />
+      )}
+      <span style={{ transform: "translateY(-1px)" }}>
+        {t("applixir.daily.claim")} +{rewardTotal.toLocaleString()}
+      </span>
+    </button>
   );
 }
 
@@ -259,7 +469,7 @@ const STATE_META: Record<AdState, { icon: string; labelKey: string; spin?: boole
   error: { icon: "solar:danger-triangle-bold", labelKey: "applixir.window.error" },
 };
 
-function Sidebar({ state }: { state: AdState }) {
+function Sidebar({ state, claimState }: { state: AdState; claimState: DailyClaim }) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
   const meta = STATE_META[state];
@@ -304,16 +514,7 @@ function Sidebar({ state }: { state: AdState }) {
       </div>
 
       <div className="mt-auto">
-        <div className="flex items-start gap-3 px-3 py-3 rounded-lg border border-white/10 bg-black/30">
-          <Icon
-            icon="solar:gift-bold"
-            className="w-4 h-4 flex-shrink-0 mt-0.5"
-            style={{ color: accentColor.value }}
-          />
-          <span className="font-minecraft text-xs text-white/60 leading-relaxed">
-            {t("applixir.window.rewards_soon")}
-          </span>
-        </div>
+        <DailyClaimPanel claimState={claimState} />
       </div>
     </div>
   );
@@ -340,10 +541,18 @@ export function ApplixirWindow() {
   const [attempt, setAttempt] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [points, setPoints] = useState(0);
+  const [view, setView] = useState<WindowView>("ads");
   const [busy, setBusy] = useState(false);
   const [reward, setReward] = useState<{ points: number; balance: number; key: number } | null>(null);
-  const [state, setState] = useState<AdState>(initialToken ? "loading" : "error");
+  const [state, setState] = useState<AdState>("loading");
   const adStartedRef = useRef(false);
+  const autoMintRef = useRef(false);
+
+  const dailyClaim = useDailyClaim(reward?.key ?? 0, (claimPoints, balance, streak) => {
+    setPoints(balance);
+    setStreakDays(streak);
+    setReward({ points: claimPoints, balance, key: Date.now() });
+  });
 
   const pageUrl = base && token
     ? `${base}/applixir/page?token=${encodeURIComponent(token)}${resetConsent ? "&resetConsent=1" : ""}`
@@ -356,6 +565,7 @@ export function ApplixirWindow() {
       const fresh = await mintApplixirSession();
       if (!fresh) {
         log("warn", "[ApplixirWindow] watch another: mint returned null");
+        setState("error");
         return;
       }
       setToken(fresh);
@@ -364,10 +574,18 @@ export function ApplixirWindow() {
       setState("loading");
     } catch (e) {
       log("error", `[ApplixirWindow] watch another mint failed: ${JSON.stringify(e)}`);
+      setState("error");
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (initialToken || autoMintRef.current) return;
+    autoMintRef.current = true;
+    log("info", "[ApplixirWindow] no token in URL, minting session from window");
+    watchAnother();
+  }, []);
 
   useEffect(() => {
     getAfkPointsBalance()
@@ -463,9 +681,15 @@ export function ApplixirWindow() {
       }}
     >
       <BorderGlowEffects accent={accentColor.value} />
-      <Titlebar points={points} />
+      <Titlebar points={points} view={view} onViewChange={setView} />
 
-      <div className="relative z-10 flex-1 min-h-0 flex">
+      {view === "shop" && (
+        <div className="relative z-10 flex-1 min-h-0 flex flex-col">
+          <AfkShop onBalanceChange={setPoints} />
+        </div>
+      )}
+
+      <div className={`relative z-10 flex-1 min-h-0 ${view === "ads" ? "flex" : "hidden"}`}>
         <div className="relative flex-1 p-4 flex flex-col min-h-0">
           <div className="relative flex-1 min-h-0 rounded-lg overflow-hidden border border-white/10 bg-black">
             {reward && <RewardPop key={reward.key} points={reward.points} balance={reward.balance} />}
@@ -517,10 +741,10 @@ export function ApplixirWindow() {
             )}
           </div>
 
-          <StreakTrack streakDays={streakDays} />
+          <StreakClaimBar claimState={dailyClaim} />
         </div>
 
-        <Sidebar state={state} />
+        <Sidebar state={state} claimState={dailyClaim} />
       </div>
     </div>
   );

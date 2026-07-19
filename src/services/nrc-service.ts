@@ -4,7 +4,13 @@ import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
 import type { AdventCalendarDay, Reward } from '../types/advent';
 import type { UserNotification } from '../types/notification';
-import type { AfkPointsBalance } from '../types/afkpoints';
+import type {
+  AfkPointsBalance,
+  AfkShopCatalogResponse,
+  AfkShopPurchaseResponse,
+  DailyClaimResult,
+  DailyClaimState,
+} from '../types/afkpoints';
 import { useProfileStore } from '../store/profile-store';
 import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './flagsmith-service';
 import { refreshPermissions } from './permission-service';
@@ -145,6 +151,25 @@ export const mintApplixirSession = (): Promise<string | null> => {
 
 export const getAfkPointsBalance = (): Promise<AfkPointsBalance | null> => {
   return invoke('get_afkpoints_balance');
+};
+
+export const getAfkDailyState = (): Promise<DailyClaimState | null> => {
+  return invoke('afk_daily_state');
+};
+
+export const claimAfkDaily = (): Promise<DailyClaimResult> => {
+  return invoke('afk_daily_claim');
+};
+
+export const getAfkShopCatalog = (): Promise<AfkShopCatalogResponse | null> => {
+  return invoke('afk_shop_catalog');
+};
+
+export const purchaseAfkShopItem = (
+  itemId: string,
+  purchaseId: string,
+): Promise<AfkShopPurchaseResponse> => {
+  return invoke('afk_shop_purchase', { itemId, purchaseId });
 };
 
 /**
