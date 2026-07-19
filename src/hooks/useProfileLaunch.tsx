@@ -5,7 +5,7 @@ import { listen, Event as TauriEvent } from "@tauri-apps/api/event";
 import { EventPayload as FrontendEventPayload, EventType as FrontendEventType } from "../types/events";
 import { invoke } from "@tauri-apps/api/core";
 import { LaunchState } from "../store/launch-state-store";
-import { useLaunchStateStore } from "../store/launch-state-store";
+import { useLaunchStateStore, DEFAULT_PROFILE_STATE } from "../store/launch-state-store";
 import * as ProcessService from "../services/process-service";
 import type { LaunchOverrides } from "../services/process-service";
 import { toast } from "react-hot-toast";
@@ -31,16 +31,15 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
   const { showModal, hideModal } = useGlobalModal();
 
 
-  const {
-    getProfileState,
-    initializeProfile,
-    initiateButtonLaunch,
-    finalizeButtonLaunch,
-    setButtonStatusMessage,
-    setLaunchError,
-  } = useLaunchStateStore();
+  const getProfileState = useLaunchStateStore((s) => s.getProfileState);
+  const initializeProfile = useLaunchStateStore((s) => s.initializeProfile);
+  const initiateButtonLaunch = useLaunchStateStore((s) => s.initiateButtonLaunch);
+  const finalizeButtonLaunch = useLaunchStateStore((s) => s.finalizeButtonLaunch);
+  const setButtonStatusMessage = useLaunchStateStore((s) => s.setButtonStatusMessage);
+  const setLaunchError = useLaunchStateStore((s) => s.setLaunchError);
 
-  const { isButtonLaunching, buttonStatusMessage, launchState } = getProfileState(profileId);
+  const { isButtonLaunching, buttonStatusMessage, launchState } =
+    useLaunchStateStore((s) => s.profiles[profileId] ?? DEFAULT_PROFILE_STATE);
 
   // Initialize profile on mount
   useEffect(() => {

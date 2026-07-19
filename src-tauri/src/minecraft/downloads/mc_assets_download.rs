@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::{AssetIndex, AssetIndexContent, AssetObject};
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use crate::utils::mc_utils;
@@ -234,6 +234,8 @@ impl MinecraftAssetsDownloadService {
             .await?;
         }
 
+        let progress_throttle = Arc::new(ProgressThrottle::new(100));
+
         let results: Vec<Result<()>> = iter(downloads)
             .buffer_unordered(self.concurrent_downloads)
             .inspect(|_| {
@@ -241,8 +243,7 @@ impl MinecraftAssetsDownloadService {
                 let completed = completed_counter.fetch_add(0, Ordering::SeqCst); // Just read current value
                 let total = total_to_download.load(Ordering::SeqCst);
 
-                // Report progress every time
-                if total > 0 {
+                if total > 0 && progress_throttle.should_emit() {
                     // Calculate progress from 0.2 to 0.9
                     let progress = 0.2 + 0.7 * (completed as f64 / total as f64);
 

@@ -1,6 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::{Profile, ProfileState};
 use crate::state::state_manager::State;
 use async_zip::tokio::read::seek::ZipFileReader;
@@ -403,6 +403,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let extraction_throttle = std::sync::Arc::new(ProgressThrottle::new(100));
     let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
@@ -521,6 +522,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
                     entry_filename_str, task_final_dest_path, entry_uncompressed_size
                 );
                 let task_counter = extraction_counter.clone();
+                let task_throttle = extraction_throttle.clone();
                 let task_total = total_files;
                 let task_state = state.clone();
                 let task_event_id = event_id;
@@ -619,7 +621,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
                     // Increment counter and emit progress
                     let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    if task_total > 0 {
+                    if task_total > 0 && task_throttle.should_emit() {
                         // Progress from 0.25 to 0.90 during extraction (65% of total)
                         let extraction_progress = completed as f64 / task_total as f64;
                         let overall_progress = 0.25 + (extraction_progress * 0.65);

@@ -272,7 +272,7 @@ export function InstanceSidebar({
   const { processes, stoppedProcesses, processEndTimes, metrics, fetchProcesses, stopProcess, isLoading } = useProcessStore();
 
   // Get launch state store for launch feedback
-  const { getProfileState, initiateButtonLaunch, finalizeButtonLaunch, setButtonStatusMessage } = useLaunchStateStore();
+  const { getProfileState, initiateButtonLaunch, finalizeButtonLaunch } = useLaunchStateStore();
 
   // Get launcher log functions
   const { addLauncherLog, clearLauncherLogs, clearLogs } = useProcessStore();
@@ -320,9 +320,6 @@ export function InstanceSidebar({
           finalizeButtonLaunch(profileId);
         } else if (payload.event_type === EventType.Error) {
           finalizeButtonLaunch(profileId, payload.message || "Error");
-        } else if (payload.message && getProfileState(profileId).isButtonLaunching) {
-          // Update button status message during launch
-          setButtonStatusMessage(profileId, payload.message);
         }
       });
     };
@@ -335,7 +332,7 @@ export function InstanceSidebar({
         eventListenerRef.current();
       }
     };
-  }, [finalizeButtonLaunch, setButtonStatusMessage, getProfileState]);
+  }, [finalizeButtonLaunch]);
 
   // Convert processes to instance data (merge running + stopped)
   const instances = useMemo(() => {
