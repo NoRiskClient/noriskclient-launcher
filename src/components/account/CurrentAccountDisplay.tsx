@@ -4,10 +4,10 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { gsap } from "gsap";
 import { PlayerHead } from "../common/PlayerHead";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface CurrentAccountDisplayProps {
   onClick?: () => void;
@@ -27,20 +27,11 @@ export function CurrentAccountDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  useEffect(() => {
-    if (buttonRef.current) {
-      gsap.fromTo(
-        buttonRef.current,
-        { scale: 0.95, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    buttonRef,
+    { scale: 0.95, opacity: 0 },
+    { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" },
+  );
 
   // Get border classes based on variant
   const getBorderClasses = () => {
@@ -103,7 +94,7 @@ export function CurrentAccountDisplay({
       <div
         ref={buttonRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
           "rounded-md text-white tracking-wider",
           "flex items-center gap-3 px-4 py-1",
           "text-shadow-sm",
@@ -150,11 +141,11 @@ export function CurrentAccountDisplay({
             backgroundColor: `${accentColor.value}20`,
           }}
         >
-          <span className="text-white font-minecraft text-xs">+</span>
+          <span className="text-white font-smallcaps text-xs">+</span>
         </div>
 
         <div className="flex items-center gap-1 min-w-0">
-          <span className="text-xl text-white font-minecraft lowercase">
+          <span className="text-sm text-white font-smallcaps">
             {t('auth.addAccount')}
           </span>
         </div>
@@ -174,7 +165,7 @@ export function CurrentAccountDisplay({
     <div
       ref={buttonRef}
       className={cn(
-        "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+        "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
         "rounded-md text-white tracking-wider",
         "flex items-center gap-3 px-4 py-1",
         "text-shadow-sm",
@@ -233,7 +224,7 @@ export function CurrentAccountDisplay({
       {!compact && (
         <div className="flex flex-col min-w-0">
           <span
-            className="text-2xl text-white font-minecraft uppercase truncate"
+            className="text-base text-white font-smallcaps truncate"
             title={username}
           >
             {username}

@@ -66,7 +66,7 @@ export function SettingsSection({
             />
           )}
           <h3
-            className="font-minecraft text-3xl lowercase leading-none tracking-wide"
+            className="font-smallcaps text-lg leading-none tracking-wide"
             style={{ color: accentColor.value }}
           >
             {title}
@@ -76,7 +76,7 @@ export function SettingsSection({
       </div>
 
       {description && (
-        <p className="font-minecraft-ten text-xs text-white/45 mt-2">{description}</p>
+        <p className="font-minecraft text-xs text-white/45 mt-2">{description}</p>
       )}
 
       <div className={cn("mt-1", bodyClassName)}>{body}</div>

@@ -1,4 +1,5 @@
 pub mod curseforge;
+pub mod lenient;
 pub mod modrinth;
 pub mod mrpack;
 pub mod norisk_packs;

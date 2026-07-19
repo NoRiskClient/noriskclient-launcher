@@ -149,6 +149,7 @@ export interface UnifiedUpdateCheckRequest {
 
 export interface UnifiedUpdateCheckResponse {
   updates: Record<string, UnifiedVersion>;
+  failed_platforms?: ModPlatform[];
 }
 
 /// Response structure for modpack version requests

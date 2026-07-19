@@ -7,20 +7,12 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Icon } from "@iconify/react";
 import { ModPlatform } from "../../types/unified";
+import { sanitizeRichHtml } from "../../utils/html-sanitize";
 
 interface ModDetailDescriptionProps {
   body: string;
   source: ModPlatform;
 }
-
-// HTML sanitizer for CurseForge HTML content
-const sanitizeHtml = (html: string) => {
-  return html
-    .replace(/<script[^>]*>.*?<\/script>/gi, "")
-    .replace(/<style[^>]*>.*?<\/style>/gi, "")
-    .replace(/javascript:/gi, "")
-    .replace(/on\w+="[^"]*"/gi, "");
-};
 
 export function ModDetailDescription({ body, source }: ModDetailDescriptionProps) {
   const { t } = useTranslation();
@@ -28,11 +20,11 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
   if (!body || body.trim().length === 0) {
     return (
       <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-        <h2 className="text-lg font-minecraft-ten text-white flex items-center gap-2 mb-4 normal-case">
+        <h2 className="text-lg font-minecraft text-white flex items-center gap-2 mb-4 normal-case">
           <Icon icon="solar:document-text-bold" className="w-5 h-5" />
           {t('mod_detail.description')}
         </h2>
-        <p className="text-white/50 font-minecraft-ten text-center py-8">
+        <p className="text-white/50 font-minecraft text-center py-8">
           {t('mod_detail.no_description')}
         </p>
       </div>
@@ -41,7 +33,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
 
   return (
     <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-      <h2 className="text-lg font-minecraft-ten text-white flex items-center gap-2 mb-4 normal-case">
+      <h2 className="text-lg font-minecraft text-white flex items-center gap-2 mb-4 normal-case">
         <Icon icon="solar:document-text-bold" className="w-5 h-5" />
         {t('mod_detail.description')}
       </h2>
@@ -74,7 +66,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
               [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3
               [&_th]:bg-black/30 [&_th]:p-2 [&_th]:border [&_th]:border-white/20 [&_th]:text-left
               [&_td]:p-2 [&_td]:border [&_td]:border-white/20"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(body) }}
           />
         ) : (
           // Render Markdown for Modrinth (with HTML support via rehype-raw)

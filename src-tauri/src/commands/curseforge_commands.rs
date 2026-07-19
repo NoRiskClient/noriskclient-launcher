@@ -4,7 +4,9 @@ use crate::integrations::curseforge::{
     import_curseforge_pack_as_profile, download_and_install_curseforge_modpack, get_file_changelog,
     get_mod_description
 };
+use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::profile_state::default_profile_path;
+use crate::state::State;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -13,13 +15,17 @@ use std::path::PathBuf;
 pub async fn get_curseforge_mods_by_ids(
     mod_ids: Vec<u32>,
     filter_pc_only: Option<bool>,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<CurseForgeModsResponse, CommandError> {
     log::debug!(
         "Received get_curseforge_mods_by_ids command for {} mod IDs",
         mod_ids.len()
     );
 
-    let result = get_mods_by_ids(mod_ids, filter_pc_only)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let result = state
+        .content_cache
+        .get_curseforge_mods(mod_ids, filter_pc_only, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 
@@ -141,13 +147,17 @@ pub async fn get_curseforge_file_changelog_command(
 #[tauri::command]
 pub async fn get_curseforge_mod_description_command(
     mod_id: u32,
+    cache_behaviour: Option<CacheBehaviour>,
 ) -> Result<String, CommandError> {
     log::debug!(
         "Received get_curseforge_mod_description command: mod_id={}",
         mod_id
     );
 
-    let description = get_mod_description(mod_id)
+    let state = State::get().await.map_err(CommandError::from)?;
+    let description = state
+        .content_cache
+        .get_curseforge_description(mod_id, cache_behaviour.unwrap_or_default())
         .await
         .map_err(CommandError::from)?;
 

@@ -63,6 +63,7 @@ pub async fn get_datapacks_for_profile(
         content_type: ContentType::DataPack,
         calculate_hashes,
         fetch_modrinth_data,
+        cache_behaviour: Default::default(),
     };
 
     // Call load_items directly

@@ -1455,6 +1455,10 @@ impl ProfileManager {
                 ModPlatform::Modrinth => {
                     // For Modrinth, we need to get the full version details to access dependencies
                     if let Ok(full_version) = crate::integrations::modrinth::get_version_details(payload.version_id.clone()).await {
+                        if let Ok(state) = crate::state::state_manager::State::get().await {
+                            info!("[cache-warm] single install warming modrinth version {} for {}", full_version.id, display_name_log);
+                            state.content_cache.cache_modrinth_version(&full_version).await;
+                        }
                         self.install_modrinth_dependencies(payload.profile_id, &full_version, display_name_log).await?;
                     }
                 }

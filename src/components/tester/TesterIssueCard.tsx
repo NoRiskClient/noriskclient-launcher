@@ -54,13 +54,13 @@ export function TesterIssueCard({
             type="button"
             onClick={onOpenIssue}
             title={issue.header.title}
-            className="block text-left font-minecraft-ten text-sm text-white normal-case truncate w-full hover:text-white/80 transition-colors"
+            className="block text-left font-minecraft text-sm text-white normal-case truncate w-full hover:text-white/80 transition-colors"
             style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
           >
             {issue.header.title || "(untitled)"}
           </button>
           <div
-            className="mt-1 flex items-center gap-1.5 text-xs font-minecraft-ten text-white/50 truncate"
+            className="mt-1 flex items-center gap-1.5 text-xs font-minecraft text-white/50 truncate"
             style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
           >
             {metaParts.map((p, i) => (

@@ -120,7 +120,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
         
         <span 
             className={cn(
-              "node-name flex-1 truncate text-sm font-minecraft-ten self-center", 
+              "node-name flex-1 truncate text-sm font-minecraft self-center", 
               {"cursor-pointer": node.is_dir || checkboxesEnabled && !node.is_dir }
             )}
             onClick={(e) => {
@@ -136,11 +136,11 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
         </span>
 
         {!node.is_dir && (
-          <span className="node-size text-xs text-white/60 font-minecraft-ten w-[70px] text-right mr-2 tabular-nums flex-shrink-0 self-center">
+          <span className="node-size text-xs text-white/60 font-minecraft w-[70px] text-right mr-2 tabular-nums flex-shrink-0 self-center">
             {formatFileSize(node.size)}
           </span>
         )}
-        <span className="node-date text-xs text-white/60 font-minecraft-ten w-[150px] text-right tabular-nums flex-shrink-0 self-center">
+        <span className="node-date text-xs text-white/60 font-minecraft w-[150px] text-right tabular-nums flex-shrink-0 self-center">
           {formatDate(node.last_modified)}
         </span>
       </div>
@@ -346,15 +346,15 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   };
 
   if (loading) {
-    return <div className="p-4 text-center text-white/70 font-minecraft-ten">{t('files.loading_structure')}</div>;
+    return <div className="p-4 text-center text-white/70 font-minecraft">{t('files.loading_structure')}</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-center text-red-400 font-minecraft-ten">{t('common.error')}: {error}</div>;
+    return <div className="p-4 text-center text-red-400 font-minecraft">{t('common.error')}: {error}</div>;
   }
 
   if (!rootNode) {
-    return <div className="p-4 text-center text-white/70 font-minecraft-ten">{t('files.no_structure_available')}</div>;
+    return <div className="p-4 text-center text-white/70 font-minecraft">{t('files.no_structure_available')}</div>;
   }
 
   const nodesToRender = hideRootNode ? rootNode.children || [] : [rootNode];

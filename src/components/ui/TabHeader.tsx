@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
-import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { 
   getVariantColors,
   getAccessibilityProps
@@ -36,20 +36,11 @@ export function TabHeader({
     label: ariaLabel
   });
 
-  useEffect(() => {
-    if (headerRef.current) {
-      gsap.fromTo(
-        headerRef.current,
-        { opacity: 0, y: -20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    headerRef,
+    { opacity: 0, y: -20 },
+    { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
+  );
   return (
     <div
       ref={headerRef}      className={cn(
@@ -67,13 +58,13 @@ export function TabHeader({
     >      <div className="flex items-center gap-3">        {icon && (
           <Icon
             icon={icon}
-            className="text-xl"
+            className="text-sm"
             style={{ color: colors.light }}
             aria-hidden="true"
           />
         )}
         <h1
-          className="text-xl font-minecraft font-bold"
+          className="text-sm font-smallcaps font-bold"
           style={{ color: "#ffffff" }}
         >
           {title}

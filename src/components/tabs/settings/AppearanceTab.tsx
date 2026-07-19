@@ -6,6 +6,7 @@ import { SnowEffectToggle } from "../../ui/SnowEffectToggle";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { ThemeSelector } from "../../ThemeSelector";
+import { FontSelector } from "../../FontSelector";
 import EffectPreviewCard from "../../EffectPreviewCard";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { BACKGROUND_EFFECTS, useBackgroundEffectStore } from "../../../store/background-effect-store";
@@ -57,6 +58,18 @@ export function AppearanceTab() {
       </SettingsSection>
 
       <SettingsSection
+        id="settings-section-font"
+        title={t("settings.font.title")}
+        icon="solar:text-bold"
+        keywords={kw("settings.font.title", "font", "schrift", "schriftart", "typography", "typografie", "text")}
+        description={t("settings.font.description")}
+      >
+        <div className="py-3">
+          <FontSelector disabled={saving} />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
         id="settings-section-background"
         title={t("settings.background.title")}
         icon="solar:stars-bold"
@@ -90,7 +103,7 @@ export function AppearanceTab() {
         </SettingRow>
         <SettingRow label={t("settings.background.quality")} searchKeywords={kw("settings.background.quality", "quality", "qualität", "performance", "leistung", "fps")} disabled={saving}>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_low")}</span>
+            <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_low")}</span>
             <input
               type="range"
               min="0"
@@ -105,7 +118,7 @@ export function AppearanceTab() {
               className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
               disabled={saving}
             />
-            <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_high")}</span>
+            <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_high")}</span>
           </div>
         </SettingRow>
 
@@ -143,7 +156,7 @@ export function AppearanceTab() {
               </Button>
             )}
             <Button
-              variant="primary"
+              variant="flat"
               size="sm"
               onClick={async () => {
                 const selected = await open({

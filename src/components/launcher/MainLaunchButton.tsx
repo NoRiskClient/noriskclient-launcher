@@ -134,12 +134,12 @@ export function MainLaunchButton({
   };
 
   const renderLaunchButtonContent = () => {
-    const actionText = isButtonLaunching ? "STOP" : "LAUNCH";
+    const actionText = isButtonLaunching ? "Stop" : "Launch";
 
     let statusSubText: string | null | undefined = null;
     let statusColorClass = "opacity-85";
 
-    if (transientSuccessActive && buttonStatusMessage === "STARTING!") {
+    if (transientSuccessActive && buttonStatusMessage === t('launch.starting')) {
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {
@@ -158,12 +158,12 @@ export function MainLaunchButton({
 
     const displaySubText = statusSubText || selectedVersionLabel;
     return (
-      <div className="w-full flex flex-col items-center justify-center leading-none -mt-4">
-        <span className="text-5xl text-center lowercase">{actionText}</span>{" "}
+      <div className="w-full flex flex-col items-center justify-center leading-none -translate-y-[5px]">
+        <span className="text-3xl text-center">{actionText}</span>
         {displaySubText && (
           <span
             className={cn(
-              "text-xs font-minecraft-ten tracking-normal -mt-1 text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
+              "text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
               isButtonLaunching ? "max-w-64" : "",
               statusColorClass
             )}

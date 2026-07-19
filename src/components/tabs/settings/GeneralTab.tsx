@@ -110,10 +110,10 @@ export function GeneralTab() {
               style={{ backgroundColor: accentColor.value }}
             />
             <div className="flex flex-col items-start">
-              <span className="font-minecraft-ten text-base text-white/80 group-hover:text-white transition-colors">
+              <span className="font-minecraft text-base text-white/80 group-hover:text-white transition-colors">
                 {t("settings.accent_color.custom")}
               </span>
-              <span className="text-xs text-white/60 font-minecraft-ten">
+              <span className="text-xs text-white/60 font-minecraft">
                 {accentColor.value}
               </span>
             </div>

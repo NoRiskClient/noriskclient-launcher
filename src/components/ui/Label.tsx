@@ -162,7 +162,7 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
       <div
         ref={mergedRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md",
           "rounded-md text-white tracking-wider",
           "inline-flex items-center justify-center",
           "text-shadow-sm",

@@ -79,10 +79,7 @@ impl Default for DownloadConfig {
             use_streaming: true,
             force_overwrite: false,
             max_retries: 3,
-            user_agent: Some(format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            )),
+            user_agent: None,
             progress_callback: None,
             check_disk_space: true,
             disk_space_buffer: 0.25, // 25% buffer by default
@@ -663,3 +660,7 @@ impl DownloadUtils {
         false
     }
 }
+
+#[cfg(test)]
+#[path = "download_utils_test.rs"]
+mod tests;

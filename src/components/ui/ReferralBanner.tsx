@@ -72,7 +72,7 @@ export function ReferralBanner() {
       >
         <div className="flex items-center gap-3 px-4 py-2">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="font-minecraft-ten text-sm text-white/80 tracking-wide">
+          <span className="font-minecraft text-sm text-white/80 tracking-wide">
             <span className="text-red-400">{t('common.error')}:</span> {error}
           </span>
           <button
@@ -102,7 +102,7 @@ export function ReferralBanner() {
       >
         <div className="flex items-center gap-3 px-4 py-2">
           <Loader2 className="w-4 h-4 text-white/70 flex-shrink-0 animate-spin" />
-          <span className="font-minecraft-ten text-sm text-white/80 tracking-wide">
+          <span className="font-minecraft text-sm text-white/80 tracking-wide">
             {t('referral.loading')}
           </span>
         </div>
@@ -136,7 +136,7 @@ export function ReferralBanner() {
         )}
 
         {/* Content */}
-        <div className="flex flex-col font-minecraft-ten text-sm tracking-wide">
+        <div className="flex flex-col font-minecraft text-sm tracking-wide">
           <span className="text-white/80">
             {displayInfo?.fallbackMessage || "You were invited by"}{" "}
             <span style={{ color: accentColor.value }} className="font-semibold">

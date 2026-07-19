@@ -261,18 +261,18 @@ export function PlayerActionsDisplay({
                 >
                   <button
                     onClick={handleTopToggle}
-                    className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                    className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   >
                     <span className="flex items-center gap-2">
                       <FeaturedPromoIcon src={WM_PUBLIC_VIEWING.iconSrc} alt="" size="md" />
-                      {t('wm.public_viewing').toLowerCase()}
+                      {t('wm.public_viewing')}
                     </span>
                   </button>
                 </StaticTooltip>
               ) : (
                 <button
                   onClick={handleTopToggle}
-                  className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   title={
                     featureMode
                       ? t('wm.switch_to_main')
@@ -281,7 +281,7 @@ export function PlayerActionsDisplay({
                 >
                   {featureMode
                     ? t('wm.switch_to_main')
-                    : FEATURED_SERVER.name.toLowerCase()}
+                    : FEATURED_SERVER.name}
                 </button>
               )}
             </div>

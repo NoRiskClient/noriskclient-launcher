@@ -1,5 +1,8 @@
 use crate::{
     error::{AppError, Result},
+    minecraft::dto::afkpoints::{
+        AfkShopCatalogResponse, AfkShopPurchaseRequest, AfkShopPurchaseResponse,
+    },
     utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put},
 };
 use log::{debug, error};
@@ -535,6 +538,37 @@ impl CapeApi {
             .bearer(norisk_token)
             .query(&query_params)
             .expect_success("Cape unequip")
+            .await
+    }
+
+    pub async fn get_afk_shop_catalog(
+        &self,
+        norisk_token: &str,
+        is_experimental: bool,
+    ) -> Result<AfkShopCatalogResponse> {
+        let url = format!("{}/afk-shop", Self::get_api_base(is_experimental));
+        nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<AfkShopCatalogResponse>("AFK shop catalog")
+            .await
+    }
+
+    pub async fn purchase_afk_shop_item(
+        &self,
+        norisk_token: &str,
+        item_id: &str,
+        purchase_id: &str,
+        is_experimental: bool,
+    ) -> Result<AfkShopPurchaseResponse> {
+        let url = format!("{}/afk-shop/purchase", Self::get_api_base(is_experimental));
+        let body = AfkShopPurchaseRequest {
+            item_id: item_id.to_string(),
+            purchase_id: purchase_id.to_string(),
+        };
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&body)
+            .json::<AfkShopPurchaseResponse>("AFK shop purchase")
             .await
     }
 }

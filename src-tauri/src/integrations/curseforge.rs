@@ -1,10 +1,11 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
-use crate::state::event_state::{EventPayload, EventType};
+use crate::integrations::lenient;
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::{Mod, ModLoader, ModPackInfo, ModPackSource, ModSource, Profile, ProfileSettings, ProfileState};
 use log::{debug, error, info, warn};
 use reqwest;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -95,6 +96,7 @@ fn determine_memory_settings(recommended_ram_mb: Option<u64>) -> crate::state::p
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurseForgeSearchResponse {
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub data: Vec<CurseForgeMod>,
     pub pagination: CurseForgePagination,
 }
@@ -119,14 +121,21 @@ pub struct CurseForgeMod {
     pub downloadCount: u64,
     pub isFeatured: bool,
     pub primaryCategoryId: u32,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub categories: Vec<CurseForgeCategory>,
     pub classId: Option<u32>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub authors: Vec<CurseForgeAuthor>,
+    #[serde(default, deserialize_with = "lenient::opt")]
     pub logo: Option<CurseForgeAttachment>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub screenshots: Vec<CurseForgeAttachment>,
     pub mainFileId: u32,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub latestFiles: Vec<CurseForgeFile>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub latestFilesIndexes: Vec<CurseForgeFileIndex>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub latestEarlyAccessFilesIndexes: Vec<CurseForgeFileIndex>,
     pub dateCreated: String,
     pub dateModified: String,
@@ -189,14 +198,18 @@ pub struct CurseForgeFile {
     pub fileName: String,
     pub releaseType: u32,
     pub fileStatus: u32,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub hashes: Vec<CurseForgeFileHash>,
     pub fileDate: String,
     pub fileLength: u64,
     pub downloadCount: u64,
     pub fileSizeOnDisk: Option<u64>, // Made optional as per API docs
     pub downloadUrl: String, // Not optional per API docs
+    #[serde(default)]
     pub gameVersions: Vec<String>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub sortableGameVersions: Vec<CurseForgeSortableGameVersion>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub dependencies: Vec<CurseForgeDependency>,
     pub exposeAsAlternative: Option<bool>,
     pub parentProjectFileId: Option<u32>,
@@ -206,7 +219,7 @@ pub struct CurseForgeFile {
     pub isEarlyAccessContent: Option<bool>,
     pub earlyAccessEndDate: Option<String>,
     pub fileFingerprint: u64,
-    #[serde(default, deserialize_with = "parse_vec_default_on_null")]
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub modules: Vec<CurseForgeModule>,
 }
 
@@ -245,14 +258,6 @@ pub struct CurseForgeFileIndex {
     pub releaseType: u32,
     pub gameVersionTypeId: Option<u32>,
     pub modLoader: Option<u32>,
-}
-
-fn parse_vec_default_on_null<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Ok(Option::<Vec<T>>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 // Function to search for mods on CurseForge
@@ -549,6 +554,7 @@ impl CurseForgeHashAlgo {
 // Structure for CurseForge mod files response
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurseForgeFilesResponse {
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub data: Vec<CurseForgeFile>,
     pub pagination: CurseForgePagination,
 }
@@ -580,6 +586,7 @@ pub struct GetModFilesResponse {
 // Structure for Get Mods by IDs response
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurseForgeModsResponse {
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub data: Vec<CurseForgeMod>,
 }
 
@@ -943,7 +950,6 @@ pub async fn get_mods_by_ids(
         )));
     }
 
-    // Try to parse the JSON response
     let mods_response: CurseForgeModsResponse = match serde_json::from_str(&response_text) {
         Ok(parsed) => parsed,
         Err(parse_err) => {
@@ -953,7 +959,6 @@ pub async fn get_mods_by_ids(
                 safe_truncate(&response_text, 500)
             );
 
-            // Try to parse as error response
             if let Ok(error_response) = serde_json::from_str::<serde_json::Value>(&response_text) {
                 log::error!("Parsed response as generic JSON: {}", error_response);
             }
@@ -967,8 +972,9 @@ pub async fn get_mods_by_ids(
     };
 
     log::info!(
-        "Successfully retrieved {} mods by IDs",
-        mods_response.data.len()
+        "Successfully retrieved {}/{} mods by IDs",
+        mods_response.data.len(),
+        mod_ids.len()
     );
 
     Ok(mods_response)
@@ -1394,6 +1400,11 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     let mods_response = get_mods_by_ids(project_ids, Some(true)).await?;
     info!("Received mod information for {} projects.", mods_response.data.len());
 
+    if let Ok(state) = crate::state::state_manager::State::get().await {
+        info!("[cache-warm] CF modpack install seeding {} curseforge mods into cache", mods_response.data.len());
+        state.content_cache.put_curseforge_mods(&mods_response.data).await;
+    }
+
     // Collect all file IDs for bulk request
     let file_ids: Vec<u32> = file_mapping.values().cloned().collect();
 
@@ -1557,6 +1568,7 @@ pub async fn extract_curseforge_overrides(
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let extraction_throttle = std::sync::Arc::new(ProgressThrottle::new(100));
     let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
@@ -1694,6 +1706,7 @@ pub async fn extract_curseforge_overrides(
                 );
 
                 let task_counter = extraction_counter.clone();
+                let task_throttle = extraction_throttle.clone();
                 let task_total = total_files;
                 let task_state = state.clone();
                 let task_event_id = event_id;
@@ -1795,7 +1808,7 @@ pub async fn extract_curseforge_overrides(
 
                     // Increment counter and emit progress
                     let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    if task_total > 0 {
+                    if task_total > 0 && task_throttle.should_emit() {
                         // Scale progress within the provided range
                         let extraction_progress = completed as f64 / task_total as f64;
                         let overall_progress = task_progress_offset + (extraction_progress * task_progress_scale);
@@ -2045,13 +2058,6 @@ pub async fn download_and_install_curseforge_modpack(
     let client = HTTP_CLIENT.clone();
     let response = client
         .get(&download_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -2173,7 +2179,7 @@ pub struct CurseForgeFingerprintRequest {
 pub struct CurseForgeFingerprintMatch {
     pub id: u32,
     pub file: CurseForgeFile,
-    #[serde(rename = "latestFiles")]
+    #[serde(rename = "latestFiles", default, deserialize_with = "lenient::vec")]
     pub latest_files: Vec<CurseForgeFile>,
 }
 
@@ -2182,15 +2188,15 @@ pub struct CurseForgeFingerprintMatch {
 pub struct CurseForgeFingerprintResponse {
     #[serde(rename = "isCacheBuilt")]
     pub is_cache_built: bool,
-    #[serde(rename = "exactMatches")]
+    #[serde(rename = "exactMatches", default, deserialize_with = "lenient::vec")]
     pub exact_matches: Vec<CurseForgeFingerprintMatch>,
-    #[serde(rename = "exactFingerprints")]
+    #[serde(rename = "exactFingerprints", default)]
     pub exact_fingerprints: Vec<u64>,
-    #[serde(rename = "partialMatches")]
+    #[serde(rename = "partialMatches", default, deserialize_with = "lenient::vec")]
     pub partial_matches: Vec<CurseForgeFingerprintMatch>,
-    #[serde(rename = "partialMatchFingerprints")]
+    #[serde(rename = "partialMatchFingerprints", default)]
     pub partial_match_fingerprints: std::collections::HashMap<String, Vec<u64>>,
-    #[serde(rename = "installedFingerprints")]
+    #[serde(rename = "installedFingerprints", default)]
     pub installed_fingerprints: Vec<u64>,
     #[serde(rename = "unmatchedFingerprints")]
     pub unmatched_fingerprints: Option<Vec<u64>>,

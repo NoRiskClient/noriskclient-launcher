@@ -1,6 +1,6 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth;
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::content_cache_state::CacheBehaviour;
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::{
     Mod, ModLoader, ModSource, ModPackInfo, ModPackSource, Profile, ProfileSettings, ProfileState,
 };
@@ -9,7 +9,6 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
-use reqwest::Client;
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,7 +17,6 @@ use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -296,15 +294,22 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
         "Looking up Modrinth info for {} sha1 hashes...",
         hashes_to_lookup.len()
     );
-    let versions_map =
-        match modrinth::get_versions_by_hashes(hashes_to_lookup.clone(), "sha1").await {
-            Ok(map) => map,
-            Err(e) => {
-                error!("Failed to get version info by hashes: {}", e);
-                return Err(e);
-            }
-        };
-    info!("Received Modrinth info for {} hashes.", versions_map.len());
+    let state = State::get().await?;
+    let versions_map = match state
+        .content_cache
+        .get_modrinth_versions_by_hashes(hashes_to_lookup.clone(), CacheBehaviour::StaleWhileRevalidate)
+        .await
+    {
+        Ok(map) => map,
+        Err(e) => {
+            error!("Failed to get version info by hashes: {}", e);
+            return Err(e);
+        }
+    };
+    info!(
+        "[cache-warm] mrpack install resolved {} modrinth versions through the cache",
+        versions_map.len()
+    );
 
     // 3. Create Mod structs from the results
     for (hash, version_info) in versions_map {
@@ -445,6 +450,7 @@ pub async fn extract_mrpack_overrides(
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let extraction_throttle = std::sync::Arc::new(ProgressThrottle::new(100));
     let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
@@ -587,6 +593,7 @@ pub async fn extract_mrpack_overrides(
                 );
 
                 let task_counter = extraction_counter.clone();
+                let task_throttle = extraction_throttle.clone();
                 let task_total = total_files;
                 let task_state = state.clone();
                 let task_event_id = event_id;
@@ -688,7 +695,7 @@ pub async fn extract_mrpack_overrides(
 
                     // Increment counter and emit progress
                     let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    if task_total > 0 {
+                    if task_total > 0 && task_throttle.should_emit() {
                         // Scale progress within the provided range
                         let extraction_progress = completed as f64 / task_total as f64;
                         let overall_progress = task_progress_offset + (extraction_progress * task_progress_scale);
@@ -1008,19 +1015,11 @@ pub async fn download_and_process_mrpack(
         temp_file_path
     );
 
-    // Create HTTP client
-    let client = Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
 
     // Download the file
     let response = client
         .get(download_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {

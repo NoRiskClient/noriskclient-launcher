@@ -25,7 +25,7 @@ export function SettingRow({
   children,
 }: SettingRowProps) {
   const labelNode = (
-    <span className="font-minecraft-ten text-base text-white">{label}</span>
+    <span className="font-minecraft text-base text-white">{label}</span>
   );
 
   return (
@@ -40,7 +40,7 @@ export function SettingRow({
       <div className="min-w-0">
         {tooltip ? <SimpleTooltip content={tooltip}>{labelNode}</SimpleTooltip> : labelNode}
         {description && (
-          <div className="font-minecraft-ten text-xs text-white/50 mt-0.5">
+          <div className="font-minecraft text-xs text-white/50 mt-0.5">
             {description}
           </div>
         )}

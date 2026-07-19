@@ -3,6 +3,7 @@ use crate::error::{AppError, Result};
 use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, TexturesData};
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error};
 use reqwest;
 use serde::Serialize;
@@ -61,7 +62,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize manifest: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Minecraft manifest cache: {}", e);
         } else {
             debug!("Cached Minecraft version manifest: {:?}", cache_path);
@@ -131,7 +132,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize piston meta: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Piston Meta cache: {}", e);
         } else {
             debug!("Cached Piston Meta: {:?}", cache_path);
@@ -360,7 +361,7 @@ impl MinecraftApiService {
             .unwrap_or("skin.png");
         debug!("Using filename: {}", filename);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -422,7 +423,7 @@ impl MinecraftApiService {
         let url = format!("{}/user/profile/{}/skin", MOJANG_API_URL, uuid);
         debug!("Request URL: {}", url);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending skin reset request to Minecraft API");
 
         let response_result = client
@@ -490,7 +491,7 @@ impl MinecraftApiService {
             }
         };
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -568,7 +569,7 @@ impl MinecraftApiService {
 
         debug!("Join request - selected_profile: {}, server_id: {}", selected_profile, server_id);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending join server request to Minecraft Session API");
 
         let response_result = client

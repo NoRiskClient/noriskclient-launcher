@@ -1,4 +1,5 @@
 use crate::error::{AppError, Result};
+use crate::integrations::lenient;
 use futures::future::join_all;
 use log::{self, error, info};
 use reqwest;
@@ -11,11 +12,31 @@ use crate::utils::string_utils::safe_truncate;
 // Base URL for Modrinth API v2
 const MODRINTH_API_BASE_URL: &str = "https://api.modrinth.com/v2";
 
+async fn read_list<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+    context: &str,
+) -> Result<Vec<T>> {
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!(
+            "Failed to read Modrinth {} response: {}",
+            context, e
+        ))
+    })?;
+
+    lenient::list_from_str::<T>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth {} response: {}",
+            context, e
+        ))
+    })
+}
+
 // Structures for deserializing Modrinth API responses (Search)
 // Based on https://docs.modrinth.com/api-spec/#tag/projects/operation/searchProjects
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ModrinthSearchResponse {
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub hits: Vec<ModrinthSearchHit>,
     pub offset: u32,
     pub limit: u32,
@@ -58,10 +79,12 @@ pub struct ModrinthVersion {
     pub name: String,                          // Version title/name
     pub version_number: String,                // Version number (e.g., "0.100.0+1.21.5")
     pub changelog: Option<String>,             // Changelog text (or null)
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub dependencies: Vec<ModrinthDependency>, // List of dependencies
     pub game_versions: Vec<String>,            // Compatible game versions
     pub version_type: ModrinthVersionType,     // alpha, beta, release
     pub loaders: Vec<String>,                  // Compatible loaders
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub files: Vec<ModrinthFile>,              // Files associated with this version
     pub date_published: String,                // ISO 8601 timestamp
     #[serde(default)]
@@ -155,14 +178,16 @@ pub struct ModrinthProject {
     pub additional_categories: Option<Vec<String>>, // Added: Can be an array or missing
     pub versions: Vec<String>,    // List of version IDs
     pub icon_url: Option<String>, // The field we often need
-    pub color: Option<i32>,
+    pub color: Option<i64>,
     pub thread_id: Option<String>, // Ensured Option: Can be present as string or null
     pub monetization_status: Option<String>, // Ensured Option: Can be present as string or null
     pub issues_url: Option<String>,
     pub source_url: Option<String>,
     pub wiki_url: Option<String>,
     pub discord_url: Option<String>,
+    #[serde(default, deserialize_with = "lenient::opt_vec")]
     pub donation_urls: Option<Vec<ModrinthDonationUrl>>,
+    #[serde(default, deserialize_with = "lenient::vec")]
     pub gallery: Vec<ModrinthGalleryImage>,
     #[serde(default)]
     pub game_versions: Option<Vec<String>>,
@@ -197,7 +222,7 @@ pub struct ModrinthGalleryImage {
     pub title: Option<String>,
     pub description: Option<String>,
     pub created: String, // ISO 8601
-    pub ordering: i32,
+    pub ordering: i64,
     pub raw_url: Option<String>, // Added: Can be present as string or null
 }
 
@@ -226,6 +251,27 @@ pub struct ModrinthGameVersion {
     pub date: String,         // ISO 8601 date string
     pub major: bool,          // Whether it's a major version
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModrinthTags {
+    pub categories: Vec<ModrinthCategory>,
+    pub loaders: Vec<ModrinthLoader>,
+    pub game_versions: Vec<ModrinthGameVersion>,
+}
+
+pub async fn get_modrinth_tags() -> Result<ModrinthTags> {
+    let (categories, loaders, game_versions) = tokio::try_join!(
+        get_modrinth_categories(),
+        get_modrinth_loaders(),
+        get_modrinth_game_versions()
+    )?;
+
+    Ok(ModrinthTags {
+        categories,
+        loaders,
+        game_versions,
+    })
+}
 // --- End Structures for Tags/Categories ---
 
 // --- Structures for Team Members ---
@@ -234,7 +280,7 @@ pub struct ModrinthTeamMember {
     pub team_id: String,
     pub user: ModrinthUser,
     pub role: String,
-    pub ordering: i32,
+    pub ordering: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -316,7 +362,7 @@ pub async fn search_projects(
     client_side_filter: Option<String>,
     server_side_filter: Option<String>,
 ) -> Result<ModrinthSearchResponse> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let base_url = format!("{}/search", MODRINTH_API_BASE_URL);
 
     let mut query_params: Vec<(String, String)> = Vec::new();
@@ -422,15 +468,6 @@ pub async fn search_projects(
 
     let response = client
         .get(final_url)
-        // It's good practice to set a User-Agent
-        // Use format! correctly and ensure CARGO_PKG_VERSION is available
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
@@ -484,7 +521,7 @@ pub async fn get_mod_versions(
     loaders: Option<Vec<String>>,
     game_versions: Option<Vec<String>>,
 ) -> Result<Vec<ModrinthVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/project/{}/version",
         MODRINTH_API_BASE_URL, project_id_or_slug
@@ -528,13 +565,6 @@ pub async fn get_mod_versions(
 
     let response = client
         .get(final_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
@@ -556,30 +586,19 @@ pub async fn get_mod_versions(
         )));
     }
 
-    let versions_result = response.json::<Vec<ModrinthVersion>>().await.map_err(|e| {
-        AppError::Other(format!("Failed to parse Modrinth versions response: {}", e))
-    })?;
-
-    Ok(versions_result)
+    read_list::<ModrinthVersion>(response, "versions").await
 }
 
 // Function to get details for a specific Modrinth version ID
 // Based on https://docs.modrinth.com/api-spec/#tag/versions/operation/getVersion
 pub async fn get_version_details(version_id: String) -> Result<ModrinthVersion> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version/{}", MODRINTH_API_BASE_URL, version_id);
 
     log::info!("Getting Modrinth version details: {}", url);
 
     let response = client
         .get(url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -634,11 +653,8 @@ pub async fn get_all_versions_for_projects(
         contexts.len()
     );
 
-    let client = reqwest::Client::new();
-
     // Create a list of futures, one for each context
     let futures = contexts.into_iter().map(|context| {
-        let client = client.clone();
         let original_context = context.clone();
 
         async move {
@@ -699,7 +715,7 @@ pub async fn get_version_by_hash(file_hash: String) -> Result<ModrinthVersion> {
         }
     };
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/version_file/{}?algorithm={}", // Correct endpoint path
         MODRINTH_API_BASE_URL, file_hash, algorithm
@@ -713,13 +729,6 @@ pub async fn get_version_by_hash(file_hash: String) -> Result<ModrinthVersion> {
 
     let response = client
         .get(&url) // Pass URL by reference
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -780,7 +789,7 @@ pub async fn get_versions_by_hashes(
         )));
     }
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version_files", MODRINTH_API_BASE_URL); // POST endpoint
 
     let request_body = HashesRequestBody {
@@ -797,13 +806,6 @@ pub async fn get_versions_by_hashes(
 
     let response = client
         .post(&url) // Use POST
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .header("Content-Type", "application/json") // Set content type
         .json(&request_body) // Send the serialized request body
         .send()
@@ -835,15 +837,19 @@ pub async fn get_versions_by_hashes(
 
     // The response is a map where keys are the *input* hashes and values are the Version objects.
     // Hashes not found are simply omitted from the response map.
-    let versions_map = response
-        .json::<HashMap<String, ModrinthVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth versions by hashes response: {}",
-                e
-            ))
-        })?;
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!(
+            "Failed to read Modrinth versions by hashes response: {}",
+            e
+        ))
+    })?;
+
+    let versions_map = lenient::map_from_str::<ModrinthVersion>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth versions by hashes response: {}",
+            e
+        ))
+    })?;
 
     log::info!(
         "Successfully retrieved version info for {} out of {} requested hashes.",
@@ -905,7 +911,7 @@ impl ModrinthBulkUpdateRequestBody {
 pub async fn check_bulk_updates(
     request: ModrinthBulkUpdateRequestBody,
 ) -> Result<HashMap<String, ModrinthVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/version_files/update", MODRINTH_API_BASE_URL); // Update check endpoint
 
     log::info!(
@@ -915,13 +921,6 @@ pub async fn check_bulk_updates(
 
     let response = client
         .post(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .header("Content-Type", "application/json")
         .json(&request)
         .send()
@@ -953,15 +952,16 @@ pub async fn check_bulk_updates(
 
     // The response is a map where keys are the input hashes and values are the latest Version objects.
     // Hashes without updates available are omitted from the response map.
-    let updates_map = response
-        .json::<HashMap<String, ModrinthVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth bulk update response: {}",
-                e
-            ))
-        })?;
+    let body = response.text().await.map_err(|e| {
+        AppError::Other(format!("Failed to read Modrinth bulk update response: {}", e))
+    })?;
+
+    let updates_map = lenient::map_from_str::<ModrinthVersion>(&body).map_err(|e| {
+        AppError::Other(format!(
+            "Failed to parse Modrinth bulk update response: {}",
+            e
+        ))
+    })?;
 
     let update_count = updates_map.len();
     log::info!(
@@ -983,7 +983,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
     // Modrinth expects the IDs as a JSON array string in the query parameter
     let ids_json = serde_json::to_string(&ids).map_err(|e| AppError::Json(e))?; // Use appropriate error type
 
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     // Note: No trailing slash needed for the base URL when using parse_with_params
     let base_url = format!("{}/projects", MODRINTH_API_BASE_URL);
 
@@ -1000,13 +1000,6 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
 
     let response = client
         .get(final_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1060,9 +1053,8 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
         logged_response_body_display
     );
 
-    // Now parse the original, full text
     let projects =
-        serde_json::from_str::<Vec<ModrinthProject>>(&response_body_text).map_err(|e| {
+        lenient::list_from_str::<ModrinthProject>(&response_body_text).map_err(|e| {
             let error_message = format!(
                 "Failed to parse Modrinth bulk projects response: {}. Body (logged version): {}",
                 e, logged_response_body_display
@@ -1070,13 +1062,14 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
             log::error!(
                 "JSON Parsing Error in get_multiple_projects: {}",
                 error_message
-            ); // Added explicit error log
+            );
             AppError::RequestError(error_message)
         })?;
 
     log::info!(
-        "Successfully retrieved details for {} projects.",
-        projects.len()
+        "Successfully retrieved details for {}/{} projects.",
+        projects.len(),
+        ids.len()
     );
 
     Ok(projects)
@@ -1085,20 +1078,13 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
 /// Fetches a list of all categories from Modrinth.
 /// https://docs.modrinth.com/api/operations/categorylist/
 pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/category", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth categories from: {}", url);
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1125,15 +1111,7 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
         )));
     }
 
-    let categories = response
-        .json::<Vec<ModrinthCategory>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth categories response: {}",
-                e
-            ))
-        })?;
+    let categories = read_list::<ModrinthCategory>(response, "categories").await?;
 
     log::info!("Successfully fetched {} categories.", categories.len());
     Ok(categories)
@@ -1142,20 +1120,13 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
 /// Fetches a list of all loaders from Modrinth.
 /// https://docs.modrinth.com/api/operations/loaderlist/
 pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/loader", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth loaders from: {}", url);
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1182,9 +1153,7 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
         )));
     }
 
-    let loaders = response.json::<Vec<ModrinthLoader>>().await.map_err(|e| {
-        AppError::Other(format!("Failed to parse Modrinth loaders response: {}", e))
-    })?;
+    let loaders = read_list::<ModrinthLoader>(response, "loaders").await?;
 
     log::info!("Successfully fetched {} loaders.", loaders.len());
     Ok(loaders)
@@ -1193,20 +1162,13 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
 /// Fetches a list of all game versions from Modrinth.
 /// https://docs.modrinth.com/api/operations/versionlist/
 pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!("{}/tag/game_version", MODRINTH_API_BASE_URL);
 
     log::info!("Fetching Modrinth game versions from: {}", url);
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1232,15 +1194,7 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
         )));
     }
 
-    let game_versions = response
-        .json::<Vec<ModrinthGameVersion>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth game versions response: {}",
-                e
-            ))
-        })?;
+    let game_versions = read_list::<ModrinthGameVersion>(response, "game versions").await?;
 
     log::info!(
         "Successfully fetched {} game versions.",
@@ -1252,7 +1206,7 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
 /// Fetches team members for a specific project from Modrinth.
 /// https://docs.modrinth.com/api/operations/getprojectteammembers/
 pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<ModrinthTeamMember>> {
-    let client = reqwest::Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
     let url = format!(
         "{}/project/{}/members",
         MODRINTH_API_BASE_URL, project_id_or_slug
@@ -1262,13 +1216,6 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
 
     let response = client
         .get(&url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (contact@noriskclient.de)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {
@@ -1295,15 +1242,7 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
         )));
     }
 
-    let members = response
-        .json::<Vec<ModrinthTeamMember>>()
-        .await
-        .map_err(|e| {
-            AppError::Other(format!(
-                "Failed to parse Modrinth project members response: {}",
-                e
-            ))
-        })?;
+    let members = read_list::<ModrinthTeamMember>(response, "project members").await?;
 
     log::info!(
         "Successfully fetched {} team members for project {}.",

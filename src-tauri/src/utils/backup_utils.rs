@@ -514,12 +514,7 @@ pub async fn safe_write_with_backup<P: AsRef<Path>, C: AsRef<[u8]>>(
         create_backup(file_path, category, config).await?;
     }
 
-    // Write new content (atomic operation)
-    let temp_path = file_path.with_extension("tmp");
-    fs::write(&temp_path, contents).await.map_err(AppError::Io)?;
-
-    // Atomic move
-    fs::rename(&temp_path, file_path).await.map_err(AppError::Io)?;
+    crate::utils::file_utils::write_atomic(file_path, contents).await?;
 
     info!("Successfully wrote file with backup: {}", file_path.display());
     Ok(())

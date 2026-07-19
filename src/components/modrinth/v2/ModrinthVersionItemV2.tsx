@@ -313,15 +313,15 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                   </Tooltip>
                 )}
                 <div className="min-w-0">
-                  <h5 className="text-gray-100 text-sm font-minecraft-ten normal-case truncate">
+                  <h5 className="text-gray-100 text-sm font-minecraft normal-case truncate">
                     {version.name}
                   </h5>
-                  <p className="text-gray-400 text-xs font-minecraft-ten normal-case truncate">
+                  <p className="text-gray-400 text-xs font-minecraft normal-case truncate">
                     {version.version_number}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-minecraft-ten flex-shrink-0">
+              <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-minecraft flex-shrink-0">
                 {" "}
                 <span className="flex items-center">
                   <Icon

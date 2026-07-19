@@ -66,7 +66,7 @@ export function ChatMessage({ message, isOwn, friendUuid, friendName, currentUse
             </div>
           )
         ) : (
-          <span className="text-[10px] text-white/30 opacity-0 group-hover:opacity-100 transition-opacity font-minecraft-ten">
+          <span className="text-[10px] text-white/30 opacity-0 group-hover:opacity-100 transition-opacity font-minecraft">
             {formatTime(timestamp)}
           </span>
         )}
@@ -77,17 +77,17 @@ export function ChatMessage({ message, isOwn, friendUuid, friendName, currentUse
         {showHeader && (
           <div className="flex items-baseline gap-2 mb-0.5">
             <span
-              className="font-minecraft-ten text-sm"
+              className="font-minecraft text-sm"
               style={{ color: isOwn ? accentColor : "#ffffff" }}
             >
               {displayName}
             </span>
-            <span className="text-[11px] text-white/40 font-minecraft-ten">
+            <span className="text-[11px] text-white/40 font-minecraft">
               {formatTime(timestamp)}
             </span>
           </div>
         )}
-        <p className="text-sm text-white/90 whitespace-pre-wrap break-words font-minecraft-ten leading-relaxed">
+        <p className="text-sm text-white/90 whitespace-pre-wrap break-words font-minecraft leading-relaxed">
           {message.content}
         </p>
       </div>

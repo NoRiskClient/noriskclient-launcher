@@ -8,7 +8,6 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use flate2::read::GzDecoder;
 use futures::future::try_join_all;
 use log::{debug, error, info};
-use reqwest;
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -107,8 +106,7 @@ impl JavaDownloadService {
         // For Zulu, we need to make an extra API call to get the actual download URL
         let download_url = if distribution.requires_api_response() {
             info!("Fetching actual download URL from Zulu API...");
-            let client = reqwest::Client::new();
-            let response = client
+            let response = HTTP_CLIENT
                 .get(&initial_url)
                 .header("Accept", "application/json")
                 .send()

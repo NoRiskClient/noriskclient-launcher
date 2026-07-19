@@ -79,10 +79,10 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               />
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-2xl text-white mb-1">
+              <p className="font-minecraft text-2xl text-white mb-1">
                 {t('advent.coins_amount', { amount: reward.amount })}
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">{t('advent.added_to_account')}</p>
+              <p className="font-minecraft text-white/60 text-sm">{t('advent.added_to_account')}</p>
             </div>
           </div>
         );
@@ -97,17 +97,17 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
                 <CosmeticPreview modelPath={modelUrl} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-white/50 text-sm font-minecraft-ten">
+                  <div className="text-white/50 text-sm font-minecraft">
                     {isLoadingModel ? t('advent.loading_model') : t('advent.preparing_model')}
                   </div>
                 </div>
               )}
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-xl text-white mb-1">
+              <p className="font-minecraft text-xl text-white mb-1">
                 {shopItemName || "Shop Item"}
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">
+              <p className="font-minecraft text-white/60 text-sm">
                 {reward.duration
                   ? `Duration: ${Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days`
                   : "Permanent"}
@@ -133,10 +133,10 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               />
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-xl text-white mb-1">
+              <p className="font-minecraft text-xl text-white mb-1">
                 Random {reward.itemType}
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">
+              <p className="font-minecraft text-white/60 text-sm">
                 {reward.duration
                   ? `Duration: ${Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days`
                   : "Permanent"}
@@ -162,13 +162,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               />
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-2xl text-white mb-1">
+              <p className="font-minecraft text-2xl text-white mb-1">
                 {reward.percentage}% Discount
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">
+              <p className="font-minecraft text-white/60 text-sm">
                 Valid until {new Date(reward.endTimestamp).toLocaleDateString()}
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm mt-1">
+              <p className="font-minecraft text-white/60 text-sm mt-1">
                 Redeemable once for your next in-game purchase
               </p>
             </div>
@@ -192,10 +192,10 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               />
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-xl text-white mb-1">
+              <p className="font-minecraft text-xl text-white mb-1">
                 NoRisk Plus
               </p>
-              <p className="font-minecraft-ten text-white/60 text-sm">
+              <p className="font-minecraft text-white/60 text-sm">
                 {Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days
               </p>
             </div>
@@ -240,13 +240,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               )}
             </div>
             <div className="text-center">
-              <p className="font-minecraft-ten text-xl text-white mb-1">
+              <p className="font-minecraft text-xl text-white mb-1">
                 {theme?.name || "Theme Unlocked"}
               </p>
               {!theme && (
-                <p className="font-minecraft-ten text-white/60 text-sm mb-1">Theme ID: {reward.themeId}</p>
+                <p className="font-minecraft text-white/60 text-sm mb-1">Theme ID: {reward.themeId}</p>
               )}
-              <p className="font-minecraft-ten text-white/60 text-sm">
+              <p className="font-minecraft text-white/60 text-sm">
                 You can apply this theme in Settings/Background
               </p>
             </div>
@@ -261,7 +261,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-16 h-16"
               style={{ color: accentColor.value }}
             />
-            <p className="font-minecraft-ten text-xl text-white">{t('advent.unknown_reward')}</p>
+            <p className="font-minecraft text-xl text-white">{t('advent.unknown_reward')}</p>
           </div>
         );
     }
@@ -463,7 +463,7 @@ export function AdventRewardModal({
                     icon="solar:info-circle-bold"
                     className="w-12 h-12 text-white/50"
                   />
-                  <p className="font-minecraft-ten text-white/70">{t('advent.no_reward_available')}</p>
+                  <p className="font-minecraft text-white/70">{t('advent.no_reward_available')}</p>
                 </div>
               )}
             </motion.div>

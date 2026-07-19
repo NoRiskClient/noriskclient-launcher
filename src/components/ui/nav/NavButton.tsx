@@ -49,7 +49,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
     const colors = getVariantColors();
 
     const baseClasses = cn(
-      "font-minecraft relative overflow-hidden transition-all duration-300",
+      "font-smallcaps relative overflow-hidden transition-all duration-300",
       "w-16 rounded-md text-white flex items-center justify-center",
       label ? "py-2" : "h-16",
       variant !== "ghost" && "border-2 border-b-4 border-transparent",
@@ -113,7 +113,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
         <span className="relative z-10 flex flex-col items-center justify-center gap-1">
           <span className="flex items-center justify-center w-8 h-8">{icon}</span>
           {label && (
-            <span className="font-minecraft text-lg lowercase leading-tight text-center whitespace-nowrap [text-shadow:none]">
+            <span className="font-smallcaps text-xs leading-tight text-center whitespace-nowrap [text-shadow:none]">
               {label}
             </span>
           )}

@@ -161,7 +161,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         onConfirm={doDelete}
         isDeleting={isBatchDeleting}
         title={t("profiles.v3.screenshots.batchDeleteTitle")}
-        message={<p className="text-white/80 font-minecraft-ten">{t("profiles.v3.screenshots.batchDeleteConfirm", { count: paths.length })}</p>}
+        message={<p className="text-white/80 font-minecraft">{t("profiles.v3.screenshots.batchDeleteConfirm", { count: paths.length })}</p>}
       />
     ));
   }, [selectedPaths, loadData, showModal, hideModal, isBatchDeleting, t]);
@@ -193,7 +193,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         <div className="relative">
           <button
             onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft-ten text-white/70 flex items-center gap-1.5"
+            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
           >
             <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
             {activeSortLabel}
@@ -215,7 +215,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
         <div className="flex-1" />
 
-        <span className="text-[10px] text-white/35 font-minecraft-ten tabular-nums">
+        <span className="text-[10px] text-white/35 font-minecraft tabular-nums">
           {t("profiles.v3.screenshots.count", { count: screenshots.length })}
         </span>
 
@@ -234,10 +234,10 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         {error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft-ten text-rose-100 break-words">{error}</div>
+            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={loadData}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -246,8 +246,8 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
         {loading && screenshots.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : (
@@ -407,7 +407,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
 
       {/* Date-Badge unten links — nur bei Hover sichtbar */}
       <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <span className="text-[10px] text-white font-minecraft-ten bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+        <span className="text-[10px] text-white font-minecraft bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
           {formatRelativeTime(screenshot.modified)}
         </span>
       </div>

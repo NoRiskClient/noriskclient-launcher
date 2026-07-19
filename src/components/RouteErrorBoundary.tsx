@@ -26,8 +26,8 @@ export function RouteErrorBoundary() {
             <Icon icon="solar:danger-triangle-bold" className="w-6 h-6 text-rose-300" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg text-white font-minecraft-ten normal-case">{title}</h1>
-            <p className="mt-1 text-sm text-white/60 font-minecraft-ten normal-case break-words">
+            <h1 className="text-lg text-white font-minecraft normal-case">{title}</h1>
+            <p className="mt-1 text-sm text-white/60 font-minecraft normal-case break-words">
               {message}
             </p>
           </div>
@@ -36,21 +36,21 @@ export function RouteErrorBoundary() {
         <div className="mt-5 flex items-center gap-2">
           <button
             onClick={() => { navigate("/play"); }}
-            className="h-9 px-4 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft-ten uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
             <Icon icon="solar:home-bold" className="w-4 h-4" />
             {t("errorBoundary.goHome")}
           </button>
           <button
             onClick={() => { window.location.reload(); }}
-            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft-ten uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
             <Icon icon="solar:refresh-bold" className="w-4 h-4" />
             {t("errorBoundary.reload")}
           </button>
           <button
             onClick={() => { navigate(-1); }}
-            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft-ten uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
             <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
             {t("errorBoundary.back")}
@@ -61,7 +61,7 @@ export function RouteErrorBoundary() {
           <div className="mt-5">
             <button
               onClick={() => setDetailsOpen(v => !v)}
-              className="text-[11px] text-white/50 hover:text-white/80 font-minecraft-ten uppercase tracking-wider flex items-center gap-1"
+              className="text-[11px] text-white/50 hover:text-white/80 font-minecraft uppercase tracking-wider flex items-center gap-1"
             >
               <Icon
                 icon="solar:alt-arrow-down-linear"

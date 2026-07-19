@@ -542,6 +542,12 @@ impl ConfigManager {
             // Update cache
             update_custom_game_dir(new_config.custom_game_directory.clone());
 
+            // meta_dir() just moved, so app.db has to move with it — everything else under
+            // meta_dir resolves its path per access and follows the change immediately.
+            if let Ok(state) = crate::state::State::get().await {
+                crate::state::db::open_or_reopen(&state.db).await;
+            }
+
             // Update Discord status if it changed
             if let Ok(state) = crate::state::State::get().await {
                 // Check if Discord status changed

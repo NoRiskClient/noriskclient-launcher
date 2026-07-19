@@ -3,6 +3,7 @@ use crate::error::{AppError, Result};
 use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManager};
 use crate::state::config_state::ConfigManager;
+use crate::state::content_cache_state::ContentCacheManager;
 use crate::state::cosmetic_pack_state::CosmeticPackManager;
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
@@ -14,6 +15,7 @@ use crate::state::process_state::{default_processes_path, ProcessManager};
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
 use crate::utils::referral_utils;
+use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, Mutex, Semaphore};
 use tokio::task::JoinHandle;
@@ -35,6 +37,8 @@ pub struct State {
     pub discord_manager: DiscordManager,
     pub cosmetic_pack_manager: CosmeticPackManager,
     pub friends_state: FriendsState,
+    pub content_cache: ContentCacheManager,
+    pub db: crate::state::db::DbHandle,
     pub io_semaphore: Arc<Semaphore>,
     pub login_server_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
 }
@@ -60,6 +64,8 @@ impl State {
                 log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
                 let cosmetic_pack_manager = CosmeticPackManager::new();
+                let db = crate::state::db::new_handle();
+                let content_cache = ContentCacheManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
                     profile_manager,
@@ -74,6 +80,8 @@ impl State {
                     discord_manager,
                     cosmetic_pack_manager,
                     friends_state,
+                    content_cache,
+                    db,
                     io_semaphore,
                     login_server_handle: Arc::new(Mutex::new(None)),
                 }))
@@ -87,6 +95,16 @@ impl State {
             .on_state_ready(app.clone())
             .await?;
         log::info!("State::init - ConfigManager post-initialization complete.");
+
+        // Must run after ConfigManager: meta_dir() resolves CUSTOM_GAME_DIR_CACHE.
+        crate::state::db::open_or_reopen(&initial_state_arc.db).await;
+        log::info!("State::init - Database pool ready.");
+
+        initial_state_arc
+            .content_cache
+            .on_state_ready(app.clone())
+            .await?;
+        log::info!("State::init - ContentCacheManager post-initialization complete.");
 
         let loaded_config = initial_state_arc.config_manager.get_config().await;
 

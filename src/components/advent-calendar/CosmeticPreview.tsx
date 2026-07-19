@@ -105,7 +105,7 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
           <ErrorBoundary fallback={ErrorFallback}>
             <Suspense fallback={
               <Html center>
-                <div className="text-white/70 text-sm font-minecraft-ten">{loadingText}</div>
+                <div className="text-white/70 text-sm font-minecraft">{loadingText}</div>
               </Html>
             }>
               <group position={[0, -0.5, 0]}>
@@ -131,7 +131,7 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
         </Canvas>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-white/50 text-sm font-minecraft-ten">{loadingText}</div>
+          <div className="text-white/50 text-sm font-minecraft">{loadingText}</div>
         </div>
       )}
     </div>
