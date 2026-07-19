@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function CustomMediaBackground({ activeTab }: Props) {
-  const { customMediaUrl, customMediaType, customMediaOpacity, customMediaQuality, customMediaOnlyOnPlay } = useBackgroundEffectStore();
+  const { customMediaUrl, customMediaType, customMediaOpacity, customMediaBlur, customMediaQuality, customMediaOnlyOnPlay } = useBackgroundEffectStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaError, setMediaError] = useState(false);
 
@@ -88,6 +88,8 @@ export default function CustomMediaBackground({ activeTab }: Props) {
         opacity: customMediaOpacity,
         transition: "opacity 0.3s ease",
         display: hiddenByTab ? "none" : undefined,
+        filter: customMediaBlur > 0 ? `blur(${customMediaBlur}px)` : undefined,
+        transform: customMediaBlur > 0 ? `scale(${1 + customMediaBlur * 0.006})` : undefined,
       }}
     >
       {customMediaType === "video" ? (

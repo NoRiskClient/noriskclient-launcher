@@ -65,6 +65,7 @@
   "settings.custom_background.clear": "Remove",
   "settings.custom_background.change": "Change",
   "settings.custom_background.opacity": "Visibility",
+  "settings.custom_background.blur": "Blur",
   "settings.custom_background.only_on_play": "Show only on 'Play' tab",
   "settings.custom_background.hide_effects": "Hide other effects",
   "settings.nav_labels": "Sidebar labels",

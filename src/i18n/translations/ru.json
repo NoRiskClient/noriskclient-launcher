@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "Удалить",
   "settings.custom_background.change": "Изменить",
   "settings.custom_background.opacity": "Видимость",
+  "settings.custom_background.blur": "Размытие",
   "settings.custom_background.only_on_play": "Показывать только на вкладке 'Play'",
   "settings.custom_background.hide_effects": "Скрыть другие эффекты",
   "settings.nav_labels": "Подписи боковой панели",

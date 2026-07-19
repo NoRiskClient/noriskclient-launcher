@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "Kaldır",
   "settings.custom_background.change": "Değiştir",
   "settings.custom_background.opacity": "Görünürlük",
+  "settings.custom_background.blur": "Bulanıklık",
   "settings.custom_background.only_on_play": "Sadece 'Play' sekmesinde göster",
   "settings.custom_background.hide_effects": "Diğer efektleri gizle",
   "settings.nav_labels": "Kenar çubuğu etiketleri",

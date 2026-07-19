@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "हटाएं",
   "settings.custom_background.change": "बदलें",
   "settings.custom_background.opacity": "दृश्यता",
+  "settings.custom_background.blur": "धुंधलापन",
   "settings.custom_background.only_on_play": "केवल 'Play' टैब पर दिखाएं",
   "settings.custom_background.hide_effects": "अन्य प्रभाव छुपाएं",
   "settings.nav_labels": "साइडबार लेबल",

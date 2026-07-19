@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "Usuń",
   "settings.custom_background.change": "Zmień",
   "settings.custom_background.opacity": "Widoczność",
+  "settings.custom_background.blur": "Rozmycie",
   "settings.custom_background.only_on_play": "Pokaż tylko w zakładce 'Play'",
   "settings.custom_background.hide_effects": "Ukryj inne efekty",
   "settings.nav_labels": "Etykiety paska bocznego",

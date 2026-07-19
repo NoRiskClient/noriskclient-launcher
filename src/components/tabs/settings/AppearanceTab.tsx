@@ -24,8 +24,8 @@ export function AppearanceTab() {
     useThemeStore();
   const { 
     currentEffect, setCurrentEffect, 
-    customMediaUrl, customMediaOpacity, customMediaQuality, customMediaOnlyOnPlay, customMediaHideEffects,
-    setCustomMedia, setCustomMediaOpacity, setCustomMediaQuality, setCustomMediaOnlyOnPlay, setCustomMediaHideEffects
+    customMediaUrl, customMediaOpacity, customMediaBlur, customMediaQuality, customMediaOnlyOnPlay, customMediaHideEffects,
+    setCustomMedia, setCustomMediaOpacity, setCustomMediaBlur, setCustomMediaQuality, setCustomMediaOnlyOnPlay, setCustomMediaHideEffects
   } = useBackgroundEffectStore();
   const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } =
     useQualitySettingsStore();
@@ -194,6 +194,22 @@ export function AppearanceTab() {
                   className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
                 />
                 <span className="text-xs text-white/60 font-minecraft-ten">100%</span>
+              </div>
+            </SettingRow>
+
+            <SettingRow label={t("settings.custom_background.blur")} searchKeywords={kw("settings.custom_background.blur", "blur", "unscharf", "weichzeichnen")}>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-white/60 font-minecraft-ten">0</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={customMediaBlur}
+                  onChange={(e) => setCustomMediaBlur(parseInt(e.target.value))}
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider accent-white hover:accent-white/80 transition-colors"
+                />
+                <span className="text-xs text-white/60 font-minecraft-ten">20</span>
               </div>
             </SettingRow>
 

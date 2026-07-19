@@ -65,6 +65,7 @@
   "settings.custom_background.clear": "Entfernen",
   "settings.custom_background.change": "Ändern",
   "settings.custom_background.opacity": "Sichtbarkeit",
+  "settings.custom_background.blur": "Weichzeichnen",
   "settings.custom_background.only_on_play": "Nur im 'Play' Bereich anzeigen",
   "settings.custom_background.hide_effects": "Andere Effekte ausblenden",
   "settings.nav_labels": "Sidebar-Beschriftung",

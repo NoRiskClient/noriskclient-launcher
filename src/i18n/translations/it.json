@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "Rimuovi",
   "settings.custom_background.change": "Cambia",
   "settings.custom_background.opacity": "Visibilità",
+  "settings.custom_background.blur": "Sfocatura",
   "settings.custom_background.only_on_play": "Mostra solo nella scheda 'Play'",
   "settings.custom_background.hide_effects": "Nascondi altri effetti",
   "settings.nav_labels": "Etichette della barra laterale",

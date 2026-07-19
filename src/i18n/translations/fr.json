@@ -16,6 +16,7 @@
   "settings.custom_background.clear": "Supprimer",
   "settings.custom_background.change": "Modifier",
   "settings.custom_background.opacity": "Visibilité",
+  "settings.custom_background.blur": "Flou",
   "settings.custom_background.only_on_play": "Afficher uniquement sur 'Play'",
   "settings.custom_background.hide_effects": "Masquer les autres effets",
   "settings.nav_labels": "Libellés de la barre latérale",
