@@ -64,6 +64,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "theme", label: t("settings.theme.title") },
       { id: "font", label: t("settings.font.title") },
       { id: "background", label: t("settings.background.title") },
+      { id: "custom-background", label: t("settings.custom_background.title") },
     ],
     advanced: [
       { id: "login_cache", label: t("settings.sections.login_cache") },

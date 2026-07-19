@@ -34,7 +34,8 @@ export function PlayTab() {
 
   const { activeAccount } = useMinecraftAuthStore();
   const { staticBackground, accentColor } = useThemeStore();
-  const { currentEffect } = useBackgroundEffectStore();
+  const { currentEffect, customMediaUrl, customMediaHideEffects } = useBackgroundEffectStore();
+  const shouldShowEffects = !(customMediaUrl && customMediaHideEffects);
   const { isThemeActive, selectedTheme } = useLauncherTheme();
   const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
 
@@ -68,8 +69,8 @@ export function PlayTab() {
   return (
     <div className="flex h-full relative">
       <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
-        {/* Only show RetroGrid effect if no theme background is active */}
-        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && !(isThemeActive && selectedTheme?.backgroundImage) && (
+        {/* Only show RetroGrid effect if no theme background is active and effects are not hidden */}
+        {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && shouldShowEffects && !(isThemeActive && selectedTheme?.backgroundImage) && (
           <RetroGridEffect
             renderMode="both"
             isAnimationEnabled={!staticBackground}

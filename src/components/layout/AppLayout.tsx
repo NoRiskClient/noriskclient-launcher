@@ -24,6 +24,7 @@ import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
+import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
@@ -68,7 +69,9 @@ export function AppLayout({
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
-  const { currentEffect } = useBackgroundEffectStore();
+  const { currentEffect, customMediaUrl, customMediaOnlyOnPlay, customMediaHideEffects } = useBackgroundEffectStore();
+  const isCustomMediaVisible = Boolean(customMediaUrl) && (!customMediaOnlyOnPlay || activeTab === 'play');
+  const shouldShowEffects = !(isCustomMediaVisible && customMediaHideEffects);
 
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
@@ -128,6 +131,11 @@ export function AppLayout({
     const finalB = Math.min(darkB, 30);
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
+  };
+
+  const getComplementaryBackgroundWithAlpha = (alpha: number) => {
+    const rgb = getComplementaryBackground();
+    return rgb.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
   };
 
   const backgroundColor = getComplementaryBackground();
@@ -320,7 +328,9 @@ export function AppLayout({
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundImage: `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
+        backgroundImage: isCustomMediaVisible 
+          ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
+          : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         borderColor: `${themeAccentColor.value}30`,
         boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
       }}
@@ -343,9 +353,10 @@ export function AppLayout({
         />
 
         <div className="flex-1 relative overflow-hidden">
-          {renderBackgroundEffect()}
+          <CustomMediaBackground activeTab={activeTab} />
+          {shouldShowEffects && renderBackgroundEffect()}
           {/* Snow overlay - independent of theme/background */}
-          {isSnowEnabled && <Snowfall />}
+          {shouldShowEffects && isSnowEnabled && <Snowfall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
             {children}
