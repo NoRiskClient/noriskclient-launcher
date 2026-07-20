@@ -914,7 +914,7 @@ impl MinecraftAuthStore {
                 match self.refresh_token_sisu(creds, cred_id, profile_name.clone()).await {
                     Ok(result) => Ok(result),
                     Err(sisu_err) => {
-                        if let Some(reason) = unreachable_reason(&sisu_err) {
+                        if let Some(reason) = keep_cached_credentials_reason(&sisu_err) {
                             info!("[Token Refresh] SISU flow failed ({}); skipping Direct fallback", reason);
                             return Err(sisu_err);
                         }
@@ -1176,12 +1176,14 @@ impl MinecraftAuthStore {
                     };
                 }
                 Err(err) => {
-                    if let Some(reason) = unreachable_reason(&err) {
+                    if let Some(reason) = keep_cached_credentials_reason(&err) {
                         info!(
                             "[Token Check] {} during refresh, using cached credentials",
                             reason
                         );
-                        emit_offline_mode(&creds.username).await;
+                        if is_offline_error(&err) {
+                            emit_offline_mode(&creds.username).await;
+                        }
                         return Ok(None);
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
@@ -2104,7 +2106,7 @@ async fn minecraft_entitlements(
     Ok(entitlements)
 }
 
-fn unreachable_reason(err: &AppError) -> Option<&'static str> {
+fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
     match err {
         AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
             source,
@@ -2124,13 +2126,23 @@ fn unreachable_reason(err: &AppError) -> Option<&'static str> {
             if status_code.as_u16() == 429 || status_code.is_server_error() {
                 Some("Transient outage")
             } else if status_code.is_success() {
-                Some("Unparseable response on a success status (captive portal?)")
+                Some("Unparseable response on a success status")
             } else {
                 None
             }
         }
         _ => None,
     }
+}
+
+fn is_offline_error(err: &AppError) -> bool {
+    matches!(
+        err,
+        AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
+            source,
+            ..
+        }) if source.is_connect() || source.is_timeout()
+    )
 }
 
 async fn emit_offline_mode(username: &str) {

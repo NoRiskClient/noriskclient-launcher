@@ -24,6 +24,7 @@ import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
+import { useLaunchStateStore } from "./store/launch-state-store";
 import { useGlobalModal } from "./hooks/useGlobalModal";
 import { Modal } from "./components/ui/Modal";
 import { refreshNrcDataOnMount } from "./services/nrc-service";
@@ -152,11 +153,16 @@ export function App() {
           }
           if (event.payload.event_type === FrontendEventType.OfflineMode) {
             console.log("[App.tsx] Global OfflineMode event");
-            toast(t('app.offline_mode'), {
-              id: 'offline-mode',
-              duration: 8000,
-              icon: '📡',
-            });
+            const anyLaunching = Object.values(
+              useLaunchStateStore.getState().profiles,
+            ).some((p) => p.isButtonLaunching);
+            if (anyLaunching) {
+              toast(t('app.offline_mode'), {
+                id: 'offline-mode',
+                duration: 8000,
+                icon: '📡',
+              });
+            }
             return;
           }
           if (
