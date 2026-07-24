@@ -15,6 +15,7 @@ pub struct ForgePatcher {
     library_path: PathBuf,
     java_path: PathBuf,
     minecraft_jar_path: PathBuf,
+    minecraft_version: String,
     root_path: PathBuf,
     event_id: Option<Uuid>,
     profile_id: Option<Uuid>,
@@ -34,6 +35,7 @@ impl ForgePatcher {
             library_path,
             java_path,
             minecraft_jar_path,
+            minecraft_version: minecraft_version.to_string(),
             root_path,
             event_id: None,
             profile_id: None,
@@ -77,6 +79,7 @@ impl ForgePatcher {
         arg: &str,
         install_profile: &ForgeInstallProfile,
         is_client: bool,
+        installer_path: &PathBuf,
     ) -> Result<String> {
         let mut result = String::new();
         let mut chars = arg.chars().peekable();
@@ -84,7 +87,6 @@ impl ForgePatcher {
         while let Some(c) = chars.next() {
             match c {
                 '\\' => {
-                    // Handle escape character
                     if let Some(next) = chars.next() {
                         result.push(next);
                     } else {
@@ -94,14 +96,12 @@ impl ForgePatcher {
                     }
                 }
                 '{' | '\'' => {
-                    // Start of a token or quoted string
                     let mut key = String::new();
                     let mut found_end = false;
 
                     while let Some(d) = chars.next() {
                         match d {
                             '\\' => {
-                                // Handle escape in token
                                 if let Some(next) = chars.next() {
                                     key.push(next);
                                 } else {
@@ -111,12 +111,10 @@ impl ForgePatcher {
                                 }
                             }
                             '}' if c == '{' => {
-                                // End of token
                                 found_end = true;
                                 break;
                             }
                             '\'' if c == '\'' => {
-                                // End of quoted string
                                 found_end = true;
                                 break;
                             }
@@ -132,10 +130,8 @@ impl ForgePatcher {
                     }
 
                     if c == '\'' {
-                        // Quoted string, use as is
                         result.push_str(&key);
                     } else {
-                        // Token replacement
                         if let Some(value) = install_profile.data.get(&key) {
                             let replacement = if is_client {
                                 &value.client
@@ -145,7 +141,6 @@ impl ForgePatcher {
                             info!("Replacing {} with: {}", key, replacement);
                             result.push_str(replacement);
                         } else {
-                            // Handle special tokens
                             match key.as_str() {
                                 "SIDE" => {
                                     let side = if is_client { "client" } else { "server" };
@@ -160,6 +155,26 @@ impl ForgePatcher {
                                 "ROOT" => {
                                     let path = self.root_path.to_string_lossy();
                                     info!("Replacing {{ROOT}} with: {}", path);
+                                    result.push_str(&path);
+                                }
+                                // Only server-side processors use these today, but an unknown
+                                // token is a hard error below, so a future version shipping one
+                                // client-side would otherwise fail to install.
+                                "MINECRAFT_VERSION" => {
+                                    info!(
+                                        "Replacing {{MINECRAFT_VERSION}} with: {}",
+                                        self.minecraft_version
+                                    );
+                                    result.push_str(&self.minecraft_version);
+                                }
+                                "LIBRARY_DIR" => {
+                                    let path = self.library_path.to_string_lossy();
+                                    info!("Replacing {{LIBRARY_DIR}} with: {}", path);
+                                    result.push_str(&path);
+                                }
+                                "INSTALLER" => {
+                                    let path = installer_path.to_string_lossy();
+                                    info!("Replacing {{INSTALLER}} with: {}", path);
                                     result.push_str(&path);
                                 }
                                 _ => {
@@ -194,7 +209,8 @@ impl ForgePatcher {
                 info!("\nProcessing argument: {}", arg);
 
                 // First handle token replacement
-                let processed = self.replace_tokens(arg, install_profile, is_client)?;
+                let processed =
+                    self.replace_tokens(arg, install_profile, is_client, installer_path)?;
                 info!("After token replacement: {}", processed);
 
                 // Then check if the result is an artifact or data path

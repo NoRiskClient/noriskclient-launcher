@@ -1,13 +1,14 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::api::forge_api::ForgeApi;
+use crate::minecraft::dto::forge_install_profile::ForgeInstallProfile;
 use crate::minecraft::downloads::{ForgeInstallerDownloadService, ForgeLibrariesDownload};
 use crate::minecraft::launch::forge_arguments::ForgeArguments;
 use crate::minecraft::ForgePatcher;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
-use log::info;
+use log::{info, warn};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -30,7 +31,6 @@ impl ForgeInstaller {
     }
 
     pub async fn install(&self, version_id: &str, profile: &Profile) -> Result<ForgeInstallResult> {
-        // Emit Forge installation event
         let forge_event_id = Uuid::new_v4();
         let state = State::get().await?;
         state
@@ -46,18 +46,13 @@ impl ForgeInstaller {
 
         info!("\nInstalling Forge...");
 
-        // Initialize services
         let forge_api = ForgeApi::new();
         let mut forge_libraries_download = ForgeLibrariesDownload::new();
         let forge_installer_download = ForgeInstallerDownloadService::new();
 
-        // Setze die Anzahl der konkurrenten Downloads
         forge_libraries_download.set_concurrent_downloads(self.concurrent_downloads);
-        // Forge installer hat möglicherweise keine set_concurrent_downloads Methode
 
-        // Get all Forge versions metadata
         let forge_metadata = forge_api.get_all_versions().await?;
-        // Get versions compatible with the current Minecraft version
         let compatible_versions = forge_metadata.get_versions_for_minecraft(version_id);
 
         if compatible_versions.is_empty() {
@@ -67,7 +62,6 @@ impl ForgeInstaller {
             )));
         }
 
-        // --- Determine Forge Version ---
         let target_forge_version = match &profile.loader_version {
             Some(specific_version_str) if !specific_version_str.is_empty() => {
                 info!(
@@ -75,21 +69,31 @@ impl ForgeInstaller {
                     specific_version_str
                 );
 
-                // Check if the specific version exists in the compatible list
-                if compatible_versions.contains(specific_version_str) {
-                    info!("Found specified Forge version: {}", specific_version_str);
-                    specific_version_str.clone() // Clone the string to own it
+                // compatible_versions holds full Maven strings ("1.20.1-47.4.20"), while a
+                // profile — and a .mrpack's `dependencies.forge` — usually carries just the
+                // build ("47.4.20"). Comparing the two directly never matches, so every pack
+                // with a pinned Forge version silently fell back to latest. Accept both.
+                let wanted = specific_version_str.trim();
+                let prefix = format!("{}-", version_id);
+                let matched = compatible_versions.iter().find(|candidate| {
+                    candidate.as_str() == wanted
+                        || candidate
+                            .strip_prefix(prefix.as_str())
+                            .map_or(false, |build| build == wanted)
+                });
+
+                if let Some(found) = matched {
+                    info!("Found specified Forge version: {}", found);
+                    found.clone()
                 } else {
                     log::warn!(
                         "Specified Forge version '{}' not found or incompatible with MC {}. Falling back to latest.",
                         specific_version_str, version_id
                     );
-                    // Fallback to the latest compatible version (first in the list from get_versions_for_minecraft)
                     compatible_versions.first().unwrap().clone() // Unsafe unwrap okay due to is_empty check above
                 }
             }
             _ => {
-                // Fallback to latest compatible if no specific version is set
                 info!(
                     "No specific Forge version set in profile, using latest for MC {}.",
                     version_id
@@ -97,11 +101,9 @@ impl ForgeInstaller {
                 compatible_versions.first().unwrap().clone() // Unsafe unwrap okay due to is_empty check above
             }
         };
-        // --- End Determine Forge Version ---
 
         info!("Using Forge version: {}", target_forge_version);
 
-        // Emit Forge version found event (using the determined version)
         state
             .emit_event(EventPayload {
                 event_id: forge_event_id,
@@ -113,7 +115,6 @@ impl ForgeInstaller {
             })
             .await?;
 
-        // Download and extract Forge installer (using the determined version)
         state
             .emit_event(EventPayload {
                 event_id: forge_event_id,
@@ -167,7 +168,6 @@ impl ForgeInstaller {
             })
             .await?;
 
-        // Download Forge libraries (still uses forge_version DTO derived from the installer)
         forge_libraries_download
             .download_libraries(&forge_version)
             .await?;
@@ -177,12 +177,13 @@ impl ForgeInstaller {
 
         info!("Forge Libraries: {:?}", libraries);
 
-        // Use determined target_forge_version for client path and installer path
-        let custom_client_path = forge_installer_download.get_client_path(&target_forge_version);
         let installer_path = forge_installer_download.get_installer_path(&target_forge_version);
 
-        let mut force_include_minecraft_jar = false;
-        let mut use_custom_client_path = true;
+        // None for the jarmod generation, which ships no processors at all and delivers its
+        // Forge code as an ordinary library. Assuming a patched jar there puts a file that was
+        // never written on the classpath — Java skips missing entries silently, so the
+        // Minecraft jar just goes absent.
+        let patched_client_jar = profile_json.as_ref().and_then(declared_patched_client_jar);
 
         if let Some(forge_profile) = profile_json {
             state
@@ -200,56 +201,20 @@ impl ForgeInstaller {
                 .download_installer_libraries(&forge_profile)
                 .await?;
 
-            // Prüfen, ob Patching übersprungen werden kann
-            let mut should_run_patcher = true;
-
-            // Nur noch PATCHED abrufen
-            if let Some(patched) = forge_profile.data.get("PATCHED") {
-                let client_path_str = &patched.client;
-                // Maven-Koordinaten extrahieren: [group:artifact:version:classifier]
-                if client_path_str.starts_with('[') && client_path_str.ends_with(']') {
-                    let maven_coords = &client_path_str[1..client_path_str.len() - 1];
-                    let parts: Vec<&str> = maven_coords.split(':').collect();
-
-                    if parts.len() >= 4 {
-                        let (group, artifact, version, classifier) =
-                            (parts[0], parts[1], parts[2], parts[3]);
-
-                        // Berechne Dateipfad
-                        let group_path = group.replace('.', "/");
-                        let file_name = format!("{}-{}-{}.jar", artifact, version, classifier);
-
-                        let library_path = LAUNCHER_DIRECTORY
-                            .meta_dir()
-                            .join("libraries")
-                            .join(group_path)
-                            .join(artifact)
-                            .join(version)
-                            .join(file_name);
-
-                        info!(
-                            "Checking for pre-patched Forge client: {}",
-                            library_path.display()
-                        );
-
-                        // Prüfe ob die Datei existiert
-                        if library_path.exists() {
-                            info!(
-                                "✅ Pre-patched Forge client found: {}",
-                                library_path.display()
-                            );
-                            should_run_patcher = false;
-                        } else {
-                            info!(
-                                "❌ Patched Forge client file not found, patching required: {}",
-                                library_path.display()
-                            );
-                        }
-                    }
+            // Processors only need to run when their output is missing. A build that declares
+            // no patched jar has nothing to skip, so it always runs them.
+            let should_run_patcher = match &patched_client_jar {
+                Some(jar) if jar.exists() => {
+                    info!("✅ Pre-patched Forge client found: {}", jar.display());
+                    false
                 }
-            }
+                Some(jar) => {
+                    info!("Patched Forge client missing, running processors: {}", jar.display());
+                    true
+                }
+                None => true,
+            };
 
-            // Patcher nur ausführen, wenn nötig
             if should_run_patcher {
                 state
                     .emit_event(EventPayload {
@@ -283,11 +248,7 @@ impl ForgeInstaller {
                     .await?;
             }
 
-            if version_id == "1.12.2" {
-                force_include_minecraft_jar = true;
-            }
         } else {
-            // Restore full event payload for legacy library download
             state
                 .emit_event(EventPayload {
                     event_id: forge_event_id,
@@ -302,8 +263,6 @@ impl ForgeInstaller {
             forge_libraries_download
                 .download_legacy_libraries(&forge_version)
                 .await?;
-
-            use_custom_client_path = false;
         }
 
         info!("Forge installation completed!");
@@ -319,22 +278,61 @@ impl ForgeInstaller {
             })
             .await?;
 
+        let launch_kind = ForgeLaunchKind::from_main_class(&forge_version.main_class);
+        info!(
+            "Forge launch generation: {:?} (mainClass {})",
+            launch_kind, forge_version.main_class
+        );
+
+        // Which jar goes on the classpath as *the* Minecraft jar.
+        //
+        // The patched jar holds code only — assets, data and version.json sit in the
+        // client-extra half of Forge's split. The module-layer generation finds its patched
+        // classes through -DlibraryDirectory anyway, so it gets plain vanilla; handing it the
+        // code-only jar leaves nothing on the classpath providing version.json, and mods that
+        // read it through getSystemClassLoader() (CustomSkinLoader) then fall back to their
+        // oldest protocol and load 1.12-era classes, colliding with the real minecraft module.
+        //
+        // ModLauncher keeps the patched jar: it runs on a flat classpath where that jar has to
+        // be the single Minecraft jar.
+        let custom_client_path = if launch_kind == ForgeLaunchKind::Bootstrap {
+            info!("Module-layer generation — keeping the vanilla jar on the classpath");
+            None
+        } else {
+            // Never hand on a path the processors did not actually produce: Java drops missing
+            // classpath entries without a word, which would leave the instance with no
+            // Minecraft jar at all and no hint as to why.
+            match patched_client_jar {
+                Some(jar) if !jar.exists() => {
+                    return Err(AppError::Other(format!(
+                        "Forge processors did not produce the patched client jar declared by the \
+                         install profile: {}",
+                        jar.display()
+                    )))
+                }
+                other => other,
+            }
+        };
+
         let result = ForgeInstallResult {
             libraries,
             main_class: forge_version.main_class.clone(),
             jvm_args: ForgeArguments::get_jvm_arguments(
                 &forge_version,
                 &LAUNCHER_DIRECTORY.meta_dir().join("libraries"),
-                &target_forge_version,
+                // ${version_name} feeds -DignoreList: the jar BootstrapLauncher must NOT
+                // turn into a module. It has to name the Minecraft jar we actually put on the
+                // classpath, otherwise that jar becomes a second module and resolution fails
+                // with "Modules minecraft and _1._20._1 export package ...".
+                if launch_kind == ForgeLaunchKind::Bootstrap {
+                    version_id
+                } else {
+                    &target_forge_version
+                },
             ),
             game_args: ForgeArguments::get_game_arguments(&forge_version),
             minecraft_arguments: forge_version.minecraft_arguments.clone(),
-            custom_client_path: if use_custom_client_path {
-                Some(custom_client_path)
-            } else {
-                None
-            },
-            force_include_minecraft_jar,
+            custom_client_path,
         };
 
         Ok(result)
@@ -348,5 +346,108 @@ pub struct ForgeInstallResult {
     pub game_args: Vec<String>,
     pub minecraft_arguments: Option<String>,
     pub custom_client_path: Option<PathBuf>,
-    pub force_include_minecraft_jar: bool,
+}
+
+/// Locates the `client-<mc>-<mcp>-extra.jar` that Forge installs alongside the patched client.
+///
+/// Forge names the directory `<mc>-<mcp-timestamp>` and we only know the MC version here, so
+/// match on the prefix and take the newest entry. Returns `None` when nothing matches — the
+/// caller then logs a warning rather than failing the launch.
+fn find_client_extra_jar(minecraft_version: &str) -> Option<PathBuf> {
+    let client_dir = LAUNCHER_DIRECTORY
+        .meta_dir()
+        .join("libraries")
+        .join("net")
+        .join("minecraft")
+        .join("client");
+    let prefix = format!("{}-", minecraft_version);
+
+    let mut candidates: Vec<PathBuf> = std::fs::read_dir(&client_dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry.file_name().to_string_lossy().starts_with(&prefix) && entry.path().is_dir()
+        })
+        .filter_map(|entry| {
+            std::fs::read_dir(entry.path()).ok().and_then(|files| {
+                files
+                    .filter_map(|f| f.ok())
+                    .map(|f| f.path())
+                    .find(|p| {
+                        p.file_name()
+                            .and_then(|n| n.to_str())
+                            .map_or(false, |n| n.ends_with("-extra.jar"))
+                    })
+            })
+        })
+        .collect();
+
+    candidates.sort();
+    candidates.pop()
+}
+
+/// Resolves the patched client jar that the install profile declares in `data.PATCHED`,
+/// returning `None` for builds that patch nothing.
+///
+/// The declared coordinate must not be reconstructed from a naming convention: Forge writes
+/// `[net.minecraftforge:forge:<version>:client]`, NeoForge up to 21.9
+/// `[net.neoforged:neoforge:<version>:client]`, and NeoForge from 21.10 on
+/// `[net.neoforged:minecraft-client-patched:<version>]` — a different artifact with no
+/// classifier at all.
+fn declared_patched_client_jar(profile: &ForgeInstallProfile) -> Option<PathBuf> {
+    let declared = profile.data.get("PATCHED")?.client.trim();
+    let coordinate = declared.strip_prefix('[')?.strip_suffix(']')?;
+
+    let mut parts = coordinate.split(':');
+    let group = parts.next()?;
+    let artifact = parts.next()?;
+    let version = parts.next()?;
+    let classifier = parts.next();
+
+    let file_name = match classifier {
+        Some(c) => format!("{}-{}-{}.jar", artifact, version, c),
+        None => format!("{}-{}.jar", artifact, version),
+    };
+
+    Some(
+        LAUNCHER_DIRECTORY
+            .meta_dir()
+            .join("libraries")
+            .join(group.replace('.', "/"))
+            .join(artifact)
+            .join(version)
+            .join(file_name),
+    )
+}
+
+/// Forge's launch generations, which differ in how the Minecraft classes reach the JVM.
+/// Identified by the `mainClass` the version JSON declares, never by the Minecraft version
+/// number — the generation is a property of the Forge build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ForgeLaunchKind {
+    /// `net.minecraft.launchwrapper.Launch` — flat classpath. Forge ships as an ordinary
+    /// library and transforms vanilla at load time, so no patched jar is ever produced.
+    LaunchWrapper,
+    /// `cpw.mods.modlauncher.Launcher` — binary patches produce a patched client jar that
+    /// takes the Minecraft jar's place on a flat classpath.
+    ModLauncher,
+    /// Module-layer era. Forge builds the layer itself from `-DlibraryDirectory`, so the
+    /// classpath carries plain vanilla and the patches ride along as libraries.
+    Bootstrap,
+}
+
+impl ForgeLaunchKind {
+    /// The module-layer era alone uses three different main classes
+    /// (`cpw.mods.bootstraplauncher.BootstrapLauncher` up to 1.21.0,
+    /// `net.minecraftforge.bootstrap.ForgeBootstrap` from 1.21.1,
+    /// `net.neoforged.fml.startup.Client` on NeoForge), so only the two legacy generations are
+    /// matched by name and anything unknown counts as module-layer. Legacy is frozen and
+    /// cannot gain new main classes; everything new goes the other way.
+    fn from_main_class(main_class: &str) -> Self {
+        match main_class {
+            "net.minecraft.launchwrapper.Launch" | "" => Self::LaunchWrapper,
+            "cpw.mods.modlauncher.Launcher" => Self::ModLauncher,
+            _ => Self::Bootstrap,
+        }
+    }
 }

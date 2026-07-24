@@ -496,10 +496,6 @@ pub async fn install_minecraft_version(
         if let Some(custom_client_path) = modloader_result.custom_client_path {
             launch_params = launch_params.with_custom_client_jar(custom_client_path);
         }
-
-        if modloader_result.force_include_minecraft_jar {
-            launch_params = launch_params.with_force_include_minecraft_jar(true);
-        }
     } else {
         // Vanilla main class
         launch_params = launch_params.with_main_class(&piston_meta.main_class);
