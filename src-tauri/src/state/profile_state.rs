@@ -1368,53 +1368,90 @@ impl ProfileManager {
         display_name_log: &str,
         platform_name: &str,
     ) -> Result<()> {
-        use crate::integrations::unified_mod::{ModPlatform, UnifiedModVersionsParams};
+        use crate::integrations::unified_mod::ModPlatform;
 
         info!(
             "Installing dependencies for {} mod {} (version: {})",
-            platform_name, display_name_log, payload.version_number.as_deref().unwrap_or("unknown")
+            platform_name,
+            display_name_log,
+            payload.version_number.as_deref().unwrap_or("unknown")
         );
 
-        // Get version details to find dependencies
-        let versions_params = UnifiedModVersionsParams {
-            source: payload.source.clone(),
-            project_id: payload.project_id.clone(),
-            loaders: payload.loaders.clone(),
-            game_versions: payload.game_versions.clone(),
-            limit: Some(1), // We only need the specific version
-            offset: None,
-        };
-
-        let versions_response = match crate::integrations::unified_mod::get_mod_versions_unified(versions_params).await {
-            Ok(response) => response,
-            Err(e) => {
-                warn!("Failed to get version details for dependencies: {}", e);
-                return Ok(()); // Don't fail the whole operation if dependencies can't be fetched
-            }
-        };
-
-        if let Some(target_version) = versions_response.versions.into_iter().find(|v| v.id == payload.version_id) {
-            info!("Found {} dependencies for {} mod {}", target_version.files.len(), platform_name, display_name_log);
-
-            match payload.source {
-                ModPlatform::Modrinth => {
-                    // For Modrinth, we need to get the full version details to access dependencies
-                    if let Ok(full_version) = crate::integrations::modrinth::get_version_details(payload.version_id.clone()).await {
-                        self.install_modrinth_dependencies(payload.profile_id, &full_version, display_name_log).await?;
+        match payload.source {
+            ModPlatform::Modrinth => {
+                match crate::integrations::modrinth::get_version_details(
+                    payload.version_id.clone(),
+                )
+                .await
+                {
+                    Ok(full_version) => {
+                        self.install_modrinth_dependencies(
+                            payload.profile_id,
+                            &full_version,
+                            display_name_log,
+                        )
+                        .await?;
                     }
-                }
-                ModPlatform::CurseForge => {
-                    // For CurseForge, we need to get the file details to access dependencies
-                    if let Ok(curseforge_file) = crate::integrations::curseforge::get_file_details(
-                        payload.project_id.parse::<u32>().unwrap_or(0),
-                        payload.version_id.parse::<u32>().unwrap_or(0)
-                    ).await {
-                        self.install_curseforge_dependencies(payload.profile_id, &curseforge_file, display_name_log).await?;
+                    Err(e) => {
+                        warn!(
+                            "Failed to get Modrinth version {} for dependency resolution: {}",
+                            payload.version_id, e
+                        );
                     }
                 }
             }
-        } else {
-            warn!("Could not find version {} for dependency resolution", payload.version_id);
+
+            ModPlatform::CurseForge => {
+                let project_id = match payload.project_id.parse::<u32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        warn!(
+                            "Invalid CurseForge project ID '{}' for dependency resolution: {}",
+                            payload.project_id, e
+                        );
+                        return Ok(());
+                    }
+                };
+
+                let file_id = match payload.version_id.parse::<u32>() {
+                    Ok(file_id) => file_id,
+                    Err(e) => {
+                        warn!(
+                            "Invalid CurseForge file ID '{}' for dependency resolution: {}",
+                            payload.version_id, e
+                        );
+                        return Ok(());
+                    }
+                };
+
+                match crate::integrations::curseforge::get_file_details(
+                    project_id,
+                    file_id,
+                )
+                .await
+                {
+                    Ok(curseforge_file) => {
+                        info!(
+                            "Found {} CurseForge dependencies for {}",
+                            curseforge_file.dependencies.len(),
+                            display_name_log
+                        );
+
+                        self.install_curseforge_dependencies(
+                            payload.profile_id,
+                            &curseforge_file,
+                            display_name_log,
+                        )
+                        .await?;
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to get CurseForge file {} for dependency resolution: {}",
+                            file_id, e
+                        );
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -1427,11 +1464,21 @@ impl ProfileManager {
         file: &crate::integrations::curseforge::CurseForgeFile,
         _parent_mod_name: &str,
     ) -> Result<()> {
-        use crate::integrations::curseforge::CurseForgeFileRelationType;
+        use crate::integrations::curseforge::{
+            CurseForgeFileRelationType, CurseForgeModLoaderType,
+        };
 
         let profile = self.get_profile(profile_id).await?;
         let profile_loader_str = profile.loader.as_str().to_string();
         let profile_game_version = profile.game_version.clone();
+
+        let curseforge_loader_type = match profile.loader {
+            ModLoader::Forge => Some(CurseForgeModLoaderType::Forge),
+            ModLoader::Fabric => Some(CurseForgeModLoaderType::Fabric),
+            ModLoader::Quilt => Some(CurseForgeModLoaderType::Quilt),
+            ModLoader::NeoForge => Some(CurseForgeModLoaderType::NeoForge),
+            ModLoader::Vanilla => None,
+        };
 
         for dependency in &file.dependencies {
             // Only install required dependencies
