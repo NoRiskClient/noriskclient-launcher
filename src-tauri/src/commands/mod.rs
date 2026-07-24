@@ -22,6 +22,7 @@ pub mod pack_rollout_commands;
 pub mod permission_commands;
 pub mod oauth_error_html;
 pub mod oauth_success_html;
+pub mod modpack_command;
 pub mod path_commands;
 pub mod process_command;
 pub mod profile_command;

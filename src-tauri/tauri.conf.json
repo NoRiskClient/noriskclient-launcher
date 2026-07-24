@@ -45,6 +45,16 @@
         "version": {
           "description": "Print launcher version and exit"
         },
+        "modpack": {
+          "description": "Install a Modrinth modpack by project id and launch it",
+          "args": [
+            { "name": "id",             "short": "i", "takesValue": true, "required": true,  "description": "Modrinth project id or slug, e.g. 1KVo5zza or fabulously-optimized" },
+            { "name": "pack-version",                 "takesValue": true,                    "description": "Pin an exact version id or number (default: newest release)" },
+            { "name": "mc",             "short": "m", "takesValue": true,                    "description": "Only consider versions for this MC version" },
+            { "name": "loader",         "short": "l", "takesValue": true,                    "description": "Only consider versions for this loader" },
+            { "name": "no-launch",                                                           "description": "Install only, don't launch afterwards" }
+          ]
+        },
         "temp": {
           "description": "Launch a throwaway MC instance (in-memory profile, no profiles.json entry; instance dir swept to trash on next launcher start)",
           "args": [
