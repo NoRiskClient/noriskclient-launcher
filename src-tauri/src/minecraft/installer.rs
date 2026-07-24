@@ -496,6 +496,7 @@ pub async fn install_minecraft_version(
         if let Some(custom_client_path) = modloader_result.custom_client_path {
             launch_params = launch_params.with_custom_client_jar(custom_client_path);
         }
+
     } else {
         // Vanilla main class
         launch_params = launch_params.with_main_class(&piston_meta.main_class);
@@ -744,10 +745,28 @@ pub async fn install_minecraft_version(
 
     // --- Provide managed mods via meta file (Fabric: addMods, Forge: NrcCoreMod) ---
     if modloader_enum == ModLoader::Fabric {
+        // Loose jars in <instance>/mods are invisible to Fabric, because fabric.modsFolder
+        // replaces that directory rather than adding to it. Pass them through addMods so
+        // dropping a jar into mods/ behaves the same as it does on Forge.
+        let instance_path = state
+            .profile_manager
+            .calculate_instance_path_for_profile(profile)?;
+        let root_mods =
+            crate::minecraft::downloads::mod_resolver::collect_instance_root_mods(&instance_path)
+                .await;
+        if !root_mods.is_empty() {
+            info!(
+                "Including {} loose jar(s) from {}/mods for profile '{}'",
+                root_mods.len(),
+                instance_path.display(),
+                profile.name
+            );
+        }
         let add_mods_arg = crate::minecraft::downloads::mod_resolver::build_fabric_add_mods_arg(
             profile.id,
             version_id,
             &target_mods,
+            &root_mods,
         )
         .await?;
         let mut current_jvm_args = launch_params.additional_jvm_args.clone();

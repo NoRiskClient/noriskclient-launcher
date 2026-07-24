@@ -629,12 +629,59 @@ pub async fn resolve_target_mods(
     Ok(final_target_list)
 }
 
-/// Creates a Fabric addMods meta file that lists one absolute path per line for the provided target mods.
-/// Returns the absolute path to the created meta file.
+/// Collects loose jars sitting directly in `<instance>/mods`.
+///
+/// Fabric normally treats that directory as *the* mods folder, but we point
+/// `fabric.modsFolder` at the launcher-managed per-profile subdirectory, and
+/// `FabricLoaderImpl.getModsDirectory0()` picks one or the other — it does not merge:
+///
+/// ```text
+/// return directory != null ? Paths.get(directory) : gameDir.resolve("mods");
+/// ```
+///
+/// So anything dropped into `mods/` — a jar the user dragged in, or the `overrides/mods`
+/// of an installed .mrpack — silently never loads. Forge/NeoForge do not have that problem:
+/// FML scans `<instance>/mods` itself, and our own loader merges `nrc.modsFolder` with
+/// `nrc.addMods`. Feeding these jars through addMods gives Fabric the same behaviour.
+///
+/// Only the top level is scanned, so the managed `nrc-<mc>-<loader>[-<uuid>]` subdirectory
+/// (and any other subfolder) is left alone.
+pub async fn collect_instance_root_mods(instance_path: &std::path::Path) -> Vec<PathBuf> {
+    let mods_dir = instance_path.join("mods");
+    let mut out = Vec::new();
+
+    let mut entries = match fs::read_dir(&mods_dir).await {
+        Ok(e) => e,
+        Err(_) => return out, // No mods dir yet — nothing to add.
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        // Anything not ending in .jar is skipped, which also covers the `.disabled`
+        // convention launchers use to park a mod without deleting it.
+        if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map_or(true, |e| !e.eq_ignore_ascii_case("jar"))
+        {
+            continue;
+        }
+        out.push(path);
+    }
+    out.sort();
+    out
+}
+
+/// Creates a Fabric addMods meta file that lists one absolute path per line for the provided
+/// target mods, followed by any loose jars from `<instance>/mods` (see
+/// [`collect_instance_root_mods`]). Returns the absolute path to the created meta file.
 pub async fn create_fabric_add_mods_meta(
     profile_id: Uuid,
     minecraft_version: &str,
     target_mods: &[TargetMod],
+    extra_jars: &[PathBuf],
 ) -> crate::error::Result<PathBuf> {
     let runtime_dir = LAUNCHER_DIRECTORY.meta_dir().join("runtime");
     fs::create_dir_all(&runtime_dir).await?;
@@ -644,9 +691,21 @@ pub async fn create_fabric_add_mods_meta(
         profile_id, minecraft_version
     ));
 
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut meta_contents = String::new();
-    for tm in target_mods {
-        let p = tm.cache_path.to_string_lossy().replace("\\", "/");
+    for p in target_mods
+        .iter()
+        .map(|tm| tm.cache_path.to_string_lossy().replace("\\", "/"))
+        .chain(
+            extra_jars
+                .iter()
+                .map(|p| p.to_string_lossy().replace("\\", "/")),
+        )
+    {
+        // A managed mod could also sit in mods/ — list it only once.
+        if !seen.insert(p.clone()) {
+            continue;
+        }
         meta_contents.push_str(&p);
         meta_contents.push('\n');
     }
@@ -659,8 +718,10 @@ pub async fn build_fabric_add_mods_arg(
     profile_id: Uuid,
     minecraft_version: &str,
     target_mods: &[TargetMod],
+    extra_jars: &[PathBuf],
 ) -> crate::error::Result<String> {
-    let meta = create_fabric_add_mods_meta(profile_id, minecraft_version, target_mods).await?;
+    let meta =
+        create_fabric_add_mods_meta(profile_id, minecraft_version, target_mods, extra_jars).await?;
     Ok(format!(
         "-Dfabric.addMods=@{}",
         meta.to_string_lossy().replace("\\", "/")
