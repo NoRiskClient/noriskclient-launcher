@@ -4,17 +4,26 @@ use crate::minecraft::launch::version::compare_versions;
 use crate::minecraft::rules::RuleProcessor;
 use log::info;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-struct LibraryInfo {
+struct LibraryEntry {
     path: PathBuf,
     version: String,
-    priority: u32, // Höhere Zahl = höhere Priorität
+    priority: u32,
 }
 
+/// Builds the JVM classpath.
+///
+/// A library's identity is its Maven coordinate — group, artifact and classifier, but never
+/// the version, which only decides which of two competing copies wins. Identity must not be
+/// derived from the file name: `forge-…-client.jar` and `forge-…-universal.jar` then look like
+/// one library in two versions and one of them gets dropped.
 pub struct ClasspathBuilder {
     entries: Vec<String>,
-    libraries: HashMap<String, LibraryInfo>,
+    libraries: Vec<LibraryEntry>,
+    /// Coordinate key -> index into `libraries`. Entries are replaced in place and never
+    /// removed, so the indices stay valid.
+    library_index: HashMap<String, usize>,
     custom_client_jar_path: Option<PathBuf>,
     vanilla_client_jar: Option<PathBuf>,
 }
@@ -33,10 +42,50 @@ impl ClasspathBuilder {
 
         Self {
             entries: Vec::new(),
-            libraries: HashMap::new(),
+            libraries: Vec::new(),
+            library_index: HashMap::new(),
             custom_client_jar_path: None,
             vanilla_client_jar: Some(client_jar),
         }
+    }
+
+    /// A known coordinate is replaced in place so its original position survives. Higher
+    /// version wins; on a tie the higher priority does, which lets a loader's copy of a
+    /// vanilla library take over.
+    fn apply_library(&mut self, key: String, path: PathBuf, version: String, priority: u32) {
+        if let Some(&index) = self.library_index.get(&key) {
+            let existing = &self.libraries[index];
+            let replace = match compare_versions(&version, &existing.version) {
+                std::cmp::Ordering::Greater => true,
+                std::cmp::Ordering::Equal => priority > existing.priority,
+                std::cmp::Ordering::Less => false,
+            };
+            if replace {
+                info!(
+                    "🔄 Replacing library {} ({} -> {})",
+                    key, existing.version, version
+                );
+                self.libraries[index] = LibraryEntry {
+                    path,
+                    version,
+                    priority,
+                };
+            } else {
+                info!(
+                    "⏩ Skipping library {} (existing version {} is newer or equal to {})",
+                    key, existing.version, version
+                );
+            }
+            return;
+        }
+
+        info!("✅ Adding library: {} ({})", key, version);
+        self.library_index.insert(key, self.libraries.len());
+        self.libraries.push(LibraryEntry {
+            path,
+            version,
+            priority,
+        });
     }
 
     pub fn add_piston_libraries(&mut self, libraries: &[Library]) -> &mut Self {
@@ -47,68 +96,35 @@ impl ClasspathBuilder {
                 continue;
             }
 
-            if let Some(artifact) = &lib.downloads.artifact {
-                // Extrahiere den Pfad aus dem Maven-Format (group:artifact:version[:classifier])
-                let parts: Vec<&str> = lib.name.split(':').collect();
-                if parts.len() != 3 && parts.len() != 4 {
-                    info!("❌ Skipping library with invalid format: {}", lib.name);
-                    continue;
-                }
-
-                let (group, artifact_name, version) = (parts[0], parts[1], parts[2]);
-                let classifier = parts.get(3).copied();
-                // Distinguish classifier'd entries (e.g. lwjgl:natives-windows) from the
-                // base artifact so they don't overwrite each other in self.libraries.
-                let lib_key = match classifier {
-                    Some(c) => format!("{}:{}", artifact_name, c),
-                    None => artifact_name.to_string(),
-                };
-                let relativ_path = artifact.path.clone().unwrap_or_else(|| match classifier {
-                    Some(c) => format!("{}-{}-{}.jar", artifact_name, version, c),
-                    None => format!("{}-{}.jar", artifact_name, version),
-                });
-                info!("Library path: {}", relativ_path);
-                let jar_path = LAUNCHER_DIRECTORY
-                    .meta_dir()
-                    .join("libraries")
-                    .join(relativ_path.clone());
-
-                // Prüfe ob wir diese Library schon haben
-                if let Some(existing) = self.libraries.get(&lib_key) {
-                    // Nur ersetzen wenn neue Version höher ist
-                    if compare_versions(version, &existing.version) == std::cmp::Ordering::Greater {
-                        info!(
-                            "🔄 Replacing library {} {:?} ({} -> {})",
-                            relativ_path, existing.path, existing.version, version
-                        );
-                        self.libraries.insert(
-                            lib_key.clone(),
-                            LibraryInfo {
-                                path: jar_path,
-                                version: version.to_string(),
-                                priority: 0,
-                            },
-                        );
-                    } else {
-                        info!(
-                            "⏩ Skipping library {} (existing version {} is newer or equal to {})",
-                            lib_key, existing.version, version
-                        );
-                    }
-                } else {
-                    info!("✅ Adding library: {}", relativ_path);
-                    self.libraries.insert(
-                        lib_key.clone(),
-                        LibraryInfo {
-                            path: jar_path,
-                            version: version.to_string(),
-                            priority: 0,
-                        },
-                    );
-                }
-            } else {
+            let Some(artifact) = &lib.downloads.artifact else {
                 info!("❌ Skipping library without artifact: {}", lib.name);
+                continue;
+            };
+
+            // group:artifact:version[:classifier]
+            let parts: Vec<&str> = lib.name.split(':').collect();
+            if parts.len() != 3 && parts.len() != 4 {
+                info!("❌ Skipping library with invalid format: {}", lib.name);
+                continue;
             }
+            let (group, artifact_name, version) = (parts[0], parts[1], parts[2]);
+            let classifier = parts.get(3).copied();
+
+            let relativ_path = artifact.path.clone().unwrap_or_else(|| match classifier {
+                Some(c) => format!("{}-{}-{}.jar", artifact_name, version, c),
+                None => format!("{}-{}.jar", artifact_name, version),
+            });
+            let jar_path = LAUNCHER_DIRECTORY
+                .meta_dir()
+                .join("libraries")
+                .join(&relativ_path);
+
+            self.apply_library(
+                coordinate_key(group, artifact_name, classifier),
+                jar_path,
+                version.to_string(),
+                0,
+            );
         }
         info!("=== Vanilla Library Processing Complete ===\n");
         self
@@ -117,56 +133,31 @@ impl ClasspathBuilder {
     pub fn add_additional_libraries(&mut self, libraries: &[PathBuf], priority: u32) -> &mut Self {
         info!("\n=== Processing Additional Libraries ===");
         for library in libraries {
-            if let Some(file_name) = library.file_name().and_then(|n| n.to_str()) {
-                if !file_name.ends_with(".jar") {
-                    info!("❌ Skipping non-jar file: {}", file_name);
-                    continue;
-                }
+            let Some(file_name) = library.file_name().and_then(|n| n.to_str()) else {
+                info!("❌ Skipping library with invalid filename");
+                continue;
+            };
+            if !file_name.ends_with(".jar") {
+                info!("❌ Skipping non-jar file: {}", file_name);
+                continue;
+            }
 
-                // Extrahiere den Basis-Namen und die Version
-                let base_name = file_name.strip_suffix(".jar").unwrap_or(file_name);
-                if let Some((name, version)) = base_name.rsplit_once('-') {
-                    // Prüfe ob wir diese Library schon haben
-                    if let Some(existing) = self.libraries.get(name) {
-                        // Nur ersetzen wenn neue Version höher ist
-                        if compare_versions(version, &existing.version)
-                            == std::cmp::Ordering::Greater
-                        {
-                            info!(
-                                "🔄 Replacing library {} ({} -> {})",
-                                name, existing.version, version
-                            );
-                            self.libraries.insert(
-                                name.to_string(),
-                                LibraryInfo {
-                                    path: library.clone(),
-                                    version: version.to_string(),
-                                    priority,
-                                },
-                            );
-                        } else {
-                            info!("⏩ Skipping library {} (existing version {} is newer or equal to {})",
-                                name, existing.version, version);
-                        }
-                    } else {
-                        info!("✅ Adding library: {}", name);
-                        self.libraries.insert(
-                            name.to_string(),
-                            LibraryInfo {
-                                path: library.clone(),
-                                version: version.to_string(),
-                                priority,
-                            },
-                        );
-                    }
-                } else {
-                    info!(
-                        "❌ Skipping file with invalid format (no version): {}",
-                        file_name
+            match coordinate_from_maven_path(library) {
+                Some((key, version)) => self.apply_library(key, library.clone(), version, priority),
+                None => {
+                    // Outside the Maven tree there is no coordinate to trust, so the file name
+                    // becomes the identity and the entry is never version-arbitrated. Dropping
+                    // it instead would be worse: on Forge 1.21 the client jar carries the
+                    // patched Minecraft classes.
+                    let base_name = file_name.strip_suffix(".jar").unwrap_or(file_name);
+                    info!("✅ Adding library (non-Maven path): {}", base_name);
+                    self.apply_library(
+                        base_name.to_string(),
+                        library.clone(),
+                        String::new(),
+                        priority,
                     );
                 }
-            } else {
-                info!("❌ Skipping library with invalid filename");
             }
         }
         info!("=== Additional Library Processing Complete ===\n");
@@ -179,65 +170,91 @@ impl ClasspathBuilder {
         self
     }
 
-    pub fn build(&self, force_include_minecraft_jar: bool) -> String {
+    /// Builds the classpath: libraries in insertion order, Minecraft jar last, so a library
+    /// carrying a patched copy of a Minecraft class wins over the jar itself.
+    pub fn build(&self) -> String {
         use std::collections::HashSet;
 
-        let mut unique_entries = HashSet::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut ordered: Vec<String> = Vec::new();
 
-        for lib_info in self.libraries.values() {
-            let path_str = lib_info
-                .path
-                .to_string_lossy()
-                .to_string()
-                .replace("\\", "/");
-            unique_entries.insert(path_str);
-        }
-
-        for entry in &self.entries {
-            unique_entries.insert(entry.replace("\\", "/"));
-        }
-
-        if let Some(custom_client_jar) = &self.custom_client_jar_path {
-            info!("Using custom client jar: {}", custom_client_jar.display());
-            unique_entries.insert(
-                custom_client_jar
-                    .to_string_lossy()
-                    .to_string()
-                    .replace("\\", "/"),
-            );
-        } else if let Some(vanilla_jar) = &self.vanilla_client_jar {
-            info!("Using vanilla client jar: {}", vanilla_jar.display());
-            unique_entries.insert(vanilla_jar.to_string_lossy().to_string().replace("\\", "/"));
-        } else {
-            info!("⚠️ Warning: No client jar found! This might cause issues.");
-        }
-
-        if force_include_minecraft_jar {
-            if let Some(vanilla_jar) = &self.vanilla_client_jar {
-                info!(
-                    "Force including vanilla client jar: {}",
-                    vanilla_jar.display()
-                );
-                unique_entries.insert(vanilla_jar.to_string_lossy().to_string().replace("\\", "/"));
+        fn push(path: String, seen: &mut HashSet<String>, out: &mut Vec<String>) {
+            let normalized = path.replace("\\", "/");
+            if seen.insert(normalized.clone()) {
+                out.push(normalized);
             }
         }
 
-        let all_entries: Vec<String> = unique_entries.into_iter().collect();
-        info!(
-            "Final classpath contains {} unique entries",
-            all_entries.len()
-        );
-        all_entries.join(if cfg!(windows) { ";" } else { ":" })
+        for lib in &self.libraries {
+            push(
+                lib.path.to_string_lossy().to_string(),
+                &mut seen,
+                &mut ordered,
+            );
+        }
+        for entry in &self.entries {
+            push(entry.clone(), &mut seen, &mut ordered);
+        }
+
+        match (&self.custom_client_jar_path, &self.vanilla_client_jar) {
+            (Some(custom), _) => {
+                info!("Using custom client jar: {}", custom.display());
+                push(custom.to_string_lossy().to_string(), &mut seen, &mut ordered);
+            }
+            (None, Some(vanilla)) => {
+                info!("Using vanilla client jar: {}", vanilla.display());
+                push(
+                    vanilla.to_string_lossy().to_string(),
+                    &mut seen,
+                    &mut ordered,
+                );
+            }
+            (None, None) => {
+                info!("⚠️ Warning: No client jar found! This might cause issues.");
+            }
+        }
+
+        info!("Final classpath contains {} unique entries", ordered.len());
+        ordered.join(if cfg!(windows) { ";" } else { ":" })
     }
 }
 
-fn extract_version_from_filename(filename: &str) -> String {
-    // Versuche Version aus dem Dateinamen zu extrahieren
-    // Format ist normalerweise: name-version.jar
-    if let Some((_, version_part)) = filename.rsplit_once('-') {
-        if let Some((version, _)) = version_part.rsplit_once('.') {
-            return version.to_string();
-        }
+fn coordinate_key(group: &str, artifact: &str, classifier: Option<&str>) -> String {
+    match classifier.filter(|c| !c.is_empty()) {
+        Some(c) => format!("{}:{}:{}", group, artifact, c),
+        None => format!("{}:{}", group, artifact),
     }
-    "0.0.0".to_string() // Fallback
+}
+
+/// Recovers `(coordinate key, version)` from a Maven repository path:
+/// `…/libraries/<group as dirs>/<artifact>/<version>/<artifact>-<version>[-<classifier>].jar`.
+///
+/// This replaces the old "split the file name at the last dash" guess, which could not tell a
+/// classifier from a version.
+fn coordinate_from_maven_path(path: &Path) -> Option<(String, String)> {
+    let libraries_root = LAUNCHER_DIRECTORY.meta_dir().join("libraries");
+    let relative = path.strip_prefix(&libraries_root).ok()?;
+
+    let components: Vec<&str> = relative
+        .components()
+        .map(|c| c.as_os_str().to_str())
+        .collect::<Option<Vec<_>>>()?;
+    // group (>=1) + artifact + version + file
+    if components.len() < 4 {
+        return None;
+    }
+
+    let file_stem = components[components.len() - 1].strip_suffix(".jar")?;
+    let version = components[components.len() - 2];
+    let artifact = components[components.len() - 3];
+    let group = components[..components.len() - 3].join(".");
+
+    // A file that does not follow the layout is not safe to arbitrate on.
+    let remainder = file_stem.strip_prefix(&format!("{}-{}", artifact, version))?;
+    let classifier = remainder.strip_prefix('-').unwrap_or(remainder);
+
+    Some((
+        coordinate_key(&group, artifact, Some(classifier)),
+        version.to_string(),
+    ))
 }
