@@ -5,6 +5,7 @@ use crate::state::profile_state::{
     Mod, ModLoader, ModSource, ModPackInfo, ModPackSource, Profile, ProfileSettings, ProfileState,
 };
 use crate::state::state_manager::State;
+use crate::utils::download_utils::DownloadUtils;
 use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
 use futures::future::try_join_all;
@@ -228,9 +229,101 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
     Ok((profile, manifest))
 }
 
-/// Takes a parsed ModrinthIndex manifest and resolves the file entries
-/// against the Modrinth API (using hashes) to create a list of Mod structs.
-/// Determines the pack loader from the manifest dependencies.
+fn is_manifest_mod_path(path: &str) -> bool {
+    let norm = path.replace('\\', "/");
+    let trimmed = norm.trim_start_matches("./");
+    trimmed.starts_with("mods/")
+}
+
+fn sanitize_manifest_relative_path(path: &str) -> Option<PathBuf> {
+    let sanitized = PathBuf::from(path.replace('\\', "/"))
+        .components()
+        .filter_map(|comp| match comp {
+            std::path::Component::Normal(os_str) => {
+                let s = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            }
+            _ => None,
+        })
+        .collect::<PathBuf>();
+    if sanitized.as_os_str().is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
+pub async fn download_manifest_content_files(
+    manifest: &ModrinthIndex,
+    profile: &Profile,
+) -> Result<()> {
+    let state = State::get().await?;
+    let target_dir = state
+        .profile_manager
+        .calculate_instance_path_for_profile(profile)?;
+
+    for file_data in &manifest.files {
+        let is_client_required = file_data
+            .env
+            .as_ref()
+            .and_then(|env| env.get("client"))
+            .map_or(true, |req| req == "required" || req == "optional");
+        if !is_client_required {
+            continue;
+        }
+
+        if is_manifest_mod_path(&file_data.path) {
+            continue;
+        }
+
+        let sanitized_relative_path = match sanitize_manifest_relative_path(&file_data.path) {
+            Some(p) => p,
+            None => {
+                warn!(
+                    "Skipping manifest content file with unsafe/empty path: {}",
+                    file_data.path
+                );
+                continue;
+            }
+        };
+        let dest_path = target_dir.join(&sanitized_relative_path);
+
+        let url = match file_data.downloads.first() {
+            Some(u) => u,
+            None => {
+                warn!(
+                    "Manifest content file '{}' has no download URL. Skipping.",
+                    file_data.path
+                );
+                continue;
+            }
+        };
+
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent).await.map_err(AppError::Io)?;
+        }
+
+        info!(
+            "Downloading manifest content file '{}' -> {:?}",
+            file_data.path, dest_path
+        );
+        match file_data.hashes.get("sha1") {
+            Some(sha1) if sha1.len() == 40 => {
+                DownloadUtils::download_with_sha1(url, &dest_path, sha1).await?;
+            }
+            _ => {
+                DownloadUtils::download_simple(url, &dest_path).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>> {
     // Determine loader internally using the helper function
     let (pack_loader, _) = determine_loader_from_dependencies(&manifest.dependencies);
@@ -266,6 +359,14 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             .map_or(true, |req| req == "required" || req == "optional");
 
         if !is_client_required {
+            continue;
+        }
+
+        if !is_manifest_mod_path(&file_data.path) {
+            debug!(
+                "Skipping non-mod manifest file in mod resolution: {}",
+                file_data.path
+            );
             continue;
         }
 
@@ -531,23 +632,7 @@ pub async fn extract_mrpack_overrides(
                 continue;
             }
 
-            let final_dest_path = {
-                let relative_path_str = sanitized_relative_path.to_string_lossy();
-                // Check for both / and \ to be platform-agnostic for path separators within the string
-                if relative_path_str.starts_with("mods/") || relative_path_str.starts_with("mods\\")
-                {
-                    // Construct the new path by taking the part of the string *after* "mods"
-                    // e.g., if relative_path_str is "mods/foo.jar", then &relative_path_str["mods".len()..] is "/foo.jar"
-                    // We then prepend "custom_mods"
-                    let new_relative_path =
-                        format!("custom_mods{}", &relative_path_str["mods".len()..]);
-                    target_dir.join(new_relative_path)
-                } else {
-                    // If sanitized_relative_path is used again after this block, ensure it's cloned if needed.
-                    // Here, it seems it's only used for final_dest_path construction.
-                    target_dir.join(sanitized_relative_path)
-                }
-            };
+            let final_dest_path = target_dir.join(sanitized_relative_path);
 
             let task_pack_path = pack_path.to_path_buf();
             let task_io_semaphore = io_semaphore.clone();
@@ -950,6 +1035,9 @@ pub async fn import_mrpack_as_profile(
     let extraction_progress_scale = 0.45 * progress_scale; // 45% of the total scale for extraction
     extract_mrpack_overrides(&pack_path, &profile, event_id, extraction_progress_offset, extraction_progress_scale).await?;
     info!("Successfully extracted overrides.");
+
+    download_manifest_content_files(&manifest, &profile).await?;
+    info!("Successfully downloaded manifest content files.");
 
     emit_progress(0.90, "Saving profile...".to_string()).await;
 

@@ -1324,7 +1324,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
     info!("Loaded profile '{}' for modpack switching", profile.name);
 
     // Extract platform from modpack_source and process accordingly
-    let (minecraft_version, loader, loader_version, mods, curseforge_manifest) = match &request.modpack_source {
+    let (minecraft_version, loader, loader_version, mods, curseforge_manifest, modrinth_manifest) = match &request.modpack_source {
         crate::state::profile_state::ModPackSource::Modrinth { .. } => {
             info!("Processing as Modrinth modpack");
             let (_profile, manifest) = crate::integrations::mrpack::process_mrpack(temp_file_path.clone()).await
@@ -1333,7 +1333,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
                     e
                 })?;
             let (mc, ldr, ldr_ver, mods) = extract_modpack_info(&manifest, &manifest.name).await?;
-            (mc, ldr, ldr_ver, mods, None)
+            (mc, ldr, ldr_ver, mods, None, Some(manifest))
         }
         crate::state::profile_state::ModPackSource::CurseForge { .. } => {
             info!("Processing as CurseForge modpack");
@@ -1343,7 +1343,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
                     e
                 })?;
             let (mc, ldr, ldr_ver, mods) = extract_modpack_info(&manifest, &manifest.name).await?;
-            (mc, ldr, ldr_ver, mods, Some(manifest))
+            (mc, ldr, ldr_ver, mods, Some(manifest), None)
         }
     };
 
@@ -1396,11 +1396,19 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
         crate::state::profile_state::ModPackSource::Modrinth { .. } => {
             crate::integrations::mrpack::extract_mrpack_overrides(&temp_file_path, &profile, None, 0.0, 1.0).await?;
             info!("Successfully extracted Modrinth modpack overrides");
+
+            if let Some(manifest) = &modrinth_manifest {
+                crate::integrations::mrpack::download_manifest_content_files(manifest, &profile).await?;
+                info!("Successfully downloaded Modrinth manifest content files");
+            }
         }
         crate::state::profile_state::ModPackSource::CurseForge { .. } => {
             if let Some(manifest) = curseforge_manifest {
                 crate::integrations::curseforge::extract_curseforge_overrides(&temp_file_path, &profile, &manifest, None, 0.0, 1.0).await?;
                 info!("Successfully extracted CurseForge modpack overrides");
+
+                crate::integrations::curseforge::download_curseforge_content_files(&manifest, &profile).await?;
+                info!("Successfully downloaded CurseForge manifest content files");
             } else {
                 warn!("CurseForge manifest not available for override extraction");
             }

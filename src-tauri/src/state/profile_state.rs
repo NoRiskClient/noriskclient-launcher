@@ -2584,8 +2584,20 @@ impl ProfileManager {
         Ok(mods_path)
     }
 
-    /// Returns the path to the custom_mods directory for a given profile ID.
-    /// The directory is located next to the .minecraft directory within the instance folder.
+    pub fn mod_scan_dirs(&self, profile: &Profile) -> Result<Vec<PathBuf>> {
+        let instance = self.calculate_instance_path_for_profile(profile)?;
+        let mut dirs = vec![
+            instance.join("mods"),
+            self.get_profile_mods_path(profile)?,
+            instance.join("custom_mods"),
+        ];
+        dirs.dedup();
+        Ok(dirs)
+    }
+
+    #[deprecated(
+        note = "custom_mods/ is legacy. Local and imported mods now go into the flat mods/ folder (get_content_directory / ContentType::Mod). custom_mods/ is still read at launch as a back-compat fallback for existing profiles."
+    )]
     pub async fn get_profile_custom_mods_path(&self, profile_id: Uuid) -> Result<PathBuf> {
         log::debug!(
             "Attempting to get custom_mods path for profile {}",
@@ -2602,8 +2614,10 @@ impl ProfileManager {
         Ok(custom_mods_dir)
     }
 
-    /// Lists relevant custom mods found in the profile's `custom_mods` directory.
-    /// Only includes files ending in `.jar` or `.jar.disabled`.
+    #[deprecated(
+        note = "custom_mods/ is legacy; new local/imported mods live in the flat mods/ folder. Retained as a launch-time back-compat scan for existing profiles."
+    )]
+    #[allow(deprecated)]
     pub async fn list_custom_mods(&self, profile: &Profile) -> Result<Vec<CustomModInfo>> {
         let custom_mods_path = self.get_profile_custom_mods_path(profile.id).await?;
         let mut custom_mods = Vec::new();
@@ -2695,9 +2709,10 @@ impl ProfileManager {
         Ok(custom_mods)
     }
 
-    /// Sets the enabled/disabled state of a custom mod by renaming it.
-    /// Accepts the base filename (e.g., "OptiFine.jar") and the desired enabled state.
-    /// Returns Ok(()) if the state is successfully set or already correct.
+    #[deprecated(
+        note = "custom_mods/ is legacy; new local/imported mods live in the flat mods/ folder. Retained for back-compat toggling of existing custom_mods/ entries."
+    )]
+    #[allow(deprecated)]
     pub async fn set_custom_mod_enabled(
         &self,
         profile_id: Uuid,
@@ -2865,14 +2880,8 @@ impl ProfileManager {
         let versions_map_result =
             crate::integrations::modrinth::get_versions_by_hashes(hashes_to_check, "sha1").await;
 
-        // --- Process Results ---
-        // Use normal mods directory for direct file placement
         let profile = self.get_profile(profile_id).await?;
-        let mods_dir = if profile.loader == ModLoader::Fabric {
-            self.get_profile_mods_path(&profile)?
-        } else {
-            self.get_profile_custom_mods_path(profile_id).await?
-        };
+        let mods_dir = self.calculate_instance_path_for_profile(&profile)?.join("mods");
         // Ensure mods_dir exists ONCE
         fs::create_dir_all(&mods_dir)
             .await
@@ -2934,10 +2943,9 @@ impl ProfileManager {
                                 }
                             }
                         } else {
-                            // Log error, count it, and fallback
-                            error!("Modrinth version {} found for hash {}, but no primary file found. Falling back to custom mod import for profile {} - {:?}.", modrinth_version.id, hash, profile_id, src_path_buf.file_name().unwrap_or_default());
-                            error_count += 1; // Count as error because Modrinth add failed essentially
-                            path_utils::copy_as_custom_mod(
+                            error!("Modrinth version {} found for hash {}, but no primary file found. Falling back to local mod import for profile {} - {:?}.", modrinth_version.id, hash, profile_id, src_path_buf.file_name().unwrap_or_default());
+                            error_count += 1;
+                            path_utils::copy_local_mod(
                                 &src_path_buf,
                                 &mods_dir,
                                 profile_id,
@@ -2947,9 +2955,8 @@ impl ProfileManager {
                             .await;
                         }
                     } else {
-                        // Not found in Modrinth results -> Treat as custom mod
-                        log::info!("Mod {:?} (hash: {}) not found on Modrinth for profile {}. Importing as custom mod.", src_path_buf.file_name().unwrap_or_default(), hash, profile_id);
-                        path_utils::copy_as_custom_mod(
+                        log::info!("Mod {:?} (hash: {}) not found on Modrinth for profile {}. Importing as local mod.", src_path_buf.file_name().unwrap_or_default(), hash, profile_id);
+                        path_utils::copy_local_mod(
                             &src_path_buf,
                             &mods_dir,
                             profile_id,
@@ -2962,10 +2969,9 @@ impl ProfileManager {
             }
             Err(e) => {
                 log::error!("Failed to perform bulk hash lookup on Modrinth for profile {}: {}. Falling back to importing all as custom mods.", profile_id, e);
-                error_count += path_map.len() as u64; // Count all as errors for Modrinth lookup
-                                                      // Fallback: Try adding all as custom mods
+                error_count += path_map.len() as u64;
                 for (_hash, src_path_buf) in path_map {
-                    path_utils::copy_as_custom_mod(
+                    path_utils::copy_local_mod(
                         &src_path_buf,
                         &mods_dir,
                         profile_id,
@@ -3418,7 +3424,10 @@ impl ProfileManager {
         Ok(())
     }
 
-    /// Deletes a custom mod file (either .jar or .jar.disabled) from the profile's custom_mods directory.
+    #[deprecated(
+        note = "custom_mods/ is legacy; new local/imported mods live in the flat mods/ folder. Retained for back-compat deletion of existing custom_mods/ entries."
+    )]
+    #[allow(deprecated)]
     pub async fn delete_custom_mod_file(&self, profile_id: Uuid, filename: &str) -> Result<()> {
         info!(
             "Attempting to delete custom mod file '{}' for profile {}",

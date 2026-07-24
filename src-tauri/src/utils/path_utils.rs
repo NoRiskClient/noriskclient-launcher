@@ -111,47 +111,44 @@ pub async fn find_unique_profile_segment(
     }
 }
 
-/// Copies a source file to the custom_mods directory if it doesn't exist.
-/// Logs success, skips, or errors.
-pub async fn copy_as_custom_mod(
+/// Copies a source .jar into the given mods directory if it doesn't already exist.
+pub async fn copy_local_mod(
     src_path_buf: &PathBuf,
-    custom_mods_dir: &PathBuf,
-    profile_id: Uuid,             // Keep profile_id for logging context
-    custom_added_count: &mut u64, // Assuming usize or u64 is better here
-    skipped_count: &mut u64,      // Assuming usize or u64 is better here
+    mods_dir: &PathBuf,
+    profile_id: Uuid,
+    added_count: &mut u64,
+    skipped_count: &mut u64,
 ) {
-    // Check extension (optional, but good safeguard)
     if src_path_buf
         .extension()
         .map_or(false, |ext| ext.eq_ignore_ascii_case("jar"))
     {
         if let Some(filename) = src_path_buf.file_name() {
-            let dest_path = custom_mods_dir.join(filename);
+            let dest_path = mods_dir.join(filename);
 
             if dest_path.exists() {
-                warn!("Skipping custom import: File '{}' already exists in custom_mods for profile {}.", filename.to_string_lossy(), profile_id);
+                warn!("Skipping local mod import: File '{}' already exists in mods for profile {}.", filename.to_string_lossy(), profile_id);
                 *skipped_count += 1;
                 return;
             }
 
             match fs::copy(&src_path_buf, &dest_path).await {
-                // Use fs::copy directly
                 Ok(_) => {
                     info!(
-                        "Successfully imported '{}' as custom mod to profile {}.",
+                        "Successfully imported '{}' as local mod to profile {}.",
                         filename.to_string_lossy(),
                         profile_id
                     );
-                    *custom_added_count += 1;
+                    *added_count += 1;
                 }
                 Err(e) => {
                     error!(
-                        "Failed to copy file '{}' as custom mod for profile {}: {}",
+                        "Failed to copy file '{}' as local mod for profile {}: {}",
                         filename.to_string_lossy(),
                         profile_id,
                         e
                     );
-                    *skipped_count += 1; // Count as skipped due to error
+                    *skipped_count += 1;
                 }
             }
         } else {
@@ -160,7 +157,7 @@ pub async fn copy_as_custom_mod(
         }
     } else {
         warn!(
-            "Skipping custom import as it does not have a .jar extension: {:?}",
+            "Skipping local mod import as it does not have a .jar extension: {:?}",
             src_path_buf
         );
         *skipped_count += 1;

@@ -23,6 +23,7 @@ use sysinfo::System;
 // Import for profile image upload functionality
 use crate::commands::path_commands::UploadProfileImagesPayload;
 use crate::utils::serde_utils::deserialize_optional_u64_from_string;
+use crate::utils::download_utils::DownloadUtils;
 
 use crate::utils::string_utils::safe_truncate;
 
@@ -1369,6 +1370,109 @@ async fn read_manifest_from_zip(pack_path: &Path) -> Result<String> {
     Ok(content)
 }
 
+fn curseforge_content_subfolder(class_id: Option<u32>) -> Option<&'static str> {
+    match class_id {
+        Some(12) => Some("resourcepacks"),
+        Some(6552) => Some("shaderpacks"),
+        Some(6945) => Some("datapacks"),
+        _ => None,
+    }
+}
+
+pub async fn download_curseforge_content_files(
+    manifest: &CurseForgeManifest,
+    profile: &Profile,
+) -> Result<()> {
+    let state = crate::state::state_manager::State::get().await?;
+    let target_dir = state
+        .profile_manager
+        .calculate_instance_path_for_profile(profile)?;
+
+    let mut project_ids = Vec::new();
+    let mut file_mapping: HashMap<u32, u32> = HashMap::new();
+    for file_entry in &manifest.files {
+        if file_entry.required {
+            project_ids.push(file_entry.project_id);
+            file_mapping.insert(file_entry.project_id, file_entry.file_id);
+        }
+    }
+    if project_ids.is_empty() {
+        return Ok(());
+    }
+
+    let mods_response = get_mods_by_ids(project_ids, Some(true)).await?;
+
+    let content_mods: Vec<_> = mods_response
+        .data
+        .into_iter()
+        .filter_map(|m| curseforge_content_subfolder(m.classId).map(|folder| (m, folder)))
+        .collect();
+    if content_mods.is_empty() {
+        return Ok(());
+    }
+
+    let file_ids: Vec<u32> = content_mods
+        .iter()
+        .filter_map(|(m, _)| file_mapping.get(&m.id).copied())
+        .collect();
+    if file_ids.is_empty() {
+        return Ok(());
+    }
+
+    let file_details_list = get_files_by_ids(file_ids).await?;
+    let mut file_details_map: HashMap<u32, CurseForgeFile> = HashMap::new();
+    for file_detail in file_details_list {
+        file_details_map.insert(file_detail.id, file_detail);
+    }
+
+    for (content_mod, folder) in content_mods {
+        let Some(&file_id) = file_mapping.get(&content_mod.id) else {
+            continue;
+        };
+        let Some(file_details) = file_details_map.get(&file_id) else {
+            warn!(
+                "File details not found for CurseForge content '{}' (file {})",
+                content_mod.name, file_id
+            );
+            continue;
+        };
+
+        if file_details.downloadUrl.trim().is_empty() {
+            warn!(
+                "CurseForge content '{}' has no download URL (distribution disabled?). Skipping.",
+                content_mod.name
+            );
+            continue;
+        }
+
+        let sanitized_name = sanitize_filename::sanitize(&file_details.fileName);
+        if sanitized_name.is_empty() {
+            warn!("Skipping CurseForge content with empty file name: {}", content_mod.name);
+            continue;
+        }
+        let dest_path = target_dir.join(folder).join(&sanitized_name);
+
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent).await.map_err(AppError::Io)?;
+        }
+
+        info!(
+            "Downloading CurseForge {} '{}' -> {:?}",
+            folder, content_mod.name, dest_path
+        );
+        match file_details.hashes.iter().find(|h| h.algo == 1) {
+            Some(sha1) => {
+                DownloadUtils::download_with_sha1(&file_details.downloadUrl, &dest_path, &sha1.value).await?;
+            }
+            None => {
+                DownloadUtils::download_simple(&file_details.downloadUrl, &dest_path).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Resolves CurseForge manifest files against the CurseForge API to create Mod structs
 pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) -> Result<Vec<Mod>> {
     info!(
@@ -1435,6 +1539,15 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     // For each mod, get the specific file details from the bulk response
     for curseforge_mod in mods_response.data {
         let project_id = curseforge_mod.id;
+
+        if curseforge_content_subfolder(curseforge_mod.classId).is_some() {
+            debug!(
+                "Skipping non-mod CurseForge project '{}' (classId {:?}) in mod resolution",
+                curseforge_mod.name, curseforge_mod.classId
+            );
+            continue;
+        }
+
         let file_id = file_mapping.get(&project_id);
 
         if let Some(&file_id) = file_id {
@@ -1644,23 +1757,7 @@ pub async fn extract_curseforge_overrides(
                 continue;
             }
 
-            let final_dest_path = {
-                let relative_path_str = sanitized_relative_path.to_string_lossy();
-                // Check for both / and \ to be platform-agnostic for path separators within the string
-                if relative_path_str.starts_with("mods/") || relative_path_str.starts_with("mods\\")
-                {
-                    // Construct the new path by taking the part of the string *after* "mods"
-                    // e.g., if relative_path_str is "mods/foo.jar", then &relative_path_str["mods".len()..] is "/foo.jar"
-                    // We then prepend "custom_mods"
-                    let new_relative_path =
-                        format!("custom_mods{}", &relative_path_str["mods".len()..]);
-                    target_dir.join(new_relative_path)
-                } else {
-                    // If sanitized_relative_path is used again after this block, ensure it's cloned if needed.
-                    // Here, it seems it's only used for final_dest_path construction.
-                    target_dir.join(sanitized_relative_path)
-                }
-            };
+            let final_dest_path = target_dir.join(sanitized_relative_path);
 
             let task_pack_path = pack_path.to_path_buf();
             let task_io_semaphore = io_semaphore.clone();
@@ -1980,6 +2077,9 @@ pub async fn import_curseforge_pack_as_profile(
     let extraction_progress_scale = 0.45 * progress_scale; // 45% of the total scale for extraction
     extract_curseforge_overrides(&pack_path, &profile, &manifest, event_id, extraction_progress_offset, extraction_progress_scale).await?;
     info!("Successfully extracted overrides.");
+
+    download_curseforge_content_files(&manifest, &profile).await?;
+    info!("Successfully downloaded CurseForge manifest content files.");
 
     emit_progress(0.90, "Saving profile...".to_string()).await;
 

@@ -1015,6 +1015,7 @@ pub async fn update_modrinth_mod_version(
 // --- Custom Mod Commands ---
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, CommandError> {
     log::info!(
         "Received get_custom_mods command for profile {}",
@@ -1026,6 +1027,7 @@ pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, Com
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn set_custom_mod_enabled(
     profile_id: Uuid,
     filename: String,
@@ -1046,6 +1048,7 @@ pub async fn set_custom_mod_enabled(
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(), CommandError> {
     log::info!(
         "Received delete_custom_mod command for profile {}, file '{}'",

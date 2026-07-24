@@ -2243,16 +2243,7 @@ impl LocalContentLoader {
             }
             ContentType::ShaderPack => vec![shaderpack_utils::get_shaderpacks_dir(&profile).await?],
             ContentType::DataPack => vec![datapack_utils::get_datapacks_dir(&profile).await?],
-            ContentType::Mod => {
-                // Prefer standard mods directory first, then custom_mods
-                let instance_path = state
-                    .profile_manager
-                    .calculate_instance_path_for_profile(&profile)?;
-                vec![
-                    profile_mods_path.clone(),
-                    instance_path.join("custom_mods"),
-                ]
-            }
+            ContentType::Mod => state.profile_manager.mod_scan_dirs(&profile)?,
             ContentType::NoRiskMod => {
                 // For NoRisk mods, handled differently (no physical directory scan)
                 Vec::new()
