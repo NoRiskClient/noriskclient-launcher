@@ -10,7 +10,8 @@ use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
+    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
+    ProfileState,
 };
 use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
@@ -36,7 +37,6 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use sysinfo::System;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs as TokioFs;
@@ -862,6 +862,22 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
     Ok(profiles)
 }
 
+#[tauri::command]
+pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.list_profile_backups().await?)
+}
+
+#[tauri::command]
+pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state
+        .profile_manager
+        .restore_profile_backup(backup_path.into())
+        .await?;
+    Ok(())
+}
+
 /// Loads and returns the list of standard profiles from the local configuration file.
 #[tauri::command]
 pub async fn get_standard_profiles() -> Result<NoriskVersionsConfig, CommandError> {
@@ -998,6 +1014,7 @@ pub async fn update_modrinth_mod_version(
 // --- Custom Mod Commands ---
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, CommandError> {
     log::info!(
         "Received get_custom_mods command for profile {}",
@@ -1009,6 +1026,7 @@ pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, Com
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn set_custom_mod_enabled(
     profile_id: Uuid,
     filename: String,
@@ -1029,6 +1047,7 @@ pub async fn set_custom_mod_enabled(
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(), CommandError> {
     log::info!(
         "Received delete_custom_mod command for profile {}, file '{}'",
@@ -1060,14 +1079,7 @@ pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(),
 #[tauri::command]
 pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
     log::info!("Received command get_system_ram_mb");
-    // In a real application, you might want to manage the System instance
-    // in the global state to avoid recreating it, but for a one-off command,
-    // this is fine.
-    let mut sys = System::new_all();
-    sys.refresh_memory(); // Refresh memory information
-    let total_memory_bytes = sys.total_memory();
-    let total_memory_mb = total_memory_bytes / (1024 * 1024);
-    Ok(total_memory_mb)
+    Ok(crate::utils::system_info::total_ram_mb())
 }
 
 // --- New Command to open Profile Folder ---

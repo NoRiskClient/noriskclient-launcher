@@ -36,7 +36,7 @@ interface LaunchStateStore {
   finalizeButtonLaunch: (profileId: string, errorMsg?: string | null) => void;
 }
 
-const DEFAULT_PROFILE_STATE: ProfileLaunchState = {
+export const DEFAULT_PROFILE_STATE: ProfileLaunchState = {
   launchState: LaunchState.IDLE,
   currentStep: "",
   launchProgress: 0,

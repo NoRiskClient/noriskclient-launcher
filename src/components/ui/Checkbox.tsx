@@ -145,7 +145,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
           >
             {(checked || indeterminate) && (
               <Icon
-                icon={indeterminate ? "mingcute:minus-line" : "mingcute:check-line"}
+                icon={indeterminate ? "mdi:minus" : "mingcute:check-line"}
                 className={cn(
                   "text-white transition-all duration-200",
                   iconSizes[effectiveSize]
@@ -158,7 +158,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
           {(label || description) && (
             <div className="flex flex-col gap-1">
               {label && (                <label                  className={cn(
-                    "text-white font-minecraft cursor-pointer select-none lowercase",
+                    "text-white font-smallcaps cursor-pointer select-none",
                     getTextSizeClass((effectiveSize as ComponentSize) || "md", "checkbox"),
                     disabled && "opacity-50 cursor-not-allowed"
                   )}
@@ -183,7 +183,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
         {error && (
           <div
             id={`checkbox-error-${id || ""}`}            className={cn(
-              "text-red-400 font-minecraft ml-8 lowercase",
+              "text-red-400 font-smallcaps ml-8",
               getTextSizeClass("sm", "checkbox")
             )}
             role="alert"

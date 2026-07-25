@@ -19,8 +19,12 @@ import type {
   ModrinthGameVersion,
   ModrinthLoader,
   ModrinthSortType,
+  ModrinthTags,
   ModrinthVersion
 } from '../../../types/modrinth';
+import { useContentCacheStore } from '../../../store/content-cache-store';
+import { useDebounce } from '../../../hooks/useDebounce';
+import { traceMark } from '../../../utils/perf-trace';
 
 // Helper function to convert ModrinthProjectType to UnifiedProjectType
 const convertToUnifiedProjectType = (modrinthType: ModrinthProjectType): UnifiedProjectType => {
@@ -99,6 +103,7 @@ export interface ModrinthSearchV2Props {
   initialProjectType?: ModrinthProjectType; // Added new prop
   allowedProjectTypes?: ModrinthProjectType[]; // New prop for allowed project types
   disableVirtualization?: boolean; // New prop to disable Virtuoso and use infinite div scrolling
+  traceScope?: string; // Only the instance owning the scope emits perf marks
   /**
    * Override the default title-click navigation on each project card.
    * Used by the V3 Add-content sheet to render the mod detail as a stacked
@@ -132,6 +137,7 @@ export function ModrinthSearchV2({
   allowedProjectTypes, // Destructure new prop
   disableVirtualization = false, // Default to false (use Virtuoso by default)
   onProjectClick,
+  traceScope,
 }: ModrinthSearchV2Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -240,6 +246,8 @@ export function ModrinthSearchV2({
   // Internal state for profiles, synced with the prop
   const [internalProfiles, setInternalProfiles] = useState<Profile[]>(initialProfiles);
   const justInstalledOrToggledRef = useRef(false); // New ref to prevent re-check loops
+  const searchVersionRef = useRef(0);
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
   useEffect(() => {
     setInternalProfiles(initialProfiles);
@@ -260,16 +268,29 @@ export function ModrinthSearchV2({
     return selectedLoadersByProjectType[projectType] || [];
   }, [selectedLoadersByProjectType, projectType]);
 
-  // Fetch filter data on mount
   useEffect(() => {
-    const fetchFilterData = async () => {
-      try {
-        setAllCategoriesData(await ModrinthService.getModrinthCategories());
-        setGameVersionsData(await ModrinthService.getModrinthGameVersions());
-        setAllLoadersData(await ModrinthService.getModrinthLoaders());
-      } catch (err) { console.error("Failed to load filter data:", err); }
+    traceMark(traceScope, 'search: component mounted');
+
+    const applyTags = (tags: ModrinthTags) => {
+      setAllCategoriesData(tags.categories);
+      setGameVersionsData(tags.game_versions);
+      setAllLoadersData(tags.loaders);
     };
-    fetchFilterData();
+
+    const cached = useContentCacheStore.getState().modrinthTags;
+    if (cached) {
+      traceMark(traceScope, 'tags: from in-session store (no IPC)');
+      applyTags(cached);
+      return;
+    }
+
+    ModrinthService.getModrinthTags()
+      .then((tags) => {
+        traceMark(traceScope, 'tags: received from backend');
+        useContentCacheStore.getState().setModrinthTags(tags);
+        applyTags(tags);
+      })
+      .catch((err) => console.error("Failed to load filter data:", err));
   }, []);
 
   // Load blocked mods config on mount (cached from nrc-service if already loaded)
@@ -353,6 +374,9 @@ export function ModrinthSearchV2({
   }, [allCategoriesData, projectType]);
 
   const performSearch = useCallback(async (newSearch = false) => {
+    const version = ++searchVersionRef.current;
+    const isStale = () => version !== searchVersionRef.current;
+
     console.log('[ModrinthSearchV2] performSearch ENTRY:', {
       newSearch,
       projectType,
@@ -397,6 +421,7 @@ export function ModrinthSearchV2({
     }
 
     try {
+      traceMark(traceScope, `search: firing request (source=${modSource})`);
       const response: UnifiedModSearchResponse = await UnifiedService.searchMods({
         query: searchTerm,
         source: modSource,
@@ -410,6 +435,9 @@ export function ModrinthSearchV2({
         client_side_filter: filterClientRequired ? "required" : undefined,
         server_side_filter: filterServerRequired ? "required" : undefined
       });
+      traceMark(traceScope, `search: ${response.results.length} hits returned`);
+      if (isStale()) return;
+
       setSearchResults(prevResults => newSearch ? response.results : [...prevResults, ...response.results]);
       setTotalHits(response.pagination.total_count);
       if (!newSearch) {
@@ -418,6 +446,8 @@ export function ModrinthSearchV2({
         setOffset(response.results.length);
       }
     } catch (err) {
+      if (isStale()) return;
+
       console.error("Failed to search Modrinth projects:", err);
       setError(`${err.message}`);
       if (newSearch) {
@@ -426,13 +456,15 @@ export function ModrinthSearchV2({
         setOffset(0);
       }
     } finally {
-      setLoading(false);
-      
-      // Set up delayed "No results found" message only for new searches
-      if (newSearch) {
-        noResultsTimeoutRef.current = setTimeout(() => {
-          setShowNoResultsMessage(true);
-        }, 250); // Show message after 1.5 seconds
+      if (!isStale()) {
+        setLoading(false);
+
+        // Set up delayed "No results found" message only for new searches
+        if (newSearch) {
+          noResultsTimeoutRef.current = setTimeout(() => {
+            setShowNoResultsMessage(true);
+          }, 250); // Show message after 1.5 seconds
+        }
       }
     }
   }, [
@@ -445,10 +477,19 @@ export function ModrinthSearchV2({
   const isInitialMount = useRef(true);
   const restoredScrollTop = useRef(searchResults.length > 0 ? scrollPosition : 0);
 
+  const paintedRef = useRef(false);
+  useEffect(() => {
+    if (!paintedRef.current && searchResults.length > 0) {
+      paintedRef.current = true;
+      traceMark(traceScope, `PAINTED ${searchResults.length} results`);
+    }
+  }, [searchResults]);
+
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       if (searchResults.length > 0) {
+        traceMark(traceScope, 'search: restored from session store, no fetch');
         console.log('[ModrinthSearchV2] Restoring cached results from store, skipping initial fetch.');
         if (disableVirtualization && searchResultsAreaRef.current && scrollPosition > 0) {
           requestAnimationFrame(() => {
@@ -483,7 +524,7 @@ export function ModrinthSearchV2({
 
     performSearch(true);
   }, [
-    searchTerm, projectType, sortOrder, modSource,
+    debouncedSearchTerm, projectType, sortOrder, modSource,
     currentSelectedCategories, selectedGameVersions, currentSelectedLoaders,
     filterClientRequired, filterServerRequired
   ]);
@@ -2016,15 +2057,17 @@ export function ModrinthSearchV2({
       }));
 
       try {
+        traceMark(traceScope, `install-check: batch of ${requests.length}`);
         // Use batch check instead of individual checks
         const batchResults = await ProfileService.batchCheckContentInstalled({
           profile_id: selectedProfile.id,
           requests
         });
+        traceMark(traceScope, 'install-check: done');
 
         // Process results into the same state format
         const newInstalledState: Record<string, ContentInstallStatus | null> = {};
-        
+
         batchResults.results.forEach(result => {
           if (result.request_id) {
             newInstalledState[result.request_id] = result.status;
@@ -3288,7 +3331,7 @@ export function ModrinthSearchV2({
             <p className="p-4 text-red-500 text-center">{t('content.search.error', { error })}</p>
           )}
           {searchResults.length === 0 && !loading && !error && showNoResultsMessage && (
-            <p className="p-4 text-center text-xl lowercase text-gray-400">{t('content.search.no_results')}</p>
+            <p className="p-4 text-center text-sm text-gray-400">{t('content.search.no_results')}</p>
           )}
 
           {searchResults.length > 0 && (
@@ -3354,7 +3397,7 @@ export function ModrinthSearchV2({
                   <div className="flex justify-center p-4">
                     <button
                       onClick={loadMoreResults}
-                      className="px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                      className="px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                     >
                       {t('content.search.load_more', { remaining: totalHits - searchResults.length })}
                     </button>
@@ -3370,7 +3413,7 @@ export function ModrinthSearchV2({
 
                 {/* End of results */}
                 {!loading && searchResults.length > 0 && searchResults.length >= totalHits && (
-                  <div className="p-4 text-center text-xl text-gray-400">
+                  <div className="p-4 text-center text-sm text-gray-400">
                     {t('content.search.no_more_results')}
                   </div>
                 )}
@@ -3452,7 +3495,7 @@ export function ModrinthSearchV2({
                     }
                     if (!loading && searchResults.length > 0 && searchResults.length >= totalHits) {
                        return (
-                        <div className="p-4 text-center text-xl lowercase text-gray-400">
+                        <div className="p-4 text-center text-sm text-gray-400">
                           {t('content.search.no_more_results')}
                         </div>
                       );

@@ -24,6 +24,7 @@ import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
+import { useLaunchStateStore } from "./store/launch-state-store";
 import { useGlobalModal } from "./hooks/useGlobalModal";
 import { Modal } from "./components/ui/Modal";
 import { refreshNrcDataOnMount } from "./services/nrc-service";
@@ -49,6 +50,7 @@ import ChildProtectionModal from "./components/modals/ChildProtectionModal";
 import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
+import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
 import { hasPermission, refreshPermissions } from "./services/permission-service";
 import {
@@ -149,6 +151,20 @@ export function App() {
             useSkinStore.getState().bumpSkinRevision();
             return;
           }
+          if (event.payload.event_type === FrontendEventType.OfflineMode) {
+            console.log("[App.tsx] Global OfflineMode event");
+            const anyLaunching = Object.values(
+              useLaunchStateStore.getState().profiles,
+            ).some((p) => p.isButtonLaunching);
+            if (anyLaunching) {
+              toast(t('app.offline_mode'), {
+                id: 'offline-mode',
+                duration: 8000,
+                icon: '📡',
+              });
+            }
+            return;
+          }
           if (
               event.payload.event_type === FrontendEventType.MinecraftProcessExited
           ) {
@@ -247,7 +263,7 @@ export function App() {
               </div>
             }
           >
-            <div className="p-6 text-white/80 font-minecraft-ten">
+            <div className="p-6 text-white/80 font-minecraft">
               <p>{t("deep_link.auth.description", { username })}</p>
             </div>
           </Modal>,
@@ -512,6 +528,14 @@ export function App() {
   }, [incrementLaunchCount]);
 
   const handleNavChange = async (tabId: string) => {
+    if (tabId === "settings") {
+      useSettingsModalStore.getState().open();
+      if (analyticsConsent.decision === 'accepted') {
+        trackEvent('sidebar_tab_clicked', { tab_name: 'settings' }).catch(console.error);
+      }
+      return;
+    }
+
     navigate(`/${tabId}`);
 
     // Track tab clicked only if analytics are enabled

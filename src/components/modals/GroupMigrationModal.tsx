@@ -40,7 +40,7 @@ export function GroupMigrationModal({
       width="md"
     >
       <div className="p-6">
-        <p className="text-white/80 mb-6 text-center font-minecraft-ten">
+        <p className="text-white/80 mb-6 text-center font-minecraft">
           {t('group_migration.description')}
         </p>
 

@@ -24,6 +24,7 @@ import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
+import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
@@ -38,6 +39,7 @@ import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/n
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
+import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
 import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
@@ -67,7 +69,9 @@ export function AppLayout({
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
-  const { currentEffect } = useBackgroundEffectStore();
+  const { currentEffect, customMediaUrl, customMediaOnlyOnPlay, customMediaHideEffects } = useBackgroundEffectStore();
+  const isCustomMediaVisible = Boolean(customMediaUrl) && (!customMediaOnlyOnPlay || activeTab === 'play');
+  const shouldShowEffects = !(isCustomMediaVisible && customMediaHideEffects);
 
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
@@ -77,7 +81,7 @@ export function AppLayout({
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
-    { id: "settings", icon: "solar:settings-bold", label: t("nav.settings") },
+    { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
@@ -127,6 +131,11 @@ export function AppLayout({
     const finalB = Math.min(darkB, 30);
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
+  };
+
+  const getComplementaryBackgroundWithAlpha = (alpha: number) => {
+    const rgb = getComplementaryBackground();
+    return rgb.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
   };
 
   const backgroundColor = getComplementaryBackground();
@@ -319,7 +328,9 @@ export function AppLayout({
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundImage: `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
+        backgroundImage: isCustomMediaVisible 
+          ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
+          : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         borderColor: `${themeAccentColor.value}30`,
         boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
       }}
@@ -342,9 +353,10 @@ export function AppLayout({
         />
 
         <div className="flex-1 relative overflow-hidden">
-          {renderBackgroundEffect()}
+          <CustomMediaBackground activeTab={activeTab} />
+          {shouldShowEffects && renderBackgroundEffect()}
           {/* Snow overlay - independent of theme/background */}
-          {isSnowEnabled && <Snowfall />}
+          {shouldShowEffects && isSnowEnabled && <Snowfall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
             {children}
@@ -355,6 +367,7 @@ export function AppLayout({
       <SocialsModal />
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
+      <SettingsModal />
       <ProfileDuplicateModal />
       <FriendsSidebar />
     </div>
@@ -508,18 +521,18 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       <div className="flex items-center gap-4" data-tauri-drag-region>
         <NavigationHistory />
 
-        <div className="flex flex-col items-start -mt-2.5">
+        <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
             <h1
-              className="font-minecraft text-4xl tracking-wider font-bold lowercase text-shadow"
+              className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
-              noriskclient
+              NoRiskClient
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
                 <div
-                  className={`mt-2.5 ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                   onClick={handleUpdateClick}
                 >
                   <Icon

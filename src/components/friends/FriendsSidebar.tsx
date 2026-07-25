@@ -127,7 +127,7 @@ export function FriendsSidebar() {
                 >
                   <Icon icon="solar:settings-bold" className="w-5 h-5" style={{ color: accentColor.value }} />
                 </button>
-                <h2 className="text-lg font-bold text-white font-minecraft-ten uppercase tracking-wide">
+                <h2 className="text-lg font-bold text-white font-minecraft uppercase tracking-wide">
                   {t('friends.title')}
                 </h2>
               </div>
@@ -176,7 +176,7 @@ export function FriendsSidebar() {
               <button
                 onClick={() => setActiveTab("friends")}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-minecraft-ten transition-all duration-200"
+                  "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-minecraft transition-all duration-200"
                 )}
                 style={{
                   backgroundColor: activeTab === "friends" ? `${accentColor.value}40` : "transparent",
@@ -190,7 +190,7 @@ export function FriendsSidebar() {
               <button
                 onClick={() => setActiveTab("requests")}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-minecraft-ten transition-all duration-200"
+                  "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-minecraft transition-all duration-200"
                 )}
                 style={{
                   backgroundColor: activeTab === "requests" ? `${accentColor.value}40` : "transparent",
@@ -202,7 +202,7 @@ export function FriendsSidebar() {
                 {t('friends.tab_requests')}
                 {incomingRequests.length > 0 && (
                   <span
-                    className="text-xs font-minecraft-ten"
+                    className="text-xs font-minecraft"
                     style={{ color: accentColor.value }}
                   >
                     {incomingRequests.length > 99 ? "99+" : incomingRequests.length}
@@ -225,7 +225,7 @@ export function FriendsSidebar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('friends.search_placeholder')}
-                  className="flex-1 bg-transparent text-white text-sm font-minecraft-ten placeholder:text-white/30 focus:outline-none"
+                  className="flex-1 bg-transparent text-white text-sm font-minecraft placeholder:text-white/30 focus:outline-none"
                 />
               </div>
             )}
@@ -308,8 +308,8 @@ function FriendsTab({
         >
           <Icon icon="solar:users-group-rounded-bold" className="w-8 h-8" style={{ color: accentColor }} />
         </div>
-        <p className="text-white/50 text-xs font-minecraft-ten">{t('friends.no_friends_title')}</p>
-        <p className="text-white/30 text-xl mt-1 font-minecraft">{t('friends.no_friends_desc')}</p>
+        <p className="text-white/50 text-xs font-minecraft">{t('friends.no_friends_title')}</p>
+        <p className="text-white/30 text-sm mt-1 font-smallcaps">{t('friends.no_friends_desc')}</p>
       </div>
     );
   }
@@ -333,7 +333,7 @@ function FriendsTab({
                 }}
               />
               <span className={cn(
-                "text-xs font-bold uppercase tracking-wider font-minecraft-ten",
+                "text-xs font-bold uppercase tracking-wider font-minecraft",
                 isOnline ? "text-white/70" : "text-white/40"
               )}>
                 {isOnline ? t('friends.online') : t('friends.offline')} — {row.count}
@@ -365,7 +365,7 @@ function RequestsTab({
   return (
     <>
       <div className="p-4 border-b border-white/10">
-        <div className="text-xs font-medium text-white/40 mb-3 font-minecraft-ten uppercase tracking-wider">
+        <div className="text-xs font-medium text-white/40 mb-3 font-minecraft uppercase tracking-wider">
           {t('friends.add_friend')}
         </div>
         <AddFriendInput />
@@ -374,7 +374,7 @@ function RequestsTab({
       {incomingRequests.length > 0 && (
         <div className="mt-2">
           <div
-            className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider font-minecraft-ten flex items-center gap-2"
+            className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider font-minecraft flex items-center gap-2"
             style={{ color: "#22c55e" }}
           >
             <Icon icon="solar:inbox-in-bold" className="w-4 h-4" />
@@ -391,7 +391,7 @@ function RequestsTab({
       {outgoingRequests.length > 0 && (
         <div className="mt-3">
           <div
-            className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider font-minecraft-ten flex items-center gap-2"
+            className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider font-minecraft flex items-center gap-2"
             style={{ color: "rgba(255, 255, 255, 0.5)" }}
           >
             <Icon icon="solar:inbox-out-bold" className="w-4 h-4" />
@@ -413,8 +413,8 @@ function RequestsTab({
           >
             <Icon icon="solar:letter-linear" className="w-7 h-7" style={{ color: accentColor }} />
           </div>
-          <p className="text-white/50 text-xs font-minecraft-ten">{t('friends.no_requests_title')}</p>
-          <p className="text-white/30 text-xl mt-1 font-minecraft">{t('friends.no_requests_desc')}</p>
+          <p className="text-white/50 text-xs font-minecraft">{t('friends.no_requests_title')}</p>
+          <p className="text-white/30 text-sm mt-1 font-smallcaps">{t('friends.no_requests_desc')}</p>
         </div>
       )}
     </>

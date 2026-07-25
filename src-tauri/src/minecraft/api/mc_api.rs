@@ -1,11 +1,12 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
+use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, TexturesData};
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{self, Value};
 use sha1::{Digest, Sha1};
 use std::fs;
@@ -61,7 +62,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize manifest: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Minecraft manifest cache: {}", e);
         } else {
             debug!("Cached Minecraft version manifest: {:?}", cache_path);
@@ -131,7 +132,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize piston meta: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Piston Meta cache: {}", e);
         } else {
             debug!("Cached Piston Meta: {:?}", cache_path);
@@ -218,6 +219,37 @@ impl MinecraftApiService {
 
         debug!("API call completed: get_user_profile");
         Ok(profile)
+    }
+
+    pub async fn resolve_uuid(&self, identifier: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(identifier) {
+            return Ok(uuid);
+        }
+        let profile = self.get_profile_by_name_or_uuid(identifier).await?;
+        Uuid::parse_str(&profile.id).map_err(|_| {
+            AppError::InvalidInput(format!(
+                "Could not resolve player '{}' to a valid UUID.",
+                identifier
+            ))
+        })
+    }
+
+    /// Resolve a player's current skin texture URL via their Mojang profile
+    /// (https-normalized). `None` when the player or skin can't be resolved.
+    pub async fn skin_url_by_name(&self, name: &str) -> Option<String> {
+        if name.is_empty() {
+            return None;
+        }
+        let profile = self.get_profile_by_name_or_uuid(name).await.ok()?;
+        let textures_prop = profile.properties.iter().find(|p| p.name == "textures")?;
+        let decoded = base64::decode(&textures_prop.value).ok()?;
+        let textures: TexturesData = serde_json::from_slice(&decoded).ok()?;
+        let url = textures.textures.SKIN?.url;
+        Some(if let Some(stripped) = url.strip_prefix("http:") {
+            format!("https:{}", stripped)
+        } else {
+            url
+        })
     }
 
     pub async fn get_profile_by_name_or_uuid(
@@ -329,7 +361,7 @@ impl MinecraftApiService {
             .unwrap_or("skin.png");
         debug!("Using filename: {}", filename);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -391,7 +423,7 @@ impl MinecraftApiService {
         let url = format!("{}/user/profile/{}/skin", MOJANG_API_URL, uuid);
         debug!("Request URL: {}", url);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending skin reset request to Minecraft API");
 
         let response_result = client
@@ -459,7 +491,7 @@ impl MinecraftApiService {
             }
         };
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -537,7 +569,7 @@ impl MinecraftApiService {
 
         debug!("Join request - selected_profile: {}, server_id: {}", selected_profile, server_id);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending join server request to Minecraft Session API");
 
         let response_result = client

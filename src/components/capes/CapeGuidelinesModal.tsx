@@ -39,15 +39,15 @@ export function CapeGuidelinesModal({ onAccept, onClose }: CapeGuidelinesModalPr
     >
       <div className="p-6 space-y-6 text-white">
         <div className="text-center space-y-4">
-          <h3 className="text-3xl font-minecraft text-yellow-400 lowercase">
+          <h3 className="text-lg font-smallcaps text-yellow-400">
             Before you upload
           </h3>
-          <p className="text-lg font-minecraft-ten text-gray-300">
+          <p className="text-lg font-minecraft text-gray-300">
             Please read and accept the following guidelines for custom capes.
           </p>
         </div>
 
-        <div className="space-y-4 text-base font-minecraft-ten text-gray-200 p-4 bg-black/30 rounded border border-gray-600">
+        <div className="space-y-4 text-base font-minecraft text-gray-200 p-4 bg-black/30 rounded border border-gray-600">
           <ul className="space-y-3 list-disc list-inside text-sm">
             <li>
               No copyrighted content (e.g. capes from other clients, Nintendo-related content, etc.)

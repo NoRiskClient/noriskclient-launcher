@@ -2,6 +2,7 @@ import type {
   CurseForgeModsResponse,
   GetModsByIdsRequestBody,
 } from "../types/curseforge";
+import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 
 export class CurseForgeService {
@@ -14,10 +15,12 @@ export class CurseForgeService {
   static async getModsByIds(
     modIds: number[],
     filterPcOnly?: boolean,
+    cacheBehaviour?: CacheBehaviour,
   ): Promise<CurseForgeModsResponse> {
     return invoke<CurseForgeModsResponse>("get_curseforge_mods_by_ids", {
       modIds,
       filterPcOnly,
+      cacheBehaviour,
     });
   }
 

@@ -3,6 +3,7 @@ use crate::state::process_state::ProcessMetadata;
 use dashmap::DashMap;
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
 use uuid::Uuid;
@@ -46,6 +47,7 @@ pub enum EventType {
     StarlightSkinUpdated,
     MinecraftSkinChanged,
     Error,
+    OfflineMode,
     LaunchSuccessful,
     CrashReportContentAvailable,
     MigrationStarted,
@@ -173,3 +175,42 @@ impl EventState {
             .collect()
     }
 }
+
+pub struct ProgressThrottle {
+    last_ms: AtomicU64,
+    interval_ms: u64,
+}
+
+impl ProgressThrottle {
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            last_ms: AtomicU64::new(0),
+            interval_ms,
+        }
+    }
+
+    pub fn should_emit(&self) -> bool {
+        self.should_emit_at(now_ms())
+    }
+
+    pub fn should_emit_at(&self, now_ms: u64) -> bool {
+        let last = self.last_ms.load(Ordering::Relaxed);
+        if now_ms.saturating_sub(last) < self.interval_ms {
+            return false;
+        }
+        self.last_ms
+            .compare_exchange(last, now_ms, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+    }
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+#[path = "event_state_test.rs"]
+mod tests;

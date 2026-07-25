@@ -9,6 +9,15 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
 
+  resolve: {
+    alias: [
+      {
+        find: /^@iconify\/react$/,
+        replacement: resolve(__dirname, "src/lib/iconify.tsx"),
+      },
+    ],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent vite from obscuring rust errors
@@ -37,7 +46,8 @@ export default defineConfig(async () => ({
         updater: resolve(__dirname, 'updater.html'),
         minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
         singleLogWindow: resolve(__dirname, 'single-log-window.html'),
-        testerWindow: resolve(__dirname, 'tester-window.html')
+        testerWindow: resolve(__dirname, 'tester-window.html'),
+        applixirWindow: resolve(__dirname, 'applixir-window.html')
       }
     }
   }

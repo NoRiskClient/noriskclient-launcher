@@ -1,15 +1,15 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth;
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::content_cache_state::CacheBehaviour;
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::{
     Mod, ModLoader, ModSource, ModPackInfo, ModPackSource, Profile, ProfileSettings, ProfileState,
 };
 use crate::state::state_manager::State;
+use crate::utils::download_utils::DownloadUtils;
 use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
-use reqwest::Client;
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,7 +18,6 @@ use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -230,9 +229,101 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
     Ok((profile, manifest))
 }
 
-/// Takes a parsed ModrinthIndex manifest and resolves the file entries
-/// against the Modrinth API (using hashes) to create a list of Mod structs.
-/// Determines the pack loader from the manifest dependencies.
+fn is_manifest_mod_path(path: &str) -> bool {
+    let norm = path.replace('\\', "/");
+    let trimmed = norm.trim_start_matches("./");
+    trimmed.starts_with("mods/")
+}
+
+fn sanitize_manifest_relative_path(path: &str) -> Option<PathBuf> {
+    let sanitized = PathBuf::from(path.replace('\\', "/"))
+        .components()
+        .filter_map(|comp| match comp {
+            std::path::Component::Normal(os_str) => {
+                let s = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            }
+            _ => None,
+        })
+        .collect::<PathBuf>();
+    if sanitized.as_os_str().is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
+pub async fn download_manifest_content_files(
+    manifest: &ModrinthIndex,
+    profile: &Profile,
+) -> Result<()> {
+    let state = State::get().await?;
+    let target_dir = state
+        .profile_manager
+        .calculate_instance_path_for_profile(profile)?;
+
+    for file_data in &manifest.files {
+        let is_client_required = file_data
+            .env
+            .as_ref()
+            .and_then(|env| env.get("client"))
+            .map_or(true, |req| req == "required" || req == "optional");
+        if !is_client_required {
+            continue;
+        }
+
+        if is_manifest_mod_path(&file_data.path) {
+            continue;
+        }
+
+        let sanitized_relative_path = match sanitize_manifest_relative_path(&file_data.path) {
+            Some(p) => p,
+            None => {
+                warn!(
+                    "Skipping manifest content file with unsafe/empty path: {}",
+                    file_data.path
+                );
+                continue;
+            }
+        };
+        let dest_path = target_dir.join(&sanitized_relative_path);
+
+        let url = match file_data.downloads.first() {
+            Some(u) => u,
+            None => {
+                warn!(
+                    "Manifest content file '{}' has no download URL. Skipping.",
+                    file_data.path
+                );
+                continue;
+            }
+        };
+
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent).await.map_err(AppError::Io)?;
+        }
+
+        info!(
+            "Downloading manifest content file '{}' -> {:?}",
+            file_data.path, dest_path
+        );
+        match file_data.hashes.get("sha1") {
+            Some(sha1) if sha1.len() == 40 => {
+                DownloadUtils::download_with_sha1(url, &dest_path, sha1).await?;
+            }
+            _ => {
+                DownloadUtils::download_simple(url, &dest_path).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>> {
     // Determine loader internally using the helper function
     let (pack_loader, _) = determine_loader_from_dependencies(&manifest.dependencies);
@@ -271,6 +362,14 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             continue;
         }
 
+        if !is_manifest_mod_path(&file_data.path) {
+            debug!(
+                "Skipping non-mod manifest file in mod resolution: {}",
+                file_data.path
+            );
+            continue;
+        }
+
         if let Some(hash) = file_data.hashes.get("sha1") {
             if hash.len() == 40 {
                 hashes_to_lookup.push(hash.clone());
@@ -296,17 +395,25 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
         "Looking up Modrinth info for {} sha1 hashes...",
         hashes_to_lookup.len()
     );
-    let versions_map =
-        match modrinth::get_versions_by_hashes(hashes_to_lookup.clone(), "sha1").await {
-            Ok(map) => map,
-            Err(e) => {
-                error!("Failed to get version info by hashes: {}", e);
-                return Err(e);
-            }
-        };
-    info!("Received Modrinth info for {} hashes.", versions_map.len());
+    let state = State::get().await?;
+    let versions_map = match state
+        .content_cache
+        .get_modrinth_versions_by_hashes(hashes_to_lookup.clone(), CacheBehaviour::StaleWhileRevalidate)
+        .await
+    {
+        Ok(map) => map,
+        Err(e) => {
+            error!("Failed to get version info by hashes: {}", e);
+            return Err(e);
+        }
+    };
+    info!(
+        "[cache-warm] mrpack install resolved {} modrinth versions through the cache",
+        versions_map.len()
+    );
 
     // 3. Create Mod structs from the results
+    let resolved: std::collections::HashSet<String> = versions_map.keys().cloned().collect();
     for (hash, version_info) in versions_map {
         if let Some(original_file_info) = file_info_map.get(&hash) {
             let primary_file = version_info
@@ -367,9 +474,73 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
         }
     }
 
+    let mut from_manifest = 0;
+    for (hash, file_info) in &file_info_map {
+        if resolved.contains(hash) {
+            continue;
+        }
+        let Some(url) = file_info.downloads.first().cloned() else {
+            warn!(
+                "Manifest file {} is unknown to the API and lists no download URL. Skipping.",
+                file_info.path
+            );
+            continue;
+        };
+
+        let file_name = std::path::Path::new(&file_info.path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| file_info.path.clone());
+
+        if !crate::integrations::modrinth::is_whitelisted_modpack_url(&url) {
+            warn!(
+                "Manifest file {} downloads from {}, which is not a host Modrinth allows for \
+                 modpacks. Skipping.",
+                file_info.path, url
+            );
+            continue;
+        }
+
+        warn!(
+            "Manifest file {} is unknown to the Modrinth API (delisted?); installing it from the \
+             manifest instead.",
+            file_info.path
+        );
+
+        let source = match crate::integrations::modrinth::ids_from_cdn_url(&url) {
+            Some((project_id, version_id)) => ModSource::Modrinth {
+                project_id,
+                version_id,
+                file_name: file_name.clone(),
+                download_url: url,
+                file_hash_sha1: Some(hash.clone()),
+            },
+            None => ModSource::Url {
+                url,
+                file_name: Some(file_name.clone()),
+            },
+        };
+
+        mods_to_add.push(Mod {
+            id: Uuid::new_v4(),
+            source,
+            enabled: !file_info.path.ends_with(".disabled"),
+            display_name: Some(file_name),
+            version: None,
+            game_versions: Some(vec![game_version.clone()]),
+            file_name_override: None,
+            associated_loader: Some(pack_loader),
+            modpack_origin: Some("modrinth:manifest".to_string()),
+            updates_enabled: false,
+            force_include_versions: Vec::new(),
+        });
+        from_manifest += 1;
+    }
+
     info!(
-        "Successfully resolved {} mods from the manifest.",
-        mods_to_add.len()
+        "Successfully resolved {} mods from the manifest ({} straight from manifest URLs).",
+        mods_to_add.len(),
+        from_manifest
     );
     Ok(mods_to_add)
 }
@@ -445,6 +616,7 @@ pub async fn extract_mrpack_overrides(
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let extraction_throttle = std::sync::Arc::new(ProgressThrottle::new(100));
     let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
@@ -525,23 +697,7 @@ pub async fn extract_mrpack_overrides(
                 continue;
             }
 
-            let final_dest_path = {
-                let relative_path_str = sanitized_relative_path.to_string_lossy();
-                // Check for both / and \ to be platform-agnostic for path separators within the string
-                if relative_path_str.starts_with("mods/") || relative_path_str.starts_with("mods\\")
-                {
-                    // Construct the new path by taking the part of the string *after* "mods"
-                    // e.g., if relative_path_str is "mods/foo.jar", then &relative_path_str["mods".len()..] is "/foo.jar"
-                    // We then prepend "custom_mods"
-                    let new_relative_path =
-                        format!("custom_mods{}", &relative_path_str["mods".len()..]);
-                    target_dir.join(new_relative_path)
-                } else {
-                    // If sanitized_relative_path is used again after this block, ensure it's cloned if needed.
-                    // Here, it seems it's only used for final_dest_path construction.
-                    target_dir.join(sanitized_relative_path)
-                }
-            };
+            let final_dest_path = target_dir.join(sanitized_relative_path);
 
             let task_pack_path = pack_path.to_path_buf();
             let task_io_semaphore = io_semaphore.clone();
@@ -587,6 +743,7 @@ pub async fn extract_mrpack_overrides(
                 );
 
                 let task_counter = extraction_counter.clone();
+                let task_throttle = extraction_throttle.clone();
                 let task_total = total_files;
                 let task_state = state.clone();
                 let task_event_id = event_id;
@@ -688,7 +845,7 @@ pub async fn extract_mrpack_overrides(
 
                     // Increment counter and emit progress
                     let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    if task_total > 0 {
+                    if task_total > 0 && task_throttle.should_emit() {
                         // Scale progress within the provided range
                         let extraction_progress = completed as f64 / task_total as f64;
                         let overall_progress = task_progress_offset + (extraction_progress * task_progress_scale);
@@ -944,6 +1101,9 @@ pub async fn import_mrpack_as_profile(
     extract_mrpack_overrides(&pack_path, &profile, event_id, extraction_progress_offset, extraction_progress_scale).await?;
     info!("Successfully extracted overrides.");
 
+    download_manifest_content_files(&manifest, &profile).await?;
+    info!("Successfully downloaded manifest content files.");
+
     emit_progress(0.90, "Saving profile...".to_string()).await;
 
     // 5. Save the profile using ProfileManager via State
@@ -1008,19 +1168,11 @@ pub async fn download_and_process_mrpack(
         temp_file_path
     );
 
-    // Create HTTP client
-    let client = Client::new();
+    let client = &*crate::config::HTTP_CLIENT;
 
     // Download the file
     let response = client
         .get(download_url)
-        .header(
-            "User-Agent",
-            format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            ),
-        )
         .send()
         .await
         .map_err(|e| {

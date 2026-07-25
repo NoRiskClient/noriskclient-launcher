@@ -11,9 +11,11 @@ export function useProcessLogCursor(
   useEffect(() => {
     if (!sessionId || !processId) return;
     let cancelled = false;
+    let isPolling = false;
 
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || isPolling) return;
+      isPolling = true;
       const store = useProcessStore.getState();
       const cursor = store.cursors.get(processId) ?? 0;
       try {
@@ -34,6 +36,8 @@ export function useProcessLogCursor(
         useProcessStore.getState().setCursor(processId, res.cursor);
       } catch (e) {
         console.error("[useProcessLogCursor] poll failed:", e);
+      } finally {
+        isPolling = false;
       }
     };
 

@@ -67,6 +67,7 @@ pub async fn get_resourcepacks_for_profile(
         content_type: ContentType::ResourcePack,
         calculate_hashes,
         fetch_modrinth_data,
+        cache_behaviour: Default::default(),
     };
 
     // Call load_items directly
