@@ -26,21 +26,23 @@ pub async fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) 
     let path = path.as_ref().to_path_buf();
     let contents = contents.as_ref().to_vec();
 
+    tokio::task::spawn_blocking(move || write_atomic_sync(&path, &contents))
+        .await
+        .map_err(|e| AppError::Other(format!("Atomic write task failed: {e}")))?
+}
+
+pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     // A bare filename has a parent of Some("") — the temp file still belongs next to it
     let dir = match path.parent() {
         Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
         _ => std::path::PathBuf::from("."),
     };
 
-    tokio::task::spawn_blocking(move || -> Result<()> {
-        let mut tmp = tempfile::NamedTempFile::new_in(&dir).map_err(AppError::Io)?;
-        tmp.write_all(&contents).map_err(AppError::Io)?;
-        tmp.as_file().sync_all().map_err(AppError::Io)?;
-        tmp.persist(&path).map_err(|e| AppError::Io(e.error))?;
-        Ok(())
-    })
-    .await
-    .map_err(|e| AppError::Other(format!("Atomic write task failed: {e}")))?
+    let mut tmp = tempfile::NamedTempFile::new_in(&dir).map_err(AppError::Io)?;
+    tmp.write_all(contents).map_err(AppError::Io)?;
+    tmp.as_file().sync_all().map_err(AppError::Io)?;
+    tmp.persist(path).map_err(|e| AppError::Io(e.error))?;
+    Ok(())
 }
 
 /// Helper function to read a specific zip entry by index and encode it as Base64
