@@ -728,68 +728,6 @@ pub async fn build_fabric_add_mods_arg(
     ))
 }
 
-const NEOFORGE_EARLY_SERVICE_CLASSES: &[&str] = &[
-    "net.neoforged.neoforgespi.earlywindow.GraphicsBootstrapper",
-    "net.neoforged.neoforgespi.earlywindow.ImmediateWindowProvider",
-    "net.neoforged.neoforgespi.locating.IModFileCandidateLocator",
-    "net.neoforged.neoforgespi.locating.IModFileReader",
-    "net.neoforged.neoforgespi.locating.IDependencyLocator",
-];
-
-pub async fn has_neoforge_early_service(jar_path: &std::path::Path) -> bool {
-    use async_zip::tokio::read::seek::ZipFileReader;
-    use tokio::io::BufReader;
-
-    let file = match tokio::fs::File::open(jar_path).await {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-    let mut buf_reader = BufReader::new(file);
-    let zip = match ZipFileReader::with_tokio(&mut buf_reader).await {
-        Ok(z) => z,
-        Err(_) => return false,
-    };
-    let targets: Vec<String> = NEOFORGE_EARLY_SERVICE_CLASSES
-        .iter()
-        .map(|c| format!("META-INF/services/{}", c))
-        .collect();
-    for entry in zip.file().entries() {
-        if let Ok(name) = entry.filename().as_str() {
-            if targets.iter().any(|t| t == name) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-pub async fn split_neoforge_early_service_mods(
-    mods: &[TargetMod],
-) -> (Vec<TargetMod>, Vec<TargetMod>) {
-    use futures::stream::{FuturesUnordered, StreamExt};
-
-    let mut tasks: FuturesUnordered<_> = mods
-        .iter()
-        .cloned()
-        .map(|tm| async move {
-            let early = has_neoforge_early_service(&tm.cache_path).await;
-            (tm, early)
-        })
-        .collect();
-
-    let mut early = Vec::new();
-    let mut normal = Vec::new();
-    while let Some((tm, is_early)) = tasks.next().await {
-        if is_early {
-            info!("NeoForge early-service jar detected (→ classpath): {}", tm.filename);
-            early.push(tm);
-        } else {
-            normal.push(tm);
-        }
-    }
-    (early, normal)
-}
-
 /// Creates a Forge addMods meta file listing ALL mod JARs (absolute paths, one per line).
 /// ForgeModLoader reads this via `-Dnrc.addMods=@<meta>` and registers each JAR with ModListHelper.
 pub async fn build_forge_add_mods_meta(

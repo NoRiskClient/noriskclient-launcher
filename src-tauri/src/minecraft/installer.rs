@@ -778,16 +778,14 @@ pub async fn install_minecraft_version(
         let is_legacy_forge = modloader_enum == ModLoader::Forge
             && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
 
-        let (early_service_mods, meta_mods) = if modloader_enum == ModLoader::NeoForge {
-            crate::minecraft::downloads::mod_resolver::split_neoforge_early_service_mods(&target_mods).await
-        } else {
-            (Vec::new(), target_mods.clone())
-        };
-
+        // Early services go through the meta file like everything else: the loader registers an
+        // ITransformerDiscoveryService, and ModLauncher puts what it reports into Layer.SERVICE.
+        // Handing those jars to the class path instead made BootstrapLauncher own them from
+        // MC-BOOTSTRAP, which a class-transforming mod rejects.
         let meta_path = crate::minecraft::downloads::mod_resolver::build_forge_add_mods_meta(
             profile.id,
             version_id,
-            &meta_mods,
+            &target_mods,
         )
         .await?;
 
@@ -805,14 +803,11 @@ pub async fn install_minecraft_version(
 
         let mut libs = launch_params.additional_libraries.clone();
         libs.push(loader_path);
-        for tm in &early_service_mods {
-            libs.push(tm.cache_path.clone());
-        }
         launch_params = launch_params.with_additional_libraries(libs);
 
         info!(
-            "Configured {} ForgeModLoader for profile '{}' ({} meta mods, {} early-service mods on cp)",
-            loader_str, profile.name, meta_mods.len(), early_service_mods.len()
+            "Configured {} ForgeModLoader for profile '{}' ({} mods)",
+            loader_str, profile.name, target_mods.len()
         );
     }
 
