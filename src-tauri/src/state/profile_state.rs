@@ -3595,11 +3595,30 @@ impl Default for ProfileSettings {
     }
 }
 
+pub const LEGACY_DEFAULT_MEMORY_MIN_MB: u32 = 1024;
+pub const LEGACY_DEFAULT_MEMORY_MAX_MB: u32 = 2048;
+
+pub fn default_memory_max_mb() -> u32 {
+    static TIER: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+
+    *TIER.get_or_init(|| {
+        let system_gib = crate::utils::system_info::total_ram_mb() / 1024;
+
+        if system_gib < 8 {
+            2048
+        } else if system_gib >= 24 {
+            6144
+        } else {
+            4096
+        }
+    })
+}
+
 impl Default for MemorySettings {
     fn default() -> Self {
         Self {
-            min: 1024, // 1GB
-            max: 2048, // 2GB
+            min: LEGACY_DEFAULT_MEMORY_MIN_MB,
+            max: default_memory_max_mb(),
         }
     }
 }

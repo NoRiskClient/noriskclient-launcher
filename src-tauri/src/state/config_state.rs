@@ -114,9 +114,10 @@ fn default_hide_on_process_start() -> bool {
 }
 
 fn default_global_memory_settings() -> MemorySettings {
+    const PREVIOUS_DEFAULT_MB: u32 = 3072;
     MemorySettings {
-        min: 3072, // 2GB
-        max: 3072, // 4GB
+        min: PREVIOUS_DEFAULT_MB,
+        max: crate::state::profile_state::default_memory_max_mb().max(PREVIOUS_DEFAULT_MB),
     }
 }
 
