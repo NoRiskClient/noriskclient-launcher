@@ -1251,3 +1251,43 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
     );
     Ok(members)
 }
+
+pub const WHITELISTED_MODPACK_DOMAINS: &[&str] =
+    &["cdn.modrinth.com", "github.com", "raw.githubusercontent.com"];
+
+pub fn is_whitelisted_modpack_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split('/').next().unwrap_or("");
+    WHITELISTED_MODPACK_DOMAINS
+        .iter()
+        .any(|allowed| host.eq_ignore_ascii_case(allowed))
+}
+
+/// `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>` -> the two ids.
+pub fn ids_from_cdn_url(url: &str) -> Option<(String, String)> {
+    let rest = url.split("://").nth(1).unwrap_or(url);
+    let mut parts = rest.split('/');
+
+    if !parts.next()?.eq_ignore_ascii_case("cdn.modrinth.com") {
+        return None;
+    }
+    if parts.next()? != "data" {
+        return None;
+    }
+    let project_id = parts.next()?.to_string();
+    if parts.next()? != "versions" {
+        return None;
+    }
+    let version_id = parts.next()?.to_string();
+
+    if project_id.is_empty() || version_id.is_empty() {
+        return None;
+    }
+    Some((project_id, version_id))
+}
+
+#[cfg(test)]
+#[path = "modrinth_test.rs"]
+mod tests;

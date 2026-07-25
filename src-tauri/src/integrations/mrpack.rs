@@ -413,6 +413,7 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
     );
 
     // 3. Create Mod structs from the results
+    let resolved: std::collections::HashSet<String> = versions_map.keys().cloned().collect();
     for (hash, version_info) in versions_map {
         if let Some(original_file_info) = file_info_map.get(&hash) {
             let primary_file = version_info
@@ -473,9 +474,73 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
         }
     }
 
+    let mut from_manifest = 0;
+    for (hash, file_info) in &file_info_map {
+        if resolved.contains(hash) {
+            continue;
+        }
+        let Some(url) = file_info.downloads.first().cloned() else {
+            warn!(
+                "Manifest file {} is unknown to the API and lists no download URL. Skipping.",
+                file_info.path
+            );
+            continue;
+        };
+
+        let file_name = std::path::Path::new(&file_info.path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| file_info.path.clone());
+
+        if !crate::integrations::modrinth::is_whitelisted_modpack_url(&url) {
+            warn!(
+                "Manifest file {} downloads from {}, which is not a host Modrinth allows for \
+                 modpacks. Skipping.",
+                file_info.path, url
+            );
+            continue;
+        }
+
+        warn!(
+            "Manifest file {} is unknown to the Modrinth API (delisted?); installing it from the \
+             manifest instead.",
+            file_info.path
+        );
+
+        let source = match crate::integrations::modrinth::ids_from_cdn_url(&url) {
+            Some((project_id, version_id)) => ModSource::Modrinth {
+                project_id,
+                version_id,
+                file_name: file_name.clone(),
+                download_url: url,
+                file_hash_sha1: Some(hash.clone()),
+            },
+            None => ModSource::Url {
+                url,
+                file_name: Some(file_name.clone()),
+            },
+        };
+
+        mods_to_add.push(Mod {
+            id: Uuid::new_v4(),
+            source,
+            enabled: !file_info.path.ends_with(".disabled"),
+            display_name: Some(file_name),
+            version: None,
+            game_versions: Some(vec![game_version.clone()]),
+            file_name_override: None,
+            associated_loader: Some(pack_loader),
+            modpack_origin: Some("modrinth:manifest".to_string()),
+            updates_enabled: false,
+            force_include_versions: Vec::new(),
+        });
+        from_manifest += 1;
+    }
+
     info!(
-        "Successfully resolved {} mods from the manifest.",
-        mods_to_add.len()
+        "Successfully resolved {} mods from the manifest ({} straight from manifest URLs).",
+        mods_to_add.len(),
+        from_manifest
     );
     Ok(mods_to_add)
 }
