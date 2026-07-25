@@ -30,6 +30,7 @@ pub async fn find_unique_profile_segment(
         ['/', '\\', '?', '!', '<', '>', '*', ':', '\'', '\"', '|'],
         "_",
     );
+    let sanitized_segment = to_launchable_ascii(&sanitized_segment);
 
     // Bereinigen und sicherstellen, dass der Segmentname nicht leer ist
     let clean_segment = sanitized_segment.trim();
@@ -941,3 +942,45 @@ pub async fn download_and_replace_file(
 
     Ok(())
 }
+
+/// Java decodes launch arguments with `sun.jnu.encoding` — on Windows the system ANSI code page,
+/// which `-Dsun.jnu.encoding=UTF-8` does not override. Anything outside it reaches the game as
+/// `?` and the launch dies on an unreadable path. Only the directory is restricted; the display
+/// name keeps its spelling.
+fn to_launchable_ascii(segment: &str) -> String {
+    let transliterated = deunicode::deunicode(segment);
+
+    let mut out = String::with_capacity(transliterated.len());
+    let mut pending_replacement = false;
+
+    for c in transliterated.chars() {
+        if c.is_ascii_graphic() || c == ' ' {
+            if pending_replacement {
+                out.push('_');
+                pending_replacement = false;
+            }
+            out.push(c);
+        } else {
+            pending_replacement = true;
+        }
+    }
+    if pending_replacement && !out.is_empty() {
+        out.push('_');
+    }
+
+    let trimmed = out.trim().trim_matches('_').trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in segment.as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("profile-{:06x}", hash & 0xffffff)
+}
+
+#[cfg(test)]
+#[path = "path_utils_test.rs"]
+mod tests;

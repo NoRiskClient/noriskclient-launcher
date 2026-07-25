@@ -92,6 +92,7 @@ tower-http = { version = "0.5", features = ["fs"] }
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 hyper-util = { version = "0.1", features = ["server", "http1", "http2"] }
 tokio-stream = "0.1"
+deunicode = "1.6.2"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
