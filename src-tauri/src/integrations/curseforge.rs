@@ -18,7 +18,6 @@ use tokio::io::BufReader;
 use futures::future::try_join_all;
 use tempfile;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use sysinfo::System;
 
 // Import for profile image upload functionality
 use crate::commands::path_commands::UploadProfileImagesPayload;
@@ -33,19 +32,11 @@ const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
 // Public CurseForge API Key (from PrismLauncher/MultiMC)
 const CURSEFORGE_API_KEY: &str = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm";
 
-/// Gets the total system RAM in MB
-fn get_system_ram_mb() -> u64 {
-    let mut sys = System::new_all();
-    sys.refresh_memory();
-    let total_memory_bytes = sys.total_memory();
-    total_memory_bytes / (1024 * 1024)
-}
-
 /// Determines appropriate memory settings based on recommended RAM and system capabilities
 fn determine_memory_settings(recommended_ram_mb: Option<u64>) -> crate::state::profile_state::MemorySettings {
     use crate::state::profile_state::MemorySettings;
 
-    let system_ram_mb = get_system_ram_mb();
+    let system_ram_mb = crate::utils::system_info::total_ram_mb();
     info!("System RAM detected: {} MB", system_ram_mb);
 
     match recommended_ram_mb {

@@ -37,7 +37,6 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use sysinfo::System;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs as TokioFs;
@@ -1080,14 +1079,7 @@ pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(),
 #[tauri::command]
 pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
     log::info!("Received command get_system_ram_mb");
-    // In a real application, you might want to manage the System instance
-    // in the global state to avoid recreating it, but for a one-off command,
-    // this is fine.
-    let mut sys = System::new_all();
-    sys.refresh_memory(); // Refresh memory information
-    let total_memory_bytes = sys.total_memory();
-    let total_memory_mb = total_memory_bytes / (1024 * 1024);
-    Ok(total_memory_mb)
+    Ok(crate::utils::system_info::total_ram_mb())
 }
 
 // --- New Command to open Profile Folder ---
