@@ -9,7 +9,7 @@ use crate::commands::modrinth_commands::{
     download_and_install_modrinth_modpack, get_modrinth_mod_versions,
 };
 use crate::commands::profile_command::{launch_profile_with_overrides, LaunchOverrides};
-use crate::integrations::modrinth::{ModrinthVersion, ModrinthVersionType};
+use crate::integrations::modrinth::{ModrinthVersion};
 use log::{error, info};
 use uuid::Uuid;
 
@@ -50,28 +50,19 @@ async fn install_and_launch(args: &ModpackArgs) -> Result<Uuid, String> {
     .await
     .map_err(|e| format!("version lookup for '{}' failed: {:?}", args.id, e))?;
 
-    // Modrinth returns versions newest-first. Without an explicit pin we take the
-    // newest *release* — a pack's latest build is often an alpha/beta that its
-    // author does not consider ready. Fall back to the newest of any type for
-    // packs that never publish releases.
+    // Modrinth returns versions newest-first, and the newest of any type is what the pack page
+    // offers and the Modrinth app installs. Preferring a release picks whatever the author last
+    // marked stable, which for a pack that has moved on to alphas is a years-old build on an
+    // older Minecraft — a different pack than the one being asked for.
     let version = match &args.version {
         Some(wanted) => versions
             .into_iter()
             .find(|v| &v.id == wanted || &v.version_number == wanted)
             .ok_or_else(|| format!("version '{}' not found for '{}'", wanted, args.id))?,
-        None => {
-            let newest_release = versions
-                .iter()
-                .find(|v| matches!(v.version_type, ModrinthVersionType::Release))
-                .cloned();
-            match newest_release {
-                Some(v) => v,
-                None => versions
-                    .into_iter()
-                    .next()
-                    .ok_or_else(|| format!("no matching version for '{}'", args.id))?,
-            }
-        }
+        None => versions
+            .into_iter()
+            .next()
+            .ok_or_else(|| format!("no matching version for '{}'", args.id))?,
     };
 
     let file = version
