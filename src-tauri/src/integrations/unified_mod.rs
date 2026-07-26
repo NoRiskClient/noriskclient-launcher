@@ -909,22 +909,13 @@ pub fn extract_loaders_from_game_versions(game_versions: &[String]) -> Vec<Strin
 
 /// Extract actual game versions from mixed game versions array (excluding loaders)
 pub fn extract_game_versions_from_mixed(game_versions: &[String]) -> Vec<String> {
+    // CurseForge lists loaders and the sides a file supports next to the Minecraft versions, and
+    // "Client" sorts above any number, so anything picking the highest entry gets it instead of a
+    // version. Every Minecraft version starts with a digit; none of the others do.
     game_versions
         .iter()
-        .filter_map(|version| {
-            let version_lower = version.to_lowercase();
-            // Filter out loaders, keep only actual game versions like "1.21", "1.20.1", etc.
-            if version_lower.contains("forge") ||
-               version_lower.contains("fabric") ||
-               version_lower.contains("quilt") ||
-               version_lower.contains("neoforge") ||
-               version_lower.contains("liteloader") ||
-               version_lower.contains("cauldron") {
-                None // This is a loader, exclude it
-            } else {
-                Some(version.clone()) // This is likely a game version
-            }
-        })
+        .filter(|version| version.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .cloned()
         .collect()
 }
 
