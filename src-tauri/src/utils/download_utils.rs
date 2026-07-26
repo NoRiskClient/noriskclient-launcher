@@ -161,7 +161,7 @@ impl DownloadUtils {
 
         // Check if file already exists and is valid
         if !config.force_overwrite && Self::verify_existing_file(target_path, &config).await? {
-            info!("File already exists and passes verification: {:?}", target_path);
+            debug!("File already exists and passes verification: {:?}", target_path);
             return Ok(());
         }
 

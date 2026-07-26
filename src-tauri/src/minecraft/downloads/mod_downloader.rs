@@ -80,7 +80,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        info!(
+                        debug!(
                             "Preparing Modrinth mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -100,7 +100,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        info!(
+                        debug!(
                             "Preparing CurseForge mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -116,7 +116,7 @@ impl ModDownloadService {
                         })
                     }
                     ModSource::Url { url, .. } => {
-                        info!("Preparing URL mod for cache: {} ({})", display_name, filename);
+                        debug!("Preparing URL mod for cache: {} ({})", display_name, filename);
                         Self::download_and_verify_file(&url, &target_path, None)
                             .await
                             .map_err(|e| {
@@ -150,7 +150,8 @@ impl ModDownloadService {
             });
         }
 
-        info!("Executing {} mod cache tasks...", download_futures.len());
+        let task_count = download_futures.len();
+        debug!("Executing {} mod cache tasks...", task_count);
         let results: Vec<Result<()>> = iter(download_futures)
             .buffer_unordered(self.concurrent_downloads)
             .collect()
@@ -165,8 +166,8 @@ impl ModDownloadService {
 
         if errors.is_empty() {
             info!(
-                "Mod cache check/download process completed successfully for profile: '{}'",
-                profile.name
+                "Mod cache ready for profile '{}': {} mods",
+                profile.name, task_count
             );
             Ok(())
         } else {
