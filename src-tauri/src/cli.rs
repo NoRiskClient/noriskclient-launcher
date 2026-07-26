@@ -9,7 +9,7 @@
 //! Both go through `tauri-plugin-cli`'s `matches()` / `matches_from(argv)` —
 //! the subcommand schema lives once in `tauri.conf.json`.
 
-use crate::commands::modpack_command::{run_modpack, ModpackArgs};
+use crate::commands::modpack_command::{run_modpack, ModpackArgs, PackSource};
 use crate::commands::profile_command::{
     launch_profile_with_overrides, launch_temp_profile, LaunchOverrides, TempLaunchArgs,
 };
@@ -71,6 +71,10 @@ impl ModpackArgs {
     fn from_matches(sub: &SubcommandMatches) -> Result<Self, String> {
         Ok(Self {
             id: arg_str(sub, "id").ok_or_else(|| "--id is required".to_string())?,
+            source: match arg_str(sub, "source") {
+                Some(value) => PackSource::parse(&value)?,
+                None => PackSource::default(),
+            },
             // Not "version": clap reserves that name for its own --version flag
             // and panics on the collision while building the subcommand.
             version: arg_str(sub, "pack-version"),

@@ -252,6 +252,34 @@ pub struct CurseForgeFileIndex {
     pub modLoader: Option<u32>,
 }
 
+pub async fn find_project_by_slug(slug: &str, class_id: u32) -> Result<Option<u32>> {
+    let url = reqwest::Url::parse_with_params(
+        &format!("{}/mods/search", CURSEFORGE_API_BASE_URL),
+        &[
+            ("gameId", "432".to_string()),
+            ("classId", class_id.to_string()),
+            ("slug", slug.to_lowercase()),
+        ],
+    )
+    .map_err(|e| AppError::Other(format!("Failed to build CurseForge slug URL: {}", e)))?;
+
+    let response: CurseForgeSearchResponse = HTTP_CLIENT
+        .get(url)
+        .header("x-api-key", CURSEFORGE_API_KEY)
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("CurseForge slug lookup failed: {}", e)))?
+        .json()
+        .await
+        .map_err(|e| AppError::Other(format!("CurseForge slug lookup unreadable: {}", e)))?;
+
+    Ok(response
+        .data
+        .iter()
+        .find(|m| m.slug.eq_ignore_ascii_case(slug))
+        .map(|m| m.id))
+}
+
 // Function to search for mods on CurseForge
 pub async fn search_mods(
     game_id: u32,
