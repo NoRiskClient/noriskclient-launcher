@@ -88,20 +88,26 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
       <div>
         <h3 className="text-xl sm:text-2xl font-semibold text-gray-100 font-minecraft normal-case">
           {isActuallyCopying
-            ? `Copy existing profile and install `
-            : `Install `}
+            ? t('modrinth.quick_profile.copy_prefix')
+            : t('modrinth.quick_profile.install_prefix')}
           <span style={{ color: accentColor.value }}>{projectTitle}</span>
           {versionNumber && (
             <span className="text-gray-400"> v{versionNumber}</span>
           )}
-          {isActuallyCopying ? ` to new profile` : ` as new profile`}
+          {isActuallyCopying
+            ? t('modrinth.quick_profile.copy_suffix')
+            : t('modrinth.quick_profile.install_suffix')}
         </h3>
       </div>
 
       <p className="text-xs font-minecraft sm:text-sm text-gray-400">
         {isActuallyCopying
-          ? `Copying settings from '${storeProfiles.find((p) => p.id === selectedSourceProfileId)?.name || "selected profile"}'. Enter a name for the new copy.`
-          : "Enter a name for the new profile. Optionally, copy settings from an existing profile."}
+          ? t('modrinth.quick_profile.copy_description', {
+              name:
+                storeProfiles.find((p) => p.id === selectedSourceProfileId)?.name ||
+                t('modrinth.quick_profile.selected_profile'),
+            })
+          : t('modrinth.quick_profile.description')}
       </p>
 
       <div className="flex items-start gap-2">
@@ -110,7 +116,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
             htmlFor="quickProfileNameInput"
             className="block text-sm font-medium text-gray-300 mb-1 sr-only"
           >
-            New Profile Name
+            {t('modrinth.quick_profile.name_label')}
           </label>
           <SearchStyleInput
             id="quickProfileNameInput"
@@ -139,8 +145,8 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
           disabled={isLoading}
           title={
             isActuallyCopying
-              ? "Clear source profile selection"
-              : "Copy settings from existing profile"
+              ? t('modrinth.quick_profile.clear_source')
+              : t('modrinth.quick_profile.copy_from_existing')
           }
           className="flex-shrink-0 mt-0.5"
         />

@@ -2019,5 +2019,16 @@
   "settings.ads.reset_consent.tooltip": "Kişiselleştirilmiş reklam iznini geri çek. Reklam penceresi açılır ve izin iletişim kutusunu tekrar gösterir.",
   "settings.ads.reset_consent.button": "Sıfırla",
   "settings.font.title": "Yazı Tipi",
-  "settings.font.description": "Başlatıcı genelinde kullanılan yazı tipini seçin"
+  "settings.font.description": "Başlatıcı genelinde kullanılan yazı tipini seçin",
+
+  "modrinth.quick_profile.install_prefix": "",
+  "modrinth.quick_profile.install_suffix": " uygulamasını yeni profil olarak yükle",
+  "modrinth.quick_profile.copy_prefix": "Mevcut profili kopyala ve ",
+  "modrinth.quick_profile.copy_suffix": " yeni profile yükle",
+  "modrinth.quick_profile.description": "Yeni profil için bir ad gir. İstersen mevcut bir profilin ayarlarını kopyalayabilirsin.",
+  "modrinth.quick_profile.copy_description": "'{{name}}' profilinin ayarları kopyalanacak. Yeni kopya için bir ad gir.",
+  "modrinth.quick_profile.selected_profile": "seçili profil",
+  "modrinth.quick_profile.clear_source": "Kaynak profil seçimini kaldır",
+  "modrinth.quick_profile.copy_from_existing": "Mevcut profilin ayarlarını kopyala",
+  "modrinth.quick_profile.name_label": "Yeni profil adı"
 }

@@ -2185,5 +2185,16 @@
   "time.remaining_hours_minutes": "{{hours}}Std {{minutes}}Min",
   "time.remaining_minutes": "{{minutes}}Min",
   "settings.font.title": "Schriftart",
-  "settings.font.description": "Wähle die Schriftart für den gesamten Launcher"
+  "settings.font.description": "Wähle die Schriftart für den gesamten Launcher",
+
+  "modrinth.quick_profile.install_prefix": "",
+  "modrinth.quick_profile.install_suffix": " als neues Profil installieren",
+  "modrinth.quick_profile.copy_prefix": "Vorhandenes Profil kopieren und ",
+  "modrinth.quick_profile.copy_suffix": " ins neue Profil installieren",
+  "modrinth.quick_profile.description": "Gib einen Namen für das neue Profil ein. Du kannst auch Einstellungen aus einem vorhandenen Profil übernehmen.",
+  "modrinth.quick_profile.copy_description": "Einstellungen von '{{name}}' werden übernommen. Gib einen Namen für die neue Kopie ein.",
+  "modrinth.quick_profile.selected_profile": "ausgewähltem Profil",
+  "modrinth.quick_profile.clear_source": "Auswahl des Quellprofils aufheben",
+  "modrinth.quick_profile.copy_from_existing": "Einstellungen aus vorhandenem Profil übernehmen",
+  "modrinth.quick_profile.name_label": "Name des neuen Profils"
 }

@@ -2019,5 +2019,16 @@
   "settings.ads.reset_consent.tooltip": "Retirez votre consentement à la publicité personnalisée. La fenêtre de pub s'ouvre et affiche à nouveau la boîte de dialogue de consentement.",
   "settings.ads.reset_consent.button": "Réinitialiser",
   "settings.font.title": "Police",
-  "settings.font.description": "Choisissez la police utilisée dans tout le launcher"
+  "settings.font.description": "Choisissez la police utilisée dans tout le launcher",
+
+  "modrinth.quick_profile.install_prefix": "Installer ",
+  "modrinth.quick_profile.install_suffix": " comme nouveau profil",
+  "modrinth.quick_profile.copy_prefix": "Copier un profil existant et installer ",
+  "modrinth.quick_profile.copy_suffix": " dans le nouveau profil",
+  "modrinth.quick_profile.description": "Saisis un nom pour le nouveau profil. Tu peux aussi copier les paramètres d'un profil existant.",
+  "modrinth.quick_profile.copy_description": "Les paramètres de '{{name}}' seront copiés. Saisis un nom pour la nouvelle copie.",
+  "modrinth.quick_profile.selected_profile": "profil sélectionné",
+  "modrinth.quick_profile.clear_source": "Annuler la sélection du profil source",
+  "modrinth.quick_profile.copy_from_existing": "Copier les paramètres d'un profil existant",
+  "modrinth.quick_profile.name_label": "Nom du nouveau profil"
 }

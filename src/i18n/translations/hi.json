@@ -2034,5 +2034,16 @@
   "settings.ads.reset_consent.tooltip": "व्यक्तिगत विज्ञापनों की अपनी सहमति वापस लें। विज्ञापन विंडो खुलेगी और सहमति डायलॉग फिर से दिखाएगी।",
   "settings.ads.reset_consent.button": "रीसेट करें",
   "settings.font.title": "फ़ॉन्ट",
-  "settings.font.description": "लॉन्चर में उपयोग किया जाने वाला फ़ॉन्ट चुनें"
+  "settings.font.description": "लॉन्चर में उपयोग किया जाने वाला फ़ॉन्ट चुनें",
+
+  "modrinth.quick_profile.install_prefix": "",
+  "modrinth.quick_profile.install_suffix": " को नई प्रोफ़ाइल के रूप में इंस्टॉल करें",
+  "modrinth.quick_profile.copy_prefix": "मौजूदा प्रोफ़ाइल कॉपी करें और ",
+  "modrinth.quick_profile.copy_suffix": " को नई प्रोफ़ाइल में इंस्टॉल करें",
+  "modrinth.quick_profile.description": "नई प्रोफ़ाइल के लिए नाम दर्ज करें। आप चाहें तो किसी मौजूदा प्रोफ़ाइल की सेटिंग्स भी कॉपी कर सकते हैं।",
+  "modrinth.quick_profile.copy_description": "'{{name}}' की सेटिंग्स कॉपी की जा रही हैं। नई कॉपी के लिए नाम दर्ज करें।",
+  "modrinth.quick_profile.selected_profile": "चयनित प्रोफ़ाइल",
+  "modrinth.quick_profile.clear_source": "स्रोत प्रोफ़ाइल का चयन हटाएं",
+  "modrinth.quick_profile.copy_from_existing": "मौजूदा प्रोफ़ाइल से सेटिंग्स कॉपी करें",
+  "modrinth.quick_profile.name_label": "नई प्रोफ़ाइल का नाम"
 }

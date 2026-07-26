@@ -2017,5 +2017,16 @@
   "settings.sections.ads": "Reklamy",
   "settings.ads.reset_consent": "Zgoda na reklamy",
   "settings.ads.reset_consent.tooltip": "Wycofaj zgodę na spersonalizowane reklamy. Okno reklamy otworzy się i ponownie wyświetli okno zgody.",
-  "settings.ads.reset_consent.button": "Resetuj"
+  "settings.ads.reset_consent.button": "Resetuj",
+
+  "modrinth.quick_profile.install_prefix": "Zainstaluj ",
+  "modrinth.quick_profile.install_suffix": " jako nowy profil",
+  "modrinth.quick_profile.copy_prefix": "Skopiuj istniejący profil i zainstaluj ",
+  "modrinth.quick_profile.copy_suffix": " w nowym profilu",
+  "modrinth.quick_profile.description": "Podaj nazwę nowego profilu. Opcjonalnie skopiuj ustawienia z istniejącego profilu.",
+  "modrinth.quick_profile.copy_description": "Ustawienia profilu '{{name}}' zostaną skopiowane. Podaj nazwę nowej kopii.",
+  "modrinth.quick_profile.selected_profile": "wybranego profilu",
+  "modrinth.quick_profile.clear_source": "Usuń wybór profilu źródłowego",
+  "modrinth.quick_profile.copy_from_existing": "Skopiuj ustawienia z istniejącego profilu",
+  "modrinth.quick_profile.name_label": "Nazwa nowego profilu"
 }
