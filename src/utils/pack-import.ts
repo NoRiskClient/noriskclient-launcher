@@ -78,7 +78,7 @@ export async function runPackImport(
       id: toastId,
       duration: 3000,
     });
-    useProfileStore.getState().fetchProfiles();
+    await useProfileStore.getState().fetchProfiles();
 
     return newProfileId;
   } catch (err) {

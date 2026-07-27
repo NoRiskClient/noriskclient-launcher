@@ -157,6 +157,8 @@ async fn expiry_sweep_spares_file_hashes_and_the_grace_window() {
 
     assert_eq!(m.delete_expired(STALE_GRACE_MS).await.unwrap(), 0);
 
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+
     assert_eq!(m.delete_expired(0).await.unwrap(), 1);
     assert!(m.get_entry::<String>(K, "fresh").await.is_some());
     assert!(m.get_file_hash("/some/path", 1, 1).await.is_some());
