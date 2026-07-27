@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
-use crate::state::profile_state::{Profile, ProfileState};
+use crate::state::profile_state::ProfileState;
 use crate::state::state_manager::State;
 use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
@@ -293,10 +293,17 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     drop(profile_json_buf_reader);
 
     // 4. Parse the profile.json
-    let mut exported_profile: Profile = serde_json::from_str(&profile_content).map_err(|e| {
-        error!("Failed to parse profile.json: {}", e);
-        AppError::Json(e)
-    })?;
+    let (mut exported_profile, security_report) =
+        crate::utils::import_safety::parse_untrusted_profile(&profile_content).map_err(|e| {
+            error!("Failed to parse profile.json: {}", e);
+            e
+        })?;
+    if !security_report.is_clean() {
+        warn!(
+            "Sanitized untrusted noriskpack {:?}: {:?}",
+            pack_path, security_report
+        );
+    }
 
     // 5. Use the filename as the profile name if available
     if let Some(file_name) = pack_path.file_stem().and_then(|s| s.to_str()) {
@@ -737,7 +744,16 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
 
             // Spawn an async task to handle the import
             tauri::async_runtime::spawn(async move {
-                match crate::commands::profile_command::import_profile(path_string_for_task, None).await {
+                match crate::commands::profile_command::import_profile(
+                    path_string_for_task,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                {
                     Ok(profile_id) => {
                         info!("Profile {} imported successfully.", profile_id);
                         // Attempt to bring the main window to the front and focus it.

@@ -38,33 +38,6 @@ pub async fn get_curseforge_mods_by_ids(
 }
 
 
-/// Import a CurseForge modpack as a new profile
-#[tauri::command]
-pub async fn import_curseforge_pack(pack_path: String) -> Result<String, CommandError> {
-    log::debug!("Received import_curseforge_pack command for path: {}", pack_path);
-
-    let path_buf = PathBuf::from(&pack_path);
-
-    // Check if file exists
-    if !path_buf.exists() {
-        return Err(CommandError::from(AppError::Other(format!("Pack file does not exist: {}", pack_path))));
-    }
-
-    // Check if it's a file
-    if !path_buf.is_file() {
-        return Err(CommandError::from(AppError::Other(format!("Path is not a file: {}", pack_path))));
-    }
-
-    // Import the pack (without project_id/file_id for manually imported packs)
-    let profile_id = import_curseforge_pack_as_profile(path_buf, None, None, None, 0.0, 1.0)
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!("Successfully imported CurseForge pack as profile with ID: {}", profile_id);
-
-    Ok(profile_id.to_string())
-}
-
 /// Download and install a CurseForge modpack from its URL
 #[tauri::command]
 pub async fn download_and_install_curseforge_modpack_command(

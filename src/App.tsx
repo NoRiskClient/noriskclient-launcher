@@ -20,6 +20,8 @@ import {
   type MinecraftProcessExitedPayload,
 } from "./types/events";
 import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportModal";
+import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
+import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
@@ -559,6 +561,8 @@ export function App() {
         <GlobalToaster />
         <LauncherNoticeBanner />
         <GlobalCrashReportModal />
+        <ImportPackConfirmModal />
+        <DragDropOverlay />
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
         <GlobalModalPortal />
         <ChildProtectionModal />

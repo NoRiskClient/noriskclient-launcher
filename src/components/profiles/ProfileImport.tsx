@@ -1,22 +1,15 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
-import { StatusMessage } from "../ui/StatusMessage";
-import { ProgressToast } from "../ui/ProgressToast";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import * as ProfileService from "../../services/profile-service";
-import { useProfileStore } from "../../store/profile-store";
-import { useImportProgressStore } from "../../store/import-progress-store";
-import { parseErrorMessage } from "../../utils/error-utils";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { EventType, type EventPayload } from "../../types/events";
+import { useImportConfirmStore } from "../../store/import-confirm-store";
+import { logInfo, logWarn } from "../../utils/logging-utils";
 import { useTranslation } from "react-i18next";
 
 interface ProfileImportProps {
@@ -30,18 +23,12 @@ export function ProfileImport({
 }: ProfileImportProps) {
   const { t } = useTranslation();
   const [isImporting, setIsImporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
   const contentRef = useRef<HTMLDivElement>(null);
   const formatItemsRef = useRef<HTMLUListElement>(null);
-  const navigate = useNavigate();
+  const requestImport = useImportConfirmStore((state) => state.requestImport);
 
   const handleImport = async () => {
-    const eventId = crypto.randomUUID();
-    const toastId = `import-${eventId}`;
-    let unlisten: UnlistenFn | null = null;
-
     try {
       const selectedPath = await openDialog({
         multiple: false,
@@ -56,88 +43,17 @@ export function ProfileImport({
       });
 
       if (selectedPath && typeof selectedPath === "string") {
-        const { isPathImporting, addImportingPath, removeImportingPath } = useProfileStore.getState();
-
-        // Check if this file is already being imported
-        if (isPathImporting(selectedPath)) {
-          toast.error(t('profiles.errors.already_importing'));
-          return;
-        }
-
         setIsImporting(true);
         onClose();
-        addImportingPath(selectedPath);
-
-        const fileName = selectedPath.substring(selectedPath.lastIndexOf('/') + 1).substring(selectedPath.lastIndexOf('\\') + 1);
-
-        // Set up event listener for progress updates
-        unlisten = await listen<EventPayload>("state_event", (event) => {
-          const payload = event.payload;
-          if (payload.event_type !== EventType.TaskProgress) return;
-          if (payload.event_id !== eventId) return;
-
-          const progress = (payload.progress ?? 0) * 100; // Convert 0-1 to 0-100
-
-          // Update toast with progress
-          toast.custom(
-            () => <ProgressToast message={`Importing ${fileName}`} progress={progress} />,
-            { id: toastId, duration: Infinity }
-          );
-        });
-
-        // Show initial progress toast
-        toast.custom(
-          () => <ProgressToast message={`Importing ${fileName}`} progress={0} />,
-          { id: toastId, duration: Infinity }
-        );
-
-        try {
-          const newProfileId = await ProfileService.importProfileByPath(selectedPath, eventId);
-
-          // Clean up listener before showing success
-          if (unlisten) {
-            unlisten();
-            unlisten = null;
-          }
-
-          toast.success(t('profiles.import_success', { fileName }), {
-            id: toastId,
-            duration: 3000,
-          });
-          useProfileStore.getState().fetchProfiles();
-          onImportComplete();
-
-          // Navigate to the new profile
-          navigate(`/profilesv2/${newProfileId}`);
-        } finally {
-          removeImportingPath(selectedPath);
-        }
-
+        onImportComplete();
+        await requestImport(selectedPath);
+      } else if (selectedPath === null) {
+        logInfo("[PackImport] Profile import dialog cancelled by user.");
       } else {
-        if (selectedPath === null) {
-          console.log("Profile import dialog cancelled by user.");
-          // No toast for cancellation is usually fine
-        } else {
-          console.warn("File selection dialog did not return a valid path or was an array:", selectedPath);
-          toast.error(t('profiles.errors.file_path_failed'));
-        }
-      }
-    } catch (err) {
-      console.error("Failed to import profile:", err);
-      const errorMessage = parseErrorMessage(err);
-
-      // Check for disk space error and provide helpful hint
-      if (errorMessage.toLowerCase().includes("insufficient disk space")) {
-        const enhancedMessage = `${errorMessage}\n\n${t('profiles.disk_space_tip')}`;
-        toast.error(enhancedMessage, { id: toastId, duration: 8000 });
-      } else {
-        toast.error(t('profiles.import_failed', { error: errorMessage }), { id: toastId });
+        logWarn(`[PackImport] File dialog returned no usable path: ${JSON.stringify(selectedPath)}`);
+        toast.error(t('profiles.errors.file_path_failed'));
       }
     } finally {
-      // Clean up listener
-      if (unlisten) {
-        unlisten();
-      }
       setIsImporting(false);
     }
   };
@@ -174,9 +90,6 @@ export function ProfileImport({
       footer={renderFooter()}
     >
       <div className="p-6" ref={contentRef}>
-        {error && <StatusMessage type="error" message={error} />}
-        {success && <StatusMessage type="success" message={success} />}
-
         <div className="space-y-6">
           <div>
             <p className="text-lg text-white/70 mb-6 font-minecraft tracking-wide select-none">

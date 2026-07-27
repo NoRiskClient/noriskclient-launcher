@@ -69,16 +69,17 @@ use commands::profile_command::{
     get_profile_log_files,
     get_servers_for_profile,
     get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
-    import_profile, import_profile_from_file, import_world, is_content_installed, is_profile_launching,
+    import_profile, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
-    open_profile_latest_log, refresh_norisk_packs, refresh_standard_versions, repair_profile,
+    open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
+    repair_profile,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
 
 // Use statements for registered commands only
-use commands::curseforge_commands::{get_curseforge_mods_by_ids, import_curseforge_pack, download_and_install_curseforge_modpack_command, get_curseforge_file_changelog_command, get_curseforge_mod_description_command};
+use commands::curseforge_commands::{get_curseforge_mods_by_ids, download_and_install_curseforge_modpack_command, get_curseforge_file_changelog_command, get_curseforge_mod_description_command};
 
 use commands::modrinth_commands::{
     check_modrinth_updates, check_mod_updates_unified_command, download_and_install_modrinth_modpack,
@@ -555,7 +556,6 @@ async fn main() {
             get_mod_versions_unified_command,
             get_modpack_versions_unified_command,
             get_curseforge_mods_by_ids,
-            import_curseforge_pack,
             download_and_install_curseforge_modpack_command,
             get_curseforge_file_changelog_command,
             get_curseforge_mod_description_command,
@@ -585,8 +585,8 @@ async fn main() {
             get_system_ram_mb,
             delete_custom_mod,
             open_profile_folder,
-            import_profile_from_file,
             import_profile,
+            preview_import_pack,
             upload_log_to_mclogs_command,
             get_fabric_loader_versions,
             get_forge_versions,

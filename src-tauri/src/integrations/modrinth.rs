@@ -1252,8 +1252,12 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
     Ok(members)
 }
 
-pub const WHITELISTED_MODPACK_DOMAINS: &[&str] =
-    &["cdn.modrinth.com", "github.com", "raw.githubusercontent.com"];
+pub const WHITELISTED_MODPACK_DOMAINS: &[&str] = &[
+    "cdn.modrinth.com",
+    "github.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+];
 
 pub fn is_whitelisted_modpack_url(url: &str) -> bool {
     let Some(rest) = url.strip_prefix("https://") else {

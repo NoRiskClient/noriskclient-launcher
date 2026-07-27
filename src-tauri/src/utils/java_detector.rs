@@ -322,6 +322,47 @@ pub async fn detect_java_installations() -> Result<Vec<JavaInstallation>> {
     Ok(installations)
 }
 
+fn ensure_looks_like_java_binary(java_path: &Path) -> Result<()> {
+    let stem = java_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if !matches!(stem.as_str(), "java" | "javaw") {
+        return Err(AppError::Other(format!(
+            "Refusing to execute '{}': a Java path must point at a java or javaw binary",
+            java_path.display()
+        )));
+    }
+
+    let extension = java_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let extension_ok = if cfg!(windows) {
+        extension == "exe"
+    } else {
+        extension.is_empty()
+    };
+    if !extension_ok {
+        return Err(AppError::Other(format!(
+            "Refusing to execute '{}': unexpected file extension for a Java binary",
+            java_path.display()
+        )));
+    }
+
+    if !java_path.is_file() {
+        return Err(AppError::Other(format!(
+            "Java path is not a regular file: {}",
+            java_path.display()
+        )));
+    }
+
+    Ok(())
+}
+
 /// Gets information about a Java installation at the given path
 pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
     let java_path = if java_path.is_dir() {
@@ -341,6 +382,8 @@ pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
             java_path.display()
         )));
     }
+
+    ensure_looks_like_java_binary(&java_path)?;
 
     // Run java -version and parse the output
     let mut cmd = Command::new(&java_path);

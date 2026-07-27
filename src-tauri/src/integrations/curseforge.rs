@@ -2287,6 +2287,47 @@ pub async fn download_and_install_curseforge_modpack(
 
 // ===== CurseForge Update Checking Structures =====
 
+pub async fn fingerprints_known(
+    fingerprints: Vec<u64>,
+) -> Result<std::collections::HashSet<u64>> {
+    use std::collections::HashSet;
+
+    if fingerprints.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    let url = format!("{}/fingerprints", CURSEFORGE_API_BASE_URL);
+    let response = HTTP_CLIENT
+        .post(&url)
+        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&CurseForgeFingerprintRequest {
+            fingerprints: fingerprints.clone(),
+        })
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("CurseForge fingerprint request failed: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!(
+            "CurseForge fingerprint API returned HTTP {}",
+            response.status()
+        )));
+    }
+
+    let parsed: CurseForgeFingerprintApiResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to parse fingerprint response: {}", e)))?;
+
+    let mut known: HashSet<u64> = parsed.data.exact_fingerprints.into_iter().collect();
+    for m in parsed.data.exact_matches {
+        known.insert(m.file.fileFingerprint);
+    }
+    Ok(known)
+}
+
 /// Request structure for CurseForge fingerprint-based update checking
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurseForgeFingerprintRequest {

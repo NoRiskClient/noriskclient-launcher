@@ -32,6 +32,7 @@ fn accepts_the_hosts_modrinth_allows() {
     assert!(is_whitelisted_modpack_url(
         "https://raw.githubusercontent.com/o/r/main/x.jar"
     ));
+    assert!(is_whitelisted_modpack_url("https://gitlab.com/o/r/-/raw/main/x.jar"));
 }
 
 #[test]

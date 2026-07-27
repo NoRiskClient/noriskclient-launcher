@@ -1202,95 +1202,63 @@ pub async fn import_local_mods(
 }
 
 #[tauri::command]
-pub async fn import_profile_from_file(app_handle: tauri::AppHandle) -> Result<(), CommandError> {
-    log::info!("Executing import_profile_from_file command");
+pub async fn preview_import_pack(
+    file_path_str: String,
+) -> Result<crate::integrations::pack_preview::ImportPackPreview, CommandError> {
+    log::info!("Previewing modpack file: {}", file_path_str);
+    Ok(crate::integrations::pack_preview::preview_pack_at(PathBuf::from(file_path_str)).await?)
+}
 
-    // Spawn the blocking dialog call onto a blocking thread pool
-    let dialog_result = tokio::task::spawn_blocking(move || {
-        app_handle
-            .dialog()
-            .file()
-            .add_filter("Modpack Files", &["mrpack", "noriskpack", "zip"])
-            .set_title("Select Modpack File (.mrpack, .noriskpack, or .zip)")
-            .blocking_pick_file() // Use the blocking version for single file selection
-    })
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Dialog task failed: {}", e))))?;
+async fn apply_import_overrides(
+    state: &std::sync::Arc<State>,
+    profile_id: Uuid,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) {
+    let name = name_override.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    let group = group_override.map(|g| g.trim().to_string());
+    let clear_pack = clear_norisk_pack.unwrap_or(false);
+    if name.is_none() && group.is_none() && norisk_pack_id.is_none() && !clear_pack {
+        return;
+    }
 
-    if let Some(file_path_obj) = dialog_result {
-        // Convert FilePath to PathBuf
-        let file_path_buf = match file_path_obj.into_path() {
-            Ok(path) => path,
-            Err(e) => {
-                log::error!("Failed to convert selected file path: {}", e);
-                return Err(CommandError::from(AppError::Other(
-                    "Failed to convert selected file path".to_string(),
-                )));
-            }
-        };
-
-        log::info!(
-            "User selected modpack file: {:?}. Triggering processing...",
-            file_path_buf
-        );
-
-        // Check the file extension
-        let file_extension = file_path_buf
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| ext.to_lowercase());
-
-        let new_profile_id = match file_extension.as_deref() {
-            Some("mrpack") => {
-                log::info!("File extension is .mrpack, proceeding with mrpack processing.");
-                mrpack::import_mrpack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            Some("noriskpack") => {
-                log::info!("File extension is .noriskpack, proceeding with noriskpack processing.");
-                crate::integrations::norisk_packs::import_noriskpack_as_profile(file_path_buf, None)
-                    .await?
-            }
-            Some("zip") => {
-                log::info!("File extension is .zip, proceeding with CurseForge modpack processing.");
-                curseforge::import_curseforge_pack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            _ => {
-                log::error!(
-                    "Selected file has an invalid extension: {:?}",
-                    file_path_buf
-                );
-                return Err(CommandError::from(AppError::Other(
-                    "Invalid file type selected. Please select a .mrpack, .noriskpack, or .zip file."
-                        .to_string(),
-                )));
-            }
-        };
-
-        // Get state to emit event
-        let state = State::get().await?;
-        // Emit event to trigger UI update for the newly created profile
-        if let Err(e) = state
-            .event_state
-            .trigger_profile_update(new_profile_id)
-            .await
-        {
-            log::error!(
-                "Failed to emit TriggerProfileUpdate event for new profile {}: {}",
-                new_profile_id,
-                e
-            );
+    let mut profile = match state.profile_manager.get_profile(profile_id).await {
+        Ok(profile) => profile,
+        Err(e) => {
+            log::error!("Cannot apply import overrides for {}: {}", profile_id, e);
+            return;
         }
+    };
 
-        Ok(())
-    } else {
-        log::info!("User cancelled the file import dialog.");
-        Ok(())
+    if let Some(name) = name {
+        profile.name = name;
+    }
+    if let Some(group) = group {
+        profile.group = if group.is_empty() { None } else { Some(group) };
+    }
+    if clear_pack {
+        profile.selected_norisk_pack_id = None;
+    } else if let Some(pack_id) = norisk_pack_id {
+        profile.selected_norisk_pack_id = Some(pack_id);
+    }
+
+    if let Err(e) = state.profile_manager.update_profile(profile_id, profile).await {
+        log::error!("Failed to apply import overrides for {}: {}", profile_id, e);
     }
 }
 
 /// Imports a profile from a specified file path.
 #[tauri::command]
-pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> Result<Uuid, CommandError> {
+pub async fn import_profile(
+    file_path_str: String,
+    event_id: Option<String>,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) -> Result<Uuid, CommandError> {
     log::info!(
         "Executing import_profile command with file_path: {}",
         file_path_str
@@ -1363,6 +1331,16 @@ pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> 
             )));
         }
     };
+
+    apply_import_overrides(
+        &state,
+        new_profile_id,
+        name_override,
+        group_override,
+        norisk_pack_id,
+        clear_norisk_pack,
+    )
+    .await;
 
     if let Ok(profile) = state.profile_manager.get_profile(new_profile_id).await {
         let mut props = std::collections::HashMap::new();

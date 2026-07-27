@@ -26,17 +26,6 @@ export class CurseForgeService {
 
 
   /**
-   * Import a local CurseForge modpack file as a new profile
-   * @param packPath Path to the CurseForge modpack file (.zip)
-   * @returns Promise with the new profile ID as string
-   */
-  static async importCurseForgePack(packPath: string): Promise<string> {
-    return invoke<string>("import_curseforge_pack", {
-      packPath,
-    });
-  }
-
-  /**
    * Download and install a CurseForge modpack from its URL
    * @param projectId CurseForge project ID (number)
    * @param fileId CurseForge file ID (number)

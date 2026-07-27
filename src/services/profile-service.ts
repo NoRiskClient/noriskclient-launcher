@@ -17,6 +17,7 @@ import type {
   ImageSource,
   UploadProfileIconPayload,
 } from "../types/profile";
+import type { ImportPackPreview } from "../types/importPreview";
 import type {
   DataPackInfo,
   ModrinthVersion,
@@ -208,10 +209,6 @@ export async function importLocalMods(profileId: string): Promise<void> {
   return invoke<void>("import_local_mods", { profileId });
 }
 
-export async function importProfileFromFile(): Promise<void> {
-  return invoke<void>("import_profile_from_file");
-}
-
 export async function openProfileFolder(profileId: string): Promise<void> {
   return invoke<void>("open_profile_folder", { profileId });
 }
@@ -347,8 +344,26 @@ export async function checkForGroupMigration(profileId: string): Promise<Migrati
   return invoke<MigrationInfo>("check_for_group_migration_command", { profileId });
 }
 
-export async function importProfileByPath(filePathStr: string, eventId?: string): Promise<string> {
-  return invoke<string>("import_profile", { filePathStr, eventId });
+export async function importProfileByPath(
+  filePathStr: string,
+  eventId?: string,
+  nameOverride?: string,
+  groupOverride?: string,
+  noriskPackId?: string,
+  clearNoriskPack?: boolean,
+): Promise<string> {
+  return invoke<string>("import_profile", {
+    filePathStr,
+    eventId,
+    nameOverride,
+    groupOverride,
+    noriskPackId,
+    clearNoriskPack,
+  });
+}
+
+export async function previewImportPack(filePathStr: string): Promise<ImportPackPreview> {
+  return invoke<ImportPackPreview>("preview_import_pack", { filePathStr });
 }
 
 export async function resolveImagePath(

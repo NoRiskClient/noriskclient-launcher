@@ -1339,6 +1339,14 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
         }
     }
 
+    export_profile.settings.java_path = None;
+    export_profile.settings.use_custom_java_path = false;
+    export_profile.settings.custom_jvm_args = None;
+    export_profile.settings.extra_game_args = Vec::new();
+    export_profile.settings.quick_play_path = None;
+    export_profile.preferred_account_id = None;
+    export_profile.playtime_seconds = 0;
+
     // Keep other essential data
     export_profile
 }

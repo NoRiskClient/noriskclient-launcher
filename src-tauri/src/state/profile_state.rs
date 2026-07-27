@@ -3486,12 +3486,24 @@ impl PostInitializationHandler for ProfileManager {
 /// Helper function to determine the definitive filename for a mod defined within a Profile.
 pub fn get_profile_mod_filename(source: &ModSource) -> crate::error::Result<String> {
     match source {
-        ModSource::Modrinth { file_name, .. } => Ok(file_name.clone()),
-        ModSource::CurseForge { file_name, .. } => Ok(file_name.clone()),
-        ModSource::Local { file_name } => Ok(file_name.clone()),
-        ModSource::Url { file_name, url } => file_name.clone().ok_or_else(|| {
-            crate::error::AppError::Other(format!("Filename missing for URL mod source: {}", url))
-        }),
+        ModSource::Modrinth { file_name, .. } => {
+            crate::utils::import_safety::safe_file_component(file_name)
+        }
+        ModSource::CurseForge { file_name, .. } => {
+            crate::utils::import_safety::safe_file_component(file_name)
+        }
+        ModSource::Local { file_name } => {
+            crate::utils::import_safety::safe_file_component(file_name)
+        }
+        ModSource::Url { file_name, url } => file_name
+            .as_deref()
+            .ok_or_else(|| {
+                crate::error::AppError::Other(format!(
+                    "Filename missing for URL mod source: {}",
+                    url
+                ))
+            })
+            .and_then(crate::utils::import_safety::safe_file_component),
         ModSource::Maven { coordinates, .. } => Err(crate::error::AppError::Other(format!(
             "Cannot determine filename for profile Maven mod source: {}",
             coordinates
