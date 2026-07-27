@@ -85,7 +85,14 @@ pub fn safe_file_component(name: &str) -> Result<String> {
         _ => return Err(reject("is not a single plain path component")),
     }
 
-    let cleaned = sanitize_filename::sanitize(name);
+    let cleaned = sanitize_filename::sanitize_with_options(
+        name,
+        sanitize_filename::Options {
+            windows: true,
+            truncate: true,
+            replacement: "",
+        },
+    );
     if cleaned != name {
         return Err(reject("contains characters that are not valid in a file name"));
     }
