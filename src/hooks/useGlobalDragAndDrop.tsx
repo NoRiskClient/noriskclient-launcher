@@ -27,28 +27,45 @@ const recentlyProcessedPaths = new Set<string>();
 const PROCESS_COOLDOWN_MS = 1500; // Cooldown period in milliseconds
 
 const MODPACK_EXTENSIONS = ['.noriskpack', '.mrpack', '.zip'];
-const CONTENT_EXTENSIONS = ['.jar', '.jar.disabled', '.zip.disabled'];
 
-function classifyHover(paths: string[]): DragHoverKind {
+const CONTENT_EXTENSIONS: Partial<Record<BackendContentType, string[]>> = {
+  [BackendContentType.Mod]: ['.jar', '.jar.disabled'],
+  [BackendContentType.ResourcePack]: ['.zip', '.zip.disabled'],
+  [BackendContentType.ShaderPack]: ['.zip', '.zip.disabled'],
+  [BackendContentType.DataPack]: ['.zip', '.zip.disabled'],
+};
+
+const CONTENT_TYPE_LABELS: Partial<Record<BackendContentType, string>> = {
+  [BackendContentType.Mod]: 'mods',
+  [BackendContentType.ResourcePack]: 'resource packs',
+  [BackendContentType.ShaderPack]: 'shader packs',
+  [BackendContentType.DataPack]: 'data packs',
+};
+
+function acceptedContentExtensions(
+  contentType: BackendContentType | null,
+): string[] | undefined {
+  return contentType ? CONTENT_EXTENSIONS[contentType] : undefined;
+}
+
+function classifyDrop(paths: string[]): DragHoverKind {
   if (paths.length === 0) return 'unsupported';
 
   const lower = paths.map((path) => path.toLowerCase());
   const { activeDropProfileId, activeDropContentType, activeMainTab } =
     useAppDragDropStore.getState();
 
-  if (lower.some((path) => MODPACK_EXTENSIONS.some((ext) => path.endsWith(ext)))) {
-    if (activeDropProfileId && activeDropContentType && lower.every((path) => path.endsWith('.zip'))) {
-      return 'content';
-    }
-    return 'modpack';
-  }
-
+  const accepted = acceptedContentExtensions(activeDropContentType);
   if (
     activeDropProfileId &&
-    activeDropContentType &&
-    lower.some((path) => CONTENT_EXTENSIONS.some((ext) => path.endsWith(ext)))
+    accepted &&
+    lower.some((path) => accepted.some((ext) => path.endsWith(ext)))
   ) {
     return 'content';
+  }
+
+  if (lower.some((path) => MODPACK_EXTENSIONS.some((ext) => path.endsWith(ext)))) {
+    return 'modpack';
   }
 
   if (activeMainTab === 'worlds' && activeDropProfileId) {
@@ -81,7 +98,7 @@ export function useGlobalDragAndDrop() {
           if (payload.type === 'enter') {
             const hoveredPaths = payload.paths ?? [];
             useAppDragDropStore.getState().setDragHover({
-              kind: classifyHover(hoveredPaths),
+              kind: classifyDrop(hoveredPaths),
               fileNames: hoveredPaths.map((path) => path.split(/[/\\]/).pop() ?? path),
             });
           } else if (payload.type === 'over') {
@@ -109,9 +126,13 @@ export function useGlobalDragAndDrop() {
               console.log(`[DragDrop Hook ${instanceId}] Cleared pathKey from cache: ${pathKey}`);
             }, PROCESS_COOLDOWN_MS);
 
-            const profilePackPath = droppedPaths.find(path =>
-              path.toLowerCase().endsWith('.noriskpack') || path.toLowerCase().endsWith('.mrpack') || path.toLowerCase().endsWith('.zip')
-            );
+            const dropKind = classifyDrop(droppedPaths);
+            const profilePackPath =
+              dropKind === 'modpack'
+                ? droppedPaths.find((path) =>
+                    MODPACK_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)),
+                  )
+                : undefined;
 
             if (profilePackPath) {
               // Check if this file is already being imported
@@ -202,33 +223,14 @@ export function useGlobalDragAndDrop() {
             }
 
             if (currentProfileId && currentContentType) {
-              let relevantFiles: string[] = [];
-              let expectedExtensions: string[] = [];
-              let itemTypeName = currentContentType.toString();
-
-              switch (currentContentType) {
-                case BackendContentType.Mod:
-                  expectedExtensions = ['.jar', '.jar.disabled'];
-                  itemTypeName = 'mods';
-                  break;
-                case BackendContentType.ResourcePack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'resource packs';
-                  break;
-                case BackendContentType.ShaderPack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'shader packs';
-                  break;
-                case BackendContentType.DataPack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'data packs';
-                  break;
-                default:
-                  toast.error(i18n.t('dragdrop.not_configured', { type: currentContentType }));
-                  return;
+              const expectedExtensions = acceptedContentExtensions(currentContentType);
+              if (!expectedExtensions) {
+                toast.error(i18n.t('dragdrop.not_configured', { type: currentContentType }));
+                return;
               }
+              const itemTypeName = CONTENT_TYPE_LABELS[currentContentType] ?? currentContentType.toString();
 
-              relevantFiles = droppedPaths.filter(path => 
+              const relevantFiles = droppedPaths.filter(path =>
                 expectedExtensions.some(ext => path.toLowerCase().endsWith(ext))
               );
 
