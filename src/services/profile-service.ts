@@ -109,6 +109,10 @@ export async function getSystemRamMb(): Promise<number> {
   return invoke<number>("get_system_ram_mb");
 }
 
+export async function getDefaultMemoryMaxMb(): Promise<number> {
+  return invoke<number>("get_default_memory_max_mb");
+}
+
 export async function setProfileModEnabled(
   profileId: string,
   modId: string,

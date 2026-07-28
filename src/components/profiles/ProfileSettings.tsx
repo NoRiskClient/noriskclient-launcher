@@ -13,6 +13,7 @@ import { SymlinkSettingsTab } from "./settings/SymlinkSettingsTab";
 
 import { useProfileStore } from "../../store/profile-store";
 import * as ProfileService from "../../services/profile-service";
+import { logError } from "../../utils/logging-utils";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -47,6 +48,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [systemRam, setSystemRam] = useState<number>(8192);
+  const [recommendedRam, setRecommendedRam] = useState<number>(4096);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -56,13 +58,23 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   );
 
   const showDesignerTab = usePermission(PERMISSION.DESIGNER_TAB);
-  const [tempRamMb, setTempRamMb] = useState(profile.settings?.memory?.max ?? 3072);
+  const [tempRamMb, setTempRamMb] = useState(profile.settings?.memory?.max ?? 0);
 
   useEffect(() => {
     ProfileService.getSystemRamMb()
       .then((ram) => setSystemRam(ram))
       .catch((err) => {
-        console.error("Failed to get system RAM:", err);
+        logError(`Failed to get system RAM: ${err}`);
+      });
+
+    ProfileService.getDefaultMemoryMaxMb()
+      .then((recommended) => {
+        setRecommendedRam(recommended);
+        setTempRamMb((current) => (current === 0 ? recommended : current));
+      })
+      .catch((err) => {
+        logError(`Failed to get the recommended memory default: ${err}`);
+        setTempRamMb((current) => (current === 0 ? 4096 : current));
       });
   }, []);
 
@@ -87,7 +99,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   }, [isBackgroundAnimationEnabled]);
 
   useEffect(() => {
-    setTempRamMb(profile.settings?.memory?.max ?? 3072);
+    setTempRamMb(profile.settings?.memory?.max ?? recommendedRam);
   }, [profile]);
 
   const updateProfileData = (updates: Partial<Profile>) => {
@@ -229,6 +241,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
             editedProfile={editedProfile}
             updateProfile={updateProfileData}
             systemRam={systemRam}
+            recommendedRam={recommendedRam}
             tempRamMb={tempRamMb}
             setTempRamMb={setTempRamMb}
           />

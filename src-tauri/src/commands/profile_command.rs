@@ -1082,6 +1082,11 @@ pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
     Ok(crate::utils::system_info::total_ram_mb())
 }
 
+#[tauri::command]
+pub async fn get_default_memory_max_mb() -> Result<u32, CommandError> {
+    Ok(crate::state::profile_state::default_memory_max_mb())
+}
+
 // --- New Command to open Profile Folder ---
 #[tauri::command]
 pub async fn open_profile_folder(

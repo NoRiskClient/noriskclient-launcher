@@ -23,6 +23,7 @@ interface JavaSettingsTabProps {
   editedProfile: Profile;
   updateProfile: (updates: Partial<Profile>) => void;
   systemRam: number;
+  recommendedRam: number;
   tempRamMb: number;
   setTempRamMb: (value: number) => void;
 }
@@ -40,6 +41,7 @@ export function JavaSettingsTab({
   editedProfile,
   updateProfile,
   systemRam,
+  recommendedRam,
   tempRamMb,
   setTempRamMb,
 }: JavaSettingsTabProps) {
@@ -272,12 +274,7 @@ export function JavaSettingsTab({
     }
   };
 
-  let recommendedMaxRam;
-  if (systemRam <= 8192) {
-    recommendedMaxRam = Math.min(2048, systemRam);
-  } else {
-    recommendedMaxRam = Math.min(4096, systemRam);
-  }
+  const recommendedMaxRam = Math.min(recommendedRam, systemRam);
   
   // Use global memory settings for standard profiles, profile settings for custom profiles
   const memory = editedProfile.is_standard_version

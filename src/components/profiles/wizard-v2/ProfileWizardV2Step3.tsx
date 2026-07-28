@@ -18,6 +18,8 @@ import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
 import { getRandomBlockIcon } from "../../../data/block-icons";
+import { getDefaultMemoryMaxMb, getSystemRamMb } from "../../../services/profile-service";
+import { logError } from "../../../utils/logging-utils";
 import { parseErrorMessage } from "../../../utils/error-utils";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
@@ -64,9 +66,9 @@ export function ProfileWizardV2Step3({
     const [chosenIcon, setChosenIcon] = useState<ChosenIcon>(() => ({ url: getRandomBlockIcon().url }));
     const [profileName, setProfileName] = useState("");
     const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
-    const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
-    const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
-    const recommendedRam = systemRamMb <= 8192 ? Math.min(2048, systemRamMb) : Math.min(4096, systemRamMb);
+    const [memoryMaxMb, setMemoryMaxMb] = useState<number>(0);
+    const [systemRamMb, setSystemRamMb] = useState<number>(16384);
+    const [recommendedRam, setRecommendedRam] = useState<number>(0);
     const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
     const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
     const [loadingPacks, setLoadingPacks] = useState(false);
@@ -77,6 +79,32 @@ export function ProfileWizardV2Step3({
         defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
     ); // Default to true when group exists and is not "modpacks"
     const [showAllVersions, setShowAllVersions] = useState(false); // Default to false to show only curated versions
+    const effectiveMemoryMaxMb = memoryMaxMb || recommendedRam || 4096;
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadMemoryDefaults = async () => {
+            try {
+                const [systemRam, recommended] = await Promise.all([
+                    getSystemRamMb(),
+                    getDefaultMemoryMaxMb(),
+                ]);
+                if (cancelled) return;
+                setSystemRamMb(systemRam);
+                setRecommendedRam(recommended);
+                setMemoryMaxMb((current) => (current === 0 ? recommended : current));
+            } catch (e) {
+                logError(`[ProfileWizard] Failed to load memory defaults: ${e}`);
+                if (cancelled) return;
+                setRecommendedRam(4096);
+                setMemoryMaxMb((current) => (current === 0 ? 4096 : current));
+            }
+        };
+        loadMemoryDefaults();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     // Update profile group when defaultGroup changes
     useEffect(() => {
@@ -251,7 +279,7 @@ export function ProfileWizardV2Step3({
                 minecraftVersion: selectedMinecraftVersion,
                 loader: selectedLoader,
                 loaderVersion: selectedLoaderVersion,
-                memoryMaxMb: memoryMaxMb,
+                memoryMaxMb: effectiveMemoryMaxMb,
                 selectedNoriskPackId: selectedNoriskPackId,
                 use_shared_minecraft_folder: useSharedMinecraftFolder,
                 chosenIcon: chosenIcon
@@ -363,15 +391,15 @@ export function ProfileWizardV2Step3({
                 {/* RAM Settings */}
                 <div className="space-y-3">
                     <label className="block text-base font-minecraft text-white/50">
-                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam })}
+                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam || 4096 })}
                     </label>
                     <RangeSlider
-                        value={memoryMaxMb}
+                        value={effectiveMemoryMaxMb}
                         onChange={handleMemoryChange}
                         min={1024}
                         max={systemRamMb}
                         step={512}
-                        valueLabel={`${memoryMaxMb} MB (${(memoryMaxMb / 1024).toFixed(1)} GB)`}
+                        valueLabel={`${effectiveMemoryMaxMb} MB (${(effectiveMemoryMaxMb / 1024).toFixed(1)} GB)`}
                         minLabel="1 GB"
                         maxLabel={`${systemRamMb} MB`}
                         variant="flat"
