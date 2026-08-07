@@ -2,9 +2,11 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Profile } from "../../../types/profile"; // Adjust path as needed
+import type { ExportPackFormat, Profile } from "../../../types/profile"; // Adjust path as needed
 import { SearchStyleInput } from "../../ui/Input";
 import { Checkbox } from "../../ui/Checkbox";
+import { Tooltip } from "../../ui/Tooltip";
+import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
 import { Card } from "../../ui/Card";
 import { Icon } from "@iconify/react";
@@ -17,6 +19,31 @@ import gsap from "gsap";
 import { listen } from "@tauri-apps/api/event";
 import { EventType, type EventPayload } from "../../../types/events";
 import { parseErrorMessage } from "../../../utils/error-utils";
+
+const EXPORT_FORMATS: {
+  value: ExportPackFormat | "curseforge";
+  labelKey: string;
+  image: string;
+  disabled?: boolean;
+}[] = [
+  {
+    value: "noriskpack",
+    labelKey: "export.format_noriskpack",
+    image: "/logo.png",
+  },
+  {
+    value: "mrpack",
+    labelKey: "export.format_mrpack",
+    image: "https://cdn.modrinth.com/modrinth-new.png",
+  },
+  // TODO: CurseForge export (manifest.json + overrides/) is not implemented in the backend yet.
+  {
+    value: "curseforge",
+    labelKey: "export.format_curseforge",
+    image: "https://cdn.norisk.gg/misc/curseforge.webp",
+    disabled: true,
+  },
+];
 
 interface ExportSettingsTabProps {
   profile: Profile;
@@ -42,6 +69,8 @@ export function ExportSettingsTab({
 }: ExportSettingsTabProps) {
   const { t } = useTranslation();
   const [exportFilename, setExportFilename] = useState(profile.name);
+  const [exportFormat, setExportFormat] =
+    useState<ExportPackFormat>("noriskpack");
   const [selectedExportPaths, setSelectedExportPaths] = useState<Set<string>>(
     new Set()
   );
@@ -182,6 +211,7 @@ export function ExportSettingsTab({
           ? Array.from(currentPathsForExport) // Use the value from the ref
           : undefined,
       open_folder: exportOpenFolder,
+      format: exportFormat,
     });
 
     // Store the toast ID so we can update it with progress
@@ -235,6 +265,7 @@ export function ExportSettingsTab({
     onExportActionAvailable,
     isExporting,
     exportFilename,
+    exportFormat,
     isLoadingDirectory,
     exportOpenFolder,
     setExportOpenFolder,
@@ -263,15 +294,75 @@ export function ExportSettingsTab({
           >
             {t('export.filename_label')}
           </label>
-          <SearchStyleInput
-            value={exportFilename}
-            onChange={(e) => setExportFilename(e.target.value)}
-            placeholder={t('placeholders.enter_filename')}
-            icon="solar:document-text-bold"
-            disabled={isExporting}
-          />
-          <p className="mt-1 text-xs text-white/50 font-minecraft tracking-wide">
-            {t('export.extension_added_auto')}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <SearchStyleInput
+                value={exportFilename}
+                onChange={(e) => setExportFilename(e.target.value)}
+                placeholder={t('placeholders.enter_filename')}
+                icon="solar:document-text-bold"
+                disabled={isExporting}
+              />
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {EXPORT_FORMATS.map((format) => {
+                const isSelected = exportFormat === format.value;
+                const isLocked = format.disabled === true;
+                const label = isLocked
+                  ? t('export.format_coming_soon', {
+                      format: t(format.labelKey),
+                    })
+                  : t(format.labelKey);
+
+                const isBlocked = isLocked || isExporting;
+
+                return (
+                  <Tooltip key={format.value} content={label} position="top">
+                    <button
+                      type="button"
+                      aria-label={label}
+                      aria-pressed={isSelected}
+                      aria-disabled={isBlocked}
+                      onClick={() => {
+                        if (isBlocked) return;
+                        setExportFormat(format.value as ExportPackFormat);
+                      }}
+                      className={cn(
+                        "w-12 h-12 p-1.5 rounded-lg border-2 bg-black/30 transition-all duration-150",
+                        isSelected ? "" : "border-white/10",
+                        isLocked
+                          ? "opacity-30 grayscale cursor-not-allowed"
+                          : isExporting
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer hover:border-white/25",
+                      )}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: accentColor.value,
+                              boxShadow: `0 0 0 2px ${accentColor.value}55`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <img
+                        src={format.image}
+                        alt=""
+                        className={cn(
+                          "w-full h-full object-contain",
+                          !isSelected && !isLocked && "opacity-70",
+                        )}
+                      />
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-white/50 font-minecraft tracking-wide truncate">
+            {t('export.saved_as', {
+              filename: `${exportFilename.trim() || profile.name}.${exportFormat}`,
+            })}
           </p>
         </div>
         {/* File selection section */}
@@ -353,8 +444,8 @@ export function ExportSettingsTab({
                 className="h-full transition-all duration-300 ease-out"
                 style={{
                   width: `${exportProgress}%`,
-                  backgroundColor: `rgb(${accentColor})`,
-                  boxShadow: `0 0 10px rgba(${accentColor}, 0.5)`,
+                  backgroundColor: accentColor.value,
+                  boxShadow: `0 0 10px ${accentColor.value}80`,
                 }}
               />
             </div>

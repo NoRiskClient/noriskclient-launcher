@@ -5,7 +5,7 @@ use crate::state::profile_state::{
 };
 use log::warn;
 use serde::{Deserialize, Serialize};
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 const ALLOWED_CONTENT_EXTENSIONS: &[&str] = &["jar", "zip"];
 
@@ -62,6 +62,36 @@ pub fn parse_untrusted_profile(json: &str) -> Result<(Profile, ImportSecurityRep
     let mut profile: Profile = serde_json::from_str(json).map_err(AppError::Json)?;
     let report = sanitize_imported_profile(&mut profile);
     Ok((profile, report))
+}
+
+pub fn safe_relative_path(path: &str) -> Result<PathBuf> {
+    let reject = |why: &str| -> AppError {
+        AppError::Other(format!("Unsafe relative path '{}': {}", path, why))
+    };
+
+    let mut normalized = PathBuf::new();
+    for segment in path.split(['/', '\\']) {
+        if segment.is_empty() {
+            continue;
+        }
+        if segment.contains('\0') {
+            return Err(reject("contains a NUL byte"));
+        }
+
+        let mut components = Path::new(segment).components();
+        match (components.next(), components.next()) {
+            (Some(Component::Normal(_)), None) => {}
+            _ => return Err(reject("contains a segment that is not a plain name")),
+        }
+
+        normalized.push(segment);
+    }
+
+    if normalized.as_os_str().is_empty() {
+        return Err(reject("resolves to no path segments"));
+    }
+
+    Ok(normalized)
 }
 
 pub fn safe_file_component(name: &str) -> Result<String> {

@@ -284,11 +284,14 @@ export interface CopyProfileParams {
   copy_all_files?: boolean;
 }
 
+export type ExportPackFormat = "noriskpack" | "mrpack";
+
 export interface ExportProfileParams {
   profile_id: string;
   file_name: string;
   include_files?: string[];
   open_folder: boolean;
+  format?: ExportPackFormat;
 }
 
 // --- Payload for upload_profile_icon command ---

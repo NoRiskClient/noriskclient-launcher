@@ -27,8 +27,12 @@ use tokio::io::AsyncReadExt;
 use tokio::task::JoinHandle;
 
 use futures_lite::io::AsyncWriteExt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+
+#[cfg(test)]
+#[path = "profile_utils_test.rs"]
+mod tests;
 
 /// Represents the type of content to be installed
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1055,7 +1059,7 @@ pub async fn execute_group_migration(migration_info: MigrationInfo, profile_id: 
 /// Determines the optimal compression type for a file based on its extension and size.
 /// Already-compressed files and large files use Stored (no compression) for speed.
 /// Small text/config files use Deflate for better compression.
-fn determine_compression(file_path: &Path, file_size: u64) -> Compression {
+pub(crate) fn determine_compression(file_path: &Path, file_size: u64) -> Compression {
     // Files larger than 1MB - use Stored for speed
     if file_size > 1_048_576 {
         return Compression::Stored;
@@ -1098,47 +1102,28 @@ pub async fn export_profile_to_noriskpack(
 ) -> Result<PathBuf> {
     info!("Exporting profile {} to .noriskpack", profile_id);
 
-    // Get the profile (no global semaphore - we'll use per-file permits)
     let state = crate::state::state_manager::State::get().await?;
     let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    // Single traversal strategy like Modrinth
-    let mut all_files = Vec::new();
     let profile_instance_path = state
         .profile_manager
         .get_profile_instance_path(profile_id)
         .await?;
 
-    // 1. Collect ALL files in profile once (like Modrinth)
-    collect_all_files_recursive(&profile_instance_path, &mut all_files).await?;
-
-    // 2. Filter with string matching (like Modrinth's included_candidates_set check)
-    if let Some(ref include_paths) = include_files {
-        let include_paths_str: Vec<String> = include_paths
-            .iter()
-            .filter_map(|p| p.strip_prefix(&profile_instance_path).ok())
-            .map(|rel_path| rel_path.to_string_lossy().replace('\\', "/"))
+    let entries: Vec<ExportEntry> =
+        select_export_files(&profile_instance_path, include_files.as_ref())
+            .await?
+            .into_iter()
+            .filter_map(|source_path| {
+                let rel_path = relative_zip_path(&profile_instance_path, &source_path)?;
+                Some(ExportEntry {
+                    zip_path: format!("overrides/{}", rel_path),
+                    source_path,
+                })
+            })
             .collect();
 
-        all_files.retain(|file_path| {
-            if let Ok(rel_path) = file_path.strip_prefix(&profile_instance_path) {
-                let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-                include_paths_str
-                    .iter()
-                    .any(|include_str| rel_path_str.starts_with(include_str))
-            } else {
-                false
-            }
-        });
-    } else {
-        all_files.clear(); // No include_files = no files to export
-    }
-
-    let total_files = all_files.len();
-    info!("Exporting {} files to .noriskpack", total_files);
-
-    // Create a sanitized copy of the profile for export
     let export_profile = sanitize_profile_for_export(&profile);
+    let profile_json = serde_json::to_vec_pretty(&export_profile)?;
 
     // Determine the output file path
     let output_file = match output_path {
@@ -1160,125 +1145,159 @@ pub async fn export_profile_to_noriskpack(
         }
     };
 
-    // Ensure parent directory exists
-    if let Some(parent) = output_file.parent() {
+    write_export_archive(
+        &state,
+        profile_id,
+        &output_file,
+        entries,
+        vec![("profile.json".to_string(), profile_json)],
+    )
+    .await?;
+
+    info!(
+        "Successfully exported profile to: {}",
+        output_file.display()
+    );
+    Ok(output_file)
+}
+
+pub(crate) struct ExportEntry {
+    pub source_path: PathBuf,
+    pub zip_path: String,
+}
+
+pub(crate) fn relative_zip_path(base: &Path, path: &Path) -> Option<String> {
+    path.strip_prefix(base)
+        .ok()
+        .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+}
+
+pub(crate) async fn select_export_files(
+    instance_path: &Path,
+    include_files: Option<&Vec<PathBuf>>,
+) -> Result<Vec<PathBuf>> {
+    let Some(include_paths) = include_files else {
+        return Ok(Vec::new());
+    };
+
+    let mut all_files = Vec::new();
+    collect_all_files_recursive(instance_path, &mut all_files).await?;
+
+    let include_paths_str: Vec<String> = include_paths
+        .iter()
+        .filter_map(|p| relative_zip_path(instance_path, p))
+        .collect();
+
+    all_files.retain(|file_path| {
+        relative_zip_path(instance_path, file_path).is_some_and(|rel_path| {
+            include_paths_str
+                .iter()
+                .any(|include_str| rel_path.starts_with(include_str))
+        })
+    });
+
+    Ok(all_files)
+}
+
+pub(crate) async fn write_export_archive(
+    state: &Arc<crate::state::state_manager::State>,
+    profile_id: Uuid,
+    output_path: &Path,
+    entries: Vec<ExportEntry>,
+    trailing_entries: Vec<(String, Vec<u8>)>,
+) -> Result<()> {
+    let total_files = entries.len();
+    info!(
+        "Creating export archive at {} ({} files)",
+        output_path.display(),
+        total_files
+    );
+
+    if let Some(parent) = output_path.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| AppError::Io(e))?;
+            fs::create_dir_all(parent).await.map_err(AppError::Io)?;
         }
     }
 
-    info!("Creating .noriskpack archive at: {}", output_file.display());
-
-    // Create zip file and writer - write directly to target file
-    let mut file = fs::File::create(&output_file)
-        .await
-        .map_err(|e| AppError::Io(e))?;
+    let mut file = fs::File::create(output_path).await.map_err(AppError::Io)?;
     let mut writer = ZipFileWriter::with_tokio(&mut file);
 
-    // Write the profile data to JSON directly into zip
-    let profile_json = serde_json::to_vec_pretty(&export_profile)?;
-    let profile_builder = ZipEntryBuilder::new("profile.json".into(), Compression::Deflate);
-    writer
-        .write_entry_whole(profile_builder, &profile_json)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to write profile.json to zip: {}", e)))?;
-
-    // Progress tracking
     let export_event_id = Uuid::new_v4();
     let completed_files = Arc::new(AtomicUsize::new(0));
 
-    // Emit initial progress
-    state.event_state.emit(crate::state::event_state::EventPayload {
-        event_id: export_event_id,
-        event_type: crate::state::event_state::EventType::ExportingProfile,
-        target_id: Some(profile_id),
-        message: format!("Starting export of {} files...", total_files),
-        progress: Some(0.0),
-        error: None,
-    }).await?;
+    emit_export_progress(
+        state,
+        export_event_id,
+        profile_id,
+        format!("Starting export of {} files...", total_files),
+        0.0,
+    )
+    .await?;
 
-    // Channel for parallel file processing
     let (tx, mut rx) = tokio::sync::mpsc::channel::<(String, Vec<u8>, Compression)>(100);
-    
-    // Spawn worker tasks to read files in parallel
     let mut tasks: Vec<JoinHandle<Result<()>>> = Vec::new();
     let io_semaphore = state.io_semaphore.clone();
-    
-    for file_path in all_files {
-        if let Ok(rel_path) = file_path.strip_prefix(&profile_instance_path) {
-            let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-            let zip_path = format!("overrides/{}", rel_path_str);
-            
-            let tx_clone = tx.clone();
-            let file_path_clone = file_path.clone();
-            let semaphore_clone = io_semaphore.clone();
-            let completed_clone = completed_files.clone();
-            let state_clone = state.clone();
-            let total = total_files;
-            
-            let task = tokio::spawn(async move {
-                // Acquire semaphore for this file
-                let _permit = semaphore_clone.acquire().await.map_err(|e| {
-                    AppError::Other(format!("Failed to acquire semaphore: {}", e))
-                })?;
-                
-                // Get file metadata for compression decision
-                let metadata = fs::metadata(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
-                let file_size = metadata.len();
-                let compression = determine_compression(&file_path_clone, file_size);
-                
-                // Read file data
-                let data = fs::read(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
-                
-                // Send to writer
-                tx_clone.send((zip_path, data, compression)).await.map_err(|e| {
-                    AppError::Other(format!("Failed to send file data: {}", e))
-                })?;
-                
-                // Update progress
-                let completed = completed_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                let progress = (completed as f64) / (total as f64);
-                
-                // Emit progress every 5% or every 100 files
-                if completed % 100 == 0 || (progress - (completed as f64 - 1.0) / total as f64) >= 0.05 {
-                    let _ = state_clone.event_state.emit(crate::state::event_state::EventPayload {
-                        event_id: export_event_id,
-                        event_type: crate::state::event_state::EventType::ExportingProfile,
-                        target_id: Some(profile_id),
-                        message: format!("Exporting files... {}/{}", completed, total),
-                        progress: Some(progress),
-                        error: None,
-                    }).await;
-                }
-                
-                debug!("Processed file: {}", file_path_clone.display());
-                
-                Ok(())
-            });
-            
-            tasks.push(task);
-        }
+
+    for entry in entries {
+        let tx_clone = tx.clone();
+        let semaphore_clone = io_semaphore.clone();
+        let completed_clone = completed_files.clone();
+        let state_clone = state.clone();
+        let total = total_files.max(1);
+
+        let task = tokio::spawn(async move {
+            let _permit = semaphore_clone
+                .acquire()
+                .await
+                .map_err(|e| AppError::Other(format!("Failed to acquire semaphore: {}", e)))?;
+
+            let metadata = fs::metadata(&entry.source_path)
+                .await
+                .map_err(AppError::Io)?;
+            let compression = determine_compression(&entry.source_path, metadata.len());
+            let data = fs::read(&entry.source_path).await.map_err(AppError::Io)?;
+
+            tx_clone
+                .send((entry.zip_path, data, compression))
+                .await
+                .map_err(|e| AppError::Other(format!("Failed to send file data: {}", e)))?;
+
+            let completed = completed_clone.fetch_add(1, Ordering::SeqCst) + 1;
+            let progress = (completed as f64) / (total as f64);
+
+            // Emit progress every 5% or every 100 files
+            if completed % 100 == 0 || (progress - (completed as f64 - 1.0) / total as f64) >= 0.05 {
+                let _ = emit_export_progress(
+                    &state_clone,
+                    export_event_id,
+                    profile_id,
+                    format!("Exporting files... {}/{}", completed, total),
+                    progress,
+                )
+                .await;
+            }
+
+            debug!("Processed file: {}", entry.source_path.display());
+            Ok(())
+        });
+
+        tasks.push(task);
     }
-    
+
     // Drop the original sender so the channel closes when all tasks finish
     drop(tx);
-    
-    // Spawn a task to wait for all workers to complete
+
     let workers_handle = tokio::spawn(async move {
-        let results = join_all(tasks).await;
-        for result in results {
+        for result in join_all(tasks).await {
             match result {
-                Ok(Ok(())) => {},
+                Ok(Ok(())) => {}
                 Ok(Err(e)) => return Err(e),
                 Err(e) => return Err(AppError::Other(format!("Task panicked: {}", e))),
             }
         }
         Ok(())
     });
-    
-    // Write files to zip as they come from the channel
+
     while let Some((zip_path, data, compression)) = rx.recv().await {
         let entry_builder = ZipEntryBuilder::new(zip_path.into(), compression);
         writer
@@ -1286,33 +1305,54 @@ pub async fn export_profile_to_noriskpack(
             .await
             .map_err(|e| AppError::Other(format!("Failed to write zip entry: {}", e)))?;
     }
-    
-    // Wait for all workers to complete
-    workers_handle.await.map_err(|e| {
-        AppError::Other(format!("Workers task panicked: {}", e))
-    })??;
 
-    // Close the zip writer
+    workers_handle
+        .await
+        .map_err(|e| AppError::Other(format!("Workers task panicked: {}", e)))??;
+
+    for (zip_path, data) in trailing_entries {
+        let entry_builder = ZipEntryBuilder::new(zip_path.clone().into(), Compression::Deflate);
+        writer
+            .write_entry_whole(entry_builder, &data)
+            .await
+            .map_err(|e| AppError::Other(format!("Failed to write {} to zip: {}", zip_path, e)))?;
+    }
+
     writer
         .close()
         .await
         .map_err(|e| AppError::Other(format!("Failed to finalize zip file: {}", e)))?;
 
-    // Emit completion progress
-    state.event_state.emit(crate::state::event_state::EventPayload {
-        event_id: export_event_id,
-        event_type: crate::state::event_state::EventType::ExportingProfile,
-        target_id: Some(profile_id),
-        message: format!("Export completed! {} files exported.", total_files),
-        progress: Some(1.0),
-        error: None,
-    }).await?;
+    emit_export_progress(
+        state,
+        export_event_id,
+        profile_id,
+        format!("Export completed! {} files exported.", total_files),
+        1.0,
+    )
+    .await?;
 
-    info!(
-        "Successfully exported profile to: {}",
-        output_file.display()
-    );
-    Ok(output_file)
+    Ok(())
+}
+
+async fn emit_export_progress(
+    state: &Arc<crate::state::state_manager::State>,
+    event_id: Uuid,
+    profile_id: Uuid,
+    message: String,
+    progress: f64,
+) -> Result<()> {
+    state
+        .event_state
+        .emit(crate::state::event_state::EventPayload {
+            event_id,
+            event_type: crate::state::event_state::EventType::ExportingProfile,
+            target_id: Some(profile_id),
+            message,
+            progress: Some(progress),
+            error: None,
+        })
+        .await
 }
 
 /// Creates a sanitized copy of a profile for export
@@ -1352,9 +1392,23 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
 }
 
 /// Collect all files recursively (like Modrinth's add_all_recursive_folder_paths)
-fn collect_all_files_recursive<'a>(
+pub(crate) fn collect_all_files_recursive<'a>(
     dir_path: &'a Path,
     file_list: &'a mut Vec<PathBuf>,
+) -> BoxFuture<'a, Result<()>> {
+    Box::pin(async move {
+        let mut visited = HashSet::new();
+        if let Ok(root) = fs::canonicalize(dir_path).await {
+            visited.insert(root);
+        }
+        collect_files_guarded(dir_path, file_list, &mut visited).await
+    })
+}
+
+fn collect_files_guarded<'a>(
+    dir_path: &'a Path,
+    file_list: &'a mut Vec<PathBuf>,
+    visited: &'a mut HashSet<PathBuf>,
 ) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         let mut entries = fs::read_dir(dir_path).await.map_err(|e| AppError::Io(e))?;
@@ -1362,10 +1416,27 @@ fn collect_all_files_recursive<'a>(
         while let Some(entry) = entries.next_entry().await.map_err(|e| AppError::Io(e))? {
             let path = entry.path();
 
-            if path.is_dir() {
+            // Resolves through symlinks, so linked-in content is still exported.
+            let metadata = match fs::metadata(&path).await {
+                Ok(metadata) => metadata,
+                Err(e) => {
+                    warn!("Skipping unreadable entry {}: {}", path.display(), e);
+                    continue;
+                }
+            };
+
+            if metadata.is_dir() {
+                let identity = fs::canonicalize(&path).await.unwrap_or_else(|_| path.clone());
+                if !visited.insert(identity) {
+                    warn!(
+                        "Skipping already visited directory, symlink loop: {}",
+                        path.display()
+                    );
+                    continue;
+                }
                 // Recurse into directories
-                collect_all_files_recursive(&path, file_list).await?;
-            } else {
+                collect_files_guarded(&path, file_list, visited).await?;
+            } else if metadata.is_file() {
                 // Add files to the list
                 file_list.push(path);
             }

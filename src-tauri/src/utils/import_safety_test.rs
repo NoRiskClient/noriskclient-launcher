@@ -263,3 +263,42 @@ fn version_strings_reject_path_characters() {
     assert!(!is_version_like("../../evil"));
     assert!(!is_version_like(""));
 }
+
+#[test]
+fn safe_relative_path_accepts_nested_segments() {
+    assert_eq!(
+        safe_relative_path("saves/world").unwrap(),
+        PathBuf::from("saves").join("world")
+    );
+    assert_eq!(safe_relative_path("/mods/").unwrap(), PathBuf::from("mods"));
+}
+
+#[test]
+fn safe_relative_path_keeps_folder_names_the_os_allows() {
+    for good in ["resourcepacks", "My Packs", "CON", "shaders.backup", "a.b.c"] {
+        assert!(
+            safe_relative_path(good).is_ok(),
+            "expected '{}' to be accepted",
+            good
+        );
+    }
+}
+
+#[test]
+fn safe_relative_path_rejects_escapes_and_empties() {
+    for bad in [
+        "..",
+        "../../etc",
+        "saves/../../..",
+        r"mods\..\x",
+        "",
+        "/",
+        "///",
+    ] {
+        assert!(
+            safe_relative_path(bad).is_err(),
+            "expected '{}' to be rejected",
+            bad
+        );
+    }
+}

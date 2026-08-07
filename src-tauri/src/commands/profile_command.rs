@@ -82,6 +82,23 @@ pub struct CopyProfileParams {
     copy_all_files: Option<bool>,
 }
 
+#[derive(Deserialize, Default, Clone, Copy, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    #[default]
+    Noriskpack,
+    Mrpack,
+}
+
+impl ExportFormat {
+    fn extension(&self) -> &'static str {
+        match self {
+            Self::Noriskpack => "noriskpack",
+            Self::Mrpack => "mrpack",
+        }
+    }
+}
+
 // Export profile command parameters
 #[derive(Deserialize)]
 pub struct ExportProfileParams {
@@ -90,6 +107,8 @@ pub struct ExportProfileParams {
     file_name: String,           // Base name without extension
     include_files: Option<Vec<PathBuf>>,
     open_folder: bool, // Whether to open the exports folder after export
+    #[serde(default)]
+    format: ExportFormat,
 }
 
 // DTO for the new command
@@ -1731,20 +1750,33 @@ pub async fn export_profile(
     }
 
     // Generate complete filename with extension
-    let noriskpack_filename = format!("{}.noriskpack", sanitized_name);
+    let pack_filename = format!("{}.{}", sanitized_name, params.format.extension());
 
     // Create full export path
-    let export_path = exports_dir.join(&noriskpack_filename);
+    let export_path = exports_dir.join(&pack_filename);
 
     info!("Exporting profile to {}", export_path.display());
 
     // Perform the export
-    let result_path = profile_utils::export_profile_to_noriskpack(
-        params.profile_id,
-        Some(export_path.clone()),
-        params.include_files,
-    )
-        .await?;
+    let result_path = match params.format {
+        ExportFormat::Noriskpack => {
+            profile_utils::export_profile_to_noriskpack(
+                params.profile_id,
+                Some(export_path.clone()),
+                params.include_files,
+            )
+            .await?
+        }
+        ExportFormat::Mrpack => {
+            crate::integrations::mrpack_export::export_profile_to_mrpack(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+    };
 
     // Open the export directory if requested
     if params.open_folder {
@@ -2415,13 +2447,10 @@ pub async fn add_profile_symlink(params: AddSymlinkParams) -> Result<(), Command
     
     // Normalize relative_path by converting to PathBuf (handles forward/backslash normalization)
     // Split by '/' and push segments individually to ensure platform-appropriate separators
-    let mut normalized_relative = PathBuf::new();
-    for segment in params.relative_path.split('/') {
-        if !segment.is_empty() {
-            normalized_relative.push(segment);
-        }
-    }
-    
+    let normalized_relative =
+        crate::utils::import_safety::safe_relative_path(&params.relative_path)
+            .map_err(CommandError::from)?;
+
     let link_path = instance_path.join(&normalized_relative);
     let target_path = PathBuf::from(&params.external_path);
     
