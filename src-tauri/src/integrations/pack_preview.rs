@@ -20,7 +20,7 @@ const MAX_TOTAL_BUNDLED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const HASH_CHUNK_BYTES: usize = 64 * 1024;
 
 const MODRINTH_HASH_BATCH: usize = 200;
-const CURSEFORGE_FINGERPRINT_BATCH: usize = 200;
+use crate::integrations::curseforge::CURSEFORGE_FINGERPRINT_BATCH;
 
 type PackZip = ZipFileReader<BufReader<File>>;
 
@@ -307,13 +307,15 @@ async fn read_curseforge(zip: &mut PackZip) -> Result<PackDetails> {
     let mut loader = None;
     let mut loader_version = None;
     if let Some(entry) = manifest.minecraft.mod_loaders.first() {
-        let (name, version) = entry
-            .id
-            .split_once('-')
-            .map(|(n, v)| (n.to_string(), Some(v.to_string())))
-            .unwrap_or_else(|| (entry.id.clone(), None));
-        loader = Some(name);
-        loader_version = version;
+        loader = Some(
+            crate::integrations::curseforge::determine_loader_from_curseforge_string(&entry.id)
+                .as_str()
+                .to_string(),
+        );
+        loader_version = crate::integrations::curseforge::extract_loader_version(
+            &entry.id,
+            Some(&manifest.minecraft.version),
+        );
     }
 
     let overrides_dir = format!(

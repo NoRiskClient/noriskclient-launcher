@@ -88,6 +88,7 @@ pub enum ExportFormat {
     #[default]
     Noriskpack,
     Mrpack,
+    Curseforge,
 }
 
 impl ExportFormat {
@@ -95,6 +96,7 @@ impl ExportFormat {
         match self {
             Self::Noriskpack => "noriskpack",
             Self::Mrpack => "mrpack",
+            Self::Curseforge => "zip",
         }
     }
 }
@@ -1769,6 +1771,15 @@ pub async fn export_profile(
         }
         ExportFormat::Mrpack => {
             crate::integrations::mrpack_export::export_profile_to_mrpack(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+        ExportFormat::Curseforge => {
+            crate::integrations::curseforge_export::export_profile_to_curseforge(
                 params.profile_id,
                 export_path.clone(),
                 params.include_files,

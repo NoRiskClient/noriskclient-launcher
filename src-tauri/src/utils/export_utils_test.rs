@@ -114,7 +114,6 @@ async fn linked_in_content_is_still_collected() {
     fs::write(shared.join("sodium.jar"), "jar").await.unwrap();
     fs::write(instance.join("options.txt"), "opts").await.unwrap();
 
-    // Creating links needs Developer Mode or admin on Windows; skip where it is unavailable.
     if link_dir(&shared, &instance.join("mods")).is_err() {
         return;
     }
@@ -137,7 +136,6 @@ async fn symlink_loop_terminates() {
     fs::create_dir_all(instance.join("nested")).await.unwrap();
     fs::write(instance.join("nested/a.txt"), "a").await.unwrap();
 
-    // Creating links needs Developer Mode or admin on Windows; skip where it is unavailable.
     if link_dir(&instance, &instance.join("nested").join("loop")).is_err() {
         return;
     }
@@ -149,6 +147,39 @@ async fn symlink_loop_terminates() {
 }
 
 #[test]
+fn loader_versions_lose_the_game_version_maven_prefix() {
+    assert_eq!(normalize_loader_version("1.21.1-52.1.0", "1.21.1"), "52.1.0");
+    assert_eq!(
+        normalize_loader_version("1.8.9-11.15.1.2318-1.8.9", "1.8.9"),
+        "11.15.1.2318"
+    );
+    assert_eq!(
+        normalize_loader_version("  1.20.1-47.4.20  ", "1.20.1"),
+        "47.4.20"
+    );
+}
+
+#[test]
+fn loader_versions_lose_the_stable_annotation() {
+    assert_eq!(
+        normalize_loader_version("0.19.3 (stable)", "1.21.11"),
+        "0.19.3"
+    );
+    assert_eq!(
+        normalize_loader_version("0.17.0 (stable)", "1.20.1"),
+        "0.17.0"
+    );
+}
+
+#[test]
+fn loader_versions_without_a_prefix_are_untouched() {
+    assert_eq!(normalize_loader_version("52.1.0", "1.21.1"), "52.1.0");
+    assert_eq!(normalize_loader_version("0.15.11", "1.21.1"), "0.15.11");
+    assert_eq!(normalize_loader_version("21.1.203", "1.21.1"), "21.1.203");
+    assert_eq!(normalize_loader_version("1.20.1", "1.20.1"), "1.20.1");
+}
+
+#[test]
 fn relative_zip_path_normalises_separators_and_rejects_outsiders() {
     let base = Path::new("/instances/foo");
     assert_eq!(
@@ -156,4 +187,62 @@ fn relative_zip_path_normalises_separators_and_rejects_outsiders() {
         Some("config/a.json")
     );
     assert_eq!(relative_zip_path(base, Path::new("/instances/bar/a.json")), None);
+}
+
+#[test]
+fn flattens_managed_mod_dirs_into_overrides_mods() {
+    assert_eq!(
+        override_zip_path("mods/nrc-1.21.1-fabric/sodium-0.6.jar").as_deref(),
+        Some("overrides/mods/sodium-0.6.jar")
+    );
+    assert_eq!(
+        override_zip_path("mods/nrc-1.21.1-neoforge-ab12/jei.jar").as_deref(),
+        Some("overrides/mods/jei.jar")
+    );
+    assert_eq!(
+        override_zip_path("custom_mods/my-mod.jar").as_deref(),
+        Some("overrides/mods/my-mod.jar")
+    );
+}
+
+#[test]
+fn keeps_regular_paths_verbatim() {
+    assert_eq!(
+        override_zip_path("mods/local-mod.jar").as_deref(),
+        Some("overrides/mods/local-mod.jar")
+    );
+    assert_eq!(
+        override_zip_path("config/sodium-options.json").as_deref(),
+        Some("overrides/config/sodium-options.json")
+    );
+    assert_eq!(
+        override_zip_path("options.txt").as_deref(),
+        Some("overrides/options.txt")
+    );
+    assert_eq!(
+        override_zip_path("saves/world/level.dat").as_deref(),
+        Some("overrides/saves/world/level.dat")
+    );
+}
+
+#[test]
+fn drops_launcher_internal_and_runtime_junk() {
+    assert_eq!(override_zip_path("profile.json"), None);
+    assert_eq!(override_zip_path("logs/latest.log"), None);
+    assert_eq!(override_zip_path("crash-reports/crash-2026.txt"), None);
+    assert_eq!(override_zip_path(".fabric/remappedJars/a.jar"), None);
+    assert_eq!(override_zip_path(".mixin.out/class.json"), None);
+    assert_eq!(override_zip_path("config/.DS_Store"), None);
+}
+
+#[test]
+fn nested_mod_folders_still_resolve_to_the_bare_filename() {
+    assert_eq!(
+        override_zip_path("mods/1.21.1/sodium.jar").as_deref(),
+        Some("overrides/mods/1.21.1/sodium.jar")
+    );
+
+    let zip_path = override_zip_path("mods/1.21.1/sodium.jar").unwrap();
+    let rest = zip_path.strip_prefix(OVERRIDES_MODS_PREFIX).unwrap();
+    assert_eq!(rest.rsplit('/').next().unwrap(), "sodium.jar");
 }

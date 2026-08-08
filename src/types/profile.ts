@@ -284,7 +284,7 @@ export interface CopyProfileParams {
   copy_all_files?: boolean;
 }
 
-export type ExportPackFormat = "noriskpack" | "mrpack";
+export type ExportPackFormat = "noriskpack" | "mrpack" | "curseforge";
 
 export interface ExportProfileParams {
   profile_id: string;

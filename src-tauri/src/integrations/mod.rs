@@ -1,4 +1,5 @@
 pub mod curseforge;
+pub mod curseforge_export;
 pub mod lenient;
 pub mod modrinth;
 pub mod mrpack;

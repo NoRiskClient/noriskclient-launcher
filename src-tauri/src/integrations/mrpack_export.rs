@@ -1,42 +1,23 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
-use crate::error::{AppError, Result};
+use crate::error::Result;
 use crate::integrations::modrinth;
 use crate::integrations::mrpack::{
     ModrinthIndex, ModrinthIndexFile, FABRIC_LOADER_DEPENDENCY, FORGE_DEPENDENCY,
     MINECRAFT_DEPENDENCY, NEOFORGE_DEPENDENCY, QUILT_LOADER_DEPENDENCY,
 };
-use crate::minecraft::modloader::ModloaderFactory;
-use crate::state::profile_state::{self, ModLoader, ModSource, Profile};
+use crate::state::profile_state::{ModLoader, ModSource, Profile};
 use crate::state::state_manager::State;
-use crate::utils::hash_utils;
-use crate::utils::import_safety::safe_file_component;
-use crate::utils::profile_utils::{
-    relative_zip_path, select_export_files, write_export_archive, ExportEntry,
+use crate::utils::export_utils::{
+    collect_export_entries, locate_mod_jar, mod_file_name, resolve_export_loader_version,
+    write_export_archive,
 };
+use crate::utils::hash_utils;
 use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use tokio::fs;
 use uuid::Uuid;
 
-#[cfg(test)]
-#[path = "mrpack_export_test.rs"]
-mod tests;
-
-const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 const DEFAULT_PACK_VERSION: &str = "1.0.0";
 const INDEX_FILE_NAME: &str = "modrinth.index.json";
-const OVERRIDES_MODS_PREFIX: &str = "overrides/mods/";
-
-const NEVER_EXPORTABLE_PREFIXES: &[&str] = &[
-    "profile.json",
-    "logs/",
-    "crash-reports/",
-    ".fabric/",
-    ".mixin.out/",
-    "__MACOSX/",
-];
-const NEVER_EXPORTABLE_SUFFIXES: &[&str] = &[".DS_Store"];
 
 pub async fn export_profile_to_mrpack(
     profile_id: Uuid,
@@ -57,12 +38,16 @@ pub async fn export_profile_to_mrpack(
     let (index_files, bundled_mod_filenames) =
         build_index_files(&state, &profile, &instance_path).await?;
 
-    let entries = collect_entries(
+    let indexed_mod_filenames: HashSet<String> = index_files
+        .iter()
+        .filter_map(|entry| entry.path.rsplit('/').next().map(|name| name.to_string()))
+        .collect();
+    let entries = collect_export_entries(
         &state,
         &profile,
         &instance_path,
         include_files.as_ref(),
-        &index_files,
+        &indexed_mod_filenames,
         &bundled_mod_filenames,
     )
     .await?;
@@ -113,21 +98,7 @@ async fn build_dependencies(state: &State, profile: &Profile) -> Result<HashMap<
         return Ok(dependencies);
     };
 
-    let loader_version = match &profile.loader_version {
-        Some(version) if !version.trim().is_empty() => version.clone(),
-        _ => {
-            let config = state.norisk_pack_manager.get_config().await;
-            ModloaderFactory::resolve_loader_version(profile, &profile.game_version, Some(&config))
-                .await
-                .version
-                .ok_or_else(|| {
-                    AppError::Other(format!(
-                        "Could not resolve a {} version for MC {} - .mrpack requires an exact loader version",
-                        loader_key, profile.game_version
-                    ))
-                })?
-        }
-    };
+    let loader_version = resolve_export_loader_version(state, profile, ".mrpack").await?;
 
     dependencies.insert(loader_key.to_string(), loader_version);
     Ok(dependencies)
@@ -142,16 +113,8 @@ async fn build_index_files(
     let mut bundled: Vec<String> = Vec::new();
 
     for mod_info in profile.mods.iter().filter(|m| m.enabled) {
-        let raw_filename = match &mod_info.file_name_override {
-            Some(name) => Ok(name.clone()),
-            None => profile_state::get_profile_mod_filename(&mod_info.source),
-        };
-        let filename = match raw_filename.and_then(|name| safe_file_component(&name)) {
-            Ok(name) => name,
-            Err(e) => {
-                warn!("Skipping mod without resolvable filename: {}", e);
-                continue;
-            }
+        let Some(filename) = mod_file_name(mod_info) else {
+            continue;
         };
 
         let ModSource::Modrinth { file_hash_sha1, .. } = &mod_info.source else {
@@ -244,111 +207,3 @@ async fn build_index_files(
     Ok((index_files, bundled))
 }
 
-async fn collect_entries(
-    state: &State,
-    profile: &Profile,
-    instance_path: &Path,
-    include_files: Option<&Vec<PathBuf>>,
-    index_files: &[ModrinthIndexFile],
-    bundled_mod_filenames: &[String],
-) -> Result<Vec<ExportEntry>> {
-    let index_mod_filenames: HashSet<&str> = index_files
-        .iter()
-        .filter_map(|entry| entry.path.rsplit('/').next())
-        .collect();
-
-    let mut claimed_zip_paths: HashSet<String> = HashSet::new();
-    let mut entries: Vec<ExportEntry> = Vec::new();
-
-    for source_path in select_export_files(instance_path, include_files).await? {
-        let Some(rel_path) = relative_zip_path(instance_path, &source_path) else {
-            continue;
-        };
-        let Some(zip_path) = override_zip_path(&rel_path) else {
-            continue;
-        };
-        if let Some(name) = zip_path.strip_prefix(OVERRIDES_MODS_PREFIX) {
-            if index_mod_filenames.contains(name) {
-                continue;
-            }
-        }
-        if !claimed_zip_paths.insert(zip_path.clone()) {
-            continue;
-        }
-        entries.push(ExportEntry {
-            source_path,
-            zip_path,
-        });
-    }
-
-    for filename in bundled_mod_filenames {
-        let zip_path = format!("{}{}", OVERRIDES_MODS_PREFIX, filename);
-        if claimed_zip_paths.contains(&zip_path) {
-            continue;
-        }
-        match locate_mod_jar(state, profile, instance_path, filename).await {
-            Some(source_path) => {
-                claimed_zip_paths.insert(zip_path.clone());
-                entries.push(ExportEntry {
-                    source_path,
-                    zip_path,
-                });
-            }
-            None => warn!(
-                "Could not locate jar for mod '{}', it will be missing from the exported .mrpack",
-                filename
-            ),
-        }
-    }
-
-    Ok(entries)
-}
-
-fn override_zip_path(rel_path: &str) -> Option<String> {
-    let is_excluded = NEVER_EXPORTABLE_PREFIXES
-        .iter()
-        .any(|prefix| rel_path.starts_with(prefix))
-        || NEVER_EXPORTABLE_SUFFIXES
-            .iter()
-            .any(|suffix| rel_path.ends_with(suffix));
-    if is_excluded {
-        return None;
-    }
-
-    let is_managed_mod = rel_path.starts_with("mods/nrc-") || rel_path.starts_with("custom_mods/");
-    if is_managed_mod {
-        let filename = rel_path.rsplit('/').next()?;
-        return Some(format!("{}{}", OVERRIDES_MODS_PREFIX, filename));
-    }
-
-    Some(format!("overrides/{}", rel_path))
-}
-
-async fn locate_mod_jar(
-    state: &State,
-    profile: &Profile,
-    instance_path: &Path,
-    filename: &str,
-) -> Option<PathBuf> {
-    let mut candidates = vec![instance_path.join("mods").join(filename)];
-    if let Ok(managed_dir) = state.profile_manager.get_profile_mods_path(profile) {
-        candidates.push(managed_dir.join(filename));
-    }
-    candidates.push(instance_path.join("custom_mods").join(filename));
-    candidates.push(
-        LAUNCHER_DIRECTORY
-            .meta_dir()
-            .join(MOD_CACHE_DIR_NAME)
-            .join(filename),
-    );
-
-    for candidate in candidates {
-        if fs::metadata(&candidate)
-            .await
-            .is_ok_and(|meta| meta.is_file())
-        {
-            return Some(candidate);
-        }
-    }
-    None
-}

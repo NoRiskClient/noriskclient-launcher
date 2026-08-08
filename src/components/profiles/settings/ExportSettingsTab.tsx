@@ -21,27 +21,29 @@ import { EventType, type EventPayload } from "../../../types/events";
 import { parseErrorMessage } from "../../../utils/error-utils";
 
 const EXPORT_FORMATS: {
-  value: ExportPackFormat | "curseforge";
+  value: ExportPackFormat;
   labelKey: string;
+  extension: string;
   image: string;
   disabled?: boolean;
 }[] = [
   {
     value: "noriskpack",
     labelKey: "export.format_noriskpack",
+    extension: "noriskpack",
     image: "/logo.png",
   },
   {
     value: "mrpack",
     labelKey: "export.format_mrpack",
+    extension: "mrpack",
     image: "https://cdn.modrinth.com/modrinth-new.png",
   },
-  // TODO: CurseForge export (manifest.json + overrides/) is not implemented in the backend yet.
   {
     value: "curseforge",
     labelKey: "export.format_curseforge",
+    extension: "zip",
     image: "https://cdn.norisk.gg/misc/curseforge.webp",
-    disabled: true,
   },
 ];
 
@@ -361,7 +363,10 @@ export function ExportSettingsTab({
           </div>
           <p className="mt-1 text-xs text-white/50 font-minecraft tracking-wide truncate">
             {t('export.saved_as', {
-              filename: `${exportFilename.trim() || profile.name}.${exportFormat}`,
+              filename: `${exportFilename.trim() || profile.name}.${
+                EXPORT_FORMATS.find((format) => format.value === exportFormat)
+                  ?.extension ?? exportFormat
+              }`,
             })}
           </p>
         </div>

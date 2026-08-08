@@ -26,6 +26,10 @@ use crate::utils::download_utils::DownloadUtils;
 
 use crate::utils::string_utils::safe_truncate;
 
+#[cfg(test)]
+#[path = "curseforge_test.rs"]
+mod tests;
+
 // Base URL for CurseForge API
 const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
 
@@ -1101,10 +1105,14 @@ pub struct CurseForgeManifest {
     #[serde(rename = "manifestVersion")]
     pub manifest_version: u32, // Usually 1
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>, // Optional pack version
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>, // Optional author field
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>, // Optional description
     pub files: Vec<CurseForgeManifestFile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub overrides: Option<String>, // Usually "overrides" - optional in some manifests
 }
 
@@ -1114,7 +1122,7 @@ pub struct CurseForgeMinecraft {
     pub version: String,
     #[serde(rename = "modLoaders")]
     pub mod_loaders: Vec<CurseForgeModLoader>,
-    #[serde(rename = "recommendedRam", default, deserialize_with = "deserialize_optional_u64_from_string")]
+    #[serde(rename = "recommendedRam", default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_optional_u64_from_string")]
     pub recommended_ram: Option<u64>, // Optional field for recommended RAM (can be string or number)
 }
 
@@ -1122,6 +1130,7 @@ pub struct CurseForgeMinecraft {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurseForgeModLoader {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub primary: Option<bool>, // Some manifests might not specify primary
 }
 
@@ -1142,7 +1151,7 @@ fn default_required() -> bool {
 }
 
 /// Determines the ModLoader from CurseForge mod loader string
-fn determine_loader_from_curseforge_string(loader_string: &str) -> ModLoader {
+pub(crate) fn determine_loader_from_curseforge_string(loader_string: &str) -> ModLoader {
     let lower = loader_string.to_lowercase();
 
     // Check for specific loaders first (neoforge before forge)
@@ -1160,23 +1169,43 @@ fn determine_loader_from_curseforge_string(loader_string: &str) -> ModLoader {
 }
 
 /// Extracts loader version from CurseForge loader string
-fn extract_loader_version(loader_string: &str) -> Option<String> {
-    // Examples: "fabric-loader-0.15.11", "neoforge-21.1.203", "forge-50.0.0"
-    let parts: Vec<&str> = loader_string.split('-').collect();
-    if parts.len() >= 2 {
-        Some(parts[1..].join("-"))
-    } else {
+pub(crate) fn extract_loader_version(
+    loader_string: &str,
+    mc_version: Option<&str>,
+) -> Option<String> {
+    let lower = loader_string.to_lowercase();
+    let name = ["neoforge", "fabric", "quilt", "forge"]
+        .into_iter()
+        .find(|name| lower.starts_with(name))?;
+
+    let mut rest = loader_string[name.len()..].trim_start_matches('-');
+    rest = rest.strip_prefix("loader-").unwrap_or(rest);
+
+    if let Some(mc_version) = mc_version {
+        if let Some(stripped) = rest.strip_prefix(&format!("{}-", mc_version)) {
+            if !stripped.is_empty() {
+                rest = stripped;
+            }
+        }
+    }
+
+    if rest.is_empty() {
         None
+    } else {
+        Some(rest.to_string())
     }
 }
 
 /// Determines the ModLoader and version from CurseForge mod loaders
-fn determine_loader_from_curseforge_loaders(loaders: &[CurseForgeModLoader]) -> (ModLoader, Option<String>) {
+fn determine_loader_from_curseforge_loaders(
+    loaders: &[CurseForgeModLoader],
+    mc_version: Option<&str>,
+) -> (ModLoader, Option<String>) {
     // First, try to find a loader marked as primary
     for loader in loaders {
         if loader.primary.unwrap_or(false) {
             let loader_type = determine_loader_from_curseforge_string(&loader.id);
-            let version = extract_loader_version(&loader.id);
+            let version = extract_loader_version(&loader.id, mc_version);
             return (loader_type, version);
         }
     }
@@ -1184,7 +1213,7 @@ fn determine_loader_from_curseforge_loaders(loaders: &[CurseForgeModLoader]) -> 
     // If no primary loader found, use the first one
     if let Some(loader) = loaders.first() {
         let loader_type = determine_loader_from_curseforge_string(&loader.id);
-        let version = extract_loader_version(&loader.id);
+        let version = extract_loader_version(&loader.id, mc_version);
         (loader_type, version)
     } else {
         (ModLoader::Vanilla, None)
@@ -1247,7 +1276,8 @@ impl ModpackManifest for CurseForgeManifest {
     }
 
     fn get_loader(&self) -> Option<ModLoader> {
-        let (loader, _) = determine_loader_from_curseforge_loaders(&self.minecraft.mod_loaders);
+        let (loader, _) =
+            determine_loader_from_curseforge_loaders(&self.minecraft.mod_loaders, Some(&self.minecraft.version));
         if loader == ModLoader::Vanilla {
             None
         } else {
@@ -1256,7 +1286,8 @@ impl ModpackManifest for CurseForgeManifest {
     }
 
     fn get_loader_version(&self) -> Option<String> {
-        let (_, version) = determine_loader_from_curseforge_loaders(&self.minecraft.mod_loaders);
+        let (_, version) =
+            determine_loader_from_curseforge_loaders(&self.minecraft.mod_loaders, Some(&self.minecraft.version));
         version
     }
 
@@ -1283,7 +1314,10 @@ pub async fn process_curseforge_pack_from_zip(pack_path: &Path) -> Result<(Profi
     info!("Parsed CurseForge manifest for pack: '{}'", manifest.name);
 
     // Determine loader and version
-    let (loader, loader_version) = determine_loader_from_curseforge_loaders(&manifest.minecraft.mod_loaders);
+    let (loader, loader_version) = determine_loader_from_curseforge_loaders(
+        &manifest.minecraft.mod_loaders,
+        Some(&manifest.minecraft.version),
+    );
     let game_version = manifest.minecraft.version.clone();
 
     info!(
@@ -1599,7 +1633,13 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 version: Some(file_details.displayName.clone()),
                 game_versions: Some(vec![game_version.clone()]),
                 file_name_override: None,
-                associated_loader: Some(determine_loader_from_curseforge_loaders(&manifest.minecraft.mod_loaders).0),
+                associated_loader: Some(
+                    determine_loader_from_curseforge_loaders(
+                        &manifest.minecraft.mod_loaders,
+                        Some(&manifest.minecraft.version),
+                    )
+                    .0,
+                ),
                 modpack_origin: Some(format!("curseforge:{}:{}", project_id, file_id)), // From modpack
                 updates_enabled: false, // Disable updates for modpack mods (updated with pack)
                 force_include_versions: Vec::new(),
@@ -2287,24 +2327,19 @@ pub async fn download_and_install_curseforge_modpack(
 
 // ===== CurseForge Update Checking Structures =====
 
-pub async fn fingerprints_known(
-    fingerprints: Vec<u64>,
-) -> Result<std::collections::HashSet<u64>> {
-    use std::collections::HashSet;
+pub const CURSEFORGE_FINGERPRINT_BATCH: usize = 200;
 
-    if fingerprints.is_empty() {
-        return Ok(HashSet::new());
-    }
+const FINGERPRINT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
+async fn post_fingerprints(fingerprints: Vec<u64>) -> Result<CurseForgeFingerprintResponse> {
     let url = format!("{}/fingerprints", CURSEFORGE_API_BASE_URL);
     let response = HTTP_CLIENT
         .post(&url)
         .header("x-api-key", CURSEFORGE_API_KEY)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
-        .json(&CurseForgeFingerprintRequest {
-            fingerprints: fingerprints.clone(),
-        })
+        .timeout(FINGERPRINT_REQUEST_TIMEOUT)
+        .json(&CurseForgeFingerprintRequest { fingerprints })
         .send()
         .await
         .map_err(|e| AppError::Other(format!("CurseForge fingerprint request failed: {}", e)))?;
@@ -2321,11 +2356,43 @@ pub async fn fingerprints_known(
         .await
         .map_err(|e| AppError::Other(format!("Failed to parse fingerprint response: {}", e)))?;
 
-    let mut known: HashSet<u64> = parsed.data.exact_fingerprints.into_iter().collect();
-    for m in parsed.data.exact_matches {
+    Ok(parsed.data)
+}
+
+pub async fn fingerprints_known(
+    fingerprints: Vec<u64>,
+) -> Result<std::collections::HashSet<u64>> {
+    use std::collections::HashSet;
+
+    if fingerprints.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    let data = post_fingerprints(fingerprints).await?;
+
+    let mut known: HashSet<u64> = data.exact_fingerprints.into_iter().collect();
+    for m in data.exact_matches {
         known.insert(m.file.fileFingerprint);
     }
     Ok(known)
+}
+
+pub async fn fingerprint_matches(
+    fingerprints: Vec<u64>,
+) -> Result<HashMap<u64, (u32, u32)>> {
+    let mut matches = HashMap::new();
+    if fingerprints.is_empty() {
+        return Ok(matches);
+    }
+
+    for chunk in fingerprints.chunks(CURSEFORGE_FINGERPRINT_BATCH) {
+        let data = post_fingerprints(chunk.to_vec()).await?;
+        for m in data.exact_matches {
+            matches.insert(m.file.fileFingerprint, (m.file.modId, m.file.id));
+        }
+    }
+
+    Ok(matches)
 }
 
 /// Request structure for CurseForge fingerprint-based update checking
