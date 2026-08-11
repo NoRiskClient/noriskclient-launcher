@@ -3,33 +3,47 @@ import { persist } from 'zustand/middleware';
 import type { CosmeticCape } from '../types/noriskCapes';
 
 interface RecentCapesState {
-  recentCapes: CosmeticCape[];
-  addRecentCape: (cape: CosmeticCape) => void;
-  removeRecentCape: (capeId: string) => void;
-  clearRecentCapes: () => void;
+  capesByAccount: Record<string, CosmeticCape[]>;
+  addRecentCape: (accountId: string, cape: CosmeticCape) => void;
+  removeRecentCape: (accountId: string, capeId: string) => void;
+  clearRecentCapes: (accountId: string) => void;
 }
 
 export const useRecentCapesStore = create<RecentCapesState>()(
   persist(
     (set) => ({
-      recentCapes: [],
-      addRecentCape: (cape) =>
+      capesByAccount: {},
+      addRecentCape: (accountId, cape) =>
         set((state) => {
-          // Remove if it already exists to move it to the front
-          const filtered = state.recentCapes.filter((c) => c._id !== cape._id);
+          const accountCapes = state.capesByAccount[accountId] || [];
+          const filtered = accountCapes.filter((c) => c._id !== cape._id);
           return {
-            // Keep only the last 15 capes
-            recentCapes: [cape, ...filtered].slice(0, 15),
+            capesByAccount: {
+              ...state.capesByAccount,
+              [accountId]: [cape, ...filtered].slice(0, 15),
+            },
           };
         }),
-      removeRecentCape: (capeId) =>
+      removeRecentCape: (accountId, capeId) =>
+        set((state) => {
+          const accountCapes = state.capesByAccount[accountId] || [];
+          return {
+            capesByAccount: {
+              ...state.capesByAccount,
+              [accountId]: accountCapes.filter((c) => c._id !== capeId),
+            },
+          };
+        }),
+      clearRecentCapes: (accountId) =>
         set((state) => ({
-          recentCapes: state.recentCapes.filter((c) => c._id !== capeId),
+          capesByAccount: {
+            ...state.capesByAccount,
+            [accountId]: [],
+          },
         })),
-      clearRecentCapes: () => set({ recentCapes: [] }),
     }),
     {
-      name: 'recent-capes-storage',
+      name: 'recent-capes-storage-v2', // bump version to reset old structure
     }
   )
 );

@@ -102,7 +102,17 @@ export function CapeBrowser(): JSX.Element {
   const accentColor = useThemeStore((state) => state.accentColor);
   const { favoriteCapeIds, isFavorite } = useCapeFavoritesStore();
   const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape } = useVanillaCapeStore();
-  const { recentCapes, removeRecentCape } = useRecentCapesStore();
+  const capesByAccount = useRecentCapesStore((state) => state.capesByAccount);
+  const addRecentCape = useRecentCapesStore((state) => state.addRecentCape);
+  const removeRecentCapeStore = useRecentCapesStore((state) => state.removeRecentCape);
+  
+  const recentCapes = activeAccount?.id ? (capesByAccount[activeAccount.id] || []) : [];
+  
+  const removeRecentCape = useCallback((capeId: string) => {
+    if (activeAccount?.id) {
+      removeRecentCapeStore(activeAccount.id, capeId);
+    }
+  }, [activeAccount?.id, removeRecentCapeStore]);
 
   // Computed loading states based on current filter or search
   const isLoading = useMemo(() => {
@@ -463,6 +473,23 @@ export function CapeBrowser(): JSX.Element {
     [], // Stable callback
   );
 
+  // Refetch when switching accounts while on the 'My Capes' tab
+  useEffect(() => {
+    if (activeAccount?.id && filters.showOwnedOnly) {
+      setSearchQuery("");
+      setCurrentPage(0);
+      setIsLoadingMy(true);
+      fetchCapesData(0, filters, "", false).finally(() => {
+        setIsLoadingMy(false);
+      });
+    } else if (!activeAccount && filters.showOwnedOnly) {
+      // Switched to no account, but still on my capes tab (rare, but good to handle)
+      setMyCapes([]);
+      setMyPagination(null);
+    }
+  }, [activeAccount?.id]); // Only trigger on account change
+
+
   // Handle filter/search changes that require reloading data
   useEffect(() => {
     const handleFilterChange = async () => {
@@ -670,8 +697,8 @@ export function CapeBrowser(): JSX.Element {
             localStorage.setItem(`equippedNoRiskCapeId_${activeAccount.id}`, capeHash);
           }
           const capeObj = typeof capeOrId === 'object' ? capeOrId : allCapes.find(c => c._id === capeHash) || myCapes.find(c => c._id === capeHash);
-          if (capeObj) {
-            useRecentCapesStore.getState().addRecentCape(capeObj);
+          if (capeObj && activeAccount?.id) {
+            addRecentCape(activeAccount.id, capeObj);
           }
         }
         
