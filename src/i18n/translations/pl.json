@@ -837,12 +837,10 @@
   "server.stop": "Zatrzymaj",
   "server.join": "Dołącz",
   "server.mods": "Mody",
-
   "wm.public_viewing": "Strefa Kibica MŚ",
   "wm.tooltip": "Strefa kibica mistrzostw świata na HugoSMP.net! Potrzebujesz {{version}}!",
   "wm.switch_to_main": "wróć do głównego uruchamiania",
   "wm.switch_to_hugo": "Przełącz na {{server}}",
-
   "radius.title": "Promień zaokrąglenia",
   "radius.square": "Kwadratowy",
   "radius.minimal": "Minimalny",
@@ -923,7 +921,6 @@
   "content.item_not_found": "Nie znaleziono elementu.",
   "content.badge.crashes_with_nrc": "POWODUJE AWARIE Z NRC",
   "content.update_check_error": "Błąd sprawdzania aktualizacji: {{error}}",
-
   "content.update.available": "Dostępna aktualizacja",
   "content.update.ready_title": "Gotowe do aktualizacji",
   "content.update.ready_desc": "Ten samodzielny mod można zaktualizować automatycznie.",
@@ -1551,7 +1548,6 @@
   "placeholders.profile_name_awesome": "Mój super profil",
   "placeholders.group_name": "np. modpacki, vanilla+",
   "referral.loading": "Ładowanie polecenia...",
-
   "rollout.popover.title": "Testujesz nową wersję NRC",
   "rollout.popover.title_opted_out": "Testy wyłączone",
   "rollout.popover.body_intro_before": "Jesteś jednym z",
@@ -2067,7 +2063,6 @@
   "settings.ads.reset_consent": "Zgoda na reklamy",
   "settings.ads.reset_consent.tooltip": "Wycofaj zgodę na spersonalizowane reklamy. Okno reklamy otworzy się i ponownie wyświetli okno zgody.",
   "settings.ads.reset_consent.button": "Resetuj",
-
   "modrinth.quick_profile.install_prefix": "Zainstaluj ",
   "modrinth.quick_profile.install_suffix": " jako nowy profil",
   "modrinth.quick_profile.copy_prefix": "Skopiuj istniejący profil i zainstaluj ",
@@ -2077,5 +2072,15 @@
   "modrinth.quick_profile.selected_profile": "wybranego profilu",
   "modrinth.quick_profile.clear_source": "Usuń wybór profilu źródłowego",
   "modrinth.quick_profile.copy_from_existing": "Skopiuj ustawienia z istniejącego profilu",
-  "modrinth.quick_profile.name_label": "Nazwa nowego profilu"
+  "modrinth.quick_profile.name_label": "Nazwa nowego profilu",
+  "capes.stealCape": "Ukradnij pelerynę",
+  "capes.stealCapeDescription": "Wpisz nazwę gracza, któremu chcesz ukraść pelerynę.",
+  "capes.stealCapeNotFound": "Nie znaleziono peleryny dla tego gracza",
+  "capes.stealCapeNoCapeEquipped": "Ten gracz nie ma założonej peleryny",
+  "capes.stealCapeError": "Nie udało się ukraść peleryny",
+  "capes.stealCapeSuccess": "Pomyślnie ukradziono pelerynę!",
+  "capes.steal": "Ukradnij",
+  "capes.usernamePlaceholder": "Nazwa użytkownika",
+  "capes.recentCapes": "Ostatnie peleryny",
+  "capes.removeFromRecents": "Usuń z ostatnich"
 }

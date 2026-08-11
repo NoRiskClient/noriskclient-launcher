@@ -846,12 +846,10 @@
   "server.stop": "रोकें",
   "server.join": "जुड़ें",
   "server.mods": "Mods",
-
   "wm.public_viewing": "वर्ल्ड कप पब्लिक व्यूइंग",
   "wm.tooltip": "HugoSMP.net पर वर्ल्ड कप पब्लिक व्यूइंग! आपको {{version}} चाहिए!",
   "wm.switch_to_main": "मुख्य लॉन्च पर लौटें",
   "wm.switch_to_hugo": "{{server}} पर जाएं",
-
   "radius.title": "बॉर्डर रेडियस",
   "radius.square": "वर्गाकार",
   "radius.minimal": "न्यूनतम",
@@ -932,7 +930,6 @@
   "content.item_not_found": "आइटम नहीं मिला।",
   "content.badge.crashes_with_nrc": "NRC के साथ क्रैश होता है",
   "content.update_check_error": "अपडेट जांच त्रुटि: {{error}}",
-
   "content.update.available": "अपडेट उपलब्ध",
   "content.update.ready_title": "अपडेट के लिए तैयार",
   "content.update.ready_desc": "इस स्वतंत्र मॉड को स्वचालित रूप से अपडेट किया जा सकता है।",
@@ -1560,7 +1557,6 @@
   "placeholders.profile_name_awesome": "मेरी शानदार प्रोफ़ाइल",
   "placeholders.group_name": "जैसे modpacks, vanilla+",
   "referral.loading": "रेफरल लोड हो रहा है...",
-
   "rollout.popover.title": "आप नया NRC संस्करण टेस्ट कर रहे हैं",
   "rollout.popover.title_opted_out": "टेस्टिंग बंद",
   "rollout.popover.body_intro_before": "आप उन",
@@ -2084,7 +2080,6 @@
   "settings.ads.reset_consent.button": "रीसेट करें",
   "settings.font.title": "फ़ॉन्ट",
   "settings.font.description": "लॉन्चर में उपयोग किया जाने वाला फ़ॉन्ट चुनें",
-
   "modrinth.quick_profile.install_prefix": "",
   "modrinth.quick_profile.install_suffix": " को नई प्रोफ़ाइल के रूप में इंस्टॉल करें",
   "modrinth.quick_profile.copy_prefix": "मौजूदा प्रोफ़ाइल कॉपी करें और ",
@@ -2094,5 +2089,15 @@
   "modrinth.quick_profile.selected_profile": "चयनित प्रोफ़ाइल",
   "modrinth.quick_profile.clear_source": "स्रोत प्रोफ़ाइल का चयन हटाएं",
   "modrinth.quick_profile.copy_from_existing": "मौजूदा प्रोफ़ाइल से सेटिंग्स कॉपी करें",
-  "modrinth.quick_profile.name_label": "नई प्रोफ़ाइल का नाम"
+  "modrinth.quick_profile.name_label": "नई प्रोफ़ाइल का नाम",
+  "capes.stealCape": "केप चुराएं",
+  "capes.stealCapeDescription": "उस खिलाड़ी का नाम दर्ज करें जिससे आप केप चुराना चाहते हैं।",
+  "capes.stealCapeNotFound": "इस खिलाड़ी के लिए केप नहीं मिला",
+  "capes.stealCapeNoCapeEquipped": "इस खिलाड़ी ने कोई केप नहीं पहना है",
+  "capes.stealCapeError": "केप चुराने में विफल",
+  "capes.stealCapeSuccess": "केप सफलतापूर्वक चुरा लिया गया!",
+  "capes.steal": "चुराएं",
+  "capes.usernamePlaceholder": "उपयोगकर्ता नाम",
+  "capes.recentCapes": "हाल के केप",
+  "capes.removeFromRecents": "हाल के आइटम से हटाएं"
 }

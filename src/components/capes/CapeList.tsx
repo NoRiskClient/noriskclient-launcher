@@ -42,7 +42,7 @@ interface CapeItemDisplayProps {
   imageUrl: string;
   isCurrentlyEquipping: boolean;
   isEquipped?: boolean;
-  onEquipCape: (capeId: string) => void;
+  onEquipCape: (capeId: string, capeObj?: CosmeticCape) => void;
   canDelete?: boolean;
   onDeleteCapeClick?: (cape: CosmeticCape | VanillaCape, e: React.MouseEvent) => void;
   creatorNameCache: Map<string, string>;
@@ -55,6 +55,7 @@ interface CapeItemDisplayProps {
   isExperimental?: boolean;
   isModerator?: boolean;
   onModeratorDeleteClick?: (cape: CosmeticCape, e: React.MouseEvent) => void;
+  onRemoveRecent?: () => void;
 }
 
 function CapeItemDisplay({
@@ -75,6 +76,7 @@ function CapeItemDisplay({
   isExperimental = false,
   isModerator = false,
   onModeratorDeleteClick,
+  onRemoveRecent
 }: CapeItemDisplayProps) {
   const { t } = useTranslation();
   const [creatorName, setCreatorName] = useState<string | null>(null);
@@ -101,7 +103,7 @@ function CapeItemDisplay({
     }
 
     const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
-    const capeUrl = isVanilla
+    const previewUrl = isVanilla
       ? (cape as VanillaCape).url
       : isInReview
         ? getCapeReviewImageUrl(capeId, isExperimental)
@@ -116,18 +118,18 @@ function CapeItemDisplay({
       >
         <Cape3DPreviewWithToggle
           skinUrl={userSkinUrl}
-          capeUrl={capeUrl}
+          capeUrl={previewUrl}
           capeId={capeId}
-          isEquipped={false}
+          isEquipped={isEquipped}
           isExperimental={isExperimental}
           onEquipCape={() => {
-            onEquipCape(capeId);
+            onEquipCape(capeId, isVanilla ? undefined : (cape as CosmeticCape));
             hideModal && hideModal(`cape-preview-${capeId}`);
           }}
         />
       </Modal>
     ));
-  }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
+  }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental, isEquipped]);
 
   const isFavorite = !isVanilla ? useCapeFavoritesStore((s) => s.isFavorite((cape as CosmeticCape)._id)) : false;
   const toggleFavoriteOptimistic = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
@@ -206,6 +208,14 @@ function CapeItemDisplay({
           </button>
         )}
 
+        {isEquipped && !isCurrentlyEquipping && (
+          <Tooltip content={t('capes.currentlyEquipped')}>
+            <div className="w-8 h-8 flex items-center justify-center bg-black/30 text-white/70 border border-white/10 rounded cursor-default">
+              <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+            </div>
+          </Tooltip>
+        )}
+
         {canDelete && onDeleteCapeClick && !isVanilla && (
           <button
             onClick={(e) => {
@@ -221,6 +231,19 @@ function CapeItemDisplay({
           </button>
         )}
 
+        {onRemoveRecent && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemoveRecent();
+            }}
+            className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded opacity-0 group-hover:opacity-100 transition-all duration-200"
+            title={t('capes.removeFromRecents', 'Remove from recents')}
+          >
+            <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {isModerator && onModeratorDeleteClick && !isVanilla && (
@@ -246,6 +269,7 @@ function CapeItemDisplay({
             height: `${displayHeight}px`,
             backgroundColor: isHovered ? `${accentColor.value}20` : 'transparent',
             borderColor: isEquipped ? accentColor.value : (isHovered ? `${accentColor.value}60` : 'transparent'),
+            boxShadow: isHovered ? `0 0 15px ${accentColor.value}40` : 'none',
           }}
         >
           {(() => {
@@ -265,18 +289,6 @@ function CapeItemDisplay({
             }
             return <CapeImage imageUrl={imageUrl} part="front" width={displayWidth} className="rounded-sm block" />;
           })()}
-
-          {isEquipped && !isCurrentlyEquipping && (
-            <div className="absolute top-2 right-2 z-30">
-              <Tooltip content={t('capes.currentlyEquipped')}>
-                <Icon
-                  icon="solar:check-circle-bold"
-                  className="w-4 h-4"
-                  style={{ color: accentColor.value }}
-                />
-              </Tooltip>
-            </div>
-          )}
 
           {isCurrentlyEquipping && (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
@@ -333,6 +345,8 @@ function CapeItemDisplay({
             }
           </h3>
 
+
+
           {!isVanilla && (
             <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
@@ -340,7 +354,7 @@ function CapeItemDisplay({
                   icon="solar:download-minimalistic-outline"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
+                <span>{t('capes.usesCount', { formattedCount: ((cape as CosmeticCape).uses || 0).toLocaleString() })}</span>
               </div>
             </div>
           )}
@@ -352,8 +366,10 @@ function CapeItemDisplay({
 
 
 export interface CapeListProps {
-  capes: CosmeticCape[] | VanillaCape[];
-  onEquipCape: (capeHash: string) => void;
+  capes: (CosmeticCape | VanillaCape)[];
+  recentCapes?: CosmeticCape[];
+  onRemoveRecentCape?: (capeId: string) => void;
+  onEquipCape: (capeId: string, capeObj?: CosmeticCape) => void;
   isLoading?: boolean;
   isEquippingCapeId?: string | null;
   equippedCapeId?: string | null;
@@ -376,6 +392,8 @@ export interface CapeListProps {
 
 export function CapeList({
   capes,
+  recentCapes,
+  onRemoveRecentCape,
   onEquipCape,
   isLoading = false,
   isEquippingCapeId = null,
@@ -429,6 +447,8 @@ export function CapeList({
     return [...result, ...fetchedFavorites];
   }, [favoriteCapeIds, favoriteCapesFetched, capes, isVanilla]); // Keep capes dependency but optimize the calculation
 
+  const attemptedFetchIdsRef = useRef<Set<string>>(new Set());
+
   const missingFavoriteIds = useMemo(() => {
     // Always fetch missing favorites, regardless of groupFavoritesInHeader
     // Don't include placeholders in the check
@@ -438,8 +458,11 @@ export function CapeList({
   }, [favoriteCapeIds, capes, favoriteCapesFetched]);
 
   useEffect(() => {
-    const idsToFetch = missingFavoriteIds.filter((id) => !favoriteCapesFetched.has(id));
+    const idsToFetch = missingFavoriteIds.filter((id) => !favoriteCapesFetched.has(id) && !attemptedFetchIdsRef.current.has(id));
     if (idsToFetch.length === 0) return;
+    
+    idsToFetch.forEach(id => attemptedFetchIdsRef.current.add(id));
+    
     const chunk = idsToFetch.slice(0, 100);
     getCapesByHashes(chunk)
       .then((capes) => {
@@ -668,7 +691,54 @@ export function CapeList({
       )}
     >
       <div className="flex-1 min-h-0 flex flex-col">
-        {/* Render favorites separately above native grid to prevent flickering */}
+        {/* Recent Capes Section */}
+        {recentCapes && recentCapes.length > 0 && (
+          <div className="w-full mb-8 flex flex-col">
+            <div className="flex items-center gap-3 mb-4 mx-4">
+              <h3 className="text-lg font-smallcaps text-white whitespace-nowrap">{t('capes.recentCapes', 'Recent Capes')}</h3>
+              <div className="flex-1 h-px bg-white/10 min-w-[20px]"></div>
+            </div>
+            
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                gap: "16px",
+                padding: "0 16px",
+              }}
+            >
+              {recentCapes.map((cape) => {
+                const isCapeEquipped = equippedCapeId === cape._id;
+                const isCurrentlyEquipping = isEquippingCapeId === cape._id;
+                const imageUrl = getCapeImageUrl(cape._id, isExperimental);
+                
+                return (
+                  <CapeItemDisplay
+                    key={`recent-${cape._id}`}
+                    cape={cape}
+                    imageUrl={imageUrl}
+                    isCurrentlyEquipping={isCurrentlyEquipping}
+                    isEquipped={isCapeEquipped}
+                    onEquipCape={onEquipCape}
+                    creatorNameCache={creatorNameCacheRef.current}
+                    activeAccount={activeAccount}
+                    showModal={showModal}
+                    hideModal={hideModal}
+                    isExperimental={isExperimental}
+                    onRemoveRecent={isCapeEquipped ? undefined : () => onRemoveRecentCape?.(cape._id)}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-3 mt-8 mb-4 mx-4">
+              <h3 className="text-lg font-smallcaps text-white whitespace-nowrap">{t('capes.myCapes', 'My Capes')}</h3>
+              <div className="flex-1 h-px bg-white/10 min-w-[20px]"></div>
+            </div>
+          </div>
+        )}
+
+        {/* Regular Favorites Section */}
         {groupFavoritesInHeader && stableFavoriteCapes.length > 0 && !showFavoritesOnly && !isVanilla && (
           <div
             style={{
@@ -686,7 +756,7 @@ export function CapeList({
                   cape={cape}
                   imageUrl={imageUrl}
                   isCurrentlyEquipping={isEquippingCapeId === cape._id}
-                  isEquipped={false}
+                  isEquipped={equippedCapeId === cape._id}
                   onEquipCape={onEquipCape}
                   canDelete={canDelete}
                   onDeleteCapeClick={handleDeleteClickInternal}
@@ -732,7 +802,7 @@ export function CapeList({
                 canDelete={canDelete && !isVanilla}
                 onDeleteCapeClick={handleDeleteClickInternal}
                 creatorNameCache={creatorNameCacheRef.current}
-                onContextMenu={(e) => handleCapeContextMenu(cape, e)}
+                onContextMenu={(e) => handleCapeContextMenu(cape as CosmeticCape, e)}
                 activeAccount={activeAccount}
                 showModal={(id, component) => showModal(id, component)}
                 hideModal={(id) => hideModal(id)}
@@ -788,7 +858,7 @@ export function CapeList({
   );
 }
 
-function Cape3DPreviewWithToggle({
+export function Cape3DPreviewWithToggle({
   skinUrl,
   capeUrl,
   capeId,

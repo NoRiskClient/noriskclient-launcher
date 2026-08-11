@@ -143,6 +143,8 @@ export const downloadTemplateAndOpenExplorer = (withElytra: boolean): Promise<vo
   return invoke('download_template_and_open_explorer', { withElytra });
 };
 
+const profileCache = new Map<string, Promise<MinecraftProfile>>();
+
 /**
  * Fetches a Minecraft profile by player name or UUID.
  * Corresponds to the Rust `get_profile_by_name_or_uuid` command.
@@ -152,7 +154,16 @@ export const downloadTemplateAndOpenExplorer = (withElytra: boolean): Promise<vo
  * @throws If the backend command fails.
  */
 export const getPlayerProfileByUuidOrName = (nameOrUuidQuery: string): Promise<MinecraftProfile> => {
-  return invoke('get_profile_by_name_or_uuid', { nameOrUuidQuery });
+  const query = nameOrUuidQuery.toLowerCase().trim();
+  if (profileCache.has(query)) {
+    return profileCache.get(query)!;
+  }
+  const req = invoke<MinecraftProfile>('get_profile_by_name_or_uuid', { nameOrUuidQuery }).catch((e) => {
+    profileCache.delete(query);
+    throw e;
+  });
+  profileCache.set(query, req);
+  return req;
 }; 
 
 /**

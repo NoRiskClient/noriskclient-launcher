@@ -32,6 +32,7 @@ import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useVanillaCapeStore } from "../../store/useVanillaCapeStore";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
+import { useRecentCapesStore } from "../../store/useRecentCapesStore";
 import { preloadIcons } from "../../lib/icon-utils";
 import { deleteCape, checkIsModerator } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
@@ -41,6 +42,7 @@ import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
 import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { StealCapeModal } from "./StealCapeModal";
 
 
 
@@ -61,6 +63,7 @@ export function CapeBrowser(): JSX.Element {
   );
   const [isUploading, setIsUploading] = useState(false);
   const [isUnequipping, setIsUnequipping] = useState(false);
+  const [currentEquippedCapeId, setCurrentEquippedCapeId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<CapeFiltersData>({
     sortBy: "",
@@ -79,6 +82,17 @@ export function CapeBrowser(): JSX.Element {
     }).catch(() => {});
   }, []);
 
+  const { activeAccount } = useMinecraftAuthStore();
+
+  useEffect(() => {
+    if (activeAccount?.id) {
+      const saved = localStorage.getItem(`equippedNoRiskCapeId_${activeAccount.id}`);
+      setCurrentEquippedCapeId(saved);
+    } else {
+      setCurrentEquippedCapeId(null);
+    }
+  }, [activeAccount?.id]);
+
   // Helper functions to get correct setters based on current filter
   const getCapesSetter = (showOwnedOnly: boolean) =>
     showOwnedOnly ? setMyCapes : setAllCapes;
@@ -88,6 +102,7 @@ export function CapeBrowser(): JSX.Element {
   const accentColor = useThemeStore((state) => state.accentColor);
   const { favoriteCapeIds, isFavorite } = useCapeFavoritesStore();
   const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape } = useVanillaCapeStore();
+  const { recentCapes, removeRecentCape } = useRecentCapesStore();
 
   // Computed loading states based on current filter or search
   const isLoading = useMemo(() => {
@@ -112,16 +127,25 @@ export function CapeBrowser(): JSX.Element {
     return filters.showOwnedOnly ? isFetchingMoreMy : isFetchingMoreAll;
   }, [filters.showOwnedOnly, filters.showVanillaOnly, isFetchingMoreMy, isFetchingMoreAll, searchQuery]);
 
-  // Computed equipped cape ID based on current tab
   const equippedCapeId = useMemo(() => {
     if (filters.showVanillaOnly) {
       return equippedCape?.id || null;
     }
-    // For NoRisk capes, we don't have equipped state yet
-    return null;
-  }, [filters.showVanillaOnly, equippedCape]);
+    // For NoRisk capes, we don't have equipped state from API yet, but we track it locally
+    return currentEquippedCapeId;
+  }, [filters.showVanillaOnly, equippedCape, currentEquippedCapeId]);
 
   const { showModal, hideModal } = useGlobalModal();
+
+  const handleStealCapeClick = () => {
+    showModal('steal-cape-modal', (
+      <StealCapeModal
+        onCancel={() => hideModal('steal-cape-modal')}
+        onEquipCape={handleEquipCape}
+        isExperimental={isExperimental}
+      />
+    ));
+  };
 
   // Computed current data based on filter
   const capesData = useMemo(() => {
@@ -208,7 +232,6 @@ export function CapeBrowser(): JSX.Element {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
-  const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
     if (!activeAccount) return;
@@ -620,7 +643,8 @@ export function CapeBrowser(): JSX.Element {
     }
   };
 
-  const handleEquipCape = async (capeHash: string) => {
+  const handleEquipCape = async (capeOrId: string | CosmeticCape) => {
+    const capeHash = typeof capeOrId === 'string' ? capeOrId : capeOrId._id;
     setIsEquippingCapeId(capeHash);
 
     let promise;
@@ -638,6 +662,19 @@ export function CapeBrowser(): JSX.Element {
       loading: t('capes.equippingCape'),
       success: () => {
         setIsEquippingCapeId(null);
+        
+        // Add to recent capes if it's not a vanilla cape
+        if (!filters.showVanillaOnly) {
+          setCurrentEquippedCapeId(capeHash);
+          if (activeAccount?.id) {
+            localStorage.setItem(`equippedNoRiskCapeId_${activeAccount.id}`, capeHash);
+          }
+          const capeObj = typeof capeOrId === 'object' ? capeOrId : allCapes.find(c => c._id === capeHash) || myCapes.find(c => c._id === capeHash);
+          if (capeObj) {
+            useRecentCapesStore.getState().addRecentCape(capeObj);
+          }
+        }
+        
         return t('capes.capeEquippedSuccess');
       },
       error: (err: any) => {
@@ -652,6 +689,10 @@ export function CapeBrowser(): JSX.Element {
     setIsUnequipping(true);
     try {
       await unequipCape();
+      setCurrentEquippedCapeId(null);
+      if (activeAccount?.id) {
+        localStorage.removeItem(`equippedNoRiskCapeId_${activeAccount.id}`);
+      }
       toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
@@ -662,11 +703,26 @@ export function CapeBrowser(): JSX.Element {
   };
 
   const handleDeleteCapeClick = (cape: CosmeticCape) => {
+    // Check if cape is denied (not accepted and not in review)
+    const isDenied = !cape.accepted && cape.moderatorMessage !== 'In Review';
+    
     showModal('delete-cape-modal', (
       <ConfirmDeletionModal
         capeToDelete={cape}
         onConfirmDelete={async () => {
           try {
+            if (isDenied) {
+              const hidden = JSON.parse(localStorage.getItem('hidden_denied_capes') || '[]');
+              if (!hidden.includes(cape._id)) {
+                hidden.push(cape._id);
+                localStorage.setItem('hidden_denied_capes', JSON.stringify(hidden));
+              }
+              toast.success(t('capes.capeDeletedSuccess'));
+              refreshCurrentView();
+              hideModal('delete-cape-modal');
+              return;
+            }
+            
             await deleteCape(cape._id);
             toast.success(t('capes.capeDeletedSuccess'));
             refreshCurrentView();
@@ -936,6 +992,18 @@ export function CapeBrowser(): JSX.Element {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-3">
+                  {!filters.showVanillaOnly && (
+                    <Button
+                      onClick={handleStealCapeClick}
+                      variant="flat"
+                      size="md"
+                      icon={<Icon icon="solar:mask-happly-bold-duotone" className="w-5 h-5" />}
+                      className="h-[42px] px-3 border border-purple-500/30 hover:border-purple-400/60 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 whitespace-nowrap"
+                      title={t('capes.stealCape', 'Steal')}
+                    >
+                      {t('capes.stealCape', 'Steal')}
+                    </Button>
+                  )}
                   {activeAccount && (
                     <>
                       <div className="relative" ref={templateMenuRef}>
@@ -985,10 +1053,13 @@ export function CapeBrowser(): JSX.Element {
                 </div>
               </div>
             </div>
-
+            {/* Main Content Area */}
+            <div className="relative min-h-[400px]">
             {/* Cape List */}
             <CapeList
-              capes={capesForList}
+              capes={capesForList as any}
+              recentCapes={filters.showOwnedOnly ? recentCapes : undefined}
+              onRemoveRecentCape={filters.showOwnedOnly ? removeRecentCape : undefined}
               onEquipCape={handleEquipCape}
               isLoading={isLoading}
               isEquippingCapeId={isEquippingCapeId}
@@ -1009,7 +1080,8 @@ export function CapeBrowser(): JSX.Element {
               isModerator={isModerator && !filters.showOwnedOnly && !filters.showVanillaOnly}
               onModeratorDeleteCape={isModerator && !filters.showVanillaOnly && !filters.showOwnedOnly ? handleModeratorDeleteCapeClick : undefined}
             />
+          </div>
+        </div>
       </div>
-    </div>
   );
 }
