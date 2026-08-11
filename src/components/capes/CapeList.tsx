@@ -631,26 +631,7 @@ export function CapeList({
   // For favorites, don't show loading state since favorites are filtered from available capes
   // Just show the filtered results immediately
 
-  if (!isLoading && noActualCapesToDisplay && hasInitiallyLoaded) {
-    return (
-      <div className="flex-grow flex items-center justify-center p-5">
-        <EmptyState
-          icon="solar:hanger-2-line-duotone"
-          message={
-            isVanilla
-              ? searchQuery
-                ? t('capes.noVanillaCapesFoundForSearch', { query: searchQuery })
-                : t('capes.noVanillaCapesOwned')
-              : showFavoritesOnly
-              ? t('capes.markFavoritesHint')
-              : searchQuery
-              ? t('capes.noCapesFoundForSearch', { query: searchQuery })
-              : t('capes.noCapesAvailable')
-          }
-        />
-      </div>
-    );
-  }
+  // The EmptyState logic is now moved inside the main render block so Recent Capes still show up
 
   // Load more trigger component for intersection observer
   const LoadMoreTrigger = () => {
@@ -777,47 +758,66 @@ export function CapeList({
 
         {/* Native scrolling grid - similar to ScreenshotsTab */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-              gap: "16px",
-              padding: "16px",
-          }}
-        >
-          {itemsToRender.map((cape) => {
-            const imageUrl = isVanilla
-              ? (cape as VanillaCape).url
-              : getCapeImageUrl((cape as CosmeticCape)._id, isExperimental);
-            const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
-            const isEquipped = equippedCapeId === capeId;
-            return (
-              <CapeItemDisplay
-                key={capeId}
-                cape={cape}
-                imageUrl={imageUrl}
-                isCurrentlyEquipping={isEquippingCapeId === capeId}
-                isEquipped={isEquipped}
-                onEquipCape={onEquipCape}
-                canDelete={canDelete && !isVanilla}
-                onDeleteCapeClick={handleDeleteClickInternal}
-                creatorNameCache={creatorNameCacheRef.current}
-                onContextMenu={(e) => handleCapeContextMenu(cape as CosmeticCape, e)}
-                activeAccount={activeAccount}
-                showModal={(id, component) => showModal(id, component)}
-                hideModal={(id) => hideModal(id)}
-                isVanilla={isVanilla}
-                showReviewState={showReviewState}
-                isExperimental={isExperimental}
-                isModerator={isModerator}
-                onModeratorDeleteClick={handleModeratorDeleteClickInternal}
+          {!isLoading && noActualCapesToDisplay && hasInitiallyLoaded ? (
+            <div className="flex items-center justify-center p-5 h-full min-h-[300px]">
+              <EmptyState
+                icon="solar:hanger-2-line-duotone"
+                message={
+                  isVanilla
+                    ? searchQuery
+                      ? t('capes.noVanillaCapesFoundForSearch', { query: searchQuery })
+                      : t('capes.noVanillaCapesOwned')
+                    : showFavoritesOnly
+                    ? t('capes.markFavoritesHint')
+                    : searchQuery
+                    ? t('capes.noCapesFoundForSearch', { query: searchQuery })
+                    : t('capes.noCapesAvailable')
+                }
               />
-            );
-          })}
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                gap: "16px",
+                padding: "16px",
+            }}
+          >
+            {itemsToRender.map((cape) => {
+              const imageUrl = isVanilla
+                ? (cape as VanillaCape).url
+                : getCapeImageUrl((cape as CosmeticCape)._id, isExperimental);
+              const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
+              const isEquipped = equippedCapeId === capeId;
+              return (
+                <CapeItemDisplay
+                  key={capeId}
+                  cape={cape}
+                  imageUrl={imageUrl}
+                  isCurrentlyEquipping={isEquippingCapeId === capeId}
+                  isEquipped={isEquipped}
+                  onEquipCape={onEquipCape}
+                  canDelete={canDelete && !isVanilla}
+                  onDeleteCapeClick={handleDeleteClickInternal}
+                  creatorNameCache={creatorNameCacheRef.current}
+                  onContextMenu={(e) => handleCapeContextMenu(cape as CosmeticCape, e)}
+                  activeAccount={activeAccount}
+                  showModal={(id, component) => showModal(id, component)}
+                  hideModal={(id) => hideModal(id)}
+                  isVanilla={isVanilla}
+                  showReviewState={showReviewState}
+                  isExperimental={isExperimental}
+                  isModerator={isModerator}
+                  onModeratorDeleteClick={handleModeratorDeleteClickInternal}
+                />
+              );
+            })}
 
-          {/* Load more trigger - only for non-favorites modes */}
-          {!showFavoritesOnly && <LoadMoreTrigger />}
-          </div>
+            {/* Load more trigger - only for non-favorites modes */}
+            {!showFavoritesOnly && <LoadMoreTrigger />}
+            </div>
+          )}
         </div>
       </div>
 
