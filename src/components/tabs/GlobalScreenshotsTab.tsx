@@ -17,7 +17,7 @@ import { ProfileScreenshotModal } from "../profiles/ProfileScreenshotModal";
 import { ConfirmDeleteDialog } from "../modals/ConfirmDeleteDialog";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ThemedDropdown, ThemedDropdownItem } from "../profiles/v3/shared/ThemedDropdown";
-import { EmptyState } from "../profiles/v3/shared/EmptyState";
+import { EmptyStateV3 as EmptyState } from "../profiles/v3/shared/EmptyStateV3";
 import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
 import { parseErrorMessage } from "../../utils/error-utils";
 
