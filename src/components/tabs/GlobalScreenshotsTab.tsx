@@ -1,7 +1,5 @@
 "use client";
 
-
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
@@ -10,24 +8,18 @@ import { toast } from "react-hot-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { useInView } from "react-intersection-observer";
 
-import type { Profile } from "../../../../types/profile";
-import type { ScreenshotInfo, ScreenshotGroup } from "../../../../types/profile";
-import { getImagePreview } from "../../../../services/tauri-service";
-import { useThemeStore } from "../../../../store/useThemeStore";
-import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
-import { formatRelativeTime } from "../../../../utils/format-relative-time";
-import { ProfileScreenshotModal } from "../../ProfileScreenshotModal";
-import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
-import { useGlobalModal } from "../../../../hooks/useGlobalModal";
-import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
-import { EmptyStateV3 as EmptyState } from "../shared/EmptyStateV3";
-import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
-import { parseErrorMessage } from "../../../../utils/error-utils";
-
-interface ScreenshotTabProps {
-  profile: Profile;
-  isActive?: boolean;
-}
+import type { ScreenshotInfo, ScreenshotGroup } from "../../types/profile";
+import { getImagePreview } from "../../services/tauri-service";
+import { useThemeStore } from "../../store/useThemeStore";
+import { useDelayedTrue } from "../../hooks/useDelayedTrue";
+import { formatRelativeTime } from "../../utils/format-relative-time";
+import { ProfileScreenshotModal } from "../profiles/ProfileScreenshotModal";
+import { ConfirmDeleteDialog } from "../modals/ConfirmDeleteDialog";
+import { useGlobalModal } from "../../hooks/useGlobalModal";
+import { ThemedDropdown, ThemedDropdownItem } from "../profiles/v3/shared/ThemedDropdown";
+import { EmptyState } from "../profiles/v3/shared/EmptyState";
+import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 type SortKey = "newest" | "oldest";
 
@@ -36,14 +28,11 @@ const SORT_OPTIONS: { value: SortKey; labelKey: string; icon: string }[] = [
   { value: "oldest", labelKey: "profiles.v3.screenshots.sort.oldest", icon: "solar:sort-from-bottom-to-top-bold" },
 ];
 
-// Preview-Groesse fuer die Grid-Thumbnails. Backend resized das Bild auf
-// diese Dimensionen (mit JPEG-Quality) damit wir nicht fuer jedes Tile das
-// volle Bild ausliefern.
 const PREVIEW_WIDTH = 480;
 const PREVIEW_HEIGHT = 270;
 const PREVIEW_QUALITY = 75;
 
-export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProps) {
+export function GlobalScreenshotsTab() {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
   const { showModal, hideModal } = useGlobalModal();
@@ -57,6 +46,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [modalScreenshotGroup, setModalScreenshotGroup] = useState<ScreenshotGroup | null>(null);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const selectMode = selectedPaths.size > 0;
 
   // McReal Toggle
   const [showMcreals, setShowMcreals] = useState(false);
@@ -68,15 +58,12 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!profile?.id) return;
     setLoading(true);
     setError(null);
     try {
-      const list = await invoke<ScreenshotInfo[]>("list_profile_screenshots", { profileId: profile.id });
+      const list = await invoke<ScreenshotInfo[]>("list_all_screenshots");
       if (!mountedRef.current) return;
       setScreenshots(list);
-      // Stale Selektions-Eintraege dropen — wenn Files extern geloescht
-      // wurden, haette selectedPaths sonst tote Pfade.
       setSelectedPaths(prev => {
         if (prev.size === 0) return prev;
         const alive = new Set(list.map(s => s.path));
@@ -85,26 +72,26 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
         return kept.size === prev.size ? prev : kept;
       });
     } catch (err) {
-      console.error("[V3 Screenshots] Failed to load:", err);
+      console.error("[Global Screenshots] Failed to load:", err);
       if (mountedRef.current) setError(parseErrorMessage(err));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [profile.id]);
+  }, []);
 
   useEffect(() => {
-    if (isActive) void loadData();
-  }, [isActive, loadData]);
+    void loadData();
+  }, [loadData]);
 
   const visibleGroups = useMemo(() => {
-    const sorted = [...screenshots];
+    let sorted = [...screenshots];
     const toTs = (s: ScreenshotInfo) => s.modified ? new Date(s.modified).getTime() : 0;
-    if (sortBy === "newest") sorted.sort((a, b) => toTs(b) - toTs(a));
-    else sorted.sort((a, b) => toTs(a) - toTs(b));
+    if (sortBy === "newest")  sorted.sort((a, b) => toTs(b) - toTs(a));
+    else                      sorted.sort((a, b) => toTs(a) - toTs(b));
 
     const groups: ScreenshotGroup[] = [];
     const mcrealSecondaries = new Map<string, ScreenshotInfo>();
-
+    
     // First pass: identify all secondary images
     for (const s of sorted) {
       if (s.filename.includes("_mcreal_secondary")) {
@@ -112,25 +99,25 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
         mcrealSecondaries.set(prefix, s);
       }
     }
-
+    
     // Second pass: build groups
     for (const s of sorted) {
       if (s.filename.includes("_mcreal_secondary")) {
-        // Skip, handled by primary
-        continue;
+         // Skip, handled by primary
+         continue;
       }
       if (s.filename.includes("_mcreal_primary")) {
-        if (!showMcreals) continue;
-        const prefix = s.filename.split("_mcreal_primary")[0];
-        const secondary = mcrealSecondaries.get(prefix);
-        if (secondary) {
-          groups.push({ type: 'bereal', main: s, secondary: secondary });
-        } else {
-          groups.push({ type: 'single', main: s });
-        }
+         if (!showMcreals) continue;
+         const prefix = s.filename.split("_mcreal_primary")[0];
+         const secondary = mcrealSecondaries.get(prefix);
+         if (secondary) {
+            groups.push({ type: 'bereal', main: s, secondary: secondary });
+         } else {
+            groups.push({ type: 'single', main: s });
+         }
       } else {
-        if (showMcreals) continue;
-        groups.push({ type: 'single', main: s });
+         if (showMcreals) continue;
+         groups.push({ type: 'single', main: s });
       }
     }
     return groups;
@@ -181,7 +168,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
             await invoke("delete_file", { filePath: p });
             successCount++;
           } catch (err) {
-            console.error("[V3 Screenshots] Delete failed for", p, err);
+            console.error("[Global Screenshots] Delete failed for", p, err);
           }
         }
         toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: successCount }));
@@ -205,7 +192,6 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
     ));
   }, [selectedPaths, visibleGroups, loadData, showModal, hideModal, isBatchDeleting, t]);
 
-  // Esc clears selection
   useEffect(() => {
     if (selectedPaths.size === 0) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSelectedPaths(new Set()); };
@@ -230,17 +216,20 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
   const onPrev = modalIndex > 0 ? () => setModalScreenshotGroup(visibleGroups[modalIndex - 1]) : undefined;
 
   return (
-    <div className="flex flex-col min-h-0 flex-1 relative">
-      {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+    <div className="flex flex-col min-h-0 h-full relative p-6">
+      <div className="flex items-center gap-2 mb-6 h-12 flex-shrink-0 z-10">
+        <h1 className="text-2xl font-minecraft text-white mr-auto flex items-center gap-3">
+          <Icon icon="solar:gallery-bold-duotone" className="w-8 h-8 opacity-80" style={{ color: accentColor.value }} />
+          {t("nav.screenshots")}
+        </h1>
         <div className="relative">
           <button
             onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
+            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-minecraft text-white/70 flex items-center gap-2"
           >
-            <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
+            <Icon icon="solar:sort-vertical-bold" className="w-4 h-4" />
             {activeSortLabel}
-            <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 opacity-60" />
+            <Icon icon="solar:alt-arrow-down-linear" className="w-4 h-4 opacity-60" />
           </button>
           <ThemedDropdown open={sortMenuOpen} onClose={() => setSortMenuOpen(false)} width="w-48">
             {SORT_OPTIONS.map(opt => (
@@ -259,41 +248,35 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
         {/* McReal Toggle */}
         <button
           onClick={() => setShowMcreals(!showMcreals)}
-          className={`h-8 px-3 rounded-md border text-[10px] font-minecraft flex items-center gap-1.5 transition-colors ${showMcreals
-              ? "bg-white/10 border-white/20 text-white"
+          className={`h-9 px-4 rounded-md border text-sm font-minecraft flex items-center gap-2 transition-colors ${
+            showMcreals 
+              ? "bg-white/10 border-white/20 text-white" 
               : "bg-black/20 border-white/5 text-white/50"
-            }`}
+          }`}
           title={showMcreals ? "Hide McReals" : "Show McReals"}
         >
-          <Icon icon={showMcreals ? "solar:eye-bold" : "solar:eye-closed-bold"} className="w-3.5 h-3.5" />
+          <Icon icon={showMcreals ? "solar:eye-bold" : "solar:eye-closed-bold"} className="w-4 h-4" />
           McReals
         </button>
-
-        <div className="flex-1" />
-
-        <span className="text-[10px] text-white/35 font-minecraft tabular-nums">
-          {t("profiles.v3.screenshots.count", { count: screenshots.length })}
-        </span>
 
         <button
           onClick={loadData}
           disabled={loading}
-          className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
+          className="h-9 px-3.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
           title={t("profiles.v3.toolbar.refresh")}
         >
-          <Icon icon="solar:refresh-bold" className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          <Icon icon="solar:refresh-bold" className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
-      {/* ── Content ────────────────────────────────────────────────────── */}
       <div className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2 -m-2 ${selectedPaths.size > 0 ? "pb-24" : ""}`}>
         {error && (
-          <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
-            <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
+          <div className="mb-4 flex items-start gap-3 p-4 rounded-lg border border-rose-400/30 bg-rose-500/10">
+            <Icon icon="solar:danger-triangle-bold" className="w-6 h-6 text-rose-300 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0 text-sm font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={loadData}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-8 px-3 rounded-md text-xs font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -302,8 +285,8 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
 
         {loading && screenshots.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
+            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-base animate-in fade-in duration-300">
+              <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 mr-3" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : (
@@ -324,12 +307,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotTabProp
                 accentColor={accentColor.value}
                 isSelected={selectedPaths.has(g.main.path)}
                 selectMode={selectedPaths.size > 0}
-                onToggleSelection={() => {
-                  toggleSelection(g.main.path);
-                  if (g.secondary) {
-                    // Optional: Toggle both, but for now we'll just track the main path to determine tile selection
-                  }
-                }}
+                onToggleSelection={() => toggleSelection(g.main.path)}
                 onOpen={() => setModalScreenshotGroup(g)}
               />
             ))}
@@ -384,8 +362,6 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-
-  // BeReal State
   const [swapped, setSwapped] = useState(false);
 
   const mountedRef = useRef(true);
@@ -418,7 +394,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
         if (!mountedRef.current) return;
         setPreviewUrl(`data:image/jpeg;base64,${res.base64_image}`);
       } catch (err) {
-        console.error("[V3 Screenshots] Preview failed:", err);
+        console.error("[Global Screenshots] Preview failed:", err);
         if (mountedRef.current) setPreviewError(true);
       }
     })();
@@ -428,15 +404,14 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
     <div
       ref={ref}
       onClick={(e) => {
-        // Klick in Select-Mode toggled Selection statt Modal zu oeffnen.
         if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
         onOpen();
       }}
       style={isSelected ? { borderColor: `${accentColor}aa`, boxShadow: `0 0 0 1px ${accentColor}aa` } : undefined}
-      className={`group relative aspect-video rounded-md overflow-hidden bg-white/5 border transition-all cursor-pointer ${isSelected ? "" : "border-white/10 hover:border-white/30"
-        }`}
+      className={`group relative aspect-video rounded-md overflow-hidden bg-black/40 border transition-all cursor-pointer ${
+        isSelected ? "" : "border-white/10 hover:border-white/30 hover:-translate-y-1 hover:shadow-lg"
+      }`}
     >
-      {/* Preview / Placeholder / Error */}
       {previewError ? (
         <div className="w-full h-full flex items-center justify-center text-white/25">
           <Icon icon="solar:gallery-remove-bold" className="w-6 h-6" />
@@ -449,7 +424,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
             className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? "opacity-100" : "opacity-0"}`}
             muted
             loop
-            onMouseEnter={(e) => { e.currentTarget.play().catch(() => { }); }}
+            onMouseEnter={(e) => { e.currentTarget.play().catch(()=>{}); }}
             onMouseLeave={(e) => { e.currentTarget.pause(); }}
           />
         ) : (
@@ -468,16 +443,14 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
         </div>
       )}
 
-      {/* Video Indicator */}
       {currentIsVideo && (
         <div className="absolute top-2 right-2 bg-black/60 rounded p-1 text-white/90">
           <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
         </div>
       )}
 
-      {/* BeReal Secondary Image */}
       {group.type === 'bereal' && currentSecInfo && (
-        <div
+        <div 
           onClick={(e) => {
             e.stopPropagation();
             setSwapped(!swapped);
@@ -495,32 +468,30 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
         </div>
       )}
 
-      {/* Hover overlay (dimmt Bild, zeigt Checkbox + Date) */}
       <div
-        className={`absolute inset-0 pointer-events-none transition-opacity ${isSelected ? "bg-black/25" : "bg-gradient-to-b from-black/40 via-transparent to-black/60 opacity-0 group-hover:opacity-100"
-          }`}
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+          isSelected ? "bg-black/25" : "bg-gradient-to-b from-black/40 via-transparent to-black/80 opacity-0 group-hover:opacity-100"
+        }`}
       />
 
-      {/* Selection-Checkbox: permanent sichtbar im Select-Mode oder bei Selected,
-          sonst erst on-hover. Eigener pointer-events-auto damit Click nicht
-          durch den Overlay blockiert wird. */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelection(); }}
-        className={`absolute top-2 left-2 pointer-events-auto transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
+        className={`absolute top-2 left-2 pointer-events-auto transition-opacity duration-200 ${
+          selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}
         title={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
       >
         <div
           style={isSelected ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? "" : "bg-black/50 border-white/60 hover:border-white"
-            }`}
+          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+            isSelected ? "" : "bg-black/60 border-white/60 hover:border-white"
+          }`}
         >
-          {isSelected && <Icon icon="mdi:check-bold" className="w-3.5 h-3.5 text-black" />}
+          {isSelected && <Icon icon="mdi:check-bold" className="w-4 h-4 text-black" />}
         </div>
       </button>
 
-      {/* Date-Badge unten links — nur bei Hover sichtbar */}
-      <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
         <span className="text-[10px] text-white font-minecraft bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
           {formatRelativeTime(currentMainInfo.modified)}
         </span>
@@ -529,7 +500,6 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   );
 };
 
-// Small component to handle the BeReal secondary image loading
 const BeRealSecondaryImage = ({ path, inView }: { path: string, inView: boolean }) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -539,10 +509,10 @@ const BeRealSecondaryImage = ({ path, inView }: { path: string, inView: boolean 
       .then(res => {
         if (active) setUrl(`data:image/jpeg;base64,${res.base64_image}`);
       })
-      .catch(() => { });
+      .catch(() => {});
     return () => { active = false; };
   }, [path, inView]);
-
+  
   if (!url) return <div className="w-full h-full bg-zinc-800 animate-pulse" />;
   return <img src={url} className="w-full h-full object-cover" alt="" />;
 };

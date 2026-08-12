@@ -83,7 +83,7 @@ export function FloatingActionBar({
           className="h-11 w-11 hover:bg-white/5 text-white/55 hover:text-white flex items-center justify-center transition-colors"
           title={t("profiles.v3.fab.clearSelection")}
         >
-          <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+          <Icon icon="solar:close-circle-linear" className="w-6 h-6" />
         </button>
       </div>
     </div>
