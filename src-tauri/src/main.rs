@@ -70,7 +70,7 @@ use commands::profile_command::{
     get_servers_for_profile,
     get_default_memory_max_mb, get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_world, is_content_installed, is_profile_launching,
-    launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
+    launch_profile, list_profile_backups, list_profile_screenshots, list_all_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
     repair_profile,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
@@ -92,7 +92,7 @@ use commands::modrinth_commands::{
 };
 
 use commands::file_command::{
-    delete_file, get_icons_for_archives, get_icons_for_norisk_mods, list_all_mc_logs,
+    delete_file, fetch_image_base64, get_icons_for_archives, get_icons_for_norisk_mods, list_all_mc_logs,
     list_crash_reports, list_launcher_logs, list_process_logs, open_file, open_file_directory,
     read_file_bytes,
     set_file_enabled,
@@ -656,6 +656,7 @@ async fn main() {
             get_profile_log_files,
             get_log_file_content,
             list_profile_screenshots,
+            list_all_screenshots,
             list_launcher_logs,
             list_crash_reports,
             list_all_mc_logs,
@@ -679,6 +680,7 @@ async fn main() {
             commands::minecraft_command::add_skin_locally,
             commands::minecraft_command::get_base64_from_skin_source_command,
             commands::file_command::get_image_preview,
+            commands::file_command::fetch_image_base64,
             download_template_and_open_explorer,
             get_all_profiles_and_last_played,
             get_local_content,

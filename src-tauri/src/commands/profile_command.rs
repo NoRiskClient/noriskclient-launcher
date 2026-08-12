@@ -2272,6 +2272,40 @@ pub async fn list_profile_screenshots(
     Ok(profile_utils::get_screenshots_for_profile(profile_id).await?)
 }
 
+#[tauri::command]
+pub async fn list_all_screenshots() -> Result<Vec<ScreenshotInfo>, CommandError> {
+    info!("Executing list_all_screenshots command");
+    let state = State::get().await?;
+    let profiles = state.profile_manager.list_profiles().await?;
+    
+    let mut all_screenshots = Vec::new();
+    let mut seen_paths = std::collections::HashSet::new();
+    
+    for profile in profiles {
+        match profile_utils::get_screenshots_for_profile(profile.id).await {
+            Ok(profile_screenshots) => {
+                for mut s in profile_screenshots {
+                    let normalized_path = s.path.to_string_lossy().to_lowercase();
+                    if !seen_paths.contains(&normalized_path) {
+                        seen_paths.insert(normalized_path);
+                        s.profile_id = Some(profile.id);
+                        s.profile_name = Some(profile.group.clone().unwrap_or(profile.name.clone()));
+                        all_screenshots.push(s);
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to get screenshots for profile {}: {}", profile.name, e);
+            }
+        }
+    }
+    
+    // Sort all screenshots by modified time (newest first)
+    all_screenshots.sort_by(|a, b| b.modified.cmp(&a.modified));
+    
+    Ok(all_screenshots)
+}
+
 // --- New DTO and Command for All Profiles and Last Played ---
 #[derive(Serialize, Debug, Clone)]
 pub struct AllProfilesAndLastPlayed {

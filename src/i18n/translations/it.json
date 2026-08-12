@@ -837,12 +837,10 @@
   "server.stop": "Ferma",
   "server.join": "Unisciti",
   "server.mods": "Mod",
-
   "wm.public_viewing": "Public Viewing Mondiali",
   "wm.tooltip": "Public viewing dei Mondiali su HugoSMP.net! Ti serve la {{version}}!",
   "wm.switch_to_main": "torna all'avvio principale",
   "wm.switch_to_hugo": "Passa a {{server}}",
-
   "radius.title": "Raggio bordi",
   "radius.square": "Quadrato",
   "radius.minimal": "Minimo",
@@ -923,7 +921,6 @@
   "content.item_not_found": "Elemento non trovato.",
   "content.badge.crashes_with_nrc": "Crash con NRC",
   "content.update_check_error": "Errore controllo aggiornamenti: {{error}}",
-
   "content.update.available": "Aggiornamento disponibile",
   "content.update.ready_title": "Pronto per l'aggiornamento",
   "content.update.ready_desc": "Questa mod autonoma può essere aggiornata automaticamente.",
@@ -1551,7 +1548,6 @@
   "placeholders.profile_name_awesome": "Il mio profilo fantastico",
   "placeholders.group_name": "es. modpack, vanilla+",
   "referral.loading": "Caricamento referral...",
-
   "rollout.popover.title": "Stai testando la nuova versione NRC",
   "rollout.popover.title_opted_out": "Test disattivati",
   "rollout.popover.body_intro_before": "Sei uno dei",
@@ -2069,7 +2065,6 @@
   "settings.ads.reset_consent.button": "Reimposta",
   "settings.font.title": "Carattere",
   "settings.font.description": "Scegli il carattere utilizzato nel launcher",
-
   "modrinth.quick_profile.install_prefix": "Installa ",
   "modrinth.quick_profile.install_suffix": " come nuovo profilo",
   "modrinth.quick_profile.copy_prefix": "Copia il profilo esistente e installa ",
@@ -2079,5 +2074,21 @@
   "modrinth.quick_profile.selected_profile": "profilo selezionato",
   "modrinth.quick_profile.clear_source": "Annulla la selezione del profilo di origine",
   "modrinth.quick_profile.copy_from_existing": "Copia le impostazioni da un profilo esistente",
-  "modrinth.quick_profile.name_label": "Nome del nuovo profilo"
+  "modrinth.quick_profile.name_label": "Nome del nuovo profilo",
+  "capes.stealCape": "Ruba mantello",
+  "capes.stealCapeDescription": "Inserisci il nome del giocatore a cui vuoi rubare il mantello.",
+  "capes.stealCapeNotFound": "Mantello non trovato per questo giocatore",
+  "capes.stealCapeNoCapeEquipped": "Questo giocatore non ha un mantello equipaggiato",
+  "capes.stealCapeError": "Impossibile rubare il mantello",
+  "capes.stealCapeSuccess": "Mantello rubato con successo!",
+  "capes.steal": "Ruba",
+  "capes.usernamePlaceholder": "Nome utente",
+  "capes.recentCapes": "Mantelli recenti",
+  "capes.removeFromRecents": "Rimuovi dai recenti",
+  "nav.screenshots": "IMMAGINI",
+  "nav.all": "Tutti i profili",
+  "screenshots.set_background": "Imposta come sfondo del launcher",
+  "settings.custom_background.set_success": "Sfondo personalizzato impostato con successo!",
+  "screenshots.replace_background_title": "Sostituire lo sfondo?",
+  "screenshots.replace_background_desc": "Hai già impostato uno sfondo. Vuoi sostituirlo con questo screenshot?"
 }

@@ -964,3 +964,21 @@ pub async fn list_process_logs() -> Result<Vec<FileInfo>, CommandError> {
     info!("Found {} archived process logs", all_files.len());
     Ok(all_files)
 }
+
+#[tauri::command]
+pub async fn fetch_image_base64(url: String) -> Result<String, String> {
+    use reqwest::Client;
+    use base64::{Engine as _, engine::general_purpose};
+    
+    let client = Client::new();
+    let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Failed to fetch image: {}", response.status()));
+    }
+    
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    let base64_str = general_purpose::STANDARD.encode(&bytes);
+    
+    Ok(format!("data:image/png;base64,{}", base64_str))
+}

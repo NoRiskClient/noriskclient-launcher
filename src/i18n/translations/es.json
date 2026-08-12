@@ -837,12 +837,10 @@
   "server.stop": "Detener",
   "server.join": "Unirse",
   "server.mods": "Mods",
-
   "wm.public_viewing": "Public Viewing del Mundial",
   "wm.tooltip": "¡Public viewing del Mundial en HugoSMP.net! ¡Necesitas la {{version}}!",
   "wm.switch_to_main": "volver al inicio principal",
   "wm.switch_to_hugo": "Cambiar a {{server}}",
-
   "radius.title": "Radio de Bordes",
   "radius.square": "Cuadrado",
   "radius.minimal": "Mínimo",
@@ -923,7 +921,6 @@
   "content.item_not_found": "Elemento no encontrado.",
   "content.badge.crashes_with_nrc": "Crashea con NRC",
   "content.update_check_error": "Error de Verificación de Actualización: {{error}}",
-
   "content.update.available": "Actualización disponible",
   "content.update.ready_title": "Listo para actualizar",
   "content.update.ready_desc": "Este mod independiente se puede actualizar automáticamente.",
@@ -1551,7 +1548,6 @@
   "placeholders.profile_name_awesome": "Mi Perfil Increíble",
   "placeholders.group_name": "ej. modpacks, vanilla+",
   "referral.loading": "Cargando referido...",
-
   "rollout.popover.title": "Estás probando la nueva versión NRC",
   "rollout.popover.title_opted_out": "Pruebas desactivadas",
   "rollout.popover.body_intro_before": "Eres uno de los",
@@ -2069,7 +2065,6 @@
   "settings.ads.reset_consent.button": "Restablecer",
   "settings.font.title": "Fuente",
   "settings.font.description": "Elige la fuente utilizada en todo el launcher",
-
   "modrinth.quick_profile.install_prefix": "Instalar ",
   "modrinth.quick_profile.install_suffix": " como nuevo perfil",
   "modrinth.quick_profile.copy_prefix": "Copiar perfil existente e instalar ",
@@ -2079,5 +2074,21 @@
   "modrinth.quick_profile.selected_profile": "perfil seleccionado",
   "modrinth.quick_profile.clear_source": "Quitar la selección del perfil de origen",
   "modrinth.quick_profile.copy_from_existing": "Copiar ajustes de un perfil existente",
-  "modrinth.quick_profile.name_label": "Nombre del nuevo perfil"
+  "modrinth.quick_profile.name_label": "Nombre del nuevo perfil",
+  "capes.stealCape": "Robar capa",
+  "capes.stealCapeDescription": "Introduce el nombre del jugador al que quieres robar la capa.",
+  "capes.stealCapeNotFound": "Capa no encontrada para este jugador",
+  "capes.stealCapeNoCapeEquipped": "Este jugador no tiene una capa equipada",
+  "capes.stealCapeError": "Error al robar la capa",
+  "capes.stealCapeSuccess": "¡Capa robada con éxito!",
+  "capes.steal": "Robar",
+  "capes.usernamePlaceholder": "Nombre de usuario",
+  "capes.recentCapes": "Capas recientes",
+  "capes.removeFromRecents": "Eliminar del historial",
+  "nav.screenshots": "IMÁGENES",
+  "nav.all": "Todos los perfiles",
+  "screenshots.set_background": "Establecer como fondo del lanzador",
+  "settings.custom_background.set_success": "¡Fondo personalizado establecido con éxito!",
+  "screenshots.replace_background_title": "¿Reemplazar fondo?",
+  "screenshots.replace_background_desc": "Ya tienes un fondo personalizado. ¿Quieres reemplazarlo con esta captura?"
 }

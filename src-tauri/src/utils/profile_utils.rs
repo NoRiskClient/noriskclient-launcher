@@ -1169,6 +1169,8 @@ pub struct ScreenshotInfo {
     pub filename: String,
     pub path: PathBuf,
     pub modified: Option<chrono::DateTime<chrono::Utc>>, // Use chrono for timestamps
+    pub profile_id: Option<Uuid>,
+    pub profile_name: Option<String>,
 }
 
 /// Recursively finds screenshot files in a directory and its subdirectories.
@@ -1198,9 +1200,10 @@ pub fn find_screenshots_recursive<'a>(
                 // If it's a directory, recurse into it
                 find_screenshots_recursive(&path, screenshots).await?;
             } else if path.is_file() {
-                // If it's a file, check if it's a PNG
+                // Check if it's a supported media file
                 if let Some(filename_str) = path.file_name().and_then(|n| n.to_str()) {
-                    if filename_str.to_lowercase().ends_with(".png") {
+                    let name_lower = filename_str.to_lowercase();
+                    if name_lower.ends_with(".png") || name_lower.ends_with(".jpg") || name_lower.ends_with(".jpeg") || name_lower.ends_with(".mp4") || name_lower.ends_with(".gif") {
                         let modified_time = match fs::metadata(&path).await {
                             Ok(metadata) => match metadata.modified() {
                                 Ok(sys_time) => {
@@ -1221,6 +1224,8 @@ pub fn find_screenshots_recursive<'a>(
                             filename: filename_str.to_string(),
                             path: path.clone(),
                             modified: modified_time,
+                            profile_id: None,
+                            profile_name: None,
                         });
                     }
                 }
