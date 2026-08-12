@@ -370,6 +370,7 @@ export function App() {
         'solar:widget-bold',
         'solar:emoji-funny-circle-bold',
         'solar:shop-bold',
+        'solar:gallery-bold',
 
         // Search & Filters
         'solar:magnifer-bold',

@@ -5,6 +5,7 @@ import { PlayTab } from "../components/tabs/PlayTab";
 import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
 import { SkinsTab } from "../components/tabs/SkinsTab";
 import { StoreTab } from "../components/tabs/StoreTab";
+import { GlobalScreenshotsTab } from "../components/tabs/GlobalScreenshotsTab";
 import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
 import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
 import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetailViewV2Wrapper";
@@ -61,6 +62,10 @@ export const router = createHashRouter([
       {
         path: "capes",
         element: <StoreTab />,
+      },
+      {
+        path: "screenshots",
+        element: <GlobalScreenshotsTab />,
       },
       // DISABLED: Advent Calendar (seasonal feature)
       // {
