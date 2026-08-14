@@ -214,6 +214,14 @@ pub struct DirectOAuthFlow {
     pub authorize_url: String,
 }
 
+fn publish_log_redactions(accounts: &[Credentials]) {
+    let pairs: Vec<(String, String)> = accounts
+        .iter()
+        .map(|account| (account.username.clone(), account.id.to_string()))
+        .collect();
+    crate::utils::security_utils::set_known_accounts(&pairs);
+}
+
 #[derive(Clone)]
 pub struct MinecraftAuthStore {
     accounts: Arc<RwLock<Vec<Credentials>>>,
@@ -293,6 +301,7 @@ impl MinecraftAuthStore {
                 store.accounts.len()
             );
             *accounts = store.accounts;
+            publish_log_redactions(&accounts);
             info!("[Storage] Successfully loaded accounts");
 
             // Also restore saved device token
@@ -323,6 +332,7 @@ impl MinecraftAuthStore {
                 token: device_token.clone(),
             }
         };
+        publish_log_redactions(&store.accounts);
         debug!(
             "[Storage] Saving AccountStore with {} accounts to: {}",
             store.accounts.len(),
@@ -467,7 +477,10 @@ impl MinecraftAuthStore {
         match sisu_authenticate(&token.token, &challenge, &key, current_date, redirect_uri).await {
             Ok((session_id, redirect_uri)) => {
                 info!("[Auth Flow] SISU authentication successful");
-                info!("[Auth Flow] Session ID generated: {}", session_id);
+                info!(
+                    "[Auth Flow] Session ID generated: {}",
+                    crate::utils::security_utils::mask_identifier(&session_id)
+                );
                 Ok(MinecraftLoginFlow {
                     verifier,
                     challenge,

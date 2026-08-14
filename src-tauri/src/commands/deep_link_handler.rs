@@ -7,7 +7,10 @@ use log::info;
 /// Tauri command called by the frontend after user confirms the auth bridge request.
 #[tauri::command]
 pub async fn confirm_auth_bridge(session_id: String) -> Result<AuthBridgeResult, crate::error::CommandError> {
-    info!("[DeepLink] User confirmed auth bridge for sessionId: {}", session_id);
+    info!(
+        "[DeepLink] User confirmed auth bridge for sessionId: {}",
+        crate::utils::security_utils::mask_identifier(&session_id)
+    );
 
     let state = State::get().await?;
     let is_experimental = state.config_manager.is_experimental_mode().await;

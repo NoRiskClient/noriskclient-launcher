@@ -762,7 +762,10 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/auth/bridge/confirm", base_url);
 
-        debug!("[NoRisk API] Confirming auth bridge session: {}", session_id);
+        debug!(
+            "[NoRisk API] Confirming auth bridge session: {}",
+            crate::utils::security_utils::mask_identifier(session_id)
+        );
 
         nrc_post(&url)
             .bearer(norisk_token)
