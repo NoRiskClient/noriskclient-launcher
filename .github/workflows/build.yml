@@ -62,6 +62,15 @@ jobs:
             asset_name_base: NoRiskClient-Windows-setup
 
     runs-on: ${{ matrix.platform }}
+    # The environment exists to give the GitHub OIDC token a stable subject
+    # (repo:NoRiskClient@76866278/noriskclient-launcher@683336999:environment:signing)
+    # so one Azure federated credential covers every branch and tag.
+    # Leave it without deployment-branch restrictions: this job also runs on plain
+    # branch pushes, and a restricted environment would fail those outright.
+    environment: signing
+    permissions:
+      contents: read
+      id-token: write # Azure OIDC login for Artifact Signing
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -145,7 +154,7 @@ jobs:
           
           echo "--- Fix Complete ---"
 
-      # --- EV Code Signing (Windows) ---
+      # --- Code Signing (Windows) via Azure Artifact Signing ---
       - name: Find Windows EXE for Signing
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         id: find_exe
@@ -157,30 +166,47 @@ jobs:
           echo "Found EXE: $($ExeFile.FullName)"
         shell: pwsh
 
-      - name: Sign Windows EXE with SSL.com EV Certificate
-        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-beta')
-        uses: sslcom/esigner-codesign@develop
+      - name: Azure login (OIDC federated credential)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/login@v3
         with:
-          command: sign
-          username: ${{ secrets.ES_USERNAME }}
-          password: ${{ secrets.ES_PASSWORD }}
-          credential_id: ${{ secrets.CREDENTIAL_ID }}
-          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          file_path: ${{ steps.find_exe.outputs.EXE_PATH }}
-          environment_name: PROD
-          malware_block: false
-          override: true
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Sign Windows EXE with Azure Artifact Signing
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ steps.find_exe.outputs.EXE_PATH }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # tauri-action generated the .exe.sig before code signing changed the binary,
+      # so the updater signature no longer matches and has to be regenerated.
       - name: Re-sign Windows EXE for Tauri Updater
-        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-beta')
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: |
-          echo "Re-signing EXE for Tauri updater after EV code signing..."
+          echo "Re-signing EXE for Tauri updater after code signing..."
           yarn tauri signer sign "${{ steps.find_exe.outputs.EXE_PATH }}"
           echo "Re-signing complete."
         shell: bash
+
+      - name: Verify the Windows signature
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature "${{ steps.find_exe.outputs.EXE_PATH }}"
+          $sig | Format-List Status, StatusMessage
+          $sig.SignerCertificate | Format-List Subject, Issuer, NotAfter
+          if ($sig.Status -ne 'Valid') { throw "Signature status is $($sig.Status)" }
 
       # --- Umbenennen und Artefakte vorbereiten ---
       - name: Rename Linux Artifacts
