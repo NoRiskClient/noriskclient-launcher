@@ -56,9 +56,9 @@ pub fn mask_sensitive_data(content: &str) -> String {
         // Mask JWT tokens (eyJ... format), including ones truncated mid-segment by log truncation
         static ref JWT_REGEX: Regex = Regex::new(r"\beyJ[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]*){0,2}").unwrap();
         // Mask the OS username in Windows paths (C:\Users\<name>\... or C:/Users/<name>/...)
-        static ref WINDOWS_USER_PATH_REGEX: Regex = Regex::new(r#"(?i)([A-Z]:[/\\]Users[/\\])[^/\\"'\s]+"#).unwrap();
+        static ref WINDOWS_USER_PATH_REGEX: Regex = Regex::new(r#"(?i)([A-Z]:[/\\]+Users[/\\]+)[^/\\"'\s]+"#).unwrap();
         // Mask the OS username in Unix/macOS home paths (/home/<name>/..., /Users/<name>/...)
-        static ref UNIX_USER_PATH_REGEX: Regex = Regex::new(r#"(/(?:home|Users)/)[^/"'\s]+"#).unwrap();
+        static ref UNIX_USER_PATH_REGEX: Regex = Regex::new(r#"(/+(?:home|Users)/+)[^/"'\s]+"#).unwrap();
         // Mask email addresses
         static ref EMAIL_REGEX: Regex = Regex::new(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b").unwrap();
     }
@@ -97,6 +97,12 @@ pub fn mask_identifier(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{mask_identifier, mask_sensitive_data};
+
+    static ACCOUNT_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_account_state() -> std::sync::MutexGuard<'static, ()> {
+        ACCOUNT_STATE.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     #[test]
     fn shortens_long_identifiers_and_hides_short_ones() {
@@ -137,6 +143,7 @@ mod tests {
 
     #[test]
     fn masks_registered_player_name_and_uuid_in_every_spelling() {
+        let _guard = lock_account_state();
         super::set_known_accounts(&[(
             "ZzTestPlayerZz".to_string(),
             "A1B2C3D4-1111-2222-3333-444455556666".to_string(),
@@ -160,6 +167,7 @@ mod tests {
 
     #[test]
     fn ignores_accounts_with_a_too_short_name() {
+        let _guard = lock_account_state();
         super::set_known_accounts(&[("ab".to_string(), "".to_string())]);
         assert_eq!(mask_sensitive_data("about a cab"), "about a cab");
         super::set_known_accounts(&[]);
@@ -175,6 +183,18 @@ mod tests {
 
         let masked = mask_sensitive_data("/home/sheesh/.minecraft and /Users/sheesh/Library");
         assert_eq!(masked, "/home/*****/.minecraft and /Users/*****/Library");
+    }
+
+    #[test]
+    fn masks_os_username_in_debug_escaped_paths() {
+        let masked = mask_sensitive_data(
+            r#"Successfully saved config to "C:\\Users\\sheesh\\AppData\\Roaming\\norisk""#,
+        );
+        assert!(!masked.contains("sheesh"), "os username leaked: {}", masked);
+        assert_eq!(
+            masked,
+            r#"Successfully saved config to "C:\\Users\\*****\\AppData\\Roaming\\norisk""#
+        );
     }
 
     #[test]
