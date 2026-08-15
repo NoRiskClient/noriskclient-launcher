@@ -1,6 +1,6 @@
 [package]
 name = "noriskclient-launcher-v3"
-version = "0.6.25-beta.28"
+version = "0.6.25-beta.29"
 description = "A Tauri App"
 authors = ["NoRiskk"]
 edition = "2021"
