@@ -359,6 +359,68 @@ pub struct ProfileBackupInfo {
     pub profile_count: usize,
 }
 
+#[cfg(test)]
+#[path = "profile_state_test.rs"]
+mod tests;
+
+pub(crate) fn mod_project_key(source: &ModSource) -> Option<(&'static str, &str)> {
+    match source {
+        ModSource::Modrinth { project_id, .. } => Some(("modrinth", project_id.as_str())),
+        ModSource::CurseForge { project_id, .. } => Some(("curseforge", project_id.as_str())),
+        _ => None,
+    }
+}
+
+pub(crate) fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
+    let key = mod_project_key(source)?;
+    mods.iter()
+        .position(|m| mod_project_key(&m.source) == Some(key))
+}
+
+pub(crate) fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
+    mods.iter()
+        .position(|m| mod_project_key(&m.source).map(|(_, id)| id) == Some(project_id))
+}
+
+pub(crate) fn replace_mod_with_payload(
+    existing: &mut Mod,
+    payload: &crate::commands::content_command::InstallContentPayload,
+    source: ModSource,
+) {
+    existing.source = source;
+    existing.display_name = payload.content_name.clone();
+    existing.version = payload.version_number.clone();
+    existing.game_versions = payload.game_versions.clone();
+    existing.file_name_override = None;
+    existing.associated_loader = payload
+        .loaders
+        .clone()
+        .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok()));
+    existing.enabled = true;
+}
+
+pub(crate) fn find_mod_for_version_switch(
+    mods: &[Mod],
+    current_item: &crate::utils::profile_utils::LocalContentItem,
+) -> Option<usize> {
+    if let Some(id) = current_item.id.as_ref() {
+        return mods.iter().position(|m| m.id.to_string() == *id);
+    }
+
+    let project_id = current_item
+        .modrinth_info
+        .as_ref()
+        .map(|info| info.project_id.as_str())
+        .or_else(|| {
+            current_item
+                .curseforge_info
+                .as_ref()
+                .map(|info| info.project_id.as_str())
+        })?;
+
+    find_mod_by_project_id(mods, project_id)
+}
+
 // Profile Manager
 pub struct ProfileManager {
     profiles: Arc<RwLock<HashMap<Uuid, Profile>>>,
@@ -1359,7 +1421,23 @@ impl ProfileManager {
         {
             let mut profiles = self.profiles.write().await;
             if let Some(profile) = profiles.get_mut(&payload.profile_id) {
-                if !profile.mods.iter().any(|m| m.source == source) {
+                let existing_index = find_mod_by_project(&profile.mods, &source);
+
+                if let Some(index) = existing_index {
+                    if profile.mods[index].source == source {
+                        info!(
+                            "{} mod {} already exists in profile {}. Skipping addition.",
+                            platform_name, display_name_log, payload.profile_id
+                        );
+                    } else {
+                        info!(
+                            "{} mod {} already present in profile {} in a different version. Replacing it instead of adding a duplicate.",
+                            platform_name, display_name_log, payload.profile_id
+                        );
+                        replace_mod_with_payload(&mut profile.mods[index], payload, source.clone());
+                        needs_save = true;
+                    }
+                } else {
                     info!(
                         "Adding mod {} to profile {}",
                         display_name_log, payload.profile_id
@@ -1389,11 +1467,6 @@ impl ProfileManager {
                     };
                     profile.mods.push(new_mod);
                     needs_save = true;
-                } else {
-                    info!(
-                        "{} mod {} already exists in profile {}. Skipping addition.",
-                        platform_name, display_name_log, payload.profile_id
-                    );
                 }
             } else {
                 return Err(AppError::ProfileNotFound(payload.profile_id));
@@ -3134,22 +3207,7 @@ impl ProfileManager {
             AppError::InvalidInput("Missing current_item_details in payload.".to_string())
         })?;
 
-        // Find the mod to update
-        let mod_to_update_index = profile.mods.iter().position(|m| {
-            match &m.source {
-                ModSource::Modrinth { project_id, .. } => {
-                    // Check if ID matches or project_id from modrinth_info matches
-                    current_item.id.as_ref() == Some(&m.id.to_string()) ||
-                    (current_item.modrinth_info.as_ref().map(|info| &info.project_id) == Some(project_id))
-                },
-                ModSource::CurseForge { project_id, .. } => {
-                    // Check if ID matches or project_id from curseforge_info matches
-                    current_item.id.as_ref() == Some(&m.id.to_string()) ||
-                    (current_item.curseforge_info.as_ref().map(|info| &info.project_id) == Some(project_id))
-                },
-                _ => false,
-            }
-        });
+        let mod_to_update_index = find_mod_for_version_switch(&profile.mods, current_item);
 
         if let Some(index) = mod_to_update_index {
             apply_unified_version_to_mod(
@@ -3197,22 +3255,13 @@ impl ProfileManager {
     }
 
     /// Checks if a dependency mod is already installed in the profile
-    fn is_dependency_installed(
+    fn installed_dependency(
         &self,
         profile: &Profile,
         dependency_project_id: &str,
-    ) -> bool {
-        profile.mods.iter().any(|mod_entry| {
-            match &mod_entry.source {
-                ModSource::Modrinth { project_id, .. } => {
-                    project_id == dependency_project_id && mod_entry.enabled
-                },
-                ModSource::CurseForge { project_id, .. } => {
-                    project_id == dependency_project_id && mod_entry.enabled
-                },
-                _ => false,
-            }
-        })
+    ) -> Option<(Uuid, bool)> {
+        find_mod_by_project_id(&profile.mods, dependency_project_id)
+            .map(|idx| (profile.mods[idx].id, profile.mods[idx].enabled))
     }
 
     const DEPENDENCY_DEPTH: u8 = 20;
@@ -3280,9 +3329,18 @@ impl ProfileManager {
                     continue;
                 }
 
-                // Check if dependency is already installed
-                if self.is_dependency_installed(&profile, dep_project_id) {
-                    info!("Dependency {} already installed, skipping", dep_project_id);
+                if let Some((existing_id, enabled)) = self.installed_dependency(&profile, dep_project_id) {
+                    if enabled {
+                        info!("Dependency {} already installed, skipping", dep_project_id);
+                    } else {
+                        info!(
+                            "Dependency {} is installed but disabled, re-enabling instead of adding a second copy",
+                            dep_project_id
+                        );
+                        if let Err(e) = self.set_mod_enabled(profile_id, existing_id, true).await {
+                            error!("Failed to re-enable dependency '{}': {}", dep_project_id, e);
+                        }
+                    }
                     continue;
                 }
 
