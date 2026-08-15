@@ -40,6 +40,7 @@ export function ProfileScreenshotModal({
   const [isCopyingImage, setIsCopyingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showBackgroundConfirm, setShowBackgroundConfirm] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
   
   // BeReal Swap State
   const [swapped, setSwapped] = useState(false);
@@ -50,6 +51,7 @@ export function ProfileScreenshotModal({
       setIsModalImageLoaded(false);
       setSwapped(false);
       setShowBackgroundConfirm(false);
+      setIsZoomed(false);
     }
     if (!isOpen) {
       setShowBackgroundConfirm(false);
@@ -61,8 +63,13 @@ export function ProfileScreenshotModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" && onNext) {
         onNext();
+        setIsZoomed(false);
       } else if (e.key === "ArrowLeft" && onPrev) {
         onPrev();
+        setIsZoomed(false);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        setIsZoomed(prev => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -191,7 +198,7 @@ export function ProfileScreenshotModal({
       width="xl"
       closeOnClickOutside
     >
-      <div className="flex justify-center items-center py-4 bg-transparent min-h-[400px] max-h-[calc(85vh-120px)] relative">
+      <div className="flex justify-center items-center py-4 bg-transparent min-h-[400px] max-h-[calc(85vh-120px)] relative overflow-hidden">
         {!isModalImageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Icon icon="eos-icons:loading" className="w-12 h-12 text-white/70" />
@@ -201,26 +208,30 @@ export function ProfileScreenshotModal({
         {currentIsVideo ? (
           <video
             src={convertFileSrc(currentMainInfo.path)}
-            controls
+            controls={!isZoomed}
             autoPlay
             controlsList="nofullscreen"
             onDoubleClick={(e) => e.preventDefault()}
+            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
             className={cn(
-              "block max-w-full max-h-full w-auto h-auto object-contain rounded-md transition-opacity duration-700 ease-in-out",
-              isModalImageLoaded ? "opacity-100" : "opacity-0"
+              "block w-auto h-auto object-contain rounded-md transition-all duration-300 ease-out cursor-zoom-in",
+              isModalImageLoaded ? "opacity-100" : "opacity-0",
+              isZoomed ? "fixed inset-0 w-screen h-screen z-[9999] bg-black/95 cursor-zoom-out" : "max-w-full max-h-full"
             )}
-            style={{ maxHeight: 'calc(85vh - 150px)' }}
+            style={isZoomed ? {} : { maxHeight: 'calc(85vh - 150px)' }}
             onLoadedData={() => setIsModalImageLoaded(true)}
           />
         ) : (
           <img
             src={convertFileSrc(currentMainInfo.path)}
             alt={`Enlarged screenshot: ${currentMainInfo.filename}`}
+            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
             className={cn(
-              "block max-w-full max-h-full w-auto h-auto object-contain rounded-md transition-opacity duration-700 ease-in-out",
-              isModalImageLoaded ? "opacity-100" : "opacity-0"
+              "block w-auto h-auto object-contain rounded-md transition-all duration-300 ease-out cursor-zoom-in",
+              isModalImageLoaded ? "opacity-100" : "opacity-0",
+              isZoomed ? "fixed inset-0 w-screen h-screen z-[9999] bg-black/95 cursor-zoom-out p-4" : "max-w-full max-h-full"
             )}
-            style={{ maxHeight: 'calc(85vh - 150px)' }}
+            style={isZoomed ? {} : { maxHeight: 'calc(85vh - 150px)' }}
             onLoad={() => setIsModalImageLoaded(true)}
             onError={() => {
               setIsModalImageLoaded(false);

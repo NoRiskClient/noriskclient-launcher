@@ -2285,9 +2285,12 @@ pub async fn list_all_screenshots() -> Result<Vec<ScreenshotInfo>, CommandError>
         match profile_utils::get_screenshots_for_profile(profile.id).await {
             Ok(profile_screenshots) => {
                 for mut s in profile_screenshots {
-                    let normalized_path = s.path.to_string_lossy().to_lowercase();
-                    if !seen_paths.contains(&normalized_path) {
-                        seen_paths.insert(normalized_path);
+                    // Deduplicate by filename to prevent the same screenshot from multiple shared profiles
+                    // showing up multiple times. Minecraft screenshots have unique timestamps in their names.
+                    let normalized_key = s.filename.to_lowercase();
+                    
+                    if !seen_paths.contains(&normalized_key) {
+                        seen_paths.insert(normalized_key);
                         s.profile_id = Some(profile.id);
                         s.profile_name = Some(profile.group.clone().unwrap_or(profile.name.clone()));
                         all_screenshots.push(s);

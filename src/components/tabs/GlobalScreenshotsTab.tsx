@@ -192,12 +192,22 @@ export function GlobalScreenshotsTab() {
     ));
   }, [selectedPaths, visibleGroups, loadData, showModal, hideModal, isBatchDeleting, t]);
 
+  // Esc clears selection, Space opens single selection
   useEffect(() => {
     if (selectedPaths.size === 0) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSelectedPaths(new Set()); };
+    const onKey = (e: KeyboardEvent) => { 
+      if (e.key === "Escape") {
+        setSelectedPaths(new Set()); 
+      } else if (e.key === " " && selectedPaths.size === 1) {
+        e.preventDefault();
+        const selectedPath = Array.from(selectedPaths)[0];
+        const group = visibleGroups.find(g => g.main.path === selectedPath);
+        if (group) setModalScreenshotGroup(group);
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPaths.size]);
+  }, [selectedPaths, visibleGroups]);
 
   const shouldShowLoading = useDelayedTrue(loading && screenshots.length === 0, 500);
 
@@ -214,6 +224,20 @@ export function GlobalScreenshotsTab() {
   const modalIndex = modalScreenshotGroup ? visibleGroups.findIndex(g => g.main.path === modalScreenshotGroup.main.path) : -1;
   const onNext = modalIndex >= 0 && modalIndex < visibleGroups.length - 1 ? () => setModalScreenshotGroup(visibleGroups[modalIndex + 1]) : undefined;
   const onPrev = modalIndex > 0 ? () => setModalScreenshotGroup(visibleGroups[modalIndex - 1]) : undefined;
+
+  const handleOpenFolder = () => {
+    if (screenshots.length > 0) {
+      const rootScreenshot = screenshots.find(s => !s.path.toLowerCase().includes('mcreal'));
+      if (rootScreenshot) {
+        invoke("open_file_directory", { filePath: rootScreenshot.path }).catch(console.error);
+      } else {
+        const mcrealPath = screenshots[0].path;
+        const mcrealIndex = mcrealPath.toLowerCase().lastIndexOf('mcreal');
+        const parentDir = mcrealPath.substring(0, mcrealIndex - 1);
+        invoke("open_file_directory", { filePath: parentDir }).catch(console.error);
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-0 h-full relative p-6">
@@ -257,6 +281,15 @@ export function GlobalScreenshotsTab() {
         >
           <Icon icon={showMcreals ? "solar:eye-bold" : "solar:eye-closed-bold"} className="w-4 h-4" />
           McReals
+        </button>
+
+        <button
+          onClick={handleOpenFolder}
+          disabled={screenshots.length === 0}
+          className="h-9 px-3.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
+          title={t("logs.open_folder")}
+        >
+          <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
         </button>
 
         <button
@@ -403,12 +436,20 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   return (
     <div
       ref={ref}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (selectMode) { onToggleSelection(); return; }
+          onOpen();
+        }
+      }}
       onClick={(e) => {
         if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
         onOpen();
       }}
       style={isSelected ? { borderColor: `${accentColor}aa`, boxShadow: `0 0 0 1px ${accentColor}aa` } : undefined}
-      className={`group relative aspect-video rounded-md overflow-hidden bg-black/40 border transition-all cursor-pointer ${
+      className={`group relative aspect-video rounded-md overflow-hidden bg-black/40 border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50 ${
         isSelected ? "" : "border-white/10 hover:border-white/30 hover:-translate-y-1 hover:shadow-lg"
       }`}
     >
