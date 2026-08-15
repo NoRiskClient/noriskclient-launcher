@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NoRisk Launcher",
-  "version": "0.6.25-beta.27",
+  "version": "0.6.25-beta.28",
   "identifier": "gg.norisk.NoRiskClientLauncherV3",
   "build": {
     "beforeDevCommand": "yarn dev",
