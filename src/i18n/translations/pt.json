@@ -957,12 +957,10 @@
   "server.stop": "Parar",
   "server.join": "Entrar",
   "server.mods": "Mods",
-
   "wm.public_viewing": "Public Viewing da Copa",
   "wm.tooltip": "Public viewing da Copa do Mundo no HugoSMP.net! Você precisa da {{version}}!",
   "wm.switch_to_main": "voltar ao início principal",
   "wm.switch_to_hugo": "Mudar para {{server}}",
-
   "radius.title": "Raio da Borda",
   "radius.square": "Quadrado",
   "radius.minimal": "Mínimo",
@@ -1043,7 +1041,6 @@
   "content.item_not_found": "Item não encontrado.",
   "content.badge.crashes_with_nrc": "Trava com NRC",
   "content.update_check_error": "Erro na Verificação de Atualização: {{error}}",
-
   "content.update.available": "Atualização disponível",
   "content.update.ready_title": "Pronto para atualizar",
   "content.update.ready_desc": "Este mod independente pode ser atualizado automaticamente.",
@@ -1748,7 +1745,6 @@
   "placeholders.profile_name_awesome": "Meu Perfil Incrível",
   "placeholders.group_name": "ex. modpacks, vanilla+",
   "referral.loading": "Carregando indicação...",
-
   "rollout.popover.title": "Você está testando a nova versão NRC",
   "rollout.popover.title_opted_out": "Testes desativados",
   "rollout.popover.body_intro_before": "Você é um dos",
@@ -2069,7 +2065,6 @@
   "settings.ads.reset_consent.button": "Repor",
   "settings.font.title": "Fonte",
   "settings.font.description": "Escolha a fonte usada em todo o launcher",
-
   "modrinth.quick_profile.install_prefix": "Instalar ",
   "modrinth.quick_profile.install_suffix": " como novo perfil",
   "modrinth.quick_profile.copy_prefix": "Copiar perfil existente e instalar ",
@@ -2079,5 +2074,15 @@
   "modrinth.quick_profile.selected_profile": "perfil selecionado",
   "modrinth.quick_profile.clear_source": "Remover a seleção do perfil de origem",
   "modrinth.quick_profile.copy_from_existing": "Copiar definições de um perfil existente",
-  "modrinth.quick_profile.name_label": "Nome do novo perfil"
+  "modrinth.quick_profile.name_label": "Nome do novo perfil",
+  "capes.stealCape": "Roubar capa",
+  "capes.stealCapeDescription": "Digite o nome do jogador de quem você quer roubar a capa.",
+  "capes.stealCapeNotFound": "Capa não encontrada para este jogador",
+  "capes.stealCapeNoCapeEquipped": "Este jogador não tem uma capa equipada",
+  "capes.stealCapeError": "Falha ao roubar a capa",
+  "capes.stealCapeSuccess": "Capa roubada com sucesso!",
+  "capes.steal": "Roubar",
+  "capes.usernamePlaceholder": "Nome de usuário",
+  "capes.recentCapes": "Capas recentes",
+  "capes.removeFromRecents": "Remover do histórico"
 }

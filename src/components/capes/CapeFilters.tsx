@@ -20,12 +20,14 @@ interface CapeFiltersProps {
   onFilterChange: (filters: CapeFiltersData) => void;
   currentFilters: CapeFiltersData;
   onSearchSubmit?: (term: string) => void;
+  onStealCapeClick?: () => void;
 }
 
 export function CapeFilters({
   onFilterChange,
   currentFilters,
   onSearchSubmit,
+  onStealCapeClick,
 }: CapeFiltersProps) {
   const [searchInputValue, setSearchInputValue] = useState<string>("");
   const { activeAccount } = useMinecraftAuthStore();
@@ -107,6 +109,19 @@ export function CapeFilters({
         variant="flat"
         className="w-full md:w-auto flex-grow md:flex-grow-0 h-[42px]"
       />
+
+      {onStealCapeClick && !currentFilters.showVanillaOnly && (
+        <Button
+          onClick={onStealCapeClick}
+          variant="flat"
+          size="md"
+          icon={<Icon icon="solar:mask-happly-bold-duotone" className="w-5 h-5" />}
+          className="min-w-0 h-[42px] px-3 border border-purple-500/30 hover:border-purple-400/60 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
+          title={t('capes.stealCape', 'Steal Cape')}
+        >
+          {t('capes.stealCape', 'Steal')}
+        </Button>
+      )}
 
       <Select
         value={currentFilters.sortBy || ""}
