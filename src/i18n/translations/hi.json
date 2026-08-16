@@ -469,6 +469,7 @@
   "skins.slim": "स्लिम",
   "skins.classic": "क्लासिक",
   "skins.applied": "लागू हुआ",
+  "skins.saveAndApply": "सहेजें और लागू करें",
   "skins.addNewSkin": "नई Skin जोड़ें",
   "skins.uploadOrImport": "एक Skin अपलोड या आयात करें",
   "skins.failedToParseSkinDetails": "Skin विवरण पार्स करने में विफल",

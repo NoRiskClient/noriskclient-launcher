@@ -465,6 +465,7 @@
   "skins.slim": "Тонкий",
   "skins.classic": "Классический",
   "skins.applied": "Применён",
+  "skins.saveAndApply": "Сохранить и применить",
   "skins.addNewSkin": "Добавить новый скин",
   "skins.uploadOrImport": "Загрузить или импортировать скин",
   "skins.failedToParseSkinDetails": "Не удалось разобрать детали скина",

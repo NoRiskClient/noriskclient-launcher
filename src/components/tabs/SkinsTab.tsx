@@ -5,11 +5,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
-import type {
-  GetStarlightSkinRenderPayload,
-  MinecraftSkin,
-  SkinVariant,
-} from "../../types/localSkin";
+import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { Button } from "../ui/buttons/Button";
@@ -21,12 +17,30 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useSkinStore } from "../../store/useSkinStore";
 import { toast } from "react-hot-toast";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
+import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
+
+function useDelayedFlag(active: boolean, delayMs: number): boolean {
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    const id = setTimeout(() => setShown(true), delayMs);
+    return () => clearTimeout(id);
+  }, [active, delayMs]);
+
+  return shown;
+}
+
+const PREVIEW_WIDTH = 176;
+const PREVIEW_HEIGHT = 280;
 
 const SkinPreview = memo(
   ({
@@ -66,90 +80,15 @@ const SkinPreview = memo(
     const isSelected = selectedLocalSkin?.id === skin.id;
     const isDisabled = loading && isSelected;
 
-    const [starlightRenderUrl, setStarlightRenderUrl] = useState<string | null>(
-      null,
-    );
-    const [isRenderLoading, setIsRenderLoading] = useState<boolean>(true);
-    const [canShowSpinner, setCanShowSpinner] = useState<boolean>(false);
-    const spinnerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
-      let isMounted = true;
-      setIsRenderLoading(true);
-      setStarlightRenderUrl(null);
-      setCanShowSpinner(false);
-
-      if (spinnerTimeoutRef.current) {
-        clearTimeout(spinnerTimeoutRef.current);
-      }
-
-      spinnerTimeoutRef.current = setTimeout(() => {
-        if (isMounted && isRenderLoading) {
-          setCanShowSpinner(true);
-        }
-      }, 500);
-
-      const fetchRender = async () => {
-        if (skin && skin.name) {
-          try {
-            const payload: GetStarlightSkinRenderPayload = {
-              player_name: "skin",
-              render_type: "default",
-              render_view: "full",
-              base64_skin_data: skin.base64_data,
-            };
-            const localPath =
-              await MinecraftSkinService.getStarlightSkinRender(payload);
-            if (isMounted) {
-              if (localPath) {
-                setStarlightRenderUrl(convertFileSrc(localPath));
-              } else {
-                console.warn(
-                  `[SkinPreview] Starlight render returned empty path for ${skin.name}.`,
-                );
-                setStarlightRenderUrl("");
-              }
-              setIsRenderLoading(false);
-              setCanShowSpinner(false);
-              if (spinnerTimeoutRef.current)
-                clearTimeout(spinnerTimeoutRef.current);
-            }
-          } catch (error) {
-            console.error(
-              `[SkinPreview] Failed to fetch Starlight skin render for ${skin.name}:`,
-              error,
-            );
-            if (isMounted) {
-              setStarlightRenderUrl("");
-              setIsRenderLoading(false);
-              setCanShowSpinner(false);
-              if (spinnerTimeoutRef.current)
-                clearTimeout(spinnerTimeoutRef.current);
-            }
-          }
-        } else {
-          if (isMounted) {
-            console.warn(
-              `[SkinPreview] No skin.name provided, cannot fetch Starlight render.`,
-            );
-            setStarlightRenderUrl("");
-            setIsRenderLoading(false);
-            setCanShowSpinner(false);
-            if (spinnerTimeoutRef.current)
-              clearTimeout(spinnerTimeoutRef.current);
-          }
-        }
-      };
-
-      fetchRender();
-
-      return () => {
-        isMounted = false;
-        if (spinnerTimeoutRef.current) {
-          clearTimeout(spinnerTimeoutRef.current);
-        }
-      };
-    }, [skin?.name, skin?.base64_data, skin]);
+    const { url: previewUrl, loading: isRenderLoading } = useSkinPreview(true, {
+      textureUrl: skin.base64_data
+        ? `data:image/png;base64,${skin.base64_data}`
+        : null,
+      variant: skin.variant,
+      width: PREVIEW_WIDTH,
+      height: PREVIEW_HEIGHT,
+    });
+    const canShowSpinner = useDelayedFlag(isRenderLoading, 500);
 
     const animationStyle = isBackgroundAnimationEnabled
       ? { animationDelay: `${index * 0.075}s` }
@@ -171,9 +110,7 @@ const SkinPreview = memo(
           animationClasses,
           isDisabled ? "opacity-60 pointer-events-none" : ""
         )}
-        onClick={() =>
-          !isDisabled && !isApplied && !isSelected && onClick(skin)
-        }
+        onClick={() => !isDisabled && onClick(skin)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -219,8 +156,8 @@ const SkinPreview = memo(
           <div
             className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
             style={{
-              width: "140px",
-              height: "280px",
+              width: `${PREVIEW_WIDTH}px`,
+              height: `${PREVIEW_HEIGHT}px`,
             }}
           >
             {isRenderLoading && canShowSpinner ? (
@@ -230,9 +167,10 @@ const SkinPreview = memo(
               </div>
             ) : !isRenderLoading ? (
               <SkinViewer
-                skinUrl={starlightRenderUrl || ""}
-                width={140}
-                height={280}
+                skinUrl={previewUrl}
+                width={PREVIEW_WIDTH}
+                height={PREVIEW_HEIGHT}
+                fill
                 className="rounded-sm block"
               />
             ) : null}
@@ -326,8 +264,8 @@ const AddSkinCard = memo(
           <div
             className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
             style={{
-              width: "140px",
-              height: "280px",
+              width: `${PREVIEW_WIDTH}px`,
+              height: `${PREVIEW_HEIGHT}px`,
             }}
           >
             <SkinViewer
@@ -497,6 +435,7 @@ export function SkinsTab() {
       <AddSkinModal
         skin={skin}
         onSave={saveSkin}
+        onSaveAndApply={saveAndApplySkin}
         onAdd={addSkin}
         isLoading={localSkinsLoading}
       />
@@ -590,6 +529,16 @@ export function SkinsTab() {
         error: { duration: 5000 },
       },
     );
+  };
+
+  const saveAndApplySkin = async (skin: MinecraftSkin) => {
+    try {
+      await saveSkin(skin);
+      await applyLocalSkin(skin);
+    } catch (err) {
+      console.error("Save and apply failed:", err);
+      toast.error(parseErrorMessage(err));
+    }
   };
 
   const applyLocalSkin = async (skin: MinecraftSkin) => {
@@ -718,7 +667,7 @@ export function SkinsTab() {
                       localSkinsLoading={localSkinsLoading}
                       selectedLocalSkin={selectedLocalSkin}
                       isApplied={isSkinApplied(skin)}
-                      onClick={applyLocalSkin}
+                      onClick={(target) => startEditSkin(target)}
                       onEditSkin={startEditSkin}
                       onDeleteSkin={handleDeleteSkin}
                     />

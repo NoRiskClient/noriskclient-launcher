@@ -465,6 +465,7 @@
   "skins.slim": "İnce",
   "skins.classic": "Klasik",
   "skins.applied": "Uygulandı",
+  "skins.saveAndApply": "Kaydet ve uygula",
   "skins.addNewSkin": "Yeni Skin Ekle",
   "skins.uploadOrImport": "Skin yükle veya içe aktar",
   "skins.failedToParseSkinDetails": "Skin detayları ayrıştırılamadı",

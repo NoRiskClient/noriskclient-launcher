@@ -465,6 +465,7 @@
   "skins.slim": "Slim",
   "skins.classic": "Clássico",
   "skins.applied": "Aplicada",
+  "skins.saveAndApply": "Salvar e aplicar",
   "skins.addNewSkin": "Adicionar Nova Skin",
   "skins.uploadOrImport": "Enviar ou importar uma skin",
   "skins.failedToParseSkinDetails": "Falha ao analisar detalhes da skin",
