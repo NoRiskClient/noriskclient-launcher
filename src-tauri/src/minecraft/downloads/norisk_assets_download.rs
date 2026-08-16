@@ -7,6 +7,7 @@ use crate::minecraft::dto::piston_meta::AssetObject;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
 use crate::state::State;
+use crate::utils::file_utils::write_atomic;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
 use std::collections::{HashMap, HashSet};
@@ -307,6 +308,60 @@ impl NoriskClientAssetsDownloadService {
         Ok(())
     }
 
+    fn manifest_path(&self, asset_id: &str, is_experimental: bool) -> PathBuf {
+        self.base_path
+            .join(NORISK_ASSETS_DIR)
+            .join(asset_id)
+            .join(format!(
+                "manifest_{}.json",
+                if is_experimental { "exp" } else { "prod" }
+            ))
+    }
+
+    async fn cache_manifest(&self, path: &Path, assets: &NoriskAssets) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+        write_atomic(path, serde_json::to_vec(assets)?).await
+    }
+
+    async fn fetch_manifest(
+        &self,
+        asset_id: &str,
+        norisk_token: &str,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<NoriskAssets> {
+        let path = self.manifest_path(asset_id, is_experimental);
+
+        match NoRiskApi::norisk_assets(asset_id, norisk_token, request_uuid, is_experimental).await {
+            Ok(assets) => {
+                if let Err(e) = self.cache_manifest(&path, &assets).await {
+                    warn!(
+                        "[NRC Assets Group '{}'] Failed to cache manifest: {}",
+                        asset_id, e
+                    );
+                }
+                Ok(assets)
+            }
+            Err(e) => match Self::read_manifest(&path).await {
+                Some(assets) => {
+                    warn!(
+                        "[NRC Assets Group '{}'] Backend unreachable ({}); using cached manifest {:?}",
+                        asset_id, e, path
+                    );
+                    Ok(assets)
+                }
+                None => Err(e),
+            },
+        }
+    }
+
+    async fn read_manifest(path: &Path) -> Option<NoriskAssets> {
+        let bytes = fs::read(path).await.ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
     /// Processes a single asset group: Fetches metadata, downloads assets, copies to game dir.
     /// Returns the set of expected target paths for cleanup.
     async fn process_asset_group(
@@ -337,7 +392,7 @@ impl NoriskClientAssetsDownloadService {
         .await?;
 
         let assets =
-            match measure_time!(format!("NRC API call '{}'", asset_id), NoRiskApi::norisk_assets(asset_id, norisk_token, request_uuid, is_experimental)
+            match measure_time!(format!("NRC API call '{}'", asset_id), self.fetch_manifest(asset_id, norisk_token, request_uuid, is_experimental)
                 .await)
             {
                 Ok(fetched_assets) => {
