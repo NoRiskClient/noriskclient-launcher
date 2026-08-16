@@ -416,6 +416,7 @@ export const AddSkinModal = memo(
                   emoteLoop={idleEmote.loop}
                   zoom={1.75}
                   draggable
+                  dragAxis="yaw"
                   fps={30}
                   style={{ width: "100%", height: "100%" }}
                 />
@@ -455,6 +456,7 @@ export const AddSkinModal = memo(
                       emoteLoop={idleEmote.loop}
                       zoom={1.75}
                       draggable
+                      dragAxis="yaw"
                       fps={30}
                       style={{ width: "100%", height: "100%" }}
                     />
