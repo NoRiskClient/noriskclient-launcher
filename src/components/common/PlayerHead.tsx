@@ -46,7 +46,7 @@ export function PlayerHead({
   return (
     <span
       className={cn(
-        "flex items-center justify-center text-white font-minecraft lowercase",
+        "flex items-center justify-center text-white font-smallcaps",
         className,
       )}
       style={{ ...sizeStyle, ...style }}

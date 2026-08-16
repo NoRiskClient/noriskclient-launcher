@@ -48,8 +48,8 @@ function getProjectTypeIcon(type: string): string {
     case "modpack": return "pixel:folder-open-solid";
     case "resourcepack": return "pixel:image-solid";
     case "shader": return "pixel:sun-solid";
-    case "datapack": return "pixel:cube-solid";
-    default: return "pixel:cube-solid";
+    case "datapack": return "pixel:archive-solid";
+    default: return "pixel:archive-solid";
   }
 }
 
@@ -441,12 +441,12 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           <div>
             <button
               onClick={handleOpenProjectPage}
-              className="text-2xl font-minecraft-ten text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
+              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
             >
               {project.title}
             </button>
             {project.author && (
-              <p className="text-sm text-gray-400 font-minecraft-ten mt-1">
+              <p className="text-sm text-gray-400 font-minecraft mt-1">
                 by {project.author}
               </p>
             )}
@@ -454,7 +454,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
           {/* Stats + Install Button */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft-ten">
+            <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft">
               <div className="flex items-center gap-1">
                 <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                 <span>{formatNumber(project.downloads)}</span>
@@ -488,7 +488,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-300 font-minecraft-ten mt-3 line-clamp-2">
+        <p className="text-sm text-gray-300 font-minecraft mt-3 line-clamp-2">
           {project.description}
         </p>
 
@@ -519,7 +519,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             </TagBadge>
           ))}
           {project.categories.length > 4 && (
-            <span className="text-xs text-white/50 font-minecraft-ten">
+            <span className="text-xs text-white/50 font-minecraft">
               +{project.categories.length - 4} more
             </span>
           )}

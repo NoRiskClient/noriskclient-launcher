@@ -17,6 +17,7 @@ import type {
   ImageSource,
   UploadProfileIconPayload,
 } from "../types/profile";
+import type { ImportPackPreview } from "../types/importPreview";
 import type {
   DataPackInfo,
   ModrinthVersion,
@@ -32,6 +33,21 @@ export async function listProfiles(): Promise<Profile[]> {
 
 export async function searchProfiles(query: string): Promise<Profile[]> {
   return invoke<Profile[]>("search_profiles", { query });
+}
+
+export interface ProfileBackupInfo {
+  path: string;
+  backup_time: number;
+  file_size: number;
+  profile_count: number;
+}
+
+export async function listProfileBackups(): Promise<ProfileBackupInfo[]> {
+  return invoke<ProfileBackupInfo[]>("list_profile_backups");
+}
+
+export async function restoreProfileBackup(backupPath: string): Promise<void> {
+  return invoke<void>("restore_profile_backup", { backupPath });
 }
 
 export async function getProfile(id: string): Promise<Profile> {
@@ -91,6 +107,10 @@ export async function exportProfile(
 
 export async function getSystemRamMb(): Promise<number> {
   return invoke<number>("get_system_ram_mb");
+}
+
+export async function getDefaultMemoryMaxMb(): Promise<number> {
+  return invoke<number>("get_default_memory_max_mb");
 }
 
 export async function setProfileModEnabled(
@@ -191,10 +211,6 @@ export async function deleteCustomMod(
 
 export async function importLocalMods(profileId: string): Promise<void> {
   return invoke<void>("import_local_mods", { profileId });
-}
-
-export async function importProfileFromFile(): Promise<void> {
-  return invoke<void>("import_profile_from_file");
 }
 
 export async function openProfileFolder(profileId: string): Promise<void> {
@@ -332,8 +348,26 @@ export async function checkForGroupMigration(profileId: string): Promise<Migrati
   return invoke<MigrationInfo>("check_for_group_migration_command", { profileId });
 }
 
-export async function importProfileByPath(filePathStr: string, eventId?: string): Promise<string> {
-  return invoke<string>("import_profile", { filePathStr, eventId });
+export async function importProfileByPath(
+  filePathStr: string,
+  eventId?: string,
+  nameOverride?: string,
+  groupOverride?: string,
+  noriskPackId?: string,
+  clearNoriskPack?: boolean,
+): Promise<string> {
+  return invoke<string>("import_profile", {
+    filePathStr,
+    eventId,
+    nameOverride,
+    groupOverride,
+    noriskPackId,
+    clearNoriskPack,
+  });
+}
+
+export async function previewImportPack(filePathStr: string): Promise<ImportPackPreview> {
+  return invoke<ImportPackPreview>("preview_import_pack", { filePathStr });
 }
 
 export async function resolveImagePath(

@@ -5,8 +5,45 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
 use image::{imageops::FilterType, DynamicImage, ImageFormat};
 use log::debug;
+use std::io::Write;
 use std::path::Path;
 use tokio::fs::File;
+
+/// Writes `contents` to `path` atomically: readers see either the previous file or the
+/// complete new one, never a half-written mix.
+///
+/// Neither Rust nor Java has a native atomic *write* — the portable pattern is temp file
+/// → fsync → rename (Java's rename equivalent is `Files.move(.., ATOMIC_MOVE)`).
+/// `tempfile::persist()` only does the rename and explicitly does not sync, so the fsync
+/// is on us: without it a crash can persist the rename while the data is still in the
+/// page cache, leaving a truncated file.
+///
+/// The temp file is created in the target directory, so it shares the filesystem (rename
+/// stays atomic) and concurrent writers get distinct temp names. Blocking std::fs on a
+/// worker thread because the handle must be closed before the rename — Windows fails the
+/// rename otherwise, and tokio's File closes on drop asynchronously.
+pub async fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
+    let path = path.as_ref().to_path_buf();
+    let contents = contents.as_ref().to_vec();
+
+    tokio::task::spawn_blocking(move || write_atomic_sync(&path, &contents))
+        .await
+        .map_err(|e| AppError::Other(format!("Atomic write task failed: {e}")))?
+}
+
+pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
+    // A bare filename has a parent of Some("") — the temp file still belongs next to it
+    let dir = match path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+        _ => std::path::PathBuf::from("."),
+    };
+
+    let mut tmp = tempfile::NamedTempFile::new_in(&dir).map_err(AppError::Io)?;
+    tmp.write_all(contents).map_err(AppError::Io)?;
+    tmp.as_file().sync_all().map_err(AppError::Io)?;
+    tmp.persist(path).map_err(|e| AppError::Io(e.error))?;
+    Ok(())
+}
 
 /// Helper function to read a specific zip entry by index and encode it as Base64
 async fn read_zip_entry_as_base64(

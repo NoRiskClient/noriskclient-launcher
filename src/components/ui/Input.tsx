@@ -49,7 +49,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
             type="text"
             placeholder={placeholder}
             className={cn(
-              "bg-transparent text-white placeholder-white/50 font-minecraft-ten text-lg flex-1 outline-none",
+              "bg-transparent text-white placeholder-white/50 font-minecraft text-lg flex-1 outline-none",
               className
             )}
             spellCheck={false}
@@ -58,7 +58,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
           />
         </div>
         {error && (
-          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
+          <p className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}
@@ -90,7 +90,7 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
             ref={ref}
             placeholder={placeholder}
             className={cn(
-              "bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none resize-none",
+              "bg-transparent text-white placeholder-white/50 font-minecraft text-sm flex-1 outline-none resize-none",
               className
             )}
             style={{ minHeight }}
@@ -100,7 +100,7 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
           />
         </div>
         {error && (
-          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
+          <p className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}
@@ -146,6 +146,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       if (props.disabled) return;
       setIsFocused(true);
     };
+
+    const hasClearableValue =
+      !!clearable &&
+      typeof props.value === "string" &&
+      props.value.length > 0;
 
     const handleBlur = () => {
       if (props.disabled) return;
@@ -236,7 +241,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             )}            <input
               ref={ref}
               className={cn(
-                "flex-1 h-full bg-transparent border-none outline-none px-3 text-white font-minecraft placeholder:text-white/50 lowercase",
+                "flex-1 h-full bg-transparent border-none outline-none px-3 text-white font-smallcaps placeholder:text-white/50",
                 "flex items-center"
               )}
               style={{
@@ -252,18 +257,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               {...props}
             />
 
-            {clearable && props.value && (
+            {hasClearableValue && (
               <button
                 type="button"
                 onClick={handleClear}
                 className="flex items-center justify-center w-10 h-full transition-opacity duration-200 hover:opacity-80 text-white"
+                aria-label="Clear input"
                 tabIndex={-1}
               >
-                <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                <Icon icon="lucide:x" className="w-4 h-4" />
               </button>
             )}
           </div>
-        </div>        {error && (          <p className="mt-1 text-xl text-red-400 font-minecraft lowercase">
+        </div> {error && ( <p className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}

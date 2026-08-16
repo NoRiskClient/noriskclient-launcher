@@ -18,6 +18,8 @@ import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
 import { getRandomBlockIcon } from "../../../data/block-icons";
+import { getDefaultMemoryMaxMb, getSystemRamMb } from "../../../services/profile-service";
+import { logError } from "../../../utils/logging-utils";
 import { parseErrorMessage } from "../../../utils/error-utils";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
@@ -64,9 +66,9 @@ export function ProfileWizardV2Step3({
     const [chosenIcon, setChosenIcon] = useState<ChosenIcon>(() => ({ url: getRandomBlockIcon().url }));
     const [profileName, setProfileName] = useState("");
     const [profileGroup, setProfileGroup] = useState(defaultGroup || "");
-    const [memoryMaxMb, setMemoryMaxMb] = useState<number>(3072); // 3GB default
-    const [systemRamMb] = useState<number>(16384); // 16GB default for slider range
-    const recommendedRam = systemRamMb <= 8192 ? Math.min(2048, systemRamMb) : Math.min(4096, systemRamMb);
+    const [memoryMaxMb, setMemoryMaxMb] = useState<number>(0);
+    const [systemRamMb, setSystemRamMb] = useState<number>(16384);
+    const [recommendedRam, setRecommendedRam] = useState<number>(0);
     const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
     const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
     const [loadingPacks, setLoadingPacks] = useState(false);
@@ -77,6 +79,32 @@ export function ProfileWizardV2Step3({
         defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
     ); // Default to true when group exists and is not "modpacks"
     const [showAllVersions, setShowAllVersions] = useState(false); // Default to false to show only curated versions
+    const effectiveMemoryMaxMb = memoryMaxMb || recommendedRam || 4096;
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadMemoryDefaults = async () => {
+            try {
+                const [systemRam, recommended] = await Promise.all([
+                    getSystemRamMb(),
+                    getDefaultMemoryMaxMb(),
+                ]);
+                if (cancelled) return;
+                setSystemRamMb(systemRam);
+                setRecommendedRam(recommended);
+                setMemoryMaxMb((current) => (current === 0 ? recommended : current));
+            } catch (e) {
+                logError(`[ProfileWizard] Failed to load memory defaults: ${e}`);
+                if (cancelled) return;
+                setRecommendedRam(4096);
+                setMemoryMaxMb((current) => (current === 0 ? 4096 : current));
+            }
+        };
+        loadMemoryDefaults();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     // Update profile group when defaultGroup changes
     useEffect(() => {
@@ -251,7 +279,7 @@ export function ProfileWizardV2Step3({
                 minecraftVersion: selectedMinecraftVersion,
                 loader: selectedLoader,
                 loaderVersion: selectedLoaderVersion,
-                memoryMaxMb: memoryMaxMb,
+                memoryMaxMb: effectiveMemoryMaxMb,
                 selectedNoriskPackId: selectedNoriskPackId,
                 use_shared_minecraft_folder: useSharedMinecraftFolder,
                 chosenIcon: chosenIcon
@@ -309,7 +337,7 @@ export function ProfileWizardV2Step3({
                     </button>
                     <div className="grid grid-cols-2 gap-4 flex-1">
                     <div className="space-y-2">
-                        <label className="block text-base font-minecraft-ten text-white/50">
+                        <label className="block text-base font-minecraft text-white/50">
                             {t('profiles.wizard.profileName')}
                         </label>
                         <SearchStyleInput
@@ -319,19 +347,19 @@ export function ProfileWizardV2Step3({
                             required
                         />
                         {profileCharRemoved && (
-                            <p className="text-xs text-red-400 font-minecraft-ten mt-1">
+                            <p className="text-xs text-red-400 font-minecraft mt-1">
                                 {t('profiles.wizard.forbiddenChars')}
                             </p>
                         )}
                         {profileNameHasForbiddenEnding && (
-                            <p className="text-xs text-red-400 font-minecraft-ten mt-1">
+                            <p className="text-xs text-red-400 font-minecraft mt-1">
                                 {t('profiles.wizard.forbiddenEnding')}
                             </p>
                         )}
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-base font-minecraft-ten text-white/50">
+                        <label className="block text-base font-minecraft text-white/50">
                             {t('profiles.wizard.groupOptional')}
                         </label>
                         <SearchStyleInput
@@ -351,10 +379,10 @@ export function ProfileWizardV2Step3({
                             checked={useSharedMinecraftFolder}
                             onChange={(event) => setUseSharedMinecraftFolder(event.target.checked)}
                             description={t('profiles.wizard.sharedFolderDescription')}
-                            descriptionClassName="font-minecraft-ten text-sm"
+                            descriptionClassName="font-minecraft text-sm"
                             size="lg"
                         />
-                        <p className="text-xs text-white/50 font-minecraft-ten ml-10 -mt-1">
+                        <p className="text-xs text-white/50 font-minecraft ml-10 -mt-1">
                             {t('profiles.wizard.canChangeAnytime')}
                         </p>
                     </div>
@@ -362,16 +390,16 @@ export function ProfileWizardV2Step3({
 
                 {/* RAM Settings */}
                 <div className="space-y-3">
-                    <label className="block text-base font-minecraft-ten text-white/50">
-                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam })}
+                    <label className="block text-base font-minecraft text-white/50">
+                        {t('profiles.wizard.recommendedRam', { ram: recommendedRam || 4096 })}
                     </label>
                     <RangeSlider
-                        value={memoryMaxMb}
+                        value={effectiveMemoryMaxMb}
                         onChange={handleMemoryChange}
                         min={1024}
                         max={systemRamMb}
                         step={512}
-                        valueLabel={`${memoryMaxMb} MB (${(memoryMaxMb / 1024).toFixed(1)} GB)`}
+                        valueLabel={`${effectiveMemoryMaxMb} MB (${(effectiveMemoryMaxMb / 1024).toFixed(1)} GB)`}
                         minLabel="1 GB"
                         maxLabel={`${systemRamMb} MB`}
                         variant="flat"
@@ -386,11 +414,11 @@ export function ProfileWizardV2Step3({
                         onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
                         className="flex items-center justify-between w-full p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
                     >
-                        <span className="text-base font-minecraft-ten text-white/80">
+                        <span className="text-base font-minecraft text-white/80">
                             {t('profiles.wizard.advancedSettings')}
                         </span>
                         <Icon
-                            icon={showAdvancedSettings ? "solar:chevron-up-bold" : "solar:chevron-down-bold"}
+                            icon={showAdvancedSettings ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
                             className="w-5 h-5 text-white/60"
                         />
                     </button>
@@ -399,19 +427,19 @@ export function ProfileWizardV2Step3({
                         <div className="space-y-4 p-4 bg-white/5 border border-white/10 rounded-lg">
                             {/* NoRisk Pack Selection */}
                             <div className="space-y-3">
-                                <label className="block text-base font-minecraft-ten text-white/50">
+                                <label className="block text-base font-minecraft text-white/50">
                                     {t('profiles.wizard.noriskClientPack')}
                                 </label>
-                                <p className="text-sm text-white/60 font-minecraft-ten">
+                                <p className="text-sm text-white/60 font-minecraft">
                                     {t('profiles.wizard.noriskPackDescription')}
                                 </p>
                                 {loadingPacks ? (
                                     <div className="flex items-center gap-2 text-white/70">
                                         <Icon
-                                            icon="solar:refresh-bold"
-                                            className="w-4 h-4 animate-spin"
+                                            icon="svg-spinners:ring-resize"
+                                            className="w-4 h-4"
                                         />
-                                        <span className="text-sm font-minecraft-ten">
+                                        <span className="text-sm font-minecraft">
                                             {t('profiles.wizard.loadingPacks')}
                                         </span>
                                     </div>
@@ -444,20 +472,20 @@ export function ProfileWizardV2Step3({
                                         {/* Show either warning, none hint, or description */}
                                         {showYellowWarning ? (
                                             <div className="text-center">
-                                                <p className="text-base text-yellow-400 font-minecraft-ten">
+                                                <p className="text-base text-yellow-400 font-minecraft">
                                                     {t('profiles.wizard.nrcIncompatibleWarning')}
                                                 </p>
                                             </div>
                                         ) : selectedNoriskPackId === null || selectedNoriskPackId === "" ? (
                                             <div className="text-center">
-                                                <p className="text-sm text-amber-400 font-minecraft-ten">
+                                                <p className="text-sm text-amber-400 font-minecraft">
                                                     {t('profiles.wizard.noNrcFeatures')}
                                                 </p>
                                             </div>
                                         ) : (
                                             selectedNoriskPackId && noriskPacks[selectedNoriskPackId] && (
                                                 <div className="text-center">
-                                                    <p className="text-sm text-white/70 font-minecraft-ten">
+                                                    <p className="text-sm text-white/70 font-minecraft">
                                                         {noriskPacks[selectedNoriskPackId].description}
                                                     </p>
                                                 </div>
@@ -468,10 +496,10 @@ export function ProfileWizardV2Step3({
                                         {checkingCompatibility && (
                                             <div className="flex items-center gap-2 text-white/70">
                                                 <Icon
-                                                    icon="solar:refresh-bold"
-                                                    className="w-4 h-4 animate-spin"
+                                                    icon="svg-spinners:ring-resize"
+                                                    className="w-4 h-4"
                                                 />
-                                                <span className="text-sm font-minecraft-ten">
+                                                <span className="text-sm font-minecraft">
                                                     {t('profiles.wizard.checkingCompatibility')}
                                                 </span>
                                             </div>
@@ -488,7 +516,7 @@ export function ProfileWizardV2Step3({
                                                         icon="solar:danger-triangle-bold"
                                                         className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5"
                                                     />
-                                                    <p className="text-xs text-red-300 font-minecraft-ten">
+                                                    <p className="text-xs text-red-300 font-minecraft">
                                                         {packCompatibilityWarning}
                                                     </p>
                                                 </div>
@@ -511,7 +539,7 @@ export function ProfileWizardV2Step3({
                 onClick={onBack}
                 disabled={creating}
                 size="md"
-                className="text-xl"
+                className="text-sm"
                 icon={<Icon icon="solar:arrow-left-bold" className="w-5 h-5" />}
                 iconPosition="left"
             >
@@ -527,10 +555,10 @@ export function ProfileWizardV2Step3({
                     profileNameHasForbiddenEnding
                 }
                 size="md"
-                className="min-w-[180px] text-xl"
+                className="min-w-[180px] text-sm"
                 icon={
                     creating ? (
-                        <Icon icon="solar:refresh-bold" className="w-5 h-5 animate-spin" />
+                        <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
                     ) : (
                         <Icon icon="solar:check-circle-bold" className="w-5 h-5" />
                     )

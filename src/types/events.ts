@@ -36,6 +36,7 @@ export enum EventType {
   MinecraftProcessExited = "minecraft_process_exited",
   MinecraftSkinChanged = "minecraft_skin_changed",
   Error = "error",
+  OfflineMode = "offline_mode",
   LaunchSuccessful = "launch_successful",
   CrashReportContentAvailable = "crash_report_content_available",
   MigrationStarted = "migration_started",

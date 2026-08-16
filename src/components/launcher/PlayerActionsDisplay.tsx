@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '../../lib/utils';
-import { SkinViewer } from './SkinViewer';
 import { MainLaunchButton } from './MainLaunchButton';
+import { PlayerRig } from './PlayerRig';
 import { useThemeStore } from '../../store/useThemeStore';
-import { useSkinStore } from '../../store/useSkinStore';
-import { MinecraftSkinService } from '../../services/minecraft-skin-service';
-import type { GetStarlightSkinRenderPayload } from '../../types/localSkin';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
+import { useProfileStore } from '../../store/profile-store';
+import type { PromoOutlineConfig } from '@noriskclient/nrc-skin-renderer/postfx';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StaticTooltip } from '../ui/Tooltip';
@@ -18,8 +16,9 @@ import { toast } from 'sonner';
 import { isWorldCupEventActive } from '../../data/worldcup-event';
 import type { LaunchOverrides } from '../../services/process-service';
 
-const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
-
+// Featured server configuration
+// Option A: profileId = null → uses currently selected profile from MainLaunchButton
+// Option B: profileId = "uuid" → uses dedicated profile for this server
 const FEATURED_SERVER = {
   address: "hugosmp.net",
   name: "HugoSMP.net",
@@ -47,6 +46,7 @@ interface PlayerActionsDisplayProps {
   }>;
   className?: string;
   displayMode?: 'playerName' | 'logo';
+  outline?: Partial<PromoOutlineConfig>;
 }
 
 function FeaturedPromoIcon({ src, alt, size = "md" }: { src: string; alt: string; size?: "sm" | "md" | "lg" }) {
@@ -76,13 +76,12 @@ export function PlayerActionsDisplay({
   launchButtonVersions,
   className,
   displayMode = 'playerName',
+  outline,
 }: PlayerActionsDisplayProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
-  const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(DEFAULT_FALLBACK_SKIN_URL);
-  const skinRevision = useSkinStore((state) => state.skinRevision);
   const navigate = useNavigate();
 
   const isLoadingProfiles = launchButtonVersions.length === 0;
@@ -111,51 +110,11 @@ export function PlayerActionsDisplay({
     setFeatureMode(!featureMode);
   };
 
-  useEffect(() => {
-    const fetchAndSetSkin = async () => {
-      if (playerName) {
-        try {
-          const activeSkin = await MinecraftSkinService.getActiveSkin().catch(() => null);
-          const payload: GetStarlightSkinRenderPayload = {
-            player_name: playerName,
-            render_type: "default",
-            render_view: "full",
-            base64_skin_data: activeSkin?.base64_data ?? null,
-          };
-          const localPath = await MinecraftSkinService.getStarlightSkinRender(payload);
-          if (localPath) {
-            setResolvedSkinUrl(convertFileSrc(localPath));
-          } else {
-            setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-          }
-        } catch (error) {
-          console.error("[PlayerActionsDisplay] Failed to fetch starlight skin render:", error);
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-        }
-      } else {
-        setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-      }
-    };
-
-    fetchAndSetSkin();
-  }, [playerName, skinRevision]);
-
   const dropShadowX = '2px';
   const dropShadowY = '4px';
   const dropShadowBlur = '6px';
   const commonDropShadowStyle = `drop-shadow(${dropShadowX} ${dropShadowY} ${dropShadowBlur} ${accentColor.value})`;
   
-  const skinViewerDisplayHeight = 450;
-  const skinViewerMaxDisplayWidth = 225;
-
-  const skinViewerStyles: React.CSSProperties = {
-    filter: 'drop-shadow(5px 10px 5px rgba(0,0,0,0.75))',
-    WebkitBoxReflect: 'below 0px linear-gradient(to bottom, transparent, rgba(0,0,0,0.05))',
-    height: `${skinViewerDisplayHeight}px`,
-    width: 'auto',
-    maxWidth: `${skinViewerMaxDisplayWidth}px`,
-  };
-
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
 
   const worldCupActive = isWorldCupEventActive();
@@ -180,30 +139,19 @@ export function PlayerActionsDisplay({
             filter: commonDropShadowStyle
           }}
         />
-      ) : (
-        <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
-          {playerName || "no account"}
-        </h2>
-      )}
+      ) : null}
 
       <div className={cn(
         "relative w-full max-w-[500px] flex flex-col items-center",
         displayMode === 'logo' && "z-10"
       )}>
-        <SkinViewer
-          skinUrl={resolvedSkinUrl} 
-          playerName={playerName?.toString()} 
-          width={skinViewerMaxDisplayWidth} 
-          height={skinViewerDisplayHeight} 
-          className="bg-transparent flex-shrink-0"
-          style={skinViewerStyles}
-        />
+        <PlayerRig playerName={playerName} outline={outline} />
 
         {!isLoadingProfiles && (
           <>
             {/* Featured Server Toggle - above the launch button */}
             <div
-              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-40' : 'bottom-32'}`}
+              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-32' : 'bottom-24'}`}
             >
               {!featureMode && worldCupActive ? (
                 <StaticTooltip
@@ -215,18 +163,18 @@ export function PlayerActionsDisplay({
                 >
                   <button
                     onClick={handleTopToggle}
-                    className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                    className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   >
                     <span className="flex items-center gap-2">
                       <FeaturedPromoIcon src={WM_PUBLIC_VIEWING.iconSrc} alt="" size="md" />
-                      {t('wm.public_viewing').toLowerCase()}
+                      {t('wm.public_viewing')}
                     </span>
                   </button>
                 </StaticTooltip>
               ) : (
                 <button
                   onClick={handleTopToggle}
-                  className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   title={
                     featureMode
                       ? t('wm.switch_to_main')
@@ -235,11 +183,11 @@ export function PlayerActionsDisplay({
                 >
                   {featureMode
                     ? t('wm.switch_to_main')
-                    : FEATURED_SERVER.name.toLowerCase()}
+                    : FEATURED_SERVER.name}
                 </button>
               )}
             </div>
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
+            <div className={`absolute left-0 right-0 flex justify-center px-4 bottom-2`}>
               {featureMode ? (
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}

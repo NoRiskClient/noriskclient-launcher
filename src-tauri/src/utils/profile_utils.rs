@@ -3,20 +3,21 @@ use crate::error::{AppError, Result};
 use crate::integrations::modrinth::{ModrinthProjectType, ModrinthVersion};
 use crate::integrations::norisk_packs;
 use crate::integrations::unified_mod::ModPlatform;
+use crate::state::content_cache_state::{CacheBehaviour, FileHashEntry};
 use crate::state::profile_state::ModSource;
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
 use crate::utils::download_utils::DownloadUtils;
+use crate::utils::export_utils::{
+    relative_zip_path, select_export_files, write_export_archive, ExportEntry,
+};
 use crate::utils::{datapack_utils, hash_utils, resourcepack_utils, shaderpack_utils};
-use async_zip::tokio::write::ZipFileWriter;
-use async_zip::{Compression, ZipEntryBuilder};
 use chrono;
 use futures::future::{join_all, BoxFuture, FutureExt};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
@@ -25,7 +26,6 @@ use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio::task::JoinHandle;
 
-use futures_lite::io::AsyncWriteExt;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -1051,35 +1051,6 @@ pub async fn execute_group_migration(migration_info: MigrationInfo, profile_id: 
     }
 }
 
-/// Determines the optimal compression type for a file based on its extension and size.
-/// Already-compressed files and large files use Stored (no compression) for speed.
-/// Small text/config files use Deflate for better compression.
-fn determine_compression(file_path: &Path, file_size: u64) -> Compression {
-    // Files larger than 1MB - use Stored for speed
-    if file_size > 1_048_576 {
-        return Compression::Stored;
-    }
-
-    // Check file extension for already-compressed formats
-    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
-        let ext_lower = ext.to_lowercase();
-        match ext_lower.as_str() {
-            // Already compressed formats
-            "png" | "jpg" | "jpeg" | "gif" | "zip" | "jar" | "gz" | "mca" | "dat" | "dat_old" | "dat_mcr" => {
-                return Compression::Stored;
-            }
-            // Text files benefit from compression
-            "json" | "txt" | "toml" | "cfg" | "properties" | "yml" | "yaml" => {
-                return Compression::Deflate;
-            }
-            _ => {}
-        }
-    }
-
-    // Default to Deflate for small files
-    Compression::Deflate
-}
-
 /// Exports a profile to a `.noriskpack` file
 ///
 /// This creates a zip archive with the .noriskpack extension that contains:
@@ -1097,47 +1068,28 @@ pub async fn export_profile_to_noriskpack(
 ) -> Result<PathBuf> {
     info!("Exporting profile {} to .noriskpack", profile_id);
 
-    // Get the profile (no global semaphore - we'll use per-file permits)
     let state = crate::state::state_manager::State::get().await?;
     let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    // Single traversal strategy like Modrinth
-    let mut all_files = Vec::new();
     let profile_instance_path = state
         .profile_manager
         .get_profile_instance_path(profile_id)
         .await?;
 
-    // 1. Collect ALL files in profile once (like Modrinth)
-    collect_all_files_recursive(&profile_instance_path, &mut all_files).await?;
-
-    // 2. Filter with string matching (like Modrinth's included_candidates_set check)
-    if let Some(ref include_paths) = include_files {
-        let include_paths_str: Vec<String> = include_paths
-            .iter()
-            .filter_map(|p| p.strip_prefix(&profile_instance_path).ok())
-            .map(|rel_path| rel_path.to_string_lossy().replace('\\', "/"))
+    let entries: Vec<ExportEntry> =
+        select_export_files(&profile_instance_path, include_files.as_ref())
+            .await?
+            .into_iter()
+            .filter_map(|source_path| {
+                let rel_path = relative_zip_path(&profile_instance_path, &source_path)?;
+                Some(ExportEntry {
+                    zip_path: format!("overrides/{}", rel_path),
+                    source_path,
+                })
+            })
             .collect();
 
-        all_files.retain(|file_path| {
-            if let Ok(rel_path) = file_path.strip_prefix(&profile_instance_path) {
-                let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-                include_paths_str
-                    .iter()
-                    .any(|include_str| rel_path_str.starts_with(include_str))
-            } else {
-                false
-            }
-        });
-    } else {
-        all_files.clear(); // No include_files = no files to export
-    }
-
-    let total_files = all_files.len();
-    info!("Exporting {} files to .noriskpack", total_files);
-
-    // Create a sanitized copy of the profile for export
     let export_profile = sanitize_profile_for_export(&profile);
+    let profile_json = serde_json::to_vec_pretty(&export_profile)?;
 
     // Determine the output file path
     let output_file = match output_path {
@@ -1159,153 +1111,14 @@ pub async fn export_profile_to_noriskpack(
         }
     };
 
-    // Ensure parent directory exists
-    if let Some(parent) = output_file.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| AppError::Io(e))?;
-        }
-    }
-
-    info!("Creating .noriskpack archive at: {}", output_file.display());
-
-    // Create zip file and writer - write directly to target file
-    let mut file = fs::File::create(&output_file)
-        .await
-        .map_err(|e| AppError::Io(e))?;
-    let mut writer = ZipFileWriter::with_tokio(&mut file);
-
-    // Write the profile data to JSON directly into zip
-    let profile_json = serde_json::to_vec_pretty(&export_profile)?;
-    let profile_builder = ZipEntryBuilder::new("profile.json".into(), Compression::Deflate);
-    writer
-        .write_entry_whole(profile_builder, &profile_json)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to write profile.json to zip: {}", e)))?;
-
-    // Progress tracking
-    let export_event_id = Uuid::new_v4();
-    let completed_files = Arc::new(AtomicUsize::new(0));
-
-    // Emit initial progress
-    state.event_state.emit(crate::state::event_state::EventPayload {
-        event_id: export_event_id,
-        event_type: crate::state::event_state::EventType::ExportingProfile,
-        target_id: Some(profile_id),
-        message: format!("Starting export of {} files...", total_files),
-        progress: Some(0.0),
-        error: None,
-    }).await?;
-
-    // Channel for parallel file processing
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<(String, Vec<u8>, Compression)>(100);
-    
-    // Spawn worker tasks to read files in parallel
-    let mut tasks: Vec<JoinHandle<Result<()>>> = Vec::new();
-    let io_semaphore = state.io_semaphore.clone();
-    
-    for file_path in all_files {
-        if let Ok(rel_path) = file_path.strip_prefix(&profile_instance_path) {
-            let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-            let zip_path = format!("overrides/{}", rel_path_str);
-            
-            let tx_clone = tx.clone();
-            let file_path_clone = file_path.clone();
-            let semaphore_clone = io_semaphore.clone();
-            let completed_clone = completed_files.clone();
-            let state_clone = state.clone();
-            let total = total_files;
-            
-            let task = tokio::spawn(async move {
-                // Acquire semaphore for this file
-                let _permit = semaphore_clone.acquire().await.map_err(|e| {
-                    AppError::Other(format!("Failed to acquire semaphore: {}", e))
-                })?;
-                
-                // Get file metadata for compression decision
-                let metadata = fs::metadata(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
-                let file_size = metadata.len();
-                let compression = determine_compression(&file_path_clone, file_size);
-                
-                // Read file data
-                let data = fs::read(&file_path_clone).await.map_err(|e| AppError::Io(e))?;
-                
-                // Send to writer
-                tx_clone.send((zip_path, data, compression)).await.map_err(|e| {
-                    AppError::Other(format!("Failed to send file data: {}", e))
-                })?;
-                
-                // Update progress
-                let completed = completed_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                let progress = (completed as f64) / (total as f64);
-                
-                // Emit progress every 5% or every 100 files
-                if completed % 100 == 0 || (progress - (completed as f64 - 1.0) / total as f64) >= 0.05 {
-                    let _ = state_clone.event_state.emit(crate::state::event_state::EventPayload {
-                        event_id: export_event_id,
-                        event_type: crate::state::event_state::EventType::ExportingProfile,
-                        target_id: Some(profile_id),
-                        message: format!("Exporting files... {}/{}", completed, total),
-                        progress: Some(progress),
-                        error: None,
-                    }).await;
-                }
-                
-                debug!("Processed file: {}", file_path_clone.display());
-                
-                Ok(())
-            });
-            
-            tasks.push(task);
-        }
-    }
-    
-    // Drop the original sender so the channel closes when all tasks finish
-    drop(tx);
-    
-    // Spawn a task to wait for all workers to complete
-    let workers_handle = tokio::spawn(async move {
-        let results = join_all(tasks).await;
-        for result in results {
-            match result {
-                Ok(Ok(())) => {},
-                Ok(Err(e)) => return Err(e),
-                Err(e) => return Err(AppError::Other(format!("Task panicked: {}", e))),
-            }
-        }
-        Ok(())
-    });
-    
-    // Write files to zip as they come from the channel
-    while let Some((zip_path, data, compression)) = rx.recv().await {
-        let entry_builder = ZipEntryBuilder::new(zip_path.into(), compression);
-        writer
-            .write_entry_whole(entry_builder, &data)
-            .await
-            .map_err(|e| AppError::Other(format!("Failed to write zip entry: {}", e)))?;
-    }
-    
-    // Wait for all workers to complete
-    workers_handle.await.map_err(|e| {
-        AppError::Other(format!("Workers task panicked: {}", e))
-    })??;
-
-    // Close the zip writer
-    writer
-        .close()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to finalize zip file: {}", e)))?;
-
-    // Emit completion progress
-    state.event_state.emit(crate::state::event_state::EventPayload {
-        event_id: export_event_id,
-        event_type: crate::state::event_state::EventType::ExportingProfile,
-        target_id: Some(profile_id),
-        message: format!("Export completed! {} files exported.", total_files),
-        progress: Some(1.0),
-        error: None,
-    }).await?;
+    write_export_archive(
+        &state,
+        profile_id,
+        &output_file,
+        entries,
+        vec![("profile.json".to_string(), profile_json)],
+    )
+    .await?;
 
     info!(
         "Successfully exported profile to: {}",
@@ -1338,32 +1151,16 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
         }
     }
 
+    export_profile.settings.java_path = None;
+    export_profile.settings.use_custom_java_path = false;
+    export_profile.settings.custom_jvm_args = None;
+    export_profile.settings.extra_game_args = Vec::new();
+    export_profile.settings.quick_play_path = None;
+    export_profile.preferred_account_id = None;
+    export_profile.playtime_seconds = 0;
+
     // Keep other essential data
     export_profile
-}
-
-/// Collect all files recursively (like Modrinth's add_all_recursive_folder_paths)
-fn collect_all_files_recursive<'a>(
-    dir_path: &'a Path,
-    file_list: &'a mut Vec<PathBuf>,
-) -> BoxFuture<'a, Result<()>> {
-    Box::pin(async move {
-        let mut entries = fs::read_dir(dir_path).await.map_err(|e| AppError::Io(e))?;
-
-        while let Some(entry) = entries.next_entry().await.map_err(|e| AppError::Io(e))? {
-            let path = entry.path();
-
-            if path.is_dir() {
-                // Recurse into directories
-                collect_all_files_recursive(&path, file_list).await?;
-            } else {
-                // Add files to the list
-                file_list.push(path);
-            }
-        }
-
-        Ok(())
-    })
 }
 
 // Added: ScreenshotInfo struct
@@ -1655,6 +1452,7 @@ async fn process_mod_requests(
         content_type: ContentType::Mod,
         calculate_hashes: true,
         fetch_modrinth_data: true,
+        cache_behaviour: Default::default(),
     }).await {
         Ok(mods) => mods,
         Err(e) => {
@@ -2168,6 +1966,8 @@ pub struct GenericModrinthInfo {
     pub name: String, // Name des Modrinth-Projekts oder der Version
     pub version_number: String,
     pub download_url: Option<String>,
+    #[serde(default)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2210,6 +2010,8 @@ pub struct LoadItemsParams {
     pub content_type: ContentType,
     pub calculate_hashes: bool,
     pub fetch_modrinth_data: bool,
+    #[serde(default)]
+    pub cache_behaviour: CacheBehaviour,
 }
 
 pub struct LocalContentLoader; // No longer holds profile_id, becomes a namespace/utility struct
@@ -2237,16 +2039,7 @@ impl LocalContentLoader {
             }
             ContentType::ShaderPack => vec![shaderpack_utils::get_shaderpacks_dir(&profile).await?],
             ContentType::DataPack => vec![datapack_utils::get_datapacks_dir(&profile).await?],
-            ContentType::Mod => {
-                // Prefer standard mods directory first, then custom_mods
-                let instance_path = state
-                    .profile_manager
-                    .calculate_instance_path_for_profile(&profile)?;
-                vec![
-                    profile_mods_path.clone(),
-                    instance_path.join("custom_mods"),
-                ]
-            }
+            ContentType::Mod => state.profile_manager.mod_scan_dirs(&profile)?,
             ContentType::NoRiskMod => {
                 // For NoRisk mods, handled differently (no physical directory scan)
                 Vec::new()
@@ -2254,6 +2047,7 @@ impl LocalContentLoader {
         };
 
         let mut preliminary_items: Vec<LocalContentItem> = Vec::new();
+        let mut file_mtimes: HashMap<String, u64> = HashMap::new();
 
         if params.content_type == ContentType::NoRiskMod {
             // Special handling for NoRisk mods - fetch them from the NoRisk pack system
@@ -2318,6 +2112,7 @@ impl LocalContentLoader {
                                     name: norisk_mod.display_name.clone().unwrap_or_else(|| norisk_mod.id.clone()),
                                     version_number: "".to_string(), // Not directly available
                                     download_url: None,
+                                    icon_url: None,
                                 })
                             } else {
                                 None
@@ -2469,6 +2264,7 @@ impl LocalContentLoader {
                             .clone()
                             .unwrap_or_else(|| version_id.clone()),
                         download_url: None,
+                        icon_url: None,
                     }),
                     _ => None,
                 };
@@ -2491,7 +2287,7 @@ impl LocalContentLoader {
                             .clone()
                             .unwrap_or_else(|| file_id.clone()),
                         download_url: None,
-                        icon_url: None, // Will be populated later by frontend
+                        icon_url: None,
                         fingerprint: *file_fingerprint,
                     }),
                     _ => None,
@@ -2591,6 +2387,13 @@ impl LocalContentLoader {
                 let file_name_str = file_name_os.to_string_lossy().to_string();
                 let metadata = fs::metadata(&path).await.map_err(|e| AppError::Io(e))?;
                 let file_size = metadata.len();
+                let mtime_ms = metadata
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                file_mtimes.insert(path.to_string_lossy().into_owned(), mtime_ms);
                 let is_disabled = file_name_str.ends_with(".disabled");
                 let base_filename = if is_disabled {
                     file_name_str
@@ -2649,8 +2452,6 @@ impl LocalContentLoader {
         }
 
         if params.calculate_hashes {
-            let mut hash_tasks: Vec<JoinHandle<(usize, std::result::Result<String, AppError>)>> =
-                Vec::new();
             // Collect indices of items that need hashing (files only, or non-Modrinth mods if hash not present)
             let items_to_hash_indices: Vec<usize> = final_items
                 .iter()
@@ -2669,7 +2470,8 @@ impl LocalContentLoader {
                 .map(|(index, _)| index)
                 .collect();
 
-            let mut hash_tasks = Vec::new();
+            let mut hash_tasks: Vec<JoinHandle<(usize, std::result::Result<String, AppError>)>> =
+                Vec::new();
 
             // Create a vector of (index, path, filename) to avoid borrowing final_items in the async tasks
             let hash_items_info: Vec<(usize, String, String)> = items_to_hash_indices
@@ -2683,7 +2485,47 @@ impl LocalContentLoader {
                 })
                 .collect();
 
+            let cached_hashes = if params.cache_behaviour != CacheBehaviour::Bypass {
+                let requests: Vec<(String, u64, u64)> = hash_items_info
+                    .iter()
+                    .filter_map(|(idx, path_str, _)| {
+                        file_mtimes
+                            .get(path_str)
+                            .map(|mtime| (path_str.clone(), final_items[*idx].file_size, *mtime))
+                    })
+                    .collect();
+                state.content_cache.get_file_hashes(&requests).await
+            } else {
+                HashMap::new()
+            };
+
+            let mut items_to_hash = Vec::new();
             for (index_in_final_items, path_str, filename) in hash_items_info {
+                let file_size = final_items[index_in_final_items].file_size;
+                let mtime_ms = file_mtimes.get(&path_str).copied();
+
+                if let Some(cached_hash) = cached_hashes.get(&path_str) {
+                    final_items[index_in_final_items].sha1_hash = Some(cached_hash.clone());
+                    continue;
+                }
+                items_to_hash.push((index_in_final_items, path_str, filename, file_size, mtime_ms));
+            }
+
+            debug!(
+                "Hashing {} of {} items ({} served from cache)",
+                items_to_hash.len(),
+                items_to_hash_indices.len(),
+                items_to_hash_indices.len() - items_to_hash.len()
+            );
+
+            let hash_meta: HashMap<usize, (String, u64, u64)> = items_to_hash
+                .iter()
+                .filter_map(|(idx, path, _, size, mtime)| {
+                    mtime.map(|mtime| (*idx, (path.clone(), *size, mtime)))
+                })
+                .collect();
+
+            for (index_in_final_items, path_str, filename, _, _) in items_to_hash {
                 let path_buf = PathBuf::from(&path_str);
                 let semaphore_clone = Arc::clone(&state.io_semaphore);
 
@@ -2717,9 +2559,22 @@ impl LocalContentLoader {
             }
 
             let hash_calculation_results = join_all(hash_tasks).await;
+            let mut new_cache_entries: Vec<(String, FileHashEntry)> = Vec::new();
             for task_result in hash_calculation_results {
                 match task_result {
                     Ok((item_idx, Ok(sha1))) => {
+                        if sha1 != "0" {
+                            if let Some((path_str, size, mtime_ms)) = hash_meta.get(&item_idx) {
+                                new_cache_entries.push((
+                                    path_str.clone(),
+                                    FileHashEntry {
+                                        size: *size,
+                                        mtime_ms: *mtime_ms,
+                                        sha1: sha1.clone(),
+                                    },
+                                ));
+                            }
+                        }
                         if let Some(item_to_update) = final_items.get_mut(item_idx) {
                             item_to_update.sha1_hash = Some(sha1);
                         }
@@ -2740,6 +2595,8 @@ impl LocalContentLoader {
                     }
                 }
             }
+
+            state.content_cache.put_file_hashes(new_cache_entries).await;
         }
 
         if params.fetch_modrinth_data {
@@ -2747,7 +2604,7 @@ impl LocalContentLoader {
             let mut hashes_for_modrinth_lookup: HashMap<String, Vec<usize>> = HashMap::new(); // sha1 -> Vec of indices in final_items
             for (index, item) in final_items.iter().enumerate() {
                 if let Some(hash) = &item.sha1_hash {
-                    if !item.is_directory {
+                    if !item.is_directory && hash != "0" {
                         // Only fetch for files with hashes
                         hashes_for_modrinth_lookup
                             .entry(hash.clone())
@@ -2768,7 +2625,9 @@ impl LocalContentLoader {
                         .sum::<usize>()
                 );
 
-                match crate::integrations::modrinth::get_versions_by_hashes(hashes_vec, "sha1")
+                match state
+                    .content_cache
+                    .get_modrinth_versions_by_hashes(hashes_vec, params.cache_behaviour)
                     .await
                 {
                     Ok(version_map) => {
@@ -2811,6 +2670,7 @@ impl LocalContentLoader {
                                                         .version_number
                                                         .clone(),
                                                     download_url: Some(file_info.url.clone()),
+                                                    icon_url: None,
                                                 });
                                         } else if !modrinth_version.files.is_empty() {
                                             // Fallback to first file if no primary, but log this
@@ -2825,6 +2685,7 @@ impl LocalContentLoader {
                                                         .version_number
                                                         .clone(),
                                                     download_url: Some(first_file.url.clone()),
+                                                    icon_url: None,
                                                 });
                                         } else {
                                             debug!("No files found for Modrinth version {} (project {}) to determine download URL.", modrinth_version.id, modrinth_version.project_id);
@@ -2841,25 +2702,10 @@ impl LocalContentLoader {
             }
         }
 
-        for (idx, item) in final_items.iter().enumerate() {
-            info!(
-                "Final item [{}]: filename='{}', path_str='{}', sha1_hash={:?}, file_size={}, is_disabled={}, is_directory={}, content_type={:?}, source_type={:?}, norisk_info={:?}, id={:?}, associated_loader={:?}, fallback_version={:?}, modrinth_info={:?}",
-                idx,
-                item.filename,
-                item.path_str,
-                item.sha1_hash,
-                item.file_size,
-                item.is_disabled,
-                item.is_directory,
-                item.content_type,
-                item.source_type,
-                item.norisk_info,
-                item.id,
-                item.associated_loader,
-                item.fallback_version,
-                item.modrinth_info
-            );
+        if params.fetch_modrinth_data {
+            Self::attach_icon_urls(&state, &mut final_items).await;
         }
+
         info!(
             "Successfully loaded {} items of type {:?} for profile {}",
             final_items.len(),
@@ -2867,5 +2713,49 @@ impl LocalContentLoader {
             params.profile_id
         );
         Ok(final_items)
+    }
+
+    async fn attach_icon_urls(state: &Arc<State>, items: &mut [LocalContentItem]) {
+        let modrinth_ids: Vec<String> = items
+            .iter()
+            .filter_map(|i| i.modrinth_info.as_ref().map(|m| m.project_id.clone()))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if !modrinth_ids.is_empty() {
+            let projects = state.content_cache.peek_modrinth_projects(modrinth_ids).await;
+            for item in items.iter_mut() {
+                if let Some(info) = item.modrinth_info.as_mut() {
+                    if let Some(project) = projects.get(&info.project_id) {
+                        info.icon_url = project.icon_url.clone();
+                    }
+                }
+            }
+        }
+
+        let curseforge_ids: Vec<u32> = items
+            .iter()
+            .filter_map(|i| {
+                i.curseforge_info
+                    .as_ref()
+                    .and_then(|c| c.project_id.parse::<u32>().ok())
+            })
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if !curseforge_ids.is_empty() {
+            let mods = state.content_cache.peek_curseforge_mods(curseforge_ids).await;
+            for item in items.iter_mut() {
+                if let Some(info) = item.curseforge_info.as_mut() {
+                    if let Ok(id) = info.project_id.parse::<u32>() {
+                        if let Some(cf_mod) = mods.get(&id) {
+                            info.icon_url = cf_mod.logo.as_ref().map(|l| l.url.clone());
+                        }
+                    }
+                }
+            }
+        }
     }
 }

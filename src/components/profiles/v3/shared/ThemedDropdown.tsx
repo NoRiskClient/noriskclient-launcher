@@ -212,7 +212,7 @@ export function ThemedDropdownItem({
         if (selected || disabled) return;
         e.currentTarget.style.backgroundColor = "transparent";
       }}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft-ten text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
+      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
     >
       {icon && <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />}
       <span className="flex-1 min-w-0">{children}</span>
@@ -227,7 +227,7 @@ export const ThemedDropdownDivider: React.FC = () => (
 );
 
 export const ThemedDropdownHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft-ten border-b border-white/10">
+  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft border-b border-white/10">
     {children}
   </div>
 );

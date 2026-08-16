@@ -114,9 +114,10 @@ fn default_hide_on_process_start() -> bool {
 }
 
 fn default_global_memory_settings() -> MemorySettings {
+    const PREVIOUS_DEFAULT_MB: u32 = 3072;
     MemorySettings {
-        min: 3072, // 2GB
-        max: 3072, // 4GB
+        min: PREVIOUS_DEFAULT_MB,
+        max: crate::state::profile_state::default_memory_max_mb().max(PREVIOUS_DEFAULT_MB),
     }
 }
 
@@ -541,6 +542,12 @@ impl ConfigManager {
 
             // Update cache
             update_custom_game_dir(new_config.custom_game_directory.clone());
+
+            // meta_dir() just moved, so app.db has to move with it — everything else under
+            // meta_dir resolves its path per access and follows the change immediately.
+            if let Ok(state) = crate::state::State::get().await {
+                crate::state::db::open_or_reopen(&state.db).await;
+            }
 
             // Update Discord status if it changed
             if let Ok(state) = crate::state::State::get().await {

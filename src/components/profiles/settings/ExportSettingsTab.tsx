@@ -2,9 +2,11 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Profile } from "../../../types/profile"; // Adjust path as needed
+import type { ExportPackFormat, Profile } from "../../../types/profile"; // Adjust path as needed
 import { SearchStyleInput } from "../../ui/Input";
 import { Checkbox } from "../../ui/Checkbox";
+import { Tooltip } from "../../ui/Tooltip";
+import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
 import { Card } from "../../ui/Card";
 import { Icon } from "@iconify/react";
@@ -17,6 +19,33 @@ import gsap from "gsap";
 import { listen } from "@tauri-apps/api/event";
 import { EventType, type EventPayload } from "../../../types/events";
 import { parseErrorMessage } from "../../../utils/error-utils";
+
+const EXPORT_FORMATS: {
+  value: ExportPackFormat;
+  labelKey: string;
+  extension: string;
+  image: string;
+  disabled?: boolean;
+}[] = [
+  {
+    value: "noriskpack",
+    labelKey: "export.format_noriskpack",
+    extension: "noriskpack",
+    image: "/logo.png",
+  },
+  {
+    value: "mrpack",
+    labelKey: "export.format_mrpack",
+    extension: "mrpack",
+    image: "https://cdn.modrinth.com/modrinth-new.png",
+  },
+  {
+    value: "curseforge",
+    labelKey: "export.format_curseforge",
+    extension: "zip",
+    image: "https://cdn.norisk.gg/misc/curseforge.webp",
+  },
+];
 
 interface ExportSettingsTabProps {
   profile: Profile;
@@ -42,6 +71,8 @@ export function ExportSettingsTab({
 }: ExportSettingsTabProps) {
   const { t } = useTranslation();
   const [exportFilename, setExportFilename] = useState(profile.name);
+  const [exportFormat, setExportFormat] =
+    useState<ExportPackFormat>("noriskpack");
   const [selectedExportPaths, setSelectedExportPaths] = useState<Set<string>>(
     new Set()
   );
@@ -182,6 +213,7 @@ export function ExportSettingsTab({
           ? Array.from(currentPathsForExport) // Use the value from the ref
           : undefined,
       open_folder: exportOpenFolder,
+      format: exportFormat,
     });
 
     // Store the toast ID so we can update it with progress
@@ -235,6 +267,7 @@ export function ExportSettingsTab({
     onExportActionAvailable,
     isExporting,
     exportFilename,
+    exportFormat,
     isLoadingDirectory,
     exportOpenFolder,
     setExportOpenFolder,
@@ -244,10 +277,10 @@ export function ExportSettingsTab({
     <div ref={contentRef} className="space-y-6">
       {!isInModalContext && (
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-1 lowercase">
+          <h3 className="text-lg font-smallcaps text-white mb-1">
             {t('export.title')}
           </h3>
-          <p className="text-xs text-white/70 mb-4 font-minecraft-ten tracking-wide">
+          <p className="text-xs text-white/70 mb-4 font-minecraft tracking-wide">
             {t('export.description')}
           </p>
         </div>
@@ -259,27 +292,90 @@ export function ExportSettingsTab({
         <div className="space-y-1">
           <label
             htmlFor="exportFilename"
-            className="block text-2xl text-white font-minecraft mb-2 lowercase"
+            className="block text-base text-white font-smallcaps mb-2"
           >
             {t('export.filename_label')}
           </label>
-          <SearchStyleInput
-            value={exportFilename}
-            onChange={(e) => setExportFilename(e.target.value)}
-            placeholder={t('placeholders.enter_filename')}
-            icon="solar:document-text-bold"
-            disabled={isExporting}
-          />
-          <p className="mt-1 text-xs text-white/50 font-minecraft-ten tracking-wide">
-            {t('export.extension_added_auto')}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <SearchStyleInput
+                value={exportFilename}
+                onChange={(e) => setExportFilename(e.target.value)}
+                placeholder={t('placeholders.enter_filename')}
+                icon="solar:document-text-bold"
+                disabled={isExporting}
+              />
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {EXPORT_FORMATS.map((format) => {
+                const isSelected = exportFormat === format.value;
+                const isLocked = format.disabled === true;
+                const label = isLocked
+                  ? t('export.format_coming_soon', {
+                      format: t(format.labelKey),
+                    })
+                  : t(format.labelKey);
+
+                const isBlocked = isLocked || isExporting;
+
+                return (
+                  <Tooltip key={format.value} content={label} position="top">
+                    <button
+                      type="button"
+                      aria-label={label}
+                      aria-pressed={isSelected}
+                      aria-disabled={isBlocked}
+                      onClick={() => {
+                        if (isBlocked) return;
+                        setExportFormat(format.value as ExportPackFormat);
+                      }}
+                      className={cn(
+                        "w-12 h-12 p-1.5 rounded-lg border-2 bg-black/30 transition-all duration-150",
+                        isSelected ? "" : "border-white/10",
+                        isLocked
+                          ? "opacity-30 grayscale cursor-not-allowed"
+                          : isExporting
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer hover:border-white/25",
+                      )}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: accentColor.value,
+                              boxShadow: `0 0 0 2px ${accentColor.value}55`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <img
+                        src={format.image}
+                        alt=""
+                        className={cn(
+                          "w-full h-full object-contain",
+                          !isSelected && !isLocked && "opacity-70",
+                        )}
+                      />
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-white/50 font-minecraft tracking-wide truncate">
+            {t('export.saved_as', {
+              filename: `${exportFilename.trim() || profile.name}.${
+                EXPORT_FORMATS.find((format) => format.value === exportFormat)
+                  ?.extension ?? exportFormat
+              }`,
+            })}
           </p>
         </div>
         {/* File selection section */}
         <div>
-          <h4 className="text-2xl font-minecraft text-white lowercase mb-1">
+          <h4 className="text-base font-smallcaps text-white mb-1">
             {t('export.select_files_title')}
           </h4>
-          <p className="text-xs text-white/70 mb-3 font-minecraft-ten tracking-wide">
+          <p className="text-xs text-white/70 mb-3 font-minecraft tracking-wide">
             {t('export.select_files_description')}
           </p>
           <div className="flex gap-2 mb-3">
@@ -344,17 +440,17 @@ export function ExportSettingsTab({
         {/* Progress indicator during export (shown in both contexts) */}
         {isInModalContext && isExporting && exportProgress !== null && (
           <div className="mt-4 space-y-2">
-            <div className="flex justify-between items-center text-sm font-minecraft-ten">
+            <div className="flex justify-between items-center text-sm font-minecraft">
               <span className="text-white/70">{exportMessage}</span>
-              <span className="text-white font-minecraft">{exportProgress}%</span>
+              <span className="text-white font-smallcaps">{exportProgress}%</span>
             </div>
             <div className="w-full h-2 bg-black/30 border border-white/10 overflow-hidden">
               <div
                 className="h-full transition-all duration-300 ease-out"
                 style={{
                   width: `${exportProgress}%`,
-                  backgroundColor: `rgb(${accentColor})`,
-                  boxShadow: `0 0 10px rgba(${accentColor}, 0.5)`,
+                  backgroundColor: accentColor.value,
+                  boxShadow: `0 0 10px ${accentColor.value}80`,
                 }}
               />
             </div>
@@ -368,7 +464,7 @@ export function ExportSettingsTab({
                 checked={exportOpenFolder}
                 onChange={(e) => setExportOpenFolder(e.target.checked)}
                 label={t('export.open_folder_after')}
-                className="text-xl"
+              className="text-sm"
                 customSize="md"
                 disabled={isExporting}
                 variant="flat"
@@ -378,9 +474,9 @@ export function ExportSettingsTab({
             {/* Progress indicator during export */}
             {isExporting && exportProgress !== null && (
               <div className="mt-4 space-y-2">
-                <div className="flex justify-between items-center text-sm font-minecraft-ten">
+                <div className="flex justify-between items-center text-sm font-minecraft">
                   <span className="text-white/70">{exportMessage}</span>
-                  <span className="text-white font-minecraft">{exportProgress}%</span>
+                  <span className="text-white font-smallcaps">{exportProgress}%</span>
                 </div>
                 <div className="w-full h-2 bg-black/30 border border-white/10 overflow-hidden">
                   <div
@@ -404,7 +500,7 @@ export function ExportSettingsTab({
                 }
                 icon={<Icon icon="solar:export-bold" className="w-5 h-5" />}
                 size="md"
-                className="text-xl w-full md:w-auto"
+                className="text-sm w-full md:w-auto"
               >
                 {isExporting ? t('export.exporting') : t('export.export_profile')}
               </Button>

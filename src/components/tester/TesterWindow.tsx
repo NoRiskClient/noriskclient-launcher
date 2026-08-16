@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useFontStore } from "../../store/font-store";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { TesterWindowTitlebar } from "./TesterWindowTitlebar";
 import { TesterIssueCard } from "./TesterIssueCard";
@@ -84,6 +85,7 @@ export function TesterWindow() {
     const themeStore = useThemeStore.getState();
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
+    useFontStore.getState().applyFontToDOM();
   }, []);
 
   const reload = useCallback(async () => {
@@ -228,11 +230,11 @@ export function TesterWindow() {
           {loading && issues.length === 0 && (
             <div className="text-center py-16">
               <Icon
-                icon="solar:refresh-bold"
-                className="w-7 h-7 mx-auto animate-spin mb-3"
+                icon="svg-spinners:ring-resize"
+                className="w-7 h-7 mx-auto mb-3"
                 style={{ color: accentColor.value }}
               />
-              <div className="font-minecraft-ten text-xs uppercase tracking-wider text-white/50">
+              <div className="font-minecraft text-xs tracking-wider text-white/50">
                 Loading queue…
               </div>
             </div>
@@ -245,7 +247,7 @@ export function TesterWindow() {
                 className="w-12 h-12 mx-auto mb-3"
                 style={{ color: accentColor.value }}
               />
-              <div className="font-minecraft-ten text-base uppercase tracking-wider text-white">
+              <div className="font-minecraft text-base tracking-wider text-white">
                 All caught up
               </div>
               <div className="text-sm text-white/50 mt-2 font-sans">
@@ -260,7 +262,7 @@ export function TesterWindow() {
                 icon="solar:filter-bold"
                 className="w-10 h-10 mx-auto mb-3 text-white/40"
               />
-              <div className="font-minecraft-ten text-sm uppercase tracking-wider text-white/70">
+              <div className="font-minecraft text-sm tracking-wider text-white/70">
                 Nothing in this tab
               </div>
               <div className="text-sm text-white/50 mt-2 font-sans">

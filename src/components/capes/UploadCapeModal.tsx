@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
@@ -105,32 +105,38 @@ export function UploadCapeModal({
       variant="flat"
     >
       <div className="p-4">
-        <p className="text-white/80 mb-4 text-center font-minecraft-ten">
+        <p className="text-white/80 mb-4 text-center font-minecraft">
           {uploadError ? t('capes.failedToUploadCape') : uploadWarning ? t('capes.capeSubmittedForReview') : t('capes.doesThisLookCorrect')}
         </p>
         {uploadError && (
           <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
-            <p className="text-red-400 text-sm font-minecraft-ten text-center">
+            <p className="text-red-400 text-sm font-minecraft text-center">
               {uploadError}
             </p>
           </div>
         )}
         {uploadWarning && (
           <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-md">
-            <p className="text-yellow-400 text-sm font-minecraft-ten text-center">
+            <p className="text-yellow-400 text-sm font-minecraft text-center">
               {uploadWarning}
             </p>
-            <p className="text-yellow-300/70 text-xs font-minecraft-ten text-center mt-2">
+            <p className="text-yellow-300/70 text-xs font-minecraft text-center mt-2">
               {t('capes.reviewsCanTake24Hours')}
             </p>
           </div>
         )}
         <div className="relative flex justify-center items-center mb-6 p-2 rounded-md aspect-[10/16] max-w-[200px] mx-auto">
-          <SkinView3DWrapper
-            capeUrl={paddedPreviewUrl || previewImageUrl}
-            className="w-full h-full"
+          <SkinRenderer
+            textureUrl={null}
+            cape={{
+              texture: paddedPreviewUrl || previewImageUrl,
+              elytra: showElytraPreview,
+            }}
+            rotation={Math.PI}
+            draggable
             zoom={1.5}
-            displayAsElytra={showElytraPreview}
+            fps={30}
+            className="w-full h-full"
           />
           {!isCapeOnly && (
             <IconButton

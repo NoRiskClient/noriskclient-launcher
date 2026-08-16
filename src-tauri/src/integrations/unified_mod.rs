@@ -592,6 +592,10 @@ pub async fn search_mods_unified(
             ).await {
                 Ok(response) => {
                     log::info!("CurseForge search successful: {} mods", response.data.len());
+                    if let Ok(state) = crate::state::state_manager::State::get().await {
+                        log::info!("[cache-warm] browse seeding {} curseforge mods into cache", response.data.len());
+                        state.content_cache.put_curseforge_mods(&response.data).await;
+                    }
                     let unified_results: Vec<UnifiedModSearchResult> = response.data
                         .into_iter()
                         .map(|mod_info| mod_info.into())
@@ -905,22 +909,13 @@ pub fn extract_loaders_from_game_versions(game_versions: &[String]) -> Vec<Strin
 
 /// Extract actual game versions from mixed game versions array (excluding loaders)
 pub fn extract_game_versions_from_mixed(game_versions: &[String]) -> Vec<String> {
+    // CurseForge lists loaders and the sides a file supports next to the Minecraft versions, and
+    // "Client" sorts above any number, so anything picking the highest entry gets it instead of a
+    // version. Every Minecraft version starts with a digit; none of the others do.
     game_versions
         .iter()
-        .filter_map(|version| {
-            let version_lower = version.to_lowercase();
-            // Filter out loaders, keep only actual game versions like "1.21", "1.20.1", etc.
-            if version_lower.contains("forge") ||
-               version_lower.contains("fabric") ||
-               version_lower.contains("quilt") ||
-               version_lower.contains("neoforge") ||
-               version_lower.contains("liteloader") ||
-               version_lower.contains("cauldron") {
-                None // This is a loader, exclude it
-            } else {
-                Some(version.clone()) // This is likely a game version
-            }
-        })
+        .filter(|version| version.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .cloned()
         .collect()
 }
 
@@ -986,6 +981,8 @@ pub struct InstalledFileInfo {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnifiedUpdateCheckResponse {
     pub updates: std::collections::HashMap<String, UnifiedVersion>,
+    #[serde(default)]
+    pub failed_platforms: Vec<ModPlatform>,
 }
 
 /// Check for updates across all supported platforms
@@ -1017,6 +1014,7 @@ pub async fn check_mod_updates_unified(
 
     // Combine results
     let mut all_updates = std::collections::HashMap::new();
+    let mut failed_platforms = Vec::new();
 
     // Handle Modrinth results
     match modrinth_updates {
@@ -1028,6 +1026,7 @@ pub async fn check_mod_updates_unified(
         Err(e) => {
             error!("Failed to check Modrinth updates: {}", e);
             // Continue with CurseForge results even if Modrinth fails
+            failed_platforms.push(ModPlatform::Modrinth);
         }
     }
 
@@ -1041,6 +1040,7 @@ pub async fn check_mod_updates_unified(
         Err(e) => {
             error!("Failed to check CurseForge updates: {}", e);
             // Continue with Modrinth results even if CurseForge fails
+            failed_platforms.push(ModPlatform::CurseForge);
         }
     }
 
@@ -1048,6 +1048,7 @@ pub async fn check_mod_updates_unified(
 
     Ok(UnifiedUpdateCheckResponse {
         updates: all_updates,
+        failed_platforms,
     })
 }
 
@@ -1314,7 +1315,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
     info!("Loaded profile '{}' for modpack switching", profile.name);
 
     // Extract platform from modpack_source and process accordingly
-    let (minecraft_version, loader, loader_version, mods, curseforge_manifest) = match &request.modpack_source {
+    let (minecraft_version, loader, loader_version, mods, curseforge_manifest, modrinth_manifest) = match &request.modpack_source {
         crate::state::profile_state::ModPackSource::Modrinth { .. } => {
             info!("Processing as Modrinth modpack");
             let (_profile, manifest) = crate::integrations::mrpack::process_mrpack(temp_file_path.clone()).await
@@ -1323,7 +1324,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
                     e
                 })?;
             let (mc, ldr, ldr_ver, mods) = extract_modpack_info(&manifest, &manifest.name).await?;
-            (mc, ldr, ldr_ver, mods, None)
+            (mc, ldr, ldr_ver, mods, None, Some(manifest))
         }
         crate::state::profile_state::ModPackSource::CurseForge { .. } => {
             info!("Processing as CurseForge modpack");
@@ -1333,7 +1334,7 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
                     e
                 })?;
             let (mc, ldr, ldr_ver, mods) = extract_modpack_info(&manifest, &manifest.name).await?;
-            (mc, ldr, ldr_ver, mods, Some(manifest))
+            (mc, ldr, ldr_ver, mods, Some(manifest), None)
         }
     };
 
@@ -1386,11 +1387,19 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
         crate::state::profile_state::ModPackSource::Modrinth { .. } => {
             crate::integrations::mrpack::extract_mrpack_overrides(&temp_file_path, &profile, None, 0.0, 1.0).await?;
             info!("Successfully extracted Modrinth modpack overrides");
+
+            if let Some(manifest) = &modrinth_manifest {
+                crate::integrations::mrpack::download_manifest_content_files(manifest, &profile).await?;
+                info!("Successfully downloaded Modrinth manifest content files");
+            }
         }
         crate::state::profile_state::ModPackSource::CurseForge { .. } => {
             if let Some(manifest) = curseforge_manifest {
                 crate::integrations::curseforge::extract_curseforge_overrides(&temp_file_path, &profile, &manifest, None, 0.0, 1.0).await?;
                 info!("Successfully extracted CurseForge modpack overrides");
+
+                crate::integrations::curseforge::download_curseforge_content_files(&manifest, &profile).await?;
+                info!("Successfully downloaded CurseForge manifest content files");
             } else {
                 warn!("CurseForge manifest not available for override extraction");
             }

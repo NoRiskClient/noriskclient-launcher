@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useFontStore } from "../../store/font-store";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { InstanceSidebar } from "./InstanceSidebar";
 import { LogViewerCore } from "./LogViewerCore";
@@ -45,6 +46,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     const themeStore = useThemeStore.getState();
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
+    useFontStore.getState().applyFontToDOM();
   }, []);
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
             <div className="flex-1 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white/30">
               <div className="text-center">
                 <Icon icon="solar:monitor-smartphone-bold" className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="font-minecraft-ten">{t('logs.select_instance')}</p>
+                <p className="font-minecraft">{t('logs.select_instance')}</p>
                 <p className="text-xs mt-1 font-sans">{t('logs.select_instance_hint')}</p>
               </div>
             </div>

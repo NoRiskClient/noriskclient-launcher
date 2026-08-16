@@ -23,7 +23,6 @@ pub struct MinecraftLaunchParameters {
     pub additional_game_args: Vec<String>,
     pub custom_client_jar: Option<PathBuf>,
     pub old_minecraft_arguments: Option<String>,
-    pub force_include_minecraft_jar: bool,
     pub profile_id: Uuid,
     pub memory_max_mb: u32,
     pub is_experimental_mode: bool,
@@ -41,7 +40,6 @@ impl MinecraftLaunchParameters {
             additional_game_args: Vec::new(),
             custom_client_jar: None,
             old_minecraft_arguments: None,
-            force_include_minecraft_jar: false,
             profile_id,
             memory_max_mb,
             is_experimental_mode: false,
@@ -78,11 +76,6 @@ impl MinecraftLaunchParameters {
 
     pub fn with_old_minecraft_arguments(mut self, args: Option<String>) -> Self {
         self.old_minecraft_arguments = args;
-        self
-    }
-
-    pub fn with_force_include_minecraft_jar(mut self, force: bool) -> Self {
-        self.force_include_minecraft_jar = force;
         self
     }
 
@@ -269,7 +262,6 @@ impl MinecraftLauncher {
         let mut command = match launcher_config.hooks.wrapper {
             Some(wrapper) => {
                 info!("Using wrapper command: {}", wrapper);
-                // Exactly like Modrinth: use the whole wrapper string as command and add java path as arg
                 {
                     let mut it = Command::new(wrapper);
                     it.arg(&self.java_path);
@@ -291,12 +283,12 @@ impl MinecraftLauncher {
                 .add_additional_libraries(&params.additional_libraries, 1)
                 .add_piston_libraries(&piston_meta.libraries)
                 .set_custom_client_jar(client_jar)
-                .build(params.force_include_minecraft_jar)
+                .build()
         } else {
             ClasspathBuilder::new(&piston_meta.id)
                 .add_additional_libraries(&params.additional_libraries, 1)
                 .add_piston_libraries(&piston_meta.libraries)
-                .build(params.force_include_minecraft_jar)
+                .build()
         };
 
         // Create JVM arguments processor
@@ -441,6 +433,10 @@ impl MinecraftLauncher {
                     "-Dnorisk.experimental={}",
                     params.is_experimental_mode
                 ));
+
+                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
+                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
+                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
             } else {
                 info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
             }

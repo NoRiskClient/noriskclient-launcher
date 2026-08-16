@@ -74,7 +74,7 @@ export function ProfilesTabV2() {
   const actionButtons: ActionButton[] = [
     {
       id: "import",
-      label: t('profiles.import').toUpperCase(),
+      label: t('profiles.import'),
       icon: "solar:upload-bold",
       tooltip: t('profiles.importProfile'),
       onClick: () => {
@@ -90,7 +90,7 @@ export function ProfilesTabV2() {
     },
     {
       id: "create",
-      label: t('profiles.create').toUpperCase(),
+      label: t('profiles.create'),
       icon: "solar:widget-add-bold",
       tooltip: t('profiles.createNewProfile'),
       onClick: () => {
@@ -429,7 +429,7 @@ export function ProfilesTabV2() {
                 const nextMode = layoutMode === "list" ? "grid" : layoutMode === "grid" ? "compact" : "list";
                 setProfilesTabLayoutMode(nextMode);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
+              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
               title={
                 layoutMode === "list"
                   ? t('profiles.layout.switchToGrid')
@@ -466,7 +466,7 @@ export function ProfilesTabV2() {
                   // Version divider header, e.g. "── 26.1 ──────────────"
                   <div className="flex items-center gap-3 mb-3">
                     <div className="h-px w-6 bg-white/10" />
-                    <span className="font-minecraft text-2xl lowercase text-white/60 whitespace-nowrap">
+                    <span className="font-smallcaps text-base text-white/60 whitespace-nowrap">
                       {row.version}
                     </span>
                     <div className="h-px flex-1 bg-white/10" />

@@ -12,6 +12,10 @@ interface UsePlayerAvatarOptions {
 
 const normalize = (uuid: string) => uuid.replace(/-/g, "").toLowerCase();
 
+const avatarUrlCache = new Map<string, string>();
+const cacheKey = (uuid: string, size: number, overlay: boolean) =>
+  `${normalize(uuid)}:${size}:${overlay}`;
+
 export function usePlayerAvatar({
   uuid,
   size = 64,
@@ -19,7 +23,9 @@ export function usePlayerAvatar({
 }: UsePlayerAvatarOptions): string | null {
   const activeAccountId = useMinecraftAuthStore((state) => state.activeAccount?.id);
   const skinRevision = useSkinStore((state) => state.skinRevision);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(() =>
+    uuid ? avatarUrlCache.get(cacheKey(uuid, size, overlay)) ?? null : null,
+  );
 
   const isSelf = !!uuid && !!activeAccountId && normalize(uuid) === normalize(activeAccountId);
 
@@ -29,14 +35,20 @@ export function usePlayerAvatar({
       return;
     }
 
+    const key = cacheKey(uuid, size, overlay);
+    const cached = avatarUrlCache.get(key);
+    if (cached) setAvatarUrl(cached);
+
     let cancelled = false;
     const load = async () => {
       try {
         const localPath = await MinecraftSkinService.getFaceAvatar(uuid, size, overlay);
-        if (!cancelled) setAvatarUrl(convertFileSrc(localPath));
+        const url = convertFileSrc(localPath);
+        avatarUrlCache.set(key, url);
+        if (!cancelled) setAvatarUrl(url);
       } catch (error) {
         console.error("[usePlayerAvatar] Failed to load avatar:", error);
-        if (!cancelled) setAvatarUrl(null);
+        if (!cancelled && !cached) setAvatarUrl(null);
       }
     };
 

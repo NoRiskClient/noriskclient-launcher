@@ -65,7 +65,7 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
     <aside className="w-64 flex-shrink-0 border-l border-white/10 overflow-y-auto no-scrollbar py-4 flex flex-col">
       {groups.map((group, gi) => (
         <div key={gi} className="mb-5">
-          <div className="px-4 mb-2 text-xs uppercase tracking-wider text-white/60 font-minecraft-ten">
+          <div className="px-4 mb-2 text-xs uppercase tracking-wider text-white/60 font-minecraft">
             {gi === 0 ? t("profiles.tabs.content") : t("profiles.v3.leftRail.world")}
           </div>
           <div className="px-2 space-y-1">
@@ -107,9 +107,9 @@ const NavButton: React.FC<NavButtonProps> = ({ icon, label, count, active, onCli
     }`}
   >
     <Icon icon={icon} className="w-5 h-5 flex-shrink-0" />
-    <span className="flex-1 font-minecraft-ten text-sm uppercase tracking-wide truncate">{label}</span>
+    <span className="flex-1 font-minecraft text-sm uppercase tracking-wide truncate">{label}</span>
     {typeof count === "number" && count > 0 && (
-      <span className="text-xs font-minecraft-ten text-white/45 tabular-nums">{count}</span>
+      <span className="text-xs font-minecraft text-white/45 tabular-nums">{count}</span>
     )}
   </button>
 );

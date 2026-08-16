@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { gsap } from "gsap";
 
 interface ToggleSwitchProps {
@@ -35,41 +36,32 @@ export function ToggleSwitch({
           track: "w-8 h-4",
           knob: "w-3 h-3",
           knobTranslate: "translate-x-4",
-          label: "text-base",
+          label: "text-xs",
         };
       case "lg":
         return {
           track: "w-14 h-7",
           knob: "w-5 h-5",
           knobTranslate: "translate-x-7",
-          label: "text-2xl",
+          label: "text-base",
         };
       default:
         return {
           track: "w-10 h-5",
           knob: "w-4 h-4",
           knobTranslate: "translate-x-5",
-          label: "text-lg",
+          label: "text-sm",
         };
     }
   };
 
   const sizeConfig = getSizeConfig();
 
-  useEffect(() => {
-    if (containerRef.current) {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0, scale: 0.95 },
-        {
-          opacity: 1,
-          scale: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    containerRef,
+    { opacity: 0, scale: 0.95 },
+    { opacity: 1, scale: 1, duration: 0.4, ease: "power2.out" },
+  );
 
   useEffect(() => {
     if (knobRef.current) {
@@ -196,7 +188,7 @@ export function ToggleSwitch({
       {label && (
         <span
           className={cn(
-            "font-minecraft lowercase text-white",
+            "font-smallcaps text-white",
             sizeConfig.label,
           )}
         >

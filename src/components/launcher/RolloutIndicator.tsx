@@ -195,7 +195,7 @@ export function RolloutIndicator() {
                   filter: optedOut ? "grayscale(1)" : undefined,
                 }}
               />
-              <h3 className="font-minecraft text-xl text-white lowercase tracking-wide leading-none pt-1">
+              <h3 className="font-smallcaps text-sm text-white tracking-wide leading-none pt-1">
                 {optedOut
                   ? t("rollout.popover.title_opted_out")
                   : t("rollout.popover.title")}
@@ -204,12 +204,12 @@ export function RolloutIndicator() {
 
             <div className="p-4 flex flex-col gap-3.5">
               {optedOut ? (
-                <p className="font-minecraft-ten text-sm text-white/80 leading-relaxed">
+                <p className="font-minecraft text-sm text-white/80 leading-relaxed">
                   {t("rollout.popover.body_opted_out")}
                 </p>
               ) : (
                 <>
-                  <p className="font-minecraft-ten text-sm text-white/85 leading-relaxed">
+                  <p className="font-minecraft text-sm text-white/85 leading-relaxed">
                     {t("rollout.popover.body_intro_before")}
                     <span
                       className="font-bold mx-1"
@@ -219,7 +219,7 @@ export function RolloutIndicator() {
                     </span>
                     {t("rollout.popover.body_intro_after")}
                   </p>
-                  <p className="font-minecraft-ten text-sm text-white/65 leading-relaxed">
+                  <p className="font-minecraft text-sm text-white/65 leading-relaxed">
                     {t("rollout.popover.body_bug")}
                   </p>
                 </>
@@ -241,7 +241,7 @@ export function RolloutIndicator() {
                 </Button>
               )}
 
-              <p className="font-minecraft-ten text-xs tracking-wide text-white/45 text-center mt-1 lowercase">
+              <p className="font-minecraft text-xs tracking-wide text-white/45 text-center mt-1 lowercase">
                 {optedOut
                   ? t("rollout.popover.click_to_opt_in")
                   : t("rollout.popover.click_to_opt_out")}

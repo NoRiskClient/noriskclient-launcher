@@ -60,14 +60,6 @@ export interface AddLocalSkinCommandPayload {
 
 // --- End Payload Types ---
 
-// --- Payload Type for get_starlight_skin_render command ---
-export interface GetStarlightSkinRenderPayload {
-  player_name: string;
-  render_type: string;
-  render_view: string;
-  base64_skin_data?: string | null;
-}
-// --- End Payload Type ---
 
 export interface ActiveSkin {
   uuid: string;

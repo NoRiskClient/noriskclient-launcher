@@ -1,3 +1,4 @@
+import "./polyfills";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";

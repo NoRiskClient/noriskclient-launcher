@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
+import type { SkinVariant } from "../../types/localSkin";
 import { EmptyState } from "../ui/EmptyState";
 import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage";
@@ -23,7 +24,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import gsap from "gsap";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -89,11 +90,13 @@ function CapeItemDisplay({
     if (isCurrentlyEquipping || !showModal || isDenied) return;
 
     let userSkinUrl: string | undefined;
+    let userSkinVariant: SkinVariant | undefined;
     if (activeAccount?.id) {
       try {
         const active = await MinecraftSkinService.getActiveSkin();
         if (active?.base64_data) {
           userSkinUrl = `data:image/png;base64,${active.base64_data}`;
+          userSkinVariant = active.variant;
         }
       } catch (e) {
         console.error("[CapeList] Failed to load active skin for preview:", e);
@@ -116,6 +119,7 @@ function CapeItemDisplay({
       >
         <Cape3DPreviewWithToggle
           skinUrl={userSkinUrl}
+          skinVariant={userSkinVariant}
           capeUrl={capeUrl}
           capeId={capeId}
           isEquipped={false}
@@ -281,11 +285,11 @@ function CapeItemDisplay({
           {isCurrentlyEquipping && (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
               <Icon
-                icon="solar:refresh-bold"
-                className="w-8 h-8 animate-spin mb-1"
+                icon="svg-spinners:ring-resize"
+                className="w-8 h-8 mb-1"
                 style={{ color: accentColor.value }}
               />
-              <span className="font-minecraft text-xs text-white lowercase">
+              <span className="font-smallcaps text-xs text-white">
                 {t('capes.equipping')}
               </span>
             </div>
@@ -302,13 +306,13 @@ function CapeItemDisplay({
                 <Tooltip content={(cape as CosmeticCape).moderatorMessage}>
                   <div className="flex items-center gap-1.5">
                     <Icon icon="solar:close-circle-bold" className="w-4 h-4 text-red-400" />
-                    <span className="text-[11px] font-minecraft-ten lowercase text-red-400">{t('capes.denied')}</span>
+                    <span className="text-[11px] font-minecraft lowercase text-red-400">{t('capes.denied')}</span>
                   </div>
                 </Tooltip>
               ) : (
                 <>
                   <Icon icon="solar:clock-circle-bold" className="w-4 h-4 text-yellow-400" />
-                  <span className="text-[11px] font-minecraft-ten lowercase text-yellow-400">{t('capes.inReview')}</span>
+                  <span className="text-[11px] font-minecraft lowercase text-yellow-400">{t('capes.inReview')}</span>
                 </>
               )}
             </div>
@@ -318,7 +322,7 @@ function CapeItemDisplay({
 
         <div className="flex-grow min-w-0 w-full text-center">
           <h3
-            className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+            className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
             title={
               isVanilla
                 ? (cape as VanillaCape).name
@@ -334,7 +338,7 @@ function CapeItemDisplay({
           </h3>
 
           {!isVanilla && (
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:download-minimalistic-outline"
@@ -612,7 +616,7 @@ export function CapeList({
     return (
       <div className="flex-grow flex items-center justify-center p-5">
         <EmptyState
-          icon="solar:hanger-wave-line-duotone"
+          icon="solar:hanger-2-line-duotone"
           message={
             isVanilla
               ? searchQuery
@@ -777,7 +781,7 @@ export function CapeList({
               onClick={handlePreview3D}
             >
               <Icon icon="ph:eye-bold" className="w-5 h-5 text-white" />
-              <span className="font-minecraft-ten text-base text-white/80">
+              <span className="font-minecraft text-base text-white/80">
                 {t('capes.preview')}
               </span>
             </li>
@@ -790,6 +794,7 @@ export function CapeList({
 
 function Cape3DPreviewWithToggle({
   skinUrl,
+  skinVariant,
   capeUrl,
   capeId,
   onEquipCape,
@@ -797,6 +802,7 @@ function Cape3DPreviewWithToggle({
   isExperimental = false,
 }: {
   skinUrl?: string;
+  skinVariant?: SkinVariant;
   capeUrl?: string;
   capeId: string;
   onEquipCape: () => void;
@@ -825,16 +831,15 @@ function Cape3DPreviewWithToggle({
           title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
           aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
         />
-        <SkinView3DWrapper
-          skinUrl={skinUrl}
-          capeUrl={finalCapeUrl}
-          enableAutoRotate={true}
-          autoRotateSpeed={0.5}
-          startFromBack={true}
-          zoom={0.9}
-          displayAsElytra={showElytra}
-          width={300}
-          height={380}
+        <SkinRenderer
+          textureUrl={skinUrl ?? null}
+          variant={skinVariant ?? "auto"}
+          cape={{ texture: finalCapeUrl, elytra: showElytra }}
+          rotation={Math.PI}
+          draggable
+          zoom={1.6}
+          fps={30}
+          style={{ width: 300, height: 380 }}
         />
       </div>
 

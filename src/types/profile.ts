@@ -284,11 +284,14 @@ export interface CopyProfileParams {
   copy_all_files?: boolean;
 }
 
+export type ExportPackFormat = "noriskpack" | "mrpack" | "curseforge";
+
 export interface ExportProfileParams {
   profile_id: string;
   file_name: string;
   include_files?: string[];
   open_folder: boolean;
+  format?: ExportPackFormat;
 }
 
 // --- Payload for upload_profile_icon command ---
@@ -422,6 +425,7 @@ export interface GenericModrinthInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
 }
 
 export interface GenericCurseForgeInfo {
@@ -430,6 +434,7 @@ export interface GenericCurseForgeInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
   fingerprint?: number; // CurseForge file fingerprint for update checking
 }
 
@@ -457,11 +462,17 @@ export interface LocalContentItem {
 }
 
 // --- Params for get_local_content command ---
+export type CacheBehaviour =
+  | "stale_while_revalidate"
+  | "must_revalidate"
+  | "bypass";
+
 export interface LoadItemsParams {
   profile_id: string; // UUID
   content_type: ContentType; // Enum: ResourcePack, ShaderPack, DataPack
   calculate_hashes: boolean;
   fetch_modrinth_data: boolean;
+  cache_behaviour?: CacheBehaviour;
 }
 
 // --- Migration types ---

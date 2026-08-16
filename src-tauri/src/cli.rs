@@ -9,6 +9,7 @@
 //! Both go through `tauri-plugin-cli`'s `matches()` / `matches_from(argv)` —
 //! the subcommand schema lives once in `tauri.conf.json`.
 
+use crate::commands::modpack_command::{run_modpack, ModpackArgs, PackSource};
 use crate::commands::profile_command::{
     launch_profile_with_overrides, launch_temp_profile, LaunchOverrides, TempLaunchArgs,
 };
@@ -66,6 +67,24 @@ impl LaunchArgs {
     }
 }
 
+impl ModpackArgs {
+    fn from_matches(sub: &SubcommandMatches) -> Result<Self, String> {
+        Ok(Self {
+            id: arg_str(sub, "id").ok_or_else(|| "--id is required".to_string())?,
+            source: match arg_str(sub, "source") {
+                Some(value) => PackSource::parse(&value)?,
+                None => PackSource::default(),
+            },
+            // Not "version": clap reserves that name for its own --version flag
+            // and panics on the collision while building the subcommand.
+            version: arg_str(sub, "pack-version"),
+            game_version: arg_str(sub, "mc"),
+            loader: arg_str(sub, "loader"),
+            no_launch: arg_flag(sub, "no-launch"),
+        })
+    }
+}
+
 impl TempLaunchArgs {
     fn from_matches(sub: &SubcommandMatches) -> Result<Self, String> {
         let game_version = arg_str(sub, "mc").ok_or_else(|| "--mc is required".to_string())?;
@@ -91,6 +110,14 @@ fn arg_str(sub: &SubcommandMatches, name: &str) -> Option<String> {
         .get(name)
         .and_then(|a| a.value.as_str())
         .map(String::from)
+}
+
+/// Boolean flag — present (and not literally `false`) means on.
+fn arg_flag(sub: &SubcommandMatches, name: &str) -> bool {
+    match sub.matches.args.get(name) {
+        Some(a) => a.value.as_bool().unwrap_or(true),
+        None => false,
+    }
 }
 
 /// Comma-separated multi-value arg → trimmed, non-empty parts.
@@ -144,6 +171,17 @@ pub fn dispatch_cold_start(app: &AppHandle) -> bool {
             }
             false
         }
+        "modpack" => {
+            match ModpackArgs::from_matches(&sub) {
+                Ok(args) => spawn_dispatch_after_state_init(
+                    app.clone(),
+                    DispatchAction::Modpack(args),
+                    "cold",
+                ),
+                Err(e) => error!("[CLI cold] modpack: {}", e),
+            }
+            false
+        }
         other => {
             info!(
                 "[CLI cold] unknown subcommand '{}', falling through to GUI",
@@ -158,12 +196,21 @@ pub fn dispatch_cold_start(app: &AppHandle) -> bool {
 /// `true` if argv was consumed by a CLI subcommand — caller should then skip
 /// the default window-focus behavior.
 pub fn dispatch_hot_start(app: &AppHandle, argv: Vec<String>) -> bool {
-    let Ok(matches) = app.cli().matches_from(argv) else {
-        return false;
+    // Log the parse failure instead of swallowing it: an unknown flag or a
+    // subcommand this build predates is otherwise indistinguishable from "no
+    // subcommand given", and the caller just silently focuses the window.
+    let matches = match app.cli().matches_from(argv) {
+        Ok(m) => m,
+        Err(e) => {
+            error!("[CLI hot] could not parse forwarded args: {}", e);
+            return false;
+        }
     };
     let Some(sub) = matches.subcommand else {
+        info!("[CLI hot] forwarded args carried no subcommand");
         return false;
     };
+    info!("[CLI hot] subcommand '{}'", sub.name);
 
     let action = match sub.name.as_str() {
         "launch" => match LaunchArgs::from_matches(&sub) {
@@ -177,6 +224,13 @@ pub fn dispatch_hot_start(app: &AppHandle, argv: Vec<String>) -> bool {
             Ok(a) => DispatchAction::Temp(a),
             Err(e) => {
                 error!("[CLI hot] temp: {}", e);
+                return false;
+            }
+        },
+        "modpack" => match ModpackArgs::from_matches(&sub) {
+            Ok(a) => DispatchAction::Modpack(a),
+            Err(e) => {
+                error!("[CLI hot] modpack: {}", e);
                 return false;
             }
         },
@@ -195,6 +249,7 @@ pub fn dispatch_hot_start(app: &AppHandle, argv: Vec<String>) -> bool {
 enum DispatchAction {
     Launch(LaunchArgs),
     Temp(TempLaunchArgs),
+    Modpack(ModpackArgs),
 }
 
 async fn run_action(action: DispatchAction, tag: &'static str) {
@@ -218,6 +273,13 @@ async fn run_action(action: DispatchAction, tag: &'static str) {
             Ok(_) => info!("[CLI {}] Temp launch dispatched.", tag),
             Err(e) => error!("[CLI {}] Temp launch failed: {:?}", tag, e),
         },
+        // Downloads before it launches, so this one runs for a while rather than
+        // just handing off like the other two.
+        DispatchAction::Modpack(a) => {
+            info!("[CLI {}] Modpack install starting.", tag);
+            run_modpack(a).await;
+            info!("[CLI {}] Modpack install finished.", tag);
+        }
     }
 }
 
