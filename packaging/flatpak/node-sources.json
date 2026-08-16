@@ -41,9 +41,9 @@
     },
     {
         "type": "file",
-        "url": "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.7.5.tgz#0fa4a1637aed84b8d8c2de2a0592723c14f4575b",
-        "sha512": "6f739811773697da623e1fb8532d458ebe642aec8ce9bc10209db5c503ce044acb4e0ca23fa5dfb293e7d2b44db2a6d71778406c357b0e759e8f514d011bb049",
-        "dest-filename": "@noriskclient-nrc-skin-renderer-0.7.5.tgz",
+        "url": "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.8.2.tgz#e8a7b30b275bf428265b65b887530134c6c52a5b",
+        "sha512": "94471c2745f41ad7bc64d94001d3229dce432ba9f96f2a39d113fa11933551275b5aaa7f41ae4cd6685e62722addf913ed3ff2a5f598405a85389c11ccc1f8f3",
+        "dest-filename": "@noriskclient-nrc-skin-renderer-0.8.2.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
