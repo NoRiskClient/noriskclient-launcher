@@ -44,7 +44,6 @@ pub enum EventType {
     ProfileUpdate,
     TriggerProfileUpdate,
     MinecraftProcessExited,
-    StarlightSkinUpdated,
     MinecraftSkinChanged,
     Error,
     OfflineMode,
