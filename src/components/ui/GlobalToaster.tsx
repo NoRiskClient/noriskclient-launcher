@@ -120,8 +120,8 @@ export function GlobalToaster() {
     toasts.forEach((toast) => {
       gsap.to(toast, {
         backgroundColor: `${accentColor.value}30`,
-        borderColor: `${accentColor.value}80`,
-        borderBottomColor: accentColor.value,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
+        borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
         duration: 0.2,
         ease: "power2.out",
       });

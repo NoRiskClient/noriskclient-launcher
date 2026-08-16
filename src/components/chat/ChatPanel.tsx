@@ -393,20 +393,20 @@ export function ChatPanel({ friend }: ChatPanelProps) {
               src={avatarUrl}
               alt={friend.username}
               className="w-7 h-7 rounded-lg"
-              style={{ border: `2px solid ${accentColor.value}50` }}
+              style={{ border: `2px solid ${accentColor.textValue || accentColor.value}50` }}
             />
           ) : (
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{
                 backgroundColor: `${accentColor.value}30`,
-                border: `2px solid ${accentColor.value}50`,
+                border: `2px solid ${accentColor.textValue || accentColor.value}50`,
               }}
             >
               <Icon
                 icon="solar:user-bold"
                 className="w-4 h-4"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
             </div>
           )}
@@ -419,7 +419,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
           className="p-1.5 rounded-lg transition-all duration-200"
           style={{
             backgroundColor: `${accentColor.value}20`,
-            color: accentColor.value,
+            color: accentColor.textValue || accentColor.value,
           }}
         >
           <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
@@ -437,13 +437,13 @@ export function ChatPanel({ friend }: ChatPanelProps) {
               className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
               style={{
                 backgroundColor: `${accentColor.value}15`,
-                border: `1px solid ${accentColor.value}40`,
+                border: `1px solid ${accentColor.textValue || accentColor.value}40`,
               }}
             >
               <Icon
                 icon="solar:chat-round-line-linear"
                 className="w-6 h-6"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
             </div>
             <p className="text-white/50 text-xs font-minecraft">{t('chat.no_messages_title')}</p>
@@ -460,7 +460,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                 <Icon
                   icon="svg-spinners:ring-resize"
                   className="w-5 h-5"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               </div>
             )}
@@ -494,7 +494,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                         style={{
                           backgroundColor: `${accentColor.value}15`,
                           color: `${accentColor.value}90`,
-                          border: `1px solid ${accentColor.value}30`,
+                          border: `1px solid ${accentColor.textValue || accentColor.value}30`,
                         }}
                       >
                         {getDateLabel(timestamp, t)}

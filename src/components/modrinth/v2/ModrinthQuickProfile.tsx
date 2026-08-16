@@ -90,7 +90,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
           {isActuallyCopying
             ? t('modrinth.quick_profile.copy_prefix')
             : t('modrinth.quick_profile.install_prefix')}
-          <span style={{ color: accentColor.value }}>{projectTitle}</span>
+          <span style={{ color: accentColor.textValue || accentColor.value }}>{projectTitle}</span>
           {versionNumber && (
             <span className="text-gray-400"> v{versionNumber}</span>
           )}
@@ -186,7 +186,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                   value={profileSearchValue}
                   onChange={(e) => setProfileSearchValue(e.target.value)}
                   placeholder={t('placeholders.search_profiles')}
-                  className="w-full pl-7 pr-3 py-1.5 bg-black/20 border border-white/10 rounded-md text-xs font-minecraft text-white placeholder-white/50 focus:border-accent focus:outline-none transition-colors"
+                  className="w-full pl-7 pr-3 py-1.5 bg-black/20 border border-white/10 rounded-md text-xs font-minecraft text-white placeholder-white/50 focus:border-accent-text focus:outline-none transition-colors"
                   disabled={isLoading}
                 />
                 {profileSearchValue && (
@@ -212,7 +212,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                     className={cn(
                       "flex flex-col items-center gap-1 p-2 rounded-md bg-black/20 border transition-all duration-200 hover:bg-black/30 text-center",
                       selectedSourceProfileId === profile.id
-                        ? "border-accent bg-accent/10"
+                        ? "border-accent-text bg-accent/10"
                         : "border-white/10 hover:border-white/20",
                       isLoading && "opacity-50 cursor-not-allowed"
                     )}
@@ -229,7 +229,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                       </div>
                     </div>
                     {selectedSourceProfileId === profile.id && (
-                      <Icon icon="solar:check-circle-bold" className="w-3 h-3 text-accent flex-shrink-0" />
+                      <Icon icon="solar:check-circle-bold" className="w-3 h-3 text-accent-text flex-shrink-0" />
                     )}
                   </button>
                 ))}

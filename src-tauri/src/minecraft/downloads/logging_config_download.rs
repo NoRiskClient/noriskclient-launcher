@@ -2,11 +2,15 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::minecraft::dto::piston_meta::LoggingClient;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
-use log::info;
-use std::path::PathBuf;
+use crate::utils::file_utils::write_atomic;
+use log::{info, warn};
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 const LOGGING_DIR: &str = "assets/log_configs";
+const PATCHED_PREFIX: &str = "nrc-";
+const PATTERN_LAYOUT: &str =
+    "<PatternLayout pattern=\"[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n\" />";
 
 pub struct MinecraftLoggingDownloadService {
     logging_configs_path: PathBuf,
@@ -19,6 +23,10 @@ impl MinecraftLoggingDownloadService {
             "[Logging Config Service] Initialized. Config Path: {}",
             logging_configs_path.display()
         );
+        Self::with_path(logging_configs_path)
+    }
+
+    pub fn with_path(logging_configs_path: PathBuf) -> Self {
         Self {
             logging_configs_path,
         }
@@ -26,23 +34,37 @@ impl MinecraftLoggingDownloadService {
 
     pub async fn download_logging_config(&self, logging: &LoggingClient) -> Result<PathBuf> {
         let file_name = logging.file.id.clone();
-        let target_path = self.logging_configs_path.join(&file_name);
+        let vanilla_path = self.logging_configs_path.join(&file_name);
+        let patched_path = self
+            .logging_configs_path
+            .join(format!("{}{}", PATCHED_PREFIX, file_name));
 
-        info!("[Logging Config Download] Downloading logging config: {}", file_name);
-
-        // Use the new centralized download utility with size verification
         let config = DownloadConfig::new()
-            .with_size(logging.file.size as u64)  // Size verification prevents corruption
-            .with_streaming(false)  // Config files are small
-            .with_retries(3);  // Built-in retry logic
+            .with_sha1(logging.file.sha1.clone())
+            .with_size(logging.file.size as u64)
+            .with_streaming(false)
+            .with_retries(3);
 
-        DownloadUtils::download_file(&logging.file.url, &target_path, config).await?;
-
-        info!("[Logging Config Download] Successfully downloaded logging config to: {}", target_path.display());
-
-        Self::patch_console_to_plain(&target_path).await;
-
-        Ok(target_path)
+        match DownloadUtils::download_file(&logging.file.url, &vanilla_path, config).await {
+            Ok(()) => {
+                info!(
+                    "[Logging Config] Verified logging config: {}",
+                    vanilla_path.display()
+                );
+                Self::write_patched(&vanilla_path, &patched_path).await?;
+                Ok(patched_path)
+            }
+            Err(e) if fs::try_exists(&patched_path).await.unwrap_or(false) => {
+                warn!(
+                    "[Logging Config] {} unreachable ({}); using cached {}",
+                    logging.file.url,
+                    e,
+                    patched_path.display()
+                );
+                Ok(patched_path)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn get_jvm_argument(&self, logging_config_path: &PathBuf) -> String {
@@ -52,36 +74,24 @@ impl MinecraftLoggingDownloadService {
         )
     }
 
-    async fn patch_console_to_plain(config_path: &PathBuf) {
-        match fs::read_to_string(config_path).await {
-            Ok(content) => {
-                let patched = Self::rewrite_console_layout(&content);
-                if patched != content {
-                    if let Err(e) = fs::write(config_path, &patched).await {
-                        log::warn!(
-                            "[Logging Config] Could not write patched config {}: {}",
-                            config_path.display(),
-                            e
-                        );
-                    } else {
-                        info!(
-                            "[Logging Config] Patched console appender to plain-text layout: {}",
-                            config_path.display()
-                        );
-                    }
-                }
-            }
-            Err(e) => log::warn!(
-                "[Logging Config] Could not read config for patching {}: {}",
-                config_path.display(),
-                e
-            ),
+    async fn write_patched(source: &Path, target: &Path) -> Result<()> {
+        let content = fs::read_to_string(source).await?;
+        let patched = Self::rewrite_console_layout(&content);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).await?;
         }
+        if fs::read_to_string(target).await.ok().as_deref() == Some(patched.as_str()) {
+            return Ok(());
+        }
+        write_atomic(target, patched.as_bytes()).await?;
+        info!(
+            "[Logging Config] Wrote plain-text console config: {}",
+            target.display()
+        );
+        Ok(())
     }
 
     fn rewrite_console_layout(content: &str) -> String {
-        const PATTERN_LAYOUT: &str =
-            "<PatternLayout pattern=\"[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n\" />";
         content
             .replace("<LegacyXMLLayout />", PATTERN_LAYOUT)
             .replace("<LegacyXMLLayout/>", PATTERN_LAYOUT)
@@ -89,3 +99,7 @@ impl MinecraftLoggingDownloadService {
             .replace("<XMLLayout/>", PATTERN_LAYOUT)
     }
 }
+
+#[cfg(test)]
+#[path = "logging_config_download_test.rs"]
+mod tests;

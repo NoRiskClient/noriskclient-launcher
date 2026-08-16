@@ -91,9 +91,9 @@ export const getVariantColors = (variant: ComponentVariant, accentColor: AccentC
       };
     default:
       return {
-        main: accentColor.value,
-        light: accentColor.hoverValue || accentColor.value,
-        dark: accentColor.value,
+        main: accentColor.borderValue || accentColor.textValue || accentColor.value,
+        light: accentColor.borderValue || accentColor.textValue || accentColor.hoverValue || accentColor.value,
+        dark: accentColor.borderValue || accentColor.textValue || accentColor.value,
         text: "#ffffff"
       };
   }

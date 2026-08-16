@@ -196,7 +196,7 @@ export function NewsSection({ className }: NewsSectionProps) {
         width: `${newsSectionWidth}px`,
         borderLeft: `2px solid ${accentColor.value}60`,
         borderRight: `2px solid ${accentColor.value}60`,
-        boxShadow: `0 0 15px ${accentColor.value}30 inset`,
+        boxShadow: `0 0 15px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30 inset`,
       }}
     >
       {/* Resize handle */}
@@ -219,7 +219,7 @@ export function NewsSection({ className }: NewsSectionProps) {
         </div>
         <hr
           className="mt-2 border-t-2"
-          style={{ borderColor: `${accentColor.value}40` }}
+          style={{ borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40` }}
         />
       </div>
       <div className="flex-1 overflow-y-auto no-scrollbar relative">

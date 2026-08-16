@@ -62,7 +62,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
         )}
         style={{
           backgroundColor: `${accentColor.value}15`,
-          border: `1px solid ${accentColor.value}40`,
+          border: `1px solid ${accentColor.textValue || accentColor.value}40`,
         }}
         disabled={isChanging}
       >
@@ -80,7 +80,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
             "w-4 h-4 ml-auto transition-transform duration-200",
             isOpen && "rotate-180"
           )}
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         />
       </button>
 

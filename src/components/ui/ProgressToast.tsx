@@ -29,7 +29,7 @@ export function ProgressToast({ message, progress }: ProgressToastProps) {
           {/* Spinning loader icon like loading toast */}
           <svg
             className="animate-spin h-5 w-5 flex-shrink-0"
-            style={{ color: accentColor.value }}
+            style={{ color: accentColor.textValue || accentColor.value }}
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -49,7 +49,7 @@ export function ProgressToast({ message, progress }: ProgressToastProps) {
             />
           </svg>
           <span className="flex-1">{message}</span>
-          <span style={{ color: accentColor.value }}>
+          <span style={{ color: accentColor.textValue || accentColor.value }}>
             {Math.round(clampedProgress)}%
           </span>
         </div>

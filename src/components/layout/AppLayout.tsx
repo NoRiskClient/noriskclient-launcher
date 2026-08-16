@@ -510,7 +510,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     <div
       className="h-20 flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between px-8 z-10"
       style={{
-        borderColor: `${accentColor.value}40`,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`,
         backgroundColor: `rgba(${Number.parseInt(accentColor.value.slice(1, 3), 16)}, ${Number.parseInt(
           accentColor.value.slice(3, 5),
           16,
@@ -539,7 +539,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
                     icon={isUpdating ? "solar:download-minimalistic-bold" : "solar:download-minimalistic-bold"}
                     className={`w-6 h-6 transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
                     style={{
-                      color: accentColor.value,
+                      color: accentColor.textValue || accentColor.value,
                     }}
                   />
                 </div>

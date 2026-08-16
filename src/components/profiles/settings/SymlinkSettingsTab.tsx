@@ -259,7 +259,7 @@ export function SymlinkSettingsTab({
                   <div className="flex items-center gap-2 mb-2 min-w-0 overflow-hidden">
                     <Icon 
                       icon={symlink.is_directory ? "solar:folder-bold" : "solar:file-bold"} 
-                      className="w-5 h-5 text-accent flex-shrink-0" 
+                      className="w-5 h-5 text-accent-text flex-shrink-0" 
                     />
                     <span 
                       className="text-white text-base font-medium truncate font-minecraft min-w-0 flex-1"
@@ -350,7 +350,7 @@ export function SymlinkSettingsTab({
 
           <div className="p-4 bg-white/5 rounded border border-white/10">
             <div className="flex items-start gap-3">
-              <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+              <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-accent-text flex-shrink-0 mt-0.5" />
               <div className="text-xs text-white/70 font-minecraft tracking-wide select-none space-y-2">
                 <p className="text-white">{t('symlinks.how_it_works')}</p>
                 <ol className="list-decimal list-inside space-y-1 text-white/60">

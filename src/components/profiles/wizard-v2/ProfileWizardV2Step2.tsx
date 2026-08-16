@@ -337,8 +337,8 @@ export function ProfileWizardV2Step2({
                   backgroundRepeat: 'no-repeat',
                   border: isDisabled ? 'none' : undefined,
                   ...(selectedLoader === loader.key && !isDisabled ? {
-                    borderColor: accentColor.value,
-                    color: accentColor.value
+                    borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
+                    color: accentColor.textValue || accentColor.value
                   } : {})
                 }}
                 onClick={() => !isDisabled && setSelectedLoader(loader.key)}

@@ -111,7 +111,7 @@ export function ProfileImport({
                       backgroundColor: `${accentColor.value}30`,
                       borderWidth: "2px",
                       borderStyle: "solid",
-                      borderColor: `${accentColor.value}60`,
+                      borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
                     }}
                   >
                     <Icon
@@ -128,7 +128,7 @@ export function ProfileImport({
                       backgroundColor: `${accentColor.value}30`,
                       borderWidth: "2px",
                       borderStyle: "solid",
-                      borderColor: `${accentColor.value}60`,
+                      borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
                     }}
                   >
                     <Icon
@@ -145,7 +145,7 @@ export function ProfileImport({
                       backgroundColor: `${accentColor.value}30`,
                       borderWidth: "2px",
                       borderStyle: "solid",
-                      borderColor: `${accentColor.value}60`,
+                      borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
                     }}
                   >
                     <Icon

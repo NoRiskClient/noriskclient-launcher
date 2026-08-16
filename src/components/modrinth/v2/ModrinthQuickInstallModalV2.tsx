@@ -188,7 +188,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
           <div className="mb-1">
             <div 
               className="max-h-60 overflow-y-auto border custom-scrollbar" 
-              style={{ borderColor: `${accentColor.value}80` }}
+              style={{ borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80` }}
             >
               {profiles.length > 0 ? (
                 [...profiles]
@@ -212,7 +212,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                         )}
                         style={{
                           backgroundColor: profile.id === selectedProfileId ? `${accentColor.value}50` : `${accentColor.value}30`,
-                          borderBottomColor: `${accentColor.value}80`,
+                          borderBottomColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
                         }}
                       >
                         <div className="text-white flex-grow mr-3 min-w-0">

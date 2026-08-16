@@ -459,7 +459,7 @@ export function JavaSettingsTab({
                   {t('profiles.settings.recommended')}: {recommendedMaxRam} MB (
                   {(recommendedMaxRam / 1024).toFixed(1)} GB)
                   {editedProfile.is_standard_version && (
-                    <div className="mt-1 text-accent font-minecraft">
+                    <div className="mt-1 text-accent-text font-minecraft">
                       {t('profiles.settings.appliesToAllStandard')}
                     </div>
                   )}
@@ -555,13 +555,13 @@ export function JavaSettingsTab({
                         className={cn(
                           "w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
                           customJavaPathInput === java.path
-                            ? "bg-accent/30 border-accent text-white"
+                            ? "bg-accent/30 border-accent-text text-white"
                             : "bg-black/20 border-white/10 hover:bg-black/30 hover:border-white/20 text-white/80",
                         )}
                         style={
                           customJavaPathInput === java.path
                             ? {
-                                borderColor: accentColor.value,
+                                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
                                 backgroundColor: `${accentColor.value}20`,
                               }
                             : {}
@@ -636,7 +636,7 @@ export function JavaSettingsTab({
                 <p className="mt-2 text-xs text-white/50 font-minecraft tracking-wide">
                   {t('profiles.settings.javaArgsHint')}
                   {editedProfile.is_standard_version && (
-                    <span className="block mt-1 text-accent">
+                    <span className="block mt-1 text-accent-text">
                       {t('profiles.settings.appliesToAllStandard')}
                     </span>
                   )}

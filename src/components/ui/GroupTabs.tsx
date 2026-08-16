@@ -67,7 +67,7 @@ export function GroupTabs({
             }`}
             style={{
               backgroundColor: activeGroup === group.id ? `${accentColor.value}20` : undefined,
-              borderColor: activeGroup === group.id ? accentColor.value : undefined,
+              borderColor: activeGroup === group.id ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : undefined,
             }}
           >
             {group.icon && (

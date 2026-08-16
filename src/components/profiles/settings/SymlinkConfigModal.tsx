@@ -139,7 +139,7 @@ export function SymlinkConfigModal({
                 {t('symlink.advanced_custom_location')}
               </span>
               {targetDirectory && (
-                <span className="text-xs text-accent font-minecraft">
+                <span className="text-xs text-accent-text font-minecraft">
                   ({targetDirectory})
                 </span>
               )}
@@ -173,8 +173,8 @@ export function SymlinkConfigModal({
               {/* Show final path where symlink will be created */}
               <div className="p-3 bg-white/5 rounded border border-white/10">
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon icon="solar:map-point-bold" className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-minecraft text-accent tracking-wide">
+                  <Icon icon="solar:map-point-bold" className="w-4 h-4 text-accent-text" />
+                  <span className="text-xs font-minecraft text-accent-text tracking-wide">
                     Symlink will be created at:
                   </span>
                 </div>

@@ -45,7 +45,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
                 <Icon
                   icon="solar:code-2-bold"
                   className="w-5 h-5"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               </div>
               <div className="min-h-[3rem] flex flex-col justify-center">
@@ -90,7 +90,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
                 <Icon
                   icon="solar:server-bold"
                   className="w-5 h-5"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               </div>
               <div className="min-h-[3rem] flex flex-col justify-center">

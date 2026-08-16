@@ -308,12 +308,12 @@ export function SocialsModal() {
         <div className="flex flex-col items-center text-center space-y-4">
           <Icon
             icon="mdi:gift-outline"
-            className="w-16 h-16 text-accent"
+            className="w-16 h-16 text-accent-text"
           />
           <p className="text-white/90 font-minecraft text-sm select-none">
             {t('socials.referral_text')}{" "}
             <span
-              className="text-accent underline cursor-pointer hover:text-accent/80"
+              className="text-accent-text underline cursor-pointer hover:text-accent-text/80"
               onClick={() => openExternalUrl(navigator.language.startsWith("de") ? "https://nrc.gg/freunde-werben" : "https://nrc.gg/invite-friends")}
             >
               {t('socials.referral_more')}

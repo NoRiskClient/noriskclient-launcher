@@ -172,8 +172,8 @@ export function RolloutIndicator() {
               top: pos.top,
               bottom: pos.bottom,
               backgroundColor: `${accentColor.value}22`,
-              borderColor: `${accentColor.value}80`,
-              borderBottomColor: accentColor.value,
+              borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
+              borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
               backdropFilter: "blur(14px)",
               boxShadow: "0 8px 24px rgba(0, 0, 0, 0.55)",
             }}
@@ -184,7 +184,7 @@ export function RolloutIndicator() {
               className="flex items-center gap-2.5 px-4 py-3 border-b-2"
               style={{
                 backgroundColor: `${accentColor.value}30`,
-                borderColor: `${accentColor.value}60`,
+                borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
               }}
             >
               <Icon

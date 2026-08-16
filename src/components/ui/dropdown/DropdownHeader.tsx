@@ -26,7 +26,7 @@ export function DropdownHeader({
       )}
       style={{
         backgroundColor: `${accentColor.value}25`,
-        borderBottomColor: `${accentColor.value}50`,
+        borderBottomColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}50`,
       }}
     >
       <span className="text-shadow-sm">{title}</span>

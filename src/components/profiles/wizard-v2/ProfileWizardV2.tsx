@@ -276,8 +276,8 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
                     : "border-transparent bg-black/20 hover:bg-black/30"
                 }`}
                 style={selectedVersion === version.id ? {
-                  borderColor: accentColor.value,
-                  color: accentColor.value
+                  borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
+                  color: accentColor.textValue || accentColor.value
                 } : {}}
                 onClick={() => setSelectedVersion(version.id)}
               >

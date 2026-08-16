@@ -276,7 +276,7 @@ function CapeItemDisplay({
                 <Icon
                   icon="solar:check-circle-bold"
                   className="w-4 h-4"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               </Tooltip>
             </div>
@@ -287,7 +287,7 @@ function CapeItemDisplay({
               <Icon
                 icon="svg-spinners:ring-resize"
                 className="w-8 h-8 mb-1"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
               <span className="font-smallcaps text-xs text-white">
                 {t('capes.equipping')}
@@ -655,7 +655,7 @@ export function CapeList({
           <Icon
             icon="eos-icons:loading"
             className="w-8 h-8 animate-spin"
-            style={{ color: accentColor.value }}
+            style={{ color: accentColor.textValue || accentColor.value }}
           />
         ) : (
           <div className="w-full h-4" /> // Invisible trigger area
@@ -763,8 +763,8 @@ export function CapeList({
             top: menuPosition.y,
             left: menuPosition.x,
             backgroundColor: accentColor.value + "20",
-            borderColor: accentColor.value + "90",
-            borderBottomColor: accentColor.value,
+            borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value + "90",
+            borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
             backdropFilter: "blur(8px)",
             WebkitBackdropFilter: "blur(8px)",
             boxShadow: "0 8px 16px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",

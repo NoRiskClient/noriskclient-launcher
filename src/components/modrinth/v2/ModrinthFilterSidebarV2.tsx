@@ -205,7 +205,7 @@ const FilterOption = ({
         <Icon
           icon="solar:check-circle-bold"
           className="w-4 h-4 flex-shrink-0 ml-2"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         />
       )}
     </button>

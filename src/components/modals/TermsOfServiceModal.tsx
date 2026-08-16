@@ -21,7 +21,7 @@ export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: Analy
     <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
       <BannerCard onDismiss={onDismiss} dismissTitle={t('analytics.banner.dismiss')}>
         <div className="flex items-start gap-3 pr-8">
-          <Icon icon="solar:chart-square-bold" className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
+          <Icon icon="solar:chart-square-bold" className="w-6 h-6 text-accent-text flex-shrink-0 mt-1" />
 
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-smallcaps text-white mb-2">
@@ -32,7 +32,7 @@ export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: Analy
               {t('analytics.banner.description')}{' '}
               <button
                 onClick={() => openExternalUrl('https://blog.norisk.gg/en/privacy-policy/')}
-                className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors text-sm"
+                className="text-accent-text hover:text-accent-hover underline underline-offset-2 transition-colors text-sm"
               >
                 {t('analytics.banner.learn_more')}
               </button>

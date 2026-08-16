@@ -99,16 +99,16 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
               icon="solar:gift-bold"
               className="w-12 h-12 transition-transform duration-200"
               style={{ 
-                color: accentColor.value,
+                color: accentColor.textValue || accentColor.value,
                 transform: isHovered ? "scale(1.1) rotate(5deg)" : "scale(1)",
-                filter: isHovered ? `drop-shadow(0 0 8px ${accentColor.value}80)` : undefined,
+                filter: isHovered ? `drop-shadow(0 0 8px ${accentColor.borderValue || accentColor.textValue || accentColor.value}80)` : undefined,
               }}
             />
             <span
               className="font-minecraft text-xs text-white/80 uppercase transition-colors duration-200 text-center px-1"
               style={{ 
                 textShadow: "0 1px 2px rgba(0,0,0,0.5)",
-                color: isHovered ? accentColor.value : undefined,
+                color: isHovered ? (accentColor.textValue || accentColor.value) : undefined,
               }}
               title={rewardLabel}
             >
@@ -130,15 +130,15 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
               className="w-12 h-12 text-white/50 transition-all duration-200"
               style={{
                 transform: isHovered ? "scale(1.15) rotate(-5deg)" : "scale(1)",
-                color: isHovered ? accentColor.value : undefined,
-                filter: isHovered ? `drop-shadow(0 0 6px ${accentColor.value}60)` : undefined,
+                color: isHovered ? (accentColor.textValue || accentColor.value) : undefined,
+                filter: isHovered ? `drop-shadow(0 0 6px ${accentColor.borderValue || accentColor.textValue || accentColor.value}60)` : undefined,
               }}
             />
             <span
               className="font-minecraft text-xs text-white/60 uppercase transition-colors duration-200"
               style={{ 
                 textShadow: "0 1px 2px rgba(0,0,0,0.5)",
-                color: isHovered ? accentColor.value : undefined,
+                color: isHovered ? (accentColor.textValue || accentColor.value) : undefined,
               }}
             >
               Open

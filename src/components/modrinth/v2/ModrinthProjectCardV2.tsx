@@ -312,7 +312,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         <div
           className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden border"
           style={{
-            borderColor: `${accentColor.value}30`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
             backgroundColor: `${accentColor.value}10`,
           }}
         >
@@ -333,7 +333,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         <div className="flex-1 min-w-0">
           <div className="flex flex-row items-baseline space-x-1.5 mb-1">
             <span
-              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
+              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent-text cursor-pointer text-left transition-colors"
               title={`View ${hit.title} details`}
             >
               {hit.title}

@@ -169,7 +169,7 @@ export function WindowSettingsTab({
                       preset.width &&
                       editedProfile.settings?.resolution?.height ===
                         preset.height
-                      ? "bg-accent/20 border-accent text-white"
+                      ? "bg-accent/20 border-accent-text text-white"
                       : "bg-black/20 hover:bg-black/30 border-white/10 text-white/80",
                   )}
                   onClick={() => handlePresetClick(preset)}

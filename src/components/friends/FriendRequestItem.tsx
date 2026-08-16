@@ -64,12 +64,12 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
             src={avatarUrl}
             alt={otherUser.username}
             className="w-12 h-12 rounded-lg"
-            style={{ border: `2px solid ${accentColor.value}50` }}
+            style={{ border: `2px solid ${accentColor.textValue || accentColor.value}50` }}
           />
         ) : (
           <div
             className="w-12 h-12 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${accentColor.value}20`, border: `2px solid ${accentColor.value}50` }}
+            style={{ backgroundColor: `${accentColor.value}20`, border: `2px solid ${accentColor.borderValue || accentColor.textValue || accentColor.value}50` }}
           >
             <Icon icon="solar:user-bold" className="w-6 h-6" style={{ color: `${accentColor.value}60` }} />
           </div>
@@ -152,16 +152,16 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
           )}
           style={{
             backgroundColor: `${accentColor.value}20`,
-            border: `1px solid ${accentColor.value}40`,
-            color: accentColor.value,
+            border: `1px solid ${accentColor.textValue || accentColor.value}40`,
+            color: accentColor.textValue || accentColor.value,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = `${accentColor.value}40`;
-            e.currentTarget.style.borderColor = `${accentColor.value}70`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}70`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-            e.currentTarget.style.borderColor = `${accentColor.value}40`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`;
           }}
           title={t('friends.cancel_request')}
         >

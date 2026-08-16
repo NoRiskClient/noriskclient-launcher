@@ -132,8 +132,8 @@ export function Modal({
         )}
         style={{
           backgroundColor: `${accentColor.value}20`,
-          borderColor: `${accentColor.value}80`,
-          borderBottomColor: accentColor.value,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
+          borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
           boxShadow: getBoxShadow(),
         }}
       >
@@ -148,7 +148,7 @@ export function Modal({
           ref={headerRef}
           className="flex items-center justify-between px-6 py-4 border-b-2 flex-shrink-0"
           style={{
-            borderColor: `${accentColor.value}60`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
             backgroundColor: `${accentColor.value}30`,
           }}
         >

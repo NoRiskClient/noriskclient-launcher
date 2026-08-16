@@ -33,7 +33,7 @@ export function DropdownItem({
       )}
       onClick={onClick}
       style={{
-        color: isActive ? accentColor.value : "white",
+        color: isActive ? (accentColor.textValue || accentColor.value) : "white",
       }}
     >
       {icon && <span className="flex-shrink-0">{icon}</span>}

@@ -190,11 +190,11 @@ export function TesterWindow() {
       style={{
         backgroundColor: bgColor,
         backgroundImage: `linear-gradient(to bottom right, ${bgColor}, rgba(0,0,0,0.9))`,
-        borderColor: `${accentColor.value}30`,
-        boxShadow: `0 0 15px ${accentColor.value}30, inset 0 0 10px ${accentColor.value}20`,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
+        boxShadow: `0 0 15px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30, inset 0 0 10px ${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
       }}
     >
-      <BorderGlow color={accentColor.value} />
+      <BorderGlow color={accentColor.textValue || accentColor.value} />
       <TesterWindowTitlebar remaining={issues.length} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col p-4">
@@ -232,7 +232,7 @@ export function TesterWindow() {
               <Icon
                 icon="svg-spinners:ring-resize"
                 className="w-7 h-7 mx-auto mb-3"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
               <div className="font-minecraft text-xs tracking-wider text-white/50">
                 Loading queue…
@@ -245,7 +245,7 @@ export function TesterWindow() {
               <Icon
                 icon="solar:check-circle-bold"
                 className="w-12 h-12 mx-auto mb-3"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
               <div className="font-minecraft text-base tracking-wider text-white">
                 All caught up

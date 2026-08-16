@@ -72,7 +72,7 @@ function NotificationItem({ notification }: Readonly<{ notification: UserNotific
       className={`p-3 rounded-lg transition-colors flex ${
         notification.seen
           ? "bg-black/20 border-l-4"
-          : "bg-black/30 border-l-4 border-accent"
+          : "bg-black/30 border-l-4 border-accent-text"
       }`}
       style={{
         borderLeftColor: notification.seen ? "transparent" : "var(--accent-color)", // Transparent so spacing is maintained
@@ -91,7 +91,7 @@ function NotificationItem({ notification }: Readonly<{ notification: UserNotific
         {!notification.seen && (
             <Icon
                 icon="mdi:close"
-                className="bold w-3 h-3 mt-1 text-accent"
+                className="bold w-3 h-3 mt-1 text-accent-text"
                 style={{ cursor: "pointer" }}
                 onClick={() => handleMarkSingleRead(notification._id)}
             />

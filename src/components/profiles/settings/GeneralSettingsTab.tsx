@@ -221,13 +221,13 @@ export function GeneralSettingsTab({
                     className={cn(
                       "relative group flex flex-col items-center p-3 border-2 transition-all duration-200 rounded-lg hover:scale-105",
                       isSelected
-                        ? "border-accent shadow-lg"
+                        ? "border-accent-text shadow-lg"
                         : "border-white/10 hover:border-white/30",
                     )}
                     style={
                       isSelected
                         ? {
-                            borderColor: accentColor.value,
+                            borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
                             backgroundColor: `${accentColor.value}15`,
                           }
                         : {}
@@ -237,9 +237,9 @@ export function GeneralSettingsTab({
                     {/* Player Head */}
                     <div className={cn(
                       "relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all duration-200",
-                      isSelected ? "border-accent" : "border-white/20"
+                      isSelected ? "border-accent-text" : "border-white/20"
                     )}
-                    style={isSelected ? { borderColor: accentColor.value } : {}}>
+                    style={isSelected ? { borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value } : {}}>
                       <AccountAvatar account={account} />
                       {isSelected && (
                         <div 
@@ -248,7 +248,7 @@ export function GeneralSettingsTab({
                           <Icon
                             icon="solar:check-circle-bold"
                             className="w-8 h-8"
-                            style={{ color: accentColor.value }}
+                            style={{ color: accentColor.textValue || accentColor.value }}
                           />
                         </div>
                       )}

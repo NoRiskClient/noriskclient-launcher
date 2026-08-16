@@ -68,7 +68,7 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
               )}
               style={{
                 backgroundColor: theme.accentColor.value,
-                boxShadow: isSelected ? `0 0 12px ${theme.accentColor.value}50` : undefined,
+                boxShadow: isSelected ? `0 0 12px ${(theme.accentColor.textValue || theme.accentColor.value)}50` : undefined,
               }}
             />
             <div className="flex flex-col items-start">

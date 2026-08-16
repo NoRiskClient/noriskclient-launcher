@@ -138,12 +138,12 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
             src={avatarUrl}
             alt={friend.username}
             className="w-12 h-12 rounded-lg"
-            style={{ border: `2px solid ${accentColor.value}50` }}
+            style={{ border: `2px solid ${accentColor.textValue || accentColor.value}50` }}
           />
         ) : (
           <div
             className="w-12 h-12 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${accentColor.value}20`, border: `2px solid ${accentColor.value}50` }}
+            style={{ backgroundColor: `${accentColor.value}20`, border: `2px solid ${accentColor.borderValue || accentColor.textValue || accentColor.value}50` }}
           >
             <Icon icon="solar:user-bold" className="w-6 h-6" style={{ color: `${accentColor.value}60` }} />
           </div>
@@ -185,16 +185,16 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
             className="p-2 rounded-lg transition-all duration-200 hover:scale-110"
             style={{
               backgroundColor: activeChatFriend?.uuid === friend.uuid ? `${accentColor.value}40` : `${accentColor.value}20`,
-              border: `1px solid ${accentColor.value}40`,
-              color: accentColor.value,
+              border: `1px solid ${accentColor.textValue || accentColor.value}40`,
+              color: accentColor.textValue || accentColor.value,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = `${accentColor.value}40`;
-              e.currentTarget.style.borderColor = `${accentColor.value}70`;
+              e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}70`;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = activeChatFriend?.uuid === friend.uuid ? `${accentColor.value}40` : `${accentColor.value}20`;
-              e.currentTarget.style.borderColor = `${accentColor.value}40`;
+              e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`;
             }}
             title={t('friends.chat')}
           >
@@ -211,16 +211,16 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
           className="p-2 rounded-lg transition-all duration-200 hover:scale-110"
           style={{
             backgroundColor: `${accentColor.value}20`,
-            border: `1px solid ${accentColor.value}40`,
-            color: accentColor.value,
+            border: `1px solid ${accentColor.textValue || accentColor.value}40`,
+            color: accentColor.textValue || accentColor.value,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = `${accentColor.value}40`;
-            e.currentTarget.style.borderColor = `${accentColor.value}70`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}70`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-            e.currentTarget.style.borderColor = `${accentColor.value}40`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`;
           }}
           title={t('friends.remove_friend')}
         >

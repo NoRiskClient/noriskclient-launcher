@@ -59,8 +59,8 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
               [&_em]:italic [&_em]:text-white/80
               [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_code]:text-white/90
               [&_pre]:bg-black/30 [&_pre]:p-3 [&_pre]:rounded [&_pre]:text-xs [&_pre]:font-mono [&_pre]:text-white/90 [&_pre]:overflow-x-auto [&_pre]:mb-3
-              [&_blockquote]:border-l-2 [&_blockquote]:border-accent [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-3
-              [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline [&_a]:break-all
+              [&_blockquote]:border-l-2 [&_blockquote]:border-accent-text [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-3
+              [&_a]:text-accent-text [&_a]:hover:text-accent-text/80 [&_a]:underline [&_a]:break-all
               [&_img]:inline [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-1
               [&_hr]:border-white/20 [&_hr]:my-6
               [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3
@@ -156,14 +156,14 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
                   </pre>
                 ),
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-2 border-accent pl-4 italic text-white/70 my-3 font-sans">
+                  <blockquote className="border-l-2 border-accent-text pl-4 italic text-white/70 my-3 font-sans">
                     {children}
                   </blockquote>
                 ),
                 a: ({ href, children }) => (
                   <a
                     href={href}
-                    className="text-accent hover:text-accent/80 underline font-sans break-all"
+                    className="text-accent-text hover:text-accent-text/80 underline font-sans break-all"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

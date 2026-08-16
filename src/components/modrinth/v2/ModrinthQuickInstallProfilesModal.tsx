@@ -543,14 +543,14 @@ export function ModrinthQuickInstallProfilesModal({
                             ? {
                                 backgroundColor: 'transparent',
                                 border: 'none',
-                                color: accentColor.value,
+                                color: accentColor.textValue || accentColor.value,
                               }
                             : undefined
                         }
                         onMouseEnter={(e) => {
                           if (isInstalled) {
                             e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-                            e.currentTarget.style.textShadow = `0 0 8px ${accentColor.value}40`;
+                            e.currentTarget.style.textShadow = `0 0 8px ${accentColor.textValue || accentColor.value}40`;
                           }
                         }}
                         onMouseLeave={(e) => {

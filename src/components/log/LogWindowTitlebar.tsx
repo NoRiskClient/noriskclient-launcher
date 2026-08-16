@@ -36,11 +36,11 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
         <Icon
           icon="solar:monitor-bold"
           className="w-5 h-5"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         />
         <span
           className="font-minecraft text-sm tracking-wider"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         >
           {displayTitle}
         </span>

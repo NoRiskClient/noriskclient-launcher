@@ -139,7 +139,7 @@ export function ReferralBanner() {
         <div className="flex flex-col font-minecraft text-sm tracking-wide">
           <span className="text-white/80">
             {displayInfo?.fallbackMessage || "You were invited by"}{" "}
-            <span style={{ color: accentColor.value }} className="font-semibold">
+            <span style={{ color: accentColor.textValue || accentColor.value }} className="font-semibold">
               {displayInfo?.referrerName}
             </span>
           </span>
@@ -148,7 +148,7 @@ export function ReferralBanner() {
               {displayInfo?.customMessage}
               {displayInfo?.customMessage && displayInfo?.rewardText && " · "}
               {displayInfo?.rewardText && (
-                <span style={{ color: accentColor.value }}>{displayInfo.rewardText}</span>
+                <span style={{ color: accentColor.textValue || accentColor.value }}>{displayInfo.rewardText}</span>
               )}
             </span>
           )}

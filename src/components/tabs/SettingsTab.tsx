@@ -350,7 +350,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
                     <Icon
                       icon={tab.icon}
                       className="w-6 h-6 transition-colors duration-200"
-                      style={{ color: isActive ? accentColor.value : undefined }}
+                      style={{ color: isActive ? (accentColor.textValue || accentColor.value) : undefined }}
                     />
                     <span
                       className={cn(
@@ -376,7 +376,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
                                 ? "text-white"
                                 : "border-transparent text-white/40 hover:text-white/75",
                             )}
-                            style={childActive ? { borderColor: accentColor.value } : undefined}
+                            style={childActive ? { borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value } : undefined}
                             onClick={() => scrollToSection(child.id)}
                           >
                             {child.label}
