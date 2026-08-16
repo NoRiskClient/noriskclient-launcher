@@ -41,7 +41,10 @@
     <content_attribute id="money-purchasing">intense</content_attribute>
   </content_rating>
 
-  <releases>  
+  <releases>
+    <release version="0.6.25" date="2026-08-16">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25</url>
+    </release>
     <release version="0.6.25~beta.30" date="2026-08-16">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.25-beta.30</url>
     </release>
