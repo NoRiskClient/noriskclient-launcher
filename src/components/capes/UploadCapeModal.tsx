@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
@@ -126,11 +126,17 @@ export function UploadCapeModal({
           </div>
         )}
         <div className="relative flex justify-center items-center mb-6 p-2 rounded-md aspect-[10/16] max-w-[200px] mx-auto">
-          <SkinView3DWrapper
-            capeUrl={paddedPreviewUrl || previewImageUrl}
-            className="w-full h-full"
+          <SkinRenderer
+            textureUrl={null}
+            cape={{
+              texture: paddedPreviewUrl || previewImageUrl,
+              elytra: showElytraPreview,
+            }}
+            rotation={Math.PI}
+            draggable
             zoom={1.5}
-            displayAsElytra={showElytraPreview}
+            fps={30}
+            className="w-full h-full"
           />
           {!isCapeOnly && (
             <IconButton

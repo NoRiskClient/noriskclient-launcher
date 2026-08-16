@@ -13,7 +13,6 @@
     "icons": "node scripts/generate-icon-bundle.mjs"
   },
   "dependencies": {
-    "@flasham/react-skinview3d": "^3.0.1",
     "@iconify/react": "^5.2.1",
     "@noriskclient/nrc-skin-renderer": "0.7.5",
     "@react-three/drei": "^9.122.0",
@@ -54,7 +53,6 @@
     "react-window": "^1.8.11",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "skinview3d": "^3.2.0",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7",

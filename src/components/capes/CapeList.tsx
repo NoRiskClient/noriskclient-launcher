@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
+import type { SkinVariant } from "../../types/localSkin";
 import { EmptyState } from "../ui/EmptyState";
 import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage";
@@ -23,7 +24,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import gsap from "gsap";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -89,11 +90,13 @@ function CapeItemDisplay({
     if (isCurrentlyEquipping || !showModal || isDenied) return;
 
     let userSkinUrl: string | undefined;
+    let userSkinVariant: SkinVariant | undefined;
     if (activeAccount?.id) {
       try {
         const active = await MinecraftSkinService.getActiveSkin();
         if (active?.base64_data) {
           userSkinUrl = `data:image/png;base64,${active.base64_data}`;
+          userSkinVariant = active.variant;
         }
       } catch (e) {
         console.error("[CapeList] Failed to load active skin for preview:", e);
@@ -116,6 +119,7 @@ function CapeItemDisplay({
       >
         <Cape3DPreviewWithToggle
           skinUrl={userSkinUrl}
+          skinVariant={userSkinVariant}
           capeUrl={capeUrl}
           capeId={capeId}
           isEquipped={false}
@@ -790,6 +794,7 @@ export function CapeList({
 
 function Cape3DPreviewWithToggle({
   skinUrl,
+  skinVariant,
   capeUrl,
   capeId,
   onEquipCape,
@@ -797,6 +802,7 @@ function Cape3DPreviewWithToggle({
   isExperimental = false,
 }: {
   skinUrl?: string;
+  skinVariant?: SkinVariant;
   capeUrl?: string;
   capeId: string;
   onEquipCape: () => void;
@@ -825,16 +831,15 @@ function Cape3DPreviewWithToggle({
           title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
           aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
         />
-        <SkinView3DWrapper
-          skinUrl={skinUrl}
-          capeUrl={finalCapeUrl}
-          enableAutoRotate={true}
-          autoRotateSpeed={0.5}
-          startFromBack={true}
-          zoom={0.9}
-          displayAsElytra={showElytra}
-          width={300}
-          height={380}
+        <SkinRenderer
+          textureUrl={skinUrl ?? null}
+          variant={skinVariant ?? "auto"}
+          cape={{ texture: finalCapeUrl, elytra: showElytra }}
+          rotation={Math.PI}
+          draggable
+          zoom={1.6}
+          fps={30}
+          style={{ width: 300, height: 380 }}
         />
       </div>
 
