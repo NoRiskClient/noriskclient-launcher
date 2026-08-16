@@ -41,9 +41,9 @@
     },
     {
         "type": "file",
-        "url": "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.2.6.tgz#1850c3a629270deab7320343cedf5ad671915486",
-        "sha512": "4aaf976e394763ca4bef0d50aa86e932d9bedc2f635ac0053ae01755abc6a2f4c84300350137499254b1001a203f719f7fc417916e1d86245e2f926fb66e3251",
-        "dest-filename": "@noriskclient-nrc-skin-renderer-0.2.6.tgz",
+        "url": "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.7.5.tgz#0fa4a1637aed84b8d8c2de2a0592723c14f4575b",
+        "sha512": "6f739811773697da623e1fb8532d458ebe642aec8ce9bc10209db5c503ce044acb4e0ca23fa5dfb293e7d2b44db2a6d71778406c357b0e759e8f514d011bb049",
+        "dest-filename": "@noriskclient-nrc-skin-renderer-0.7.5.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
@@ -212,13 +212,6 @@
         "url": "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.25.3.tgz",
         "sha512": "20281447e90f8a6c74bef4737fe37fecbeed55241e13705863e3611d11d74b5901b8f3bbcf6fbb79ad876e10f265d4dea6182f36f2ab9430ca51ec6e095055be",
         "dest-filename": "@esbuild-win32-x64-0.25.3.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/@flasham/react-skinview3d/-/react-skinview3d-3.0.1.tgz",
-        "sha512": "a5acc073811ade3995519b68aa39c631b4840d5eb82ded2401c191584a90ec424ab16ed2575b83de6b30c30a247c9756880fa38b78cfc2fa7ad02f0315ff2510",
-        "dest-filename": "@flasham-react-skinview3d-3.0.1.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
@@ -772,20 +765,6 @@
         "url": "https://registry.npmjs.org/@types/stats.js/-/stats.js-0.17.3.tgz",
         "sha512": "a5735f003dca1ce7627fd1105d9f5d78af361d535a5cfe59205e513f6406e8e405353698d9821eb5fac4f6de76f2f12b78642f10f4430dcf26b9aa1878ad12c5",
         "dest-filename": "@types-stats.js-0.17.3.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/@types/three/-/three-0.136.1.tgz",
-        "sha512": "8334f0e91478754f2c19ff91a4b05658a1d154827883029540f93e2050a085ad3811f83f8ad5d851a957ea205c61e4a6683bb4a84e4ceee4ead172d0a54e0502",
-        "dest-filename": "@types-three-0.136.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/@types/three/-/three-0.156.0.tgz",
-        "sha512": "ef7ddb5c3491765af1a8e990b8e99f0b550146e276a5110f93cb169f1f4cb4824454340cc7c5343503b931555a3ab8f30cfc8b23e7053e29b65ffb2cf6fd3e2d",
-        "dest-filename": "@types-three-0.156.0.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
@@ -3184,34 +3163,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/skinview-utils/-/skinview-utils-0.6.2.tgz",
-        "sha512": "51d8d6c170956686ed1be75cee296f3116ed5d84aa3c9b5628f15d816738e06b386a83a664c2f6944aebefb87bbaeb2c5e8f73adc47e7cf8b31ac846a5d113bd",
-        "dest-filename": "skinview-utils-0.6.2.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/skinview-utils/-/skinview-utils-0.7.1.tgz",
-        "sha512": "e1e2eb32a479dba7a19596ec77c4ae67f087a52f46887d3150ca15f8f6252558bde59173e4726eed2a6de5761aef60d14bbc20b79aaabaf1d97f45d92609aef5",
-        "dest-filename": "skinview-utils-0.7.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/skinview3d/-/skinview3d-2.2.1.tgz",
-        "sha512": "54ecc1da372c5d64e6c84a84ea72178440a0d7edbd65c6633f4b70f6614818df58e0ffe10e502dd9ebfb353ec9d12aa07a2e5425e9e4a2b5b6e150d91c27a92b",
-        "dest-filename": "skinview3d-2.2.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/skinview3d/-/skinview3d-3.4.1.tgz",
-        "sha512": "595375b1e95f0d2028401ee6b0bb37b9e2635bfa607b79ec99bab125e5cf9cdfea209d4624aa4c64ef266af4af3288da32b9a94a038959f61490af41df8b6cda",
-        "dest-filename": "skinview3d-3.4.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz",
         "sha512": "f7884ad0787cacfa90976c577371ec681a0e5ca576d0c4e83e4717bf06c84962c4b3eeb8b01ab9905827da42431dbd4faf2f72acfd1dc6b088f5145c8bb4572a",
         "dest-filename": "smart-buffer-4.2.0.tgz",
@@ -3446,20 +3397,6 @@
         "url": "https://registry.npmjs.org/three-stdlib/-/three-stdlib-2.36.0.tgz",
         "sha512": "92fd01c9bfbe017ced106b142e0300b3c5368e051dcfa1cfa4007fc032672e22e5696417d803c78624c920deeba96f8e7f479181ca7b8e7d3953506c08fdf104",
         "dest-filename": "three-stdlib-2.36.0.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/three/-/three-0.136.0.tgz",
-        "sha512": "f9f10c5fb9d82f3d997ac54ffddca27e58b925ff204775cf027149bde43cd1a32189b15dbb3ac00e78cc6c045787cf96f6a2caeebb212428c020bffa703c42f8",
-        "dest-filename": "three-0.136.0.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/three/-/three-0.156.1.tgz",
-        "sha512": "90fec7d052bd77f93ab7f5ef43d14eea2f90ade3e80dc361c25d08d36fb09942513522c25080cc71f39b9f342fc5bdfbff451cf530d3d13d4782c451acee9261",
-        "dest-filename": "three-0.156.1.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
