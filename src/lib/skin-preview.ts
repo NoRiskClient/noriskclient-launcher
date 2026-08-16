@@ -162,12 +162,15 @@ export async function getSkinPreview(
   options: SkinPreviewOptions = {},
 ): Promise<string> {
   const format = FORMATS[options.format ?? "png"];
+  const given = Object.fromEntries(
+    Object.entries(request).filter(([, value]) => value !== undefined),
+  ) as SkinSnapshotRequest;
   const framed: SkinSnapshotRequest = {
     fit: FIT_MARGIN,
     crop: CROP_PADDING,
     emote: { animation: POSE_EMOTE },
     emoteTime: POSE_EMOTE_TIME,
-    ...request,
+    ...given,
   };
   const key = await skinPreviewKey(framed, options);
 

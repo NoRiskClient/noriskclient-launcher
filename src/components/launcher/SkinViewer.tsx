@@ -11,6 +11,7 @@ interface SkinViewerProps {
   width?: number;
   height?: number;
   fill?: boolean;
+  fallbackUrl?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -21,6 +22,7 @@ export function SkinViewer({
   width = 300,
   height = 400,
   fill = false,
+  fallbackUrl = FALLBACK_SKIN_URL,
   className,
   style,
 }: SkinViewerProps) {
@@ -43,7 +45,7 @@ export function SkinViewer({
   if (hasError || !skinUrl) {
     return (
       <img
-        src={FALLBACK_SKIN_URL}
+        src={fallbackUrl}
         alt={playerName ? `${playerName}'s Skin` : "Minecraft Skin"}
         width={width}
         height={height}
