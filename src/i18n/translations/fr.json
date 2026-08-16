@@ -428,6 +428,7 @@
   "common.unknown_error": "Erreur inconnue",
   "common.unknownError": "Une erreur inconnue s'est produite.",
   "auth.addAccount": "Ajouter un Compte",
+  "auth.noAccountNametag": "CONNEXION",
   "auth.unknown": "Inconnu",
   "auth.errors.load_accounts": "Échec du chargement des comptes: {{error}}",
   "auth.errors.login_cancelled": "Connexion annulée par l'utilisateur.",

@@ -443,6 +443,7 @@
   "common.unknown": "Unbekannt",
 
   "auth.addAccount": "Konto hinzufügen",
+  "auth.noAccountNametag": "ANMELDEN",
   "auth.unknown": "Unbekannt",
   "auth.errors.load_accounts": "Konten konnten nicht geladen werden: {{error}}",
   "auth.errors.login_cancelled": "Anmeldung vom Benutzer abgebrochen.",

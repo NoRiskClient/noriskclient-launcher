@@ -428,6 +428,7 @@
   "common.unknown_error": "Неизвестная ошибка",
   "common.unknownError": "Произошла неизвестная ошибка.",
   "auth.addAccount": "Добавить аккаунт",
+  "auth.noAccountNametag": "ВОЙТИ",
   "auth.unknown": "Неизвестно",
   "auth.errors.load_accounts": "Не удалось загрузить аккаунты: {{error}}",
   "auth.errors.login_cancelled": "Вход отменён пользователем.",

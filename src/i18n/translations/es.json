@@ -428,6 +428,7 @@
   "common.unknown_error": "Error desconocido",
   "common.unknownError": "Ocurrió un error desconocido.",
   "auth.addAccount": "Añadir Cuenta",
+  "auth.noAccountNametag": "ENTRAR",
   "auth.unknown": "Desconocido",
   "auth.errors.load_accounts": "Error al cargar cuentas: {{error}}",
   "auth.errors.login_cancelled": "Inicio de sesión cancelado por el usuario.",

@@ -428,6 +428,7 @@
   "common.unknown_error": "Nieznany błąd",
   "common.unknownError": "Wystąpił nieznany błąd.",
   "auth.addAccount": "Dodaj konto",
+  "auth.noAccountNametag": "ZALOGUJ",
   "auth.unknown": "Nieznane",
   "auth.errors.load_accounts": "Nie udało się załadować kont: {{error}}",
   "auth.errors.login_cancelled": "Logowanie anulowane przez użytkownika.",

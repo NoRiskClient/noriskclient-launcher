@@ -428,6 +428,7 @@
   "common.unknown_error": "Bilinmeyen hata",
   "common.unknownError": "Bilinmeyen bir hata oluştu.",
   "auth.addAccount": "Hesap Ekle",
+  "auth.noAccountNametag": "GİRİŞ",
   "auth.unknown": "Bilinmiyor",
   "auth.errors.load_accounts": "Hesaplar yüklenemedi: {{error}}",
   "auth.errors.login_cancelled": "Giriş kullanıcı tarafından iptal edildi.",

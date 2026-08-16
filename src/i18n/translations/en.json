@@ -443,6 +443,7 @@
   "common.unknown": "Unknown",
 
   "auth.addAccount": "Add Account",
+  "auth.noAccountNametag": "SIGN IN",
   "auth.unknown": "Unknown",
   "auth.errors.load_accounts": "Failed to load accounts: {{error}}",
   "auth.errors.login_cancelled": "Login cancelled by user.",

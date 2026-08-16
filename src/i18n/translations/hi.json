@@ -430,6 +430,7 @@
   "common.unknown_error": "अज्ञात त्रुटि",
   "common.unknownError": "एक अज्ञात त्रुटि हुई।",
   "auth.addAccount": "खाता जोड़ें",
+  "auth.noAccountNametag": "साइन इन",
   "auth.unknown": "अज्ञात",
   "auth.errors.load_accounts": "खाते लोड करने में विफल: {{error}}",
   "auth.errors.login_cancelled": "उपयोगकर्ता ने लॉगिन रद्द किया।",
