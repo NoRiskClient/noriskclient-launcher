@@ -15,7 +15,7 @@ import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useSelectedIcon } from '../../hooks/useSelectedIcon';
 import { useIdleEmote } from '../../hooks/useIdleEmote';
-import { useStarlightRender } from '../../hooks/useStarlightRender';
+import { useSkinPreview } from '../../hooks/useSkinPreview';
 import { useQualitySettingsStore } from '../../store/quality-settings-store';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
 import { useNavigate } from 'react-router-dom';
@@ -159,7 +159,6 @@ export function PlayerActionsDisplay({
   const idleEmote = useIdleEmote();
   const cosmeticRenderer3d = useQualitySettingsStore((s) => s.cosmeticRenderer3d);
   const isWindowFocused = useWindowFocus();
-  const resolvedSkinUrl = useStarlightRender(!cosmeticRenderer3d, playerName);
   const rigLoading = useMinLoading(skinLoading || cosmeticsLoading, 450);
   const rigCosmetics = React.useMemo(
     () =>
@@ -169,6 +168,16 @@ export function PlayerActionsDisplay({
         urls: c.urls,
       })),
     [equippedCosmetics],
+  );
+  const { url: resolvedSkinUrl } = useSkinPreview(
+    !cosmeticRenderer3d && !rigLoading,
+    {
+      textureUrl: rigTextureUrl,
+      variant: rigVariant,
+      cosmetics: rigCosmetics,
+      width: skinViewerMaxDisplayWidth,
+      height: skinViewerDisplayHeight,
+    },
   );
 
   const worldCupActive = isWorldCupEventActive();

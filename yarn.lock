@@ -316,13 +316,6 @@
   resolved "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.25.3.tgz"
   integrity sha512-ICgUR+kPimx0vvRzf+N/7L7tVSQeE3BYY+NhHRHXS1kBuPO7z2+7ea2HbhDyZdTephgvNvKrlDDKUexuCVBVvg==
 
-"@flasham/react-skinview3d@^3.0.1":
-  version "3.0.1"
-  resolved "https://registry.npmjs.org/@flasham/react-skinview3d/-/react-skinview3d-3.0.1.tgz"
-  integrity sha512-pazAc4Ea3jmVUZtoqjnGMbSEDV64Le0kAcGRWEqQ7EJKsW7SV1uD3mswwwokfJdWiA+ji3jPwvp60C8DFf8lEA==
-  dependencies:
-    skinview3d "^2.0.3"
-
 "@gar/promise-retry@^1.0.0":
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/@gar/promise-retry/-/promise-retry-1.0.3.tgz#65e726428e794bc4453948e0a41e6de4215ce8b0"
@@ -543,10 +536,10 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@noriskclient/nrc-skin-renderer@0.2.6":
-  version "0.2.6"
-  resolved "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.2.6.tgz#1850c3a629270deab7320343cedf5ad671915486"
-  integrity sha512-Sq+XbjlHY8pL7w1QqobpMtm+3C9jWsAFOuAXVavGovTIQwA1ATdJklSxABogP3Gff8QXkW4dhiReL5Jvtm4yUQ==
+"@noriskclient/nrc-skin-renderer@0.7.5":
+  version "0.7.5"
+  resolved "https://nexus.norisk.gg/repository/npm/@noriskclient/nrc-skin-renderer/-/nrc-skin-renderer-0.7.5.tgz#0fa4a1637aed84b8d8c2de2a0592723c14f4575b"
+  integrity sha512-b3OYEXc2l9piPh+4Uy1Fjr5kKuyM6bwQIJ21xQPOBErLTgyiP6XfspPn0rRNsqbXF3hAbDV7DnWej1FNARuwSQ==
 
 "@npmcli/agent@^3.0.0":
   version "3.0.0"
@@ -1306,21 +1299,6 @@
     fflate "~0.8.2"
     meshoptimizer "~0.18.1"
 
-"@types/three@^0.136.1":
-  version "0.136.1"
-  resolved "https://registry.npmjs.org/@types/three/-/three-0.136.1.tgz"
-  integrity sha512-gzTw6RR4dU8sGf+RpLBWWKHRVIJ4gwKVQPk+IFCgha04Efg/itXYUalX6iBcYeSmaDu0qE5M7uTq0XLQpU4FAg==
-
-"@types/three@^0.156.0":
-  version "0.156.0"
-  resolved "https://registry.npmjs.org/@types/three/-/three-0.156.0.tgz"
-  integrity sha512-733bXDSRdlrxqOmQuOmfC1UBRuJ2pREPk8sWnx9MtIJEVDQMx8U0NQO5MVVaOrjzDPyLI+cFPim2X/ss9v0+LQ==
-  dependencies:
-    "@types/stats.js" "*"
-    "@types/webxr" "*"
-    fflate "~0.6.10"
-    meshoptimizer "~0.18.1"
-
 "@types/trusted-types@^2.0.7":
   version "2.0.7"
   resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.7.tgz#baccb07a970b91707df3a3e8ba6896c57ead2d11"
@@ -1917,7 +1895,7 @@ fdir@^6.5.0:
   resolved "https://registry.yarnpkg.com/fdir/-/fdir-6.5.0.tgz#ed2ab967a331ade62f18d077dae192684d50d350"
   integrity sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==
 
-fflate@^0.6.9, fflate@~0.6.10:
+fflate@^0.6.9:
   version "0.6.10"
   resolved "https://registry.npmjs.org/fflate/-/fflate-0.6.10.tgz"
   integrity sha512-IQrh3lEPM93wVCEczc9SaAOvkmcoQn/G8Bo1e8ZPlY3X3bnAxWaBdvTdvM1hP62iZp0BXWDy4vTAy4fF0+Dlpg==
@@ -4140,36 +4118,6 @@ sigstore@^3.0.0:
     "@sigstore/tuf" "^3.1.0"
     "@sigstore/verify" "^2.1.0"
 
-skinview-utils@^0.6.2:
-  version "0.6.2"
-  resolved "https://registry.npmjs.org/skinview-utils/-/skinview-utils-0.6.2.tgz"
-  integrity sha512-UdjWwXCVZobtG+dc7ilvMRbtXYSqPJtWKPFdgWc44Gs4aoOmZML2lErr77h7uussXo9zrcR+fPizGshGpdETvQ==
-  dependencies:
-    "@types/offscreencanvas" "^2019.6.4"
-
-skinview-utils@^0.7.1:
-  version "0.7.1"
-  resolved "https://registry.npmjs.org/skinview-utils/-/skinview-utils-0.7.1.tgz"
-  integrity sha512-4eLrMqR526ehlZbsd8SuZ/CHpS9GiH0xUMoV+PYlJVi95ZFz5HJu7Spt5XYa72DRS7wgt5qquvHZf0XZJgmu9Q==
-
-skinview3d@^2.0.3:
-  version "2.2.1"
-  resolved "https://registry.npmjs.org/skinview3d/-/skinview3d-2.2.1.tgz"
-  integrity sha512-VOzB2jcsXWTmyEqE6nIXhECg1+29ZcZjP0tw9mFIGN9Y4P/hDlAt2ev7NT7J0Sqgei5UJenkorW24VDZHCepKw==
-  dependencies:
-    "@types/three" "^0.136.1"
-    skinview-utils "^0.6.2"
-    three "^0.136.0"
-
-skinview3d@^3.2.0:
-  version "3.4.1"
-  resolved "https://registry.npmjs.org/skinview3d/-/skinview3d-3.4.1.tgz"
-  integrity sha512-WVN1selfDSAoQB7msLs3ueJjW/pge3nsmbqxJeXPnN/qIJ1GJKpMZO8mavSvMojaMrmpSgOJWfYUkK9B34ts2g==
-  dependencies:
-    "@types/three" "^0.156.0"
-    skinview-utils "^0.7.1"
-    three "^0.156.0"
-
 smart-buffer@^4.2.0:
   version "4.2.0"
   resolved "https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz"
@@ -4465,16 +4413,6 @@ three@0.176.0:
   version "0.176.0"
   resolved "https://registry.npmjs.org/three/-/three-0.176.0.tgz"
   integrity sha512-PWRKYWQo23ojf9oZSlRGH8K09q7nRSWx6LY/HF/UUrMdYgN9i1e2OwJYHoQjwc6HF/4lvvYLC5YC1X8UJL2ZpA==
-
-three@^0.136.0:
-  version "0.136.0"
-  resolved "https://registry.npmjs.org/three/-/three-0.136.0.tgz"
-  integrity sha512-+fEMX7nYLz2ZesVP/dyifli5Jf8gR3XPAnFJveQ80aMhibFduzrADnjMbARXh8+W9qLK7rshJCjAIL/6cDxC+A==
-
-three@^0.156.0:
-  version "0.156.1"
-  resolved "https://registry.npmjs.org/three/-/three-0.156.1.tgz"
-  integrity sha512-kP7H0FK9d/k6t/XvQ9FO6i+QrePoDcNhwl0I02+wmUJRNSLCUIDMcfObnzQvxb37/0Uc9TDT0T1HgsRRrO6SYQ==
 
 three@^0.170.0:
   version "0.170.0"

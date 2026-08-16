@@ -381,6 +381,14 @@ async fn main() {
                     utils::trash_utils::reap_temp_profiles().await;
                 });
 
+                tauri::async_runtime::spawn(async {
+                    if let Err(e) =
+                        commands::skin_render_command::prune_skin_renders(30).await
+                    {
+                        log::warn!("Failed to prune skin renders: {}", e);
+                    }
+                });
+
                 // Issue #130: recover disk from pre-fix runaway logs.
                 tauri::async_runtime::spawn(async {
                     utils::log_archive::cleanup_oversized_logs().await;
@@ -684,8 +692,9 @@ async fn main() {
             get_local_content,
             install_local_content_to_profile,
             switch_content_version,
-            commands::minecraft_command::get_starlight_skin_render,
             commands::minecraft_command::get_face_avatar,
+            commands::skin_render_command::get_cached_skin_render,
+            commands::skin_render_command::store_skin_render,
             commands::applixir_command::applixir_show_ad,
             commands::applixir_command::applixir_mint_session,
             commands::applixir_command::get_afkpoints_balance,

@@ -6,7 +6,6 @@ import type {
     MinecraftSkin,
     SkinVariant,
     AddLocalSkinCommandPayload,
-    GetStarlightSkinRenderPayload, // Added new payload type
     SkinSourceDetails, // Keep this for internal construction
     ActiveSkin // Local source of truth for the active account's applied skin
 } from "../types/localSkin"; // Relative path
@@ -163,16 +162,6 @@ export class MinecraftSkinService {
         return await invoke<string>("get_base64_from_skin_source_command", { source });
     }
 
-    /**
-     * Fetches a cached skin render from the Starlight API via the backend.
-     * The backend handles caching and potential background updates.
-     * @param payload - The parameters for the skin render.
-     * @returns A promise resolving to the local file path (string) of the cached rendered skin image.
-     */
-    static async getStarlightSkinRender(payload: GetStarlightSkinRenderPayload): Promise<string> {
-        // The Rust command returns a PathBuf, which will be serialized as a string (the path).
-        return await invoke<string>("get_starlight_skin_render", { payload });
-    }
 
     /**
      * Fetches a cached avatar from the Crafatar API via the backend.
