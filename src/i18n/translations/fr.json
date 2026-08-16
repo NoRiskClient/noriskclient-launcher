@@ -839,12 +839,10 @@
   "server.stop": "Arrêter",
   "server.join": "Rejoindre",
   "server.mods": "Mods",
-
   "wm.public_viewing": "Public Viewing Coupe du Monde",
   "wm.tooltip": "Public viewing de la Coupe du Monde sur HugoSMP.net ! Tu as besoin de la {{version}} !",
   "wm.switch_to_main": "revenir au lancement principal",
   "wm.switch_to_hugo": "Passer à {{server}}",
-
   "radius.title": "Rayon des Bordures",
   "radius.square": "Carré",
   "radius.minimal": "Minimal",
@@ -925,7 +923,6 @@
   "content.item_not_found": "Élément non trouvé.",
   "content.badge.crashes_with_nrc": "Crash avec NRC",
   "content.update_check_error": "Erreur de Vérification de Mise à Jour: {{error}}",
-
   "content.update.available": "Mise à jour disponible",
   "content.update.ready_title": "Prêt à mettre à jour",
   "content.update.ready_desc": "Ce mod autonome peut être mis à jour automatiquement.",
@@ -1121,7 +1118,7 @@
   "screenshots.copy_failed": "Échec de la copie de l'image: {{error}}",
   "screenshots.deleting": "Suppression de {{name}}...",
   "screenshots.deleted": "Capture \"{{name}}\" supprimée.",
-  "screenshots.delete_failed": "Échec de la suppression: {{error}}",
+  "screenshots.delete_failed": "Échec de la suppression : {{error}}",
   "dragdrop.already_importing": "Ce fichier est déjà en cours d'importation.",
   "dragdrop.importing": "Importation de {{fileName}}",
   "dragdrop.import_success": "Importation du profil initiée pour {{fileName}}. Ouverture du profil...",
@@ -1553,7 +1550,6 @@
   "placeholders.profile_name_awesome": "Mon Super Profil",
   "placeholders.group_name": "ex. modpacks, vanilla+",
   "referral.loading": "Chargement du parrainage...",
-
   "rollout.popover.title": "Tu testes la nouvelle version NRC",
   "rollout.popover.title_opted_out": "Tests désactivés",
   "rollout.popover.body_intro_before": "Tu fais partie des",
@@ -2071,7 +2067,6 @@
   "settings.ads.reset_consent.button": "Réinitialiser",
   "settings.font.title": "Police",
   "settings.font.description": "Choisissez la police utilisée dans tout le launcher",
-
   "modrinth.quick_profile.install_prefix": "Installer ",
   "modrinth.quick_profile.install_suffix": " comme nouveau profil",
   "modrinth.quick_profile.copy_prefix": "Copier un profil existant et installer ",
@@ -2081,5 +2076,21 @@
   "modrinth.quick_profile.selected_profile": "profil sélectionné",
   "modrinth.quick_profile.clear_source": "Annuler la sélection du profil source",
   "modrinth.quick_profile.copy_from_existing": "Copier les paramètres d'un profil existant",
-  "modrinth.quick_profile.name_label": "Nom du nouveau profil"
+  "modrinth.quick_profile.name_label": "Nom du nouveau profil",
+  "capes.stealCape": "Voler la cape",
+  "capes.stealCapeDescription": "Entrez le pseudo du joueur à qui vous voulez voler la cape.",
+  "capes.stealCapeNotFound": "Cape introuvable pour ce joueur",
+  "capes.stealCapeNoCapeEquipped": "Ce joueur n'a pas de cape équipée",
+  "capes.stealCapeError": "Échec du vol de la cape",
+  "capes.stealCapeSuccess": "Cape volée avec succès !",
+  "capes.steal": "Voler",
+  "capes.usernamePlaceholder": "Nom d'utilisateur",
+  "capes.recentCapes": "Capes récentes",
+  "capes.removeFromRecents": "Supprimer de l'historique",
+  "nav.screenshots": "IMAGES",
+  "nav.all": "Tous les profils",
+  "screenshots.set_background": "Définir comme fond d'écran du lanceur",
+  "settings.custom_background.set_success": "Fond d'écran personnalisé défini avec succès !",
+  "screenshots.replace_background_title": "Remplacer le fond d'écran ?",
+  "screenshots.replace_background_desc": "Vous avez déjà défini un fond d'écran. Voulez-vous le remplacer par cette capture ?"
 }

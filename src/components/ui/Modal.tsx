@@ -169,13 +169,13 @@ export function Modal({
             {headerActions}
             <IconButton
               ref={closeButtonRef}
-              icon={<Icon icon="solar:close-circle-bold" />}
+              icon={<Icon icon="solar:close-circle-bold" className="w-5 h-5" />}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose();
               }}
               variant="ghost"
-              size="sm"
+              size="md"
               aria-label={t('common.close_modal')}
             />
           </div>

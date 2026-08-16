@@ -959,12 +959,10 @@
   "server.stop": "Стоп",
   "server.join": "Войти",
   "server.mods": "Моды",
-
   "wm.public_viewing": "Просмотр ЧМ",
   "wm.tooltip": "Совместный просмотр ЧМ на HugoSMP.net! Нужна {{version}}!",
   "wm.switch_to_main": "вернуться к обычному запуску",
   "wm.switch_to_hugo": "Переключиться на {{server}}",
-
   "radius.title": "Радиус скругления",
   "radius.square": "Квадратный",
   "radius.minimal": "Минимальный",
@@ -1045,7 +1043,6 @@
   "content.item_not_found": "Элемент не найден.",
   "content.badge.crashes_with_nrc": "Вылетает с NRC",
   "content.update_check_error": "Ошибка проверки обновлений: {{error}}",
-
   "content.update.available": "Доступно обновление",
   "content.update.ready_title": "Готово к обновлению",
   "content.update.ready_desc": "Этот отдельный мод можно обновить автоматически.",
@@ -1245,7 +1242,7 @@
   "screenshots.copy_success": "Изображение скриншота скопировано в буфер обмена!",
   "screenshots.copy_failed": "Не удалось скопировать изображение: {{error}}",
   "screenshots.deleting": "Удаление {{name}}...",
-  "screenshots.deleted": "Скриншот \"{{name}}\" удалён.",
+  "screenshots.deleted": "Скриншот \"{{name}}\" удален.",
   "screenshots.delete_failed": "Не удалось удалить: {{error}}",
   "screenshots.loading": "Загрузка скриншотов...",
   "screenshots.search_placeholder": "Поиск скриншотов...",
@@ -1750,7 +1747,6 @@
   "placeholders.profile_name_awesome": "Мой крутой профиль",
   "placeholders.group_name": "например, модпаки, ванилла+",
   "referral.loading": "Загрузка реферала...",
-
   "rollout.popover.title": "Вы тестируете новую версию NRC",
   "rollout.popover.title_opted_out": "Тестирование отключено",
   "rollout.popover.body_intro_before": "Вы один из",
@@ -2071,7 +2067,6 @@
   "settings.ads.reset_consent.button": "Сбросить",
   "settings.font.title": "Шрифт",
   "settings.font.description": "Выберите шрифт для всего лаунчера",
-
   "modrinth.quick_profile.install_prefix": "Установить ",
   "modrinth.quick_profile.install_suffix": " как новый профиль",
   "modrinth.quick_profile.copy_prefix": "Скопировать существующий профиль и установить ",
@@ -2081,5 +2076,21 @@
   "modrinth.quick_profile.selected_profile": "выбранного профиля",
   "modrinth.quick_profile.clear_source": "Сбросить выбор исходного профиля",
   "modrinth.quick_profile.copy_from_existing": "Скопировать настройки существующего профиля",
-  "modrinth.quick_profile.name_label": "Имя нового профиля"
+  "modrinth.quick_profile.name_label": "Имя нового профиля",
+  "capes.stealCape": "Украсть плащ",
+  "capes.stealCapeDescription": "Введите имя игрока, у которого хотите украсть плащ.",
+  "capes.stealCapeNotFound": "Плащ не найден для этого игрока",
+  "capes.stealCapeNoCapeEquipped": "У этого игрока нет надетого плаща",
+  "capes.stealCapeError": "Не удалось украсть плащ",
+  "capes.stealCapeSuccess": "Плащ успешно украден!",
+  "capes.steal": "Украсть",
+  "capes.usernamePlaceholder": "Имя пользователя",
+  "capes.recentCapes": "Недавние плащи",
+  "capes.removeFromRecents": "Удалить из недавних",
+  "nav.screenshots": "ИЗОБРАЖЕНИЯ",
+  "nav.all": "Все профили",
+  "screenshots.set_background": "Установить как фон лаунчера",
+  "settings.custom_background.set_success": "Пользовательский фон успешно установлен!",
+  "screenshots.replace_background_title": "Заменить фон?",
+  "screenshots.replace_background_desc": "У вас уже установлен фон. Хотите заменить его этим скриншотом?"
 }

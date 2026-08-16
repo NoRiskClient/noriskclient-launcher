@@ -113,7 +113,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
         <span className="relative z-10 flex flex-col items-center justify-center gap-1">
           <span className="flex items-center justify-center w-8 h-8">{icon}</span>
           {label && (
-            <span className="font-smallcaps text-xs leading-tight text-center whitespace-nowrap [text-shadow:none]">
+            <span className="font-smallcaps text-[10px] tracking-tight leading-tight text-center whitespace-nowrap overflow-hidden text-ellipsis w-full px-1 [text-shadow:none]">
               {label}
             </span>
           )}
