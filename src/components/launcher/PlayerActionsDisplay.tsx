@@ -113,7 +113,7 @@ export function PlayerActionsDisplay({
   const dropShadowX = '2px';
   const dropShadowY = '4px';
   const dropShadowBlur = '6px';
-  const commonDropShadowStyle = `drop-shadow(${dropShadowX} ${dropShadowY} ${dropShadowBlur} ${accentColor.value})`;
+  const commonDropShadowStyle = `drop-shadow(${dropShadowX} ${dropShadowY} ${dropShadowBlur} ${accentColor.textValue || accentColor.value})`;
   
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
 

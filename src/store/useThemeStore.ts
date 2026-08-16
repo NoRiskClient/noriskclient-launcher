@@ -5,6 +5,8 @@ import { ModPlatform } from "../types/unified";
 import type { SupportedLanguage } from "../i18n";
 
 export type AccentColor = {
+  borderValue?: string;
+  textValue?: string;
   name: string;
   value: string;
   hoverValue: string;
@@ -190,10 +192,25 @@ const calculateColorVariants = (baseColor: string): Partial<AccentColor> => {
     return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
   };
 
+  let adjustedBaseColor = baseColor;
+  let isDark = false;
+  const rgb = hexToRgb(baseColor);
+  if (rgb) {
+    const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    if (brightness < 40) {
+      adjustedBaseColor = "#ffffff";
+      isDark = true;
+    } else if (brightness < 80) {
+      adjustedBaseColor = lighten(baseColor, 0.4);
+    }
+  }
+
   return {
     value: baseColor,
+    textValue: adjustedBaseColor,
+    borderValue: isDark ? "#333333" : adjustedBaseColor,
     hoverValue: darken(baseColor, 0.1),
-    shadowValue: calculateShadow(baseColor),
+    shadowValue: calculateShadow(isDark ? "#333333" : adjustedBaseColor),
     light: lighten(baseColor, 0.2),
     dark: darken(baseColor, 0.2),
     isCustom: true,

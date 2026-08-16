@@ -62,12 +62,12 @@ export function SettingsSection({
             <Icon
               icon={icon}
               className="w-6 h-6 flex-shrink-0"
-              style={{ color: accentColor.value }}
+              style={{ color: accentColor.textValue || accentColor.value }}
             />
           )}
           <h3
             className="font-smallcaps text-lg leading-none tracking-wide"
-            style={{ color: accentColor.value }}
+            style={{ color: accentColor.textValue || accentColor.value }}
           >
             {title}
           </h3>

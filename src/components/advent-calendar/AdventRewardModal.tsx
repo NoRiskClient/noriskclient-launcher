@@ -69,7 +69,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-24 h-24 rounded-lg flex items-center justify-center border-2 overflow-hidden"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                borderColor: accentColor.value,
+                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
               }}
             >
               <img
@@ -123,13 +123,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-24 h-24 rounded-lg flex items-center justify-center border-2"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                borderColor: accentColor.value,
+                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
               }}
             >
               <Icon
                 icon="solar:gift-bold"
                 className="w-16 h-16"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
             </div>
             <div className="text-center">
@@ -152,13 +152,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-24 h-24 rounded-lg flex items-center justify-center border-2"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                borderColor: accentColor.value,
+                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
               }}
             >
               <Icon
                 icon="solar:tag-price-bold"
                 className="w-16 h-16"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
             </div>
             <div className="text-center">
@@ -182,13 +182,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-24 h-24 rounded-lg flex items-center justify-center border-2"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                borderColor: accentColor.value,
+                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
               }}
             >
               <Icon
                 icon="solar:star-bold"
                 className="w-16 h-16"
-                style={{ color: accentColor.value }}
+                style={{ color: accentColor.textValue || accentColor.value }}
               />
             </div>
             <div className="text-center">
@@ -213,7 +213,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
               className="w-full h-64 rounded-lg flex items-center justify-center border-2 overflow-hidden relative"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                borderColor: accentColor.value,
+                borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
                 minHeight: '256px',
               }}
             >
@@ -235,7 +235,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
                 <Icon
                   icon="solar:palette-bold"
                   className="w-16 h-16"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               )}
             </div>
@@ -259,7 +259,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             <Icon
               icon="solar:gift-bold"
               className="w-16 h-16"
-              style={{ color: accentColor.value }}
+              style={{ color: accentColor.textValue || accentColor.value }}
             />
             <p className="font-minecraft text-xl text-white">{t('advent.unknown_reward')}</p>
           </div>
@@ -428,7 +428,7 @@ export function AdventRewardModal({
         <Icon
           icon="solar:gift-bold"
           className="w-6 h-6"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         />
       }
       onClose={onClose}

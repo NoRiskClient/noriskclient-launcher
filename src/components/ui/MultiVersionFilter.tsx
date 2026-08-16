@@ -53,7 +53,7 @@ export function MultiVersionFilter({
           isSm ? "text-sm" : "text-xl"
         }`}
         style={{
-          boxShadow: isOpen ? `0 0 0 1px ${accentColor.value}40` : "none",
+          boxShadow: isOpen ? `0 0 0 1px ${accentColor.borderValue || accentColor.textValue || accentColor.value}40` : "none",
           backgroundColor: isActive ? `${accentColor.value}15` : "transparent",
         }}
         onMouseEnter={(e) => {
@@ -69,12 +69,12 @@ export function MultiVersionFilter({
         <Icon
           icon="solar:gamepad-bold"
           className="w-4 h-4"
-          style={{ color: isActive ? accentColor.value : "rgba(255, 255, 255, 0.7)" }}
+          style={{ color: isActive ? (accentColor.textValue || accentColor.value) : "rgba(255, 255, 255, 0.7)" }}
         />
         {isActive && (
           <span
             className="min-w-[1rem] text-center text-xs font-minecraft rounded-full px-1"
-            style={{ backgroundColor: `${accentColor.value}30`, color: accentColor.value }}
+            style={{ backgroundColor: `${accentColor.value}30`, color: accentColor.borderValue || accentColor.textValue || accentColor.value }}
           >
             {selected.length}
           </span>
@@ -114,7 +114,7 @@ export function MultiVersionFilter({
                   <span
                     className="w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0"
                     style={{
-                      borderColor: checked ? accentColor.value : "rgba(255,255,255,0.3)",
+                      borderColor: checked ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : "rgba(255,255,255,0.3)",
                       backgroundColor: checked ? accentColor.value : "transparent",
                     }}
                   >

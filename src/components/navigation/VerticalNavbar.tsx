@@ -150,7 +150,7 @@ export function VerticalNavbar({
           backgroundColor: `rgba(${parseInt(accentColor.value.slice(1, 3), 16)}, ${parseInt(accentColor.value.slice(3, 5), 16)}, ${parseInt(accentColor.value.slice(5, 7), 16)}, 0.4)`,
           borderRight: `2px solid ${accentColor.value}60`,
           borderLeft: `2px solid ${accentColor.value}60`,
-          boxShadow: `0 0 10px ${accentColor.value}30 inset`,
+          boxShadow: `0 0 10px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30 inset`,
         }}
       >        <div className="mb-12">
           <Logo size="sm" onClick={() => setShowCreditsModal(true)} />

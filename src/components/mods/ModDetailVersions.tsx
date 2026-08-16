@@ -415,7 +415,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
         className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
         style={{
           backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
         }}
       >
         <div className="flex flex-wrap gap-2 items-center">
@@ -461,7 +461,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
               className="flex-1 border rounded-md h-[40px] overflow-x-auto overflow-y-hidden whitespace-nowrap hide-scrollbar"
               style={{
                 backgroundColor: `${accentColor.value}08`,
-                borderColor: `${accentColor.value}30`,
+                borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
               }}
             >
               <div className="flex items-center gap-1.5 p-2">
@@ -543,8 +543,8 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
               className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft transition-colors"
               style={{
                 backgroundColor: `${accentColor.value}15`,
-                borderColor: `${accentColor.value}30`,
-                color: accentColor.value,
+                borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
+                color: accentColor.textValue || accentColor.value,
               }}
             >
               Load More ({filteredVersions.length - displayedCount} more)
@@ -555,8 +555,8 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
         <div
           className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border-2 border-b-4 backdrop-blur-md"
           style={{
-            borderColor: `${accentColor.value}60`,
-            borderBottomColor: accentColor.value,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
+            borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
             backgroundColor: `${accentColor.value}15`,
           }}
         >

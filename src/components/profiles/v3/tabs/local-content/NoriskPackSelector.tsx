@@ -99,10 +99,10 @@ export function NoriskPackSelector({ profile, onChanged }: NoriskPackSelectorPro
         onClick={() => setMenuOpen(v => !v)}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${accentColor.value}33`; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `${accentColor.value}1a`; }}
-        style={{ backgroundColor: `${accentColor.value}1a`, borderColor: `${accentColor.value}40` }}
+        style={{ backgroundColor: `${accentColor.value}1a`, borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40` }}
         className="h-8 px-2.5 rounded-md border text-xs font-minecraft text-white flex items-center gap-1.5 max-w-[220px] transition-colors"
       >
-        <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.value }} />
+        <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.textValue || accentColor.value }} />
         <span className="truncate">{selectedLabel}</span>
         <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 opacity-60 flex-shrink-0" />
       </button>

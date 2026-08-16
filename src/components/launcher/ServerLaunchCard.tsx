@@ -257,7 +257,7 @@ export function ServerLaunchCard({
           className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95"
           style={{
             backgroundColor: `${accentColor.value}25`,
-            border: `2px solid ${accentColor.value}50`,
+            border: `2px solid ${accentColor.textValue || accentColor.value}50`,
           }}
         >
           <Icon icon="solar:box-bold" className="w-4 h-4 text-white" />

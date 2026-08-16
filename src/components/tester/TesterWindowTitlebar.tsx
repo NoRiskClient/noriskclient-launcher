@@ -23,11 +23,11 @@ export function TesterWindowTitlebar({ remaining }: TesterWindowTitlebarProps) {
         <Icon
           icon="solar:test-tube-bold"
           className="w-4 h-4"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         />
         <span
           className="font-minecraft text-xs tracking-wider"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         >
           NoRisk Tester Queue
         </span>
@@ -36,8 +36,8 @@ export function TesterWindowTitlebar({ remaining }: TesterWindowTitlebarProps) {
             className="px-2 py-0.5 rounded font-minecraft text-[10px] tracking-wider"
             style={{
               background: `${accentColor.value}25`,
-              color: accentColor.value,
-              border: `1px solid ${accentColor.value}40`,
+              color: accentColor.textValue || accentColor.value,
+              border: `1px solid ${accentColor.textValue || accentColor.value}40`,
             }}
           >
             {remaining} pending

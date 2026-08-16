@@ -74,7 +74,7 @@ export function SettingsPanel() {
           <Icon
             icon="svg-spinners:ring-resize"
             className="w-6 h-6"
-            style={{ color: accentColor.value }}
+            style={{ color: accentColor.textValue || accentColor.value }}
           />
           <span className="text-white/60 text-xs">{t('common.loading')}</span>
         </div>
@@ -112,7 +112,7 @@ export function SettingsPanel() {
           className="p-1.5 rounded-lg transition-all duration-200"
           style={{
             backgroundColor: `${accentColor.value}20`,
-            color: accentColor.value,
+            color: accentColor.textValue || accentColor.value,
           }}
         >
           <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
@@ -124,7 +124,7 @@ export function SettingsPanel() {
           className="flex flex-col items-center p-5 rounded-xl"
           style={{
             backgroundColor: `${accentColor.value}15`,
-            border: `1px solid ${accentColor.value}40`,
+            border: `1px solid ${accentColor.textValue || accentColor.value}40`,
           }}
         >
           <div className="relative mb-3">
@@ -134,8 +134,8 @@ export function SettingsPanel() {
                 alt={currentUser.uuid}
                 className="w-16 h-16 rounded-xl"
                 style={{
-                  border: `3px solid ${accentColor.value}60`,
-                  boxShadow: `0 0 20px ${accentColor.value}30`,
+                  border: `3px solid ${accentColor.textValue || accentColor.value}60`,
+                  boxShadow: `0 0 20px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
                 }}
               />
             ) : (
@@ -143,13 +143,13 @@ export function SettingsPanel() {
                 className="w-16 h-16 rounded-xl flex items-center justify-center"
                 style={{
                   backgroundColor: `${accentColor.value}30`,
-                  border: `3px solid ${accentColor.value}60`,
+                  border: `3px solid ${accentColor.textValue || accentColor.value}60`,
                 }}
               >
                 <Icon
                   icon="solar:user-bold"
                   className="w-8 h-8"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
               </div>
             )}
@@ -158,7 +158,7 @@ export function SettingsPanel() {
               style={{
                 backgroundColor: status.color,
                 boxShadow: status.glow,
-                borderColor: `${accentColor.value}40`,
+                borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`,
               }}
             />
           </div>

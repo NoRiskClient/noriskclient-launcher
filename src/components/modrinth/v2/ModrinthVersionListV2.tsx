@@ -295,7 +295,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
         className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
         style={{
           backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
         }}
       >
         <div className="flex flex-wrap gap-2 items-center">
@@ -386,7 +386,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
               className="flex-1 border rounded-md h-[48px] overflow-x-auto overflow-y-hidden whitespace-nowrap hide-scrollbar"
               style={{
                 backgroundColor: `${accentColor.value}08`,
-                borderColor: `${accentColor.value}30`,
+                borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
               }}
             >
               <div className="flex items-center gap-1.5 p-2">
@@ -525,8 +525,8 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
         <div
           className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border-2 border-b-4 backdrop-blur-md"
           style={{
-            borderColor: `${accentColor.value}60`,
-            borderBottomColor: accentColor.value,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
+            borderBottomColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
             boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`,
             backgroundColor: `${accentColor.value}15`,
           }}

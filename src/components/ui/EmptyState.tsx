@@ -107,7 +107,7 @@ export function EmptyState({
             compact ? "w-20 h-12" : "w-28 h-20",
             onIconClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
           )}
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
           onClick={onIconClick}
         >
           <Icon icon={icon} className={compact ? "w-12 h-12" : "w-20 h-20"} />

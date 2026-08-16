@@ -308,7 +308,7 @@ export function RangeSlider({
             )}
             style={{
               backgroundColor: `${accentColor.value}15`,
-              borderColor: `${accentColor.value}40`,
+              borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`,
             }}
             ref={trackRef}
           >
@@ -334,7 +334,7 @@ export function RangeSlider({
             )}
             style={{
               backgroundColor: `${accentColor.value}${isHovered || isDragging ? "90" : "80"}`,
-              borderColor: `${accentColor.value}`,
+              borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}`,
               left: `${getPercentage(localValue)}%`,
               transform: isDragging
                 ? "translate(-50%, -50%) scale(1.1)"

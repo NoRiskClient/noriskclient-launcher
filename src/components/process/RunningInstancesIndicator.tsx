@@ -222,7 +222,7 @@ export function RunningInstancesIndicator({
                               // backgroundColor: `${accentColor.value}30`, // Removed background
                               // borderWidth: "2px", // Removed border
                               // borderStyle: "solid", // Removed border
-                              // borderColor: `${accentColor.value}60`, // Removed border
+                              // borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`, // Removed border
                             }
                           }
                         >

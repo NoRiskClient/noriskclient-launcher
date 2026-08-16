@@ -73,7 +73,7 @@ export function CustomDropdown({
             : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
         }`}
         style={{
-          boxShadow: isOpen ? `0 0 0 1px ${accentColor.value}40` : 'none',
+          boxShadow: isOpen ? `0 0 0 1px ${accentColor.borderValue || accentColor.textValue || accentColor.value}40` : 'none',
           outline: 'none',
           border: label ? undefined : 'none',
         }}
@@ -142,7 +142,7 @@ export function CustomDropdown({
                       <Icon
                         icon="solar:check-circle-bold"
                         className="w-4 h-4"
-                        style={{ color: accentColor.value }}
+                        style={{ color: accentColor.textValue || accentColor.value }}
                       />
                     )}
                   </div>

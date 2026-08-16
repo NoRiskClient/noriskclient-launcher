@@ -366,7 +366,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
                   <Icon
                     icon={tab.icon}
                     className="w-6 h-6 transition-colors duration-200"
-                    style={{ color: isActive ? accentColor.value : undefined }}
+                    style={{ color: isActive ? (accentColor.textValue || accentColor.value) : undefined }}
                   />
                   <span
                     className={cn(

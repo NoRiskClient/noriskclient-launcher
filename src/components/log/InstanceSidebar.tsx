@@ -190,7 +190,7 @@ function InstanceItem({
             <Icon
               icon="mdi:minecraft"
               className="w-6 h-6"
-              style={{ color: accentColor.value }}
+              style={{ color: accentColor.textValue || accentColor.value }}
             />
           )}
         </div>
@@ -434,7 +434,7 @@ export function InstanceSidebar({
       <div className="px-4 py-3">
         <span
           className="font-minecraft text-sm tracking-wider flex items-center gap-2"
-          style={{ color: accentColor.value }}
+          style={{ color: accentColor.textValue || accentColor.value }}
         >
           <Icon icon="solar:monitor-bold" className="w-4 h-4" />
           {t('instances.title')}
@@ -610,7 +610,7 @@ export function InstanceSidebar({
               }}
               className="px-2 py-1.5 rounded text-xs font-minecraft bg-white/10 hover:bg-white/20 transition-colors"
               title={t('logs.pop_out')}
-              style={{ color: accentColor.value }}
+              style={{ color: accentColor.textValue || accentColor.value }}
             >
               <Icon icon="solar:square-arrow-right-up-bold" className="w-3.5 h-3.5" />
             </button>

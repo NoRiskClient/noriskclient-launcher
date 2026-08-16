@@ -566,14 +566,14 @@ export function LogViewerCore({
       {/* Log Header with Search & Filters */}
       <div
         className="px-4 py-3 flex items-center gap-4 rounded-lg bg-black/60 backdrop-blur-sm"
-        style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
+        style={{ boxShadow: `0 4px 20px ${accentColor.borderValue || accentColor.textValue || accentColor.value}15` }}
       >
         {/* Search Input */}
         <div
           className="flex items-center gap-2 px-3 py-1.5 rounded flex-1 min-w-[200px] max-w-[300px]"
           style={{
             backgroundColor: `${accentColor.value}15`,
-            border: `1px solid ${accentColor.value}30`,
+            border: `1px solid ${accentColor.textValue || accentColor.value}30`,
           }}
         >
           <Icon icon="solar:magnifer-bold" className="w-4 h-4 text-white/50" />
@@ -624,7 +624,7 @@ export function LogViewerCore({
             className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-minecraft transition-all max-w-[250px]"
             style={{
               backgroundColor: isFileDropdownOpen ? `${accentColor.value}25` : `${accentColor.value}15`,
-              border: `1px solid ${accentColor.value}30`,
+              border: `1px solid ${accentColor.textValue || accentColor.value}30`,
               color: "rgba(255,255,255,0.8)",
             }}
           >
@@ -662,7 +662,7 @@ export function LogViewerCore({
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
         className="flex-1 min-h-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
-        style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
+        style={{ boxShadow: `0 4px 20px ${accentColor.borderValue || accentColor.textValue || accentColor.value}15` }}
       >
         {filteredLogs.length === 0 ? (
           showNoLogs && showNoLogsMessage && (
@@ -692,7 +692,7 @@ export function LogViewerCore({
       {/* Status Bar */}
       <div
         className="px-4 py-2 flex items-center justify-between rounded-lg bg-black/60 backdrop-blur-sm"
-        style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
+        style={{ boxShadow: `0 4px 20px ${accentColor.borderValue || accentColor.textValue || accentColor.value}15` }}
       >
         <div className="flex items-center gap-4 text-white/50 font-minecraft text-xs">
           <span className="flex items-center gap-1.5">
@@ -718,7 +718,7 @@ export function LogViewerCore({
               className="flex items-center gap-1.5 hover:text-white/70 transition-colors px-2 py-0.5 rounded"
               style={{
                 backgroundColor: `${accentColor.value}20`,
-                color: accentColor.value
+                color: accentColor.textValue || accentColor.value
               }}
             >
               <Icon icon="solar:arrow-down-bold" className="w-4 h-4" />
@@ -774,8 +774,8 @@ export function LogViewerCore({
             top: settingsButtonRef.current.getBoundingClientRect().bottom + 8,
             right: window.innerWidth - settingsButtonRef.current.getBoundingClientRect().right,
             backgroundColor: "rgba(0, 0, 0, 0.95)",
-            borderColor: `${accentColor.value}40`,
-            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.value}20`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`,
+            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
             zIndex: 9999,
           }}
         >
@@ -821,8 +821,8 @@ export function LogViewerCore({
             top: fileDropdownButtonRef.current.getBoundingClientRect().bottom + 8,
             right: window.innerWidth - fileDropdownButtonRef.current.getBoundingClientRect().right,
             backgroundColor: "rgba(0, 0, 0, 0.95)",
-            borderColor: `${accentColor.value}40`,
-            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.value}20`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}40`,
+            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
             zIndex: 9999,
           }}
         >

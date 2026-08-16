@@ -92,19 +92,19 @@ export function ActionButton({
           className: `${baseClasses} text-white`,
           style: {
             backgroundColor: `${accentColor.value}20`,
-            borderColor: `${accentColor.value}60`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
             color: 'white',
           },
           onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
             if (!disabled) {
               e.currentTarget.style.backgroundColor = `${accentColor.value}30`;
-              e.currentTarget.style.borderColor = `${accentColor.value}80`;
+              e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`;
             }
           },
           onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
             if (!disabled) {
               e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-              e.currentTarget.style.borderColor = `${accentColor.value}60`;
+              e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`;
             }
           },
         };
@@ -154,19 +154,19 @@ export function ActionButton({
           style: {
             backgroundColor: 'transparent',
             border: 'none',
-            color: accentColor.value,
+            color: accentColor.textValue || accentColor.value,
           },
           onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
             if (!disabled) {
               e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-              e.currentTarget.style.color = accentColor.value;
-              e.currentTarget.style.textShadow = `0 0 8px ${accentColor.value}40`;
+              e.currentTarget.style.color = accentColor.textValue || accentColor.value;
+              e.currentTarget.style.textShadow = `0 0 8px ${accentColor.textValue || accentColor.value}40`;
             }
           },
           onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
             if (!disabled) {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = accentColor.value;
+              e.currentTarget.style.color = accentColor.textValue || accentColor.value;
               e.currentTarget.style.textShadow = 'none';
             }
           },

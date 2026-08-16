@@ -36,7 +36,7 @@ export function ProfileIconV2({
       className={`${sizeClasses[size]} rounded-lg border-2 flex items-center justify-center overflow-hidden ${className}`}
       style={{
         backgroundColor: `${accentColor.value}20`,
-        borderColor: `${accentColor.value}60`,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
       }}
     >
       <ProfileIcon

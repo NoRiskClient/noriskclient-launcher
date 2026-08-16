@@ -21,7 +21,7 @@ export function DropdownFooter({ className, children }: DropdownFooterProps) {
       )}
       style={{
         backgroundColor: `${accentColor.value}15`,
-        borderTopColor: `${accentColor.value}30`,
+        borderTopColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
       }}
     >
       {children}

@@ -290,7 +290,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs font-minecraft text-white truncate group-hover:text-accent transition-colors block">
+                  <span className="text-xs font-minecraft text-white truncate group-hover:text-accent-text transition-colors block">
                     {dep.title}
                   </span>
                   <span className={`text-[10px] font-minecraft ${
@@ -338,7 +338,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-minecraft text-white truncate group-hover:text-accent transition-colors">{member.username}</p>
+                  <p className="text-xs font-minecraft text-white truncate group-hover:text-accent-text transition-colors">{member.username}</p>
                   <p className="text-[10px] text-white/50 font-minecraft truncate">{member.role}</p>
                 </div>
                 <Icon
@@ -425,7 +425,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
               {project.license.url ? (
                 <button
                   onClick={handleOpenLicense}
-                  className="text-accent hover:text-accent/80 transition-colors text-left [overflow-wrap:anywhere] min-w-0"
+                  className="text-accent-text hover:text-accent-text/80 transition-colors text-left [overflow-wrap:anywhere] min-w-0"
                 >
                   {project.license.name}
                 </button>

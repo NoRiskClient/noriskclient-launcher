@@ -166,7 +166,7 @@ export function ToggleSwitch({
             borderBottomColor: checked
               ? accentColor.dark
               : `${accentColor.value}70`,
-            boxShadow: `inset 0 1px 0 ${accentColor.value}20`,
+            boxShadow: `inset 0 1px 0 ${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
           }}
         >
           <div

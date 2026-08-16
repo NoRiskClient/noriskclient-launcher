@@ -308,7 +308,7 @@ export function IrisRequiredModal({
   return (
     <Modal
       title={t('iris.shader_pack_setup')}
-      titleIcon={<Icon icon="solar:eye-bold" className="w-6 h-6" style={{ color: accentColor.value }} />}
+      titleIcon={<Icon icon="solar:eye-bold" className="w-6 h-6" style={{ color: accentColor.textValue || accentColor.value }} />}
       onClose={onClose}
       width="md"
       footer={modalFooter}

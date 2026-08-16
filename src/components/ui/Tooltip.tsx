@@ -158,7 +158,7 @@ export function Tooltip({
             transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
             textAlign: isStatic ? 'center' : undefined,
             backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
-            borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`, // Wie ProfileIconV2
             maxWidth: '300px', // Kompakt für kürzere Texte
             wordWrap: 'break-word', // Automatischer Wortumbruch
           }}

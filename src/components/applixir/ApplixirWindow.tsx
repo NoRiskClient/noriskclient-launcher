@@ -112,14 +112,14 @@ function Titlebar({
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-b-2 backdrop-blur-md transition-all duration-200 hover:brightness-110"
             style={{
               backgroundColor: `${accentColor.value}30`,
-              borderColor: `${accentColor.value}80`,
+              borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
               borderBottomColor: accentColor.dark,
             }}
           >
             <Icon
               icon="solar:bolt-circle-bold"
               className="w-4 h-4"
-              style={{ color: accentColor.value, filter: `drop-shadow(0 0 4px ${accentColor.shadowValue})` }}
+              style={{ color: accentColor.borderValue || accentColor.textValue || accentColor.value, filter: `drop-shadow(0 0 4px ${accentColor.shadowValue})` }}
             />
             <span
               className="font-minecraft text-xs"
@@ -281,13 +281,13 @@ function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
           icon="solar:fire-bold"
           className="w-4 h-4"
           style={{
-            color: active ? accentColor.value : accentColor.dark,
+            color: active ? (accentColor.textValue || accentColor.value) : accentColor.dark,
             filter: active ? `drop-shadow(0 0 5px ${accentColor.shadowValue})` : undefined,
           }}
         />
         <span
           className="font-minecraft text-xs tracking-wider whitespace-nowrap"
-          style={{ color: active ? accentColor.value : accentColor.dark }}
+          style={{ color: active ? (accentColor.textValue || accentColor.value) : accentColor.dark }}
         >
           {days} {t("applixir.window.streak_days")}
         </span>
@@ -325,7 +325,7 @@ function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
                   icon={icon}
                   className={`${isToday ? "w-6 h-6" : "w-5 h-5"}${isToday ? " animate-pulse" : ""}`}
                   style={{
-                    color: on ? accentColor.value : accentColor.dark,
+                    color: on ? (accentColor.textValue || accentColor.value) : accentColor.dark,
                     filter: on ? `drop-shadow(0 0 5px ${accentColor.shadowValue})` : undefined,
                     opacity: on ? 1 : 0.55,
                   }}
@@ -372,13 +372,13 @@ function DailyClaimPanel({ claimState }: { claimState: DailyClaim }) {
     return (
       <div
         className="flex flex-col gap-1.5 px-3 py-3 rounded-lg border"
-        style={{ borderColor: `${accentColor.value}45`, backgroundColor: `${accentColor.value}12` }}
+        style={{ borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}45`, backgroundColor: `${accentColor.value}12` }}
       >
         <div className="flex items-center gap-2">
           <Icon
             icon="solar:check-circle-bold"
             className="w-4 h-4"
-            style={{ color: accentColor.value, filter: `drop-shadow(0 0 3px ${accentColor.shadowValue})` }}
+            style={{ color: accentColor.borderValue || accentColor.textValue || accentColor.value, filter: `drop-shadow(0 0 3px ${accentColor.shadowValue})` }}
           />
           <span
             className="font-smallcaps text-sm tracking-wider"
@@ -407,7 +407,7 @@ function DailyClaimPanel({ claimState }: { claimState: DailyClaim }) {
         <Icon
           icon="solar:gift-bold"
           className="w-5 h-5"
-          style={{ color: accentColor.value, filter: `drop-shadow(0 0 5px ${accentColor.shadowValue})` }}
+          style={{ color: accentColor.borderValue || accentColor.textValue || accentColor.value, filter: `drop-shadow(0 0 5px ${accentColor.shadowValue})` }}
         />
       )}
       <span style={{ transform: "translateY(-1px)" }}>
@@ -426,14 +426,14 @@ function RewardPop({ points, balance }: { points: number; balance: number }) {
         className="animate-slide-up-fade-in flex items-center gap-2 px-4 py-2 rounded-lg backdrop-blur-md"
         style={{
           background: `linear-gradient(135deg, ${accentColor.value}40, rgba(0,0,0,0.6))`,
-          border: `1px solid ${accentColor.value}`,
+          border: `1px solid ${accentColor.textValue || accentColor.value}`,
           boxShadow: `0 0 18px ${accentColor.shadowValue}`,
         }}
       >
-        <Icon icon="solar:bolt-circle-bold" className="w-5 h-5" style={{ color: accentColor.value }} />
+        <Icon icon="solar:bolt-circle-bold" className="w-5 h-5" style={{ color: accentColor.textValue || accentColor.value }} />
         <span
           className="font-smallcaps text-base leading-none"
-          style={{ color: accentColor.value, transform: "translateY(-2px)" }}
+          style={{ color: accentColor.textValue || accentColor.value, transform: "translateY(-2px)" }}
         >
           +{points} {t("applixir.window.afk_points")}
         </span>
@@ -479,7 +479,7 @@ function Sidebar({ state, claimState }: { state: AdState; claimState: DailyClaim
       className="w-72 shrink-0 bg-black/10 backdrop-blur-lg p-5 flex flex-col gap-5 overflow-y-auto"
       style={{
         borderLeft: `2px solid ${accentColor.value}60`,
-        boxShadow: `0 0 15px ${accentColor.value}30 inset`,
+        boxShadow: `0 0 15px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30 inset`,
       }}
     >
       <div className="flex flex-col gap-2">
@@ -490,7 +490,7 @@ function Sidebar({ state, claimState }: { state: AdState; claimState: DailyClaim
           className="flex items-center gap-3 px-3 py-2 rounded-lg"
           style={{
             background: `${accentColor.value}15`,
-            border: `1px solid ${accentColor.value}30`,
+            border: `1px solid ${accentColor.textValue || accentColor.value}30`,
           }}
         >
           <Icon
@@ -676,8 +676,8 @@ export function ApplixirWindow() {
       style={{
         backgroundColor: bgColor,
         backgroundImage: `linear-gradient(to bottom right, ${bgColor}, rgba(0,0,0,0.9))`,
-        borderColor: `${accentColor.value}30`,
-        boxShadow: `0 0 15px ${accentColor.value}30, inset 0 0 10px ${accentColor.value}20`,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
+        boxShadow: `0 0 15px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30, inset 0 0 10px ${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
       }}
     >
       <BorderGlowEffects accent={accentColor.value} />
@@ -711,14 +711,14 @@ export function ApplixirWindow() {
             {state === "loading" && (
               <Overlay
                 icon="svg-spinners:ring-resize"
-                color={accentColor.value}
+                color={accentColor.textValue || accentColor.value}
                 text={t("applixir.window.loading")}
               />
             )}
             {state === "completed" && (
               <Overlay
                 icon="solar:check-circle-bold"
-                color={accentColor.value}
+                color={accentColor.textValue || accentColor.value}
                 text={t("applixir.completed")}
                 action={{ label: t("applixir.window.watch_another"), onClick: watchAnother, disabled: busy }}
               />
@@ -726,7 +726,7 @@ export function ApplixirWindow() {
             {state === "finished" && (
               <Overlay
                 icon="solar:info-circle-bold"
-                color={accentColor.value}
+                color={accentColor.textValue || accentColor.value}
                 text={t("applixir.window.no_ad")}
                 action={{ label: t("applixir.window.try_again"), onClick: watchAnother, disabled: busy }}
               />

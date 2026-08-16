@@ -181,7 +181,7 @@ const SkinPreview = memo(
                 <Icon
                   icon="svg-spinners:ring-resize"
                   className="w-8 h-8 mb-1"
-                  style={{ color: accentColor.value }}
+                  style={{ color: accentColor.textValue || accentColor.value }}
                 />
                 <span className="font-smallcaps text-xs text-white">
                   {t('skins.applying')}
@@ -280,7 +280,7 @@ const AddSkinCard = memo(
               <Icon
                 icon="solar:add-circle-bold"
                 className="w-12 h-12 text-white/70 hover:text-white transition-colors"
-                style={{ color: isHovered ? accentColor.value : undefined }}
+                style={{ color: isHovered ? (accentColor.textValue || accentColor.value) : undefined }}
               />
             </div>
           </div>

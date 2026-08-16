@@ -820,8 +820,8 @@ export function CapeBrowser(): JSX.Element {
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
                   }`}
                   style={{
-                    backgroundColor: (!filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.value}20` : undefined,
-                    borderColor: (!filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
+                    backgroundColor: (!filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.borderValue || accentColor.textValue || accentColor.value}20` : undefined,
+                    borderColor: (!filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : undefined,
                   }}
                 >
                   <span className="lowercase">{t('capes.all')}</span>
@@ -848,8 +848,8 @@ export function CapeBrowser(): JSX.Element {
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
                   } ${!activeAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{
-                    backgroundColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.value}20` : undefined,
-                    borderColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
+                    backgroundColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.borderValue || accentColor.textValue || accentColor.value}20` : undefined,
+                    borderColor: (filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly) ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : undefined,
                   }}
                   title={!activeAccount ? t('capes.noActiveAccount') : undefined}
                 >
@@ -869,8 +869,8 @@ export function CapeBrowser(): JSX.Element {
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
                   }`}
                   style={{
-                    backgroundColor: (filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.value}20` : undefined,
-                    borderColor: (filters.showFavoritesOnly && !filters.showVanillaOnly) ? accentColor.value : undefined,
+                    backgroundColor: (filters.showFavoritesOnly && !filters.showVanillaOnly) ? `${accentColor.borderValue || accentColor.textValue || accentColor.value}20` : undefined,
+                    borderColor: (filters.showFavoritesOnly && !filters.showVanillaOnly) ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : undefined,
                   }}
                 >
                   <span className="lowercase">{t('capes.favorites')}</span>
@@ -891,8 +891,8 @@ export function CapeBrowser(): JSX.Element {
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
                   } ${!activeAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{
-                    backgroundColor: filters.showVanillaOnly ? `${accentColor.value}20` : undefined,
-                    borderColor: filters.showVanillaOnly ? accentColor.value : undefined,
+                    backgroundColor: filters.showVanillaOnly ? `${accentColor.borderValue || accentColor.textValue || accentColor.value}20` : undefined,
+                    borderColor: filters.showVanillaOnly ? (accentColor.borderValue || accentColor.textValue || accentColor.value) : undefined,
                   }}
                   title={!activeAccount ? t('capes.noActiveAccount') : undefined}
                 >

@@ -157,7 +157,7 @@ export default function EffectPreviewCard({
           <Icon
             icon="solar:check-circle-bold"
             className="w-5 h-5"
-            style={{ color: accentColor.value }}
+            style={{ color: accentColor.textValue || accentColor.value }}
           />
         </div>
       )}

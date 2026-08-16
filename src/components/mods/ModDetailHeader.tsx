@@ -417,7 +417,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       <div
         className="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-lg overflow-hidden border self-center sm:self-start"
         style={{
-          borderColor: `${accentColor.value}30`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
           backgroundColor: `${accentColor.value}10`,
         }}
       >
@@ -441,7 +441,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           <div>
             <button
               onClick={handleOpenProjectPage}
-              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
+              className="text-2xl font-minecraft text-white leading-tight hover:text-accent-text hover:underline transition-colors text-left"
             >
               {project.title}
             </button>

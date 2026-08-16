@@ -89,19 +89,19 @@ export function CheckboxV2({
         className: `${baseClasses} text-white`,
         style: {
           backgroundColor: `${accentColor.value}50`,
-          borderColor: `${accentColor.value}90`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}90`,
           color: 'white',
         },
         onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
           if (!disabled) {
             e.currentTarget.style.backgroundColor = `${accentColor.value}60`;
-            e.currentTarget.style.borderColor = `${accentColor.value}`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}`;
           }
         },
         onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
           if (!disabled) {
             e.currentTarget.style.backgroundColor = `${accentColor.value}50`;
-            e.currentTarget.style.borderColor = `${accentColor.value}90`;
+            e.currentTarget.style.borderColor = `${accentColor.borderValue || accentColor.textValue || accentColor.value}90`;
           }
         },
       };

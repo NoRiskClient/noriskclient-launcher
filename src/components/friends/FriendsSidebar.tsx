@@ -98,7 +98,7 @@ export function FriendsSidebar() {
           style={{
             background: `linear-gradient(135deg, ${accentColor.value}40 0%, ${accentColor.value}30 50%, ${accentColor.value}35 100%)`,
             borderLeft: (activeChatFriend || isSettingsOpen) ? `2px solid ${accentColor.value}50` : "none",
-            boxShadow: (activeChatFriend || isSettingsOpen) ? `inset 0 0 100px ${accentColor.value}25` : "none",
+            boxShadow: (activeChatFriend || isSettingsOpen) ? `inset 0 0 100px ${accentColor.borderValue || accentColor.textValue || accentColor.value}25` : "none",
           }}
         >
           {activeChatFriend && <ChatPanel friend={activeChatFriend} />}
@@ -110,7 +110,7 @@ export function FriendsSidebar() {
           style={{
             background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
             borderLeft: `2px solid ${accentColor.value}60`,
-            boxShadow: `inset 0 0 120px ${accentColor.value}30, -5px 0 20px rgba(0, 0, 0, 0.5)`,
+            boxShadow: `inset 0 0 120px ${accentColor.borderValue || accentColor.textValue || accentColor.value}30, -5px 0 20px rgba(0, 0, 0, 0.5)`,
           }}
         >
           <div className="p-4" style={{ borderBottom: `1px solid ${accentColor.value}30` }}>
@@ -125,7 +125,7 @@ export function FriendsSidebar() {
                   }}
                   title={t('common.settings')}
                 >
-                  <Icon icon="solar:settings-bold" className="w-5 h-5" style={{ color: accentColor.value }} />
+                  <Icon icon="solar:settings-bold" className="w-5 h-5" style={{ color: accentColor.textValue || accentColor.value }} />
                 </button>
                 <h2 className="text-lg font-bold text-white font-minecraft uppercase tracking-wide">
                   {t('friends.title')}
@@ -135,7 +135,7 @@ export function FriendsSidebar() {
                 <button
                   onClick={() => { loadFriends(true); loadPendingRequests(); }}
                   className="p-2 rounded-full transition-all duration-200 hover:scale-105"
-                  style={{ backgroundColor: `${accentColor.value}20`, border: `1px solid ${accentColor.value}50`, color: accentColor.value }}
+                  style={{ backgroundColor: `${accentColor.value}20`, border: `1px solid ${accentColor.borderValue || accentColor.textValue || accentColor.value}50`, color: accentColor.borderValue || accentColor.textValue || accentColor.value }}
                   title={t('common.refresh')}
                 >
                   <Icon icon="solar:refresh-bold" className="w-5 h-5" />
@@ -158,7 +158,7 @@ export function FriendsSidebar() {
                 <button
                   onClick={handleClose}
                   className="p-2 rounded-full transition-all duration-200 hover:scale-105"
-                  style={{ backgroundColor: `${accentColor.value}20`, border: `1px solid ${accentColor.value}50`, color: accentColor.value }}
+                  style={{ backgroundColor: `${accentColor.value}20`, border: `1px solid ${accentColor.borderValue || accentColor.textValue || accentColor.value}50`, color: accentColor.borderValue || accentColor.textValue || accentColor.value }}
                   title={t('common.close')}
                 >
                   <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
@@ -171,7 +171,7 @@ export function FriendsSidebar() {
           <div className="p-3" style={{ borderBottom: `1px solid ${accentColor.value}30` }}>
             <div
               className="flex rounded-xl p-1"
-              style={{ backgroundColor: `${accentColor.value}15`, border: `1px solid ${accentColor.value}40` }}
+              style={{ backgroundColor: `${accentColor.value}15`, border: `1px solid ${accentColor.borderValue || accentColor.textValue || accentColor.value}40` }}
             >
               <button
                 onClick={() => setActiveTab("friends")}
@@ -203,7 +203,7 @@ export function FriendsSidebar() {
                 {incomingRequests.length > 0 && (
                   <span
                     className="text-xs font-minecraft"
-                    style={{ color: accentColor.value }}
+                    style={{ color: accentColor.textValue || accentColor.value }}
                   >
                     {incomingRequests.length > 99 ? "99+" : incomingRequests.length}
                   </span>
@@ -216,7 +216,7 @@ export function FriendsSidebar() {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl mt-3"
                 style={{
                   backgroundColor: `${accentColor.value}15`,
-                  border: `1px solid ${accentColor.value}40`,
+                  border: `1px solid ${accentColor.textValue || accentColor.value}40`,
                 }}
               >
                 <Icon icon="solar:magnifer-bold" className="w-5 h-5" style={{ color: `${accentColor.value}80` }} />

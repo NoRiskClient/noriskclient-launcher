@@ -107,7 +107,7 @@ export function ContentTile({
 
   return (
     <div
-      style={isSelected ? { backgroundColor: `${accentColor.value}1a`, borderColor: `${accentColor.value}66` } : undefined}
+      style={isSelected ? { backgroundColor: `${accentColor.value}1a`, borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}66` } : undefined}
       className={`group relative flex items-center gap-4 p-3 rounded-lg border transition-colors ${
         isSelected
           ? ""
@@ -156,7 +156,7 @@ export function ContentTile({
             <button
               onClick={(e) => { e.stopPropagation(); onNameClick(); }}
               className={`text-sm text-white font-minecraft truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
-              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
+              style={!enabled ? { textDecorationColor: accentColor.textValue || accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
@@ -164,7 +164,7 @@ export function ContentTile({
           ) : (
             <div
               className={`text-sm text-white font-minecraft truncate normal-case ${!enabled ? "line-through" : ""}`}
-              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
+              style={!enabled ? { textDecorationColor: accentColor.textValue || accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
@@ -260,7 +260,7 @@ export function ContentTile({
                     }`}
                   >
                     {isCurrent ? (
-                      <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.value }} />
+                      <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.textValue || accentColor.value }} />
                     ) : (
                       <Icon icon="solar:tag-linear" className="w-3.5 h-3.5 flex-shrink-0 text-white/40" />
                     )}

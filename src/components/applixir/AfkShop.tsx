@@ -481,7 +481,7 @@ function CategorySidebar({
       className="w-44 shrink-0 bg-black/20 backdrop-blur-lg py-3 px-2 flex flex-col gap-1"
       style={{
         borderRight: `2px solid ${accentColor.value}40`,
-        boxShadow: `0 0 15px ${accentColor.value}20 inset`,
+        boxShadow: `0 0 15px ${accentColor.borderValue || accentColor.textValue || accentColor.value}20 inset`,
       }}
     >
       {categories.map((cat) => {
@@ -499,13 +499,13 @@ function CategorySidebar({
             {isActive && (
               <div
                 className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4/5 rounded-r"
-                style={{ backgroundColor: accentColor.value, boxShadow: `0 0 8px ${accentColor.shadowValue}` }}
+                style={{ backgroundColor: (accentColor.borderValue || accentColor.textValue || accentColor.value), boxShadow: `0 0 8px ${accentColor.shadowValue}` }}
               />
             )}
             <Icon
               icon={cat.icon}
               className="w-4 h-4 shrink-0"
-              style={{ color: isActive ? accentColor.value : "rgba(255,255,255,0.4)" }}
+              style={{ color: isActive ? (accentColor.textValue || accentColor.value) : "rgba(255,255,255,0.4)" }}
             />
             <span
               className="font-smallcaps text-sm tracking-wide flex-1 leading-none"
@@ -530,7 +530,7 @@ function StatusMessage({ icon, text, spin }: { icon: string; text: string; spin?
   const accentColor = useThemeStore((s) => s.accentColor);
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4">
-      <Icon icon={icon} className={`w-10 h-10${spin ? " animate-spin" : ""}`} style={{ color: accentColor.value }} />
+      <Icon icon={icon} className={`w-10 h-10${spin ? " animate-spin" : ""}`} style={{ color: accentColor.textValue || accentColor.value }} />
       <span className="font-minecraft text-xs text-white/60">{text}</span>
     </div>
   );

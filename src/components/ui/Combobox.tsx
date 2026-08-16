@@ -122,7 +122,7 @@ export function Combobox({
                   <Icon
                     icon="solar:check-circle-bold"
                     className="w-4 h-4 shrink-0"
-                    style={{ color: accentColor.value }}
+                    style={{ color: accentColor.textValue || accentColor.value }}
                   />
                 )}
               </button>

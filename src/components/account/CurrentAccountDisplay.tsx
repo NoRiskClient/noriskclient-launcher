@@ -46,7 +46,7 @@ export function CurrentAccountDisplay({
     if (variant === "flat") {
       return "none";
     }
-    return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
+    return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.textValue || accentColor.value}40, inset 0 0 0 1px ${accentColor.textValue || accentColor.value}20`;
   };
 
   // Get hover box shadow based on variant
@@ -84,9 +84,9 @@ export function CurrentAccountDisplay({
   // Get border bottom color based on variant and hover state
   const getBorderBottomColor = () => {
     if (variant === "flat") {
-      return isHovered ? accentColor.hoverValue : accentColor.value;
+      return isHovered ? (accentColor.borderValue || accentColor.textValue || accentColor.hoverValue) : (accentColor.borderValue || accentColor.textValue || accentColor.value);
     }
-    return accentColor.value;
+    return accentColor.borderValue || accentColor.textValue || accentColor.value;
   };
 
   if (!activeAccount) {
@@ -114,8 +114,8 @@ export function CurrentAccountDisplay({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          backgroundColor: `${accentColor.value}30`,
-          borderColor: `${accentColor.value}80`,
+          backgroundColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
           borderBottomColor: getBorderBottomColor(),
           boxShadow: getBoxShadow(),
           filter: isHovered ? "brightness(1.1)" : "brightness(1)",
@@ -127,7 +127,7 @@ export function CurrentAccountDisplay({
             style={{
               backgroundColor: isHovered
                 ? accentColor.hoverValue
-                : `${accentColor.value}80`,
+                : `${accentColor.textValue || accentColor.value}80`,
             }}
           />
         )}
@@ -137,8 +137,8 @@ export function CurrentAccountDisplay({
         <div
           className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
           style={{
-            borderColor: `${accentColor.value}60`,
-            backgroundColor: `${accentColor.value}20`,
+            borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
+            backgroundColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
           }}
         >
           <span className="text-white font-smallcaps text-xs">+</span>
@@ -185,8 +185,8 @@ export function CurrentAccountDisplay({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        backgroundColor: `${accentColor.value}30`,
-        borderColor: `${accentColor.value}80`,
+        backgroundColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}30`,
+        borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
         borderBottomColor: getBorderBottomColor(),
         boxShadow: getBoxShadow(),
         filter: isHovered ? "brightness(1.1)" : "brightness(1)",
@@ -198,7 +198,7 @@ export function CurrentAccountDisplay({
           style={{
             backgroundColor: isHovered
               ? accentColor.hoverValue
-              : `${accentColor.value}80`,
+              : `${accentColor.textValue || accentColor.value}80`,
           }}
         />
       )}
@@ -208,8 +208,8 @@ export function CurrentAccountDisplay({
       <div
         className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
         style={{
-          borderColor: `${accentColor.value}60`,
-          backgroundColor: `${accentColor.value}20`,
+          borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}60`,
+          backgroundColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}20`,
         }}
       >
         <PlayerHead

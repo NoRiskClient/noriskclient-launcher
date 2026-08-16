@@ -107,7 +107,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
 
   const activeStyle = (active: boolean): React.CSSProperties =>
     active
-      ? { borderColor: accentColor.value, boxShadow: `0 0 0 2px ${accentColor.value}55` }
+      ? { borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value, boxShadow: `0 0 0 2px ${accentColor.borderValue || accentColor.textValue || accentColor.value}55` }
       : {};
 
   return (

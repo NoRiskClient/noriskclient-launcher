@@ -341,8 +341,8 @@ export function ExportSettingsTab({
                       style={
                         isSelected
                           ? {
-                              borderColor: accentColor.value,
-                              boxShadow: `0 0 0 2px ${accentColor.value}55`,
+                              borderColor: accentColor.borderValue || accentColor.textValue || accentColor.value,
+                              boxShadow: `0 0 0 2px ${accentColor.borderValue || accentColor.textValue || accentColor.value}55`,
                             }
                           : undefined
                       }
@@ -450,7 +450,7 @@ export function ExportSettingsTab({
                 style={{
                   width: `${exportProgress}%`,
                   backgroundColor: accentColor.value,
-                  boxShadow: `0 0 10px ${accentColor.value}80`,
+                  boxShadow: `0 0 10px ${accentColor.borderValue || accentColor.textValue || accentColor.value}80`,
                 }}
               />
             </div>

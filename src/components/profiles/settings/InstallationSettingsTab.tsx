@@ -466,7 +466,7 @@ export function InstallationSettingsTab({
                         className={cn(
                           "text-center text-sm w-full",
                           editedProfile.game_version === version
-                            ? "bg-accent/20 border-accent text-white"
+                            ? "bg-accent/20 border-accent-text text-white"
                             : "bg-black/20 hover:bg-black/30 border-white/10 text-white/80 hover:text-white",
                           profile.is_standard_version && "cursor-not-allowed opacity-50"
                         )}

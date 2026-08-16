@@ -326,7 +326,7 @@ export function ProfileWizardV2Step3({
                         onClick={openIconPicker}
                         title={t('profiles.wizard.profileIcon')}
                         className="w-[52px] h-[52px] flex-shrink-0 rounded-lg border-2 overflow-hidden flex items-center justify-center bg-black/30 hover:scale-105 transition-transform"
-                        style={{ borderColor: `${accentColor.value}80` }}
+                        style={{ borderColor: `${accentColor.borderValue || accentColor.textValue || accentColor.value}80` }}
                     >
                         <img
                             src={iconPreviewSrc}
