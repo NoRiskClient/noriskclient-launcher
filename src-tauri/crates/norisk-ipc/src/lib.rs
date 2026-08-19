@@ -15,6 +15,7 @@ pub enum LauncherToCapture {
     AttachWindow { pid: u32 },
     DetachWindow,
     SaveClip(SaveClipRequest),
+    TrimClip(TrimClipRequest),
     SetBufferEnabled { enabled: bool },
     Ping { seq: u64 },
     Shutdown,
@@ -210,6 +211,7 @@ pub enum CaptureToLauncher {
     Ready(ReadyInfo),
     Status(StatusReport),
     ClipSaved(ClipManifest),
+    ClipTrimmed(TrimmedClip),
     Error(CaptureError),
     Pong { seq: u64 },
 }
@@ -564,4 +566,22 @@ mod tests {
         assert!(!CaptureState::Idle.can_save());
         assert!(!CaptureState::Paused.can_save());
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrimClipRequest {
+    pub source: PathBuf,
+    pub destination: PathBuf,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrimmedClip {
+    pub path: PathBuf,
+    pub source: PathBuf,
+    pub duration_seconds: f64,
+    pub size_bytes: u64,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
 }

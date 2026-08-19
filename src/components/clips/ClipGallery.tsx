@@ -13,9 +13,11 @@ import {
   getClipStorageUsage,
   listClips,
   revealClip,
+  trimClip,
   type ClipEntry,
   type ClipStorageUsage,
 } from "../../services/clip-service";
+import { ClipTrimmer } from "./ClipTrimmer";
 
 export function ClipGallery() {
   const { t } = useTranslation();
@@ -44,7 +46,11 @@ export function ClipGallery() {
     let unlisten: (() => void) | undefined;
     void (async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      unlisten = await listen("clip_saved", () => void refresh());
+      const stops = await Promise.all([
+        listen("clip_saved", () => void refresh()),
+        listen("clip_trimmed", () => void refresh()),
+      ]);
+      unlisten = () => stops.forEach((stop) => stop());
     })();
     return () => unlisten?.();
   }, [refresh]);
@@ -242,18 +248,42 @@ function ClipPlayer({
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const [trimming, setTrimming] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (trimming) setTrimming(false);
+      else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, trimming]);
 
   useEffect(() => {
+    if (trimming) return;
     videoRef.current?.play().catch(() => {
     });
-  }, []);
+  }, [trimming]);
+
+  const save = useCallback(
+    async (startSeconds: number, endSeconds: number) => {
+      setSaving(true);
+      try {
+        await trimClip(clip.path, startSeconds, endSeconds);
+        toast.success(t("clips.trim.saved"));
+        setTrimming(false);
+      } catch (e) {
+        console.error("Could not trim the clip", e);
+        toast.error(t("clips.trim.failed"));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [clip.path, t],
+  );
 
   return (
     <div
@@ -276,16 +306,42 @@ function ClipPlayer({
           <Icon icon="solar:close-circle-linear" className="h-6 w-6" />
         </button>
 
-        <video
-          ref={videoRef}
-          src={src}
-          controls
-          className="max-h-[78vh] w-full rounded-lg bg-black"
-        />
+        {trimming ? (
+          <ClipTrimmer
+            src={src}
+            duration={duration}
+            busy={saving}
+            onCancel={() => setTrimming(false)}
+            onSave={save}
+            t={t}
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            src={src}
+            controls
+            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+            className="max-h-[78vh] w-full rounded-lg bg-black"
+          />
+        )}
 
         <div className="flex items-baseline gap-2 text-xs">
           <span className="text-white/60">{formatWhen(clip.createdAt, t)}</span>
           <span className="tabular-nums text-white/35">{formatBytes(clip.sizeBytes)}</span>
+
+          {!trimming && (
+            <>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setTrimming(true)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Icon icon="solar:scissors-bold" className="h-3.5 w-3.5" />
+                {t("clips.trim.open")}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

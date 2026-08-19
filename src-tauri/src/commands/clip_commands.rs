@@ -198,6 +198,35 @@ pub async fn clip_reveal(path: std::path::PathBuf) -> Result<(), CommandError> {
     Ok(())
 }
 
+#[tauri::command]
+pub async fn clip_trim(
+    path: std::path::PathBuf,
+    start_seconds: f64,
+    end_seconds: f64,
+) -> Result<std::path::PathBuf, CommandError> {
+    if !start_seconds.is_finite() || !end_seconds.is_finite() || end_seconds <= start_seconds {
+        return Err(crate::error::AppError::Other(
+            "the end of a clip has to come after its start".into(),
+        )
+        .into());
+    }
+
+    let dir = clip_dir().await?;
+    let destination = crate::utils::clip_library::trimmed_destination(&dir, &path)?;
+
+    let state = State::get().await?;
+    state
+        .capture_supervisor
+        .send(LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
+            source: path,
+            destination: destination.clone(),
+            start_seconds,
+            end_seconds,
+        }))?;
+
+    Ok(destination)
+}
+
 async fn clip_dir() -> Result<std::path::PathBuf, CommandError> {
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;

@@ -845,6 +845,7 @@ async fn main() {
             commands::clip_commands::clip_storage_usage,
             commands::clip_commands::clip_delete,
             commands::clip_commands::clip_reveal,
+            commands::clip_commands::clip_trim,
             commands::clip_commands::clip_open_folder,
         ])
         .build(tauri::generate_context!())

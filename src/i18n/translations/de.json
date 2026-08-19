@@ -2239,5 +2239,18 @@
   "overlay.clip.error.Internal": "Aufnahme unterbrochen",
   "overlay.clip.error.Internal.hint": "Sie läuft gleich weiter.",
   "settings.clips.quality.thin_bitrate": "{{fps}} Bilder pro Sekunde bei nur {{mbps}} Mbps ergeben ein unscharfes Bild.",
-  "settings.clips.quality.thin_bitrate.hint": "Die Bitrate teilen sich alle Bilder — mehr Bilder bedeuten weniger für jedes einzelne. Für diese Auflösung und Bildrate wären etwa {{suggested}} Mbps nötig, oder wähle eine niedrigere Bildrate."
+  "settings.clips.quality.thin_bitrate.hint": "Die Bitrate teilen sich alle Bilder — mehr Bilder bedeuten weniger für jedes einzelne. Für diese Auflösung und Bildrate wären etwa {{suggested}} Mbps nötig, oder wähle eine niedrigere Bildrate.",
+  "clips.trim.open": "Schneiden",
+  "clips.trim.save": "Schnitt speichern",
+  "clips.trim.cancel": "Abbrechen",
+  "clips.trim.preview": "Vorschau",
+  "clips.trim.handle_start": "Anfang des Clips",
+  "clips.trim.handle_end": "Ende des Clips",
+  "clips.trim.kept": "{{seconds}} s bleiben",
+  "clips.trim.saved": "Zugeschnittene Kopie neben dem Original gespeichert",
+  "clips.trim.failed": "Der Clip konnte nicht geschnitten werden",
+  "clips.trim.from": "Von",
+  "clips.trim.to": "Bis",
+  "clips.trim.kept_label": "bleiben",
+  "clips.trim.hint": "Griffe ziehen, oder einen anwählen und die Pfeiltasten benutzen."
 }

@@ -2259,5 +2259,18 @@
   "overlay.clip.error.Internal": "Recording interrupted",
   "overlay.clip.error.Internal.hint": "It will resume in a moment.",
   "settings.clips.quality.thin_bitrate": "{{fps}} frames per second at only {{mbps}} Mbps will look blocky.",
-  "settings.clips.quality.thin_bitrate.hint": "Every frame shares the bitrate, so more frames means less for each one. This resolution and frame rate would need around {{suggested}} Mbps — or pick a lower frame rate."
+  "settings.clips.quality.thin_bitrate.hint": "Every frame shares the bitrate, so more frames means less for each one. This resolution and frame rate would need around {{suggested}} Mbps — or pick a lower frame rate.",
+  "clips.trim.open": "Trim",
+  "clips.trim.save": "Save trim",
+  "clips.trim.cancel": "Cancel",
+  "clips.trim.preview": "Preview",
+  "clips.trim.handle_start": "Start of the clip",
+  "clips.trim.handle_end": "End of the clip",
+  "clips.trim.kept": "{{seconds}} s kept",
+  "clips.trim.saved": "Trimmed copy saved beside the original",
+  "clips.trim.failed": "The clip could not be trimmed",
+  "clips.trim.from": "From",
+  "clips.trim.to": "To",
+  "clips.trim.kept_label": "kept",
+  "clips.trim.hint": "Drag the handles, or focus one and use the arrow keys."
 }

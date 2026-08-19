@@ -406,6 +406,21 @@ impl CaptureSupervisor {
                     None => log::warn!("No UI handle; the saved clip cannot be confirmed on screen"),
                 }
             }
+            CaptureToLauncher::ClipTrimmed(trimmed) => {
+                log::info!(
+                    "Trimmed clip written: {} ({:.1}s, {:.1} MB)",
+                    trimmed.path.display(),
+                    trimmed.duration_seconds,
+                    trimmed.size_bytes as f64 / 1e6
+                );
+
+                if let Some(app) = self.app.read().await.as_ref() {
+                    use tauri::Emitter;
+                    if let Err(e) = app.emit("clip_trimmed", &trimmed) {
+                        log::warn!("Could not tell the UI about the trimmed clip: {e}");
+                    }
+                }
+            }
             CaptureToLauncher::Error(error) => {
                 log::error!(
                     "Capture engine error [{:?}]: {} (recoverable: {})",

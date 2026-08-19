@@ -185,7 +185,7 @@ pub fn write_mp4(
             .map(|i| (**(*format_ctx).streams.add(i as usize)).time_base)
             .collect();
 
-        let origin = clip.playback_start_pts.max(clip.packets[0].pts).min(clip.end_pts);
+        let origin = clip.playback_start_pts.min(clip.end_pts);
         let frame_ticks = (track.time_base_den / track.fps.max(1) as i64).max(1);
 
         let packet = ff::av_packet_alloc();

@@ -10,4 +10,5 @@ pub mod engine;
 #[cfg(windows)]
 pub mod ipc;
 #[cfg(windows)]
+pub mod trim;
 pub mod writer;

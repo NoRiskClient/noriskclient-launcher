@@ -305,6 +305,7 @@ impl Engine {
                 log::info!("Buffering {}", if enabled { "resumed" } else { "paused" });
             }
             LauncherToCapture::SaveClip(request) => self.save_clip(request)?,
+            LauncherToCapture::TrimClip(request) => self.trim_clip(request),
             LauncherToCapture::Ping { seq } => {
                 let _ = self.events.send(CaptureToLauncher::Pong { seq });
             }
@@ -887,6 +888,36 @@ impl Engine {
             active_codec: Some(pipeline.settings.codec),
             active_encoder: Some(pipeline.encoder),
         }));
+    }
+
+    fn trim_clip(&self, request: norisk_ipc::TrimClipRequest) {
+        let started = Instant::now();
+        match crate::trim::trim(
+            &request.source,
+            &request.destination,
+            request.start_seconds,
+            request.end_seconds,
+        ) {
+            Ok(result) => {
+                log::info!(
+                    "Trimmed {:.1}s out of {} in {} ms",
+                    result.end_seconds - result.start_seconds,
+                    request.source.display(),
+                    started.elapsed().as_millis()
+                );
+                let _ = self
+                    .events
+                    .send(CaptureToLauncher::ClipTrimmed(norisk_ipc::TrimmedClip {
+                        path: result.path,
+                        source: request.source,
+                        duration_seconds: result.duration_seconds,
+                        size_bytes: result.size_bytes,
+                        start_seconds: result.start_seconds,
+                        end_seconds: result.end_seconds,
+                    }));
+            }
+            Err(e) => self.emit_error(ErrorCode::ClipWrite, format!("{e:#}"), true),
+        }
     }
 
     fn emit_error(&self, code: ErrorCode, message: String, recoverable: bool) {

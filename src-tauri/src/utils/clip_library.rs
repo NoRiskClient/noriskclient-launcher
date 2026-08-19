@@ -133,6 +133,52 @@ pub fn enforce_limit(dir: &Path, limit_gb: u32) -> Result<Vec<PathBuf>> {
     Ok(removed)
 }
 
+pub fn trimmed_destination(dir: &Path, source: &Path) -> Result<PathBuf> {
+    let dir = dir
+        .canonicalize()
+        .map_err(|e| AppError::Other(format!("clip folder is unreadable: {e}")))?;
+    let source = source
+        .canonicalize()
+        .map_err(|e| AppError::Other(format!("that clip no longer exists: {e}")))?;
+
+    if !source.starts_with(&dir) {
+        return Err(AppError::Other(
+            "refusing to trim a file outside the clip folder".into(),
+        ));
+    }
+    if source
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        != Some("mp4".into())
+    {
+        return Err(AppError::Other("refusing to trim a non-clip file".into()));
+    }
+
+    let stem = source
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| AppError::Other("that clip has no usable name".into()))?;
+
+    let base = stem.rsplit_once("_trimmed").map_or(stem, |(head, _)| head);
+
+    for attempt in 0..1000 {
+        let name = if attempt == 0 {
+            format!("{base}_trimmed.mp4")
+        } else {
+            format!("{base}_trimmed{}.mp4", attempt + 1)
+        };
+        let candidate = dir.join(name);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(AppError::Other(
+        "there are already a thousand trims of this clip".into(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +267,56 @@ mod tests {
         let path = write_clip(&dir, "important.txt", 10);
         assert!(delete(&dir, &path).is_err());
         assert!(path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_trim_is_written_beside_the_original() {
+        let dir = temp_dir("trim-name");
+        let source = write_clip(&dir, "1787099385_clip.mp4", 10);
+
+        let destination = trimmed_destination(&dir, &source).unwrap();
+        assert_eq!(
+            destination.file_name().unwrap(),
+            "1787099385_clip_trimmed.mp4"
+        );
+        assert!(source.exists(), "the original must be left alone");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_second_trim_does_not_overwrite_the_first() {
+        let dir = temp_dir("trim-twice");
+        let source = write_clip(&dir, "clip.mp4", 10);
+        write_clip(&dir, "clip_trimmed.mp4", 10);
+
+        let destination = trimmed_destination(&dir, &source).unwrap();
+        assert_eq!(destination.file_name().unwrap(), "clip_trimmed2.mp4");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_suffix_does_not_pile_up() {
+        let dir = temp_dir("trim-suffix");
+        let already = write_clip(&dir, "clip_trimmed.mp4", 10);
+
+        let destination = trimmed_destination(&dir, &already).unwrap();
+        assert_eq!(destination.file_name().unwrap(), "clip_trimmed2.mp4");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_source_outside_the_clip_folder_is_refused() {
+        let dir = temp_dir("trim-escape");
+        let outside = std::env::temp_dir().join("nrc-not-a-clip-to-trim.mp4");
+        std::fs::write(&outside, [0u8; 4]).unwrap();
+
+        assert!(trimmed_destination(&dir, &outside).is_err());
+
+        let _ = std::fs::remove_file(&outside);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

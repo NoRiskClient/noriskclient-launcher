@@ -49,3 +49,20 @@ export async function revealClip(path: string): Promise<void> {
 export async function openClipFolder(): Promise<void> {
   return invoke("clip_open_folder");
 }
+
+export interface TrimmedClip {
+  path: string;
+  source: string;
+  durationSeconds: number;
+  sizeBytes: number;
+  startSeconds: number;
+  endSeconds: number;
+}
+
+export async function trimClip(
+  path: string,
+  startSeconds: number,
+  endSeconds: number,
+): Promise<string> {
+  return invoke<string>("clip_trim", { path, startSeconds, endSeconds });
+}
