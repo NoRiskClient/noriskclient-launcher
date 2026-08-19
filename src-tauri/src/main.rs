@@ -115,8 +115,12 @@ use commands::cape_command::{
     get_capes_by_hashes, get_owned_capes_list,
 };
 
-use commands::cosmetic_command::{get_equipped_cosmetics, get_random_local_emote};
-use commands::icon_command::{get_active_creator_code, get_selected_player_icon};
+use commands::cosmetic_command::{
+    get_equipped_cosmetics, get_equipped_cosmetics_cached, get_random_local_emote,
+};
+use commands::icon_command::{
+    get_active_creator_code, get_selected_player_icon, get_selected_player_icon_cached,
+};
 
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
@@ -633,7 +637,9 @@ async fn main() {
             get_player_capes,
             get_active_creator_code,
             get_selected_player_icon,
+            get_selected_player_icon_cached,
             get_equipped_cosmetics,
+            get_equipped_cosmetics_cached,
             get_random_local_emote,
             get_owned_capes_list,
             equip_cape,

@@ -19,6 +19,7 @@ use sqlx::Row;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use uuid::Uuid;
 use tokio::sync::{Mutex, OnceCell};
 
 const TTL_METADATA_MS: u64 = 30 * 60 * 1000;
@@ -40,6 +41,12 @@ mod kind {
     pub const MODRINTH_MEMBERS: &str = "modrinth_project_members";
     pub const MODRINTH_PROJECT_VERSIONS: &str = "modrinth_project_versions";
     pub const CURSEFORGE_DESCRIPTION: &str = "curseforge_description";
+    pub const PLAYER_OUTFIT: &str = "player_outfit";
+    pub const PLAYER_ICON: &str = "player_icon";
+}
+
+fn player_key(uuid: &Uuid) -> String {
+    uuid.simple().to_string()
 }
 
 fn now_ms() -> u64 {
@@ -222,6 +229,46 @@ impl ContentCacheManager {
     ) -> Option<CacheEntry<Option<T>>> {
         let mut found = self.get_entries::<T>(kind, &[key.to_string()]).await;
         found.remove(key)
+    }
+
+    pub async fn get_player_outfit<T: DeserializeOwned + Clone>(&self, uuid: &Uuid) -> Option<T> {
+        self.get_entry::<T>(kind::PLAYER_OUTFIT, &player_key(uuid))
+            .await
+            .and_then(|entry| entry.data)
+    }
+
+    pub async fn put_player_outfit<T: Serialize>(&self, uuid: &Uuid, outfit: &T) {
+        self.put_entry(
+            kind::PLAYER_OUTFIT,
+            &player_key(uuid),
+            None,
+            Some(outfit),
+            TTL_IMMUTABLE_MS,
+        )
+        .await;
+    }
+
+    pub async fn get_player_icon<T: DeserializeOwned + Clone>(&self, uuid: &Uuid) -> Option<T> {
+        self.get_entry::<T>(kind::PLAYER_ICON, &player_key(uuid))
+            .await
+            .and_then(|entry| entry.data)
+    }
+
+    pub async fn put_player_icon<T: Serialize>(&self, uuid: &Uuid, icon: &T) {
+        self.put_entry(
+            kind::PLAYER_ICON,
+            &player_key(uuid),
+            None,
+            Some(icon),
+            TTL_IMMUTABLE_MS,
+        )
+        .await;
+    }
+
+    pub async fn forget_player(&self, uuid: &Uuid) {
+        let ids = vec![player_key(uuid)];
+        self.delete_ids(kind::PLAYER_OUTFIT, &ids).await;
+        self.delete_ids(kind::PLAYER_ICON, &ids).await;
     }
 
     async fn put_entries<T: Serialize>(&self, kind: &str, rows: Vec<Row2Write<T>>) {

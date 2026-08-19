@@ -54,6 +54,7 @@ import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
+import { invalidatePlayerAppearance } from "./services/cosmetic-cache";
 import { hasPermission, refreshPermissions } from "./services/permission-service";
 import {
   fetchTesterQueueCount,
@@ -150,6 +151,7 @@ export function App() {
               event.payload.event_type === FrontendEventType.MinecraftSkinChanged
           ) {
             console.log("[App.tsx] Global MinecraftSkinChanged event");
+            invalidatePlayerAppearance();
             useSkinStore.getState().bumpSkinRevision();
             return;
           }

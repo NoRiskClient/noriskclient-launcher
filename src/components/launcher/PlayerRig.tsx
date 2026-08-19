@@ -45,14 +45,19 @@ interface PlayerRigProps {
 }
 
 function useMinLoading(active: boolean, minMs: number): boolean {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(!active);
   const startRef = useRef(Date.now());
   useEffect(() => {
-    if (active) return;
+    if (active) {
+      startRef.current = Date.now();
+      setDone(false);
+      return;
+    }
+    if (done) return;
     const remaining = Math.max(0, minMs - (Date.now() - startRef.current));
     const id = setTimeout(() => setDone(true), remaining);
     return () => clearTimeout(id);
-  }, [active, minMs]);
+  }, [active, minMs, done]);
   return active || !done;
 }
 
