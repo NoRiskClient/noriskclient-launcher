@@ -204,9 +204,9 @@ impl ForgePatcher {
         let mut parsed_args = Vec::new();
 
         if let Some(args) = &processor.args {
-            info!("\nProcessing arguments for processor:");
+            info!("Processing arguments for processor:");
             for arg in args {
-                info!("\nProcessing argument: {}", arg);
+                info!("Processing argument: {}", arg);
 
                 // First handle token replacement
                 let processed =
@@ -246,12 +246,12 @@ impl ForgePatcher {
             }
         }
 
-        info!("\nFinal parsed arguments: {:?}", parsed_args);
+        info!("Final parsed arguments: {:?}", parsed_args);
         Ok(parsed_args)
     }
 
     fn get_library_path(&self, library: &str) -> Result<PathBuf> {
-        info!("\n=== get_library_path Debug ===");
+        info!("=== get_library_path Debug ===");
         info!("Input library string: {}", library);
 
         // Remove square brackets if present
@@ -318,7 +318,7 @@ impl ForgePatcher {
 
         info!("Final path: {}", path.display());
         info!("Path exists: {}", path.exists());
-        info!("=== End Debug ===\n");
+        info!("=== End Debug ===");
 
         Ok(path)
     }
@@ -407,7 +407,7 @@ impl ForgePatcher {
         installer_path: &PathBuf,
     ) -> Result<()> {
         info!(
-            "\nApplying Forge processors for {}...",
+            "Applying Forge processors for {}...",
             if is_client { "client" } else { "server" }
         );
 
@@ -449,7 +449,7 @@ impl ForgePatcher {
                 }
             }
 
-            info!("\nProcessor: {:?}", processor);
+            info!("Processor: {:?}", processor);
 
             // Print Sides
             if let Some(sides) = &processor.sides {
@@ -457,7 +457,7 @@ impl ForgePatcher {
             }
 
             // Print JAR
-            info!("\nJAR: {}", processor.jar);
+            info!("JAR: {}", processor.jar);
 
             // Print Classpath
             if let Some(classpath) = &processor.classpath {
@@ -469,19 +469,19 @@ impl ForgePatcher {
 
             // Get the JAR path from libraries
             let jar_path = self.get_library_path(&processor.jar)?;
-            info!("\nJAR Path: {}", jar_path.display());
+            info!("JAR Path: {}", jar_path.display());
             let main_class = self.get_main_class_from_jar(&jar_path).await?;
-            info!("\nMain Class: {}", main_class);
+            info!("Main Class: {}", main_class);
 
             // Build classpath including the processor JAR
             let mut classpath = self.build_classpath(processor)?;
             let separator = if cfg!(windows) { ";" } else { ":" };
             classpath = format!("{}{}{}", classpath, separator, jar_path.display());
-            info!("\nFull Classpath: {}", classpath);
+            info!("Full Classpath: {}", classpath);
 
             let jvm_arguments =
                 self.parse_arguments(install_profile, processor, is_client, installer_path)?;
-            info!("\nJVM Arguments: {:?}", jvm_arguments);
+            info!("JVM Arguments: {:?}", jvm_arguments);
 
             // Execute the processor
             let mut command = std::process::Command::new(&self.java_path);
@@ -497,7 +497,7 @@ impl ForgePatcher {
                 command.arg(arg);
             }
 
-            info!("\nExecuting command: {:?}", command);
+            info!("Executing command: {:?}", command);
 
             let output = command.output()?;
             if !output.status.success() {

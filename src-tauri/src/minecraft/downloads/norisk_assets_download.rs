@@ -4,6 +4,7 @@ use crate::minecraft::api::NoRiskApi;
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
 use crate::minecraft::dto::piston_meta::AssetObject;
+use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
 use crate::state::State;
@@ -44,19 +45,26 @@ pub fn client_managed_assets(pack_id: &str) -> bool {
 pub struct NoriskClientAssetsDownloadService {
     base_path: PathBuf,
     concurrent_downloads: usize,
+    stats: Option<Arc<DownloadStats>>,
 }
 
 impl NoriskClientAssetsDownloadService {
     pub fn new() -> Self {
         let base_path = LAUNCHER_DIRECTORY.meta_dir().join(ASSETS_DIR);
-        info!(
+        trace!(
             "[NRC Assets Service] Initialized. Base Path: {}",
             base_path.display()
         );
         Self {
             base_path,
             concurrent_downloads: DEFAULT_CONCURRENT_DOWNLOADS,
+            stats: None,
         }
+    }
+
+    pub fn with_stats(mut self, stats: Arc<DownloadStats>) -> Self {
+        self.stats = Some(stats);
+        self
     }
 
     /// Sets the number of concurrent downloads to use
@@ -647,6 +655,7 @@ impl NoriskClientAssetsDownloadService {
             let total_to_download_clone = Arc::clone(&total_to_download);
             let asset_id_clone = asset_id.to_string();
             let norisk_token_clone = norisk_token.to_string();
+            let stats = self.stats.clone();
 
             // Fast in-memory check instead of filesystem call
             if existing_objects.contains_key(&hash) {
@@ -656,6 +665,9 @@ impl NoriskClientAssetsDownloadService {
                     name_clone,
                     hash
                 );
+                if let Some(stats) = &stats {
+                    stats.record_cached();
+                }
                 continue;
             }
 
@@ -720,8 +732,11 @@ impl NoriskClientAssetsDownloadService {
 
                 let completed = completed_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 let total = total_to_download_clone.load(Ordering::SeqCst);
+                if let Some(stats) = &stats {
+                    stats.record_downloaded(bytes.len() as u64);
+                }
 
-                info!("[NRC Assets Download '{}' Task {}] Finished download for: {} ({}/{})",
+                trace!("[NRC Assets Download '{}' Task {}] Finished download for: {} ({}/{})",
                       asset_id_clone, task_id, name_clone, completed, total);
                 Ok(())
             });
@@ -800,6 +815,11 @@ impl NoriskClientAssetsDownloadService {
         for result in results {
             if let Err(e) = result {
                 errors.push(e);
+            }
+        }
+        if let Some(stats) = &self.stats {
+            for _ in &errors {
+                stats.record_failed();
             }
         }
 

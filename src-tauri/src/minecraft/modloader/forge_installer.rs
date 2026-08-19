@@ -44,7 +44,7 @@ impl ForgeInstaller {
             })
             .await?;
 
-        info!("\nInstalling Forge...");
+        info!("Installing Forge...");
 
         let forge_api = ForgeApi::new();
         let mut forge_libraries_download = ForgeLibrariesDownload::new();

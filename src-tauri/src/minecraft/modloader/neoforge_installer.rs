@@ -47,7 +47,7 @@ impl NeoForgeInstaller {
             })
             .await?;
 
-        info!("\nInstalling NeoForge...");
+        info!("Installing NeoForge...");
 
         let neoforge_api = NeoForgeApi::new();
         let mut neoforge_libraries_download = NeoForgeLibrariesDownload::new();

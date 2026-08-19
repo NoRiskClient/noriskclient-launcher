@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::minecraft::dto::fabric_meta::{FabricLibrary, FabricVersionInfo};
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use futures::stream::StreamExt;
-use log::info;
+use log::{info, trace};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -27,34 +27,34 @@ impl FabricLibrariesDownloadService {
     }
 
     pub fn print_version_info(&self, version: &FabricVersionInfo) {
-        info!("\n=== Fabric Version ===");
-        info!("Loader:");
-        info!("  - Version: {}", version.loader.version);
-        info!("  - Build: {}", version.loader.build);
-        info!("  - Maven: {}", version.loader.maven);
-        info!("  - Stable: {}", version.loader.stable);
-        info!("  - Separator: {}", version.loader.separator);
+        trace!("=== Fabric Version ===");
+        trace!("Loader:");
+        trace!("  - Version: {}", version.loader.version);
+        trace!("  - Build: {}", version.loader.build);
+        trace!("  - Maven: {}", version.loader.maven);
+        trace!("  - Stable: {}", version.loader.stable);
+        trace!("  - Separator: {}", version.loader.separator);
 
-        info!("\nIntermediary:");
-        info!("  - Version: {}", version.intermediary.version);
-        info!("  - Maven: {}", version.intermediary.maven);
-        info!("  - Stable: {}", version.intermediary.stable);
+        trace!("Intermediary:");
+        trace!("  - Version: {}", version.intermediary.version);
+        trace!("  - Maven: {}", version.intermediary.maven);
+        trace!("  - Stable: {}", version.intermediary.stable);
 
-        info!("\nLauncher Meta:");
-        info!("  - Version: {}", version.launcher_meta.version);
+        trace!("Launcher Meta:");
+        trace!("  - Version: {}", version.launcher_meta.version);
         if let Some(min_java) = version.launcher_meta.min_java_version {
-            info!("  - Min Java Version: {}", min_java);
+            trace!("  - Min Java Version: {}", min_java);
         }
-        info!(
+        trace!(
             "  - Main Class (Client): {}",
             version.launcher_meta.main_class.get_client()
         );
-        info!(
+        trace!(
             "  - Main Class (Server): {}",
             version.launcher_meta.main_class.get_server()
         );
 
-        info!("\nLibraries:");
+        trace!("Libraries:");
         self.print_libraries(&version.launcher_meta.libraries.common, "Common Libraries");
         self.print_libraries(&version.launcher_meta.libraries.client, "Client Libraries");
         self.print_libraries(&version.launcher_meta.libraries.server, "Server Libraries");
@@ -64,19 +64,19 @@ impl FabricLibrariesDownloadService {
     }
 
     fn print_libraries(&self, libraries: &[FabricLibrary], title: &str) {
-        info!("  {}:", title);
+        trace!("  {}:", title);
         for lib in libraries {
-            info!("    - Name: {}", lib.name);
+            trace!("    - Name: {}", lib.name);
             if let Some(url) = &lib.url {
-                info!("      URL: {}", url);
+                trace!("      URL: {}", url);
             }
             if let Some(size) = lib.size {
-                info!("      Size: {} bytes", size);
+                trace!("      Size: {} bytes", size);
             }
             if let Some(sha1) = &lib.sha1 {
-                info!("      SHA1: {}", sha1);
+                trace!("      SHA1: {}", sha1);
             }
-            info!("");
+            trace!("");
         }
     }
 
@@ -107,7 +107,7 @@ impl FabricLibrariesDownloadService {
         );
 
         // Use the centralized download utility
-        info!("⬇️ Downloading Maven artifact: {}", maven);
+        trace!("⬇️ Downloading Maven artifact: {}", maven);
         let config = DownloadConfig::new()
             .with_streaming(false) // Maven artifacts are usually small
             .with_retries(3);
@@ -116,7 +116,7 @@ impl FabricLibrariesDownloadService {
             crate::error::AppError::FabricError(format!("Failed to download Maven artifact: {}", e))
         })?;
 
-        info!("💾 Saved Maven artifact: {}", maven);
+        trace!("💾 Saved Maven artifact: {}", maven);
         Ok(())
     }
 
@@ -140,7 +140,7 @@ impl FabricLibrariesDownloadService {
     }
 
     pub async fn download_fabric_libraries(&self, version: &FabricVersionInfo) -> Result<()> {
-        info!("\nDownloading Fabric components...");
+        info!("Downloading Fabric components...");
 
         // Combine all libraries into a single vector
         let mut all_libraries = Vec::new();
@@ -158,7 +158,7 @@ impl FabricLibrariesDownloadService {
         }
 
         info!("Found {} components to download", all_libraries.len());
-        info!(
+        trace!(
             "Downloading with {} concurrent downloads",
             self.concurrent_downloads
         );
@@ -185,7 +185,7 @@ impl FabricLibrariesDownloadService {
                             )
                             .await?
                             {
-                                info!("✅ Successfully downloaded: {}", library.name);
+                                trace!("✅ Successfully downloaded: {}", library.name);
                             }
                         }
                         Err(e) => info!("❌ Failed to download {}: {}", library.name, e),
@@ -203,7 +203,7 @@ impl FabricLibrariesDownloadService {
         let errors: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
         if !errors.is_empty() {
-            info!("\n⚠️ Some downloads failed:");
+            info!("⚠️ Some downloads failed:");
             for error in errors {
                 info!("  - {}", error);
             }
@@ -212,7 +212,7 @@ impl FabricLibrariesDownloadService {
             ));
         }
 
-        info!("\n✅ All Fabric components downloaded successfully!");
+        info!("✅ All Fabric components downloaded successfully!");
         Ok(())
     }
 
@@ -247,7 +247,7 @@ impl FabricLibrariesDownloadService {
             .join(format!("{}-{}.jar", artifact, version));
 
         // Use the centralized download utility with optional SHA1 verification
-        info!("⬇️ Downloading: {} from {}", library.name, url);
+        trace!("⬇️ Downloading: {} from {}", library.name, url);
         
         let mut config = DownloadConfig::new()
             .with_streaming(false) // Fabric libraries are usually small
@@ -262,7 +262,7 @@ impl FabricLibrariesDownloadService {
             crate::error::AppError::FabricError(format!("Failed to download library: {}", e))
         })?;
 
-        info!("💾 Saved: {}", library.name);
+        trace!("💾 Saved: {}", library.name);
         Ok(())
     }
 

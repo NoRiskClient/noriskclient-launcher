@@ -1,12 +1,14 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::downloads::mod_resolver::TargetMod;
+use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::profile_state::{self, ModSource, Profile};
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use futures::stream::{iter, StreamExt};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs::{self, read_dir};
 use tokio::io::AsyncWriteExt;
 
@@ -16,19 +18,27 @@ const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 
 pub struct ModDownloadService {
     concurrent_downloads: usize,
+    stats: Option<Arc<DownloadStats>>,
 }
 
 impl ModDownloadService {
     pub fn new() -> Self {
         Self {
             concurrent_downloads: DEFAULT_CONCURRENT_MOD_DOWNLOADS,
+            stats: None,
         }
     }
 
     pub fn with_concurrency(concurrent_downloads: usize) -> Self {
         Self {
             concurrent_downloads,
+            stats: None,
         }
+    }
+
+    pub fn with_stats(mut self, stats: Arc<DownloadStats>) -> Self {
+        self.stats = Some(stats);
+        self
     }
 
     /// Downloads all enabled mods into the central mod cache.
@@ -50,13 +60,14 @@ impl ModDownloadService {
 
         for mod_info in profile.mods.iter() {
             if !mod_info.enabled {
-                debug!("Skipping disabled mod: {:?}", mod_info.display_name);
+                trace!("Skipping disabled mod: {:?}", mod_info.display_name);
                 continue;
             }
 
             let display_name_opt = mod_info.display_name.clone();
             let cache_dir_clone = mod_cache_dir.clone();
             let source_clone = mod_info.source.clone();
+            let stats = self.stats.clone();
 
             let filename_result = profile_state::get_profile_mod_filename(&mod_info.source);
 
@@ -81,7 +92,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        debug!(
+                        trace!(
                             "Preparing Modrinth mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -89,6 +100,7 @@ impl ModDownloadService {
                             &download_url,
                             &target_path,
                             file_hash_sha1.as_deref(),
+                            stats,
                         )
                         .await
                         .map_err(|e| {
@@ -101,7 +113,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        debug!(
+                        trace!(
                             "Preparing CurseForge mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -109,6 +121,7 @@ impl ModDownloadService {
                             &download_url,
                             &target_path,
                             file_hash_sha1.as_deref(),
+                            stats,
                         )
                         .await
                         .map_err(|e| {
@@ -117,8 +130,8 @@ impl ModDownloadService {
                         })
                     }
                     ModSource::Url { url, .. } => {
-                        debug!("Preparing URL mod for cache: {} ({})", display_name, filename);
-                        Self::download_and_verify_file(&url, &target_path, None)
+                        trace!("Preparing URL mod for cache: {} ({})", display_name, filename);
+                        Self::download_and_verify_file(&url, &target_path, None, stats)
                             .await
                             .map_err(|e| {
                                 error!("Failed cache mod {}: {}", display_name, e);
@@ -126,7 +139,7 @@ impl ModDownloadService {
                             })
                     }
                     ModSource::Local { file_name } => {
-                        debug!("Skipping local mod (cache check): {}", file_name);
+                        trace!("Skipping local mod (cache check): {}", file_name);
                         Ok(())
                     }
                     ModSource::Maven { .. } => {
@@ -363,11 +376,13 @@ impl ModDownloadService {
         url: &str,
         target_path: &PathBuf,
         expected_sha1: Option<&str>,
+        stats: Option<Arc<DownloadStats>>,
     ) -> Result<()> {
         // Use the new centralized download utility with SHA1 verification
         let mut config = DownloadConfig::new()
             .with_streaming(true)  // Mods can be large files
-            .with_retries(3);      // Built-in retry logic for network issues
+            .with_retries(3)      // Built-in retry logic for network issues
+            .with_stats(stats);
 
         // Add SHA1 verification if provided
         if let Some(sha1) = expected_sha1 {

@@ -12,12 +12,14 @@ use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadSe
 use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
+use crate::minecraft::launch::launch_summary::LaunchSummary;
 use crate::minecraft::{MinecraftLaunchParameters, MinecraftLauncher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use rand::Rng;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use super::minecraft_auth::Credentials;
@@ -54,6 +56,7 @@ async fn emit_progress_event(
 /// The timing also appears in launcher.log via log::info!.
 async fn timed_step<F, Fut, T>(
     state: &State,
+    summary: &LaunchSummary,
     event_type: EventType,
     profile_id: Uuid,
     label: &str,
@@ -64,13 +67,23 @@ where
     Fut: std::future::Future<Output = Result<T>>,
 {
     emit_progress_event(state, event_type.clone(), profile_id, &format!("{}...", label), 0.0, None).await?;
-    info!("{}", label);
+    trace!("{}", label);
     let start = Instant::now();
     let result = f().await?;
     let elapsed_ms = start.elapsed().as_millis();
-    info!("[Timing] {} took {}ms", label, elapsed_ms);
+    trace!("[Timing] {} took {}ms", label, elapsed_ms);
+    summary.record_phase(label, elapsed_ms);
     emit_progress_event(state, event_type, profile_id, &format!("{} completed! ({}ms)", label, elapsed_ms), 1.0, None).await?;
     Ok(result)
+}
+
+macro_rules! summary_phase {
+    ($summary:expr, $label:expr, $block:expr) => {{
+        let __start = Instant::now();
+        let __result = $block;
+        $summary.record_phase(&$label.to_string(), __start.elapsed().as_millis());
+        __result
+    }};
 }
 
 pub async fn install_minecraft_version(
@@ -136,6 +149,7 @@ pub async fn install_minecraft_version(
     );
 
     let total_start = Instant::now();
+    let summary = Arc::new(LaunchSummary::default());
 
     // <--- HARDCODED TEST ERROR (50% CHANCE) --- >
     let should_throw_error = {
@@ -209,7 +223,7 @@ pub async fn install_minecraft_version(
 
     // Get Java version from Minecraft version manifest
     let java_version = piston_meta.java_version.major_version as u32;
-    info!("\nChecking Java {} for Minecraft...", java_version);
+    info!("Checking Java {} for Minecraft...", java_version);
 
     // Emit Java installation event
     let event_id = emit_progress_event(
@@ -327,6 +341,7 @@ pub async fn install_minecraft_version(
 
         downloaded_path
     };
+    summary.record_phase("java", step_start.elapsed().as_millis());
 
     // Create game directory
     let game_directory = state
@@ -335,7 +350,7 @@ pub async fn install_minecraft_version(
     std::fs::create_dir_all(&game_directory)?;
 
     // --- NEW: Copy StartUpHelper data FIRST ---
-    info!("\nChecking for StartUpHelper data to import...");
+    info!("Checking for StartUpHelper data to import...");
 
     // Load NoriskPackDefinition if a pack is selected
     let norisk_pack = if let Some(pack_id) = profile.effective_norisk_pack_id().await {
@@ -354,7 +369,7 @@ pub async fn install_minecraft_version(
     // --- END NEW ---
 
     // --- Copy initial data from default Minecraft installation ---
-    info!("\nChecking for user data to import...");
+    info!("Checking for user data to import...");
     if let Err(e) =
         mc_utils::copy_initial_data_from_default_minecraft(profile, &game_directory).await
     {
@@ -366,22 +381,24 @@ pub async fn install_minecraft_version(
 
     // Download libraries
     let libraries_service = MinecraftLibrariesDownloadService::new()
-        .with_concurrent_downloads(launcher_config.concurrent_downloads);
-    timed_step(&state, EventType::DownloadingLibraries, profile.id, "Downloading libraries", || async {
+        .with_concurrent_downloads(launcher_config.concurrent_downloads)
+        .with_stats(summary.libraries.clone());
+    timed_step(&state, &summary, EventType::DownloadingLibraries, profile.id, "libraries", || async {
         libraries_service.download_libraries(&piston_meta.libraries).await
     }).await?;
 
     // Extract natives
     let natives_service = MinecraftNativesDownloadService::new();
     let cache_natives = launcher_config.cache_natives_extraction;
-    timed_step(&state, EventType::ExtractingNatives, profile.id, "Extracting natives", || async {
+    timed_step(&state, &summary, EventType::ExtractingNatives, profile.id, "natives", || async {
         natives_service.extract_natives(&piston_meta.libraries, version_id, cache_natives).await
     }).await?;
 
     // Download MC assets (handles progress events internally)
     let assets_service = MinecraftAssetsDownloadService::new()
-        .with_concurrent_downloads(launcher_config.concurrent_downloads);
-    measure_time!("MC assets download", {
+        .with_concurrent_downloads(launcher_config.concurrent_downloads)
+        .with_stats(summary.assets.clone());
+    summary_phase!(summary, "assets", {
         assets_service
             .download_assets_with_progress(&piston_meta.asset_index, profile.id)
             .await?
@@ -389,16 +406,17 @@ pub async fn install_minecraft_version(
 
     // Download NoRiskClient assets (handles progress events internally)
     let norisk_assets_service = NoriskClientAssetsDownloadService::new()
-        .with_concurrent_downloads(launcher_config.concurrent_downloads);
-    measure_time!("NRC assets download", {
+        .with_concurrent_downloads(launcher_config.concurrent_downloads)
+        .with_stats(summary.nrc_assets.clone());
+    summary_phase!(summary, "nrc assets", {
         norisk_assets_service
             .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
             .await?
     });
 
     // Download Minecraft client
-    let client_service = MinecraftClientDownloadService::new();
-    timed_step(&state, EventType::DownloadingClient, profile.id, "Downloading client", || async {
+    let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());
+    timed_step(&state, &summary, EventType::DownloadingClient, profile.id, "client", || async {
         client_service.download_client(&piston_meta.downloads.client, &piston_meta.id).await
     }).await?;
 
@@ -409,7 +427,7 @@ pub async fn install_minecraft_version(
         credentials.clone(),
     );
 
-    info!("\nPreparing launch parameters...");
+    info!("Preparing launch parameters...");
 
     // Get memory settings (global for standard profiles, profile-specific for custom)
     let memory_max = if profile.is_standard_version {
@@ -466,7 +484,7 @@ pub async fn install_minecraft_version(
             java_path.clone(),
             launcher_config.concurrent_downloads,
         );
-        let modloader_result = measure_time!("Modloader installation", {
+        let modloader_result = summary_phase!(summary, "modloader", {
             modloader_installer.install(version_id, &install_profile).await?
         });
 
@@ -584,8 +602,9 @@ pub async fn install_minecraft_version(
 
     // --- Step: Ensure profile-defined mods are downloaded/verified in cache ---
     let mod_downloader_service =
-        ModDownloadService::with_concurrency(launcher_config.concurrent_downloads);
-    timed_step(&state, EventType::DownloadingMods, profile.id, "Downloading profile mods", || async {
+        ModDownloadService::with_concurrency(launcher_config.concurrent_downloads)
+            .with_stats(summary.mods.clone());
+    timed_step(&state, &summary, EventType::DownloadingMods, profile.id, "profile mods", || async {
         mod_downloader_service.download_mods_to_cache(&profile).await
     }).await?;
 
@@ -612,10 +631,11 @@ pub async fn install_minecraft_version(
             );
 
             let norisk_downloader_service =
-                NoriskPackDownloadService::with_concurrency(launcher_config.concurrent_downloads);
+                NoriskPackDownloadService::with_concurrency(launcher_config.concurrent_downloads)
+                    .with_stats(summary.mods.clone());
             let loader_str = modloader_enum.as_str();
             let pack_download_start = Instant::now();
-            match measure_time!(format!("Norisk pack mods download '{}'", selected_pack_id), {
+            match summary_phase!(summary, format!("pack mods '{}'", selected_pack_id), {
                 norisk_downloader_service
                     .download_pack_mods_to_cache(
                         config,
@@ -721,7 +741,7 @@ pub async fn install_minecraft_version(
 
     // Call the resolver function using the already loaded config (or None)
     let resolve_start = Instant::now();
-    let target_mods = measure_time!("Mod resolving", {
+    let target_mods = summary_phase!(summary, "resolve", {
         crate::minecraft::downloads::mod_resolver::resolve_target_mods(
             profile,
             loaded_norisk_config.as_ref(),
@@ -814,7 +834,7 @@ pub async fn install_minecraft_version(
     // --- Step: Sync mods from cache to profile directory ---
     let profile_mods_path = state.profile_manager.get_profile_mods_path(profile)?;
 
-    timed_step(&state, EventType::SyncingMods, profile.id, "Syncing mods", || async {
+    timed_step(&state, &summary, EventType::SyncingMods, profile.id, "sync mods", || async {
         if modloader_enum == ModLoader::Vanilla {
             info!("Vanilla loader: skipping mod sync — vanilla does not load mods from mods/.");
         } else {
@@ -833,7 +853,7 @@ pub async fn install_minecraft_version(
     let mut log4j_arg = None;
     if let Some(logging) = &piston_meta.logging {
         let logging_service = MinecraftLoggingDownloadService::new();
-        let config_path = measure_time!("Log4j config download", {
+        let config_path = summary_phase!(summary, "log4j", {
             logging_service
                 .download_logging_config(&logging.client)
                 .await?
@@ -886,11 +906,11 @@ pub async fn install_minecraft_version(
     }
 
     // --- Launch Minecraft ---
-    timed_step(&state, EventType::LaunchingMinecraft, profile.id, "Launching Minecraft", || async {
+    timed_step(&state, &summary, EventType::LaunchingMinecraft, profile.id, "launch", || async {
         launcher.launch(&piston_meta, launch_params, Some(profile.clone())).await
     }).await?;
 
-    info!("[Timing] Total installation took {}ms", total_start.elapsed().as_millis());
+    summary.log(&profile.name, version_id, modloader_str, total_start.elapsed().as_millis());
 
     Ok(())
 }

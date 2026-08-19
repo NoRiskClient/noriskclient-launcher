@@ -1,5 +1,5 @@
 use crate::error::{AppError, CommandError};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -199,7 +199,7 @@ async fn is_filename_blocked_fast(filename: &str, config: &BlockedModsConfig) ->
 /// Check if a specific filename should be blocked
 #[tauri::command]
 pub async fn is_filename_blocked(filename: String) -> Result<bool, CommandError> {
-    debug!("Command called: is_filename_blocked for: {}", filename);
+    trace!("Command called: is_filename_blocked for: {}", filename);
 
     let storage = get_blocked_mods_config_storage().await;
     let config_guard = storage.read().await;
@@ -209,17 +209,17 @@ pub async fn is_filename_blocked(filename: String) -> Result<bool, CommandError>
     if is_blocked {
         debug!("Filename '{}' is blocked", filename);
     } else {
-        debug!("Filename '{}' is not blocked", filename);
+        trace!("Filename '{}' is not blocked", filename);
     }
 
-    debug!("Command completed: is_filename_blocked");
+    trace!("Command completed: is_filename_blocked");
     Ok(is_blocked)
 }
 
 /// Check if a specific mod ID should be blocked
 #[tauri::command]
 pub async fn is_mod_id_blocked(mod_id: String) -> Result<bool, CommandError> {
-    debug!("Command called: is_mod_id_blocked for: {}", mod_id);
+    trace!("Command called: is_mod_id_blocked for: {}", mod_id);
 
     let storage = get_blocked_mods_config_storage().await;
     let config_guard = storage.read().await;
@@ -229,17 +229,17 @@ pub async fn is_mod_id_blocked(mod_id: String) -> Result<bool, CommandError> {
     if is_blocked {
         debug!("Mod ID '{}' is blocked", mod_id);
     } else {
-        debug!("Mod ID '{}' is not blocked", mod_id);
+        trace!("Mod ID '{}' is not blocked", mod_id);
     }
 
-    debug!("Command completed: is_mod_id_blocked");
+    trace!("Command completed: is_mod_id_blocked");
     Ok(is_blocked)
 }
 
 /// Check if a specific Modrinth project ID should be blocked
 #[tauri::command]
 pub async fn is_modrinth_project_id_blocked(project_id: String) -> Result<bool, CommandError> {
-    debug!("Command called: is_modrinth_project_id_blocked for: {}", project_id);
+    trace!("Command called: is_modrinth_project_id_blocked for: {}", project_id);
 
     let storage = get_blocked_mods_config_storage().await;
     let config_guard = storage.read().await;
@@ -249,10 +249,10 @@ pub async fn is_modrinth_project_id_blocked(project_id: String) -> Result<bool, 
     if is_blocked {
         debug!("Modrinth project ID '{}' is blocked", project_id);
     } else {
-        debug!("Modrinth project ID '{}' is not blocked", project_id);
+        trace!("Modrinth project ID '{}' is not blocked", project_id);
     }
 
-    debug!("Command completed: is_modrinth_project_id_blocked");
+    trace!("Command completed: is_modrinth_project_id_blocked");
     Ok(is_blocked)
 }
 

@@ -177,7 +177,7 @@ impl MinecraftLauncher {
         piston_meta: &PistonMeta,
     ) -> Option<Vec<String>> {
         minecraft_arguments.map(|args_string| {
-            info!("\nProcessing old format arguments (with advanced splitting):");
+            info!("Processing old format arguments (with advanced splitting):");
 
             // 1. Create the helper to resolve variables
             let game_args_resolver = GameArguments::new(
@@ -300,7 +300,7 @@ impl MinecraftLauncher {
         );
 
         // Process and add JVM arguments
-        info!("\nProcessing JVM arguments:");
+        info!("Processing JVM arguments:");
         let mut has_classpath = false;
         let mut has_natives = false;
 

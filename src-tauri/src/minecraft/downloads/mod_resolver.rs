@@ -3,7 +3,7 @@ use crate::integrations::norisk_packs::{self, NoriskModSourceDefinition, NoriskM
 use crate::state::profile_state::{
     self, CustomModInfo, ModLoader, ModSource, NoriskModIdentifier, Profile,
 };
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::command;
@@ -110,7 +110,7 @@ async fn try_add_mod_to_final_list(
             mod_type_str, canonical_key, filename
         );
     } else {
-        info!(
+        trace!(
             "Adding {} mod to list: {}",
             mod_type_str, filename
         );
