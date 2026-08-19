@@ -803,21 +803,26 @@ pub async fn count_files_recursively(dir_path: &Path) -> Result<usize> {
 /// Sums the size of every file under a directory recursively, in bytes.
 /// Unreadable entries are skipped silently to avoid aborting the whole walk on a permission hiccup.
 pub async fn calculate_dir_size_recursively(dir_path: &Path) -> Result<u64> {
+    let root = dir_path.to_path_buf();
+    tokio::task::spawn_blocking(move || dir_size_sync(&root))
+        .await
+        .map_err(|e| AppError::Other(format!("Dir size task failed: {e}")))
+}
+
+fn dir_size_sync(root: &Path) -> u64 {
     let mut total: u64 = 0;
-    let mut dirs_to_check = vec![dir_path.to_path_buf()];
+    let mut dirs_to_check = vec![root.to_path_buf()];
 
     while let Some(current_dir) = dirs_to_check.pop() {
-        let mut entries = match fs::read_dir(&current_dir).await {
-            Ok(e) => e,
-            Err(_) => continue,
+        let Ok(entries) = std::fs::read_dir(&current_dir) else {
+            continue;
         };
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let file_type = match entry.file_type().await {
-                Ok(ft) => ft,
-                Err(_) => continue,
+        for entry in entries.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
             };
             if file_type.is_file() {
-                if let Ok(meta) = entry.metadata().await {
+                if let Ok(meta) = entry.metadata() {
                     total = total.saturating_add(meta.len());
                 }
             } else if file_type.is_dir() {
@@ -826,7 +831,7 @@ pub async fn calculate_dir_size_recursively(dir_path: &Path) -> Result<u64> {
         }
     }
 
-    Ok(total)
+    total
 }
 
 /// Copies directory with progress events for each file
