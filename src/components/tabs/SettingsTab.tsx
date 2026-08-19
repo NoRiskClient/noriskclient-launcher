@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import type { LauncherConfig } from "../../types/launcherConfig";
@@ -17,12 +17,14 @@ import { DebugSection, getDebugTabs } from "./DebugSection";
 import { GeneralTab } from "./settings/GeneralTab";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { AdvancedTab } from "./settings/AdvancedTab";
+import { ClipsTab } from "./settings/ClipsTab";
 import { SettingsConfigProvider } from "./settings/settings-context";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { isWindows } from "../../utils/platform";
 
-type SettingsTabId = "general" | "appearance" | "advanced" | "debug";
+type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
 interface SettingsTabProps {
   onClose: () => void;
@@ -53,6 +55,8 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab, sidebarQuery]);
 
+  const clipsAvailable = useMemo(() => isWindows(), []);
+
   const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
     general: [
       { id: "language", label: t("settings.language") },
@@ -65,6 +69,14 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "font", label: t("settings.font.title") },
       { id: "background", label: t("settings.background.title") },
       { id: "custom-background", label: t("settings.custom_background.title") },
+    ],
+    clips: [
+      { id: "clips-general", label: t("settings.clips.title") },
+      { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
+      { id: "clips-buffer", label: t("settings.clips.buffer.title") },
+      { id: "clips-quality", label: t("settings.clips.quality.title") },
+      { id: "clips-audio", label: t("settings.clips.audio.title") },
+      { id: "clips-storage", label: t("settings.clips.storage.title") },
     ],
     advanced: [
       { id: "login_cache", label: t("settings.sections.login_cache") },
@@ -83,6 +95,14 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   }[] = [
     { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
+    ...(clipsAvailable
+      ? [{
+          id: "clips" as const,
+          label: t("settings.tabs.clips"),
+          icon: "solar:videocamera-record-bold",
+          children: sectionDefs.clips,
+        }]
+      : []),
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
     { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
   ];
@@ -271,11 +291,12 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     const bodyOf: Partial<Record<SettingsTabId, ReactNode>> = {
       general: <GeneralTab />,
       appearance: <AppearanceTab />,
+      ...(clipsAvailable ? { clips: <ClipsTab /> } : {}),
       advanced: <AdvancedTab />,
     };
 
     if (sidebarQuery) {
-      const order: SettingsTabId[] = ["general", "appearance", "advanced"];
+      const order: SettingsTabId[] = ["general", "appearance", "clips", "advanced"];
       const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
         (id) => bodyOf[id],
       ) as SettingsTabId[];
