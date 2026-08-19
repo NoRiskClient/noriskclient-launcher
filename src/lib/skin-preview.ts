@@ -75,6 +75,15 @@ async function sha1(value: string): Promise<string> {
     .join("");
 }
 
+
+function cosmeticSettingsOf(metadataJson: unknown): unknown {
+  if (!metadataJson || typeof metadataJson !== "object") return null;
+  const defaults = (metadataJson as { defaultSettings?: unknown }).defaultSettings;
+  if (!defaults || typeof defaults !== "object") return null;
+  const { scale, offset, color } = defaults as { scale?: unknown; offset?: unknown; color?: unknown };
+  return { scale: scale ?? null, offset: offset ?? null, color: color ?? null };
+}
+
 export async function skinPreviewKey(
   request: SkinSnapshotRequest,
   options: SkinPreviewOptions = {},
@@ -94,6 +103,7 @@ export async function skinPreviewKey(
         id: c.id,
         geo: c.urls.geo,
         texture: c.urls.texture,
+        settings: cosmeticSettingsOf(c.urls.metadataJson),
       })),
       ...rest,
     }),
