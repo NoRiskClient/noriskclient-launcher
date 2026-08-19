@@ -38,7 +38,274 @@ pub struct ReferralState {
     pub redeemed_by_account: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityPreset {
+    Low,
+    Standard,
+    High,
+    Custom,
+}
+
+impl Default for QualityPreset {
+    fn default() -> Self {
+        QualityPreset::Standard
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QualitySpec {
+    pub width: u32,
+    pub height: u32,
+    pub fps: u32,
+    pub bitrate_kbps: u32,
+}
+
+pub const CUSTOM_RESOLUTIONS: [(u32, u32); 4] = [(640, 360), (854, 480), (1280, 720), (1920, 1080)];
+pub const CUSTOM_FPS: [u32; 5] = [24, 30, 60, 120, 144];
+pub const CUSTOM_BITRATES_KBPS: [u32; 11] = [
+    3_000, 5_000, 7_000, 10_000, 15_000, 20_000, 25_000, 30_000, 50_000, 70_000, 100_000,
+];
+
+const MIN_WIDTH: u32 = 160;
+const MAX_WIDTH: u32 = 3840;
+const MIN_HEIGHT: u32 = 120;
+const MAX_HEIGHT: u32 = 2160;
+const MIN_FPS: u32 = 10;
+const MAX_FPS: u32 = 240;
+const MIN_BITRATE_KBPS: u32 = 500;
+const MAX_BITRATE_KBPS: u32 = 200_000;
+
+pub const MIN_CLIP_SECONDS: u32 = 5;
+pub const MAX_CLIP_SECONDS: u32 = 120;
+
+pub const BUFFER_HEADROOM_SECONDS: u32 = 5;
+
+impl QualityPreset {
+    pub fn spec(&self) -> Option<QualitySpec> {
+        match self {
+            QualityPreset::Low => Some(QualitySpec { width: 640, height: 360, fps: 24, bitrate_kbps: 2_000 }),
+            QualityPreset::Standard => Some(QualitySpec { width: 1280, height: 720, fps: 60, bitrate_kbps: 7_000 }),
+            QualityPreset::High => Some(QualitySpec { width: 1920, height: 1080, fps: 60, bitrate_kbps: 12_000 }),
+            QualityPreset::Custom => None,
+        }
+    }
+
+    pub fn matching(spec: QualitySpec) -> QualityPreset {
+        for preset in [QualityPreset::Low, QualityPreset::Standard, QualityPreset::High] {
+            if preset.spec() == Some(spec) {
+                return preset;
+            }
+        }
+        QualityPreset::Custom
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ClipConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub quality: Option<QualityPreset>,
+    #[serde(default = "default_clip_width")]
+    pub width: u32,
+    #[serde(default = "default_clip_height")]
+    pub height: u32,
+    #[serde(default = "default_clip_fps")]
+    pub fps: u32,
+    #[serde(default = "default_clip_bitrate")]
+    pub bitrate_kbps: u32,
+    #[serde(default)]
+    pub codec: norisk_ipc::ClipCodec,
+    #[serde(default = "default_clip_encoder")]
+    pub encoder: String,
+    #[serde(default = "default_true_bool")]
+    pub capture_audio: bool,
+    #[serde(default)]
+    pub audio_source: norisk_ipc::AudioSourceChoice,
+    #[serde(default)]
+    pub audio_device_id: Option<String>,
+    #[serde(default = "default_volume")]
+    pub game_volume: u32,
+    #[serde(default = "default_volume")]
+    pub other_volume: u32,
+    #[serde(default)]
+    pub capture_microphone: bool,
+    #[serde(default)]
+    pub microphone_device_id: Option<String>,
+    #[serde(default = "default_volume")]
+    pub microphone_volume: u32,
+    #[serde(default)]
+    pub output_dir: Option<PathBuf>,
+    #[serde(default = "default_clip_max_storage_gb")]
+    pub max_storage_gb: u32,
+    #[serde(default = "default_clip_pre_roll")]
+    pub pre_roll_seconds: u32,
+    #[serde(default)]
+    pub post_roll_seconds: u32,
+    #[serde(default = "default_clip_hotkey_save")]
+    pub hotkey_save: String,
+    #[serde(default = "default_clip_hotkey_toggle")]
+    pub hotkey_toggle: String,
+}
+
+impl Default for ClipConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            quality: Some(QualityPreset::default()),
+            width: default_clip_width(),
+            height: default_clip_height(),
+            fps: default_clip_fps(),
+            bitrate_kbps: default_clip_bitrate(),
+            codec: norisk_ipc::ClipCodec::default(),
+            encoder: default_clip_encoder(),
+            capture_audio: true,
+            audio_source: norisk_ipc::AudioSourceChoice::default(),
+            audio_device_id: None,
+            game_volume: default_volume(),
+            other_volume: default_volume(),
+            capture_microphone: false,
+            microphone_device_id: None,
+            microphone_volume: default_volume(),
+            output_dir: None,
+            max_storage_gb: default_clip_max_storage_gb(),
+            pre_roll_seconds: default_clip_pre_roll(),
+            post_roll_seconds: 0,
+            hotkey_save: default_clip_hotkey_save(),
+            hotkey_toggle: default_clip_hotkey_toggle(),
+        }
+    }
+}
+
+impl ClipConfig {
+    pub fn resolved_output_dir(&self) -> PathBuf {
+        self.output_dir
+            .clone()
+            .unwrap_or_else(|| LAUNCHER_DIRECTORY.root_dir().join("clips"))
+    }
+
+    pub fn normalize(&mut self) {
+        if self.quality.is_none() {
+            self.quality = Some(QualityPreset::matching(QualitySpec {
+                width: self.width,
+                height: self.height,
+                fps: self.fps,
+                bitrate_kbps: self.bitrate_kbps,
+            }));
+        }
+    }
+
+    pub fn preset(&self) -> QualityPreset {
+        self.quality.unwrap_or_else(|| {
+            QualityPreset::matching(QualitySpec {
+                width: self.width,
+                height: self.height,
+                fps: self.fps,
+                bitrate_kbps: self.bitrate_kbps,
+            })
+        })
+    }
+
+    pub fn effective_quality(&self) -> QualitySpec {
+        self.preset().spec().unwrap_or(QualitySpec {
+            width: self.width.clamp(MIN_WIDTH, MAX_WIDTH) & !1,
+            height: self.height.clamp(MIN_HEIGHT, MAX_HEIGHT) & !1,
+            fps: self.fps.clamp(MIN_FPS, MAX_FPS),
+            bitrate_kbps: self.bitrate_kbps.clamp(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS),
+        })
+    }
+
+    pub fn effective_buffer_seconds(&self) -> u32 {
+        self.pre_roll_seconds
+            .saturating_add(BUFFER_HEADROOM_SECONDS)
+            .clamp(MIN_CLIP_SECONDS, MAX_CLIP_SECONDS + BUFFER_HEADROOM_SECONDS)
+    }
+
+    pub fn estimated_buffer_bytes(&self) -> u64 {
+        let quality = self.effective_quality();
+        let seconds = self.effective_buffer_seconds() as u64;
+        let video = quality.bitrate_kbps as u64 * 1000 / 8 * seconds;
+        let audio = if self.capture_audio {
+            160_u64 * 1000 / 8 * seconds
+        } else {
+            0
+        };
+        video + audio
+    }
+
+    pub fn to_capture_config(&self) -> norisk_ipc::CaptureConfig {
+        use norisk_ipc::EncoderPreference;
+        let quality = self.effective_quality();
+        norisk_ipc::CaptureConfig {
+            width: quality.width,
+            height: quality.height,
+            fps: quality.fps,
+            bitrate_kbps: quality.bitrate_kbps,
+            buffer_seconds: self.effective_buffer_seconds(),
+            gop_seconds: 2.0,
+            codec: self.codec,
+            encoder: match self.encoder.as_str() {
+                "nvenc" => EncoderPreference::Nvenc,
+                "amf" => EncoderPreference::Amf,
+                "quick_sync" => EncoderPreference::QuickSync,
+                "software" => EncoderPreference::Software,
+                _ => EncoderPreference::Auto,
+            },
+            capture_audio: self.capture_audio,
+            audio_source: self.audio_source,
+            audio_device_id: self.audio_device_id.clone(),
+            game_volume: self.game_volume,
+            other_volume: self.other_volume,
+            capture_microphone: self.capture_microphone,
+            microphone_device_id: self.microphone_device_id.clone(),
+            microphone_volume: self.microphone_volume,
+            output_dir: self.resolved_output_dir(),
+        }
+    }
+}
+
+fn default_clip_spec() -> QualitySpec {
+    QualityPreset::default()
+        .spec()
+        .expect("the default preset is never Custom")
+}
+fn default_clip_width() -> u32 {
+    default_clip_spec().width
+}
+fn default_clip_height() -> u32 {
+    default_clip_spec().height
+}
+fn default_clip_fps() -> u32 {
+    default_clip_spec().fps
+}
+fn default_clip_bitrate() -> u32 {
+    default_clip_spec().bitrate_kbps
+}
+fn default_volume() -> u32 {
+    100
+}
+fn default_clip_encoder() -> String {
+    "auto".to_string()
+}
+fn default_clip_max_storage_gb() -> u32 {
+    20
+}
+
+fn default_clip_pre_roll() -> u32 {
+    30
+}
+fn default_clip_hotkey_save() -> String {
+    "F8".to_string()
+}
+fn default_clip_hotkey_toggle() -> String {
+    "Shift+F8".to_string()
+}
+fn default_true_bool() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LauncherConfig {
     #[serde(default = "default_config_version")]
     pub version: u32,
@@ -83,6 +350,8 @@ pub struct LauncherConfig {
     /// Pack rollout override: "auto" | "off" | "on"
     #[serde(default = "default_pack_rollout_override")]
     pub pack_rollout_override: String,
+    #[serde(default)]
+    pub clips: ClipConfig,
 }
 
 fn default_config_version() -> u32 {
@@ -160,6 +429,7 @@ impl Default for LauncherConfig {
             cache_natives_extraction: default_cache_natives_extraction(),
             referral_state: None,
             pack_rollout_override: default_pack_rollout_override(),
+            clips: ClipConfig::default(),
         }
     }
 }
@@ -200,9 +470,11 @@ impl ConfigManager {
         let config_data = fs::read_to_string(&self.config_path).await?;
 
         match serde_json::from_str::<LauncherConfig>(&config_data) {
-            Ok(loaded_config) => {
+            Ok(mut loaded_config) => {
                 info!("Successfully loaded launcher configuration");
                 debug!("Loaded config: {:?}", loaded_config);
+
+                loaded_config.clips.normalize();
 
                 // Update the stored config
                 let mut config = self.config.write().await;
@@ -375,29 +647,7 @@ impl ConfigManager {
         let should_save = {
             let mut config = self.config.write().await;
             let current = &*config;
-
-            // Check if there's any change to avoid unnecessary saves
-            if current.is_experimental == new_config.is_experimental
-                && current.auto_check_updates == new_config.auto_check_updates
-                && current.concurrent_downloads == new_config.concurrent_downloads
-                && current.enable_discord_presence == new_config.enable_discord_presence
-                && current.check_beta_channel == new_config.check_beta_channel
-                && current.profile_grouping_criterion == new_config.profile_grouping_criterion
-                && current.open_logs_after_starting == new_config.open_logs_after_starting
-                && current.concurrent_io_limit == new_config.concurrent_io_limit
-                && current.last_played_profile == new_config.last_played_profile
-                && current.hooks == new_config.hooks
-                && current.hide_on_process_start == new_config.hide_on_process_start
-                && current.global_memory_settings.min == new_config.global_memory_settings.min
-                && current.global_memory_settings.max == new_config.global_memory_settings.max
-                && current.global_custom_jvm_args == new_config.global_custom_jvm_args
-                && current.custom_game_directory == new_config.custom_game_directory
-                && current.enable_analytics == new_config.enable_analytics
-                && current.use_browser_based_login == new_config.use_browser_based_login
-                && current.cache_natives_extraction == new_config.cache_natives_extraction
-                && current.referral_state == new_config.referral_state
-                && current.pack_rollout_override == new_config.pack_rollout_override
-            {
+            if !differs_ignoring_version(current, &new_config) {
                 debug!("No config changes detected, skipping save");
                 false
             } else {
@@ -530,6 +780,11 @@ impl ConfigManager {
                     cache_natives_extraction: new_config.cache_natives_extraction,
                     referral_state: new_config.referral_state.clone(),
                     pack_rollout_override: new_config.pack_rollout_override.clone(),
+                    clips: {
+                        let mut clips = new_config.clips.clone();
+                        clips.normalize();
+                        clips
+                    },
                 };
 
                 true
@@ -578,4 +833,454 @@ impl PostInitializationHandler for ConfigManager {
 
 pub fn default_config_path() -> PathBuf {
     LAUNCHER_DIRECTORY.root_dir().join(CONFIG_FILENAME)
+}
+
+fn differs_ignoring_version(current: &LauncherConfig, next: &LauncherConfig) -> bool {
+    let mut candidate = next.clone();
+    candidate.version = current.version;
+    candidate.clips.normalize();
+
+    let mut baseline = current.clone();
+    baseline.clips.normalize();
+
+    baseline != candidate
+}
+
+#[cfg(test)]
+mod clip_quality_tests {
+    use super::*;
+
+    #[test]
+    fn presets_resolve_to_the_advertised_numbers() {
+        let cases = [
+            (QualityPreset::Low, 640, 360, 24, 2_000),
+            (QualityPreset::Standard, 1280, 720, 60, 7_000),
+            (QualityPreset::High, 1920, 1080, 60, 12_000),
+        ];
+
+        for (preset, width, height, fps, bitrate_kbps) in cases {
+            let config = ClipConfig {
+                quality: Some(preset),
+                width: 7,
+                height: 7,
+                fps: 7,
+                bitrate_kbps: 7,
+                ..ClipConfig::default()
+            };
+
+            assert_eq!(
+                config.effective_quality(),
+                QualitySpec {
+                    width,
+                    height,
+                    fps,
+                    bitrate_kbps
+                },
+                "{preset:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn custom_keeps_the_stored_values() {
+        let config = ClipConfig {
+            quality: Some(QualityPreset::Custom),
+            width: 854,
+            height: 480,
+            fps: 144,
+            bitrate_kbps: 50_000,
+            ..ClipConfig::default()
+        };
+
+        assert_eq!(
+            config.effective_quality(),
+            QualitySpec {
+                width: 854,
+                height: 480,
+                fps: 144,
+                bitrate_kbps: 50_000
+            }
+        );
+    }
+
+    #[test]
+    fn every_offered_custom_value_survives_the_bounds() {
+        for (width, height) in CUSTOM_RESOLUTIONS {
+            for fps in CUSTOM_FPS {
+                for bitrate_kbps in CUSTOM_BITRATES_KBPS {
+                    let config = ClipConfig {
+                        quality: Some(QualityPreset::Custom),
+                        width,
+                        height,
+                        fps,
+                        bitrate_kbps,
+                        ..ClipConfig::default()
+                    };
+
+                    assert_eq!(
+                        config.effective_quality(),
+                        QualitySpec {
+                            width,
+                            height,
+                            fps,
+                            bitrate_kbps
+                        },
+                        "{width}x{height} {fps}fps {bitrate_kbps}kbps was altered"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hand_edited_values_are_brought_into_range() {
+        let config = ClipConfig {
+            quality: Some(QualityPreset::Custom),
+            width: 1921,
+            height: 99_999,
+            fps: 1,
+            bitrate_kbps: 999_999,
+            ..ClipConfig::default()
+        };
+
+        let quality = config.effective_quality();
+        assert_eq!(quality.width, 1920);
+        assert_eq!(quality.height, MAX_HEIGHT);
+        assert_eq!(quality.fps, MIN_FPS);
+        assert_eq!(quality.bitrate_kbps, MAX_BITRATE_KBPS);
+        assert_eq!(quality.width % 2, 0);
+        assert_eq!(quality.height % 2, 0);
+    }
+
+    #[test]
+    fn a_config_without_the_new_fields_loads_unchanged() {
+        let stored = serde_json::json!({
+            "enabled": true,
+            "buffer_seconds": 45,
+            "width": 1920,
+            "height": 1080,
+            "fps": 60,
+            "bitrate_kbps": 20_000,
+            "encoder": "nvenc",
+            "capture_audio": true,
+        });
+
+        let mut config: ClipConfig = serde_json::from_value(stored).expect("parses");
+        assert_eq!(config.quality, None, "the field is absent, not defaulted");
+        assert_eq!(config.codec, norisk_ipc::ClipCodec::H264);
+
+        assert_eq!(
+            config.effective_quality(),
+            QualitySpec {
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                bitrate_kbps: 20_000
+            },
+            "quality changed before normalize"
+        );
+
+        config.normalize();
+        assert_eq!(config.quality, Some(QualityPreset::Custom));
+        assert_eq!(
+            config.effective_quality(),
+            QualitySpec {
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                bitrate_kbps: 20_000
+            },
+            "quality changed after normalize"
+        );
+    }
+
+    #[test]
+    fn an_unusual_old_config_becomes_custom_without_moving() {
+        let mut config = ClipConfig {
+            quality: None,
+            width: 1600,
+            height: 900,
+            fps: 30,
+            bitrate_kbps: 12_345,
+            ..ClipConfig::default()
+        };
+
+        config.normalize();
+        assert_eq!(config.quality, Some(QualityPreset::Custom));
+        assert_eq!(
+            config.effective_quality(),
+            QualitySpec {
+                width: 1600,
+                height: 900,
+                fps: 30,
+                bitrate_kbps: 12_345
+            }
+        );
+    }
+
+    #[test]
+    fn normalize_leaves_an_explicit_choice_alone() {
+        let mut config = ClipConfig {
+            quality: Some(QualityPreset::Custom),
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            bitrate_kbps: 20_000,
+            ..ClipConfig::default()
+        };
+
+        config.normalize();
+        assert_eq!(config.quality, Some(QualityPreset::Custom));
+    }
+
+    #[test]
+    fn a_fresh_config_is_internally_consistent() {
+        let config = ClipConfig::default();
+        let spec = QualityPreset::default().spec().expect("not Custom");
+
+        assert_eq!(config.width, spec.width);
+        assert_eq!(config.height, spec.height);
+        assert_eq!(config.fps, spec.fps);
+        assert_eq!(config.bitrate_kbps, spec.bitrate_kbps);
+        assert_eq!(config.effective_quality(), spec);
+    }
+
+    #[test]
+    fn the_capture_config_carries_the_effective_quality() {
+        let config = ClipConfig {
+            quality: Some(QualityPreset::Low),
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            bitrate_kbps: 20_000,
+            codec: norisk_ipc::ClipCodec::Av1,
+            encoder: "nvenc".to_string(),
+            ..ClipConfig::default()
+        };
+
+        let capture = config.to_capture_config();
+        assert_eq!(capture.width, 640);
+        assert_eq!(capture.height, 360);
+        assert_eq!(capture.fps, 24);
+        assert_eq!(capture.bitrate_kbps, 2_000);
+        assert_eq!(capture.codec, norisk_ipc::ClipCodec::Av1);
+        assert_eq!(capture.encoder, norisk_ipc::EncoderPreference::Nvenc);
+    }
+
+    #[test]
+    fn a_low_quality_clip_fits_a_free_discord_upload() {
+        let quality = QualityPreset::Low.spec().expect("not Custom");
+        let audio_kbps = 160;
+        let bytes = (quality.bitrate_kbps + audio_kbps) as u64 * 1000 / 8 * 30;
+
+        assert!(bytes < 10 * 1000 * 1000, "a 30s Low clip is {bytes} bytes");
+    }
+
+    #[test]
+    fn the_memory_estimate_follows_bitrate_and_duration() {
+        let config = ClipConfig {
+            quality: Some(QualityPreset::Custom),
+            bitrate_kbps: 8_000,
+            pre_roll_seconds: 25,
+            capture_audio: false,
+            ..ClipConfig::default()
+        };
+
+        let seconds = 25 + BUFFER_HEADROOM_SECONDS as u64;
+        assert_eq!(config.estimated_buffer_bytes(), 8_000 * 1000 / 8 * seconds);
+
+        let with_audio = ClipConfig {
+            capture_audio: true,
+            ..config.clone()
+        };
+        assert_eq!(
+            with_audio.estimated_buffer_bytes(),
+            (8_000 + 160) * 1000 / 8 * seconds
+        );
+
+        let high = ClipConfig {
+            quality: Some(QualityPreset::High),
+            ..config
+        };
+        assert_eq!(high.estimated_buffer_bytes(), 12_000 * 1000 / 8 * seconds);
+    }
+
+    #[test]
+    fn the_buffer_always_covers_the_clip_length() {
+        for seconds in [MIN_CLIP_SECONDS, 15, 30, 60, MAX_CLIP_SECONDS] {
+            let config = ClipConfig {
+                pre_roll_seconds: seconds,
+                ..ClipConfig::default()
+            };
+
+            assert!(
+                config.effective_buffer_seconds() > seconds,
+                "{seconds}s of clip needs more than {seconds}s of history"
+            );
+            assert_eq!(
+                config.to_capture_config().buffer_seconds,
+                config.effective_buffer_seconds()
+            );
+        }
+    }
+
+    #[test]
+    fn an_absurd_clip_length_is_brought_into_range() {
+        let huge = ClipConfig {
+            pre_roll_seconds: 100_000,
+            ..ClipConfig::default()
+        };
+        assert_eq!(
+            huge.effective_buffer_seconds(),
+            MAX_CLIP_SECONDS + BUFFER_HEADROOM_SECONDS
+        );
+
+        let tiny = ClipConfig {
+            pre_roll_seconds: 0,
+            ..ClipConfig::default()
+        };
+        assert!(tiny.effective_buffer_seconds() >= MIN_CLIP_SECONDS);
+    }
+
+    #[test]
+    fn a_config_with_the_old_buffer_field_still_loads() {
+        let stored = serde_json::json!({
+            "enabled": true,
+            "buffer_seconds": 45,
+            "quality": "standard",
+            "width": 1280,
+            "height": 720,
+            "fps": 60,
+            "bitrate_kbps": 7_000,
+            "encoder": "auto",
+            "capture_audio": true,
+            "pre_roll_seconds": 30,
+        });
+
+        let config: ClipConfig = serde_json::from_value(stored).expect("parses");
+        assert_eq!(config.pre_roll_seconds, 30);
+        assert_eq!(
+            config.effective_buffer_seconds(),
+            30 + BUFFER_HEADROOM_SECONDS
+        );
+    }
+
+    #[test]
+    fn matching_recognises_each_preset_and_nothing_else() {
+        for preset in [
+            QualityPreset::Low,
+            QualityPreset::Standard,
+            QualityPreset::High,
+        ] {
+            assert_eq!(QualityPreset::matching(preset.spec().unwrap()), preset);
+        }
+
+        assert_eq!(
+            QualityPreset::matching(QualitySpec {
+                width: 1280,
+                height: 720,
+                fps: 60,
+                bitrate_kbps: 6_999,
+            }),
+            QualityPreset::Custom,
+            "one number off is not Standard"
+        );
+    }
+
+    #[test]
+    fn a_changed_clip_setting_counts_as_a_change() {
+        let current = LauncherConfig::default();
+
+        let changes: Vec<(&str, Box<dyn Fn(&mut ClipConfig)>)> = vec![
+            ("enabled", Box::new(|c: &mut ClipConfig| c.enabled = !c.enabled)),
+            ("quality", Box::new(|c: &mut ClipConfig| c.quality = Some(QualityPreset::Low))),
+            ("codec", Box::new(|c: &mut ClipConfig| c.codec = norisk_ipc::ClipCodec::Av1)),
+            ("encoder", Box::new(|c: &mut ClipConfig| c.encoder = "nvenc".into())),
+            ("bitrate", Box::new(|c: &mut ClipConfig| c.bitrate_kbps = 55_000)),
+            ("resolution", Box::new(|c: &mut ClipConfig| c.width = 854)),
+            ("fps", Box::new(|c: &mut ClipConfig| c.fps = 144)),
+            ("clip length", Box::new(|c: &mut ClipConfig| c.pre_roll_seconds = 45)),
+            ("audio", Box::new(|c: &mut ClipConfig| c.capture_audio = !c.capture_audio)),
+            (
+                "audio source",
+                Box::new(|c: &mut ClipConfig| c.audio_source = norisk_ipc::AudioSourceChoice::GameOnly),
+            ),
+            (
+                "audio device",
+                Box::new(|c: &mut ClipConfig| c.audio_device_id = Some("{some-endpoint}".into())),
+            ),
+            ("save hotkey", Box::new(|c: &mut ClipConfig| c.hotkey_save = "F9".into())),
+            ("toggle hotkey", Box::new(|c: &mut ClipConfig| c.hotkey_toggle = "Ctrl+F9".into())),
+            (
+                "output folder",
+                Box::new(|c: &mut ClipConfig| c.output_dir = Some(PathBuf::from("D:/clips"))),
+            ),
+        ];
+
+        for (what, change) in changes {
+            let mut next = current.clone();
+            change(&mut next.clips);
+            assert!(
+                differs_ignoring_version(&current, &next),
+                "changing the {what} setting must be saved"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unchanged_config_is_not_rewritten() {
+        let current = LauncherConfig::default();
+        assert!(!differs_ignoring_version(&current, &current.clone()));
+    }
+
+    #[test]
+    fn the_version_alone_is_not_a_change() {
+        let current = LauncherConfig::default();
+        let mut next = current.clone();
+        next.version = current.version.wrapping_add(1);
+
+        assert!(!differs_ignoring_version(&current, &next));
+    }
+
+    #[test]
+    fn an_unnormalised_config_is_not_a_change() {
+        let mut current = LauncherConfig::default();
+        current.clips.quality = Some(QualityPreset::Standard);
+
+        let mut next = current.clone();
+        next.clips.quality = None;
+
+        assert!(
+            !differs_ignoring_version(&current, &next),
+            "normalising must not look like an edit, or every save would write again"
+        );
+    }
+
+    #[test]
+    fn other_settings_still_count_as_changes() {
+        let current = LauncherConfig::default();
+
+        let mut experimental = current.clone();
+        experimental.is_experimental = !current.is_experimental;
+        assert!(differs_ignoring_version(&current, &experimental));
+
+        let mut memory = current.clone();
+        memory.global_memory_settings.max += 1024;
+        assert!(differs_ignoring_version(&current, &memory));
+    }
+
+    #[test]
+    fn the_wire_names_are_stable() {
+        for (preset, name) in [
+            (QualityPreset::Low, "low"),
+            (QualityPreset::Standard, "standard"),
+            (QualityPreset::High, "high"),
+            (QualityPreset::Custom, "custom"),
+        ] {
+            assert_eq!(
+                serde_json::to_value(preset).unwrap(),
+                serde_json::json!(name)
+            );
+        }
+    }
 }
