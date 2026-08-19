@@ -18,6 +18,14 @@ pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan clea
 pub mod file_utils; // Utilities for file operations like reading archives
 pub mod export_utils;
 pub mod hash_utils;
+pub mod clip_library;
+pub mod clip_overlay;
+#[cfg(windows)]
+pub mod hotkey_hook;
+#[cfg(windows)]
+pub mod window_finder;
+#[cfg(windows)]
+pub mod hotkey_manager;
 pub mod import_safety; // Strips execution/path primitives out of untrusted imported packs
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally

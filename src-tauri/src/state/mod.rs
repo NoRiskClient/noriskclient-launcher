@@ -1,4 +1,5 @@
 pub mod active_skin_state;
+pub mod capture_state;
 pub mod config_state;
 pub mod content_cache_state;
 pub mod cosmetic_pack_state;
