@@ -399,6 +399,59 @@ async fn main() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
+                #[cfg(windows)]
+                {
+                    let handle = state_init_app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let Ok(state) = state::state_manager::State::get().await else {
+                            return;
+                        };
+                        let clips = state.config_manager.get_config().await.clips;
+                        if !clips.enabled {
+                            debug!("Clip system disabled; not starting the capture engine");
+                            return;
+                        }
+
+
+                        state.capture_supervisor.attach_app(handle.clone()).await;
+
+                        if let Err(e) = utils::clip_overlay::create(&handle) {
+                            error!("Could not create the clip overlay: {e}");
+                        }
+
+                        if let Err(e) = state.capture_supervisor.start().await {
+                            error!("Could not start the capture engine: {e}");
+                            return;
+                        }
+                        if let Err(e) = state
+                            .capture_supervisor
+                            .send(norisk_ipc::LauncherToCapture::Configure(
+                                clips.to_capture_config(),
+                            ))
+                        {
+                            error!("Could not configure the capture engine: {e}");
+                        }
+
+                        match utils::window_finder::find_running_game() {
+                            Some(pid) => {
+                                info!("Found a game already running (pid {pid}); attaching");
+                                if let Err(e) = state
+                                    .capture_supervisor
+                                    .send(norisk_ipc::LauncherToCapture::AttachWindow { pid })
+                                {
+                                    log::warn!("Could not attach to the running game: {e}");
+                                }
+                            }
+                            None => debug!("No game running; the engine will wait for one"),
+                        }
+
+                        match utils::hotkey_manager::apply(&handle, &clips) {
+                            Ok(keys) => info!("Clip system ready, hotkeys: {keys:?}"),
+                            Err(e) => error!("Clip hotkeys could not be registered: {e}"),
+                        }
+                    });
+                }
+
                 info!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
@@ -782,6 +835,17 @@ async fn main() {
             add_message_reaction,
             remove_message_reaction,
             commands::deep_link_handler::confirm_auth_bridge,
+            commands::clip_commands::capture_apply_settings,
+            commands::clip_commands::capture_release_hotkeys,
+            commands::clip_commands::capture_status,
+            commands::clip_commands::capture_encoder_capabilities,
+            commands::clip_commands::capture_show_overlay,
+            commands::clip_commands::capture_hide_overlay,
+            commands::clip_commands::clip_list,
+            commands::clip_commands::clip_storage_usage,
+            commands::clip_commands::clip_delete,
+            commands::clip_commands::clip_reveal,
+            commands::clip_commands::clip_open_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
