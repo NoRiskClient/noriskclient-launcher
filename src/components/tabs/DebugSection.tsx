@@ -31,6 +31,10 @@ import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileStore } from "../../store/profile-store";
 import { useContentCacheStore } from "../../store/content-cache-store";
 import { SettingsSection } from "../ui/settings/SettingsSection";
+import { SettingRow } from "../ui/settings/SettingRow";
+import { Select } from "../ui/Select";
+import { useSettingsConfig } from "./settings/settings-context";
+import { LOG_LEVELS, type LogLevel } from "../../types/launcherConfig";
 
 export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
 
@@ -184,6 +188,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
 
 export function DebugSection() {
   const { t } = useTranslation();
+  const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const [permissions, setPermissions] = useState<PermissionCacheState | null>(null);
   const [refreshingPerms, setRefreshingPerms] = useState(false);
 
@@ -207,6 +212,20 @@ export function DebugSection() {
 
   return (
     <div className="space-y-6">
+      <SettingsSection id="settings-section-log-level" title={t("debug.log_level.title")} icon="solar:tuning-2-bold">
+        <SettingRow label={t("debug.log_level.label")} description={t("debug.log_level.tooltip")} disabled={saving}>
+          <div className="w-40">
+            <Select
+              value={tempConfig?.log_level ?? "debug"}
+              onChange={(value) => tempConfig && setTempConfig({ ...tempConfig, log_level: value as LogLevel })}
+              options={LOG_LEVELS.map((level) => ({ value: level, label: t(`debug.log_level.${level}`) }))}
+              size="sm"
+              variant="flat"
+              disabled={saving}
+            />
+          </div>
+        </SettingRow>
+      </SettingsSection>
       <LogFileSection id="launcher" title={t("debug.tabs.launcher")} icon="solar:document-text-bold" loader={listLauncherLogs} />
       <LogFileSection id="minecraft" title={t("debug.tabs.minecraft")} icon="solar:document-text-bold" loader={listAllMcLogs} />
       <LogFileSection id="process" title={t("debug.tabs.process")} icon="solar:document-text-bold" loader={listProcessLogs} />

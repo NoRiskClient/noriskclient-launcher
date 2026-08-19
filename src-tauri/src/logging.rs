@@ -42,21 +42,21 @@ impl Encode for RedactingEncoder {
     }
 }
 
-/// Initializes the logging system using log4rs.
-/// Configures a rolling file appender and a console appender.
-pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
-    let log_dir = LAUNCHER_DIRECTORY.root_dir().join(LOG_DIR_NAME);
+pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
 
-    // Ensure the log directory exists
-    if !log_dir.exists() {
-        fs::create_dir_all(&log_dir).await?;
-        // Use log::info! here if possible, but logging might not be fully up yet.
-        eprintln!(
-            "[Logging Setup] Created log directory: {}",
-            log_dir.display()
-        );
-    }
+static LOG_HANDLE: std::sync::OnceLock<log4rs::Handle> = std::sync::OnceLock::new();
 
+pub fn env_log_level() -> Option<LevelFilter> {
+    std::env::var("NRC_LOG_LEVEL")
+        .ok()
+        .and_then(|value| value.trim().parse::<LevelFilter>().ok())
+}
+
+pub fn current_log_level() -> LevelFilter {
+    log::max_level()
+}
+
+fn build_config(log_dir: &std::path::Path, root_level: LevelFilter) -> Result<Config, Box<dyn std::error::Error>> {
     let log_file_path = log_dir.join(LOG_FILE_NAME);
 
     // --- Configure File Rolling Policy ---
@@ -78,12 +78,6 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
         .target(Target::Stdout)
         .build();
 
-    let root_level = std::env::var("NRC_LOG_LEVEL")
-        .ok()
-        .and_then(|value| value.parse::<LevelFilter>().ok())
-        .unwrap_or(LevelFilter::Debug);
-
-    // --- Configure log4rs ---
     let config = Config::builder()
         .appender(Appender::builder().build("file", Box::new(file_appender)))
         .appender(Appender::builder().build("stdout", Box::new(console_appender))) // Add console appender
@@ -97,18 +91,58 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
                 .appender("stdout") // Log to console
                 .build(root_level),
         )?;
+    Ok(config)
+}
+
+/// Initializes the logging system using log4rs.
+/// Configures a rolling file appender and a console appender.
+pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+    let log_dir = LAUNCHER_DIRECTORY.root_dir().join(LOG_DIR_NAME);
+
+    // Ensure the log directory exists
+    if !log_dir.exists() {
+        fs::create_dir_all(&log_dir).await?;
+        // Use log::info! here if possible, but logging might not be fully up yet.
+        eprintln!(
+            "[Logging Setup] Created log directory: {}",
+            log_dir.display()
+        );
+    }
+
+    let root_level = env_log_level().unwrap_or(DEFAULT_LOG_LEVEL);
+    let config = build_config(&log_dir, root_level)?;
 
     // Initialize log4rs
-    log4rs::init_config(config)?;
+    let handle = log4rs::init_config(config)?;
+    let _ = LOG_HANDLE.set(handle);
 
     // Now we can use log::info!
     log::info!(
-        "Logging initialized (level: {}). Log directory: {}",
+        "Logging initialized (level: {}{}). Log directory: {}",
         root_level,
+        if env_log_level().is_some() { ", from NRC_LOG_LEVEL" } else { "" },
         log_dir.display()
     );
 
     Ok(())
+}
+
+pub fn set_log_level(level: LevelFilter) {
+    if current_log_level() == level {
+        return;
+    }
+    let Some(handle) = LOG_HANDLE.get() else {
+        log::warn!("Log level change requested before logging was initialized");
+        return;
+    };
+    let log_dir = LAUNCHER_DIRECTORY.root_dir().join(LOG_DIR_NAME);
+    match build_config(&log_dir, level) {
+        Ok(config) => {
+            log::info!("Log level changed: {} -> {}", current_log_level(), level);
+            handle.set_config(config);
+        }
+        Err(e) => log::error!("Failed to rebuild logging config for level {}: {}", level, e),
+    }
 }
 
 #[cfg(test)]
