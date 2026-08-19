@@ -804,6 +804,18 @@ impl ProcessManager {
         }
         // --- END Discord State Update ---
 
+        if let Ok(state) = State::get().await {
+            if state.config_manager.get_config().await.clips.enabled {
+                log::debug!("Attaching the capture engine to game process {} (pid {})", process_id, pid);
+                if let Err(e) = state
+                    .capture_supervisor
+                    .send(norisk_ipc::LauncherToCapture::AttachWindow { pid })
+                {
+                    log::warn!("Could not attach the capture engine: {}", e);
+                }
+            }
+        }
+
         if let Err(e) = self.save_processes().await {
             log::error!(
                 "Failed to save processes state immediately after starting {}: {}",
@@ -1042,6 +1054,14 @@ impl ProcessManager {
                     "Monitor task for process {} failed to get global state to emit exit event.",
                     process_id
                 );
+            }
+
+            if let Ok(global_state) = State::get().await {
+                if global_state.config_manager.get_config().await.clips.enabled {
+                    let _ = global_state
+                        .capture_supervisor
+                        .send(norisk_ipc::LauncherToCapture::DetachWindow);
+                }
             }
 
             // Show main window again if it was hidden (hide_on_process_start setting)

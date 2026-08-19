@@ -297,7 +297,7 @@ pub struct ProfileSettings {
     pub quick_play_path: Option<String>, // Quick Play Pfad für direkten Welt-/Server-Start
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct MemorySettings {
     pub min: u32, // in MB
     pub max: u32, // in MB
