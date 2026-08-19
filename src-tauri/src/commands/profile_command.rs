@@ -814,7 +814,7 @@ pub async fn resolve_loader_version(
     profile_id: Uuid,
     minecraft_version: String,
 ) -> Result<ResolvedLoaderVersion, CommandError> {
-    info!(
+    log::trace!(
         "Executing resolve_loader_version command for profile {} with MC version {}",
         profile_id, minecraft_version
     );
@@ -2408,15 +2408,7 @@ pub async fn get_local_content(
 
     match ProfileUtilLocalContentLoader::load_items(params.clone()).await {
         // .clone() if params is used later, or pass directly
-        Ok(items) => {
-            info!(
-                "Successfully loaded {} items of type '{:?}' for profile {}",
-                items.len(),
-                params.content_type, // Log the enum directly
-                params.profile_id
-            );
-            Ok(items)
-        }
+        Ok(items) => Ok(items),
         Err(e) => {
             error!(
                 "Failed to load content type '{:?}' for profile {}: {}",

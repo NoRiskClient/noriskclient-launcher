@@ -11,6 +11,7 @@ use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::debug;
 use log::error;
 use log::info;
+use log::trace;
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
@@ -772,7 +773,7 @@ impl MinecraftAuthStore {
         force_update: bool,
         experimental_mode: bool,
     ) -> Result<(Credentials, bool)> {
-        info!(
+        trace!(
             "[Token Refresh] Starting NoRisk token refresh check for user: {}",
             creds.username
         );
@@ -792,7 +793,7 @@ impl MinecraftAuthStore {
                 validation.insecure_disable_signature_validation();
                 match decode::<NoRiskTokenClaims>(&token.value, &key, &validation) {
                     Ok(data) => {
-                        info!(
+                        trace!(
                             "[Token Refresh] Token expiration check - Expires at: {}",
                             data.claims.exp
                         );
@@ -810,7 +811,7 @@ impl MinecraftAuthStore {
                     }
                 };
             } else {
-                info!("[Token Refresh] No token found for the selected mode");
+                debug!("[Token Refresh] No token found for the selected mode");
                 maybe_update = true;
             }
         }
@@ -897,7 +898,7 @@ impl MinecraftAuthStore {
                 }
             }
         } else {
-            info!("[Token Refresh] Token is still valid, no refresh needed");
+            trace!("[Token Refresh] Token is still valid, no refresh needed");
             Ok((creds.clone(), false))
         }
     }
@@ -1087,13 +1088,13 @@ impl MinecraftAuthStore {
                     debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
-                info!("[Account Manager] Saving updated account");
+                debug!("[Account Manager] Saving updated account");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved account");
+                debug!("[Account Manager] Successfully saved account");
 
                 Ok(Some(updated))
             } else {
-                info!("[Account Manager] Token refresh returned None, using original credentials");
+                debug!("[Account Manager] Token refresh returned None, using original credentials");
                 Ok(Some(creds))
             }
         } else {
@@ -1103,16 +1104,16 @@ impl MinecraftAuthStore {
     }
 
     pub async fn update_or_insert(&self, credentials: Credentials) -> Result<()> {
-        info!("[Account Manager] Starting account update/insert operation");
-        info!("[Account Manager] Account ID: {}", credentials.id);
-        info!("[Account Manager] Username: {}", credentials.username);
+        debug!("[Account Manager] Starting account update/insert operation");
+        debug!("[Account Manager] Account ID: {}", credentials.id);
+        debug!("[Account Manager] Username: {}", credentials.username);
 
         {
             let mut accounts = self.accounts.write().await;
 
             // If new credentials are active, deactivate all other accounts first
             if credentials.active {
-                info!("[Account Manager] New account is active, deactivating all other accounts");
+                debug!("[Account Manager] New account is active, deactivating all other accounts");
                 for account in accounts.iter_mut() {
                     account.active = false;
                 }
@@ -1120,7 +1121,7 @@ impl MinecraftAuthStore {
 
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
-                info!("[Account Manager] Found existing account, updating credentials");
+                debug!("[Account Manager] Found existing account, updating credentials");
                 // Preserve the existing ignore_child_protection_warning flag to avoid
                 // races where another concurrent flow set the flag while this flow
                 // was constructing credentials from stale data.
@@ -1131,15 +1132,15 @@ impl MinecraftAuthStore {
                 info!("[Account Manager] Account successfully updated (merged ignore flag)");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
-                info!("[Account Manager] No existing account found, creating new account");
+                debug!("[Account Manager] No existing account found, creating new account");
                 accounts.push(credentials);
                 info!("[Account Manager] New account successfully created");
             }
         } // Write-Lock wird hier automatisch freigegeben
 
-        info!("[Account Manager] Saving account changes to storage");
+        debug!("[Account Manager] Saving account changes to storage");
         self.save().await?;
-        info!("[Account Manager] Account changes successfully saved");
+        debug!("[Account Manager] Account changes successfully saved");
 
         Ok(())
     }
@@ -1149,11 +1150,11 @@ impl MinecraftAuthStore {
         creds: &Credentials,
         experimental_mode: bool,
     ) -> Result<Option<Credentials>> {
-        info!(
+        trace!(
             "[Token Check] Starting token validation check for user: {}",
             creds.username
         );
-        info!(
+        trace!(
             "[Token Check] Microsoft token expires at: {}",
             creds.expires
         );
@@ -1204,12 +1205,12 @@ impl MinecraftAuthStore {
                 }
             }
         } else {
-            info!("[Token Check] Microsoft token is still valid");
+            trace!("[Token Check] Microsoft token is still valid");
             if creds.ignore_child_protection_warning {
-                info!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
+                debug!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
                 Ok(None)
             } else {
-                info!("[Token Check] Checking NoRisk token status");
+                trace!("[Token Check] Checking NoRisk token status");
                 let (refreshed, changed) = self
                     .refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
                     .await?;
@@ -1224,23 +1225,23 @@ impl MinecraftAuthStore {
     }
 
     pub async fn get_active_account(&self) -> Result<Option<Credentials>> {
-        info!("[Account Manager] Starting get_active_account process");
+        trace!("[Account Manager] Starting get_active_account process");
 
         // Get the global state to check the experimental mode
         let state = crate::state::State::get().await?;
         let is_experimental = state.config_manager.is_experimental_mode().await;
-        info!(
+        trace!(
             "[Account Manager] Global experimental mode is: {}",
             is_experimental
         );
 
         // Zuerst nur lesen um den aktiven Account zu finden
         let active_account = {
-            info!("[Account Manager] Acquiring read lock to find active account");
+            trace!("[Account Manager] Acquiring read lock to find active account");
             let accounts = self.accounts.read().await;
-            info!("[Account Manager] Successfully acquired read lock");
+            trace!("[Account Manager] Successfully acquired read lock");
             let account = accounts.iter().find(|acc| acc.active).cloned();
-            info!(
+            trace!(
                 "[Account Manager] Active account found: {}",
                 account.is_some()
             );
@@ -1248,7 +1249,7 @@ impl MinecraftAuthStore {
         };
 
         if let Some(account) = active_account {
-            info!(
+            trace!(
                 "[Account Manager] Refreshing credentials for active account: {}",
                 account.username
             );
@@ -1275,16 +1276,16 @@ impl MinecraftAuthStore {
                     debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
-                info!("[Account Manager] Saving updated account");
+                debug!("[Account Manager] Saving updated account");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved account");
+                debug!("[Account Manager] Successfully saved account");
 
                 Ok(Some(updated))
             } else {
                 Ok(Some(account))
             }
         } else {
-            info!("[Account Manager] No active account found, checking for any accounts");
+            debug!("[Account Manager] No active account found, checking for any accounts");
 
             // Wenn kein Account aktiv ist, aber Accounts existieren, setze den ersten als aktiv
             let first_account = {
@@ -1302,9 +1303,9 @@ impl MinecraftAuthStore {
             }; // Write-Lock wird hier freigegeben
 
             if let Some(account) = first_account {
-                info!("[Account Manager] Saving changes");
+                debug!("[Account Manager] Saving changes");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved changes");
+                debug!("[Account Manager] Successfully saved changes");
                 Ok(Some(account))
             } else {
                 info!("[Account Manager] No accounts found at all");
@@ -1314,12 +1315,12 @@ impl MinecraftAuthStore {
     }
 
     pub async fn remove_account(&self, id: Uuid) -> Result<()> {
-        info!("[Account Manager] Starting account removal for ID: {}", id);
+        debug!("[Account Manager] Starting account removal for ID: {}", id);
 
         {
-            info!("[Account Manager] Acquiring write lock for account removal");
+            debug!("[Account Manager] Acquiring write lock for account removal");
             let mut accounts = self.accounts.write().await;
-            info!("[Account Manager] Successfully acquired write lock");
+            debug!("[Account Manager] Successfully acquired write lock");
 
             let initial_count = accounts.len();
             accounts.retain(|acc| acc.id != id);
@@ -1330,48 +1331,48 @@ impl MinecraftAuthStore {
             } else {
                 info!("[Account Manager] Successfully removed account");
             }
-            info!("[Account Manager] Releasing write lock");
+            debug!("[Account Manager] Releasing write lock");
         } // Write-Lock wird hier freigegeben
 
-        info!("[Account Manager] Saving changes after account removal");
+        debug!("[Account Manager] Saving changes after account removal");
         self.save().await?;
-        info!("[Account Manager] Successfully saved changes");
+        debug!("[Account Manager] Successfully saved changes");
 
         Ok(())
     }
 
     pub async fn get_all_accounts(&self) -> Result<Vec<Credentials>> {
-        info!("[Account Manager] Starting get_all_accounts operation");
+        trace!("[Account Manager] Starting get_all_accounts operation");
 
-        info!("[Account Manager] Acquiring read lock");
+        trace!("[Account Manager] Acquiring read lock");
         let accounts = self.accounts.read().await;
-        info!("[Account Manager] Successfully acquired read lock");
+        trace!("[Account Manager] Successfully acquired read lock");
 
-        info!("[Account Manager] Found {} accounts", accounts.len());
+        trace!("[Account Manager] Found {} accounts", accounts.len());
         let accounts_clone = accounts.clone();
 
-        info!("[Account Manager] Returning all accounts");
+        trace!("[Account Manager] Returning all accounts");
         Ok(accounts_clone)
     }
 
     pub async fn set_active_account(&self, account_id: Uuid) -> Result<()> {
-        info!("[Account Manager] Starting set_active_account operation");
+        debug!("[Account Manager] Starting set_active_account operation");
         info!("[Account Manager] Setting account {} as active", account_id);
 
         {
-            info!("[Account Manager] Acquiring write lock");
+            debug!("[Account Manager] Acquiring write lock");
             let mut accounts = self.accounts.write().await;
-            info!("[Account Manager] Successfully acquired write lock");
+            debug!("[Account Manager] Successfully acquired write lock");
 
             // Set all accounts to inactive first
-            info!("[Account Manager] Deactivating all accounts");
+            debug!("[Account Manager] Deactivating all accounts");
             for account in accounts.iter_mut() {
                 account.active = false;
             }
 
             // Find and set the specified account as active
             if let Some(account) = accounts.iter_mut().find(|acc| acc.id == account_id) {
-                info!("[Account Manager] Found account, setting as active");
+                debug!("[Account Manager] Found account, setting as active");
                 account.active = true;
             } else {
                 info!("[Account Manager] Warning: Account not found");
@@ -1381,12 +1382,12 @@ impl MinecraftAuthStore {
                 )));
             }
 
-            info!("[Account Manager] Releasing write lock");
+            debug!("[Account Manager] Releasing write lock");
         } // Write-Lock wird hier freigegeben
 
-        info!("[Account Manager] Saving changes");
+        debug!("[Account Manager] Saving changes");
         self.save().await?;
-        info!("[Account Manager] Successfully saved changes");
+        debug!("[Account Manager] Successfully saved changes");
 
         Ok(())
     }

@@ -3,7 +3,7 @@ use crate::error::{AppError, Result};
 use crate::integrations::lenient;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::{Mod, ModLoader, ModPackInfo, ModPackSource, ModSource, Profile, ProfileSettings, ProfileState};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -2501,12 +2501,12 @@ pub fn check_mod_update_by_file_index(
     game_versions: &[String],
     loaders: &[String],
 ) -> Option<CurseForgeFileIndex> {
-    log::debug!("###Checking mod update by file index for mod {}", mod_data.name);
+    log::trace!("###Checking mod update by file index for mod {}", mod_data.name);
 
     // Debug: Show all latestFilesIndexes entries first
-    log::debug!("Mod {}: Available latestFilesIndexes entries ({} total):", mod_data.name, mod_data.latestFilesIndexes.len());
+    log::trace!("Mod {}: Available latestFilesIndexes entries ({} total):", mod_data.name, mod_data.latestFilesIndexes.len());
     for (i, index_entry) in mod_data.latestFilesIndexes.iter().enumerate() {
-        log::debug!("  [{}] FileId: {}, GameVersion: {}, ModLoader: {:?}, Filename: '{}', ReleaseType: {}",
+        log::trace!("  [{}] FileId: {}, GameVersion: {}, ModLoader: {:?}, Filename: '{}', ReleaseType: {}",
                    i,
                    index_entry.fileId,
                    index_entry.gameVersion,
@@ -2517,7 +2517,7 @@ pub fn check_mod_update_by_file_index(
 
     // Find the index of the installed file in the mod's latestFilesIndexes
     let installed_file_id = fingerprint_match.file.id;
-    log::debug!("Mod {}: Looking for installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
+    log::trace!("Mod {}: Looking for installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
 
     // Find the file index entry for our installed file
     let installed_file_index = mod_data.latestFilesIndexes
@@ -2525,14 +2525,14 @@ pub fn check_mod_update_by_file_index(
         .find(|idx| idx.fileId == installed_file_id);
 
     if let Some(index) = installed_file_index {
-        log::debug!("Mod {}: Found installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
+        log::trace!("Mod {}: Found installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
     } else {
-        log::debug!("Mod {}: Installed file ID {} NOT found in latestFilesIndexes - will return first compatible file from latestFilesIndexes", mod_data.name, installed_file_id);
+        log::trace!("Mod {}: Installed file ID {} NOT found in latestFilesIndexes - will return first compatible file from latestFilesIndexes", mod_data.name, installed_file_id);
     }
 
     // If we found the installed file, log its details
     if let Some(installed_index) = installed_file_index {
-        log::debug!(
+        log::trace!(
             "Mod {}: Installed file ID {} found in latestFilesIndexes - GameVersion: {}, FileId: {}, ModLoader: {:?}",
             mod_data.name,
             installed_file_id,
@@ -2582,7 +2582,7 @@ pub fn check_mod_update_by_file_index(
         };
 
         if has_matching_game_version && has_matching_loader {
-            log::debug!(
+            log::trace!(
                 "Mod {}: Found compatible update via latestFilesIndexes - Index: {}, FileId: {}, GameVersion: {}, ModLoader: {:?}, Filename: '{}'",
                 mod_data.name,
                 current_pos,
@@ -2603,14 +2603,14 @@ pub fn check_mod_update_by_file_index(
         .min_by_key(|(pos, _)| *pos)
     {
         if installed_file_index.is_some() {
-            log::debug!(
+            log::trace!(
                 "Mod {}: Returning latest compatible update via latestFilesIndexes - Index: {}, FileId: {}",
                 mod_data.name,
                 latest_pos,
                 latest_update.fileId
             );
         } else {
-            log::debug!(
+            log::trace!(
                 "Mod {}: Returning first compatible file from latestFilesIndexes (installed file not found) - Index: {}, FileId: {}",
                 mod_data.name,
                 latest_pos,
@@ -2620,13 +2620,13 @@ pub fn check_mod_update_by_file_index(
         Some(latest_update)
     } else {
         if installed_file_index.is_some() {
-            log::debug!(
+            log::trace!(
                 "Mod {}: No newer compatible files found via latestFilesIndexes for installed file ID {}",
                 mod_data.name,
                 installed_file_id
             );
         } else {
-            log::debug!(
+            log::trace!(
                 "Mod {}: No compatible files found in latestFilesIndexes",
                 mod_data.name
             );
@@ -2809,7 +2809,7 @@ pub async fn check_mod_updates_bulk(
                 is_exact_match: true,
             });
         } else {
-            debug!("Mod {}: No newer compatible files found via latestFilesIndexes (exact match)", mod_data.name);
+            trace!("Mod {}: No newer compatible files found via latestFilesIndexes (exact match)", mod_data.name);
         }
     }
 
@@ -2847,7 +2847,7 @@ pub async fn check_mod_updates_bulk(
                 is_exact_match: false,
             });
         } else {
-            debug!("Mod {}: No newer compatible files found via latestFilesIndexes (partial match)", mod_data.name);
+            trace!("Mod {}: No newer compatible files found via latestFilesIndexes (partial match)", mod_data.name);
         }
     }
 

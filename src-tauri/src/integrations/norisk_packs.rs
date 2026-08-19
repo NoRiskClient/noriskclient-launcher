@@ -848,7 +848,7 @@ impl NoriskModpacksConfig {
         // --- 5. Handle Local Mods ---
         // Local mods defined directly in the pack override any inherited mods.
         if let local_mods = &base_definition.mods {
-            debug!(
+            log::trace!(
                 "Pack '{}': Processing {} local mods",
                 pack_id,
                 local_mods.len()
@@ -882,7 +882,7 @@ impl NoriskModpacksConfig {
         // Convert the HashMap values back to a Vec
         let final_mod_list: Vec<NoriskModEntryDefinition> = resolved_mods.into_values().collect();
 
-        debug!(
+        log::trace!(
             "Pack '{}': Resolved to {} final mods.",
             pack_id,
             final_mod_list.len()

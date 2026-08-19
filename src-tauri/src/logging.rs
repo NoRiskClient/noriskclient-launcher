@@ -78,6 +78,11 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
         .target(Target::Stdout)
         .build();
 
+    let root_level = std::env::var("NRC_LOG_LEVEL")
+        .ok()
+        .and_then(|value| value.parse::<LevelFilter>().ok())
+        .unwrap_or(LevelFilter::Debug);
+
     // --- Configure log4rs ---
     let config = Config::builder()
         .appender(Appender::builder().build("file", Box::new(file_appender)))
@@ -90,14 +95,18 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
             Root::builder()
                 .appender("file") // Log to file
                 .appender("stdout") // Log to console
-                .build(LevelFilter::Debug), // Log Debug and above to both
+                .build(root_level),
         )?;
 
     // Initialize log4rs
     log4rs::init_config(config)?;
 
     // Now we can use log::info!
-    log::info!("Logging initialized. Log directory: {}", log_dir.display());
+    log::info!(
+        "Logging initialized (level: {}). Log directory: {}",
+        root_level,
+        log_dir.display()
+    );
 
     Ok(())
 }
