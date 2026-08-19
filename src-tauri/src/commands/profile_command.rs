@@ -2273,9 +2273,27 @@ pub async fn list_profile_screenshots(
 }
 
 // --- New DTO and Command for All Profiles and Last Played ---
+// List entry with `mods` stripped: the mods arrays make up ~95% of the serialized
+// profile list and blocked the WebView main thread on JSON.parse. The frontend
+// only needs the count here; full mods come from get_profile / get_local_content.
+#[derive(Serialize, Debug, Clone)]
+pub struct ProfileListEntry {
+    #[serde(flatten)]
+    profile: Profile,
+    mod_count: usize,
+}
+
+impl From<Profile> for ProfileListEntry {
+    fn from(mut profile: Profile) -> Self {
+        let mod_count = profile.mods.len();
+        profile.mods = Vec::new();
+        Self { profile, mod_count }
+    }
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct AllProfilesAndLastPlayed {
-    all_profiles: Vec<Profile>,
+    all_profiles: Vec<ProfileListEntry>,
     last_played_profile_id: Option<Uuid>,
 }
 
@@ -2356,7 +2374,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
     }
 
     Ok(AllProfilesAndLastPlayed {
-        all_profiles: user_profiles,
+        all_profiles: user_profiles.into_iter().map(ProfileListEntry::from).collect(),
         last_played_profile_id: effective_last_played_id,
     })
 }

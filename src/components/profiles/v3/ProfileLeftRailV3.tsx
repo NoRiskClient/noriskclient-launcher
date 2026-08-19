@@ -38,7 +38,7 @@ interface ProfileLeftRailV3Props {
 export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: ProfileLeftRailV3Props) {
   const { t } = useTranslation();
 
-  const modCount = profile.mods?.length ?? 0;
+  const modCount = profile.mod_count ?? profile.mods?.length ?? 0;
 
   const groups: NavGroup[] = [
     {
