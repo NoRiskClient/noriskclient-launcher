@@ -321,7 +321,7 @@ impl ProcessManager {
             );
             return Ok(());
         }
-        log::info!("Loading processes metadata from '{:?}'...", file_path);
+        log::trace!("Loading processes metadata from '{:?}'...", file_path);
         let json_content = async_fs::read_to_string(&file_path)
             .await
             .map_err(AppError::Io)?;
@@ -1214,7 +1214,7 @@ impl ProcessManager {
         notify_tx: mpsc::Sender<CrashReportNotification>,
     ) {
         let mut interval = interval(Duration::from_secs(10));
-        log::info!("Starting periodic process and watcher checker task.");
+        log::trace!("Starting periodic process and watcher checker task.");
 
         loop {
             interval.tick().await;
@@ -1348,7 +1348,7 @@ impl ProcessManager {
     /// Emits ProcessMetricsUpdate events to the frontend.
     async fn periodic_metrics_collector(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
         let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
-        log::info!("Starting periodic metrics collector task.");
+        log::trace!("Starting periodic metrics collector task.");
 
         let mut sys = System::new_all();
 
@@ -1766,17 +1766,16 @@ impl ProcessManager {
 #[async_trait]
 impl PostInitializationHandler for ProcessManager {
     async fn on_state_ready(&self, app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        log::info!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
+        log::trace!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
 
         // For process_crash_report_events: The task requires the receive end of an mpsc channel.
         // The most robust way is to initialize tx and rx in `new`, store rx in `self` (e.g., Arc<Mutex<Option<Receiver>>>)
         // and then .take() it here. For now, we will skip spawning this specific task here to simplify the deadlock fix.
         // This can be revisited. The deadlock was caused by `load_processes_and_watchers` calling `State::get()` too early.
-        log::warn!("ProcessManager: Spawning of 'process_crash_report_events' task is TENTATIVELY SKIPPED in on_state_ready to simplify deadlock fix. Review if needed.");
 
         // This was the critical call causing deadlock issues
         self.load_processes_and_watchers().await?;
-        log::info!("ProcessManager: Finished load_processes_and_watchers.");
+        log::trace!("ProcessManager: Finished load_processes_and_watchers.");
 
         let manager_clone_periodic_check_processes = Arc::clone(&self.processes);
         let manager_clone_periodic_check_watchers = Arc::clone(&self.active_watchers);
@@ -1789,13 +1788,13 @@ impl PostInitializationHandler for ProcessManager {
             manager_clone_periodic_check_watchers,
             notify_tx_for_periodic_check,
         ));
-        log::info!("ProcessManager: Spawned periodic_process_check task.");
+        log::trace!("ProcessManager: Spawned periodic_process_check task.");
 
         let metrics_processes_arc = Arc::clone(&self.processes);
         tokio::spawn(Self::periodic_metrics_collector(metrics_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_metrics_collector task.");
+        log::trace!("ProcessManager: Spawned periodic_metrics_collector task.");
 
-        log::info!("ProcessManager: Successfully completed on_state_ready.");
+        log::trace!("ProcessManager: Successfully completed on_state_ready.");
         Ok(())
     }
 }

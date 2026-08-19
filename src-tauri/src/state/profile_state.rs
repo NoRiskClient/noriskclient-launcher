@@ -10,7 +10,7 @@ use crate::utils::path_utils;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::{HashMap, HashSet};
@@ -482,7 +482,7 @@ fn apply_unified_version_to_mod(
 
 impl ProfileManager {
     pub fn new(profiles_path: PathBuf) -> Result<Self> {
-        info!(
+        trace!(
             "ProfileManager: Initializing with path: {:?} (profiles loading deferred)",
             profiles_path
         );
@@ -3481,13 +3481,13 @@ impl ProfileManager {
 #[async_trait]
 impl PostInitializationHandler for ProfileManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("ProfileManager: on_state_ready called. Loading profiles...");
+        trace!("ProfileManager: on_state_ready called. Loading profiles...");
         // PRIORITY 0: Create backup BEFORE ANYTHING else (including loading)
-        info!("ProfileManager: Creating pre-load backup of profiles.json...");
+        trace!("ProfileManager: Creating pre-load backup of profiles.json...");
         if self.profiles_path.exists() {
             match backup_utils::create_backup(&self.profiles_path, Some("profiles"), &self.backup_config).await {
                 Ok(backup_path) => {
-                    info!("ProfileManager: Pre-load backup created: {:?}", backup_path);
+                    trace!("ProfileManager: Pre-load backup created: {:?}", backup_path);
                 }
                 Err(e) => {
                     warn!("ProfileManager: Failed to create pre-load backup: {}", e);
@@ -3506,7 +3506,7 @@ impl PostInitializationHandler for ProfileManager {
             warn!("ProfileManager: Failed to sync standard profiles: {}", e);
         }
 
-        info!("ProfileManager: Successfully loaded profiles in on_state_ready.");
+        trace!("ProfileManager: Successfully loaded profiles in on_state_ready.");
 
         // Fire-and-forget: purge trashed items and old backups after init
         let backup_config_clone = self.backup_config.clone();

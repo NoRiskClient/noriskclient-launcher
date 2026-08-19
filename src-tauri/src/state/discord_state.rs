@@ -121,16 +121,16 @@ impl DiscordManager {
             return Ok(());
         }
 
-        debug!("Attempting to connect to Discord...");
+        trace!("Attempting to connect to Discord...");
         let mut client_lock = self.client.lock().await;
 
         if client_lock.is_none() {
-            debug!("No existing Discord client, creating new one...");
+            trace!("No existing Discord client, creating new one...");
             match DiscordIpcClient::new(DISCORD_APP_ID)
                 .map_err(|e| AppError::DiscordError(format!("Discord error: {}", e)))
             {
                 Ok(mut client) => {
-                    debug!("Discord client created, connecting...");
+                    trace!("Discord client created, connecting...");
                     match client.connect().map_err(|e| {
                         AppError::DiscordError(format!("Discord connection error: {}", e))
                     }) {
@@ -151,7 +151,7 @@ impl DiscordManager {
                 }
             }
         } else {
-            debug!("Discord client already exists");
+            trace!("Discord client already exists");
         }
 
         Ok(())
@@ -223,7 +223,7 @@ impl DiscordManager {
         if client_lock.is_none() {
             drop(client_lock);
             if self.in_reconnect_backoff().await {
-                trace!("Discord unreachable, skipping reconnect during backoff");
+                debug!("Discord unreachable, skipping reconnect during backoff");
                 return Ok(());
             }
             debug!("No Discord client available, attempting to reconnect...");
@@ -484,7 +484,7 @@ impl DiscordManager {
     }
 
     pub async fn handle_focus_event(&self) -> Result<()> {
-        debug!("Handling focus event within DiscordManager.");
+        trace!("Handling focus event within DiscordManager.");
 
         if !self.is_enabled().await {
             return Ok(());
@@ -492,7 +492,7 @@ impl DiscordManager {
 
         // Re-apply the current state (force=true to refresh Discord with latest client files)
         let current = self.current_state.read().await.clone();
-        debug!("Focus handling: Re-applying current state: {:?}", current);
+        trace!("Focus handling: Re-applying current state: {:?}", current);
         self.set_state_internal(current, true).await?;
 
         Ok(())

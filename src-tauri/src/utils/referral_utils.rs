@@ -6,7 +6,7 @@
 //! 3. After login (when we have a NoRisk token), we report the code
 //! 4. On successful report, we set redeemed=true (code stays for tracing!)
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -23,22 +23,18 @@ const REFERRAL_CODE_FILENAME: &str = "referral_code.txt";
 /// This should be called during launcher startup.
 /// Does NOT send to backend - that happens after login with token.
 pub async fn check_and_process_referral_code() -> Result<()> {
-    info!("[Referral] Checking for referral code...");
+    trace!("[Referral] Checking for referral code...");
 
     // Get the install directory (where the executable is located)
     let install_dir = get_install_directory()?;
     let referral_file_path = install_dir.join(REFERRAL_CODE_FILENAME);
 
-    debug!(
-        "[Referral] Looking for referral code at: {:?}",
-        referral_file_path
-    );
-
     // Check if referral file exists
     if !referral_file_path.exists() {
-        debug!("[Referral] No referral code file found");
+        trace!("[Referral] No referral code file at {:?}", referral_file_path);
         return Ok(());
     }
+    debug!("[Referral] Found referral code file at {:?}", referral_file_path);
 
     // Read the referral code from file
     let referral_code = match tokio::fs::read_to_string(&referral_file_path).await {

@@ -2,7 +2,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::state::post_init::PostInitializationHandler;
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -52,7 +52,7 @@ pub struct SkinManager {
 impl SkinManager {
     /// Create a new skin manager
     pub fn new(skins_path: PathBuf) -> Result<Self> {
-        info!(
+        trace!(
             "SkinManager: Initializing with path: {:?} (skins loading deferred)",
             skins_path
         );
@@ -72,7 +72,7 @@ impl SkinManager {
             return Ok(());
         }
 
-        info!("Loading skins database from: {:?}", self.skins_path);
+        trace!("Loading skins database from: {:?}", self.skins_path);
         let skins_data = fs::read_to_string(&self.skins_path).await?;
 
         match serde_json::from_str::<SkinDatabase>(&skins_data) {
@@ -227,9 +227,9 @@ impl SkinManager {
 #[async_trait]
 impl PostInitializationHandler for SkinManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("SkinManager: on_state_ready called. Loading skins...");
+        trace!("SkinManager: on_state_ready called. Loading skins...");
         self.load_skins_internal().await?;
-        info!("SkinManager: Successfully loaded skins in on_state_ready.");
+        trace!("SkinManager: Successfully loaded skins in on_state_ready.");
         Ok(())
     }
 }

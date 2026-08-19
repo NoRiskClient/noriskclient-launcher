@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::state::state_manager::State;
 use crate::state::event_state::{EventPayload, EventType};
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
@@ -138,10 +138,10 @@ impl NoRiskApi {
 
     pub fn get_api_base(is_experimental: bool) -> String {
         if is_experimental {
-            debug!("[NoRisk API] Using experimental API endpoint");
+            trace!("[NoRisk API] Using experimental API endpoint");
             String::from("https://api-staging.norisk.gg/api/v1")
         } else {
-            debug!("[NoRisk API] Using production API endpoint");
+            trace!("[NoRisk API] Using production API endpoint");
             String::from("https://api.norisk.gg/api/v1")
         }
     }
@@ -151,8 +151,8 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/auth/request-server-id", base_url);
 
-        debug!("[NoRisk API] Requesting new server ID");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Requesting new server ID");
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let server_response = nrc_post(url)
             .json::<ServerIdResponse>("NoRisk server-id")
@@ -181,23 +181,23 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Making request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Making request to endpoint: {}", endpoint);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let mut query_params: HashMap<&str, &str> = HashMap::new();
         if !params.is_empty() {
             query_params.insert("params", params);
-            debug!("[NoRisk API] Added base params: {}", params);
+            trace!("[NoRisk API] Added base params: {}", params);
         }
 
         if let Some(extra) = extra_params {
             for (key, value) in extra {
                 query_params.insert(key, value);
-                debug!("[NoRisk API] Added extra param: {} = {}", key, value);
+                trace!("[NoRisk API] Added extra param: {} = {}", key, value);
             }
         }
 
-        debug!(
+        trace!(
             "[NoRisk API] Sending POST request with {} parameters",
             query_params.len()
         );
@@ -217,17 +217,17 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let mut request = nrc_get(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
-            debug!("[NoRisk API] Adding {} query parameters", extra.len());
+            trace!("[NoRisk API] Adding {} query parameters", extra.len());
             request = request.query(&extra);
         }
 
-        debug!("[NoRisk API] Sending GET request");
+        trace!("[NoRisk API] Sending GET request");
         request.json::<T>(endpoint).await
     }
 
@@ -240,20 +240,20 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!(
+        trace!(
             "[NoRisk API] Making DELETE request to endpoint: {}",
             endpoint
         );
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let mut request = nrc_delete(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
-            debug!("[NoRisk API] Adding {} query parameters", extra.len());
+            trace!("[NoRisk API] Adding {} query parameters", extra.len());
             request = request.query(&extra);
         }
 
-        debug!("[NoRisk API] Sending DELETE request");
+        trace!("[NoRisk API] Sending DELETE request");
         request.text(endpoint).await
     }
 
@@ -324,7 +324,7 @@ impl NoRiskApi {
         let url = format!("{}/launcher/auth/validate/v2", base_url);
 
         debug!("[NoRisk API] Step 3: Making POST request to auth/validate/v2 endpoint");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         // All parameters as query parameters
         let force_str = force.to_string();
@@ -334,7 +334,7 @@ impl NoRiskApi {
         query_params.insert("username", username);
         query_params.insert("server_id", server_id);
 
-        debug!("[NoRisk API] Sending POST request with server-provided server ID");
+        trace!("[NoRisk API] Sending POST request with server-provided server ID");
         nrc_post(url)
             .query(&query_params)
             .json::<NoRiskToken>("NoRisk token refresh v3")
@@ -370,11 +370,11 @@ impl NoRiskApi {
         request_uuid: Option<&str>,
         is_experimental: bool,
     ) -> Result<T> {
-        debug!("[NoRisk API] GET request from endpoint: {}", endpoint);
+        trace!("[NoRisk API] GET request from endpoint: {}", endpoint);
 
         let mut extra_params = HashMap::new();
         if let Some(uuid) = request_uuid {
-            debug!("[NoRisk API] Adding UUID: {}", uuid);
+            trace!("[NoRisk API] Adding UUID: {}", uuid);
             extra_params.insert("uuid", uuid);
         }
 
@@ -409,7 +409,7 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskModpacksConfig> {
-        debug!(
+        trace!(
             "[NoRisk API] Fetching modpack configuration from v3 endpoint. Experimental: {}",
             is_experimental
         );
@@ -422,7 +422,7 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskVersionsConfig> {
-        debug!(
+        trace!(
             "[NoRisk API] Fetching standard version profiles. Experimental: {}",
             is_experimental
         );
@@ -548,7 +548,7 @@ impl NoRiskApi {
         let url = format!("{}/{}", base_url, endpoint);
 
         info!("[NoRisk API] Requesting mcreal app token");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         nrc_get(url)
             .bearer(norisk_token)
@@ -566,8 +566,8 @@ impl NoRiskApi {
         let endpoint = "core/permissions";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Requesting user permissions for {}", player_uuid);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Requesting user permissions for {}", player_uuid);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         nrc_get(url)
             .bearer(norisk_token)
@@ -586,7 +586,7 @@ impl NoRiskApi {
         let url = format!("{}/{}", base_url, endpoint);
 
         info!("[NoRisk API] Resetting mcreal app token");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         nrc_post(url)
             .bearer(norisk_token)
@@ -609,8 +609,8 @@ impl NoRiskApi {
         let endpoint = "core/advent/calendar";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let mut extra_params = HashMap::new();
         extra_params.insert("uuid", request_uuid);
@@ -637,8 +637,8 @@ impl NoRiskApi {
             "[NoRisk API] Claiming advent calendar day {}",
             tag
         );
-        debug!("[NoRisk API] Full URL: {}", url);
-        debug!("[NoRisk API] With request UUID: {}", request_uuid);
+        trace!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] With request UUID: {}", request_uuid);
 
         nrc_post(url)
             .bearer(norisk_token)
@@ -662,7 +662,7 @@ impl NoRiskApi {
         let url = format!("{}/launcher/referral/report", base_url);
 
         info!("[NoRisk API] Reporting referral code: {} for account: {}", code, account_id);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         #[derive(Serialize)]
         struct ReferralReportRequest<'a> {
@@ -686,7 +686,7 @@ impl NoRiskApi {
         let url = format!("{}/launcher/referral/info", base_url);
 
         info!("[NoRisk API] Fetching referral info for code: {}", code);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         nrc_get(&url)
             .query(&[("code", code)])
@@ -703,7 +703,7 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/core/notifications", base_url);
 
-        debug!("[NoRisk API] Fetching notifications from: {}", url);
+        trace!("[NoRisk API] Fetching notifications from: {}", url);
 
         nrc_get(&url)
             .bearer(norisk_token)

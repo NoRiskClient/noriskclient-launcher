@@ -258,26 +258,21 @@ impl MinecraftAuthStore {
     }
 
     pub async fn load(&self) -> Result<()> {
-        info!("[Storage] Starting load operation");
+        trace!("[Storage] Starting load operation");
 
         if self.store_path.try_exists()? {
-            info!(
+            trace!(
                 "[Storage] Account file exists at: {}",
                 self.store_path.display()
             );
-            info!("[Storage] Reading account data");
             let data = fs::read_to_string(&self.store_path).await?;
-            info!(
+            trace!(
                 "[Storage] Successfully read data, length: {} bytes",
                 data.len()
             );
 
-            info!("[Storage] Deserializing account data");
             let store: AccountStore = match serde_json::from_str(&data) {
-                Ok(store) => {
-                    info!("[Storage] Successfully deserialized data");
-                    store
-                }
+                Ok(store) => store,
                 Err(e) => {
                     error!(
                         "[Storage] Failed to deserialize account data: {}. The accounts.json file appears to be corrupted. Resetting to empty state.",
@@ -285,7 +280,6 @@ impl MinecraftAuthStore {
                     );
 
                     // Create new empty store - no backup needed as corrupted data is useless
-                    info!("[Storage] Creating new empty account store");
                     AccountStore {
                         accounts: Vec::new(),
                         token: None,
@@ -293,30 +287,26 @@ impl MinecraftAuthStore {
                 }
             };
 
-            info!("[Storage] Acquiring write lock to update accounts");
+            let account_count = store.accounts.len();
+            let has_device_token = store.token.is_some();
             let mut accounts = self.accounts.write().await;
-            info!("[Storage] Successfully acquired write lock");
-
-            info!(
-                "[Storage] Loading {} accounts into memory",
-                store.accounts.len()
-            );
             *accounts = store.accounts;
             publish_log_redactions(&accounts);
-            info!("[Storage] Successfully loaded accounts");
 
             // Also restore saved device token
-            info!("[Storage] Restoring saved device token (if any)");
             {
                 let mut token_guard = self.token.write().await;
                 *token_guard = store.token;
             }
-            info!("[Storage] Device token restored");
+            info!(
+                "[Storage] Loaded {} accounts (device token: {})",
+                account_count,
+                if has_device_token { "yes" } else { "no" }
+            );
         } else {
             info!("[Storage] No account file found, starting with empty accounts");
         }
 
-        info!("[Storage] Load operation completed successfully");
         Ok(())
     }
 
@@ -898,7 +888,7 @@ impl MinecraftAuthStore {
                 }
             }
         } else {
-            trace!("[Token Refresh] Token is still valid, no refresh needed");
+            debug!("[Token Refresh] Token is still valid, no refresh needed");
             Ok((creds.clone(), false))
         }
     }
@@ -1205,7 +1195,7 @@ impl MinecraftAuthStore {
                 }
             }
         } else {
-            trace!("[Token Check] Microsoft token is still valid");
+            debug!("[Token Check] Microsoft token valid until {}", creds.expires);
             if creds.ignore_child_protection_warning {
                 debug!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
                 Ok(None)

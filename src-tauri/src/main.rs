@@ -18,7 +18,7 @@ mod state;
 
 use crate::integrations::norisk_packs;
 use crate::integrations::norisk_versions;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Listener;
@@ -350,7 +350,7 @@ async fn main() {
                 // --- Create Updater Window (but keep hidden initially) ---
                 let updater_window = match updater_utils::create_updater_window(&state_init_app_handle).await {
                     Ok(win) => {
-                        info!("Updater window created successfully (initially hidden).");
+                        trace!("Updater window created successfully (initially hidden).");
                         Some(win)
                     }
                     Err(e) => {
@@ -399,7 +399,7 @@ async fn main() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
-                info!("Attempting to retrieve launcher configuration for update check...");
+                trace!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
                         let config = state_manager_instance.config_manager.get_config().await;
@@ -413,9 +413,9 @@ async fn main() {
                         }
 
                         if auto_check_updates_enabled {
-                            info!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
+                            trace!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
                             updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
-                            info!("Update check process has finished.");
+                            trace!("Update check process has finished.");
                         } else {
                             info!("Auto-check for updates is disabled in settings. Skipping update check.");
                             // Ensure the updater window (if created) is closed if we skip the check.
@@ -500,7 +500,7 @@ async fn main() {
                 main_window.listen("tauri://focus", move |_event| {
                     let listener_app_handle = focus_app_handle.clone();
                     tokio::spawn(async move {
-                        debug!("Main window focus event received. Triggering DiscordManager handler.");
+                        trace!("Main window focus event received. Triggering DiscordManager handler.");
                         match state::state_manager::State::get().await {
                             Ok(state_manager_instance) => {
                                 if let Err(e) = state_manager_instance.discord_manager.handle_focus_event().await {

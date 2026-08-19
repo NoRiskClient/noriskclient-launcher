@@ -1,6 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::utils::http_client::{nrc_get, nrc_post};
-use log::{debug, info};
+use log::{info, trace};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -39,10 +39,10 @@ pub struct SubmitTestVoteResponse {
 impl PayloadCmsApi {
     pub fn get_cms_base(is_experimental: bool) -> String {
         if is_experimental {
-            debug!("[Payload CMS] Using experimental CMS endpoint");
+            trace!("[Payload CMS] Using experimental CMS endpoint");
             String::from("https://cms-staging.norisk.gg")
         } else {
-            debug!("[Payload CMS] Using production CMS endpoint");
+            trace!("[Payload CMS] Using production CMS endpoint");
             String::from("https://cms.norisk.gg")
         }
     }
@@ -55,7 +55,7 @@ impl PayloadCmsApi {
         let base = Self::get_cms_base(is_experimental);
         let url = format!("{}/api/issues/needs-testing", base);
 
-        debug!("[Payload CMS] Fetching needs-testing for uuid={}", uuid);
+        trace!("[Payload CMS] Fetching needs-testing for uuid={}", uuid);
 
         nrc_get(&url)
             .bearer(token)

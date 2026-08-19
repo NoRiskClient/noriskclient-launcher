@@ -4,7 +4,7 @@ use crate::integrations::norisk_packs::NoriskModpacksConfig;
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::post_init::PostInitializationHandler;
 use async_trait::async_trait;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -35,7 +35,7 @@ impl NoriskPackManager {
     /// Creates a new NoriskPackManager instance, loading the configuration from the specified path.
     /// If the file doesn't exist, it initializes with a default empty configuration.
     pub fn new(config_path: PathBuf) -> Result<Self> {
-        info!(
+        trace!(
             "NoriskPackManager: Initializing with path: {:?} (config loading deferred)",
             config_path
         );
@@ -185,7 +185,7 @@ impl NoriskPackManager {
 #[async_trait]
 impl PostInitializationHandler for NoriskPackManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("NoriskPackManager: on_state_ready called. Loading configuration...");
+        trace!("NoriskPackManager: on_state_ready called. Loading configuration...");
         // Select load path based on experimental mode if accessible
         let load_path = if let Ok(state) = crate::state::state_manager::State::get().await {
             let is_exp = state.config_manager.is_experimental_mode().await;
@@ -194,10 +194,11 @@ impl PostInitializationHandler for NoriskPackManager {
             self.config_path.clone()
         };
         let loaded_config = self.load_config_internal(&load_path).await?;
+        let pack_count = loaded_config.packs.len();
         let mut config_guard = self.config.write().await;
         *config_guard = loaded_config;
         drop(config_guard);
-        info!("NoriskPackManager: Successfully loaded configuration in on_state_ready.");
+        info!("NoriskPackManager: {} packs loaded from {:?}", pack_count, load_path);
         Ok(())
     }
 }

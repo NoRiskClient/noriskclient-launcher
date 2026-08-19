@@ -1,12 +1,44 @@
 use crate::config::HTTP_CONNECT_TIMEOUT;
 use crate::error::{AppError, Result as AppResult};
-use log::{error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::Serialize;
+use std::sync::Mutex;
+use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::time::{sleep, Duration};
 
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+const UPDATE_CHECK_CACHE_TTL: Duration = Duration::from_secs(60);
+
+struct CachedUpdateCheck {
+    checked_at: Instant,
+    is_beta_channel: bool,
+    result: Option<UpdateInfo>,
+}
+
+static LAST_UPDATE_CHECK: Mutex<Option<CachedUpdateCheck>> = Mutex::new(None);
+
+fn cached_update_check(is_beta_channel: bool) -> Option<Option<UpdateInfo>> {
+    let guard = LAST_UPDATE_CHECK.lock().ok()?;
+    let cached = guard.as_ref()?;
+    if cached.is_beta_channel != is_beta_channel
+        || cached.checked_at.elapsed() > UPDATE_CHECK_CACHE_TTL
+    {
+        return None;
+    }
+    Some(cached.result.clone())
+}
+
+fn remember_update_check(is_beta_channel: bool, result: Option<UpdateInfo>) {
+    if let Ok(mut guard) = LAST_UPDATE_CHECK.lock() {
+        *guard = Some(CachedUpdateCheck {
+            checked_at: Instant::now(),
+            is_beta_channel,
+            result,
+        });
+    }
+}
 
 /// Checks if the application is running inside a Flatpak environment.
 ///
@@ -21,7 +53,7 @@ pub fn is_flatpak() -> bool {
     if is_flatpak {
         info!("Flatpak environment detected (FLATPAK_ID environment variable is set).");
     } else {
-        info!("Not running in Flatpak environment (FLATPAK_ID environment variable not found).");
+        trace!("Not running in Flatpak environment (FLATPAK_ID environment variable not found).");
     }
 
     is_flatpak
@@ -45,7 +77,7 @@ pub async fn check_update_available_detailed(
     let current_version = app_handle.package_info().version.to_string();
     let channel = if is_beta_channel { "Beta" } else { "Stable" };
 
-    info!(
+    trace!(
         "Checking for available updates (detailed) (Current: {}). Channel: {}",
         current_version, channel
     );
@@ -80,7 +112,7 @@ pub async fn check_update_available_detailed(
         base_repo_url, platform_specific_target
     );
 
-    info!("Using update endpoint template: {}", update_url_str);
+    trace!("Using update endpoint template: {}", update_url_str);
 
     let update_url = update_url_str.parse()
         .map_err(|e| AppError::Other(format!("Failed to parse update URL '{}': {}", update_url_str, e)))?;
@@ -94,7 +126,7 @@ pub async fn check_update_available_detailed(
         .build()
         .map_err(|e| AppError::Other(format!("Failed to build updater: {}", e)))?;
 
-    info!("Updater built successfully. Checking for updates...");
+    trace!("Updater built successfully. Checking for updates...");
 
     let check_result = tokio::time::timeout(UPDATE_CHECK_TIMEOUT, updater.check())
         .await
@@ -115,10 +147,13 @@ pub async fn check_update_available_detailed(
             };
 
             info!(
-                "Update available: Version {}, Released: {:?}",
+                "Update check: {} available (current {}, {} channel, released {:?})",
                 update.version,
+                current_version,
+                channel,
                 update.date
             );
+            remember_update_check(is_beta_channel, Some(update_info.clone()));
 
             let result = UpdateCheckResult {
                 update_info,
@@ -129,7 +164,11 @@ pub async fn check_update_available_detailed(
             Ok(Some(result))
         }
         Ok(None) => {
-            info!("No update available for the {} channel.", channel);
+            info!(
+                "Update check: up to date ({}, {} channel)",
+                current_version, channel
+            );
+            remember_update_check(is_beta_channel, None);
             Ok(None)
         }
         Err(e) => {
@@ -157,6 +196,10 @@ pub async fn check_update_available(
     app_handle: &AppHandle,
     is_beta_channel: bool,
 ) -> AppResult<Option<UpdateInfo>> {
+    if let Some(cached) = cached_update_check(is_beta_channel) {
+        debug!("Update check: serving cached result");
+        return Ok(cached);
+    }
     // Use the detailed version but only return the UpdateInfo part
     match check_update_available_detailed(app_handle, is_beta_channel).await? {
         Some(result) => Ok(Some(result.update_info)),
@@ -219,7 +262,7 @@ pub fn emit_status(
 ///
 /// * `Result<WebviewWindow>` - The created Tauri webview window instance or an error.
 pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
-    info!("Creating updater window...");
+    trace!("Creating updater window...");
     let window = WebviewWindowBuilder::new(
         app_handle,
         "updater",                              // Unique label
@@ -235,7 +278,7 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
     .visible(false) // Start hidden, show when needed
     .build()?;
 
-    info!("Updater window created successfully (label: 'updater').");
+    trace!("Updater window created successfully (label: 'updater').");
     Ok(window)
 }
 
@@ -585,7 +628,7 @@ pub async fn check_for_updates(
 
     //TODO: Remove this line when the updater is fully implemented
     emit_status(&app_handle, "close", final_message.clone(), None);
-    info!(
+    trace!(
         "Update check process fully completed (Status: {}). Final Message: {}",
         final_status, final_message
     );
