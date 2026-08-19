@@ -2,13 +2,14 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 const DISCORD_APP_ID: &str = "1237087999104122981";
+const RECONNECT_BACKOFF: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiscordState {
@@ -27,6 +28,7 @@ pub struct DiscordManager {
     enabled: Arc<RwLock<bool>>,
     idle_start_timestamp: Arc<RwLock<Option<i64>>>,
     last_client_state: Arc<RwLock<Option<String>>>,
+    last_connect_failure: Arc<RwLock<Option<Instant>>>,
 }
 
 impl DiscordManager {
@@ -47,12 +49,13 @@ impl DiscordManager {
             enabled: Arc::new(RwLock::new(enabled)),
             idle_start_timestamp: Arc::new(RwLock::new(initial_timestamp)),
             last_client_state: Arc::new(RwLock::new(None)),
+            last_connect_failure: Arc::new(RwLock::new(None)),
         };
 
         if enabled {
             debug!("Discord Rich Presence initially enabled, connecting...");
             if let Err(e) = manager.connect().await {
-                error!("Failed to connect to Discord during initialization: {}", e);
+                debug!("Discord not connected during initialization: {}", e);
             }
             debug!("Setting initial Discord state to Idle");
             if let Err(e) = manager.set_state_internal(DiscordState::Idle, true).await {
@@ -90,6 +93,28 @@ impl DiscordManager {
         Ok(manager)
     }
 
+    async fn in_reconnect_backoff(&self) -> bool {
+        self.last_connect_failure
+            .read()
+            .await
+            .map(|failed_at| failed_at.elapsed() < RECONNECT_BACKOFF)
+            .unwrap_or(false)
+    }
+
+    async fn record_connect_failure(&self, error: &AppError) {
+        let mut last_failure = self.last_connect_failure.write().await;
+        if last_failure.is_none() {
+            warn!(
+                "Discord not reachable ({}); retrying at most every {}s",
+                error,
+                RECONNECT_BACKOFF.as_secs()
+            );
+        } else {
+            debug!("Discord still not reachable: {}", error);
+        }
+        *last_failure = Some(Instant::now());
+    }
+
     async fn connect(&self) -> Result<()> {
         if !*self.enabled.read().await {
             debug!("Discord Rich Presence is disabled, skipping connection");
@@ -112,15 +137,16 @@ impl DiscordManager {
                         Ok(_) => {
                             info!("Successfully connected to Discord client");
                             *client_lock = Some(client);
+                            *self.last_connect_failure.write().await = None;
                         }
                         Err(e) => {
-                            warn!("Failed to connect to Discord client: {}", e);
+                            self.record_connect_failure(&e).await;
                             return Err(e);
                         }
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to create Discord client: {}", e);
+                    self.record_connect_failure(&e).await;
                     return Err(e);
                 }
             }
@@ -157,7 +183,7 @@ impl DiscordManager {
     }
 
     pub async fn set_state(&self, state: DiscordState, force: bool) -> Result<()> {
-        debug!("Setting Discord state to: {:?}", state);
+        trace!("Setting Discord state to: {:?}", state);
         match self.set_state_internal(state, force).await {
             Ok(_) => Ok(()),
             Err(e) => {
@@ -179,10 +205,10 @@ impl DiscordManager {
         {
             let mut current_state = self.current_state.write().await;
             if !force && *current_state == state {
-                debug!("Discord state unchanged, skipping update");
+                trace!("Discord state unchanged, skipping update");
                 return Ok(());
             }
-            debug!(
+            trace!(
                 "Updating Discord state from {:?} to {:?}",
                 *current_state, state
             );
@@ -195,17 +221,23 @@ impl DiscordManager {
         let mut client_lock = self.client.lock().await;
 
         if client_lock.is_none() {
-            debug!("No Discord client available, attempting to reconnect...");
             drop(client_lock);
-            self.connect().await?;
+            if self.in_reconnect_backoff().await {
+                trace!("Discord unreachable, skipping reconnect during backoff");
+                return Ok(());
+            }
+            debug!("No Discord client available, attempting to reconnect...");
+            if self.connect().await.is_err() {
+                return Ok(());
+            }
             client_lock = self.client.lock().await;
         }
 
         if let Some(client_ref) = client_lock.as_mut() {
-            debug!("Sending activity to Discord...");
+            trace!("Sending activity to Discord...");
             match self.build_and_set_activity(&state, client_ref).await {
                 Ok(_) => {
-                    debug!("Successfully updated Discord Rich Presence");
+                    trace!("Successfully updated Discord Rich Presence");
                 }
                 Err(e) => {
                     warn!("Failed to update Discord Rich Presence: {}", e);
@@ -213,8 +245,10 @@ impl DiscordManager {
                     if let Err(reconnect_e) = client_ref.reconnect().map_err(|e| {
                         AppError::DiscordError(format!("Discord reconnect error: {}", e))
                     }) {
-                        error!("Failed to reconnect to Discord: {}", reconnect_e);
-                        return Err(reconnect_e);
+                        *client_lock = None;
+                        drop(client_lock);
+                        self.record_connect_failure(&reconnect_e).await;
+                        return Ok(());
                     }
 
                     debug!("Reconnection successful, trying to set activity again...");
@@ -241,7 +275,7 @@ impl DiscordManager {
         let buttons = vec![download_button];
 
         let client_state = Self::read_active_client_state();
-        debug!("Building activity for state: {:?}, client_active: {}", state, client_state.is_some());
+        trace!("Building activity for state: {:?}, client_active: {}", state, client_state.is_some());
 
         let idle_timestamp = *self.idle_start_timestamp.read().await;
         let default_time = SystemTime::now()
@@ -399,12 +433,13 @@ impl DiscordManager {
         if !was_enabled && enabled {
             debug!("Discord was disabled, now enabled - spawning background connection...");
             drop(enabled_lock);
+            *self.last_connect_failure.write().await = None;
 
             let manager_clone = self.clone();
             tokio::spawn(async move {
                 info!("Discord: Starting background connection...");
                 if let Err(e) = manager_clone.connect().await {
-                    error!("Failed to connect to Discord when enabling: {}", e);
+                    debug!("Discord not connected when enabling: {}", e);
                     return;
                 }
                 if let Err(e) = manager_clone

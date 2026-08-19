@@ -148,7 +148,7 @@ pub async fn set_discord_state(
     state_type: String,
     profile_name: Option<String>,
 ) -> Result<(), CommandError> {
-    log::info!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
+    log::trace!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
     let state = State::get().await?;
     state.discord_manager.set_custom_state(state_type).await;
     Ok(())
