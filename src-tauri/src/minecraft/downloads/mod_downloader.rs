@@ -11,6 +11,7 @@ use tokio::fs::{self, read_dir};
 use tokio::io::AsyncWriteExt;
 
 const DEFAULT_CONCURRENT_MOD_DOWNLOADS: usize = 4;
+const HASH_CONCURRENCY: usize = 8;
 const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 
 pub struct ModDownloadService {
@@ -315,19 +316,15 @@ impl ModDownloadService {
             return Ok(());
         }
 
-        // Compute SHA1 of all files in mods/ in parallel
-        let hash_futures: Vec<_> = files
-            .iter()
-            .map(|path| {
-                let path = path.clone();
-                async move {
-                    let hash = crate::utils::hash_utils::calculate_sha1_from_file(&path).await.ok();
-                    (path, hash)
-                }
+        // Compute SHA1 of all files in mods/ with bounded parallelism
+        let hashed_files: Vec<(PathBuf, Option<String>)> = iter(files)
+            .map(|path| async move {
+                let hash = crate::utils::hash_utils::calculate_sha1_from_file(&path).await.ok();
+                (path, hash)
             })
-            .collect();
-        let hashed_files: Vec<(PathBuf, Option<String>)> =
-            futures::future::join_all(hash_futures).await;
+            .buffer_unordered(HASH_CONCURRENCY)
+            .collect()
+            .await;
 
         // Determine which files to remove
         let mut removed = 0;

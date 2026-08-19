@@ -79,3 +79,29 @@ async fn empty_file_matches_empty_slice() {
         curseforge_fingerprint_from_bytes(b"")
     );
 }
+
+#[tokio::test]
+async fn sha1_and_sha256_file_hashes_match_byte_slice() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("large.bin");
+
+    let blob: Vec<u8> = (0..(HASH_READ_BUFFER * 3 + 17) as u32)
+        .map(|i| (i % 251) as u8)
+        .collect();
+    tokio::fs::write(&path, &blob).await.unwrap();
+
+    assert_eq!(
+        calculate_sha1(&path).await.unwrap(),
+        calculate_sha1_from_bytes(&blob)
+    );
+    assert_eq!(
+        calculate_sha256_from_file(&path).await.unwrap(),
+        calculate_sha256_from_bytes(&blob)
+    );
+}
+
+#[tokio::test]
+async fn sha1_of_missing_file_is_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(calculate_sha1(&dir.path().join("nope.jar")).await.is_err());
+}
