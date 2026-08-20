@@ -15,7 +15,7 @@ import type { CrashlogDto } from '../../types/processState';
 import { openExternalUrl } from '../../services/tauri-service';
 import { useGlobalModal } from '../../hooks/useGlobalModal';
 import { CrashAnalysisModal } from './CrashAnalysisModal';
-import { logError } from '../../utils/logging-utils';
+import { logError, logWarn } from '../../utils/logging-utils';
 import { Window } from '@tauri-apps/api/window';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -47,7 +47,7 @@ export function GlobalCrashReportModal() {
             }
           })
           .catch(err => {
-            console.error(`Failed to fetch profile details for ${crashData.profile_id}:`, err);
+            logError(`Failed to fetch profile details for ${crashData.profile_id}: ${err}`);
           });
       }
       setMclogsUrl(null);
@@ -69,7 +69,6 @@ export function GlobalCrashReportModal() {
     const focusRelevantWindow = async () => {
       if (isCrashModalOpen && crashData?.process_id) {
         const crashedProcessId = crashData.process_id;
-        console.log(`Crash modal open for process ${crashedProcessId}. Opening/focusing log window.`);
 
         // Try to find existing single log window for this process
         const singleLogWindowLabel = `single_log_window_${crashedProcessId}`;
@@ -78,7 +77,6 @@ export function GlobalCrashReportModal() {
         try {
           const singleLogWindow = await Window.getByLabel(singleLogWindowLabel);
           if (singleLogWindow) {
-            console.log(`Focusing existing single log window: ${singleLogWindowLabel}`);
             await singleLogWindow.show();
             await singleLogWindow.unminimize();
             await singleLogWindow.setFocus();
@@ -91,7 +89,6 @@ export function GlobalCrashReportModal() {
         if (!foundLogWindow) {
           // Open main log window with crashed process info
           try {
-            console.log("Opening minecraft log window for crashed process");
             const processMetadata = crashData.process_metadata;
             if (processMetadata) {
               // Pass crashed process as JSON so log window can show it
@@ -106,7 +103,7 @@ export function GlobalCrashReportModal() {
               await invoke("open_minecraft_log_window", { crashedProcess: null });
             }
           } catch (e) {
-            console.error("Failed to open log window for crash:", e);
+            logError(`Failed to open log window for crash: ${e}`);
           }
         }
 
@@ -114,13 +111,12 @@ export function GlobalCrashReportModal() {
         try {
           const mainWindowInstance = await Window.getByLabel('main');
           if (mainWindowInstance) {
-            console.log("Focusing main application window.");
             await mainWindowInstance.show();
             await mainWindowInstance.unminimize();
             await mainWindowInstance.setFocus();
           }
         } catch (e) {
-          console.error("Error getting or focusing main window:", e);
+          logError(`Error getting or focusing main window: ${e}`);
         }
       }
     };
@@ -142,7 +138,6 @@ export function GlobalCrashReportModal() {
       hasFetchedCrashReportRef.current = true;
       setIsListeningForCrashContent(true);
       
-      console.log(`Setting up crash report handling for profile ${crashData.profile_id}, process ${crashData.process_id}`);
       
       // SCHRITT 1: Event-Listener SOFORT registrieren (um schnelle Events zu fangen)
       try {
@@ -151,7 +146,6 @@ export function GlobalCrashReportModal() {
             try {
               const contentPayload = JSON.parse(event.payload.message) as CrashReportContentAvailablePayload;
               if (contentPayload.content) {
-                console.log(`Received CrashReportContentAvailable event for process ${crashData.process_id}`);
                 contentReceived = true;
                 setDisplayedCrashReportContent(contentPayload.content);
                 toast.success(t('crash_modal.toast.report_loaded'));
@@ -159,13 +153,12 @@ export function GlobalCrashReportModal() {
                 if (unlistenFn) unlistenFn();
               }
             } catch (e) {
-              console.error("Failed to parse CrashReportContentAvailablePayload:", e);
+              logError(`Failed to parse CrashReportContentAvailablePayload: ${e}`);
             }
           }
         });
-        console.log(`Event listener registered for process ${crashData.process_id}`);
       } catch (error) {
-        console.error("Failed to set up listener for CrashReportContentAvailable:", error);
+        logError(`Failed to set up listener for CrashReportContentAvailable: ${error}`);
       }
       
       // SCHRITT 2: Warte 1 Sekunde (gibt der Datei Zeit sich zu erstellen)
@@ -173,20 +166,16 @@ export function GlobalCrashReportModal() {
       
       // SCHRITT 3: Falls Event noch nicht empfangen, aktiv fetchen als Fallback
       if (!contentReceived) {
-        console.log(`Actively fetching crash report as fallback for process ${crashData.process_id}`);
         try {
           const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id, crashData.process_metadata?.start_time);
           if (fetchedContent && !contentReceived) {
-            console.log(`Successfully fetched crash report via fallback`);
             contentReceived = true;
             setDisplayedCrashReportContent(fetchedContent);
             toast.success(t('crash_modal.toast.report_loaded'));
             setIsListeningForCrashContent(false);
-          } else if (!fetchedContent) {
-            console.log(`No crash report found yet, listener remains active`);
           }
         } catch (e) {
-          console.error("Failed to fetch crash report as fallback:", e);
+          logError(`Failed to fetch crash report as fallback: ${e}`);
         }
       }
     };
@@ -195,7 +184,6 @@ export function GlobalCrashReportModal() {
 
     return () => {
       if (unlistenFn) {
-        console.log("Cleaning up CrashReportContentAvailable listener.");
         unlistenFn();
       }
     };
@@ -208,7 +196,7 @@ export function GlobalCrashReportModal() {
   const handlePrimaryAction = async () => {
     if (!crashData?.profile_id || !crashData?.process_metadata) {
       toast.error(t('crash_modal.toast.missing_data'));
-      console.error("Action error: Missing profile_id or process_metadata", crashData);
+      logError(`Action error: Missing profile_id or process_metadata for process ${crashData.process_id}`);
       return;
     }
 
@@ -223,11 +211,10 @@ export function GlobalCrashReportModal() {
         try {
           const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id, crashData.process_metadata?.start_time);
           if (fetchedContent) {
-            console.log('Fetched fresh crash report before upload');
             setDisplayedCrashReportContent(fetchedContent);
           }
         } catch (e) {
-          console.warn('Failed to fetch crash report before upload, continuing with existing data:', e);
+          logWarn(`Failed to fetch crash report before upload, continuing with existing data: ${e}`);
         }
       }
 
@@ -283,7 +270,7 @@ export function GlobalCrashReportModal() {
       }
     } catch (error: any) {
       toast.error(error.message || t('crash_modal.toast.unexpected_error'));
-      console.error("Crash report processing error:", error);
+      logError(`Crash report processing error: ${error}`);
     } finally {
       setIsProcessing(false);
       setStatusText(null);
@@ -295,7 +282,7 @@ export function GlobalCrashReportModal() {
       await openExternalUrl('https://discord.norisk.gg');
       toast.success(t('crash_modal.toast.discord_opened'));
     } catch (error) {
-      console.error("Failed to open Discord URL:", error);
+      logError(`Failed to open Discord URL: ${error}`);
       toast.error(t('crash_modal.toast.discord_failed'));
     }
   };
