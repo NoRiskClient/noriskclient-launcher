@@ -17,6 +17,7 @@ import { openPath } from '@tauri-apps/plugin-opener';
 import { revealItemInDir } from '../utils/opener-utils';
 import { getUpdateIdentifier, getContentPlatform } from '../utils/update-identifier-utils';
 import { parseErrorMessage } from "../utils/error-utils";
+import { logWarn } from '../utils/logging-utils';
 import { contentCacheKey, useContentCacheStore } from '../store/content-cache-store';
 import { archiveIconKey, useIconCacheStore } from '../store/icon-cache-store';
 
@@ -110,6 +111,19 @@ function mapUiContentTypeToBackend(uiType: LocalContentType): NrContentType {
     case 'NoRiskMod': return NrContentType.NoRiskMod;
     default: throw new Error(`Unsupported UI content type: ${uiType}`);
   }
+}
+
+function warnOnDuplicateItemKeys(contentType: LocalContentType, items: LocalContentItem[]): void {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const key = item.path_str || item.filename;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const dups = [...counts.entries()].filter(([, n]) => n > 1);
+  if (dups.length === 0) return;
+  const extra = dups.reduce((sum, [, n]) => sum + n - 1, 0);
+  const sample = dups.sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key, n]) => `${key} x${n}`).join(", ");
+  logWarn(`[${contentType}] ${extra} duplicate item keys across ${items.length} items. Offenders: ${sample}`);
 }
 
 // Helper to map backend ProfileLocalContentItem to frontend T (which extends LocalContentItem)
@@ -404,6 +418,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       });
       setItems(processedBasicItems as T[]);
       console.log(`[${contentType}] Items set (count: ${processedBasicItems.length})`, new Date().toISOString());
+      warnOnDuplicateItemKeys(contentType, processedBasicItems);
       if (!cached) setSelectedItemIds(new Set());
 
       setIsInitialLoadProcessComplete(true);

@@ -2444,7 +2444,34 @@ impl LocalContentLoader {
             }
         }
 
-        let mut final_items = preliminary_items;
+        let mut final_items = {
+            let before = preliminary_items.len();
+            let mut seen_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut dropped: Vec<String> = Vec::new();
+            let deduped: Vec<LocalContentItem> = preliminary_items
+                .into_iter()
+                .filter(|item| {
+                    if seen_paths.insert(item.path_str.clone()) {
+                        true
+                    } else {
+                        if dropped.len() < 10 {
+                            dropped.push(item.filename.clone());
+                        }
+                        false
+                    }
+                })
+                .collect();
+            if deduped.len() != before {
+                warn!(
+                    "[{:?}] Dropped {} duplicate entries (same path) for profile {}. First offenders: {:?}",
+                    params.content_type,
+                    before - deduped.len(),
+                    params.profile_id,
+                    dropped
+                );
+            }
+            deduped
+        };
 
         // If the content type is NoRiskMod, sort the items by filename for consistent ordering
         if params.content_type == ContentType::NoRiskMod {

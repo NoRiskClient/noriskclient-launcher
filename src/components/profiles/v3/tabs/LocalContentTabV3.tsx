@@ -362,7 +362,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         break;
     }
     return sorted;
-  }, [manager.filteredItems, filter, sortBy, getDisplayFileName, manager, hasUpdate, isBlockedConfigLoaded]);
+  }, [manager.filteredItems, manager.getItemPlatformDisplayName, filter, sortBy, getDisplayFileName, hasUpdate, isBlockedConfigLoaded]);
 
   // "Add content" opens an in-place side sheet instead of navigating to a
   // dedicated browse route, so the profile view stays mounted and the
@@ -548,7 +548,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
             data={visibleItems}
             customScrollParent={scrollParent ?? undefined}
             listClassName="grid grid-cols-1 lg:grid-cols-2 gap-3"
-            computeItemKey={(_, item) => tileKey(item)}
+            computeItemKey={(index, item) => `${index}:${tileKey(item)}`}
             itemContent={(_, item) => {
               const key = tileKey(item);
               const updateKey = getUpdateIdentifier(item);
