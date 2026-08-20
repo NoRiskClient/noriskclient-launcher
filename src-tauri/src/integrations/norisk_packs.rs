@@ -41,6 +41,16 @@ impl Default for NoriskModpacksConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PackListing {
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub weight: i32,
+    #[serde(default)]
+    pub hidden: bool,
+}
+
 /// Defines a single Norisk modpack variant (e.g., production, development).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NoriskPackDefinition {
@@ -62,6 +72,8 @@ pub struct NoriskPackDefinition {
     /// Optional: Whether this pack is experimental.
     #[serde(rename = "isExperimental", default)]
     pub is_experimental: bool,
+    #[serde(default)]
+    pub listing: PackListing,
     /// Optional: Policy controlling loader version per MC version/loader.
     #[serde(rename = "loaderPolicy", default)]
     pub loader_policy: Option<LoaderPolicy>,
@@ -976,6 +988,7 @@ impl NoriskModpacksConfig {
             mods: resolved_mods_vec, // Use the fully resolved list here
             assets: base_definition.assets.clone(), // Added missing field
             is_experimental: base_definition.is_experimental, // Added missing field
+            listing: base_definition.listing.clone(),
             loader_policy: resolved_loader_policy, // RESOLVED loader policy
             startup_helper: base_definition.startup_helper.clone(), // Added missing field
         })

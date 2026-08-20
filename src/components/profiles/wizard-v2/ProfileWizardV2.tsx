@@ -23,6 +23,8 @@ import type { NoriskModpacksConfig } from "../../../types/noriskPacks";
 import { extractNrcCompatibility, type NrcCompatibilityData } from "../../../utils/nrc-compatibility";
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import { loadPacks } from "../../../hooks/usePacks";
+import { logError } from "../../../utils/logging-utils";
 
 function NrcCompatibleTooltipContent() {
   const { t } = useTranslation();
@@ -104,10 +106,10 @@ export function ProfileWizardV2({ onClose, onSave, defaultGroup }: ProfileWizard
   useEffect(() => {
     const loadNrcCompatibility = async () => {
       try {
-        const packsConfig = await invoke<NoriskModpacksConfig>("get_norisk_packs_resolved");
+        const packsConfig: NoriskModpacksConfig = { packs: await loadPacks(), repositories: {} };
         setNrcCompatibility(extractNrcCompatibility(packsConfig));
       } catch (err) {
-        console.error("Failed to load NRC compatibility:", err);
+        logError(`Failed to load NRC compatibility: ${err}`);
       }
     };
     loadNrcCompatibility();

@@ -9,11 +9,12 @@ import { StatusMessage } from "../../ui/StatusMessage";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { SearchStyleInput } from "../../ui/Input";
 import { RangeSlider } from "../../ui/RangeSlider";
-import { Select } from "../../ui/Select";
 import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { NoriskModEntryDefinition, NoriskModpacksConfig } from "../../../types/noriskPacks";
+import { NoriskModEntryDefinition, NoriskModpacksConfig, NoriskPackDefinition } from "../../../types/noriskPacks";
+import { PackPicker } from "../PackPicker";
+import { loadPacks, usePacks } from "../../../hooks/usePacks";
 import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { IconPicker, handleIconImgLoad, type ChosenIcon } from "../IconPicker";
@@ -24,12 +25,6 @@ import { parseErrorMessage } from "../../../utils/error-utils";
 
 const forbiddenChars = /[<>:"/\\|?*]/g;
 const forbiddenTrailing = /[ .]$/;
-
-interface NoriskPack {
-    displayName: string;
-    description: string;
-    isExperimental?: boolean;
-}
 
 interface ProfileWizardV2Step3Props {
     onClose: () => void;
@@ -70,15 +65,13 @@ export function ProfileWizardV2Step3({
     const [systemRamMb, setSystemRamMb] = useState<number>(16384);
     const [recommendedRam, setRecommendedRam] = useState<number>(0);
     const [selectedNoriskPackId, setSelectedNoriskPackId] = useState<string | null>(null);
-    const [noriskPacks, setNoriskPacks] = useState<Record<string, NoriskPack>>({});
-    const [loadingPacks, setLoadingPacks] = useState(false);
+    const { packs: noriskPacks, loading: packsLoading } = usePacks();
     const [packCompatibilityWarning, setPackCompatibilityWarning] = useState<string | null>(null);
     const [showYellowWarning, setShowYellowWarning] = useState(false);
     const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
     const [useSharedMinecraftFolder, setUseSharedMinecraftFolder] = useState(
         defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
     ); // Default to true when group exists and is not "modpacks"
-    const [showAllVersions, setShowAllVersions] = useState(false); // Default to false to show only curated versions
     const effectiveMemoryMaxMb = memoryMaxMb || recommendedRam || 4096;
 
     useEffect(() => {
@@ -124,32 +117,9 @@ export function ProfileWizardV2Step3({
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Load NoRisk packs on component mount
     useEffect(() => {
-        const loadNoriskPacks = async () => {
-            try {
-                setLoadingPacks(true);
-                const packsData = await invoke<{ packs: Record<string, NoriskPack> }>(
-                    "get_norisk_packs_resolved",
-                ).catch(() => ({
-                    packs: {},
-                }));
-                console.log("PACKS", packsData);
-                setNoriskPacks(packsData.packs);
-
-                // Auto-select "norisk-prod" if available
-                if (packsData.packs["norisk-prod"]) {
-                    setSelectedNoriskPackId("norisk-prod");
-                }
-            } catch (err) {
-                console.error("Failed to load NoRisk packs:", err);
-            } finally {
-                setLoadingPacks(false);
-            }
-        };
-
-        loadNoriskPacks();
-    }, []);
+        if (noriskPacks["norisk-prod"]) setSelectedNoriskPackId("norisk-prod");
+    }, [noriskPacks]);
 
     const getLoaderDisplayName = (loader: ModLoader) => {
         const names = {
@@ -166,16 +136,6 @@ export function ProfileWizardV2Step3({
         setMemoryMaxMb(value);
     };
 
-    const noriskPackOptions = Object.entries(noriskPacks)
-        .filter(([packId]) => {
-            if (showAllVersions) return true; // Show all versions when checkbox is checked
-            // Show only curated versions when checkbox is unchecked
-            return packId === "norisk-prod" || packId === "norisk-bughunter" || packId === "";
-        })
-        .map(([packId, packDef]) => ({
-            value: packId,
-            label: `${packDef.displayName} ${packDef.isExperimental ? "(experimental)" : ""}`,
-        }));
 
     // Check pack compatibility when selection changes
     useEffect(() => {
@@ -192,9 +152,7 @@ export function ProfileWizardV2Step3({
 
             try {
                 // Get resolved packs with all mods
-                const resolvedPacks = await invoke<NoriskModpacksConfig>(
-                    "get_norisk_packs_resolved"
-                );
+                const resolvedPacks = { packs: await loadPacks() };
 
                 // Check if the selected pack has NoRisk Client mods for this version/loader
                 const selectedPack = resolvedPacks.packs[selectedNoriskPackId];
@@ -433,39 +391,16 @@ export function ProfileWizardV2Step3({
                                 <p className="text-sm text-white/60 font-minecraft">
                                     {t('profiles.wizard.noriskPackDescription')}
                                 </p>
-                                {loadingPacks ? (
-                                    <div className="flex items-center gap-2 text-white/70">
-                                        <Icon
-                                            icon="svg-spinners:ring-resize"
-                                            className="w-4 h-4"
-                                        />
-                                        <span className="text-sm font-minecraft">
-                                            {t('profiles.wizard.loadingPacks')}
-                                        </span>
-                                    </div>
-                                ) : (
+                                {(
                                     <>
                                         <div className="flex gap-3">
                                             <div className="flex-1">
-                                                <Select
-                                                    value={selectedNoriskPackId || ""}
-                                                    onChange={(value) => setSelectedNoriskPackId(value === "" ? null : value)}
-                                                    options={[
-                                                        { value: "", label: t('profiles.wizard.noneOptional') },
-                                                        ...noriskPackOptions,
-                                                    ]}
-                                                    placeholder={t('profiles.wizard.selectNoriskPack')}
-                                                    size="md"
+                                                <PackPicker
+                                                    packs={noriskPacks}
+                                                    value={selectedNoriskPackId}
+                                                    onChange={setSelectedNoriskPackId}
                                                     className="w-full"
-                                                />
-                                            </div>
-                                            <div className="flex items-center">
-                                                <Checkbox
-                                                    checked={showAllVersions}
-                                                    onChange={(event) => setShowAllVersions(event.target.checked)}
-                                                    label={t('profiles.wizard.showAllVersions')}
-                                                    size="sm"
-                                                    className="text-white/70"
+                                                    loading={packsLoading}
                                                 />
                                             </div>
                                         </div>
