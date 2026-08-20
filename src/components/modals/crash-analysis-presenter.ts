@@ -27,12 +27,17 @@ export function look(r: CrashCheckResult): Look {
 // apply CTA is always green — signals "this fixes it"
 export const actionVariant = (_a: CrashAction): "success" => "success";
 
-export const actionIcon = (a: CrashAction): string =>
-  a.type === "resolve_conflict" ? "solar:link-broken-minimalistic-bold"
-    : a.type === "enable_norisk_mod" || a.type === "enable_mod" ? "solar:bolt-circle-bold"
-      : a.type === "disable_mod" || a.type === "disable_norisk_mod" ? "solar:power-bold"
-        : a.type === "install_mod" ? "solar:download-minimalistic-bold"
-          : "solar:refresh-bold";
+const ACTION_ICONS: Record<string, string> = {
+  resolve_conflict: "solar:link-broken-minimalistic-bold",
+  enable_norisk_mod: "solar:bolt-circle-bold",
+  enable_mod: "solar:bolt-circle-bold",
+  disable_mod: "solar:power-bold",
+  disable_norisk_mod: "solar:power-bold",
+  install_mod: "solar:download-minimalistic-bold",
+  switch_pack: "solar:box-bold",
+};
+
+export const actionIcon = (a: CrashAction): string => ACTION_ICONS[a.type] ?? "solar:refresh-bold";
 
 const conflictMods = (a: CrashAction): string => (a.targets?.length ? a.targets : [a.target]).join(" + ");
 
@@ -52,6 +57,7 @@ export function actionLabel(a: CrashAction, t: TFunction): string {
     return t("crash_analysis.action.update_mod", { mod: a.target, version });
   if (a.type === "install_mod") return t("crash_analysis.action.install_mod", { mod: a.target, version });
   if (a.type === "disable_mod") return t("crash_analysis.action.disable_mod", { mod: a.target });
+  if (a.type === "switch_pack") return t("crash_analysis.action.switch_pack", { pack: a.target });
   return a.label ?? a.type;
 }
 
@@ -82,5 +88,6 @@ export function summaryText(r: CrashCheckResult, t: TFunction): string | null {
   if (primary?.type === "disable_mod") return t("crash_analysis.summary.disable_mod", { mod: primary.target });
   if (primary?.type === "enable_norisk_mod") return t("crash_analysis.summary.enable_norisk_mod", { mod: primary.target });
   if (primary?.type === "enable_mod") return t("crash_analysis.summary.enable_mod", { mod: primary.target });
+  if (primary?.type === "switch_pack") return t("crash_analysis.summary.switch_pack", { pack: primary.target });
   return r.summary;
 }

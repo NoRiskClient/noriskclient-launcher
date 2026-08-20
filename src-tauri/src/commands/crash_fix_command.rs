@@ -53,6 +53,7 @@ pub enum AppliedFix {
     },
     Modver { profile_id: Uuid, mod_id: Uuid, prev: UnifiedVersion },
     Conflict { profile_id: Uuid, mods: Vec<ConflictRevert> },
+    Pack { profile_id: Uuid, prev_pack_id: Option<String> },
 }
 
 #[derive(Serialize)]
@@ -337,6 +338,21 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
             })
         }
 
+        "switch_pack" => {
+            let target = action.target.clone();
+            let prev_pack_id = profile.selected_norisk_pack_id.clone();
+            if prev_pack_id.as_deref() == Some(target.as_str())
+                || !state.norisk_pack_manager.get_config().await.packs.contains_key(&target)
+            {
+                return Ok(skip(&target));
+            }
+            let mut p = profile.clone();
+            p.selected_norisk_pack_id = Some(target);
+            pm.update_profile(profile_id, p).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
+            Ok(ApplyOutcome::Applied { fix: AppliedFix::Pack { profile_id, prev_pack_id } })
+        }
+
         other => Ok(skip(other)),
     }
 }
@@ -376,6 +392,12 @@ pub async fn revert_crash_fix(applied: AppliedFix) -> Result<(), CommandError> {
             for r in mods {
                 pm.update_mod_to_unified_version(profile_id, r.mod_id, &r.prev).await?;
             }
+        }
+        AppliedFix::Pack { profile_id, prev_pack_id } => {
+            let mut p = pm.get_profile(profile_id).await?;
+            p.selected_norisk_pack_id = prev_pack_id;
+            pm.update_profile(profile_id, p).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
         }
     }
     Ok(())

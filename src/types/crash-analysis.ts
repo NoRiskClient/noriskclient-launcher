@@ -5,7 +5,7 @@ export type CrashSource = "wiki" | "auto" | "none";
 export type CrashStatus = "solved" | "investigating" | null;
 
 export interface CrashAction {
-  type: "disable_mod" | "enable_mod" | "update_loader" | "update_mod" | "install_mod" | "resolve_conflict" | "enable_norisk_mod" | "disable_norisk_mod" | string;
+  type: "disable_mod" | "enable_mod" | "update_loader" | "update_mod" | "install_mod" | "resolve_conflict" | "enable_norisk_mod" | "disable_norisk_mod" | "switch_pack" | string;
   target: string; // mod id / loader name (resolve_conflict: first of targets)
   label?: string | null; // optional fallback prose; launcher builds localized label from fields below
   scope: "profile" | "global";
