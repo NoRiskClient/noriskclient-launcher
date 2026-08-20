@@ -20,6 +20,7 @@ use uuid::Uuid;
 pub struct CrashlogDto {
     pub mc_logs_url: String,
     pub metadata: Option<ProcessMetadata>,
+    pub locale: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

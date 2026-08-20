@@ -42,6 +42,7 @@ export const actionColor = (a: CrashAction, accent: string): string =>
 
 // backend ships facts; the launcher composes the localized button label
 export function actionLabel(a: CrashAction, t: TFunction): string {
+  if (a.source === "wiki" && a.label) return a.label;
   if (a.type === "resolve_conflict") return t("crash_analysis.action.resolve_conflict", { mods: conflictMods(a) });
   if (a.type === "enable_norisk_mod") return t("crash_analysis.action.enable_norisk_mod", { mod: a.target });
   if (a.type === "disable_norisk_mod") return t("crash_analysis.action.disable_norisk_mod", { mod: a.target });
@@ -57,6 +58,7 @@ export function actionLabel(a: CrashAction, t: TFunction): string {
 // info-only status line (no actions): localized, derived from status + classification.
 export function statusMessageText(r: CrashCheckResult, t: TFunction): string | null {
   if (r.actions.length > 0) return null;
+  if (r.customMessage) return r.customMessage;
   if (r.status === "investigating") return t("crash_analysis.status.investigating");
   if (r.classification === "nrc-own" && !r.known) return t("crash_analysis.status.new_nrc_bug");
   if (r.classification === "nrc-own") return t("crash_analysis.status.nrc_own");

@@ -52,4 +52,5 @@ export interface CrashModInfo {
 export interface CrashlogDto {
   mcLogsUrl: string;
   metadata: ProcessMetadata | null;
+  locale?: string | null;
 }

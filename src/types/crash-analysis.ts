@@ -23,10 +23,10 @@ export interface CrashCheckResult {
   source: CrashSource; // where the fix came from
   status: CrashStatus; // wiki status if known
   title: string | null;
-  wikiUrl: string | null;
   issueUrl?: string | null; // link to the tracking issue on norisk.gg/issues/N (from the wiki entry)
   summary: string | null;
   statusMessage: string | null;
+  customMessage?: string | null;
   actions: CrashAction[];
   blamer: string | null; // top NRC frame / culprit location
   module?: string | null; // failing NRC feature/module, humanized (e.g. "Borderless Fullscreen")

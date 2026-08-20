@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n/i18n';
 import { Modal } from '../ui/Modal';
 import { StaticTooltip } from '../ui/Tooltip';
 import { useCrashModalStore } from '../../store/crash-modal-store';
@@ -256,6 +257,7 @@ export function GlobalCrashReportModal() {
         const crashReportPayload: CrashlogDto = {
           mcLogsUrl: currentMclogsUrl,
           metadata: crashData.process_metadata!,
+          locale: i18n.language,
         };
 
         // single call: the discord-bot reports the crash to staff AND returns the verdict

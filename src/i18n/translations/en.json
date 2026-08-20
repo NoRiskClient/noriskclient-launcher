@@ -2223,7 +2223,6 @@
   "crash_analysis.fact.mod": "Mod",
   "crash_analysis.fact.type": "Type",
   "crash_analysis.open_log": "Open log",
-  "crash_analysis.wiki_entry": "Wiki entry",
   "crash_analysis.view_issue": "Track progress",
   "crash_analysis.applies_note": "Applies to this profile only · reversible",
   "crash_analysis.apply": "Apply",
