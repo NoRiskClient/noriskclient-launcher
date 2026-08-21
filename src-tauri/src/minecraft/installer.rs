@@ -741,7 +741,7 @@ pub async fn install_minecraft_version(
 
     // Call the resolver function using the already loaded config (or None)
     let resolve_start = Instant::now();
-    let target_mods = summary_phase!(summary, "resolve", {
+    let (target_mods, mut mod_resolution) = summary_phase!(summary, "resolve", {
         crate::minecraft::downloads::mod_resolver::resolve_target_mods(
             profile,
             loaded_norisk_config.as_ref(),
@@ -848,6 +848,11 @@ pub async fn install_minecraft_version(
         }
         Ok(())
     }).await?;
+
+    if modloader_enum == ModLoader::Vanilla {
+        mod_resolution.mark_all_undelivered();
+    }
+    launch_params = launch_params.with_mod_resolution(mod_resolution);
 
     // Download log4j configuration if available
     let mut log4j_arg = None;

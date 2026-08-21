@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::ClasspathBuilder;
@@ -29,6 +30,7 @@ pub struct MinecraftLaunchParameters {
     pub resolution: Option<WindowSize>,
     pub quick_play_singleplayer: Option<String>,
     pub quick_play_multiplayer: Option<String>,
+    pub mod_resolution: Option<ModResolutionReport>,
 }
 
 impl MinecraftLaunchParameters {
@@ -46,7 +48,13 @@ impl MinecraftLaunchParameters {
             resolution: None,
             quick_play_singleplayer: None,
             quick_play_multiplayer: None,
+            mod_resolution: None,
         }
+    }
+
+    pub fn with_mod_resolution(mut self, report: ModResolutionReport) -> Self {
+        self.mod_resolution = Some(report);
+        self
     }
 
     pub fn with_main_class(mut self, main_class: &str) -> Self {
@@ -569,9 +577,19 @@ impl MinecraftLauncher {
         };
         // Snapshot mod manifest (incl. disabled) for crash analysis.
         let crash_mods = match &profile {
-            Some(p) => crate::state::process_state::build_crash_mod_manifest(p, &state).await,
+            Some(p) => {
+                crate::state::process_state::build_crash_mod_manifest(
+                    p,
+                    &state,
+                    params.mod_resolution.as_ref(),
+                )
+                .await
+            }
             None => Vec::new(),
         };
+        let crash_modpack = profile
+            .as_ref()
+            .and_then(crate::state::process_state::crash_modpack_info);
         let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name, profile_image_url) =
             match profile {
                 Some(p) => {
@@ -622,6 +640,7 @@ impl MinecraftLauncher {
                 post_exit_hook,
                 params.memory_max_mb,
                 crash_mods,
+                crash_modpack,
             )
             .await?;
 

@@ -54,6 +54,7 @@ pub enum AppliedFix {
     Modver { profile_id: Uuid, mod_id: Uuid, prev: UnifiedVersion },
     Conflict { profile_id: Uuid, mods: Vec<ConflictRevert> },
     Pack { profile_id: Uuid, prev_pack_id: Option<String> },
+    Repair { profile_id: Uuid },
 }
 
 #[derive(Serialize)]
@@ -353,6 +354,12 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
             Ok(ApplyOutcome::Applied { fix: AppliedFix::Pack { profile_id, prev_pack_id } })
         }
 
+        "repair_profile" => {
+            crate::utils::repair_utils::repair_profile(profile_id).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
+            Ok(ApplyOutcome::Applied { fix: AppliedFix::Repair { profile_id } })
+        }
+
         other => Ok(skip(other)),
     }
 }
@@ -398,6 +405,9 @@ pub async fn revert_crash_fix(applied: AppliedFix) -> Result<(), CommandError> {
             p.selected_norisk_pack_id = prev_pack_id;
             pm.update_profile(profile_id, p).await?;
             let _ = state.event_state.trigger_profile_update(profile_id).await;
+        }
+        AppliedFix::Repair { profile_id } => {
+            log::info!("Repair of profile {} is not revertible; nothing to undo.", profile_id);
         }
     }
     Ok(())

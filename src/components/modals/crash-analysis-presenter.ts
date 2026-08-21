@@ -35,6 +35,7 @@ const ACTION_ICONS: Record<string, string> = {
   disable_norisk_mod: "solar:power-bold",
   install_mod: "solar:download-minimalistic-bold",
   switch_pack: "solar:box-bold",
+  repair_profile: "solar:sledgehammer-bold",
 };
 
 export const actionIcon = (a: CrashAction): string => ACTION_ICONS[a.type] ?? "solar:refresh-bold";
@@ -58,6 +59,7 @@ export function actionLabel(a: CrashAction, t: TFunction): string {
   if (a.type === "install_mod") return t("crash_analysis.action.install_mod", { mod: a.target, version });
   if (a.type === "disable_mod") return t("crash_analysis.action.disable_mod", { mod: a.target });
   if (a.type === "switch_pack") return t("crash_analysis.action.switch_pack", { pack: a.target });
+  if (a.type === "repair_profile") return t("crash_analysis.action.repair_profile");
   return a.label ?? a.type;
 }
 
@@ -89,5 +91,7 @@ export function summaryText(r: CrashCheckResult, t: TFunction): string | null {
   if (primary?.type === "enable_norisk_mod") return t("crash_analysis.summary.enable_norisk_mod", { mod: primary.target });
   if (primary?.type === "enable_mod") return t("crash_analysis.summary.enable_mod", { mod: primary.target });
   if (primary?.type === "switch_pack") return t("crash_analysis.summary.switch_pack", { pack: primary.target });
+  if (primary?.type === "repair_profile")
+    return t("crash_analysis.summary.repair_profile", { mods: (primary.targets ?? [primary.target]).join(", ") });
   return r.summary;
 }

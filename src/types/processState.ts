@@ -36,6 +36,24 @@ export interface ProcessMetadata {
   mods?: CrashModInfo[];
 }
 
+export type ModResolutionStatus =
+  | 'unknown'
+  | 'included'
+  | 'overridden'
+  | 'user_disabled'
+  | 'no_compatible_version'
+  | 'game_version_mismatch'
+  | 'loader_mismatch'
+  | 'no_associated_loader'
+  | 'unsupported_source'
+  | 'filename_unresolved'
+  | 'blocked_by_project_id'
+  | 'blocked_by_filename'
+  | 'missing_from_cache'
+  | 'managed_elsewhere'
+  | 'not_delivered'
+  | 'pack_resolve_failed';
+
 export interface CrashModInfo {
   id: string;
   name?: string | null;
@@ -43,6 +61,10 @@ export interface CrashModInfo {
   source?: string | null;
   enabled: boolean;
   norisk: boolean;
+  resolution?: ModResolutionStatus;
+  in_launch_set?: boolean | null;
+  filename?: string | null;
+  overridden_by?: string | null;
 }
 
 /**

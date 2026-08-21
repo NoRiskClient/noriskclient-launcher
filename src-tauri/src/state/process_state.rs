@@ -1,5 +1,8 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::minecraft::downloads::mod_resolver::{
+    ModOutcome, ModResolutionReport, ModResolutionStatus,
+};
 use crate::state::event_state::{
     EventPayload, EventType, MinecraftProcessExitedPayload,
 };
@@ -66,10 +69,44 @@ pub struct ProcessMetadata {
     pub log_session_id: Option<String>,
     #[serde(default)]
     pub mods: Vec<CrashModInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modpack: Option<CrashModpackInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrashModpackInfo {
+    pub platform: String,
+    pub project_id: String,
+    pub version_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_hash: Option<String>,
+}
+
+pub fn crash_modpack_info(
+    profile: &crate::state::profile_state::Profile,
+) -> Option<CrashModpackInfo> {
+    use crate::state::profile_state::ModPackSource;
+    let info = profile.modpack_info.as_ref()?;
+    let (platform, project_id, version_id) = match &info.source {
+        ModPackSource::Modrinth {
+            project_id,
+            version_id,
+        } => ("modrinth", project_id.clone(), version_id.clone()),
+        ModPackSource::CurseForge {
+            project_id,
+            file_id,
+        } => ("curseforge", project_id.to_string(), file_id.to_string()),
+    };
+    Some(CrashModpackInfo {
+        platform: platform.to_string(),
+        project_id,
+        version_id,
+        file_hash: info.file_hash.clone(),
+    })
 }
 
 /// Mod from the launch manifest (incl. disabled). Mirrors backend `CrashModInfo`. `norisk` = pack module.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CrashModInfo {
     pub id: String,
     pub name: Option<String>,
@@ -77,6 +114,14 @@ pub struct CrashModInfo {
     pub source: Option<String>,
     pub enabled: bool,
     pub norisk: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_launch_set: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overridden_by: Option<String>,
 }
 
 fn mod_source_kind(source: &crate::state::profile_state::ModSource) -> &'static str {
@@ -111,40 +156,75 @@ fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
 pub async fn build_crash_mod_manifest(
     profile: &crate::state::profile_state::Profile,
     state: &State,
+    resolution: Option<&ModResolutionReport>,
 ) -> Vec<CrashModInfo> {
     use crate::state::profile_state::NoriskModIdentifier;
     let mut out: Vec<CrashModInfo> = Vec::new();
 
+    let loader_key = profile.loader.as_str();
+    let report = resolution.filter(|r| r.matches(&profile.game_version, loader_key));
+
+    fn apply(info: &mut CrashModInfo, outcome: Option<&ModOutcome>) {
+        let Some(outcome) = outcome else { return };
+        info.resolution = Some(outcome.status.as_wire().to_string());
+        info.in_launch_set = outcome.status.in_launch_set();
+        info.filename = outcome.filename.clone();
+        info.overridden_by = outcome.overridden_by.clone();
+        if info.version.is_none() {
+            info.version = outcome.version.clone();
+        }
+    }
+
     for m in &profile.mods {
-        out.push(CrashModInfo {
+        let mut info = CrashModInfo {
             id: custom_mod_id(m),
             name: m.display_name.clone(),
             version: m.version.clone(),
             source: Some(mod_source_kind(&m.source).to_string()),
             enabled: m.enabled,
             norisk: false,
-        });
+            ..Default::default()
+        };
+        apply(&mut info, report.and_then(|r| r.profile_mod(&m.id)));
+        out.push(info);
     }
 
     if let Some(pack_id) = profile.effective_norisk_pack_id().await {
         let config = state.norisk_pack_manager.get_config().await;
+        // the resolver saw no pack at all, so nothing from it reached the loader
+        let pack_failed = report
+            .filter(|r| r.pack_resolve_failed())
+            .map(|_| ModOutcome::skipped(ModResolutionStatus::PackResolveFailed));
         match config.get_resolved_pack_definition(&pack_id) {
             Ok(def) => {
                 for entry in &def.mods {
+                    if !entry
+                        .compatibility
+                        .get(&profile.game_version)
+                        .is_some_and(|l| l.contains_key(loader_key))
+                    {
+                        continue;
+                    }
                     let identifier = NoriskModIdentifier {
                         pack_id: pack_id.clone(),
                         mod_id: entry.id.clone(),
                         game_version: profile.game_version.clone(),
                         loader: profile.loader.clone(),
                     };
-                    out.push(CrashModInfo {
+                    let mut info = CrashModInfo {
                         id: entry.id.clone(),
                         name: entry.display_name.clone(),
                         version: None,
                         source: Some("norisk".to_string()),
                         enabled: !profile.disabled_norisk_mods_detailed.contains(&identifier),
                         norisk: true,
-                    });
+                        ..Default::default()
+                    };
+                    let outcome = pack_failed
+                        .as_ref()
+                        .or_else(|| report.and_then(|r| r.pack_mod(&entry.id)));
+                    apply(&mut info, outcome);
+                    out.push(info);
                 }
             }
             Err(e) => log::warn!(
@@ -617,6 +697,7 @@ impl ProcessManager {
         post_exit_hook: Option<String>,
         memory_max_mb: u32,
         mods: Vec<CrashModInfo>,
+        modpack: Option<CrashModpackInfo>,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -734,6 +815,7 @@ impl ProcessManager {
             memory_max_mb,
             log_session_id,
             mods,
+            modpack,
         };
 
         log::info!(
