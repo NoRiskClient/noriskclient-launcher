@@ -1,6 +1,8 @@
 pub mod audio;
+pub mod peaks;
 
 pub use audio::AudioRing;
+pub use peaks::{Peak, PeakRing};
 
 use std::collections::VecDeque;
 
