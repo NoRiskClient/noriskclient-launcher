@@ -147,6 +147,16 @@ pub struct ClipConfig {
     pub hotkey_save: String,
     #[serde(default = "default_clip_hotkey_toggle")]
     pub hotkey_toggle: String,
+    #[serde(default = "default_true_bool")]
+    pub record_minecraft: bool,
+    #[serde(default)]
+    pub other_game: Option<OtherGame>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct OtherGame {
+    pub executable: String,
+    pub name: String,
 }
 
 impl Default for ClipConfig {
@@ -174,11 +184,65 @@ impl Default for ClipConfig {
             post_roll_seconds: 0,
             hotkey_save: default_clip_hotkey_save(),
             hotkey_toggle: default_clip_hotkey_toggle(),
+            record_minecraft: true,
+            other_game: None,
         }
     }
 }
 
+#[cfg(test)]
+mod other_game {
+    use super::*;
+
+    fn chosen(executable: &str) -> ClipConfig {
+        ClipConfig {
+            other_game: Some(OtherGame {
+                executable: executable.to_string(),
+                name: "Rocket League".into(),
+            }),
+            ..ClipConfig::default()
+        }
+    }
+
+    #[test]
+    fn nothing_is_recorded_until_something_is_chosen() {
+        assert!(ClipConfig::default().other_game.is_none());
+        assert!(!ClipConfig::default().records("rocketleague.exe"));
+    }
+
+    #[test]
+    fn the_chosen_program_is_recorded() {
+        assert!(chosen("rocketleague.exe").records("rocketleague.exe"));
+    }
+
+    #[test]
+    fn nothing_else_is() {
+        let clips = chosen("rocketleague.exe");
+        for other in ["windowsterminal.exe", "chatterino.exe", "chrome.exe"] {
+            assert!(!clips.records(other), "{other} must not be recorded");
+        }
+    }
+
+    #[test]
+    fn an_executable_is_matched_whatever_its_case() {
+        let clips = chosen("RocketLeague.exe");
+        assert!(clips.records("rocketleague.exe"));
+        assert!(clips.records("ROCKETLEAGUE.EXE"));
+    }
+
+    #[test]
+    fn minecraft_is_recorded_unless_it_is_turned_off() {
+        assert!(ClipConfig::default().record_minecraft);
+    }
+}
+
 impl ClipConfig {
+    pub fn records(&self, executable: &str) -> bool {
+        self.other_game
+            .as_ref()
+            .is_some_and(|game| game.executable.eq_ignore_ascii_case(executable))
+    }
+
     pub fn resolved_output_dir(&self) -> PathBuf {
         self.output_dir
             .clone()
@@ -533,7 +597,6 @@ impl ConfigManager {
                             if let Some(cache_natives) = obj.get("cache_natives_extraction").and_then(|v| v.as_bool()) {
                                 migrated_config.cache_natives_extraction = cache_natives;
                             }
-
 
                             // Migrate numeric fields
                             if let Some(downloads) = obj.get("concurrent_downloads").and_then(|v| v.as_u64()) {
