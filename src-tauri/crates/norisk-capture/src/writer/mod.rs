@@ -42,13 +42,20 @@ pub struct AudioTrack {
     pub channels: u32,
     pub extradata: Vec<u8>,
     pub packets: Vec<crate::buffer::Packet>,
+    pub label: String,
+}
+
+impl AudioTrack {
+    fn usable(&self) -> bool {
+        !self.packets.is_empty() && !self.extradata.is_empty()
+    }
 }
 
 pub fn write_mp4(
     clip: &Clip,
     path: &Path,
     track: &TrackInfo,
-    audio: Option<&AudioTrack>,
+    audio: &[AudioTrack],
 ) -> Result<WrittenClip> {
     if clip.packets.is_empty() {
         bail!("refusing to write an empty clip");
@@ -113,50 +120,61 @@ pub fn write_mp4(
             den: 1,
         };
 
-        let audio_stream_index = match audio {
-            Some(audio) if !audio.packets.is_empty() && !audio.extradata.is_empty() => {
-                let stream = ff::avformat_new_stream(format_ctx, std::ptr::null());
-                if stream.is_null() {
-                    bail!("avformat_new_stream failed for audio");
-                }
-                let params = (*stream).codecpar;
-                (*params).codec_type = ff::AVMediaType::AVMEDIA_TYPE_AUDIO;
-                (*params).codec_id = ff::AVCodecID::AV_CODEC_ID_AAC;
-                (*params).sample_rate = audio.sample_rate as i32;
-                (*params).format = ff::AVSampleFormat::AV_SAMPLE_FMT_FLTP as i32;
-                ff::av_channel_layout_default(&mut (*params).ch_layout, audio.channels as i32);
-
-                let extradata = ff::av_malloc(
-                    audio.extradata.len() + ff::AV_INPUT_BUFFER_PADDING_SIZE as usize,
-                ) as *mut u8;
-                if extradata.is_null() {
-                    bail!("could not allocate audio extradata");
-                }
-                std::ptr::copy_nonoverlapping(
-                    audio.extradata.as_ptr(),
-                    extradata,
-                    audio.extradata.len(),
+        let mut audio_streams: Vec<(usize, i32)> = Vec::with_capacity(audio.len());
+        for (position, wanted) in audio.iter().enumerate() {
+            if !wanted.usable() {
+                log::warn!(
+                    "Audio track {position} ({}) had no packets or no header and was left out",
+                    if wanted.label.is_empty() { "unnamed" } else { &wanted.label }
                 );
-                std::ptr::write_bytes(
-                    extradata.add(audio.extradata.len()),
-                    0,
-                    ff::AV_INPUT_BUFFER_PADDING_SIZE as usize,
-                );
-                (*params).extradata = extradata;
-                (*params).extradata_size = audio.extradata.len() as i32;
+                continue;
+            }
 
-                (*stream).time_base = ff::AVRational {
-                    num: 1,
-                    den: track.time_base_den as i32,
-                };
-                Some((*stream).index)
+            let stream = ff::avformat_new_stream(format_ctx, std::ptr::null());
+            if stream.is_null() {
+                bail!("avformat_new_stream failed for audio");
             }
-            Some(_) => {
-                log::warn!("Audio was requested but had no packets or no header; writing video only");
-                None
+            let params = (*stream).codecpar;
+            (*params).codec_type = ff::AVMediaType::AVMEDIA_TYPE_AUDIO;
+            (*params).codec_id = ff::AVCodecID::AV_CODEC_ID_AAC;
+            (*params).sample_rate = wanted.sample_rate as i32;
+            (*params).format = ff::AVSampleFormat::AV_SAMPLE_FMT_FLTP as i32;
+            ff::av_channel_layout_default(&mut (*params).ch_layout, wanted.channels as i32);
+
+            let extradata = ff::av_malloc(
+                wanted.extradata.len() + ff::AV_INPUT_BUFFER_PADDING_SIZE as usize,
+            ) as *mut u8;
+            if extradata.is_null() {
+                bail!("could not allocate audio extradata");
             }
-            None => None,
-        };
+            std::ptr::copy_nonoverlapping(
+                wanted.extradata.as_ptr(),
+                extradata,
+                wanted.extradata.len(),
+            );
+            std::ptr::write_bytes(
+                extradata.add(wanted.extradata.len()),
+                0,
+                ff::AV_INPUT_BUFFER_PADDING_SIZE as usize,
+            );
+            (*params).extradata = extradata;
+            (*params).extradata_size = wanted.extradata.len() as i32;
+
+            (*stream).time_base = ff::AVRational {
+                num: 1,
+                den: track.time_base_den as i32,
+            };
+
+            if audio_streams.is_empty() {
+                (*stream).disposition |= ff::AV_DISPOSITION_DEFAULT;
+            }
+
+            if !wanted.label.is_empty() {
+                name_stream(stream, &wanted.label)?;
+            }
+
+            audio_streams.push((position, (*stream).index));
+        }
 
         let rc = ff::avio_open(&mut (*format_ctx).pb, path_c.as_ptr(), ff::AVIO_FLAG_WRITE);
         if rc < 0 {
@@ -169,7 +187,6 @@ pub fn write_mp4(
         ff::av_dict_set(&mut options, key.as_ptr(), value.as_ptr(), 0);
 
         (*format_ctx).avoid_negative_ts = ff::AVFMT_AVOID_NEG_TS_DISABLED;
-
 
         let rc = ff::avformat_write_header(format_ctx, &mut options);
         ff::av_dict_free(&mut options);
@@ -200,14 +217,15 @@ pub fn write_mp4(
             .map(|p| (p.pts, 0i32, p, frame_ticks))
             .collect();
 
-        if let (Some(audio), Some(index)) = (audio, audio_stream_index) {
+        for (position, index) in &audio_streams {
+            let source = &audio[*position];
             let audio_ticks =
-                (track.time_base_den * 1024 / audio.sample_rate.max(1) as i64).max(1);
+                (track.time_base_den * 1024 / source.sample_rate.max(1) as i64).max(1);
             queue.extend(
-                audio
+                source
                     .packets
                     .iter()
-                    .map(|p| (p.pts, index, p, audio_ticks)),
+                    .map(|p| (p.pts, *index, p, audio_ticks)),
             );
         }
         queue.sort_by_key(|(pts, _, _, _)| *pts);
@@ -238,7 +256,6 @@ pub fn write_mp4(
                 ff::av_packet_rescale_ts(packet, source_time_base, *target);
             }
 
-
             let rc = ff::av_interleaved_write_frame(format_ctx, packet);
             if rc < 0 {
                 bail!("writing a packet failed: {}", av_error(rc));
@@ -264,6 +281,18 @@ pub fn write_mp4(
             frames: clip.packets.len(),
         })
     }
+}
+
+unsafe fn name_stream(stream: *mut ff::AVStream, label: &str) -> Result<()> {
+    let value = CString::new(label).context("a track label contains an interior nul")?;
+    for key in ["title", "handler_name"] {
+        let key = CString::new(key).expect("literal key has no nul");
+        let rc = ff::av_dict_set(&mut (*stream).metadata, key.as_ptr(), value.as_ptr(), 0);
+        if rc < 0 {
+            bail!("could not label an audio track: {}", av_error(rc));
+        }
+    }
+    Ok(())
 }
 
 struct FormatGuard(*mut ff::AVFormatContext, bool);
