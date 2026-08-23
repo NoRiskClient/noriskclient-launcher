@@ -42,6 +42,8 @@ execFileSync(
   { cwd: srcTauri, stdio: "inherit" },
 );
 
+freeLockedHooks();
+
 const triple = readHostTriple();
 fs.mkdirSync(staging, { recursive: true });
 
@@ -82,6 +84,39 @@ function copyIn(dir, name, what) {
   }
   fs.copyFileSync(from, path.join(staging, name));
   return fs.statSync(from).size;
+}
+
+function freeLockedHooks() {
+  for (const name of ["graphics-hook64.dll", "graphics-hook32.dll"]) {
+    const inUse = path.join(fromDir, name);
+    if (!fs.existsSync(inUse)) continue;
+
+    try {
+      fs.closeSync(fs.openSync(inUse, "r+"));
+      continue;
+    } catch (e) {
+      if (e.code !== "EBUSY" && e.code !== "EPERM" && e.code !== "EACCES") throw e;
+    }
+
+    const parked = `${inUse}.inuse-${Date.now()}`;
+    try {
+      fs.renameSync(inUse, parked);
+      step(`${name} is loaded in another process; parked as ${path.basename(parked)}`);
+    } catch (e) {
+      throw new Error(
+        `${name} is loaded in another process and could not be moved aside (${e.code}). ` +
+          `Close whatever the launcher recorded and build again.`,
+      );
+    }
+  }
+
+  for (const name of fs.readdirSync(fromDir)) {
+    if (!name.includes(".dll.inuse-")) continue;
+    try {
+      fs.unlinkSync(path.join(fromDir, name));
+    } catch {
+    }
+  }
 }
 
 function readHostTriple() {
