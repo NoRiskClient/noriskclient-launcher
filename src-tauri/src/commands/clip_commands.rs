@@ -199,10 +199,43 @@ pub async fn clip_reveal(path: std::path::PathBuf) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
+pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), CommandError> {
+    let dir = clip_dir().await?;
+    crate::utils::clip_library::guard_inside(&dir, &path)?;
+
+    let state = State::get().await?;
+    state
+        .capture_supervisor
+        .send(LauncherToCapture::PrepareAudioPreview(
+            norisk_ipc::AudioPreviewRequest { source: path },
+        ))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clip_export_vertical(
+    path: std::path::PathBuf,
+) -> Result<std::path::PathBuf, CommandError> {
+    let dir = clip_dir().await?;
+    let destination = crate::utils::clip_library::vertical_destination(&dir, &path)?;
+
+    let state = State::get().await?;
+    state.capture_supervisor.send(LauncherToCapture::ExportVertical(
+        norisk_ipc::ExportVerticalRequest {
+            source: path,
+            destination: destination.clone(),
+        },
+    ))?;
+
+    Ok(destination)
+}
+
+#[tauri::command]
 pub async fn clip_trim(
     path: std::path::PathBuf,
     start_seconds: f64,
     end_seconds: f64,
+    levels: Option<Vec<norisk_ipc::TrackLevel>>,
 ) -> Result<std::path::PathBuf, CommandError> {
     if !start_seconds.is_finite() || !end_seconds.is_finite() || end_seconds <= start_seconds {
         return Err(crate::error::AppError::Other(
@@ -222,6 +255,7 @@ pub async fn clip_trim(
             destination: destination.clone(),
             start_seconds,
             end_seconds,
+            levels: levels.unwrap_or_default(),
         }))?;
 
     Ok(destination)
@@ -231,6 +265,60 @@ async fn clip_dir() -> Result<std::path::PathBuf, CommandError> {
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;
     Ok(config.clips.resolved_output_dir())
+}
+
+#[tauri::command]
+pub async fn clip_details(
+    path: std::path::PathBuf,
+) -> Result<Option<crate::utils::clip_library::ClipDetails>, CommandError> {
+    let dir = clip_dir().await?;
+    crate::utils::clip_library::guard_inside(&dir, &path)?;
+    Ok(tokio::task::spawn_blocking(move || {
+        crate::utils::clip_library::read_details(&path)
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(format!("reading the clip's details failed: {e}")))?)
+}
+
+#[tauri::command]
+pub async fn clip_save_thumbnail(
+    path: std::path::PathBuf,
+    jpeg: Vec<u8>,
+) -> Result<std::path::PathBuf, CommandError> {
+    let dir = clip_dir().await?;
+    Ok(tokio::task::spawn_blocking(move || {
+        crate::utils::clip_library::write_thumbnail(&dir, &path, &jpeg)
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(format!("writing the still failed: {e}")))??)
+}
+
+#[tauri::command]
+pub async fn clip_open_apps() -> Result<Vec<crate::utils::game_detect::OpenApp>, CommandError> {
+    Ok(tokio::task::spawn_blocking(crate::utils::game_detect::open_apps)
+        .await
+        .map_err(|e| crate::error::AppError::Other(format!("listing open apps failed: {e}")))?)
+}
+
+#[tauri::command]
+pub async fn clip_set_favourite(
+    path: std::path::PathBuf,
+    favourite: bool,
+) -> Result<(), CommandError> {
+    let dir = clip_dir().await?;
+    crate::utils::clip_library::set_favourite(&dir, &path, favourite)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clip_rename(
+    path: std::path::PathBuf,
+    name: String,
+) -> Result<std::path::PathBuf, CommandError> {
+    let dir = clip_dir().await?;
+    let renamed = crate::utils::clip_library::rename(&dir, &path, &name)?;
+    log::info!("Renamed {} to {}", path.display(), renamed.display());
+    Ok(renamed)
 }
 
 #[tauri::command]
