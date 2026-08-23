@@ -149,6 +149,10 @@ impl PoolFrame {
     pub fn set_pts(&mut self, pts: i64) {
         unsafe { (*self.frame).pts = pts };
     }
+
+    pub fn pts(&self) -> i64 {
+        unsafe { (*self.frame).pts }
+    }
 }
 
 impl Drop for PoolFrame {
