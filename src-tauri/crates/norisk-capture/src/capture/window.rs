@@ -66,10 +66,48 @@ pub fn find_by_pid(pid: u32) -> Option<GameWindow> {
 }
 
 const FALLBACK_PATIENCE: Duration = Duration::from_secs(5);
+
 pub struct WindowSearch {
     pid: u32,
     deadline: Instant,
     fallback: Option<(GameWindow, Instant)>,
+    patient: bool,
+}
+
+fn runs_java(pid: u32) -> bool {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    unsafe {
+        let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return true;
+        };
+
+        let mut buffer = [0u16; 260];
+        let mut length = buffer.len() as u32;
+        let ok = QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_FORMAT(0),
+            PWSTR(buffer.as_mut_ptr()),
+            &mut length,
+        );
+        let _ = CloseHandle(handle);
+        if ok.is_err() {
+            return true;
+        }
+
+        let path = String::from_utf16_lossy(&buffer[..length as usize]).to_lowercase();
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or(path);
+
+        name == "javaw.exe" || name == "java.exe"
+    }
 }
 
 pub enum SearchStep {
@@ -80,10 +118,15 @@ pub enum SearchStep {
 
 impl WindowSearch {
     pub fn new(pid: u32, timeout: Duration) -> Self {
+        let patient = runs_java(pid);
+        if !patient {
+            log::debug!("Process {pid} is not Java; taking its window straight away");
+        }
         Self {
             pid,
             deadline: Instant::now() + timeout,
             fallback: None,
+            patient,
         }
     }
 
@@ -94,6 +137,10 @@ impl WindowSearch {
     pub fn poll(&mut self) -> SearchStep {
         if let Some(window) = find_by_pid(self.pid) {
             if window.class.eq_ignore_ascii_case(GLFW_CLASS) {
+                return SearchStep::Found(window);
+            }
+
+            if !self.patient {
                 return SearchStep::Found(window);
             }
 
@@ -142,6 +189,9 @@ unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> BOOL {
 fn describe(hwnd: HWND) -> Option<GameWindow> {
     unsafe {
         if !IsWindowVisible(hwnd).as_bool() {
+            return None;
+        }
+        if IsIconic(hwnd).as_bool() {
             return None;
         }
         if GetWindow(hwnd, GW_OWNER)
