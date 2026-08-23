@@ -6,7 +6,7 @@ fn main() {
 
 #[cfg(windows)]
 fn main() -> anyhow::Result<()> {
-    use norisk_capture::{engine::Engine, ipc};
+    use norisk_capture::{engine::Engine, ipc, watchdog};
     use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
     let args: Vec<String> = std::env::args().collect();
@@ -26,6 +26,12 @@ fn main() -> anyhow::Result<()> {
         .and_then(|i| args.get(i + 1))
         .map(std::path::PathBuf::from);
 
+    let parent_pid = args
+        .iter()
+        .position(|a| a == "--parent-pid")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|pid| pid.parse::<u32>().ok());
+
     if let Some(dir) = log_dir {
         let setup = norisk_logging::LogSetup::new(dir, "capture.log")
             .level(log::LevelFilter::Debug)
@@ -39,6 +45,11 @@ fn main() -> anyhow::Result<()> {
         "norisk-capture {} starting on {pipe_name}",
         env!("CARGO_PKG_VERSION")
     );
+
+    match parent_pid {
+        Some(pid) => watchdog::watch_parent(pid),
+        None => log::warn!("Started without --parent-pid, so nothing will notice if the launcher dies"),
+    }
 
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -62,11 +73,11 @@ fn main() -> anyhow::Result<()> {
     match result {
         Ok(()) => {
             log::info!("norisk-capture exiting cleanly");
-            Ok(())
+            watchdog::leave(0)
         }
         Err(e) => {
             log::error!("IPC failed: {e:#}");
-            Err(e)
+            watchdog::leave(1)
         }
     }
 }
