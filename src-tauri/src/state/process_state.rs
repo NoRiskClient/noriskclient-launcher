@@ -805,11 +805,12 @@ impl ProcessManager {
         // --- END Discord State Update ---
 
         if let Ok(state) = State::get().await {
-            if state.config_manager.get_config().await.clips.enabled {
+            let clips = state.config_manager.get_config().await.clips;
+            if clips.enabled && clips.record_minecraft {
                 log::debug!("Attaching the capture engine to game process {} (pid {})", process_id, pid);
                 if let Err(e) = state
                     .capture_supervisor
-                    .send(norisk_ipc::LauncherToCapture::AttachWindow { pid })
+                    .attach_game(pid, "Minecraft".to_string())
                 {
                     log::warn!("Could not attach the capture engine: {}", e);
                 }
