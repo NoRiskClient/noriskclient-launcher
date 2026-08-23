@@ -16,6 +16,8 @@ pub enum LauncherToCapture {
     DetachWindow,
     SaveClip(SaveClipRequest),
     TrimClip(TrimClipRequest),
+    ExportVertical(ExportVerticalRequest),
+    PrepareAudioPreview(AudioPreviewRequest),
     SetBufferEnabled { enabled: bool },
     Ping { seq: u64 },
     Shutdown,
@@ -212,6 +214,9 @@ pub enum CaptureToLauncher {
     Status(StatusReport),
     ClipSaved(ClipManifest),
     ClipTrimmed(TrimmedClip),
+    ClipExported(ExportedClip),
+    ExportProgress(ExportProgress),
+    AudioPreviewReady(AudioPreview),
     Error(CaptureError),
     Pong { seq: u64 },
 }
@@ -276,7 +281,19 @@ pub struct ClipManifest {
     pub size_bytes: u64,
     pub reason: ClipReason,
     pub created_at: String,
+    #[serde(default)]
+    pub audio_tracks: Vec<ClipAudioTrack>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ClipAudioTrack {
+    pub label: String,
+    pub stream: u32,
+    pub adjustable: bool,
+    pub peaks: Vec<u8>,
+}
+
+pub const PEAK_STEP_MS: u32 = 20;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CaptureError {
@@ -447,6 +464,44 @@ mod selection_tests {
 }
 
 #[cfg(test)]
+mod export_progress {
+    use super::*;
+
+    fn at(done: u32, total: u32) -> ExportProgress {
+        ExportProgress {
+            source: PathBuf::from("clip.mp4"),
+            done,
+            total,
+        }
+    }
+
+    #[test]
+    fn a_fresh_export_is_at_nothing() {
+        assert_eq!(at(0, 900).fraction(), 0.0);
+    }
+
+    #[test]
+    fn halfway_is_a_half() {
+        assert_eq!(at(450, 900).fraction(), 0.5);
+    }
+
+    #[test]
+    fn finished_is_one() {
+        assert_eq!(at(900, 900).fraction(), 1.0);
+    }
+
+    #[test]
+    fn a_clip_with_no_frames_counts_as_done() {
+        assert_eq!(at(0, 0).fraction(), 1.0);
+    }
+
+    #[test]
+    fn a_count_past_the_end_does_not_overshoot() {
+        assert_eq!(at(1000, 900).fraction(), 1.0);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -574,6 +629,76 @@ pub struct TrimClipRequest {
     pub destination: PathBuf,
     pub start_seconds: f64,
     pub end_seconds: f64,
+    #[serde(default)]
+    pub levels: Vec<TrackLevel>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrackLevel {
+    pub stream: u32,
+    pub volume: u32,
+}
+
+impl TrackLevel {
+    pub fn gain(&self) -> f32 {
+        self.volume.min(200) as f32 / 100.0
+    }
+}
+
+pub fn levels_change_anything(levels: &[TrackLevel]) -> bool {
+    levels.iter().any(|level| level.volume != 100)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioPreviewRequest {
+    pub source: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioPreview {
+    pub source: PathBuf,
+    pub tracks: Vec<PreviewTrack>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewTrack {
+    pub stream: u32,
+    pub label: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExportVerticalRequest {
+    pub source: PathBuf,
+    pub destination: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProgress {
+    pub source: PathBuf,
+    pub done: u32,
+    pub total: u32,
+}
+
+impl ExportProgress {
+    pub fn fraction(&self) -> f32 {
+        if self.total == 0 {
+            return 1.0;
+        }
+        (self.done as f32 / self.total as f32).clamp(0.0, 1.0)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExportedClip {
+    pub path: PathBuf,
+    pub source: PathBuf,
+    pub width: u32,
+    pub height: u32,
+    pub duration_seconds: f64,
+    pub size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
