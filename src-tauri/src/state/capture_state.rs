@@ -29,6 +29,7 @@ const BACKOFF: &[Duration] = &[
 struct Session {
     config: Option<norisk_ipc::CaptureConfig>,
     attached_pid: Option<u32>,
+    attached_game: Option<String>,
     buffering_enabled: Option<bool>,
 }
 
@@ -91,7 +92,10 @@ impl CaptureSupervisor {
             match &command {
                 LauncherToCapture::Configure(config) => session.config = Some(config.clone()),
                 LauncherToCapture::AttachWindow { pid } => session.attached_pid = Some(*pid),
-                LauncherToCapture::DetachWindow => session.attached_pid = None,
+                LauncherToCapture::DetachWindow => {
+                    session.attached_pid = None;
+                    session.attached_game = None;
+                }
                 LauncherToCapture::SetBufferEnabled { enabled } => {
                     session.buffering_enabled = Some(*enabled)
                 }
@@ -102,6 +106,34 @@ impl CaptureSupervisor {
         self.commands
             .send(command)
             .map_err(|_| AppError::Other("the capture supervisor is not running".into()))
+    }
+
+    pub fn attached(&self) -> Option<u32> {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .attached_pid
+    }
+
+    pub fn attached_game(&self) -> Option<String> {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .attached_game
+            .clone()
+    }
+
+    pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
+        self.send(LauncherToCapture::AttachWindow { pid })?;
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .attached_game = Some(name);
+        Ok(())
+    }
+
+    pub fn detach(&self) -> Result<()> {
+        self.send(LauncherToCapture::DetachWindow)
     }
 
     fn session_snapshot(&self) -> Session {
@@ -220,6 +252,8 @@ impl CaptureSupervisor {
             .arg(&pipe_name)
             .arg("--log-dir")
             .arg(&log_dir)
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
             .creation_flags(CREATE_NO_WINDOW)
             .kill_on_drop(true);
 
@@ -377,6 +411,21 @@ impl CaptureSupervisor {
                     manifest.size_bytes as f64 / 1e6
                 );
 
+                {
+                    let mut details = crate::utils::clip_library::ClipDetails::from(&manifest);
+                    details.game = self.attached_game();
+                    let path = manifest.path.clone();
+                    if let Err(e) = tokio::task::spawn_blocking(move || {
+                        crate::utils::clip_library::write_details(&path, &details)
+                    })
+                    .await
+                    .map_err(|e| format!("{e}"))
+                    .and_then(|inner| inner.map_err(|e| format!("{e}")))
+                    {
+                        log::warn!("Could not describe the saved clip: {e}");
+                    }
+                }
+
                 if let Some(dir) = self.clip_dir_for_cleanup().await {
                     let (dir, limit) = dir;
                     match tokio::task::spawn_blocking(move || {
@@ -406,6 +455,40 @@ impl CaptureSupervisor {
                     None => log::warn!("No UI handle; the saved clip cannot be confirmed on screen"),
                 }
             }
+            CaptureToLauncher::AudioPreviewReady(preview) => {
+                log::debug!(
+                    "Audio preview ready for {}: {} track(s)",
+                    preview.source.display(),
+                    preview.tracks.len()
+                );
+                if let Some(app) = self.app.read().await.as_ref() {
+                    use tauri::Emitter;
+                    if let Err(e) = app.emit("clip_audio_preview", &preview) {
+                        log::warn!("Could not hand the audio preview to the UI: {e}");
+                    }
+                }
+            }
+            CaptureToLauncher::ExportProgress(progress) => {
+                if let Some(app) = self.app.read().await.as_ref() {
+                    use tauri::Emitter;
+                    let _ = app.emit("clip_export_progress", &progress);
+                }
+            }
+            CaptureToLauncher::ClipExported(exported) => {
+                log::info!(
+                    "Vertical clip written: {} ({}x{}, {:.1} MB)",
+                    exported.path.display(),
+                    exported.width,
+                    exported.height,
+                    exported.size_bytes as f64 / 1e6
+                );
+                if let Some(app) = self.app.read().await.as_ref() {
+                    use tauri::Emitter;
+                    if let Err(e) = app.emit("clip_exported", &exported) {
+                        log::warn!("Could not tell the UI about the export: {e}");
+                    }
+                }
+            }
             CaptureToLauncher::ClipTrimmed(trimmed) => {
                 log::info!(
                     "Trimmed clip written: {} ({:.1}s, {:.1} MB)",
@@ -413,6 +496,22 @@ impl CaptureSupervisor {
                     trimmed.duration_seconds,
                     trimmed.size_bytes as f64 / 1e6
                 );
+
+                {
+                    let source = trimmed.source.clone();
+                    let path = trimmed.path.clone();
+                    let (start, end) = (trimmed.start_seconds, trimmed.end_seconds);
+                    let _ = tokio::task::spawn_blocking(move || {
+                        let Some(details) = crate::utils::clip_library::read_details(&source) else {
+                            return;
+                        };
+                        let cut = details.sliced(start, end);
+                        if let Err(e) = crate::utils::clip_library::write_details(&path, &cut) {
+                            log::warn!("Could not describe the trimmed clip: {e}");
+                        }
+                    })
+                    .await;
+                }
 
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
