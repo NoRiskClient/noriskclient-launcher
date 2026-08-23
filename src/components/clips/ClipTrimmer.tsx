@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+
+import type { ClipDetails, TrackLevel } from "../../services/clip-service";
+import { TrackLevelControl, Waveform, trackName } from "./ClipTimeline";
 import { cn } from "../../lib/utils";
+import { useTrimPreview } from "./useTrimPreview";
 
 const MIN_LENGTH = 0.5;
 
@@ -15,14 +19,25 @@ const NUDGE = 0.1;
 
 interface Props {
   src: string;
+  path: string;
   duration: number;
   busy: boolean;
+  details: ClipDetails | null;
   onCancel: () => void;
-  onSave: (startSeconds: number, endSeconds: number) => void;
+  onSave: (startSeconds: number, endSeconds: number, levels: TrackLevel[]) => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
-export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props) {
+export function ClipTrimmer({
+  src,
+  path,
+  duration,
+  busy,
+  details,
+  onCancel,
+  onSave,
+  t,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +46,29 @@ export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props)
   const [dragging, setDragging] = useState<"start" | "end" | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+
+  const lanes = useMemo(() => details?.audioTracks ?? [], [details]);
+  const adjustable = useMemo(() => lanes.filter((track) => track.adjustable), [lanes]);
+
+  const [volumes, setVolumes] = useState<Record<number, number>>({});
+  useEffect(() => {
+    setVolumes(Object.fromEntries(adjustable.map((track) => [track.stream, 100])));
+  }, [adjustable]);
+
+  const levels: TrackLevel[] = useMemo(
+    () => adjustable.map((track) => ({ stream: track.stream, volume: volumes[track.stream] ?? 100 })),
+    [adjustable, volumes],
+  );
+  const rebalanced = levels.some((level) => level.volume !== 100);
+
+  const previewState = useTrimPreview({
+    path,
+    video: videoRef,
+    levels,
+    active: adjustable.length > 0,
+  });
+
+  const drawn = adjustable.length > 0 ? adjustable : lanes;
 
   useEffect(() => {
     if (duration > 0) setEnd((current) => (current === 0 ? duration : Math.min(current, duration)));
@@ -159,7 +197,7 @@ export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props)
       <div className="flex flex-col gap-2">
         <div
           ref={barRef}
-          className="relative h-16 select-none overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
+          className="relative select-none overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
           onPointerDown={(event) => {
             const seconds = secondsAt(event.clientX);
             seek(seconds);
@@ -167,21 +205,35 @@ export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props)
           }}
           role="presentation"
         >
-          {filmstrip ? (
-            <img
-              src={filmstrip}
-              alt=""
-              draggable={false}
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Icon
-                icon="solar:refresh-linear"
-                className="h-4 w-4 animate-spin text-white/25"
+          <div className="relative h-16">
+            {filmstrip ? (
+              <img
+                src={filmstrip}
+                alt=""
+                draggable={false}
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
               />
-            </div>
-          )}
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Icon icon="solar:refresh-linear" className="h-4 w-4 animate-spin text-white/25" />
+              </div>
+            )}
+          </div>
+
+          {drawn.map((track) => {
+            const volume = track.adjustable ? (volumes[track.stream] ?? 100) : 100;
+            return (
+              <div
+                key={track.stream}
+                className="relative h-12 border-t border-white/[0.07] text-emerald-300"
+              >
+                <Waveform peaks={track.peaks} gain={volume / 100} muted={volume === 0} />
+                <span className="pointer-events-none absolute left-2 top-1.5 text-[10px] uppercase tracking-wider text-white/40">
+                  {trackName(track.label, t)}
+                </span>
+              </div>
+            );
+          })}
 
           <div
             className="pointer-events-none absolute inset-y-0 left-0 bg-black/70"
@@ -223,6 +275,33 @@ export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props)
         <p className="min-h-[1.25rem] text-xs text-white/30">{t("clips.trim.hint")}</p>
       </div>
 
+      {adjustable.length > 0 && (
+        <div className="flex flex-col gap-2.5 rounded-lg bg-white/[0.03] px-3 py-3 ring-1 ring-white/[0.06]">
+          {adjustable.map((track) => (
+            <TrackLevelControl
+              key={track.stream}
+              track={track}
+              name={trackName(track.label, t)}
+              volume={volumes[track.stream] ?? 100}
+              onChange={(volume) =>
+                setVolumes((current) => ({ ...current, [track.stream]: volume }))
+              }
+              disabled={busy}
+              t={t}
+            />
+          ))}
+          <p className="text-[11px] leading-relaxed text-white/30">
+            {previewState === "live"
+              ? t("clips.trim.levels.live")
+              : previewState === "loading"
+                ? t("clips.trim.levels.preparing")
+                : rebalanced
+                  ? t("clips.trim.levels.rebuilt")
+                  : t("clips.trim.levels.untouched")}
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -245,7 +324,7 @@ export function ClipTrimmer({ src, duration, busy, onCancel, onSave, t }: Props)
         </button>
         <button
           type="button"
-          onClick={() => onSave(start, end)}
+          onClick={() => onSave(start, end, levels)}
           disabled={busy || kept < MIN_LENGTH}
           className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
         >
