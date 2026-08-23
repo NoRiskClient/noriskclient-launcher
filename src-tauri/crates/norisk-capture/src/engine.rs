@@ -10,7 +10,7 @@ use norisk_ipc::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::buffer::{AudioRing, RingBuffer};
+use crate::buffer::{AudioRing, PeakRing, RingBuffer};
 use crate::capture::{fit_output, window, BgraFrame, CaptureDevice, CaptureSession, Converter};
 use crate::encoder::{
     video::TIME_BASE_DEN, EncoderSettings, HwFramePool, PoolFrame, VideoEncoder,
@@ -19,6 +19,10 @@ use crate::writer::{write_mp4, TrackInfo};
 
 const STATUS_INTERVAL: Duration = Duration::from_secs(1);
 const ENCODE_QUEUE_DEPTH: usize = 4;
+
+const PROGRESS_EVERY: Duration = Duration::from_millis(150);
+
+const MIN_CAPTURE_SIDE: u32 = 128;
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct Engine {
@@ -88,8 +92,8 @@ struct Retired {
 }
 
 struct RetiredAudio {
-    ring: Arc<Mutex<AudioRing>>,
-    extradata: Arc<Mutex<Vec<u8>>>,
+    master: AudioStem,
+    stems: Vec<AudioStem>,
     sample_rate: u32,
     channels: u32,
 }
@@ -149,41 +153,53 @@ fn gain(percent: u32) -> f32 {
     (percent.min(200) as f32) / 100.0
 }
 
-struct AudioPipeline {
-    _captures: Vec<crate::audio::LoopbackCapture>,
+#[derive(Clone)]
+struct AudioStem {
+    label: &'static str,
     ring: Arc<Mutex<AudioRing>>,
     extradata: Arc<Mutex<Vec<u8>>>,
+    peaks: Arc<Mutex<PeakRing>>,
+}
+
+struct AudioPipeline {
+    _captures: Vec<crate::audio::LoopbackCapture>,
+    master: AudioStem,
+    stems: Vec<AudioStem>,
     sample_rate: u32,
     channels: u32,
-    mixer: Option<crate::audio::Mixer>,
-    sink: AudioSink,
+    mixers: Vec<(crate::audio::Mixer, AudioSink)>,
 }
 
 type AudioSink = Arc<Mutex<dyn FnMut(&[f32], i64) + Send>>;
 
 impl AudioPipeline {
+    fn tracks(&self) -> impl Iterator<Item = &AudioStem> {
+        std::iter::once(&self.master).chain(self.stems.iter())
+    }
+
     fn drain_mixer(&self) {
-        let Some(mixer) = self.mixer.as_ref() else {
-            return;
-        };
+        for (mixer, sink) in &self.mixers {
+            let tail = mixer.flush();
+            if tail.is_empty() {
+                continue;
+            }
 
-        let mut sink = self.sink.lock().unwrap_or_else(|e| e.into_inner());
+            let samples: usize = tail.iter().map(|block| block.samples.len()).sum();
+            let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
+            for block in tail {
+                (*sink)(&block.samples, block.timestamp_100ns);
+            }
+            drop(sink);
 
-        let tail = mixer.flush();
-        if tail.is_empty() {
-            return;
+            log::debug!(
+                "Drained {:.0} ms of held audio out of a mixer",
+                mixer.span_100ns(samples) as f64 / 10_000.0
+            );
         }
 
-        let samples: usize = tail.iter().map(|block| block.samples.len()).sum();
-        for block in tail {
-            (*sink)(&block.samples, block.timestamp_100ns);
+        for stem in self.tracks() {
+            stem.peaks.lock().unwrap_or_else(|e| e.into_inner()).flush();
         }
-        drop(sink);
-
-        log::debug!(
-            "Drained {:.0} ms of held audio out of the mixer",
-            mixer.span_100ns(samples) as f64 / 10_000.0
-        );
     }
 }
 
@@ -306,6 +322,8 @@ impl Engine {
             }
             LauncherToCapture::SaveClip(request) => self.save_clip(request)?,
             LauncherToCapture::TrimClip(request) => self.trim_clip(request),
+            LauncherToCapture::ExportVertical(request) => self.export_vertical(request),
+            LauncherToCapture::PrepareAudioPreview(request) => self.prepare_preview(request),
             LauncherToCapture::Ping { seq } => {
                 let _ = self.events.send(CaptureToLauncher::Pong { seq });
             }
@@ -482,6 +500,16 @@ impl Engine {
 
         let source = window::client_size(target.hwnd)
             .unwrap_or(((target.width.max(0)) as u32, (target.height.max(0)) as u32));
+
+        if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
+            anyhow::bail!(
+                "'{}' is only {}x{} on screen, too small to record — it is probably minimised",
+                target.title,
+                source.0,
+                source.1,
+            );
+        }
+
         let (width, height) = fit_output(source, (self.config.width, self.config.height));
         if (width, height) != (self.config.width, self.config.height) {
             log::info!(
@@ -533,6 +561,7 @@ impl Engine {
             TIME_BASE_DEN as i64,
         )));
         let dropped = Arc::new(AtomicU64::new(0));
+        let fps = self.config.fps.max(1);
         let (frames_tx, frames_rx) = std::sync::mpsc::sync_channel::<PoolFrame>(ENCODE_QUEUE_DEPTH);
 
         let encode_thread = {
@@ -540,7 +569,7 @@ impl Engine {
             let events = self.events.clone();
             std::thread::Builder::new()
                 .name("nrc-encode".into())
-                .spawn(move || encode_loop(encoder, frames_rx, ring, events))
+                .spawn(move || encode_loop(encoder, frames_rx, ring, events, fps))
                 .context("could not start the encode thread")?
         };
 
@@ -659,8 +688,8 @@ impl Engine {
             extradata: pipeline.extradata.clone(),
             settings: pipeline.settings,
             audio: pipeline.audio.as_ref().map(|audio| RetiredAudio {
-                ring: Arc::clone(&audio.ring),
-                extradata: Arc::clone(&audio.extradata),
+                master: audio.master.clone(),
+                stems: audio.stems.clone(),
                 sample_rate: audio.sample_rate,
                 channels: audio.channels,
             }),
@@ -725,10 +754,7 @@ impl Engine {
 
         let mut extradata = pipeline.extradata.clone();
         let mut settings = pipeline.settings;
-        let mut audio = pipeline
-            .audio
-            .as_ref()
-            .map(|a| (Arc::clone(&a.ring), Arc::clone(&a.extradata), a.sample_rate, a.channels));
+        let mut audio = pipeline.audio.as_ref().map(AudioSelection::from);
         let mut clip = clip;
 
         if let Some(retired) = self.retired.as_ref().filter(|r| r.at.elapsed() < RETAIN_FOR) {
@@ -753,10 +779,7 @@ impl Engine {
                 clip = older;
                 extradata = retired.extradata.clone();
                 settings = retired.settings;
-                audio = retired
-                    .audio
-                    .as_ref()
-                    .map(|a| (Arc::clone(&a.ring), Arc::clone(&a.extradata), a.sample_rate, a.channels));
+                audio = retired.audio.as_ref().map(AudioSelection::from);
             }
         }
 
@@ -773,42 +796,10 @@ impl Engine {
         let file_name = format!("{}_{}.mp4", created.replace(':', "-"), request.reason.slug());
         let path = self.config.output_dir.join(&file_name);
 
-        let audio_track = audio.as_ref().and_then(|(audio_ring, audio_header, rate, channels)| {
-            let ring = audio_ring.lock().unwrap_or_else(|e| e.into_inner());
-            log::debug!(
-                "Clip range {}..{} ticks; audio ring holds {} packets over {:.1}s",
-                clip.start_pts,
-                clip.end_pts,
-                ring.len(),
-                ring.duration_seconds()
-            );
-            let packets = ring.extract(clip.start_pts, clip.end_pts);
-            drop(ring);
-
-            if let (Some(first), Some(last)) = (packets.first(), packets.last()) {
-                log::debug!(
-                    "Audio selected {}..{} ticks ({:.1}s of {} packets)",
-                    first.pts,
-                    last.pts,
-                    (last.pts - first.pts) as f64 / TIME_BASE_DEN as f64,
-                    packets.len()
-                );
-            }
-
-            if packets.is_empty() {
-                log::warn!("No audio covered the clip's range; writing video only");
-                return None;
-            }
-            Some(crate::writer::AudioTrack {
-                sample_rate: *rate,
-                channels: *channels,
-                extradata: audio_header
-                    .lock()
-                    .map(|header| header.clone())
-                    .unwrap_or_default(),
-                packets,
-            })
-        });
+        let (audio_track, audio_tracks) = match audio.as_ref() {
+            Some(selection) => selection.cut(&clip),
+            None => (Vec::new(), Vec::new()),
+        };
 
         let written = write_mp4(
             &clip,
@@ -821,7 +812,7 @@ impl Engine {
                 codec: settings.codec,
                 extradata,
             },
-            audio_track.as_ref(),
+            audio_track.as_slice(),
         )?;
 
         log::info!(
@@ -843,6 +834,7 @@ impl Engine {
                 size_bytes: written.size_bytes,
                 reason: request.reason,
                 created_at: created,
+                audio_tracks,
             }));
 
         Ok(())
@@ -890,6 +882,105 @@ impl Engine {
         }));
     }
 
+    fn prepare_preview(&self, request: norisk_ipc::AudioPreviewRequest) {
+        let events = self.events.clone();
+
+        let spawned = std::thread::Builder::new()
+            .name("nrc-preview".into())
+            .spawn(move || match crate::preview::prepare(&request.source) {
+                Ok(tracks) => {
+                    let _ = events.send(CaptureToLauncher::AudioPreviewReady(
+                        norisk_ipc::AudioPreview {
+                            source: request.source,
+                            tracks,
+                        },
+                    ));
+                }
+                Err(e) => {
+                    log::warn!("Could not prepare the audio preview: {e:#}");
+                    let _ = events.send(CaptureToLauncher::AudioPreviewReady(
+                        norisk_ipc::AudioPreview {
+                            source: request.source,
+                            tracks: Vec::new(),
+                        },
+                    ));
+                }
+            });
+
+        if let Err(e) = spawned {
+            log::warn!("Could not start the audio preview: {e}");
+        }
+    }
+
+    fn export_vertical(&self, request: norisk_ipc::ExportVerticalRequest) {
+        let events = self.events.clone();
+
+        let spawned = std::thread::Builder::new()
+            .name("nrc-export".into())
+            .spawn(move || {
+                let started = Instant::now();
+
+                let source = request.source.clone();
+                let last = std::cell::Cell::new(Instant::now() - PROGRESS_EVERY);
+                let report = |done: u32, total: u32| {
+                    let finished = done >= total;
+                    if !finished && last.get().elapsed() < PROGRESS_EVERY {
+                        return;
+                    }
+                    last.set(Instant::now());
+                    let _ = events.send(CaptureToLauncher::ExportProgress(
+                        norisk_ipc::ExportProgress {
+                            source: source.clone(),
+                            done,
+                            total,
+                        },
+                    ));
+                };
+
+                match crate::vertical::to_vertical(
+                    &request.source,
+                    &request.destination,
+                    report,
+                ) {
+                    Ok(result) => {
+                        log::info!(
+                            "Exported {} as {}x{} in {} ms",
+                            request.source.display(),
+                            result.width,
+                            result.height,
+                            started.elapsed().as_millis()
+                        );
+                        let _ = events.send(CaptureToLauncher::ClipExported(
+                            norisk_ipc::ExportedClip {
+                                path: result.path,
+                                source: request.source,
+                                width: result.width,
+                                height: result.height,
+                                duration_seconds: result.duration_seconds,
+                                size_bytes: result.size_bytes,
+                            },
+                        ));
+                    }
+                    Err(e) => {
+                        log::error!("Vertical export failed: {e:#}");
+                        let _ = events.send(CaptureToLauncher::Error(CaptureError {
+                            code: ErrorCode::ClipWrite,
+                            message: format!("{e:#}"),
+                            recoverable: true,
+                        }));
+                    }
+                }
+            });
+
+        if let Err(e) = spawned {
+            self.emit_error(
+                ErrorCode::ClipWrite,
+                format!("could not start the export: {e}"),
+                true,
+            );
+        }
+    }
+
     fn trim_clip(&self, request: norisk_ipc::TrimClipRequest) {
         let started = Instant::now();
         match crate::trim::trim(
@@ -897,6 +988,7 @@ impl Engine {
             &request.destination,
             request.start_seconds,
             request.end_seconds,
+            &request.levels,
         ) {
             Ok(result) => {
                 log::info!(
@@ -934,44 +1026,279 @@ impl Engine {
     }
 }
 
-fn start_audio(
-    window_seconds: f32,
-    plan: AudioPlan,
-    epoch: Arc<AtomicI64>,
-) -> Result<AudioPipeline> {
-    use crate::audio::{encoder::DEFAULT_BITRATE, AudioEncoder, LoopbackCapture, Mixer};
+enum Destination {
+    Direct { sink: AudioSink, gain: f32 },
+    Mixed {
+        mixer: crate::audio::Mixer,
+        track: crate::audio::Track,
+        sink: AudioSink,
+        gain: f32,
+    },
+}
 
-    if plan.sources.is_empty() {
-        anyhow::bail!("no audio source to record");
+impl Destination {
+    fn accept(&self, samples: &[f32], relative: i64, scratch: &mut Vec<f32>) {
+        match self {
+            Destination::Direct { sink, gain } => {
+                let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
+                if (gain - 1.0).abs() < f32::EPSILON {
+                    (*sink)(samples, relative);
+                } else {
+                    crate::audio::mix::apply_gain(samples, *gain, scratch);
+                    (*sink)(scratch, relative);
+                }
+            }
+            Destination::Mixed {
+                mixer,
+                track,
+                sink,
+                gain,
+            } => {
+                for block in mixer.push(*track, samples, relative, *gain) {
+                    let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
+                    (*sink)(&block.samples, block.timestamp_100ns);
+                }
+            }
+        }
     }
+}
 
-    let ring = Arc::new(Mutex::new(AudioRing::new(
-        window_seconds,
-        TIME_BASE_DEN as i64,
-    )));
+fn open_stem(
+    label: &'static str,
+    window_seconds: f32,
+    format: crate::audio::AudioFormat,
+) -> Result<(AudioStem, AudioSink)> {
+    use crate::audio::{encoder::DEFAULT_BITRATE, AudioEncoder};
 
-    let (primary, format) = crate::audio::wasapi::probe_source(&plan.sources[0].source)?;
     let mut encoder = AudioEncoder::open(format, DEFAULT_BITRATE)?;
 
     let header = encoder.extradata();
     if header.is_empty() {
-        anyhow::bail!("the AAC encoder produced no header; the audio track would not decode");
+        anyhow::bail!("the AAC encoder produced no header for the {label} track, which would leave it undecodable");
     }
-    let extradata = Arc::new(Mutex::new(header));
 
-    let sink_ring = Arc::clone(&ring);
-    let encode: AudioSink = Arc::new(Mutex::new(move |samples: &[f32], relative: i64| {
+    let stem = AudioStem {
+        label,
+        ring: Arc::new(Mutex::new(AudioRing::new(
+            window_seconds,
+            TIME_BASE_DEN as i64,
+        ))),
+        extradata: Arc::new(Mutex::new(header)),
+        peaks: Arc::new(Mutex::new(PeakRing::new(
+            window_seconds,
+            TIME_BASE_DEN as i64,
+            format.sample_rate,
+            format.channels,
+        ))),
+    };
+
+    let ring = Arc::clone(&stem.ring);
+    let peaks = Arc::clone(&stem.peaks);
+
+    let sink: AudioSink = Arc::new(Mutex::new(move |samples: &[f32], relative: i64| {
+        peaks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(samples, relative);
+
         match encoder.push(samples, relative) {
             Ok(packets) if !packets.is_empty() => {
-                let mut ring = sink_ring.lock().unwrap_or_else(|e| e.into_inner());
+                let mut ring = ring.lock().unwrap_or_else(|e| e.into_inner());
                 for packet in packets {
                     ring.push(packet);
                 }
             }
             Ok(_) => {}
-            Err(e) => log::warn!("Audio encoding failed: {e:#}"),
+            Err(e) => log::warn!("Encoding the {label} track failed: {e:#}"),
         }
     }));
+
+    Ok((stem, sink))
+}
+
+struct AudioSelection {
+    master: AudioStem,
+    stems: Vec<AudioStem>,
+    sample_rate: u32,
+    channels: u32,
+}
+
+impl From<&AudioPipeline> for AudioSelection {
+    fn from(pipeline: &AudioPipeline) -> Self {
+        Self {
+            master: pipeline.master.clone(),
+            stems: pipeline.stems.clone(),
+            sample_rate: pipeline.sample_rate,
+            channels: pipeline.channels,
+        }
+    }
+}
+
+impl From<&RetiredAudio> for AudioSelection {
+    fn from(retired: &RetiredAudio) -> Self {
+        Self {
+            master: retired.master.clone(),
+            stems: retired.stems.clone(),
+            sample_rate: retired.sample_rate,
+            channels: retired.channels,
+        }
+    }
+}
+
+impl AudioSelection {
+    fn tracks(&self) -> impl Iterator<Item = &AudioStem> {
+        std::iter::once(&self.master).chain(self.stems.iter())
+    }
+
+    fn cut(
+        &self,
+        clip: &crate::buffer::Clip,
+    ) -> (Vec<crate::writer::AudioTrack>, Vec<norisk_ipc::ClipAudioTrack>) {
+        let mut written = Vec::new();
+        let mut described = Vec::new();
+
+        for stem in self.tracks() {
+            let packets = {
+                let ring = stem.ring.lock().unwrap_or_else(|e| e.into_inner());
+                log::debug!(
+                    "Clip range {}..{} ticks; the {} ring holds {} packets over {:.1}s",
+                    clip.start_pts,
+                    clip.end_pts,
+                    stem.label,
+                    ring.len(),
+                    ring.duration_seconds()
+                );
+                ring.extract(clip.start_pts, clip.end_pts)
+            };
+
+            if packets.is_empty() {
+                log::warn!("Nothing on the {} track covered the clip", stem.label);
+                continue;
+            }
+
+            let extradata = stem
+                .extradata
+                .lock()
+                .map(|header| header.clone())
+                .unwrap_or_default();
+            if extradata.is_empty() {
+                log::warn!("The {} track has no codec header; leaving it out", stem.label);
+                continue;
+            }
+
+            let peaks = {
+                let ring = stem.peaks.lock().unwrap_or_else(|e| e.into_inner());
+                dense_peaks(&ring.extract(clip.playback_start_pts, clip.end_pts), clip)
+            };
+
+            described.push(norisk_ipc::ClipAudioTrack {
+                label: stem.label.to_string(),
+                stream: written.len() as u32,
+                adjustable: stem.label != crate::audio::MIX_LABEL,
+                peaks,
+            });
+
+            written.push(crate::writer::AudioTrack {
+                sample_rate: self.sample_rate,
+                channels: self.channels,
+                extradata,
+                packets,
+                label: stem.label.to_string(),
+            });
+        }
+
+        (written, described)
+    }
+}
+
+fn dense_peaks(points: &[crate::buffer::Peak], clip: &crate::buffer::Clip) -> Vec<u8> {
+    let step = (norisk_ipc::PEAK_STEP_MS as i64 * TIME_BASE_DEN as i64 / 1_000).max(1);
+    let from = clip.playback_start_pts;
+    let span = (clip.end_pts - from).max(0);
+
+    let slots = ((span / step) + 1).clamp(0, 60 * 60 * 1_000 / norisk_ipc::PEAK_STEP_MS as i64)
+        as usize;
+
+    let mut out = vec![0u8; slots];
+    for point in points {
+        let slot = ((point.pts - from) / step).max(0) as usize;
+        if let Some(cell) = out.get_mut(slot) {
+            *cell = (*cell).max(point.value);
+        }
+    }
+    out
+}
+
+fn start_audio(
+    window_seconds: f32,
+    plan: AudioPlan,
+    epoch: Arc<AtomicI64>,
+) -> Result<AudioPipeline> {
+    use crate::audio::{LoopbackCapture, Mixer, Track};
+
+    if plan.sources.is_empty() {
+        anyhow::bail!("no audio source to record");
+    }
+
+    let (primary, format) = crate::audio::wasapi::probe_source(&plan.sources[0].source)?;
+
+    let (master, master_sink) = open_stem(crate::audio::MIX_LABEL, window_seconds, format)?;
+
+    let mut mixers: Vec<(Mixer, AudioSink)> = Vec::new();
+
+    let master_mixer = if plan.sources.len() > 1 {
+        let tracks: Vec<Track> = plan.sources.iter().map(|source| source.track).collect();
+        let mixer = Mixer::new(format.sample_rate, format.channels, &tracks);
+        mixers.push((mixer.clone(), Arc::clone(&master_sink)));
+        Some(mixer)
+    } else {
+        None
+    };
+
+    let has_microphone = plan
+        .sources
+        .iter()
+        .any(|source| source.track == Track::Microphone);
+    let game_sources = plan
+        .sources
+        .iter()
+        .filter(|source| source.track != Track::Microphone)
+        .count();
+
+    let mut stems = Vec::new();
+    let mut game_stem: Option<(Option<Mixer>, AudioSink)> = None;
+    let mut microphone_stem: Option<AudioSink> = None;
+
+    if has_microphone && game_sources > 0 {
+        let (stem, sink) = open_stem(crate::audio::GAME_LABEL, window_seconds, format)?;
+        let mixer = if game_sources > 1 {
+            let tracks: Vec<Track> = plan
+                .sources
+                .iter()
+                .map(|source| source.track)
+                .filter(|track| *track != Track::Microphone)
+                .collect();
+            let mixer = Mixer::new(format.sample_rate, format.channels, &tracks);
+            mixers.push((mixer.clone(), Arc::clone(&sink)));
+            Some(mixer)
+        } else {
+            None
+        };
+        stems.push(stem);
+        game_stem = Some((mixer, sink));
+
+        let microphone_format = plan
+            .sources
+            .iter()
+            .find(|source| source.track == Track::Microphone)
+            .and_then(|source| crate::audio::wasapi::probe_source(&source.source).ok())
+            .map(|(_, format)| format)
+            .unwrap_or(format);
+
+        let (stem, sink) = open_stem(crate::audio::MIC_LABEL, window_seconds, microphone_format)?;
+        stems.push(stem);
+        microphone_stem = Some(sink);
+    }
 
     fn rebase(epoch: &AtomicI64, timestamp: i64) -> i64 {
         let _ = epoch.compare_exchange(i64::MIN, timestamp, Ordering::Relaxed, Ordering::Relaxed);
@@ -981,96 +1308,113 @@ fn start_audio(
     }
 
     let mut captures = Vec::new();
-    let mut held_mixer = None;
 
-    if plan.sources.len() == 1 {
-        let gain = plan.sources[0].gain;
-        let encode = Arc::clone(&encode);
-        let mut scaled = Vec::new();
+    for (index, planned) in plan.sources.into_iter().enumerate() {
+        let source = if index == 0 {
+            primary.clone()
+        } else {
+            planned.source
+        };
+        let track = planned.track;
+        let gain = planned.gain;
+
+        let mut destinations = vec![match master_mixer.as_ref() {
+            Some(mixer) => Destination::Mixed {
+                mixer: mixer.clone(),
+                track,
+                sink: Arc::clone(&master_sink),
+                gain,
+            },
+            None => Destination::Direct {
+                sink: Arc::clone(&master_sink),
+                gain,
+            },
+        }];
+
+        if track == Track::Microphone {
+            if let Some(sink) = microphone_stem.as_ref() {
+                destinations.push(Destination::Direct {
+                    sink: Arc::clone(sink),
+                    gain,
+                });
+            }
+        } else if let Some((mixer, sink)) = game_stem.as_ref() {
+            destinations.push(match mixer {
+                Some(mixer) => Destination::Mixed {
+                    mixer: mixer.clone(),
+                    track,
+                    sink: Arc::clone(sink),
+                    gain,
+                },
+                None => Destination::Direct {
+                    sink: Arc::clone(sink),
+                    gain,
+                },
+            });
+        }
+
+        let epoch = Arc::clone(&epoch);
+        let mut scratch = Vec::new();
 
         captures.push(LoopbackCapture::start_from(
-            primary,
+            source,
             move |samples: &[f32], timestamp: i64| {
                 let relative = rebase(&epoch, timestamp);
-                let mut encode = encode.lock().unwrap_or_else(|e| e.into_inner());
-
-                if (gain - 1.0).abs() < f32::EPSILON {
-                    (*encode)(samples, relative);
-                } else {
-                    crate::audio::mix::apply_gain(samples, gain, &mut scaled);
-                    (*encode)(&scaled, relative);
+                for destination in &destinations {
+                    destination.accept(samples, relative, &mut scratch);
                 }
             },
         )?);
 
-        if (gain - 1.0).abs() >= f32::EPSILON {
-            log::info!("Recording audio at {:.0}%", gain * 100.0);
-        }
-    } else {
-        let tracks: Vec<crate::audio::Track> =
-            plan.sources.iter().map(|source| source.track).collect();
-        let mixer = Mixer::new(format.sample_rate, format.channels, &tracks);
-        held_mixer = Some(mixer.clone());
-
-        for (index, planned) in plan.sources.into_iter().enumerate() {
-            let source = if index == 0 {
-                primary.clone()
-            } else {
-                planned.source
-            };
-
-            let mixer = mixer.clone();
-            let encode = Arc::clone(&encode);
-            let epoch = Arc::clone(&epoch);
-            let track = planned.track;
-            let gain = planned.gain;
-
-            captures.push(LoopbackCapture::start_from(
-                source,
-                move |samples: &[f32], timestamp: i64| {
-                    let relative = rebase(&epoch, timestamp);
-                    for block in mixer.push(track, samples, relative, gain) {
-                        let mut encode = encode.lock().unwrap_or_else(|e| e.into_inner());
-                        (*encode)(&block.samples, block.timestamp_100ns);
-                    }
-                },
-            )?);
-
-            log::info!("Mixing {track:?} audio at {:.0}%", gain * 100.0);
-        }
+        log::info!("Recording {track:?} audio at {:.0}%", gain * 100.0);
     }
 
     log::info!(
-        "Desktop audio attached: {} source(s), {} Hz {}ch",
+        "Desktop audio attached: {} source(s), {} Hz {}ch, written as {} track(s)",
         captures.len(),
         format.sample_rate,
-        format.channels
+        format.channels,
+        1 + stems.len()
     );
 
     Ok(AudioPipeline {
         _captures: captures,
-        ring,
-        extradata,
+        master,
+        stems,
         sample_rate: crate::audio::encoder::OUTPUT_SAMPLE_RATE as u32,
         channels: crate::audio::encoder::OUTPUT_CHANNELS as u32,
-        mixer: held_mixer,
-        sink: encode,
+        mixers,
     })
 }
+
+const REPEAT_AFTER_FRAMES: u32 = 2;
 
 fn encode_loop(
     mut encoder: VideoEncoder,
     frames: Receiver<PoolFrame>,
     ring: Arc<Mutex<RingBuffer>>,
     events: UnboundedSender<CaptureToLauncher>,
+    fps: u32,
 ) {
-    while let Ok(frame) = frames.recv() {
-        match encoder.encode(&frame) {
+    use std::sync::mpsc::RecvTimeoutError;
+
+    let fps = fps.max(1) as i64;
+    let step = (TIME_BASE_DEN as i64 / fps).max(1);
+    let wait =
+        std::time::Duration::from_nanos((1_000_000_000 / fps as u64) * REPEAT_AFTER_FRAMES as u64);
+
+    let mut last: Option<PoolFrame> = None;
+    let mut last_pts = i64::MIN;
+    let mut repeats: u64 = 0;
+
+    let emit = |encoder: &mut VideoEncoder, frame: &PoolFrame| -> bool {
+        match encoder.encode(frame) {
             Ok(packets) => {
                 let mut guard = ring.lock().unwrap_or_else(|e| e.into_inner());
                 for packet in packets {
                     guard.push(packet);
                 }
+                true
             }
             Err(e) => {
                 log::error!("Encoding failed: {e:#}");
@@ -1079,8 +1423,44 @@ fn encode_loop(
                     message: format!("{e:#}"),
                     recoverable: false,
                 }));
-                return;
+                false
             }
+        }
+    };
+
+    loop {
+        match frames.recv_timeout(wait) {
+            Ok(mut frame) => {
+                if repeats > 0 {
+                    log::debug!("The source drew again after {repeats} repeated frame(s)");
+                    repeats = 0;
+                }
+
+                if frame.pts() <= last_pts {
+                    frame.set_pts(last_pts + 1);
+                }
+
+                if !emit(&mut encoder, &frame) {
+                    return;
+                }
+                last_pts = frame.pts();
+                last = Some(frame);
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                let Some(frame) = last.as_mut() else { continue };
+
+                last_pts += step;
+                frame.set_pts(last_pts);
+                if !emit(&mut encoder, frame) {
+                    return;
+                }
+
+                repeats += 1;
+                if repeats == 1 {
+                    log::debug!("The source stopped drawing; holding the last frame");
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => break,
         }
     }
 
