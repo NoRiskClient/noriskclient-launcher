@@ -11,4 +11,9 @@ pub mod engine;
 pub mod ipc;
 #[cfg(windows)]
 pub mod trim;
+#[cfg(windows)]
+pub mod preview;
+#[cfg(windows)]
+pub mod vertical;
+pub mod watchdog;
 pub mod writer;
