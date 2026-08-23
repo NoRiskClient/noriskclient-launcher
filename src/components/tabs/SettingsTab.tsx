@@ -6,6 +6,7 @@ import { Button } from ".././ui/buttons/Button";
 import type { LauncherConfig } from "../../types/launcherConfig";
 import * as ConfigService from "../../services/launcher-config-service";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
 import { ActionButton } from ".././ui/ActionButton";
@@ -26,6 +27,14 @@ import { isWindows } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
+const SETTINGS_TAB_IDS: SettingsTabId[] = [
+  "general",
+  "appearance",
+  "clips",
+  "advanced",
+  "debug",
+];
+
 interface SettingsTabProps {
   onClose: () => void;
 }
@@ -36,9 +45,19 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<SettingsTabId>(
-    "general",
+  const [saving, setSaving] = useState<boolean>(false);
+  const requested = useSettingsModalStore.getState().tab;
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() =>
+    SETTINGS_TAB_IDS.includes(requested as SettingsTabId)
+      ? (requested as SettingsTabId)
+      : "general",
   );
+
+  const onlyTab = useSettingsModalStore.getState().only
+    ? (SETTINGS_TAB_IDS.includes(requested as SettingsTabId)
+        ? (requested as SettingsTabId)
+        : null)
+    : null;
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -55,7 +74,10 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab, sidebarQuery]);
 
-  const clipsAvailable = useMemo(() => isWindows(), []);
+  const clipsAvailable = useMemo(
+    () => isWindows() && onlyTab === "clips",
+    [onlyTab],
+  );
 
   const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
     general: [
@@ -87,7 +109,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     debug: getDebugTabs(t),
   };
 
-  const tabConfig: {
+  const allTabs: {
     id: SettingsTabId;
     label: string;
     icon: string;
@@ -106,6 +128,8 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
     { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
   ];
+
+  const tabConfig = onlyTab ? allTabs.filter((tab) => tab.id === onlyTab) : allTabs;
 
   const selectTab = (id: SettingsTabId) => {
     setSidebarSearch("");
@@ -295,8 +319,8 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       advanced: <AdvancedTab />,
     };
 
-    if (sidebarQuery) {
-      const order: SettingsTabId[] = ["general", "appearance", "clips", "advanced"];
+    if (sidebarQuery && !onlyTab) {
+      const order: SettingsTabId[] = ["general", "appearance", "advanced"];
       const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
         (id) => bodyOf[id],
       ) as SettingsTabId[];
@@ -313,11 +337,15 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     return bodyOf[activeTab] ?? null;
   };
 
-
   return (
     <Modal
-      title={t("nav.settings")}
-      titleIcon={<Icon icon="solar:settings-bold" className="w-8 h-8" />}
+      title={onlyTab ? tabConfig[0]?.label ?? t("nav.settings") : t("nav.settings")}
+      titleIcon={
+        <Icon
+          icon={onlyTab ? tabConfig[0]?.icon ?? "solar:settings-bold" : "solar:settings-bold"}
+          className="w-8 h-8"
+        />
+      }
       onClose={onClose}
       width="xl"
       className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"

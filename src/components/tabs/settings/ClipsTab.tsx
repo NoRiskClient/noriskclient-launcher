@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
 import { Select } from "../../ui/Select";
@@ -13,7 +14,9 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 import { HotkeyInput } from "../../ui/HotkeyInput";
-import { ClipGallery } from "../../clips/ClipGallery";
+import { GamePicker } from "../../clips/GamePicker";
+import { useClipsStore } from "../../../store/clips-store";
+import { useSettingsModalStore } from "../../../store/settings-modal-store";
 import {
   getCaptureStatus,
   getEncoderCapabilities,
@@ -97,6 +100,20 @@ export function ClipsTab() {
 
   const clips = tempConfig?.clips;
   const savedClips = config?.clips;
+
+  const setClipsEnabled = useClipsStore((state) => state.set);
+  const closeSettings = useSettingsModalStore((state) => state.close);
+  const navigate = useNavigate();
+  const clipsEnabled = savedClips?.enabled;
+
+  useEffect(() => {
+    if (clipsEnabled !== undefined) setClipsEnabled(clipsEnabled);
+  }, [clipsEnabled, setClipsEnabled]);
+
+  const toLibrary = useCallback(() => {
+    closeSettings();
+    navigate("/clips");
+  }, [closeSettings, navigate]);
 
   const patch = useCallback(
     (changes: Partial<ClipConfig>) => {
@@ -226,6 +243,43 @@ export function ClipsTab() {
             disabled={saving}
           />
         </SettingRow>
+
+        <SettingRow
+          label={t("settings.clips.games.minecraft")}
+          description={t("settings.clips.games.minecraft.description")}
+          searchKeywords={kw("settings.clips.games.minecraft", "minecraft", "spiel", "game")}
+        >
+          <ToggleSwitch
+            checked={clips.record_minecraft}
+            onChange={(record_minecraft) => patch({ record_minecraft })}
+            disabled={saving || !clips.enabled}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings.clips.games.other")}
+          description={t("settings.clips.games.other.description")}
+          searchKeywords={kw(
+            "settings.clips.games.other",
+            "spiele",
+            "games",
+            "andere",
+            "other",
+            "app",
+            "programm",
+          )}
+        >
+          <span className="text-sm text-white/50">
+            {clips.other_game?.name ?? t("settings.clips.games.none")}
+          </span>
+        </SettingRow>
+
+        <GamePicker
+          value={clips.other_game}
+          onChange={(other_game) => patch({ other_game })}
+          disabled={saving || !clips.enabled}
+          t={t}
+        />
 
         <StatusRow status={status} applying={applying} enabled={clips.enabled} t={t} />
       </SettingsSection>
@@ -721,7 +775,27 @@ export function ClipsTab() {
         )}
         description={t("settings.clips.library.description")}
       >
-        <ClipGallery />
+        <SettingRow
+          label={t("settings.clips.library.open")}
+          description={t("settings.clips.library.open_description")}
+          searchKeywords={kw("settings.clips.library.open", "galerie", "gallery", "clips", "seite", "page")}
+        >
+          <button
+            type="button"
+            onClick={toLibrary}
+            disabled={!clips.enabled}
+            className={cn(
+              "flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-3 py-1.5",
+              "text-sm text-white/80 transition-colors",
+              "hover:border-white/25 hover:bg-white/[0.08] hover:text-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+              "disabled:cursor-not-allowed disabled:opacity-40",
+            )}
+          >
+            <Icon icon="solar:video-library-bold" className="h-4 w-4 shrink-0" />
+            {t("settings.clips.library.open")}
+          </button>
+        </SettingRow>
       </SettingsSection>
     </div>
   );
