@@ -412,6 +412,11 @@ async fn main() {
                             return;
                         }
 
+                        let clip_dir = clips.resolved_output_dir();
+                        let _ = tokio::task::spawn_blocking(move || {
+                            utils::clip_library::tidy_clip_folder(&clip_dir)
+                        })
+                        .await;
 
                         state.capture_supervisor.attach_app(handle.clone()).await;
 
@@ -432,12 +437,14 @@ async fn main() {
                             error!("Could not configure the capture engine: {e}");
                         }
 
-                        match utils::window_finder::find_running_game() {
+                        match utils::window_finder::find_running_game()
+                            .filter(|_| clips.record_minecraft)
+                        {
                             Some(pid) => {
                                 info!("Found a game already running (pid {pid}); attaching");
                                 if let Err(e) = state
                                     .capture_supervisor
-                                    .send(norisk_ipc::LauncherToCapture::AttachWindow { pid })
+                                    .attach_game(pid, "Minecraft".to_string())
                                 {
                                     log::warn!("Could not attach to the running game: {e}");
                                 }
@@ -449,6 +456,8 @@ async fn main() {
                             Ok(keys) => info!("Clip system ready, hotkeys: {keys:?}"),
                             Err(e) => error!("Clip hotkeys could not be registered: {e}"),
                         }
+
+                        utils::game_watch::spawn();
                     });
                 }
 
@@ -575,7 +584,6 @@ async fn main() {
             } else {
                 error!("Could not get main window handle to attach focus listener!");
             }
-
 
             Ok(())
         })
@@ -846,6 +854,13 @@ async fn main() {
             commands::clip_commands::clip_delete,
             commands::clip_commands::clip_reveal,
             commands::clip_commands::clip_trim,
+            commands::clip_commands::clip_details,
+            commands::clip_commands::clip_set_favourite,
+            commands::clip_commands::clip_open_apps,
+            commands::clip_commands::clip_save_thumbnail,
+            commands::clip_commands::clip_export_vertical,
+            commands::clip_commands::clip_prepare_preview,
+            commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
         ])
         .build(tauri::generate_context!())
