@@ -93,6 +93,13 @@ export interface ClipConfig {
   post_roll_seconds: number;
   hotkey_save: string;
   hotkey_toggle: string;
+  record_minecraft: boolean;
+  other_game: OtherGame | null;
+}
+
+export interface OtherGame {
+  executable: string;
+  name: string;
 }
 
 export interface CaptureStatus {
