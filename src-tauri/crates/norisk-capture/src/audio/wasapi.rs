@@ -11,7 +11,8 @@ use windows::Win32::Media::Audio::{
     IActivateAudioInterfaceAsyncOperation,
     IActivateAudioInterfaceCompletionHandler, IActivateAudioInterfaceCompletionHandler_Impl,
     IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator,
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+    AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
     AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK,
     AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, AUDIOCLIENT_ACTIVATION_PARAMS,
     AUDIOCLIENT_ACTIVATION_PARAMS_0,
@@ -30,6 +31,8 @@ const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;
 const WAVE_FORMAT_PCM: u16 = 0x0001;
 
 const SILENCE_TIMEOUT: Duration = Duration::from_millis(60);
+
+const RESYNC_100NS: i64 = 1_000_000;
 
 const VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK: PCWSTR =
     windows::core::w!("VAD\\Process_Loopback");
@@ -525,7 +528,9 @@ fn capture_loop(
         log::debug!("Audio capture running");
 
         let mut silence = Vec::<f32>::new();
+
         let mut next_timestamp: Option<i64> = Some(qpc_100ns());
+        let mut clock = StreamClock::default();
 
         while running.load(Ordering::Relaxed) {
             let wait = WaitForSingleObject(event, SILENCE_TIMEOUT.as_millis() as u32);
@@ -538,8 +543,8 @@ fn capture_loop(
                     silence.clear();
                     silence.resize(samples, 0.0);
                     sink.on_samples(&silence, timestamp);
-                    next_timestamp =
-                        Some(timestamp + (SILENCE_TIMEOUT.as_nanos() / 100) as i64);
+                    clock.advance(timestamp, frames, format.sample_rate);
+                    next_timestamp = Some(timestamp + span_100ns(frames, format.sample_rate));
                 }
                 continue;
             }
@@ -568,7 +573,19 @@ fn capture_loop(
                     .context("GetBuffer failed")?;
 
                 let samples = frames as usize * format.channels as usize;
-                let timestamp = qpc_position as i64;
+                let observed = qpc_position as i64;
+                let lost = flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY.0 as u32 != 0;
+
+                let before = clock.resynced();
+                let timestamp =
+                    clock.place(observed, frames as usize, format.sample_rate, lost);
+                if clock.resynced() != before {
+                    log::debug!(
+                        "Audio clock resynchronised ({} ms out{})",
+                        (observed - timestamp) / 10_000,
+                        if lost { ", packets were dropped" } else { "" },
+                    );
+                }
 
                 if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
                     silence.clear();
@@ -579,9 +596,7 @@ fn capture_loop(
                     sink.on_samples(slice, timestamp);
                 }
 
-                next_timestamp = Some(
-                    timestamp + (frames as i64 * 10_000_000 / format.sample_rate.max(1) as i64),
-                );
+                next_timestamp = Some(timestamp + span_100ns(frames as usize, format.sample_rate));
 
                 capture
                     .ReleaseBuffer(frames)
@@ -591,8 +606,53 @@ fn capture_loop(
 
         let _ = client.Stop();
         let _ = CloseHandle(event);
-        log::debug!("Audio capture stopped");
+        if clock.resynced() > 0 {
+            log::info!(
+                "Audio capture stopped after {} clock resynchronisation(s)",
+                clock.resynced()
+            );
+        } else {
+            log::debug!("Audio capture stopped");
+        }
         Ok(())
+    }
+}
+
+fn span_100ns(frames: usize, sample_rate: u32) -> i64 {
+    frames as i64 * 10_000_000 / sample_rate.max(1) as i64
+}
+
+#[derive(Debug, Default)]
+struct StreamClock {
+    next: Option<i64>,
+    resyncs: u64,
+}
+
+impl StreamClock {
+    fn place(&mut self, observed: i64, frames: usize, sample_rate: u32, lost: bool) -> i64 {
+        let at = match self.next {
+            Some(_) if lost => {
+                self.resyncs += 1;
+                observed
+            }
+            Some(expected) if (observed - expected).abs() > RESYNC_100NS => {
+                self.resyncs += 1;
+                observed
+            }
+            Some(expected) => expected,
+            None => observed,
+        };
+
+        self.next = Some(at + span_100ns(frames, sample_rate));
+        at
+    }
+
+    fn advance(&mut self, at: i64, frames: usize, sample_rate: u32) {
+        self.next = Some(at + span_100ns(frames, sample_rate));
+    }
+
+    fn resynced(&self) -> u64 {
+        self.resyncs
     }
 }
 
@@ -645,5 +705,152 @@ mod tests {
             channels: 0,
         };
         assert_eq!(broken.frame_count(1024), 1024);
+    }
+
+    const RATE: u32 = 48_000;
+    const PACKET: usize = 480;
+
+    fn step() -> i64 {
+        span_100ns(PACKET, RATE)
+    }
+
+    #[test]
+    fn the_first_packet_lands_where_the_device_says() {
+        let mut clock = StreamClock::default();
+        assert_eq!(clock.place(12_345, PACKET, RATE, false), 12_345);
+    }
+
+    #[test]
+    fn jitter_in_the_device_reading_does_not_move_the_samples() {
+        let mut clock = StreamClock::default();
+        let start = 1_000_000;
+        clock.place(start, PACKET, RATE, false);
+
+        let wobble = [37, -12, 0, 39, -25, 4, -39, 18];
+        for (i, off) in wobble.iter().enumerate() {
+            let nominal = start + step() * (i as i64 + 1);
+            let observed = nominal + off * 10_000_000 / RATE as i64;
+            let placed = clock.place(observed, PACKET, RATE, false);
+            assert_eq!(
+                placed, nominal,
+                "packet {i} was pulled off its position by the device's jitter",
+            );
+        }
+        assert_eq!(clock.resynced(), 0, "jitter must not count as a resync");
+    }
+
+    #[test]
+    fn placements_leave_neither_hole_nor_overlap() {
+        let mut clock = StreamClock::default();
+        let start = 500_000;
+        let mut previous_end = None;
+
+        for i in 0..200 {
+            let observed = start + step() * i + (i % 7) * 3_000 - 9_000;
+            let at = clock.place(observed, PACKET, RATE, false);
+            if let Some(end) = previous_end {
+                assert_eq!(at, end, "packet {i} does not start where the last one ended");
+            }
+            previous_end = Some(at + step());
+        }
+    }
+
+    #[test]
+    fn a_reading_far_from_the_count_is_believed() {
+        let mut clock = StreamClock::default();
+        clock.place(0, PACKET, RATE, false);
+
+        let jumped = clock.place(5_000_000, PACKET, RATE, false);
+        assert_eq!(jumped, 5_000_000);
+        assert_eq!(clock.resynced(), 1);
+
+        assert_eq!(clock.place(5_000_000 + step(), PACKET, RATE, false), 5_000_000 + step());
+        assert_eq!(clock.resynced(), 1);
+    }
+
+    #[test]
+    fn admitted_packet_loss_is_believed_however_small() {
+        let mut clock = StreamClock::default();
+        clock.place(0, PACKET, RATE, false);
+
+        let after = clock.place(step() + 50_000, PACKET, RATE, true);
+        assert_eq!(after, step() + 50_000);
+        assert_eq!(clock.resynced(), 1);
+    }
+
+    #[test]
+    fn slow_drift_is_corrected_rarely_rather_than_continuously() {
+        let mut clock = StreamClock::default();
+        clock.place(0, PACKET, RATE, false);
+
+        let packets = 60 * 60 * RATE as i64 / PACKET as i64;
+        let mut moved = 0;
+        let mut previous_end = step();
+
+        for i in 1..packets {
+            let observed = step() * i + step() * i * 40 / 1_000_000;
+            let at = clock.place(observed, PACKET, RATE, false);
+            if at != previous_end {
+                moved += 1;
+            }
+            previous_end = at + step();
+        }
+
+        assert_eq!(
+            moved,
+            clock.resynced(),
+            "the stream may only jump where a resync was declared",
+        );
+        assert!(
+            clock.resynced() <= 2,
+            "an hour of ordinary drift should need at most a correction or two, not {}",
+            clock.resynced(),
+        );
+        assert!(
+            clock.resynced() >= 1,
+            "drift has to be corrected eventually or audio walks away from video",
+        );
+    }
+
+    #[test]
+    fn drift_below_the_threshold_is_ignored_entirely() {
+        let mut clock = StreamClock::default();
+        clock.place(0, PACKET, RATE, false);
+
+        let packets = 10 * 60 * RATE as i64 / PACKET as i64;
+        for i in 1..packets {
+            let nominal = step() * i;
+            let observed = nominal + nominal * 40 / 1_000_000;
+            assert_eq!(
+                clock.place(observed, PACKET, RATE, false),
+                nominal,
+                "packet {i} was moved by drift",
+            );
+        }
+        assert_eq!(clock.resynced(), 0);
+    }
+
+    #[test]
+    fn injected_silence_is_counted_as_part_of_the_stream() {
+        let mut clock = StreamClock::default();
+        let at = clock.place(0, PACKET, RATE, false);
+
+        let filler_start = at + step();
+        clock.advance(filler_start, RATE as usize / 10, RATE);
+
+        let expected = filler_start + span_100ns(RATE as usize / 10, RATE);
+        assert_eq!(clock.place(expected + 5_000, PACKET, RATE, false), expected);
+    }
+
+    #[test]
+    fn a_span_is_measured_from_the_frames_not_the_clock() {
+        assert_eq!(span_100ns(48_000, 48_000), 10_000_000);
+        assert_eq!(span_100ns(480, 48_000), 100_000);
+        assert_eq!(span_100ns(0, 48_000), 0);
+    }
+
+    #[test]
+    fn a_zero_sample_rate_does_not_divide_by_zero() {
+        assert_eq!(span_100ns(480, 0), 480 * 10_000_000);
     }
 }
