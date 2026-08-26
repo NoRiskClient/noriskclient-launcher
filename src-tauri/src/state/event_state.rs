@@ -27,6 +27,7 @@ pub enum EventType {
     PatchingForge,
     DownloadingMods,
     SyncingMods,
+    SyncingPacks,
     LaunchingMinecraft,
     MinecraftOutput,
     AccountLogin,

@@ -172,6 +172,8 @@ pub struct Profile {
     /// Incremented on process-exit via `ProcessManager` using `start_time - exit_time`.
     #[serde(default)]
     pub playtime_seconds: u64,
+    #[serde(default)]
+    pub sync_pack_ids: Vec<Uuid>,
 }
 
 impl Profile {
@@ -371,6 +373,29 @@ pub(crate) fn mod_project_key(source: &ModSource) -> Option<(&'static str, &str)
     }
 }
 
+pub(crate) fn mod_platform_ids(
+    source: &ModSource,
+) -> Option<(crate::integrations::unified_mod::ModPlatform, String, String)> {
+    use crate::integrations::unified_mod::ModPlatform;
+    match source {
+        ModSource::Modrinth {
+            project_id,
+            version_id,
+            ..
+        } => Some((
+            ModPlatform::Modrinth,
+            project_id.clone(),
+            version_id.clone(),
+        )),
+        ModSource::CurseForge {
+            project_id,
+            file_id,
+            ..
+        } => Some((ModPlatform::CurseForge, project_id.clone(), file_id.clone())),
+        _ => None,
+    }
+}
+
 pub(crate) fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
     let key = mod_project_key(source)?;
     mods.iter()
@@ -380,6 +405,53 @@ pub(crate) fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<us
 pub(crate) fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
     mods.iter()
         .position(|m| mod_project_key(&m.source).map(|(_, id)| id) == Some(project_id))
+}
+
+pub(crate) fn mod_source_from_payload(
+    payload: &crate::commands::content_command::InstallContentPayload,
+) -> ModSource {
+    use crate::integrations::unified_mod::ModPlatform;
+
+    match payload.source {
+        ModPlatform::Modrinth => ModSource::Modrinth {
+            project_id: payload.project_id.clone(),
+            version_id: payload.version_id.clone(),
+            file_name: payload.file_name.clone(),
+            download_url: payload.download_url.clone(),
+            file_hash_sha1: payload.file_hash_sha1.clone(),
+        },
+        ModPlatform::CurseForge => ModSource::CurseForge {
+            project_id: payload.project_id.clone(),
+            file_id: payload.version_id.clone(),
+            file_name: payload.file_name.clone(),
+            download_url: payload.download_url.clone(),
+            file_hash_sha1: payload.file_hash_sha1.clone(),
+            file_fingerprint: payload.file_fingerprint,
+        },
+    }
+}
+
+pub(crate) fn mod_from_payload(
+    payload: &crate::commands::content_command::InstallContentPayload,
+    source: ModSource,
+    force_include_versions: Vec<String>,
+) -> Mod {
+    Mod {
+        id: Uuid::new_v4(),
+        source,
+        enabled: true,
+        display_name: payload.content_name.clone(),
+        version: payload.version_number.clone(),
+        game_versions: payload.game_versions.clone(),
+        file_name_override: None,
+        associated_loader: payload
+            .loaders
+            .clone()
+            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
+        modpack_origin: None,
+        updates_enabled: true,
+        force_include_versions,
+    }
 }
 
 pub(crate) fn replace_mod_with_payload(
@@ -397,6 +469,30 @@ pub(crate) fn replace_mod_with_payload(
         .clone()
         .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok()));
     existing.enabled = true;
+}
+
+pub enum ModUpsert {
+    Unchanged,
+    Replaced(Mod),
+    Added(Mod),
+}
+
+pub(crate) fn upsert_mod_from_payload(
+    existing: &[Mod],
+    payload: &crate::commands::content_command::InstallContentPayload,
+    force_include_versions: Vec<String>,
+) -> ModUpsert {
+    let source = mod_source_from_payload(payload);
+
+    match find_mod_by_project(existing, &source) {
+        Some(index) if existing[index].source == source => ModUpsert::Unchanged,
+        Some(index) => {
+            let mut entry = existing[index].clone();
+            replace_mod_with_payload(&mut entry, payload, source);
+            ModUpsert::Replaced(entry)
+        }
+        None => ModUpsert::Added(mod_from_payload(payload, source, force_include_versions)),
+    }
 }
 
 pub(crate) fn find_mod_for_version_switch(
@@ -491,7 +587,7 @@ impl ProfileManager {
         let backup_config = BackupConfig {
             max_backups_per_file: 10, // Keep more backups for profiles
             max_backup_age_seconds: 90 * 24 * 60 * 60, // 90 days for profiles
-            min_backup_interval_seconds: 60, // TEMP: Increased to 5 minutes to prevent spam during testing
+            min_backup_interval_seconds: 60, // at most one profiles.json backup per minute
             gfs: Some(backup_utils::GfsPolicy {
                 keep_recent: 10,
                 daily_days: 14,
@@ -939,6 +1035,19 @@ impl ProfileManager {
             info!("Profile with ID {} not found for deletion.", id);
             return Err(AppError::ProfileNotFound(id)); // Return error if profile doesn't exist
         };
+
+        if let Some(profile) = &profile_to_delete {
+            if !profile.sync_pack_ids.is_empty() {
+                if let Err(e) = crate::sync::engine::SyncEngine::detach_all(
+                    id,
+                    crate::sync::model::DetachMode::Drop,
+                )
+                .await
+                {
+                    warn!("Could not detach sync packs from profile {}: {}", id, e);
+                }
+            }
+        }
 
         // Check if other profiles use the same path before attempting directory deletion
         let should_delete_directory = if let Some(path) = &profile_dir_path {
@@ -1399,74 +1508,42 @@ impl ProfileManager {
             platform_name, display_name_log, payload.profile_id, add_dependencies
         );
 
-        let source = match payload.source {
-            ModPlatform::Modrinth => ModSource::Modrinth {
-                project_id: payload.project_id.clone(),
-                version_id: payload.version_id.clone(),
-                file_name: payload.file_name.clone(),
-                download_url: payload.download_url.clone(),
-                file_hash_sha1: payload.file_hash_sha1.clone(),
-            },
-            ModPlatform::CurseForge => ModSource::CurseForge {
-                project_id: payload.project_id.clone(),
-                file_id: payload.version_id.clone(), // For CurseForge, version_id is actually file_id
-                file_name: payload.file_name.clone(),
-                download_url: payload.download_url.clone(),
-                file_hash_sha1: payload.file_hash_sha1.clone(),
-                file_fingerprint: payload.file_fingerprint,
-            },
-        };
-
         let mut needs_save = false;
         {
             let mut profiles = self.profiles.write().await;
             if let Some(profile) = profiles.get_mut(&payload.profile_id) {
-                let existing_index = find_mod_by_project(&profile.mods, &source);
+                let force_include_versions = match &payload.game_versions {
+                    Some(list) if !list.contains(&profile.game_version) => {
+                        vec![profile.game_version.clone()]
+                    }
+                    _ => Vec::new(),
+                };
 
-                if let Some(index) = existing_index {
-                    if profile.mods[index].source == source {
+                match upsert_mod_from_payload(&profile.mods, payload, force_include_versions) {
+                    ModUpsert::Unchanged => {
                         info!(
                             "{} mod {} already exists in profile {}. Skipping addition.",
                             platform_name, display_name_log, payload.profile_id
                         );
-                    } else {
+                    }
+                    ModUpsert::Replaced(entry) => {
                         info!(
                             "{} mod {} already present in profile {} in a different version. Replacing it instead of adding a duplicate.",
                             platform_name, display_name_log, payload.profile_id
                         );
-                        replace_mod_with_payload(&mut profile.mods[index], payload, source.clone());
+                        if let Some(index) = profile.mods.iter().position(|m| m.id == entry.id) {
+                            profile.mods[index] = entry;
+                        }
                         needs_save = true;
                     }
-                } else {
-                    info!(
-                        "Adding mod {} to profile {}",
-                        display_name_log, payload.profile_id
-                    );
-
-                    let force_include_versions = match &payload.game_versions {
-                        Some(list) if !list.contains(&profile.game_version) => {
-                            vec![profile.game_version.clone()]
-                        }
-                        _ => Vec::new(),
-                    };
-
-                    let new_mod = Mod {
-                        id: Uuid::new_v4(),
-                        source: source.clone(),
-                        enabled: true,
-                        display_name: payload.content_name.clone(),
-                        version: payload.version_number.clone(),
-                        game_versions: payload.game_versions.clone(),
-                        file_name_override: None,
-                        associated_loader: payload.loaders
-                            .clone()
-                            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
-                        modpack_origin: None, // Manually added mod
-                        updates_enabled: true, // Updates enabled by default
-                        force_include_versions,
-                    };
-                    profile.mods.push(new_mod);
-                    needs_save = true;
+                    ModUpsert::Added(entry) => {
+                        info!(
+                            "Adding mod {} to profile {}",
+                            display_name_log, payload.profile_id
+                        );
+                        profile.mods.push(entry);
+                        needs_save = true;
+                    }
                 }
             } else {
                 return Err(AppError::ProfileNotFound(payload.profile_id));
@@ -1830,6 +1907,15 @@ impl ProfileManager {
     pub async fn list_profiles(&self) -> Result<Vec<Profile>> {
         let profiles = self.profiles.read().await;
         Ok(profiles.values().cloned().collect())
+    }
+
+    pub async fn profiles_subscribed_to(&self, pack_id: Uuid) -> Vec<Profile> {
+        let profiles = self.profiles.read().await;
+        profiles
+            .values()
+            .filter(|p| p.sync_pack_ids.contains(&pack_id))
+            .cloned()
+            .collect()
     }
 
     pub async fn search_profiles(&self, query: &str) -> Result<Vec<Profile>> {
@@ -3264,158 +3350,92 @@ impl ProfileManager {
             .map(|idx| (profile.mods[idx].id, profile.mods[idx].enabled))
     }
 
-    const DEPENDENCY_DEPTH: u8 = 20;
+    const DEPENDENCY_DEPTH: u8 = crate::integrations::mod_dependencies::DEPENDENCY_DEPTH;
 
     async fn install_missing_dependencies(
         &self,
         profile_id: Uuid,
         dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
         platform: &crate::integrations::unified_mod::ModPlatform,
-        parent_date: &str, // release date of the mod we just switched to — pick a contemporaneous dep
-    ) -> Result<()> {
-        let mut seen = std::collections::HashSet::new();
-        let mut queue: std::collections::VecDeque<(Vec<crate::integrations::unified_mod::UnifiedDependency>, String, u8)> =
-            std::collections::VecDeque::new();
-        queue.push_back((
-            dependencies.to_vec(),
-            parent_date.to_string(),
-            Self::DEPENDENCY_DEPTH,
-        ));
-
-        while let Some((batch, batch_parent_date, depth)) = queue.pop_front() {
-            self.install_dependency_level(
-                profile_id,
-                &batch,
-                platform,
-                &batch_parent_date,
-                &mut seen,
-                depth,
-                &mut queue,
-            )
-            .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn install_dependency_level(
-        &self,
-        profile_id: Uuid,
-        dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
-        platform: &crate::integrations::unified_mod::ModPlatform,
         parent_date: &str,
-        seen: &mut std::collections::HashSet<String>,
-        depth: u8,
-        queue: &mut std::collections::VecDeque<(Vec<crate::integrations::unified_mod::UnifiedDependency>, String, u8)>,
     ) -> Result<()> {
-        use crate::integrations::unified_mod::UnifiedModVersionsParams;
+        use crate::integrations::mod_dependencies::{
+            resolve_required_dependencies, DependencyTarget,
+        };
 
-        if depth == 0 {
-            warn!("Dependency chain too deep, stopping here");
-            return Ok(());
-        }
-
-        // Get profile once and reuse it
         let profile = self.get_profile(profile_id).await?;
+        let target = DependencyTarget {
+            loader: profile.loader.as_str().to_string(),
+            game_version: profile.game_version.clone(),
+        };
 
-        for dependency in dependencies {
-            // Only process required dependencies
-            if dependency.dependency_type != crate::integrations::unified_mod::UnifiedDependencyType::Required {
+        let resolved = resolve_required_dependencies(
+            platform,
+            dependencies,
+            parent_date,
+            &target,
+            Self::DEPENDENCY_DEPTH,
+        )
+        .await;
+
+        for dependency in resolved {
+            if let Some((existing_id, enabled)) =
+                self.installed_dependency(&profile, &dependency.project_id)
+            {
+                if enabled {
+                    info!(
+                        "Dependency {} already installed, skipping",
+                        dependency.project_id
+                    );
+                } else {
+                    info!(
+                        "Dependency {} is installed but disabled, re-enabling instead of adding a second copy",
+                        dependency.project_id
+                    );
+                    if let Err(e) = self.set_mod_enabled(profile_id, existing_id, true).await {
+                        error!(
+                            "Failed to re-enable dependency '{}': {}",
+                            dependency.project_id, e
+                        );
+                    }
+                }
                 continue;
             }
 
-            if let Some(dep_project_id) = &dependency.project_id {
-                if !seen.insert(format!("{:?}:{}", platform, dep_project_id)) {
-                    continue;
-                }
+            let version = &dependency.version;
+            let file = version
+                .files
+                .iter()
+                .find(|f| f.primary)
+                .or_else(|| version.files.first());
 
-                if let Some((existing_id, enabled)) = self.installed_dependency(&profile, dep_project_id) {
-                    if enabled {
-                        info!("Dependency {} already installed, skipping", dep_project_id);
-                    } else {
-                        info!(
-                            "Dependency {} is installed but disabled, re-enabling instead of adding a second copy",
-                            dep_project_id
-                        );
-                        if let Err(e) = self.set_mod_enabled(profile_id, existing_id, true).await {
-                            error!("Failed to re-enable dependency '{}': {}", dep_project_id, e);
-                        }
-                    }
-                    continue;
-                }
+            let dep_payload = crate::commands::content_command::InstallContentPayload {
+                profile_id,
+                project_id: dependency.project_id.clone(),
+                version_id: version.id.clone(),
+                file_name: file
+                    .map(|f| f.filename.clone())
+                    .unwrap_or_else(|| format!("{}.jar", dependency.project_id)),
+                download_url: file.map(|f| f.url.clone()).unwrap_or_default(),
+                file_hash_sha1: file.and_then(|f| f.hashes.get("sha1").cloned()),
+                file_fingerprint: file.and_then(|f| f.fingerprint),
+                content_name: Some(version.name.clone()),
+                version_number: Some(version.version_number.clone()),
+                content_type: crate::utils::profile_utils::ContentType::Mod,
+                loaders: Some(version.loaders.clone()),
+                game_versions: Some(version.game_versions.clone()),
+                source: platform.clone(),
+            };
 
-                info!("Installing missing dependency: {}", dep_project_id);
-
-                let versions_params = UnifiedModVersionsParams {
-                    source: platform.clone(),
-                    project_id: dep_project_id.clone(),
-                    loaders: Some(vec![profile.loader.as_str().to_string()]),
-                    game_versions: Some(vec![profile.game_version.clone()]),
-                    limit: None,
-                    offset: None,
-                };
-
-                match crate::integrations::unified_mod::get_mod_versions_unified(versions_params).await {
-                    Ok(versions_response) => {
-                        let mc = &profile.game_version;
-                        let versions = &versions_response.versions;
-                        // 1) exact pin from the parent's dependency metadata (e.g. Iris -> a specific Sodium)
-                        // 2) else the dep CONTEMPORANEOUS with the parent (newest <= parent's date) for this MC
-                        // 3) else newest for this MC  4) else newest overall
-                        let chosen = dependency.version_id.as_ref()
-                            .and_then(|vid| versions.iter().find(|v| &v.id == vid))
-                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc) && v.date_published.as_str() <= parent_date).max_by(|a, b| a.date_published.cmp(&b.date_published)))
-                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc)).max_by(|a, b| a.date_published.cmp(&b.date_published)))
-                            .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
-                        info!(
-                            "[dep-resolve] {} pin={:?} parent_date={} candidates={} -> chosen={:?} ({:?})",
-                            dep_project_id, dependency.version_id, parent_date, versions.len(),
-                            chosen.map(|v| &v.version_number), chosen.map(|v| &v.id)
-                        );
-                        if let Some(dep_version) = chosen {
-                            let file = dep_version
-                                .files
-                                .iter()
-                                .find(|f| f.primary)
-                                .or_else(|| dep_version.files.first());
-                            // Create install payload for the dependency
-                            let dep_payload = crate::commands::content_command::InstallContentPayload {
-                                profile_id,
-                                project_id: dep_project_id.clone(),
-                                version_id: dep_version.id.clone(),
-                                file_name: file
-                                    .map(|f| f.filename.clone())
-                                    .unwrap_or_else(|| format!("{}.jar", dep_project_id)),
-                                download_url: file.map(|f| f.url.clone()).unwrap_or_default(),
-                                file_hash_sha1: file.and_then(|f| f.hashes.get("sha1").cloned()),
-                                file_fingerprint: file.and_then(|f| f.fingerprint),
-                                content_name: Some(dep_version.name.clone()),
-                                version_number: Some(dep_version.version_number.clone()),
-                                content_type: crate::utils::profile_utils::ContentType::Mod,
-                                loaders: Some(dep_version.loaders.clone()),
-                                game_versions: Some(dep_version.game_versions.clone()),
-                                source: platform.clone(),
-                            };
-
-                            match Box::pin(self.add_mod_from_payload(&dep_payload, false)).await {
-                                Ok(_) => {
-                                    info!("Successfully installed dependency '{}'", dep_project_id);
-                                    if !dep_version.dependencies.is_empty() {
-                                        queue.push_back((
-                                            dep_version.dependencies.clone(),
-                                            dep_version.date_published.clone(),
-                                            depth - 1,
-                                        ));
-                                    }
-                                }
-                                Err(e) => error!("Failed to install dependency '{}': {}", dep_project_id, e),
-                            }
-                        } else {
-                            warn!("No compatible version found for dependency '{}'", dep_project_id);
-                        }
-                    }
-                    Err(e) => error!("Failed to get versions for dependency '{}': {}", dep_project_id, e),
-                }
+            match Box::pin(self.add_mod_from_payload(&dep_payload, false)).await {
+                Ok(_) => info!(
+                    "Successfully installed dependency '{}'",
+                    dependency.project_id
+                ),
+                Err(e) => error!(
+                    "Failed to install dependency '{}': {}",
+                    dependency.project_id, e
+                ),
             }
         }
 

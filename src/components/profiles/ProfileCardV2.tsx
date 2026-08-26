@@ -24,6 +24,7 @@ import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { useResolvedLoaderVersion } from "../../hooks/useResolvedLoaderVersion";
+import { loaderIconSrc } from "../../lib/loader-icons";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -231,20 +232,7 @@ export function ProfileCardV2({
 
 
   // Get mod loader icon - reused from ProfileCard.tsx
-  const getModLoaderIcon = () => {
-    switch (profile.loader) {
-      case "fabric":
-        return "/icons/fabric.png";
-      case "forge":
-        return "/icons/forge.png";
-      case "quilt":
-        return "/icons/quilt.png";
-      case "neoforge":
-        return "/icons/neoforge.png";
-      default:
-        return "/icons/minecraft.png";
-    }
-  };
+  const getModLoaderIcon = () => loaderIconSrc(profile.loader);
 
   // Get 3D styling for variant (matching Button.tsx exactly)
   const get3DStyling = () => {

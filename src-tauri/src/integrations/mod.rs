@@ -1,6 +1,8 @@
 pub mod curseforge;
 pub mod curseforge_export;
 pub mod lenient;
+pub mod mod_dependencies;
+pub mod mod_lookup;
 pub mod modrinth;
 pub mod mrpack;
 pub mod mrpack_export;

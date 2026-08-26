@@ -379,6 +379,36 @@ pub async fn install_minecraft_version(
     }
     info!("User data import check complete.");
 
+    let sync_result = match timed_step(
+        &state,
+        &summary,
+        EventType::SyncingPacks,
+        profile.id,
+        "sync packs",
+        || async { crate::sync::engine::SyncEngine::prepare_for_launch(profile).await },
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            warn!("Sync packs could not be prepared (non-critical error): {}", e);
+            crate::sync::report::LaunchSyncResult::default()
+        }
+    };
+
+    for warning in &sync_result.report.warnings {
+        warn!("[Sync Packs] {}", warning);
+    }
+    for conflict in &sync_result.report.conflicts {
+        warn!(
+            "[Sync Packs] '{}' is provided by '{}' and '{}'; '{}' wins",
+            conflict.path,
+            conflict.winner_pack_name,
+            conflict.loser_pack_name,
+            conflict.winner_pack_name
+        );
+    }
+
     // Download libraries
     let libraries_service = MinecraftLibrariesDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads)
@@ -608,6 +638,15 @@ pub async fn install_minecraft_version(
         mod_downloader_service.download_mods_to_cache(&profile).await
     }).await?;
 
+    if !sync_result.extra_mods.is_empty() {
+        let sync_pack_mods = sync_result.extra_mods.clone();
+        timed_step(&state, &summary, EventType::DownloadingMods, profile.id, "sync pack mods", || async {
+            mod_downloader_service
+                .download_mod_list_to_cache(&sync_pack_mods)
+                .await
+        }).await?;
+    }
+
     // --- Step: Download mods from selected Norisk Pack (if any) ---
     if let Some(selected_pack_id) = profile.effective_norisk_pack_id().await {
         // Use the already loaded config
@@ -739,6 +778,23 @@ pub async fn install_minecraft_version(
         }
     }
 
+    for path in &sync_result.extra_local_jars {
+        match path.file_name() {
+            Some(name) => {
+                info!("[Sync Packs] Adding local pack jar in-place: {}", path.display());
+                custom_mod_infos.push(crate::state::profile_state::CustomModInfo {
+                    filename: name.to_string_lossy().into_owned(),
+                    is_enabled: true,
+                    path: path.clone(),
+                });
+            }
+            None => warn!(
+                "[Sync Packs] Skipping local pack jar without filename: {}",
+                path.display()
+            ),
+        }
+    }
+
     // Call the resolver function using the already loaded config (or None)
     let resolve_start = Instant::now();
     let (target_mods, mut mod_resolution) = summary_phase!(summary, "resolve", {
@@ -746,6 +802,7 @@ pub async fn install_minecraft_version(
             profile,
             loaded_norisk_config.as_ref(),
             Some(&custom_mod_infos),
+            &sync_result.extra_mods,
             version_id,
             modloader_enum.as_str(),
             &mod_cache_dir,

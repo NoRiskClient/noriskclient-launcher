@@ -27,6 +27,7 @@ import {
   type LocalContentType,
   useLocalContentManager,
 } from "../../../../hooks/useLocalContentManager";
+import { useVersionOptions } from "../../../../hooks/useVersionOptions";
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
 import * as FlagsmithService from "../../../../services/flagsmith-service";
 import UnifiedService from "../../../../services/unified-service";
@@ -165,10 +166,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
 
   // ── Version-Switcher-State (pro Item) ─────────────────────────────────────
-  const [openVersionKey, setOpenVersionKey] = useState<string | null>(null);
-  const [versionCache, setVersionCache] = useState<Record<string, UnifiedVersion[]>>({});
-  const [loadingVersionsFor, setLoadingVersionsFor] = useState<Record<string, boolean>>({});
-  const [versionErrorFor, setVersionErrorFor] = useState<Record<string, string | null>>({});
+  const versionOptions = useVersionOptions();
   const [switchingVersionFor, setSwitchingVersionFor] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
@@ -185,37 +183,22 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   }, []);
 
   const handleOpenVersionDropdown = useCallback(async (item: LocalContentItem) => {
-    const key = tileKey(item);
-    const willOpen = openVersionKey !== key;
-    setOpenVersionKey(willOpen ? key : null);
-    if (!willOpen) return;
-    if (versionCache[key]) return;
-
     const { platform, projectId } = getItemPlatformAndProjectId(item);
-    if (!platform || !projectId) {
-      setVersionErrorFor(prev => ({ ...prev, [key]: t("profiles.v3.versions.noProject") }));
-      return;
-    }
-    setLoadingVersionsFor(prev => ({ ...prev, [key]: true }));
-    setVersionErrorFor(prev => ({ ...prev, [key]: null }));
-    try {
-      const response = await UnifiedService.getModVersions({
-        source: platform,
-        project_id: projectId,
-        loaders: contentType === "Mod" && profile?.loader ? [profile.loader] : undefined,
-        game_versions: profile?.game_version ? [profile.game_version] : undefined,
-      });
-      setVersionCache(prev => ({ ...prev, [key]: response.versions }));
-    } catch (err) {
-      console.error("[V3] Failed to load versions:", err);
-      setVersionErrorFor(prev => ({ ...prev, [key]: t("profiles.v3.versions.loadFailed") }));
-    } finally {
-      setLoadingVersionsFor(prev => ({ ...prev, [key]: false }));
-    }
-  }, [openVersionKey, versionCache, getItemPlatformAndProjectId, contentType, profile, tileKey]);
+    await versionOptions.toggle(
+      tileKey(item),
+      platform && projectId
+        ? {
+            platform,
+            projectId,
+            loaders: contentType === "Mod" && profile?.loader ? [profile.loader] : undefined,
+            gameVersions: profile?.game_version ? [profile.game_version] : undefined,
+          }
+        : null,
+    );
+  }, [contentType, getItemPlatformAndProjectId, profile, tileKey, versionOptions]);
 
   const handleSwitchVersion = useCallback(async (item: LocalContentItem, newVersion: UnifiedVersion) => {
-    setOpenVersionKey(null);
+    versionOptions.close();
     setSwitchingVersionFor(item.filename);
     try {
       await manager.handleSwitchContentVersion(item as T, newVersion);
@@ -225,7 +208,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     } finally {
       setSwitchingVersionFor(null);
     }
-  }, [manager, t]);
+  }, [manager, t, versionOptions]);
 
   // Batch Enable/Disable — iteriert Selection und toggelt nur die Mods,
   // deren aktueller State vom Ziel abweicht.
@@ -602,10 +585,10 @@ export function LocalContentTabV3<T extends LocalContentItem>({
                     : undefined}
                   isQuickUpdating={manager.itemsBeingUpdated.has(item.filename)}
                   noRiskStatus={noRiskStatus}
-                  versionDropdownOpen={openVersionKey === key}
-                  availableVersions={versionCache[key] ?? null}
-                  isLoadingVersions={!!loadingVersionsFor[key]}
-                  versionError={versionErrorFor[key] ?? null}
+                  versionDropdownOpen={versionOptions.openKey === key}
+                  availableVersions={versionOptions.versionsFor(key)}
+                  isLoadingVersions={versionOptions.loadingFor(key)}
+                  versionError={versionOptions.errorFor(key)}
                   onVersionClick={() => handleOpenVersionDropdown(item)}
                   onSwitchVersion={(v) => handleSwitchVersion(item, v)}
                   updateAvailable={updateAvailable}

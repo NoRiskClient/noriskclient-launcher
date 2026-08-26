@@ -190,6 +190,7 @@ pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, Command
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        sync_pack_ids: Vec::new(),
     };
 
     let id = state.profile_manager.create_profile(profile.clone()).await?;
@@ -1634,6 +1635,7 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         modpack_info: source_profile.modpack_info.clone(),
         preferred_account_id: source_profile.preferred_account_id,
         playtime_seconds: 0,
+        sync_pack_ids: source_profile.sync_pack_ids.clone(),
     };
 
     // 6. Erstelle das neue Profilverzeichnis
@@ -3024,6 +3026,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        sync_pack_ids: Vec::new(),
     };
 
     let game_dir = state

@@ -1040,6 +1040,30 @@ impl ProcessManager {
             }
 
             if let Some(metadata) = &exiting_process_metadata_clone {
+                match crate::sync::engine::SyncEngine::write_back_after_exit(metadata.profile_id)
+                    .await
+                {
+                    Ok(report) => {
+                        for warning in &report.warnings {
+                            log::warn!("[Sync Packs] {}", warning);
+                        }
+                        if report.changed_targets() > 0 {
+                            log::info!(
+                                "Sync packs wrote back {} target(s) for profile {}",
+                                report.changed_targets(),
+                                metadata.profile_id
+                            );
+                        }
+                    }
+                    Err(e) => log::warn!(
+                        "Sync pack write back failed for profile {}: {}",
+                        metadata.profile_id,
+                        e
+                    ),
+                }
+            }
+
+            if let Some(metadata) = &exiting_process_metadata_clone {
                 if let Some(session_id) = &metadata.log_session_id {
                     crate::utils::log_archive::finalize_game_session(
                         session_id,

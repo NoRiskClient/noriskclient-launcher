@@ -15,7 +15,7 @@ export function traceMark(scope: string | undefined, label: string): void {
   if (t0 === undefined) return;
 
   const delta = performance.now() - t0;
-  if (delta > 10_000) return;
+  if (delta > 60_000) return;
 
   logInfo(`[perf:${scope}] +${Math.round(delta)}ms ${label}`);
 }

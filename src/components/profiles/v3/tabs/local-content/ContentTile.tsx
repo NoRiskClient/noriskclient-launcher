@@ -12,7 +12,8 @@ import { Tooltip } from "../../../../ui/Tooltip";
 import { ModUpdateText } from "../../../../ui/ModUpdateText";
 import { ToggleSwitch } from "../../../../ui/ToggleSwitch";
 import { CheckboxV2 } from "../../../../ui/CheckboxV2";
-import { ThemedDropdown, ThemedDropdownItem, ThemedDropdownDivider, ThemedDropdownHeader } from "../../shared/ThemedDropdown";
+import { ThemedDropdown, ThemedDropdownItem, ThemedDropdownDivider } from "../../shared/ThemedDropdown";
+import { VersionSelectDropdown } from "../../shared/VersionSelectDropdown";
 
 export interface ContentTileProps {
   item: LocalContentItem;
@@ -225,62 +226,16 @@ export function ContentTile({
               {isSwitchable && !isSwitchingVersion && <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 flex-shrink-0 opacity-60" />}
             </button>
 
-            <ThemedDropdown
+            <VersionSelectDropdown
               open={versionDropdownOpen}
               onClose={() => onVersionClick()}
-              width="w-72"
-              align="left"
-              scrollable
               triggerRef={versionButtonRef}
-            >
-              <ThemedDropdownHeader>{t("profiles.v3.versions.selectVersion")}</ThemedDropdownHeader>
-              {isLoadingVersions && (
-                <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft gap-2">
-                  <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
-                  {t("profiles.v3.versions.loading")}
-                </div>
-              )}
-              {!isLoadingVersions && versionError && (
-                <div className="px-3 py-4 text-xs text-rose-300 font-minecraft">{versionError}</div>
-              )}
-              {!isLoadingVersions && !versionError && availableVersions && availableVersions.length === 0 && (
-                <div className="px-3 py-4 text-xs text-white/40 font-minecraft">{t("profiles.v3.versions.none")}</div>
-              )}
-              {!isLoadingVersions && !versionError && availableVersions && availableVersions.map((v) => {
-                const isCurrent = v.id === currentVersionId;
-                return (
-                  <button
-                    key={v.id}
-                    onClick={(e) => { e.stopPropagation(); if (!isCurrent) onSwitchVersion(v); }}
-                    disabled={isCurrent}
-                    onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = `${accentColor.value}40`; }}
-                    onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = "transparent"; }}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
-                      isCurrent ? "text-white/40 cursor-default" : "text-white/85 hover:text-white cursor-pointer"
-                    }`}
-                  >
-                    {isCurrent ? (
-                      <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.value }} />
-                    ) : (
-                      <Icon icon="solar:tag-linear" className="w-3.5 h-3.5 flex-shrink-0 text-white/40" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{v.version_number}</div>
-                      <div className="text-[10px] text-white/35 truncate normal-case">{v.name}</div>
-                    </div>
-                    {v.release_type !== "release" && (
-                      <span className={`text-[9px] uppercase px-1 py-0.5 rounded flex-shrink-0 ${
-                        v.release_type === "beta"  ? "bg-amber-400/15 text-amber-200 border border-amber-400/25" :
-                        v.release_type === "alpha" ? "bg-rose-400/15  text-rose-200  border border-rose-400/25" :
-                        "bg-white/10 text-white/60 border border-white/15"
-                      }`}>
-                        {v.release_type}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </ThemedDropdown>
+              versions={availableVersions}
+              loading={isLoadingVersions}
+              error={versionError}
+              currentVersionId={currentVersionId}
+              onSelect={onSwitchVersion}
+            />
           </div>
 
           {item.file_size > 0 && (

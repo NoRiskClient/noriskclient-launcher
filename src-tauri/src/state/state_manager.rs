@@ -14,6 +14,7 @@ use crate::state::post_init::PostInitializationHandler;
 use crate::state::process_state::{default_processes_path, ProcessManager};
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
+use crate::state::sync_pack_state::SyncPackManager;
 use crate::utils::referral_utils;
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -38,6 +39,7 @@ pub struct State {
     pub cosmetic_pack_manager: CosmeticPackManager,
     pub friends_state: FriendsState,
     pub content_cache: ContentCacheManager,
+    pub sync_pack_manager: SyncPackManager,
     pub db: crate::state::db::DbHandle,
     pub io_semaphore: Arc<Semaphore>,
     pub login_server_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
@@ -77,6 +79,7 @@ impl State {
                 let cosmetic_pack_manager = CosmeticPackManager::new();
                 let db = crate::state::db::new_handle();
                 let content_cache = ContentCacheManager::new(db.clone())?;
+                let sync_pack_manager = SyncPackManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
                     profile_manager,
@@ -92,6 +95,7 @@ impl State {
                     cosmetic_pack_manager,
                     friends_state,
                     content_cache,
+                    sync_pack_manager,
                     db,
                     io_semaphore,
                     login_server_handle: Arc::new(Mutex::new(None)),
@@ -130,6 +134,7 @@ impl State {
         ready_step("NoriskVersionManager", initial_state_arc.norisk_version_manager.on_state_ready(app.clone())).await?;
         ready_step("NoriskPackManager", initial_state_arc.norisk_pack_manager.on_state_ready(app.clone())).await?;
         ready_step("ProfileManager", initial_state_arc.profile_manager.on_state_ready(app.clone())).await?;
+        ready_step("SyncPackManager", initial_state_arc.sync_pack_manager.on_state_ready(app.clone())).await?;
         ready_step("ProcessManager", initial_state_arc.process_manager.on_state_ready(app.clone())).await?;
 
         // Apply any token handbacks the in-game client dropped while we were closed, then keep

@@ -13,7 +13,6 @@ import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { NoriskModEntryDefinition, NoriskModpacksConfig, NoriskPackDefinition } from "../../../types/noriskPacks";
-import { PackPicker } from "../PackPicker";
 import { loadPacks, usePacks } from "../../../hooks/usePacks";
 import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
@@ -117,9 +116,13 @@ export function ProfileWizardV2Step3({
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const defaultNoriskPackId = noriskPacks["norisk-prod"]
+        ? "norisk-prod"
+        : Object.keys(noriskPacks)[0] ?? null;
+
     useEffect(() => {
-        if (noriskPacks["norisk-prod"]) setSelectedNoriskPackId("norisk-prod");
-    }, [noriskPacks]);
+        if (defaultNoriskPackId) setSelectedNoriskPackId(defaultNoriskPackId);
+    }, [defaultNoriskPackId]);
 
     const getLoaderDisplayName = (loader: ModLoader) => {
         const names = {
@@ -366,101 +369,54 @@ export function ProfileWizardV2Step3({
                     />
                 </div>
 
-                {/* Advanced Settings */}
-                <div className="space-y-3">
-                    <button
-                        onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                        className="flex items-center justify-between w-full p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                        <span className="text-base font-minecraft text-white/80">
-                            {t('profiles.wizard.advancedSettings')}
-                        </span>
-                        <Icon
-                            icon={showAdvancedSettings ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
-                            className="w-5 h-5 text-white/60"
-                        />
-                    </button>
+                {/* NoRisk Client features */}
+                <div className="space-y-2">
+                    <Checkbox
+                        label={t('profiles.wizard.useNrcFeatures')}
+                        checked={Boolean(selectedNoriskPackId)}
+                        onChange={(event) =>
+                            setSelectedNoriskPackId(
+                                event.target.checked ? defaultNoriskPackId : null,
+                            )
+                        }
+                        size="lg"
+                        disabled={packsLoading || !defaultNoriskPackId}
+                    />
 
-                    {showAdvancedSettings && (
-                        <div className="space-y-4 p-4 bg-white/5 border border-white/10 rounded-lg">
-                            {/* NoRisk Pack Selection */}
-                            <div className="space-y-3">
-                                <label className="block text-base font-minecraft text-white/50">
-                                    {t('profiles.wizard.noriskClientPack')}
-                                </label>
-                                <p className="text-sm text-white/60 font-minecraft">
-                                    {t('profiles.wizard.noriskPackDescription')}
-                                </p>
-                                {(
-                                    <>
-                                        <div className="flex gap-3">
-                                            <div className="flex-1">
-                                                <PackPicker
-                                                    packs={noriskPacks}
-                                                    value={selectedNoriskPackId}
-                                                    onChange={setSelectedNoriskPackId}
-                                                    className="w-full"
-                                                    loading={packsLoading}
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* Show either warning, none hint, or description */}
-                                        {showYellowWarning ? (
-                                            <div className="text-center">
-                                                <p className="text-base text-yellow-400 font-minecraft">
-                                                    {t('profiles.wizard.nrcIncompatibleWarning')}
-                                                </p>
-                                            </div>
-                                        ) : selectedNoriskPackId === null || selectedNoriskPackId === "" ? (
-                                            <div className="text-center">
-                                                <p className="text-sm text-amber-400 font-minecraft">
-                                                    {t('profiles.wizard.noNrcFeatures')}
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            selectedNoriskPackId && noriskPacks[selectedNoriskPackId] && (
-                                                <div className="text-center">
-                                                    <p className="text-sm text-white/70 font-minecraft">
-                                                        {noriskPacks[selectedNoriskPackId].description}
-                                                    </p>
-                                                </div>
-                                            )
-                                        )}
+                    {showYellowWarning ? (
+                        <p className="text-sm text-yellow-400 font-minecraft">
+                            {t('profiles.wizard.nrcIncompatibleWarning')}
+                        </p>
+                    ) : (
+                        <p className="text-sm text-white/50 font-minecraft">
+                            {t('profiles.wizard.noriskPackDescription')}
+                        </p>
+                    )}
 
-                                        {/* Compatibility Checking */}
-                                        {checkingCompatibility && (
-                                            <div className="flex items-center gap-2 text-white/70">
-                                                <Icon
-                                                    icon="svg-spinners:ring-resize"
-                                                    className="w-4 h-4"
-                                                />
-                                                <span className="text-sm font-minecraft">
-                                                    {t('profiles.wizard.checkingCompatibility')}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Compatibility Warning */}
-                                        {packCompatibilityWarning && (
-                                            <Card
-                                                variant="flat"
-                                                className="p-3 bg-red-900/20 border border-red-500/30"
-                                            >
-                                                <div className="flex items-start gap-2">
-                                                    <Icon
-                                                        icon="solar:danger-triangle-bold"
-                                                        className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5"
-                                                    />
-                                                    <p className="text-xs text-red-300 font-minecraft">
-                                                        {packCompatibilityWarning}
-                                                    </p>
-                                                </div>
-                                            </Card>
-                                        )}
-                                    </>
-                                )}
-                            </div>
+                    {checkingCompatibility && (
+                        <div className="flex items-center gap-2 text-white/70">
+                            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+                            <span className="text-sm font-minecraft">
+                                {t('profiles.wizard.checkingCompatibility')}
+                            </span>
                         </div>
+                    )}
+
+                    {packCompatibilityWarning && (
+                        <Card
+                            variant="flat"
+                            className="p-3 bg-red-900/20 border border-red-500/30"
+                        >
+                            <div className="flex items-start gap-2">
+                                <Icon
+                                    icon="solar:danger-triangle-bold"
+                                    className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5"
+                                />
+                                <p className="text-xs text-red-300 font-minecraft">
+                                    {packCompatibilityWarning}
+                                </p>
+                            </div>
+                        </Card>
                     )}
                 </div>
             </div>

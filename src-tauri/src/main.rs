@@ -15,6 +15,7 @@ pub mod integrations;
 mod logging;
 mod minecraft;
 mod state;
+mod sync;
 
 use crate::integrations::norisk_packs;
 use crate::integrations::norisk_versions;
@@ -761,6 +762,31 @@ async fn main() {
             commands::profile_command::add_profile_symlink,
             commands::profile_command::remove_profile_symlink,
             commands::profile_command::get_profile_symlinks,
+            commands::sync_pack_command::get_or_create_default_sync_pack,
+            commands::sync_pack_command::add_dropped_sync_target,
+            commands::sync_pack_command::list_sync_seed_candidates,
+            commands::sync_pack_command::preview_profile_sync,
+            commands::sync_pack_command::get_sync_packs,
+            commands::sync_pack_command::get_sync_pack,
+            commands::sync_pack_command::create_sync_pack,
+            commands::sync_pack_command::update_sync_pack,
+            commands::sync_pack_command::add_sync_pack_target,
+            commands::sync_pack_command::remove_sync_pack_target,
+            commands::sync_pack_command::add_content_to_sync_pack,
+            commands::sync_pack_command::remove_content_from_sync_pack,
+            commands::sync_pack_command::remove_mod_from_sync_pack,
+            commands::sync_pack_command::get_sync_pack_local_jars,
+            commands::sync_pack_command::remove_sync_pack_local_jar,
+            commands::sync_pack_command::get_sync_pack_subscribers,
+            commands::sync_pack_command::open_sync_pack_folder,
+            commands::sync_pack_command::delete_sync_pack,
+            commands::sync_pack_command::set_profile_sync_packs,
+            commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::sync_profile_now,
+            commands::sync_pack_command::set_sync_pack_mod_enabled,
+            commands::sync_pack_command::set_sync_pack_mod_version_override,
+            commands::sync_pack_command::get_sync_pack_mod_matrix,
+            commands::sync_pack_command::resolve_sync_pack_mod,
             commands::profile_command::get_profile_instance_path,
             commands::profile_command::get_default_profile_path,
             commands::profile_command::get_profile_disk_size,

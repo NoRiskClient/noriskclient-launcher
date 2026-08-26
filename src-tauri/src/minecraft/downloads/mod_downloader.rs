@@ -50,6 +50,14 @@ impl ModDownloadService {
             profile.name, self.concurrent_downloads
         );
 
+        self.download_mod_list_to_cache(&profile.mods).await
+    }
+
+    pub async fn download_mod_list_to_cache(&self, mods: &[profile_state::Mod]) -> Result<()> {
+        if mods.is_empty() {
+            return Ok(());
+        }
+
         let mod_cache_dir = LAUNCHER_DIRECTORY.meta_dir().join(MOD_CACHE_DIR_NAME);
         if !mod_cache_dir.exists() {
             info!("Creating mod cache directory: {:?}", mod_cache_dir);
@@ -58,7 +66,7 @@ impl ModDownloadService {
 
         let mut download_futures = Vec::new();
 
-        for mod_info in profile.mods.iter() {
+        for mod_info in mods.iter() {
             if !mod_info.enabled {
                 trace!("Skipping disabled mod: {:?}", mod_info.display_name);
                 continue;
@@ -179,16 +187,12 @@ impl ModDownloadService {
         }
 
         if errors.is_empty() {
-            info!(
-                "Mod cache ready for profile '{}': {} mods",
-                profile.name, task_count
-            );
+            info!("Mod cache ready: {} mods", task_count);
             Ok(())
         } else {
             error!(
-                "Mod cache check/download process completed with {} errors for profile: '{}'",
-                errors.len(),
-                profile.name
+                "Mod cache check/download process completed with {} errors",
+                errors.len()
             );
             Err(errors.remove(0))
         }

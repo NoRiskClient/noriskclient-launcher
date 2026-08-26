@@ -233,6 +233,7 @@ export interface Profile {
   modpack_info?: ModPackInfo | null;
   preferred_account_id: string | null;
   playtime_seconds?: number;
+  sync_pack_ids: string[];
 }
 
 export interface ProfileGroup {

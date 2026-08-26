@@ -16,6 +16,7 @@ pub const DB_FILENAME: &str = "app.db";
 pub struct Db {
     pool: Option<SqlitePool>,
     path: Option<PathBuf>,
+    ephemeral: bool,
 }
 
 pub type DbHandle = Arc<RwLock<Db>>;
@@ -24,6 +25,7 @@ pub fn new_handle() -> DbHandle {
     Arc::new(RwLock::new(Db {
         pool: None,
         path: None,
+        ephemeral: false,
     }))
 }
 
@@ -49,13 +51,14 @@ async fn open_or_reopen_at(handle: &DbHandle, path: PathBuf) {
         }
     }
 
-    let opened = init_at(&path).await;
+    let (opened, ephemeral) = init_at(&path).await;
 
     let old = {
         let mut db = handle.write().await;
         let old = db.pool.take();
         db.pool = opened;
         db.path = Some(path);
+        db.ephemeral = ephemeral;
         old
     };
 
@@ -120,11 +123,11 @@ async fn open_in_memory() -> Result<SqlitePool> {
     Ok(pool)
 }
 
-async fn init_at(path: &Path) -> Option<SqlitePool> {
+async fn init_at(path: &Path) -> (Option<SqlitePool>, bool) {
     match open(path, true).await {
         Ok(pool) => {
             info!("Opened app.db (WAL) at {:?}", path);
-            return Some(pool);
+            return (Some(pool), false);
         }
         Err(e) => warn!("Opening app.db with WAL failed: {}", e),
     }
@@ -132,21 +135,25 @@ async fn init_at(path: &Path) -> Option<SqlitePool> {
     match open(path, false).await {
         Ok(pool) => {
             warn!("Opened app.db without WAL (journal=DELETE) at {:?}", path);
-            return Some(pool);
+            return (Some(pool), false);
         }
         Err(e) => warn!("Opening app.db without WAL failed too: {}", e),
     }
 
     match open_in_memory().await {
         Ok(pool) => {
-            error!("Falling back to an in-memory database — the cache will not persist this session.");
-            Some(pool)
+            error!("Falling back to an in-memory database. Caches still work, but anything stored in app.db will be lost when the launcher closes.");
+            (Some(pool), true)
         }
         Err(e) => {
             error!("Could not open any database, caching is disabled: {}", e);
-            None
+            (None, false)
         }
     }
+}
+
+pub async fn is_ephemeral(handle: &DbHandle) -> bool {
+    handle.read().await.ephemeral
 }
 
 #[cfg(test)]

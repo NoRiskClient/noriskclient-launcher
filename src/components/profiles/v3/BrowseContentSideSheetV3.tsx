@@ -21,6 +21,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
 import type { Profile } from "../../../types/profile";
+import type { ContentInstallTarget } from "../../../types/content";
 import type { LocalContentType } from "../../../hooks/useLocalContentManager";
 import type { ModrinthProjectType } from "../../../types/modrinth";
 import { ModrinthSearchV2 } from "../../modrinth/v2/ModrinthSearchV2";
@@ -34,6 +35,8 @@ export interface BrowseContentSideSheetV3Props {
   contentType: LocalContentType;
   onClose: () => void;
   onInstallSuccess?: () => void;
+  installTarget?: ContentInstallTarget;
+  installedOverride?: { projectIds: string[]; versionIds: string[] } | null;
 }
 
 const CONTENT_TO_PROJECT: Partial<Record<LocalContentType, ModrinthProjectType>> = {
@@ -49,6 +52,8 @@ export function BrowseContentSideSheetV3({
   contentType,
   onClose,
   onInstallSuccess,
+  installTarget,
+  installedOverride,
 }: BrowseContentSideSheetV3Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -58,7 +63,10 @@ export function BrowseContentSideSheetV3({
   // without that field doesn't turn the whole `background` property into
   // invalid CSS (which silently wipes every layer).
   const accentDark = accentColor.dark ?? accent;
-  const projectType = CONTENT_TO_PROJECT[contentType] ?? "mod";
+  const isPackTarget = installTarget?.type === "syncPack";
+  const projectType = isPackTarget
+    ? "mod"
+    : CONTENT_TO_PROJECT[contentType] ?? "mod";
 
   // In-sheet mod detail stack — clicking a project tile pushes its id onto
   // this piece of state instead of navigating, so the sheet stays mounted
@@ -104,6 +112,7 @@ export function BrowseContentSideSheetV3({
   if (!open) return null;
 
   const title =
+    isPackTarget                   ? t("profiles.content.addMods") :
     contentType === "Mod"          ? t("profiles.content.addMods") :
     contentType === "ResourcePack" ? t("profiles.content.addResourcePacks") :
     contentType === "ShaderPack"   ? t("profiles.content.addShaderPacks") :
@@ -204,7 +213,7 @@ export function BrowseContentSideSheetV3({
             )}
             <span className="text-white/25">/</span>
             <span className="text-xs font-minecraft text-white/55 normal-case truncate max-w-[280px]">
-              {profile.name || profile.id}
+              {isPackTarget ? installTarget.packName : profile.name || profile.id}
             </span>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-minecraft uppercase tracking-wider text-white/30">
@@ -241,7 +250,11 @@ export function BrowseContentSideSheetV3({
               selectedProfileId={profile.id}
               onProjectClick={handleProjectClick}
               initialProjectType={projectType}
-              allowedProjectTypes={["mod", "resourcepack", "shader", "datapack"]}
+              allowedProjectTypes={
+                isPackTarget
+                  ? ["mod"]
+                  : ["mod", "resourcepack", "shader", "datapack"]
+              }
               // Sidebar on by default — at 82vw the filter rail fits
               // without eating into the grid, and it's the first thing
               // users reach for when browsing Modrinth.
@@ -249,6 +262,8 @@ export function BrowseContentSideSheetV3({
               overrideDisplayContext="detail"
               disableVirtualization={true}
               onInstallSuccess={onInstallSuccess}
+              installTarget={installTarget}
+              installedOverride={installedOverride}
               className="h-full"
             />
           </div>
@@ -268,6 +283,7 @@ export function BrowseContentSideSheetV3({
                 onBack={() => setDetail(null)}
                 hideBackButton
                 targetProfile={profile}
+                installTarget={installTarget}
               />
             </div>
           )}
