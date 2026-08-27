@@ -26,6 +26,7 @@ use super::minecraft_auth::Credentials;
 use super::modloader::ModloaderFactory;
 use crate::minecraft::downloads::MinecraftLoggingDownloadService;
 use crate::utils::mc_utils;
+use crate::utils::system_info::Architecture;
 use tokio::fs as async_fs;
 
 async fn emit_progress_event(
@@ -253,12 +254,25 @@ pub async fn install_minecraft_version(
             match java_detector::get_java_info(&path).await {
                 Ok(java_info) => {
                     info!(
-                        "Verified custom Java: Version {}, Major version {}, 64-bit: {}",
-                        java_info.version, java_info.major_version, java_info.is_64bit
+                        "Verified custom Java: Version {}, Major version {}, 64-bit: {}, architecture: {:?}",
+                        java_info.version,
+                        java_info.major_version,
+                        java_info.is_64bit,
+                        java_info.architecture
                     );
 
-                    // Check if the Java version is compatible with the required one
-                    if java_info.major_version >= java_version {
+                    let wrong_arch = java_info.architecture == Architecture::AARCH64
+                        && JavaDownloadService::new()
+                            .needs_x86_64_java(Some(&piston_meta.java_version.component));
+
+                    if wrong_arch {
+                        info!(
+                            "Custom Java at {} is arm64, but this version needs x86_64 Java. Downloading Java...",
+                            path.display()
+                        );
+                        custom_java_valid = false;
+                        std::path::PathBuf::new()
+                    } else if java_info.major_version >= java_version {
                         info!(
                             "Custom Java version {} meets the required version {}",
                             java_info.major_version, java_version

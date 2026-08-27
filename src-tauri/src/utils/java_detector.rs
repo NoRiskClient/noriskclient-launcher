@@ -363,6 +363,89 @@ fn ensure_looks_like_java_binary(java_path: &Path) -> Result<()> {
     Ok(())
 }
 
+const JAVA_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+async fn run_java_probe(cmd: Command, java_path: &Path) -> Option<std::process::Output> {
+    let mut cmd = tokio::process::Command::from(cmd);
+    cmd.kill_on_drop(true);
+
+    match tokio::time::timeout(JAVA_PROBE_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => Some(output),
+        Ok(Err(e)) => {
+            warn!("Failed to run {}: {}", java_path.display(), e);
+            None
+        }
+        Err(_) => {
+            warn!(
+                "{} did not respond within {}s",
+                java_path.display(),
+                JAVA_PROBE_TIMEOUT.as_secs()
+            );
+            None
+        }
+    }
+}
+
+fn java_probe_command(java_path: &Path, with_properties: bool) -> Command {
+    let mut cmd = Command::new(java_path);
+    if with_properties {
+        cmd.arg("-XshowSettings:properties");
+    }
+    cmd.arg("-version")
+        .env_remove("_JAVA_OPTIONS")
+        .env_remove("JAVA_TOOL_OPTIONS")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
+async fn probe_java(java_path: &Path) -> Option<String> {
+    fn merge(output: std::process::Output) -> String {
+        let mut text = String::from_utf8_lossy(&output.stderr).into_owned();
+        text.push('\n');
+        text.push_str(&String::from_utf8_lossy(&output.stdout));
+        text
+    }
+
+    if let Some(output) = run_java_probe(java_probe_command(java_path, true), java_path).await {
+        if output.status.success() {
+            return Some(merge(output));
+        }
+        warn!(
+            "{} rejected -XshowSettings, falling back to -version",
+            java_path.display()
+        );
+    }
+
+    run_java_probe(java_probe_command(java_path, false), java_path)
+        .await
+        .map(merge)
+}
+
+fn parse_java_architecture(probe_output: &str) -> Option<Architecture> {
+    let raw = probe_output.lines().find_map(|line| {
+        let value = line.trim().strip_prefix("os.arch")?.trim_start();
+        Some(value.strip_prefix('=')?.trim().to_ascii_lowercase())
+    })?;
+
+    match raw.as_str() {
+        "aarch64" | "arm64" => Some(Architecture::AARCH64),
+        "amd64" | "x86_64" => Some(Architecture::X64),
+        "x86" | "i386" | "i486" | "i586" | "i686" => Some(Architecture::X86),
+        "arm" | "armhf" | "arm32" => Some(Architecture::ARM),
+        other => {
+            warn!("Unrecognised os.arch '{}'", other);
+            None
+        }
+    }
+}
+
 /// Gets information about a Java installation at the given path
 pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
     let java_path = if java_path.is_dir() {
@@ -385,23 +468,12 @@ pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
 
     ensure_looks_like_java_binary(&java_path)?;
 
-    // Run java -version and parse the output
-    let mut cmd = Command::new(&java_path);
-    cmd.arg("-version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    let output = cmd
-        .output()
-        .map_err(|e| AppError::Other(format!("Failed to execute java -version: {}", e)))?;
-
-    // Java outputs version info to stderr
-    let version_output = String::from_utf8_lossy(&output.stderr);
+    let version_output = probe_java(&java_path).await.ok_or_else(|| {
+        AppError::Other(format!(
+            "Failed to execute java -version: {}",
+            java_path.display()
+        ))
+    })?;
 
     // Parse the version string
     let version_regex = Regex::new(r#"version "([^"]+)""#).unwrap();
@@ -442,15 +514,25 @@ pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str().to_string());
 
-    // Determine if 64-bit
-    let is_64bit = bit_regex.is_match(&version_output);
-
-    // Determine architecture
-    let architecture = if is_64bit {
+    let architecture = parse_java_architecture(&version_output);
+    let is_64bit = match architecture {
+        Some(Architecture::X64) | Some(Architecture::AARCH64) => true,
+        Some(_) => false,
+        None => bit_regex.is_match(&version_output),
+    };
+    let architecture = architecture.unwrap_or(if is_64bit {
         Architecture::X64
     } else {
         Architecture::X86
-    };
+    });
+
+    info!(
+        "Java at {}: version {}, {:?}, 64-bit: {}",
+        java_path.display(),
+        version,
+        architecture,
+        is_64bit
+    );
 
     Ok(JavaInstallation {
         path: java_path,
