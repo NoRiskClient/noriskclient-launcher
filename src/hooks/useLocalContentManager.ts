@@ -12,7 +12,7 @@ import { ModrinthService } from '../services/modrinth-service';
 import { CurseForgeService } from '../services/curseforge-service';
 import UnifiedService from '../services/unified-service';
 import { getLocalContent } from '../services/profile-service';
-import { toggleContentFromProfile, uninstallContentFromProfile, switchContentVersion, toggleModUpdates, bulkToggleModUpdates } from '../services/content-service';
+import { toggleContentFromProfile, toggleContentsFromProfile, uninstallContentFromProfile, uninstallContentsFromProfile, switchContentVersion, toggleModUpdates, bulkToggleModUpdates } from '../services/content-service';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { revealItemInDir } from '../utils/opener-utils';
 import { getUpdateIdentifier, getContentPlatform } from '../utils/update-identifier-utils';
@@ -88,6 +88,7 @@ interface UseLocalContentManagerReturn<T extends LocalContentItem> {
   handleToggleItemEnabled: (item: T) => Promise<void>;
   handleDeleteItem: (item: T) => void;
   handleBatchToggleSelected: () => Promise<void>;
+  handleBatchSetEnabled: (enabled: boolean) => Promise<number>;
   handleBatchDeleteSelected: () => void;
   handleOpenItemFolder: (item: T) => void;
 
@@ -646,6 +647,54 @@ export function useLocalContentManager<T extends LocalContentItem>({
     });
   }, [filteredItems]);
 
+  const handleBatchSetEnabled = useCallback(async (enabled: boolean): Promise<number> => {
+    if (!profile) {
+      toast.error(i18n.t('content_manager.errors.profile_missing_toggle'));
+      return 0;
+    }
+
+    const targets = items.filter(
+      (item) => selectedItemIds.has(item.filename) && item.is_disabled === enabled,
+    );
+    if (targets.length === 0) return 0;
+
+    const payloads = targets
+      .map((item) => createTogglePayload(item, profile.id, contentType, enabled))
+      .filter((payload): payload is ToggleContentPayload => payload !== null);
+    if (payloads.length === 0) return 0;
+
+    try {
+      const result = await toggleContentsFromProfile(payloads);
+
+      const touched = new Set(targets.map((item) => item.filename));
+      setItems((prev) =>
+        prev.map((item) => {
+          if (!touched.has(item.filename)) return item;
+          const enabledPath = item.path.replace(/\.disabled$/, '');
+          return {
+            ...item,
+            is_disabled: !enabled,
+            path: enabled ? enabledPath : `${enabledPath}.disabled`,
+          };
+        }),
+      );
+
+      if (contentType !== 'NoRiskMod' && onRefreshRequiredRef.current) {
+        onRefreshRequiredRef.current();
+      }
+      if (result.failed > 0) {
+        toast.error(
+          i18n.t('content_manager.errors.batch_partial', { count: result.failed }),
+        );
+      }
+      return targets.length - result.failed;
+    } catch (error) {
+      console.error(`[${contentType}] batch toggle failed:`, error);
+      toast.error(i18n.t('content_manager.errors.toggle_failed'));
+      return 0;
+    }
+  }, [profile, items, selectedItemIds, contentType]);
+
   const handleToggleItemEnabled = useCallback(async (item: T) => {
     if (!profile) {
       toast.error(i18n.t('content_manager.errors.profile_missing_toggle'));
@@ -726,24 +775,30 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
     if (isBatchDeleteConfirmActive) {
       setIsBatchDeleting(true);
+      const payloads: UninstallContentPayload[] = [];
       for (const itemId of selectedItemIds) {
         const item = items.find(i => i.filename === itemId);
-        if (item) {
-          const payload = createUninstallPayload(item, profile.id, contentType);
-          if (payload) {
-            try {
-              await uninstallContentFromProfile(payload);
-              successfulOperations++;
-            } catch (err) {
-              const errorDetail = parseErrorMessage(err);
-              errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(item), error: errorDetail }));
-            }
-          } else {
-             // Error already toasted by createUninstallPayload
-            errors.push(`Could not create uninstall payload for ${getDisplayFileName(item)}.`);
-          }
-        } else {
+        if (!item) {
           errors.push(`Could not find item ID ${itemId} to delete.`);
+          continue;
+        }
+        const payload = createUninstallPayload(item, profile.id, contentType);
+        if (payload) {
+          payloads.push(payload);
+        } else {
+          errors.push(`Could not create uninstall payload for ${getDisplayFileName(item)}.`);
+        }
+      }
+
+      if (payloads.length > 0) {
+        try {
+          const batch = await uninstallContentsFromProfile(payloads);
+          successfulOperations = payloads.length - batch.failed;
+          if (batch.failed > 0) {
+            errors.push(i18n.t('content_manager.errors.batch_partial', { count: batch.failed }));
+          }
+        } catch (err) {
+          errors.push(parseErrorMessage(err));
         }
       }
       if (errors.length > 0) toast.error(i18n.t('content_manager.errors.batch_delete_failed', { errors: errors.join("; ") }));
@@ -984,25 +1039,9 @@ export function useLocalContentManager<T extends LocalContentItem>({
   }, [profile, items, contentType]);
 
   // Common function for switching content versions
-  const performContentVersionSwitch = useCallback(async (
-    item: T,
-    newVersion: UnifiedVersion,
-    options: {
-      removeUpdateNotification?: boolean;
-      isUpdateOperation?: boolean;
-    } = {}
-  ): Promise<T> => {
-    // Use the unified service method - backend handles all platform logic
-    await UnifiedService.switchContentVersion(
-      profile.id,
-      mapUiContentTypeToBackend(contentType),
-      item,
-      newVersion
-    );
-
-    // After successful invoke, create the updated item for the frontend state.
+  const buildSwitchedItem = useCallback((item: T, newVersion: UnifiedVersion): T => {
     const primaryFile = newVersion.files.find(f => f.primary) || newVersion.files[0];
-    if (!primaryFile) throw new Error(`${options.isUpdateOperation ? 'Updated' : 'Switched'} version details are missing a primary file.`);
+    if (!primaryFile) throw new Error(`Selected version details are missing a primary file.`);
 
     const newSha1 = primaryFile.hashes.sha1 || null;
     const newFilename = primaryFile.filename;
@@ -1048,23 +1087,51 @@ export function useLocalContentManager<T extends LocalContentItem>({
       curseforge_info: updatedCurseForgeInfo,
     };
 
-    // Update the main items list with the new item data
-    setItems(prevItems => prevItems.map(i => i.filename === item.filename ? updatedItem : i));
-
-    // Remove update notification if requested
-    if (options.removeUpdateNotification) {
-      const updateIdentifier = getUpdateIdentifier(item);
-      if (updateIdentifier) {
-        setContentUpdates(prev => {
-          const newUpdates = { ...prev };
-          delete newUpdates[updateIdentifier];
-          return newUpdates;
-        });
-      }
-    }
-
     return updatedItem;
-  }, [profile, contentType, setItems, setContentUpdates]);
+  }, []);
+
+  const applySwitchedItems = useCallback((
+    switched: { item: T; updatedItem: T }[],
+    removeUpdateNotification: boolean
+  ) => {
+    if (switched.length === 0) return;
+
+    const byFilename = new Map(switched.map(({ item, updatedItem }) => [item.filename, updatedItem]));
+    setItems(prevItems => prevItems.map(i => byFilename.get(i.filename) ?? i));
+
+    if (!removeUpdateNotification) return;
+
+    const identifiers = switched
+      .map(({ item }) => getUpdateIdentifier(item))
+      .filter((id): id is string => !!id);
+    if (identifiers.length === 0) return;
+
+    setContentUpdates(prev => {
+      const newUpdates = { ...prev };
+      for (const id of identifiers) delete newUpdates[id];
+      return newUpdates;
+    });
+  }, [setItems, setContentUpdates]);
+
+  const performContentVersionSwitch = useCallback(async (
+    item: T,
+    newVersion: UnifiedVersion,
+    options: {
+      removeUpdateNotification?: boolean;
+      isUpdateOperation?: boolean;
+    } = {}
+  ): Promise<T> => {
+    await UnifiedService.switchContentVersion(
+      profile.id,
+      mapUiContentTypeToBackend(contentType),
+      item,
+      newVersion
+    );
+
+    const updatedItem = buildSwitchedItem(item, newVersion);
+    applySwitchedItems([{ item, updatedItem }], options.removeUpdateNotification === true);
+    return updatedItem;
+  }, [profile, contentType, buildSwitchedItem, applySwitchedItems]);
 
   const handleUpdateContentItem = useCallback(async (item: T, updateVersion: UnifiedVersion, suppressOwnToast: boolean = false) => {
     // 1. Initial checks
@@ -1154,73 +1221,81 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
   const handleUpdateAllAvailableContent = useCallback(async () => {
     if (Object.keys(contentUpdates).length === 0 || !profile) return;
-    
-    const itemsToUpdateWithDetails: {item: T, version: UnifiedVersion}[] = [];
+
+    const itemsToUpdateWithDetails: { item: T, version: UnifiedVersion }[] = [];
     for (const item of items) {
-      // Use the same identifier logic as in checkForContentUpdates
       const updateIdentifier = getUpdateIdentifier(item);
-      if (updateIdentifier && contentUpdates[updateIdentifier]) {
-        // Only include mods that have updates enabled (true or null/undefined)
-        const hasUpdatesEnabled = contentType === 'Mod' && item.updates_enabled !== false;
+      if (!updateIdentifier || !contentUpdates[updateIdentifier]) continue;
 
-        if (hasUpdatesEnabled) {
-          itemsToUpdateWithDetails.push({ item, version: contentUpdates[updateIdentifier] });
-        } else {
-          console.log(`Skipping ${getDisplayFileName(item)} from bulk update - UpdatesDisabled: ${!hasUpdatesEnabled}`);
-        }
+      if (contentType === 'Mod' && item.updates_enabled === false) {
+        console.log(`Skipping ${getDisplayFileName(item)} from bulk update - updates disabled`);
+        continue;
       }
+      if (contentType === 'Mod' && item.modpack_origin != null && item.updates_enabled !== true) {
+        console.log(`Skipping ${getDisplayFileName(item)} from bulk update - modpack mod`);
+        continue;
+      }
+
+      itemsToUpdateWithDetails.push({ item, version: contentUpdates[updateIdentifier] });
     }
 
-    if (itemsToUpdateWithDetails.length === 0) {
-        return;
-    }
-    
+    if (itemsToUpdateWithDetails.length === 0) return;
+
+    const backendContentType = mapUiContentTypeToBackend(contentType);
+    const payloads = itemsToUpdateWithDetails.map(({ item, version }) =>
+      UnifiedService.buildSwitchContentVersionPayload(profile.id, backendContentType, item, version)
+    );
+
+    const totalCount = itemsToUpdateWithDetails.length;
     setIsUpdatingAll(true);
     setContentUpdateError(null);
+    setItemsBeingUpdated(new Set(itemsToUpdateWithDetails.map(({ item }) => item.filename)));
+
+    const toastId = toast.loading(
+      i18n.t('content_manager.loading.updating_bulk', { total: totalCount, type: contentType })
+    );
+
     let succeededCount = 0;
-    const totalCount = itemsToUpdateWithDetails.length;
-    
-    const toastId = toast.loading(i18n.t('content_manager.loading.updating_progress', { current: 0, total: totalCount, type: contentType }));
-    
-    for (const { item, version } of itemsToUpdateWithDetails) {
-      try {
-        await handleUpdateContentItem(item, version, true); // suppressOwnToast - version ist jetzt UnifiedVersion
-        succeededCount++;
-        toast.loading(i18n.t('content_manager.loading.updating_progress', { current: succeededCount, total: totalCount, type: contentType }), { id: toastId });
-      } catch(err) {
-        const errorMsg = parseErrorMessage(err);
-        toast.error(i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg }));
+    try {
+      const result = await UnifiedService.switchContentVersions(payloads);
+      succeededCount = result.applied.length;
+
+      applySwitchedItems(
+        result.applied.map(slot => {
+          const { item, version } = itemsToUpdateWithDetails[slot];
+          return { item, updatedItem: buildSwitchedItem(item, version) };
+        }),
+        true
+      );
+
+      for (const slot of result.failed) {
+        const { item } = itemsToUpdateWithDetails[slot];
+        console.error(`Failed to update ${getDisplayFileName(item)}`);
       }
+    } catch (err) {
+      const errorMsg = parseErrorMessage(err);
+      setContentUpdateError(errorMsg);
+      toast.error(i18n.t('content_manager.errors.update_all_failed', { error: errorMsg }), { id: toastId, duration: 2000 });
+      setIsUpdatingAll(false);
+      setItemsBeingUpdated(new Set());
+      return;
+    } finally {
+      setIsUpdatingAll(false);
+      setItemsBeingUpdated(new Set());
     }
-    
-    setIsUpdatingAll(false);
-    
+
     const failedCount = totalCount - succeededCount;
     if (failedCount > 0) {
-      if (totalCount > 1) {
-        const message = i18n.t('content_manager.update_result.finished_partial', { succeeded: succeededCount, failed: failedCount });
-        if (succeededCount > 0) {
-          toast.success(message, { id: toastId, duration: 700 });
-        } else {
-          toast.error(message, { id: toastId, duration: 2000 });
-        }
+      const message = i18n.t('content_manager.update_result.finished_partial', { succeeded: succeededCount, failed: failedCount });
+      if (succeededCount > 0) {
+        toast.success(message, { id: toastId, duration: 700 });
       } else {
-        // Single item failed, just dismiss the loading toast, individual error was shown
-        toast.dismiss(toastId);
+        toast.error(message, { id: toastId, duration: 2000 });
       }
-    } else if (succeededCount > 0) {
-      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentType }), { id: toastId, duration: 700 });
     } else {
-      toast.dismiss(toastId);
+      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentType }), { id: toastId, duration: 700 });
     }
-    
-    if (succeededCount > 0) {
-        // The state has been updated in-place for each item.
-        // We don't need to re-check for updates immediately, as this could use stale data
-        // and cause the "Update All" button to reappear incorrectly.
-        // A manual refresh will catch any brand new updates.
-    }
-  }, [profile, items, contentUpdates, contentType, getDisplayFileName, handleUpdateContentItem, performContentVersionSwitch]);
+  }, [profile, items, contentUpdates, contentType, getDisplayFileName, buildSwitchedItem, applySwitchedItems, setItemsBeingUpdated, setContentUpdateError]);
 
   const handleSwitchContentVersion = useCallback(async (item: T, newVersion: UnifiedVersion) => {
     if (!profile) {
@@ -1424,6 +1499,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     handleToggleItemEnabled,
     handleDeleteItem,
     handleBatchToggleSelected,
+    handleBatchSetEnabled,
     handleBatchDeleteSelected,
     handleOpenItemFolder,
     checkForContentUpdates,

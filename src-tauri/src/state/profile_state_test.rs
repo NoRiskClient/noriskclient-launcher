@@ -20,6 +20,7 @@ fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bo
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
+        extra: Default::default(),
     }
 }
 
@@ -201,7 +202,346 @@ fn local_mods_never_match_a_platform_project() {
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
+        extra: Default::default(),
     }];
 
     assert!(find_mod_by_project_id(&mods, "7P86n6Vg").is_none());
+}
+
+#[test]
+fn a_field_from_a_newer_launcher_survives_a_load_and_save() {
+    let raw = serde_json::json!({
+        "name": "test",
+        "path": "test",
+        "game_version": "1.20.1",
+        "loader": "forge",
+        "sync_pack_ids": ["8f14e45f-ceea-467a-9575-4a1a0d0b2c33"],
+        "from_an_even_newer_build": 42,
+    });
+
+    let profile: Profile =
+        serde_json::from_value(raw.clone()).expect("profile fixture must deserialize");
+    let round_tripped = serde_json::to_value(&profile).expect("profile must serialize");
+
+    assert_eq!(
+        round_tripped.get("sync_pack_ids"),
+        raw.get("sync_pack_ids"),
+        "sync_pack_ids is present on all 423 live profiles and must not be dropped"
+    );
+    assert_eq!(
+        round_tripped.get("from_an_even_newer_build"),
+        raw.get("from_an_even_newer_build"),
+        "an unknown key must round-trip so a downgrade cannot destroy newer data"
+    );
+}
+
+#[test]
+fn a_field_from_a_newer_launcher_survives_on_a_mod() {
+    let raw = serde_json::json!({
+        "id": "8f14e45f-ceea-467a-9575-4a1a0d0b2c33",
+        "source": { "type": "local", "file_name": "custom.jar" },
+        "enabled": true,
+        "display_name": null,
+        "version": null,
+        "game_versions": null,
+        "file_name_override": null,
+        "associated_loader": null,
+        "modpack_origin": null,
+        "pinned_by_a_newer_build": true,
+    });
+
+    let entry: Mod = serde_json::from_value(raw.clone()).expect("mod fixture must deserialize");
+    let round_tripped = serde_json::to_value(&entry).expect("mod must serialize");
+
+    assert_eq!(
+        round_tripped.get("pinned_by_a_newer_build"),
+        raw.get("pinned_by_a_newer_build"),
+        "an unknown key on a mod must round-trip"
+    );
+}
+
+const REAL_CORPUS: &str = include_str!("../../fixtures/profile_corpus_real.json");
+
+fn canonical(profile: &Profile) -> serde_json::Value {
+    let mut value = serde_json::to_value(profile).expect("profile must serialize");
+    if let Some(set) = value
+        .get_mut("disabled_norisk_mods_detailed")
+        .and_then(|v| v.as_array_mut())
+    {
+        set.sort_by_key(|entry| entry.to_string());
+    }
+    value
+}
+
+const SYNTHETIC_CORPUS: &str = include_str!("../../fixtures/profile_corpus_synthetic.json");
+
+fn corpus() -> Vec<serde_json::Value> {
+    let mut all: Vec<serde_json::Value> =
+        serde_json::from_str(REAL_CORPUS).expect("real corpus must be a JSON array");
+    let synthetic: Vec<serde_json::Value> =
+        serde_json::from_str(SYNTHETIC_CORPUS).expect("synthetic corpus must be a JSON array");
+    all.extend(synthetic);
+    all
+}
+
+#[test]
+fn every_corpus_profile_deserializes() {
+    let entries = corpus();
+    assert_eq!(entries.len(), 23, "the corpus lost profiles");
+
+    for (index, raw) in entries.iter().enumerate() {
+        let name = raw.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+        serde_json::from_value::<Profile>(raw.clone())
+            .unwrap_or_else(|e| panic!("corpus entry {} ({}) must parse: {}", index, name, e));
+    }
+}
+
+#[test]
+fn the_corpus_round_trips_through_serde_without_loss() {
+    for (index, raw) in corpus().iter().enumerate() {
+        let profile: Profile = serde_json::from_value(raw.clone())
+            .unwrap_or_else(|e| panic!("corpus entry {} must parse: {}", index, e));
+
+        let mut expected = raw.clone();
+        if let Some(set) = expected
+            .get_mut("disabled_norisk_mods_detailed")
+            .and_then(|v| v.as_array_mut())
+        {
+            set.sort_by_key(|entry| entry.to_string());
+        }
+
+        assert_eq!(
+            canonical(&profile),
+            expected,
+            "corpus entry {} changed shape on a serde round trip",
+            index
+        );
+    }
+}
+
+#[test]
+fn the_corpus_covers_every_tagged_variant() {
+    let mut sources = std::collections::HashSet::new();
+    let mut images = std::collections::HashSet::new();
+    let mut loaders = std::collections::HashSet::new();
+    let mut states = std::collections::HashSet::new();
+    let mut packs = std::collections::HashSet::new();
+
+    for raw in corpus() {
+        let profile: Profile = serde_json::from_value(raw).expect("corpus entry must parse");
+        loaders.insert(profile.loader);
+        states.insert(format!("{:?}", profile.state));
+        if let Some(info) = &profile.modpack_info {
+            packs.insert(std::mem::discriminant(&info.source));
+        }
+        for entry in &profile.mods {
+            sources.insert(std::mem::discriminant(&entry.source));
+        }
+        for slot in [&profile.banner, &profile.background] {
+            if let Some(banner) = slot {
+                images.insert(std::mem::discriminant(&banner.source));
+            }
+        }
+    }
+
+    assert_eq!(sources.len(), 6, "every ModSource variant needs a corpus entry");
+    assert_eq!(images.len(), 5, "every ImageSource variant needs a corpus entry");
+    assert_eq!(packs.len(), 2, "both ModPackSource variants need a corpus entry");
+    assert_eq!(loaders.len(), 5, "every ModLoader needs a corpus entry");
+    assert_eq!(states.len(), 5, "every ProfileState needs a corpus entry");
+}
+
+#[test]
+fn adding_a_field_to_profile_must_break_this_test() {
+    let profile: Profile = serde_json::from_value(serde_json::json!({
+        "name": "t", "path": "t", "game_version": "1.20.1", "loader": "forge",
+    }))
+    .expect("profile fixture must deserialize");
+
+    let Profile {
+        id: _,
+        name: _,
+        path: _,
+        game_version: _,
+        loader: _,
+        loader_version: _,
+        created: _,
+        last_played: _,
+        settings: _,
+        state: _,
+        mods: _,
+        selected_norisk_pack_id: _,
+        disabled_norisk_mods_detailed: _,
+        source_standard_profile_id: _,
+        group: _,
+        use_shared_minecraft_folder: _,
+        is_standard_version: _,
+        description: _,
+        banner: _,
+        background: _,
+        norisk_information: _,
+        modpack_info: _,
+        preferred_account_id: _,
+        playtime_seconds: _,
+        extra: _,
+    } = profile;
+}
+
+#[test]
+fn adding_a_field_to_mod_must_break_this_test() {
+    let entry = Mod {
+        id: Uuid::new_v4(),
+        source: ModSource::Local {
+            file_name: "a.jar".to_string(),
+        },
+        enabled: true,
+        display_name: None,
+        version: None,
+        game_versions: None,
+        file_name_override: None,
+        associated_loader: None,
+        modpack_origin: None,
+        updates_enabled: true,
+        force_include_versions: Vec::new(),
+        extra: Default::default(),
+    };
+
+    let Mod {
+        id: _,
+        source: _,
+        enabled: _,
+        display_name: _,
+        version: _,
+        game_versions: _,
+        file_name_override: _,
+        associated_loader: _,
+        modpack_origin: _,
+        updates_enabled: _,
+        force_include_versions: _,
+        extra: _,
+    } = entry;
+}
+
+#[test]
+fn adding_an_enum_variant_must_break_this_test() {
+    fn mod_source_tag(source: &ModSource) -> &'static str {
+        match source {
+            ModSource::Local { .. } => "local",
+            ModSource::Url { .. } => "url",
+            ModSource::Maven { .. } => "maven",
+            ModSource::Embedded { .. } => "embedded",
+            ModSource::Modrinth { .. } => "modrinth",
+            ModSource::CurseForge { .. } => "curse_forge",
+        }
+    }
+
+    fn image_tag(source: &ImageSource) -> &'static str {
+        match source {
+            ImageSource::Url { .. } => "url",
+            ImageSource::RelativePath { .. } => "relativePath",
+            ImageSource::RelativeProfile { .. } => "relativeProfile",
+            ImageSource::AbsolutePath { .. } => "absolutePath",
+            ImageSource::Base64 { .. } => "base64",
+        }
+    }
+
+    fn pack_tag(source: &ModPackSource) -> &'static str {
+        match source {
+            ModPackSource::Modrinth { .. } => "modrinth",
+            ModPackSource::CurseForge { .. } => "curse_forge",
+        }
+    }
+
+    fn state_tag(state: &ProfileState) -> &'static str {
+        match state {
+            ProfileState::NotInstalled => "not_installed",
+            ProfileState::Installing => "installing",
+            ProfileState::Installed => "installed",
+            ProfileState::Running => "running",
+            ProfileState::Error => "error",
+        }
+    }
+
+    assert_eq!(
+        mod_source_tag(&ModSource::Local {
+            file_name: "a".into()
+        }),
+        serde_json::to_value(ModSource::Local {
+            file_name: "a".into()
+        })
+        .unwrap()["type"]
+    );
+    assert_eq!(
+        image_tag(&ImageSource::RelativeProfile { path: "a".into() }),
+        serde_json::to_value(ImageSource::RelativeProfile { path: "a".into() }).unwrap()["type"]
+    );
+    assert_eq!(
+        pack_tag(&ModPackSource::CurseForge {
+            project_id: 1,
+            file_id: 2
+        }),
+        serde_json::to_value(ModPackSource::CurseForge {
+            project_id: 1,
+            file_id: 2
+        })
+        .unwrap()["source"]
+    );
+    assert_eq!(
+        state_tag(&ProfileState::NotInstalled),
+        serde_json::to_value(ProfileState::NotInstalled).unwrap()
+    );
+}
+
+fn persistence_fixture(path: &str) -> Profile {
+    serde_json::from_value(serde_json::json!({
+        "name": "test",
+        "path": path,
+        "game_version": "1.21.1",
+        "loader": "fabric",
+    }))
+    .expect("fixture must deserialize")
+}
+
+#[test]
+fn an_ordinary_profile_is_persisted() {
+    let profile = persistence_fixture("some-profile");
+    assert!(should_persist(&profile, &HashSet::new()));
+}
+
+#[test]
+fn a_transient_profile_is_never_persisted() {
+    let profile = persistence_fixture("some-profile");
+    let transient = HashSet::from([profile.id]);
+    assert!(
+        !should_persist(&profile, &transient),
+        "a CLI temp profile lives in memory only and must never reach the database"
+    );
+}
+
+#[test]
+fn a_temp_path_profile_is_never_persisted() {
+    let profile = persistence_fixture("noriskclient/temp/whatever");
+    assert!(
+        !should_persist(&profile, &HashSet::new()),
+        "the temp path alone must keep a profile out of the database"
+    );
+}
+
+#[test]
+fn a_standard_template_without_a_source_link_is_never_persisted() {
+    let mut profile = persistence_fixture("standard");
+    profile.is_standard_version = true;
+    profile.source_standard_profile_id = None;
+    assert!(!should_persist(&profile, &HashSet::new()));
+}
+
+#[test]
+fn an_editable_copy_of_a_standard_profile_is_persisted() {
+    let mut profile = persistence_fixture("standard-copy");
+    profile.is_standard_version = true;
+    profile.source_standard_profile_id = Some(Uuid::new_v4());
+    assert!(
+        should_persist(&profile, &HashSet::new()),
+        "a user's editable copy carries their changes and must be written"
+    );
 }

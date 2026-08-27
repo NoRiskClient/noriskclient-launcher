@@ -73,6 +73,7 @@ use commands::profile_command::{
     launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
     repair_profile,
+    get_profile_store_status, reimport_profiles_from_legacy_json,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
@@ -137,7 +138,10 @@ use commands::nrc_commands::{check_update_available_command, download_and_instal
 // Import Content commands
 use commands::content_command::{
     bulk_toggle_mod_updates, install_content_to_profile, install_local_content_to_profile,
-    switch_content_version, toggle_content_from_profile, toggle_mod_updates,
+    switch_content_version, toggle_content_from_profile, toggle_contents_from_profile,
+    update_contents_from_profile,
+    uninstall_contents_from_profile,
+    toggle_mod_updates,
     uninstall_content_from_profile,
 };
 
@@ -366,7 +370,7 @@ async fn main() {
                 // --- State Initialization ---
                 info!("Initiating state initialization...");
                 if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
-                    error!("CRITICAL: Failed to initialize state: {}. Update check and main window might not proceed correctly.", e);
+                    error!("CRITICAL: Failed to initialize state: {}", e);
                     if let Some(win) = updater_window {
                         updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state init error.".to_string(), None);
                         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
@@ -374,7 +378,58 @@ async fn main() {
                             error!("Failed to close updater window after state init error: {}", close_err);
                         }
                     }
-                    return;
+                    {
+                        use tauri_plugin_dialog::{
+                            DialogExt, MessageDialogButtons, MessageDialogKind,
+                        };
+
+                        let reset = state_init_app_handle
+                            .dialog()
+                            .message(
+                                [
+                                    "The NoRisk Launcher could not start.".to_string(),
+                                    String::new(),
+                                    e.to_string(),
+                                    String::new(),
+                                    "If that does not help:".to_string(),
+                                    concat!(
+                                        "\"Reset database and restart\" keeps the old ",
+                                        "database as app.db.broken.<time> and restores ",
+                                        "your profiles from profiles.json.migrated."
+                                    )
+                                    .to_string(),
+                                    String::new(),
+                                    "Support: https://discord.norisk.gg".to_string(),
+                                ]
+                                .join("\n"),
+                            )
+                            .kind(MessageDialogKind::Error)
+                            .title("NoRisk Launcher - Startup Failed")
+                            .buttons(MessageDialogButtons::OkCancelCustom(
+                                "Reset database and restart".to_string(),
+                                "Quit".to_string(),
+                            ))
+                            .blocking_show();
+
+                        if reset {
+                            match state::db::quarantine_database().await {
+                                Ok(moved) => {
+                                    info!("Database moved aside to {:?}, restarting", moved);
+                                    state_init_app_handle.restart();
+                                }
+                                Err(err) => {
+                                    error!("Could not move the database aside: {}", err);
+                                    let _ = state_init_app_handle
+                                        .dialog()
+                                        .message(format!("{}", err))
+                                        .kind(MessageDialogKind::Error)
+                                        .title("NoRisk Launcher - Reset Failed")
+                                        .blocking_show();
+                                }
+                            }
+                        }
+                    }
+                    std::process::exit(1);
                 }
                 info!("State initialization finished successfully.");
 
@@ -543,6 +598,8 @@ async fn main() {
             list_profiles,
             list_profile_backups,
             restore_profile_backup,
+            get_profile_store_status,
+            reimport_profiles_from_legacy_json,
             search_profiles,
             get_minecraft_versions,
             launch_profile,
@@ -686,6 +743,9 @@ async fn main() {
             switch_modpack_version_command,
             uninstall_content_from_profile,
             toggle_content_from_profile,
+            toggle_contents_from_profile,
+            update_contents_from_profile,
+            uninstall_contents_from_profile,
             toggle_mod_updates,
             bulk_toggle_mod_updates,
             install_content_to_profile,

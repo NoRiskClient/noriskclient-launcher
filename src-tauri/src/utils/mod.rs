@@ -24,6 +24,7 @@ pub mod log_archive; // Archives per-session game logs centrally
 pub mod bounded_log_writer;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
+pub mod perf_utils;
 pub mod path_utils; // Deklariert das neue Modul und macht seinen Inhalt (wenn `pub`) nutzbar
 pub mod profile_utils; // Utility-Funktionen für Profilinhalte wie das Installieren von Modrinth-Content
 pub mod repair_utils; // Repair utilities for fixing profile issues

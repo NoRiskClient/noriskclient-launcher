@@ -844,12 +844,10 @@
   "server.stop": "Arrêter",
   "server.join": "Rejoindre",
   "server.mods": "Mods",
-
   "wm.public_viewing": "Public Viewing Coupe du Monde",
   "wm.tooltip": "Public viewing de la Coupe du Monde sur HugoSMP.net ! Tu as besoin de la {{version}} !",
   "wm.switch_to_main": "revenir au lancement principal",
   "wm.switch_to_hugo": "Passer à {{server}}",
-
   "radius.title": "Rayon des Bordures",
   "radius.square": "Carré",
   "radius.minimal": "Minimal",
@@ -930,7 +928,6 @@
   "content.item_not_found": "Élément non trouvé.",
   "content.badge.crashes_with_nrc": "Crash avec NRC",
   "content.update_check_error": "Erreur de Vérification de Mise à Jour: {{error}}",
-
   "content.update.available": "Mise à jour disponible",
   "content.update.ready_title": "Prêt à mettre à jour",
   "content.update.ready_desc": "Ce mod autonome peut être mis à jour automatiquement.",
@@ -1180,6 +1177,7 @@
   "content_manager.success.batch_toggled": "{{count}} élément(s) basculé(s) avec succès.",
   "content_manager.success.updated": "{{name}} mis à jour vers {{version}} avec succès !",
   "content_manager.success.updated_all": "Tous les {{count}} {{type}}(s) mis à jour avec succès.",
+  "content_manager.errors.update_all_failed": "Échec de la mise à jour : {{error}}",
   "content_manager.success.switched": "{{name}} basculé vers {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Vérifications de mise à jour activées pour {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Vérifications de mise à jour désactivées pour {{name}}.",
@@ -1187,6 +1185,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Vérifications de mise à jour désactivées pour {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Mise à jour de {{name}} vers {{version}}...",
   "content_manager.loading.updating_progress": "Mise à jour de {{current}}/{{total}} {{type}}s...",
+  "content_manager.loading.updating_bulk": "Mise à jour de {{total}} {{type}}s...",
   "content_manager.loading.switching": "Basculement vers {{version}}...",
   "content_manager.loading.enabling_update_checks": "Activation des vérifications de mise à jour pour {{name}}...",
   "content_manager.loading.disabling_update_checks": "Désactivation des vérifications de mise à jour pour {{name}}...",
@@ -1558,7 +1557,6 @@
   "placeholders.profile_name_awesome": "Mon Super Profil",
   "placeholders.group_name": "ex. modpacks, vanilla+",
   "referral.loading": "Chargement du parrainage...",
-
   "rollout.popover.title": "Tu testes la nouvelle version NRC",
   "rollout.popover.title_opted_out": "Tests désactivés",
   "rollout.popover.body_intro_before": "Tu fais partie des",
@@ -2076,7 +2074,6 @@
   "settings.ads.reset_consent.button": "Réinitialiser",
   "settings.font.title": "Police",
   "settings.font.description": "Choisissez la police utilisée dans tout le launcher",
-
   "modrinth.quick_profile.install_prefix": "Installer ",
   "modrinth.quick_profile.install_suffix": " comme nouveau profil",
   "modrinth.quick_profile.copy_prefix": "Copier un profil existant et installer ",
@@ -2087,6 +2084,9 @@
   "modrinth.quick_profile.clear_source": "Annuler la sélection du profil source",
   "modrinth.quick_profile.copy_from_existing": "Copier les paramètres d'un profil existant",
   "modrinth.quick_profile.name_label": "Nom du nouveau profil",
+  "profiles.v3.batch.enabled": "{{count}} actives",
+  "profiles.v3.batch.disabled": "{{count}} desactives",
+  "content_manager.errors.batch_partial": "{{count}} n'ont pas pu etre modifies",
   "webgl.unavailable": "L'aperçu 3D n'est pas disponible sur cet appareil.",
   "webgl.unavailable.description": "Ton appareil ne prend pas en charge la 3D, les skins et capes s'affichent donc en images plates."
 }

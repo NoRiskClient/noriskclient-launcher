@@ -222,6 +222,7 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        extra: Default::default(),
     };
 
     info!("Prepared potential profile object for '{}'", profile.name);
@@ -454,6 +455,7 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
                     modpack_origin: Some(format!("modrinth:{}", version_info.project_id)), // From modpack
                     updates_enabled: false, // Disable updates for modpack mods (updated with pack)
                     force_include_versions: Vec::new(),
+                    extra: Default::default(),
                 };
 
                 info!(
@@ -533,6 +535,7 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             modpack_origin: Some("modrinth:manifest".to_string()),
             updates_enabled: false,
             force_include_versions: Vec::new(),
+            extra: Default::default(),
         });
         from_manifest += 1;
     }

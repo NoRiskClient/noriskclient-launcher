@@ -1366,6 +1366,7 @@ pub async fn process_curseforge_pack_from_zip(pack_path: &Path) -> Result<(Profi
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        extra: Default::default(),
     };
 
     info!("Prepared potential profile object for '{}'", profile.name);
@@ -1643,6 +1644,7 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 modpack_origin: Some(format!("curseforge:{}:{}", project_id, file_id)), // From modpack
                 updates_enabled: false, // Disable updates for modpack mods (updated with pack)
                 force_include_versions: Vec::new(),
+                extra: Default::default(),
             };
 
             info!(

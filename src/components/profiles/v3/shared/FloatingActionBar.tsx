@@ -31,8 +31,10 @@ export function FloatingActionBar({
   const { t } = useTranslation();
   return (
     <div
-      className={`absolute left-1/2 -translate-x-1/2 bottom-5 z-30 transition-all duration-200 ease-out ${
-        visible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"
+      className={`absolute left-1/2 -translate-x-1/2 z-30 transition-[opacity,bottom] duration-200 ease-out ${
+        visible
+          ? "opacity-100 bottom-5 pointer-events-auto"
+          : "opacity-0 bottom-1 pointer-events-none"
       }`}
     >
       <div

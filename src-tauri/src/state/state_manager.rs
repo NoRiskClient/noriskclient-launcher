@@ -69,13 +69,16 @@ impl State {
                 let norisk_version_manager = NoriskVersionManager::new(default_norisk_versions_path())?;
                 let skin_manager = SkinManager::new(default_skins_path())?;
                 let active_skin_manager = ActiveSkinManager::new(default_active_skins_path())?;
-                let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
+                let db = crate::state::db::new_handle();
+                let profile_manager = ProfileManager::new(
+                    LAUNCHER_DIRECTORY.root_dir().join("profiles.json"),
+                    db.clone(),
+                )?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
                 log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
                 let cosmetic_pack_manager = CosmeticPackManager::new();
-                let db = crate::state::db::new_handle();
                 let content_cache = ContentCacheManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
@@ -104,7 +107,7 @@ impl State {
         ready_step("ConfigManager", initial_state_arc.config_manager.on_state_ready(app.clone())).await?;
 
         // Must run after ConfigManager: meta_dir() resolves CUSTOM_GAME_DIR_CACHE.
-        crate::state::db::open_or_reopen(&initial_state_arc.db).await;
+        crate::state::db::open_or_reopen(&initial_state_arc.db).await?;
 
         ready_step("ContentCacheManager", initial_state_arc.content_cache.on_state_ready(app.clone())).await?;
 

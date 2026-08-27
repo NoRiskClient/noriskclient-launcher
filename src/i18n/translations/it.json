@@ -844,12 +844,10 @@
   "server.stop": "Ferma",
   "server.join": "Unisciti",
   "server.mods": "Mod",
-
   "wm.public_viewing": "Public Viewing Mondiali",
   "wm.tooltip": "Public viewing dei Mondiali su HugoSMP.net! Ti serve la {{version}}!",
   "wm.switch_to_main": "torna all'avvio principale",
   "wm.switch_to_hugo": "Passa a {{server}}",
-
   "radius.title": "Raggio bordi",
   "radius.square": "Quadrato",
   "radius.minimal": "Minimo",
@@ -930,7 +928,6 @@
   "content.item_not_found": "Elemento non trovato.",
   "content.badge.crashes_with_nrc": "Crash con NRC",
   "content.update_check_error": "Errore controllo aggiornamenti: {{error}}",
-
   "content.update.available": "Aggiornamento disponibile",
   "content.update.ready_title": "Pronto per l'aggiornamento",
   "content.update.ready_desc": "Questa mod autonoma può essere aggiornata automaticamente.",
@@ -1180,6 +1177,7 @@
   "content_manager.success.batch_toggled": "{{count}} elemento/i attivato/i/disattivato/i con successo.",
   "content_manager.success.updated": "{{name}} aggiornato a {{version}} con successo!",
   "content_manager.success.updated_all": "{{count}} {{type}} aggiornato/i con successo.",
+  "content_manager.errors.update_all_failed": "Aggiornamento non riuscito: {{error}}",
   "content_manager.success.switched": "{{name}} cambiato a {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Controllo aggiornamenti abilitato per {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Controllo aggiornamenti disabilitato per {{name}}.",
@@ -1187,6 +1185,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Controllo aggiornamenti disabilitato per {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Aggiornamento {{name}} a {{version}}...",
   "content_manager.loading.updating_progress": "Aggiornamento {{current}}/{{total}} {{type}}...",
+  "content_manager.loading.updating_bulk": "Aggiornamento di {{total}} {{type}}...",
   "content_manager.loading.switching": "Cambio a {{version}}...",
   "content_manager.loading.enabling_update_checks": "Abilitazione controllo aggiornamenti per {{name}}...",
   "content_manager.loading.disabling_update_checks": "Disabilitazione controllo aggiornamenti per {{name}}...",
@@ -1558,7 +1557,6 @@
   "placeholders.profile_name_awesome": "Il mio profilo fantastico",
   "placeholders.group_name": "es. modpack, vanilla+",
   "referral.loading": "Caricamento referral...",
-
   "rollout.popover.title": "Stai testando la nuova versione NRC",
   "rollout.popover.title_opted_out": "Test disattivati",
   "rollout.popover.body_intro_before": "Sei uno dei",
@@ -2076,7 +2074,6 @@
   "settings.ads.reset_consent.button": "Reimposta",
   "settings.font.title": "Carattere",
   "settings.font.description": "Scegli il carattere utilizzato nel launcher",
-
   "modrinth.quick_profile.install_prefix": "Installa ",
   "modrinth.quick_profile.install_suffix": " come nuovo profilo",
   "modrinth.quick_profile.copy_prefix": "Copia il profilo esistente e installa ",
@@ -2087,6 +2084,9 @@
   "modrinth.quick_profile.clear_source": "Annulla la selezione del profilo di origine",
   "modrinth.quick_profile.copy_from_existing": "Copia le impostazioni da un profilo esistente",
   "modrinth.quick_profile.name_label": "Nome del nuovo profilo",
+  "profiles.v3.batch.enabled": "{{count}} attivati",
+  "profiles.v3.batch.disabled": "{{count}} disattivati",
+  "content_manager.errors.batch_partial": "{{count}} non hanno potuto essere modificati",
   "webgl.unavailable": "L'anteprima 3D non è disponibile su questo dispositivo.",
   "webgl.unavailable.description": "Il tuo dispositivo non supporta il 3D, quindi skin e mantelli vengono mostrati come immagini piatte."
 }

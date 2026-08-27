@@ -844,12 +844,10 @@
   "server.stop": "Durdur",
   "server.join": "Katıl",
   "server.mods": "Modlar",
-
   "wm.public_viewing": "Dünya Kupası Public Viewing",
   "wm.tooltip": "HugoSMP.net'te Dünya Kupası public viewing! {{version}} sürümüne ihtiyacın var!",
   "wm.switch_to_main": "ana başlatmaya dön",
   "wm.switch_to_hugo": "{{server}} sunucusuna geç",
-
   "radius.title": "Kenar Yuvarlaklığı",
   "radius.square": "Kare",
   "radius.minimal": "Minimal",
@@ -930,7 +928,6 @@
   "content.item_not_found": "Öğe bulunamadı.",
   "content.badge.crashes_with_nrc": "NRC İLE ÇÖKME",
   "content.update_check_error": "Güncelleme Kontrol Hatası: {{error}}",
-
   "content.update.available": "Güncelleme mevcut",
   "content.update.ready_title": "Güncellemeye hazır",
   "content.update.ready_desc": "Bu bağımsız mod otomatik olarak güncellenebilir.",
@@ -1180,6 +1177,7 @@
   "content_manager.success.batch_toggled": "{{count}} öğe başarıyla değiştirildi.",
   "content_manager.success.updated": "{{name}} başarıyla {{version}} sürümüne güncellendi!",
   "content_manager.success.updated_all": "Tüm {{count}} {{type}} başarıyla güncellendi.",
+  "content_manager.errors.update_all_failed": "Güncelleme başarısız: {{error}}",
   "content_manager.success.switched": "{{name}} {{version}} sürümüne değiştirildi.",
   "content_manager.success.toggle_updates_enabled": "{{name}} için güncelleme kontrolleri etkinleştirildi.",
   "content_manager.success.toggle_updates_disabled": "{{name}} için güncelleme kontrolleri devre dışı bırakıldı.",
@@ -1187,6 +1185,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "{{count}} {{itemLabel}} için güncelleme kontrolleri devre dışı bırakıldı.",
   "content_manager.loading.updating": "{{name}} {{version}} sürümüne güncelleniyor...",
   "content_manager.loading.updating_progress": "{{current}}/{{total}} {{type}} güncelleniyor...",
+  "content_manager.loading.updating_bulk": "{{total}} {{type}} güncelleniyor...",
   "content_manager.loading.switching": "{{version}} sürümüne değiştiriliyor...",
   "content_manager.loading.enabling_update_checks": "{{name}} için güncelleme kontrolleri etkinleştiriliyor...",
   "content_manager.loading.disabling_update_checks": "{{name}} için güncelleme kontrolleri devre dışı bırakılıyor...",
@@ -1558,7 +1557,6 @@
   "placeholders.profile_name_awesome": "Harika Profilim",
   "placeholders.group_name": "ör. modpack'ler, vanilla+",
   "referral.loading": "Referans yükleniyor...",
-
   "rollout.popover.title": "Yeni NRC sürümünü test ediyorsun",
   "rollout.popover.title_opted_out": "Test devre dışı",
   "rollout.popover.body_intro_before": "Sen de yeni NRC sürümünü test eden",
@@ -2076,7 +2074,6 @@
   "settings.ads.reset_consent.button": "Sıfırla",
   "settings.font.title": "Yazı Tipi",
   "settings.font.description": "Başlatıcı genelinde kullanılan yazı tipini seçin",
-
   "modrinth.quick_profile.install_prefix": "",
   "modrinth.quick_profile.install_suffix": " uygulamasını yeni profil olarak yükle",
   "modrinth.quick_profile.copy_prefix": "Mevcut profili kopyala ve ",
@@ -2087,6 +2084,9 @@
   "modrinth.quick_profile.clear_source": "Kaynak profil seçimini kaldır",
   "modrinth.quick_profile.copy_from_existing": "Mevcut profilin ayarlarını kopyala",
   "modrinth.quick_profile.name_label": "Yeni profil adı",
+  "profiles.v3.batch.enabled": "{{count}} acildi",
+  "profiles.v3.batch.disabled": "{{count}} kapatildi",
+  "content_manager.errors.batch_partial": "{{count}} degistirilemedi",
   "webgl.unavailable": "Bu cihazda 3B önizleme kullanılamıyor.",
   "webgl.unavailable.description": "Cihazın 3B desteklemiyor, bu yüzden skinler ve pelerinler düz görsel olarak gösteriliyor."
 }

@@ -169,3 +169,265 @@ async fn reopening_the_same_path_is_a_noop() {
         .get("n");
     assert_eq!(n, 1, "and the data must still be there");
 }
+
+#[tokio::test]
+async fn opening_a_file_backed_database_hands_out_a_pool() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = new_handle();
+    open_at_for_test(&handle, &dir.path().join("app.db")).await;
+
+    assert!(
+        pool_of(&handle).await.is_some(),
+        "callers must get a pool when the file opened"
+    );
+}
+
+#[tokio::test]
+async fn a_database_that_cannot_be_opened_is_an_error_not_a_ram_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    let blocked = dir.path().join("app.db");
+    std::fs::create_dir(&blocked).expect("a directory where the file should be");
+
+    let handle = new_handle();
+    let opened = open_or_reopen_at(&handle, blocked).await;
+
+    assert!(
+        opened.is_err(),
+        "an unopenable database must fail loudly instead of falling back to memory"
+    );
+    assert!(
+        pool_of(&handle).await.is_none(),
+        "a failed open must not leave a usable-looking pool behind"
+    );
+}
+
+#[tokio::test]
+async fn foreign_keys_are_on_so_cascades_actually_fire() {
+    let dir = tempfile::tempdir().unwrap();
+    let pool = open(&dir.path().join("app.db"), true).await.unwrap();
+
+    let on: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(on, 1, "ON DELETE CASCADE must not depend on a driver default");
+}
+
+#[tokio::test]
+async fn a_snapshot_is_a_readable_copy_of_the_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = new_handle();
+    open_at_for_test(&handle, &dir.path().join("app.db")).await;
+
+    let pool = pool_of(&handle).await.unwrap();
+    sqlx::query("INSERT INTO cache (id, data_type, data, expires) VALUES ('a', 'k', '1', 0)")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let snapshot = dir.path().join("snap.db");
+    vacuum_into(&handle, &snapshot).await.expect("snapshot must succeed");
+
+    let restored = open(&snapshot, true).await.unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM cache")
+        .fetch_one(&restored)
+        .await
+        .unwrap();
+
+    assert_eq!(n, 1, "the snapshot must carry the rows that were committed");
+}
+
+#[tokio::test]
+async fn a_database_that_never_opened_cannot_be_snapshotted() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = new_handle();
+
+    assert!(
+        vacuum_into(&handle, &dir.path().join("snap.db")).await.is_err(),
+        "snapshotting nothing would produce a false sense of safety"
+    );
+}
+
+#[tokio::test]
+async fn the_profile_schema_is_what_we_think() {
+    let pool = test_pool().await;
+
+    let columns = |table: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(&format!("PRAGMA table_info({})", table))
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+                .iter()
+                .map(|r| r.get::<String, _>("name"))
+                .collect::<Vec<_>>()
+        }
+    };
+
+    assert_eq!(
+        columns("profiles").await,
+        [
+            "id",
+            "name",
+            "path",
+            "game_version",
+            "loader",
+            "loader_version",
+            "created",
+            "last_played",
+            "state",
+            "selected_norisk_pack_id",
+            "source_standard_profile_id",
+            "group_name",
+            "use_shared_minecraft_folder",
+            "is_standard_version",
+            "description",
+            "preferred_account_id",
+            "playtime_seconds",
+            "settings",
+            "banner",
+            "background",
+            "norisk_information",
+            "modpack_info",
+            "extra",
+            "updated_at",
+        ]
+    );
+
+    assert!(columns("profile_mods").await.contains(&"ordinal".to_string()));
+    assert!(columns("app_meta").await.contains(&"value".to_string()));
+    assert!(columns("profiles_legacy_import")
+        .await
+        .contains(&"raw".to_string()));
+}
+
+#[tokio::test]
+async fn one_mod_id_may_belong_to_several_profiles() {
+    let pool = test_pool().await;
+
+    for profile in ["p1", "p2"] {
+        sqlx::query(
+            "INSERT INTO profiles (id, name, path, game_version, loader, created)
+             VALUES (?1, 'n', 'p', '1.21.1', 'fabric', 0)",
+        )
+        .bind(profile)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO profile_mods (profile_id, id, ordinal, source, source_type)
+             VALUES (?1, 'shared-mod', 0, '{}', 'local')",
+        )
+        .bind(profile)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profile_mods WHERE id = 'shared-mod'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 2, "the same mod id must survive under two profiles");
+}
+
+#[tokio::test]
+async fn several_profiles_may_share_a_path() {
+    let pool = test_pool().await;
+
+    for id in ["a", "b", "c"] {
+        sqlx::query(
+            "INSERT INTO profiles (id, name, path, game_version, loader, created)
+             VALUES (?1, 'n', 'noriskclient/new', '1.21.1', 'fabric', 0)",
+        )
+        .bind(id)
+        .execute(&pool)
+        .await
+        .expect("a shared path must be allowed");
+    }
+
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profiles")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 3);
+}
+
+#[tokio::test]
+async fn deleting_a_profile_takes_its_children() {
+    let pool = test_pool().await;
+    sqlx::query("PRAGMA foreign_keys = ON").execute(&pool).await.unwrap();
+
+    sqlx::query(
+        "INSERT INTO profiles (id, name, path, game_version, loader, created)
+         VALUES ('p', 'n', 'p', '1.21.1', 'fabric', 0)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO profile_mods (profile_id, id, ordinal, source, source_type)
+         VALUES ('p', 'm', 0, '{}', 'local')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO profile_disabled_norisk_mods
+             (profile_id, pack_id, mod_id, game_version, loader)
+         VALUES ('p', 'pack', 'mod', '1.21.1', 'fabric')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query("DELETE FROM profiles WHERE id = 'p'")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let mods: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profile_mods")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let disabled: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profile_disabled_norisk_mods")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(mods, 0, "orphaned mod rows would resurrect a deleted profile");
+    assert_eq!(disabled, 0);
+}
+
+#[tokio::test]
+async fn a_migration_from_another_branch_does_not_kill_the_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("app.db");
+
+    let pool = open(&path, true).await.expect("first open must work");
+    sqlx::query(
+        "INSERT INTO _sqlx_migrations
+             (version, description, installed_on, success, checksum, execution_time)
+         VALUES (9999, 'from a feature branch', CURRENT_TIMESTAMP, 1, X'00', 0)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    pool.close().await;
+
+    let reopened = open(&path, true).await;
+    assert!(
+        reopened.is_ok(),
+        "switching back from a feature branch must not leave a dead database: {:?}",
+        reopened.err()
+    );
+
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM profiles")
+        .fetch_one(&reopened.unwrap())
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "the schema must still be usable");
+}

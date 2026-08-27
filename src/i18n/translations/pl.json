@@ -844,12 +844,10 @@
   "server.stop": "Zatrzymaj",
   "server.join": "Dołącz",
   "server.mods": "Mody",
-
   "wm.public_viewing": "Strefa Kibica MŚ",
   "wm.tooltip": "Strefa kibica mistrzostw świata na HugoSMP.net! Potrzebujesz {{version}}!",
   "wm.switch_to_main": "wróć do głównego uruchamiania",
   "wm.switch_to_hugo": "Przełącz na {{server}}",
-
   "radius.title": "Promień zaokrąglenia",
   "radius.square": "Kwadratowy",
   "radius.minimal": "Minimalny",
@@ -930,7 +928,6 @@
   "content.item_not_found": "Nie znaleziono elementu.",
   "content.badge.crashes_with_nrc": "POWODUJE AWARIE Z NRC",
   "content.update_check_error": "Błąd sprawdzania aktualizacji: {{error}}",
-
   "content.update.available": "Dostępna aktualizacja",
   "content.update.ready_title": "Gotowe do aktualizacji",
   "content.update.ready_desc": "Ten samodzielny mod można zaktualizować automatycznie.",
@@ -1180,6 +1177,7 @@
   "content_manager.success.batch_toggled": "Pomyślnie przełączono {{count}} element(ów).",
   "content_manager.success.updated": "Pomyślnie zaktualizowano {{name}} do {{version}}!",
   "content_manager.success.updated_all": "Pomyślnie zaktualizowano wszystkie {{count}} {{type}}(ów).",
+  "content_manager.errors.update_all_failed": "Aktualizacja nie powiodła się: {{error}}",
   "content_manager.success.switched": "Przełączono {{name}} na {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Sprawdzanie aktualizacji włączone dla {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Sprawdzanie aktualizacji wyłączone dla {{name}}.",
@@ -1187,6 +1185,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Sprawdzanie aktualizacji wyłączone dla {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Aktualizowanie {{name}} do {{version}}...",
   "content_manager.loading.updating_progress": "Aktualizowanie {{current}}/{{total}} {{type}}ów...",
+  "content_manager.loading.updating_bulk": "Aktualizowanie {{total}} {{type}}ów...",
   "content_manager.loading.switching": "Przełączanie na {{version}}...",
   "content_manager.loading.enabling_update_checks": "Włączanie sprawdzania aktualizacji dla {{name}}...",
   "content_manager.loading.disabling_update_checks": "Wyłączanie sprawdzania aktualizacji dla {{name}}...",
@@ -1558,7 +1557,6 @@
   "placeholders.profile_name_awesome": "Mój super profil",
   "placeholders.group_name": "np. modpacki, vanilla+",
   "referral.loading": "Ładowanie polecenia...",
-
   "rollout.popover.title": "Testujesz nową wersję NRC",
   "rollout.popover.title_opted_out": "Testy wyłączone",
   "rollout.popover.body_intro_before": "Jesteś jednym z",
@@ -2074,7 +2072,6 @@
   "settings.ads.reset_consent": "Zgoda na reklamy",
   "settings.ads.reset_consent.tooltip": "Wycofaj zgodę na spersonalizowane reklamy. Okno reklamy otworzy się i ponownie wyświetli okno zgody.",
   "settings.ads.reset_consent.button": "Resetuj",
-
   "modrinth.quick_profile.install_prefix": "Zainstaluj ",
   "modrinth.quick_profile.install_suffix": " jako nowy profil",
   "modrinth.quick_profile.copy_prefix": "Skopiuj istniejący profil i zainstaluj ",
@@ -2085,6 +2082,9 @@
   "modrinth.quick_profile.clear_source": "Usuń wybór profilu źródłowego",
   "modrinth.quick_profile.copy_from_existing": "Skopiuj ustawienia z istniejącego profilu",
   "modrinth.quick_profile.name_label": "Nazwa nowego profilu",
+  "profiles.v3.batch.enabled": "{{count}} wlaczonych",
+  "profiles.v3.batch.disabled": "{{count}} wylaczonych",
+  "content_manager.errors.batch_partial": "{{count}} nie udalo sie zmienic",
   "webgl.unavailable": "Podgląd 3D nie jest dostępny na tym urządzeniu.",
   "webgl.unavailable.description": "Twoje urządzenie nie obsługuje 3D, więc skiny i peleryny są pokazywane jako płaskie obrazy."
 }
