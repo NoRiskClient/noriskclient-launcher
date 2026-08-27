@@ -69,6 +69,7 @@ pub async fn repair_profile_libraries(profile_id: Uuid) -> Result<()> {
     let piston_meta = api_service.get_piston_meta(&version.url).await?;
 
     let libraries_service = MinecraftLibrariesDownloadService::new()
+        .with_verify_hashes(true)
         .with_concurrent_downloads(launcher_config.concurrent_downloads);
     libraries_service
         .download_libraries(&piston_meta.libraries)

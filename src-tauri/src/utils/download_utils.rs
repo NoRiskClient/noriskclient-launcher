@@ -34,6 +34,7 @@ pub struct DownloadConfig {
     pub check_disk_space: bool,
     /// Buffer percentage for disk space check (default: 0.25 = 25%)
     pub disk_space_buffer: f64,
+    pub hash_existing_files: bool,
     pub stats: Option<Arc<DownloadStats>>,
 }
 
@@ -50,6 +51,7 @@ impl std::fmt::Debug for DownloadConfig {
             .field("progress_callback", &"<callback function>")
             .field("check_disk_space", &self.check_disk_space)
             .field("disk_space_buffer", &self.disk_space_buffer)
+            .field("hash_existing_files", &self.hash_existing_files)
             .field("stats", &self.stats.is_some())
             .finish()
     }
@@ -70,6 +72,7 @@ impl Clone for DownloadConfig {
             progress_callback: None,
             check_disk_space: self.check_disk_space,
             disk_space_buffer: self.disk_space_buffer,
+            hash_existing_files: self.hash_existing_files,
             stats: self.stats.clone(),
         }
     }
@@ -88,6 +91,7 @@ impl Default for DownloadConfig {
             progress_callback: None,
             check_disk_space: true,
             disk_space_buffer: 0.25, // 25% buffer by default
+            hash_existing_files: true,
             stats: None,
         }
     }
@@ -148,6 +152,11 @@ impl DownloadConfig {
 
     pub fn with_disk_space_buffer(mut self, buffer_percentage: f64) -> Self {
         self.disk_space_buffer = buffer_percentage;
+        self
+    }
+
+    pub fn with_hash_existing_files(mut self, hash_existing: bool) -> Self {
+        self.hash_existing_files = hash_existing;
         self
     }
 
@@ -520,7 +529,7 @@ impl DownloadUtils {
         }
 
         // Check SHA1 hash (slower - reads entire file)
-        if let Some(expected_sha1) = &config.expected_sha1 {
+        if let Some(expected_sha1) = config.expected_sha1.as_ref().filter(|_| config.hash_existing_files) {
             let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
             if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
                 debug!(
@@ -532,7 +541,7 @@ impl DownloadUtils {
         }
 
         // Check SHA256 hash (slowest - reads entire file)
-        if let Some(expected_sha256) = &config.expected_sha256 {
+        if let Some(expected_sha256) = config.expected_sha256.as_ref().filter(|_| config.hash_existing_files) {
             let calculated_hash = hash_utils::calculate_sha256_from_file(target_path).await?;
             if !calculated_hash.eq_ignore_ascii_case(expected_sha256) {
                 debug!(
