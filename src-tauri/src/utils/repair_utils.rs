@@ -1,5 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::minecraft::api::mc_api::MinecraftApiService;
+use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
 use crate::state::state_manager::State;
@@ -75,6 +76,12 @@ pub async fn repair_profile_libraries(profile_id: Uuid) -> Result<()> {
         .download_libraries(&piston_meta.libraries)
         .await?;
     debug!("Libraries verified for version {}", version_id);
+
+    let client_service = MinecraftClientDownloadService::new().with_verify_hashes(true);
+    client_service
+        .download_client(&piston_meta.downloads.client, &piston_meta.id)
+        .await?;
+    debug!("Client jar verified for version {}", version_id);
 
     let natives_service = MinecraftNativesDownloadService::new();
     natives_service
