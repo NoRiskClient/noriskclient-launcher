@@ -2086,5 +2086,7 @@
   "modrinth.quick_profile.selected_profile": "profil sélectionné",
   "modrinth.quick_profile.clear_source": "Annuler la sélection du profil source",
   "modrinth.quick_profile.copy_from_existing": "Copier les paramètres d'un profil existant",
-  "modrinth.quick_profile.name_label": "Nom du nouveau profil"
+  "modrinth.quick_profile.name_label": "Nom du nouveau profil",
+  "webgl.unavailable": "L'aperçu 3D n'est pas disponible sur cet appareil.",
+  "webgl.unavailable.description": "Ton appareil ne prend pas en charge la 3D, les skins et capes s'affichent donc en images plates."
 }

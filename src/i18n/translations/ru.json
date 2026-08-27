@@ -2086,5 +2086,7 @@
   "modrinth.quick_profile.selected_profile": "выбранного профиля",
   "modrinth.quick_profile.clear_source": "Сбросить выбор исходного профиля",
   "modrinth.quick_profile.copy_from_existing": "Скопировать настройки существующего профиля",
-  "modrinth.quick_profile.name_label": "Имя нового профиля"
+  "modrinth.quick_profile.name_label": "Имя нового профиля",
+  "webgl.unavailable": "3D-предпросмотр недоступен на этом устройстве.",
+  "webgl.unavailable.description": "Ваше устройство не поддерживает 3D, поэтому скины и плащи показываются плоскими изображениями."
 }

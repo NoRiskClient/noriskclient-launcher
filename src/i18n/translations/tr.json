@@ -2086,5 +2086,7 @@
   "modrinth.quick_profile.selected_profile": "seçili profil",
   "modrinth.quick_profile.clear_source": "Kaynak profil seçimini kaldır",
   "modrinth.quick_profile.copy_from_existing": "Mevcut profilin ayarlarını kopyala",
-  "modrinth.quick_profile.name_label": "Yeni profil adı"
+  "modrinth.quick_profile.name_label": "Yeni profil adı",
+  "webgl.unavailable": "Bu cihazda 3B önizleme kullanılamıyor.",
+  "webgl.unavailable.description": "Cihazın 3B desteklemiyor, bu yüzden skinler ve pelerinler düz görsel olarak gösteriliyor."
 }

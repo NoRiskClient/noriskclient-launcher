@@ -2086,5 +2086,7 @@
   "modrinth.quick_profile.selected_profile": "profilo selezionato",
   "modrinth.quick_profile.clear_source": "Annulla la selezione del profilo di origine",
   "modrinth.quick_profile.copy_from_existing": "Copia le impostazioni da un profilo esistente",
-  "modrinth.quick_profile.name_label": "Nome del nuovo profilo"
+  "modrinth.quick_profile.name_label": "Nome del nuovo profilo",
+  "webgl.unavailable": "L'anteprima 3D non è disponibile su questo dispositivo.",
+  "webgl.unavailable.description": "Il tuo dispositivo non supporta il 3D, quindi skin e mantelli vengono mostrati come immagini piatte."
 }

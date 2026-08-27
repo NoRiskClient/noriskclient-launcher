@@ -2086,5 +2086,7 @@
   "modrinth.quick_profile.selected_profile": "perfil selecionado",
   "modrinth.quick_profile.clear_source": "Remover a seleção do perfil de origem",
   "modrinth.quick_profile.copy_from_existing": "Copiar definições de um perfil existente",
-  "modrinth.quick_profile.name_label": "Nome do novo perfil"
+  "modrinth.quick_profile.name_label": "Nome do novo perfil",
+  "webgl.unavailable": "A pré-visualização 3D não está disponível neste dispositivo.",
+  "webgl.unavailable.description": "O teu dispositivo não suporta 3D, por isso as skins e capas são mostradas como imagens planas."
 }

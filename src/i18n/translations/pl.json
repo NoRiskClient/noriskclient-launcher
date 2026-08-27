@@ -2084,5 +2084,7 @@
   "modrinth.quick_profile.selected_profile": "wybranego profilu",
   "modrinth.quick_profile.clear_source": "Usuń wybór profilu źródłowego",
   "modrinth.quick_profile.copy_from_existing": "Skopiuj ustawienia z istniejącego profilu",
-  "modrinth.quick_profile.name_label": "Nazwa nowego profilu"
+  "modrinth.quick_profile.name_label": "Nazwa nowego profilu",
+  "webgl.unavailable": "Podgląd 3D nie jest dostępny na tym urządzeniu.",
+  "webgl.unavailable.description": "Twoje urządzenie nie obsługuje 3D, więc skiny i peleryny są pokazywane jako płaskie obrazy."
 }

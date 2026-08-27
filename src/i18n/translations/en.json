@@ -2270,5 +2270,7 @@
   "modrinth.quick_profile.selected_profile": "selected profile",
   "modrinth.quick_profile.clear_source": "Clear source profile selection",
   "modrinth.quick_profile.copy_from_existing": "Copy settings from existing profile",
-  "modrinth.quick_profile.name_label": "New profile name"
+  "modrinth.quick_profile.name_label": "New profile name",
+  "webgl.unavailable": "3D preview is not available on this device.",
+  "webgl.unavailable.description": "Your device has no working 3D support, so skins and capes are shown as flat images."
 }
