@@ -1158,6 +1158,7 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
     export_profile.settings.quick_play_path = None;
     export_profile.preferred_account_id = None;
     export_profile.playtime_seconds = 0;
+    export_profile.sync_pack_ids = Vec::new();
 
     // Keep other essential data
     export_profile

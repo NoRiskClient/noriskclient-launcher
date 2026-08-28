@@ -356,6 +356,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     exported_profile.created = Utc::now();
     exported_profile.last_played = None;
     exported_profile.state = ProfileState::NotInstalled;
+    exported_profile.sync_pack_ids = Vec::new();
 
     info!("Prepared new profile with path: {}", exported_profile.path);
 
