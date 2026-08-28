@@ -334,6 +334,7 @@ export function SyncPacksPage() {
       {presetPrompt && (
         <AddPresetSourceModal
           preset={presetPrompt.preset}
+          currentProfileId={controller.profile?.id ?? null}
           onClose={() => setPresetPrompt(null)}
           onConfirm={(source) =>
             addPreset(presetPrompt.packId, presetPrompt.preset, source)

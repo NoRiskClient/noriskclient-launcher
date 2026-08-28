@@ -415,6 +415,52 @@ export function useSyncPacks() {
     [confirm, load, t],
   );
 
+  const renamePack = useCallback(
+    async (packId: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        toast.error(t("syncPacks.nameRequired"));
+        return false;
+      }
+      try {
+        await SyncPackService.updateSyncPack({ pack_id: packId, name: trimmed });
+        await refresh();
+        return true;
+      } catch (err) {
+        toast.error(
+          t("syncPacks.renameError", { error: parseErrorMessage(err) }),
+        );
+        return false;
+      }
+    },
+    [refresh, t],
+  );
+
+  const setPackIcon = useCallback(
+    async (packId: string, chosen: { url: string } | { path: string } | null) => {
+      try {
+        if (chosen === null) {
+          await SyncPackService.updateSyncPack({
+            pack_id: packId,
+            clear_icon: true,
+          });
+        } else {
+          const icon =
+            "url" in chosen
+              ? chosen.url
+              : await SyncPackService.importSyncPackIcon(packId, chosen.path);
+          await SyncPackService.updateSyncPack({ pack_id: packId, icon });
+        }
+        await refresh();
+      } catch (err) {
+        toast.error(
+          t("syncPacks.iconError", { error: parseErrorMessage(err) }),
+        );
+      }
+    },
+    [refresh, t],
+  );
+
   const openFolder = useCallback(
     async (packId: string, targetPath?: string) => {
       try {
@@ -586,6 +632,8 @@ export function useSyncPacks() {
     togglePack,
     deletePack,
     openFolder,
+    renamePack,
+    setPackIcon,
     removeTarget,
     removeMod,
     removeJar,

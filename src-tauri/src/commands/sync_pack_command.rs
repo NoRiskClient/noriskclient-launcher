@@ -14,6 +14,7 @@ use crate::sync::report::{SyncConflict, SyncPreviewEntry, SyncReport};
 use crate::sync::resolution::{self, SyncPackModMatrix, SyncPackModMatrixRow};
 use crate::sync::{paths, shortcuts, subscribers};
 use crate::utils::{import_safety, trash_utils};
+use chrono::Utc;
 use log::{info, warn};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -101,6 +102,62 @@ pub async fn update_sync_pack(params: UpdateSyncPackParams) -> Result<SyncPack, 
             params.sort_order,
         )
         .await?)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSyncPackIconParams {
+    pub pack_id: Uuid,
+    pub path: String,
+}
+
+#[tauri::command]
+pub async fn import_sync_pack_icon(
+    params: ImportSyncPackIconParams,
+) -> Result<String, CommandError> {
+    let source = std::path::PathBuf::from(&params.path);
+    if !source.is_file() {
+        return Err(AppError::Other(format!("'{}' is not a file", params.path)).into());
+    }
+
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .filter(|value| {
+            matches!(value.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp")
+        })
+        .ok_or_else(|| {
+            AppError::Other(format!("'{}' is not a supported image", params.path))
+        })?;
+
+    let state = State::get().await?;
+    state.sync_pack_manager.require_pack(params.pack_id).await?;
+
+    let dir = paths::pack_dir(params.pack_id);
+    tokio::fs::create_dir_all(&dir).await.map_err(AppError::Io)?;
+
+    let file_name = format!("icon-{}.{}", Utc::now().timestamp_millis(), extension);
+    let destination = dir.join(&file_name);
+    tokio::fs::copy(&source, &destination)
+        .await
+        .map_err(AppError::Io)?;
+
+    if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("icon-") && name != file_name {
+                let _ = tokio::fs::remove_file(entry.path()).await;
+            }
+        }
+    }
+
+    info!(
+        "Imported icon for sync pack {} from {}",
+        params.pack_id, params.path
+    );
+    Ok(destination.to_string_lossy().to_string())
 }
 
 #[derive(Debug, Deserialize)]

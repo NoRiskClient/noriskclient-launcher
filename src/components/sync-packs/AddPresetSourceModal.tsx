@@ -31,6 +31,7 @@ interface DragDropPayload {
 
 export interface AddPresetSourceModalProps {
   preset: SyncTargetPreset;
+  currentProfileId?: string | null;
   onClose: () => void;
   onConfirm: (source: {
     seedFrom?: string | null;
@@ -40,6 +41,7 @@ export interface AddPresetSourceModalProps {
 
 export function AddPresetSourceModal({
   preset,
+  currentProfileId,
   onClose,
   onConfirm,
 }: AddPresetSourceModalProps) {
@@ -117,13 +119,24 @@ export function AddPresetSourceModal({
   const isFolder = preset.kindType === "dir_link";
 
   const needle = query.trim().toLowerCase();
-  const visible = needle
+  const matching = needle
     ? candidates.filter(
         (candidate) =>
           candidate.profile_name.toLowerCase().includes(needle) ||
           candidate.path.toLowerCase().includes(needle),
       )
     : candidates;
+
+  const currentIndex = currentProfileId
+    ? matching.findIndex(
+        (candidate) => candidate.profile_id === currentProfileId,
+      )
+    : -1;
+
+  const visible =
+    currentIndex > 0
+      ? [matching[currentIndex], ...matching.filter((_, i) => i !== currentIndex)]
+      : matching;
 
   const handlePick = useCallback(async () => {
     const selection = await openDialog({ directory: isFolder, multiple: false });
@@ -226,8 +239,22 @@ export function AddPresetSourceModal({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-minecraft text-base text-white/90">
-                        {candidate.profile_name}
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-minecraft text-base text-white/90">
+                          {candidate.profile_name}
+                        </span>
+                        {candidate.profile_id === currentProfileId && (
+                          <span
+                            style={{
+                              color: accentColor.value,
+                              borderColor: `${accentColor.value}59`,
+                              backgroundColor: `${accentColor.value}1a`,
+                            }}
+                            className="flex-shrink-0 rounded border px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider"
+                          >
+                            {t("syncPacks.seed.currentProfile")}
+                          </span>
+                        )}
                       </div>
                       <Tooltip
                         content={candidate.path}

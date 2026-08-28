@@ -39,6 +39,15 @@ export async function updateSyncPack(
   return invoke<SyncPack>("update_sync_pack", { params });
 }
 
+export async function importSyncPackIcon(
+  packId: string,
+  path: string,
+): Promise<string> {
+  return invoke<string>("import_sync_pack_icon", {
+    params: { packId, path },
+  });
+}
+
 export async function deleteSyncPack(
   packId: string,
   detachMode: DetachMode,

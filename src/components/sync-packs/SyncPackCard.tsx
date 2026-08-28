@@ -12,6 +12,9 @@ import { RowAction, SyncPackRow, prettyPath, selectionKey, targetIcon } from "./
 import { SyncPackModRow } from "./SyncPackModRow";
 import { SyncPackDropZone } from "./SyncPackDropZone";
 import type { SyncPacksController } from "./useSyncPacks";
+import { SyncPackIcon } from "./SyncPackIcon";
+import { IconPicker } from "../profiles/IconPicker";
+import { useGlobalModal } from "../../hooks/useGlobalModal";
 import {
   ThemedDropdown,
   ThemedDropdownDivider,
@@ -53,6 +56,8 @@ export function SyncPackCard({
     togglePack,
     deletePack,
     openFolder,
+    renamePack,
+    setPackIcon,
     removeTarget,
     removeMod,
     removeJar,
@@ -64,7 +69,27 @@ export function SyncPackCard({
   const inUse = subscribedIds.has(pack.id);
   const isOpen = expandedPack === pack.id;
   const menuRef = useRef<HTMLButtonElement | null>(null);
+  const { showModal, hideModal } = useGlobalModal();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState(pack.name);
+  const editingRef = useRef(false);
+
+  const startRename = () => {
+    setDraftName(pack.name);
+    editingRef.current = true;
+    setRenaming(true);
+  };
+
+  const finishRename = (save: boolean) => {
+    if (!editingRef.current) return;
+    editingRef.current = false;
+    setRenaming(false);
+
+    const next = draftName.trim();
+    if (!save || !next || next === pack.name) return;
+    void renamePack(pack.id, next);
+  };
   const jars = localJars[pack.id] ?? [];
   const packMatrix = matrix[pack.id] ?? [];
   const isEmpty =
@@ -90,7 +115,45 @@ export function SyncPackCard({
         onClick={() => setExpandedPack(isOpen ? null : pack.id)}
         className="group/head flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]"
       >
+        <Tooltip
+          content={t("syncPacks.changeIcon")}
+          position="top"
+          wrapperClassName="flex-shrink-0"
+        >
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              const modalId = `sync-pack-icon-${pack.id}`;
+              showModal(
+                modalId,
+                <IconPicker
+                  onClose={() => hideModal(modalId)}
+                  onSelect={(chosen) => void setPackIcon(pack.id, chosen)}
+                />,
+              );
+            }}
+            className="transition-transform hover:scale-105"
+          >
+            <SyncPackIcon packId={pack.id} icon={pack.icon} />
+          </button>
+        </Tooltip>
+
         <div className="min-w-0 flex-1">
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setDraftName(event.target.value)}
+              onBlur={() => finishRename(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") finishRename(true);
+                if (event.key === "Escape") finishRename(false);
+              }}
+              className="w-full bg-transparent font-minecraft text-lg normal-case text-white outline-none placeholder:text-white/25"
+              style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
+            />
+          ) : (
           <Tooltip
             content={pack.name}
             position="top"
@@ -103,6 +166,7 @@ export function SyncPackCard({
               {pack.name}
             </h3>
           </Tooltip>
+          )}
           <div className="truncate font-minecraft text-xs text-white/45">
             {isEmpty ? t("syncPacks.targets.empty") : summary}
           </div>
@@ -145,6 +209,15 @@ export function SyncPackCard({
             width="w-52"
             triggerRef={menuRef}
           >
+            <ThemedDropdownItem
+              icon="solar:pen-linear"
+              onClick={() => {
+                setMenuOpen(false);
+                startRename();
+              }}
+            >
+              {t("syncPacks.rename")}
+            </ThemedDropdownItem>
             <ThemedDropdownItem
               icon="solar:folder-linear"
               onClick={() => {
