@@ -61,7 +61,7 @@ export function SyncPackVersionRow({
 
   const marker: Record<Mode, { icon: string; color: string; tip: string }> = {
     latest: {
-      icon: "solar:double-alt-arrow-up-bold",
+      icon: "solar:refresh-circle-linear",
       color: "rgba(255,255,255,0.4)",
       tip: t("syncPacks.entries.modeLatestTip"),
     },

@@ -59,9 +59,7 @@ export function SyncPackDropZone({
             <Tooltip
               key={preset.path}
               content={
-                preset.warn
-                  ? t("syncPacks.targets.savesWarning")
-                  : t(`syncPacks.kinds.${preset.kindType}`)
+                <span className="block max-w-[260px]">{t(preset.hint)}</span>
               }
               position="top"
             >

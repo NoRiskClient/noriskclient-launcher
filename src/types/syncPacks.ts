@@ -236,19 +236,19 @@ export interface SyncTargetPreset {
   path: string;
   kindType: SyncTargetKindType;
   icon: string;
-  warn?: boolean;
+  hint: string;
 }
 
 export const SYNC_TARGET_PRESETS: SyncTargetPreset[] = [
-  { path: "saves", kindType: "dir_link", icon: "solar:planet-bold", warn: true },
-  { path: "config", kindType: "dir_link", icon: "solar:settings-bold" },
-  { path: "screenshots", kindType: "dir_link", icon: "solar:camera-bold" },
-  { path: "shaderpacks", kindType: "dir_link", icon: "solar:sun-bold" },
-  { path: "resourcepacks", kindType: "dir_link", icon: "solar:gallery-bold" },
-  { path: "replay_recordings", kindType: "dir_link", icon: "solar:videocamera-bold" },
-  { path: "options.txt", kindType: "file_merge", icon: "solar:tuning-bold" },
-  { path: "optionsof.txt", kindType: "file_copy", icon: "solar:document-bold" },
-  { path: "servers.dat", kindType: "file_copy", icon: "solar:server-bold" },
-  { path: "command_history.txt", kindType: "file_copy", icon: "solar:command-bold" },
-  { path: "mods", kindType: "mods", icon: "solar:box-bold" },
+  { path: "saves", kindType: "dir_link", icon: "solar:planet-bold", hint: "syncPacks.presets.saves" },
+  { path: "config", kindType: "dir_link", icon: "solar:settings-bold", hint: "syncPacks.presets.config" },
+  { path: "NoRiskClient", kindType: "dir_link", icon: "solar:shield-star-bold", hint: "syncPacks.presets.noriskclient" },
+  { path: "screenshots", kindType: "dir_link", icon: "solar:camera-bold", hint: "syncPacks.presets.screenshots" },
+  { path: "shaderpacks", kindType: "dir_link", icon: "solar:sun-bold", hint: "syncPacks.presets.shaderpacks" },
+  { path: "resourcepacks", kindType: "dir_link", icon: "solar:gallery-bold", hint: "syncPacks.presets.resourcepacks" },
+  { path: "options.txt", kindType: "file_merge", icon: "solar:tuning-bold", hint: "syncPacks.presets.optionsTxt" },
+  { path: "optionsof.txt", kindType: "file_copy", icon: "solar:document-bold", hint: "syncPacks.presets.optionsofTxt" },
+  { path: "servers.dat", kindType: "file_copy", icon: "solar:server-bold", hint: "syncPacks.presets.serversDat" },
+  { path: "command_history.txt", kindType: "file_copy", icon: "solar:command-bold", hint: "syncPacks.presets.commandHistory" },
+  { path: "mods", kindType: "mods", icon: "solar:box-bold", hint: "syncPacks.presets.mods" },
 ];
