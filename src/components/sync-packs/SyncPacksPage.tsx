@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
@@ -15,6 +17,10 @@ import { AddPresetSourceModal } from "./AddPresetSourceModal";
 import { AdoptPreviewModal } from "./AdoptPreviewModal";
 import { DetachModeModal } from "./DetachModeModal";
 import { SyncPackCard } from "./SyncPackCard";
+import { parseSelectionKey, selectionKey } from "./SyncPackRow";
+import * as SyncPackService from "../../services/sync-pack-service";
+import type { SyncPackEntryRef } from "../../services/sync-pack-service";
+import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
 import { useSyncPacks } from "./useSyncPacks";
 
 preloadIcons([
@@ -85,6 +91,117 @@ export function SyncPacksPage() {
     closeDraft();
   };
 
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+
+  const toggleSelect = useCallback((key: string) => {
+    setSelection((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }, []);
+
+  const selectableKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const pack of controller.packs) {
+      for (const target of pack.targets)
+        keys.push(selectionKey(pack.id, "target", target.path));
+      for (const entry of pack.mods)
+        keys.push(selectionKey(pack.id, "mod", entry.id));
+      for (const jar of controller.localJars[pack.id] ?? [])
+        keys.push(selectionKey(pack.id, "jar", jar));
+    }
+    return keys;
+  }, [controller.packs, controller.localJars]);
+
+  useEffect(() => {
+    setSelection((current) => {
+      if (current.size === 0) return current;
+      const valid = new Set(selectableKeys);
+      const next = new Set(
+        Array.from(current).filter((key) => valid.has(key)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [selectableKeys]);
+
+  const selectedRefs = useCallback((): SyncPackEntryRef[] => {
+    return Array.from(selection).flatMap((key): SyncPackEntryRef[] => {
+      const { packId, kind, id } = parseSelectionKey(key);
+      const pack = controller.packs.find((candidate) => candidate.id === packId);
+      if (!pack) return [];
+      if (kind === "target") {
+        const target = pack.targets.find((candidate) => candidate.path === id);
+        return target ? [{ packId, kind, id: target.id }] : [];
+      }
+      return [{ packId, kind, id }];
+    });
+  }, [selection, controller.packs]);
+
+  const removeSelected = useCallback(async () => {
+    const refs = selectedRefs();
+    if (refs.length === 0) return;
+
+    const confirmed = await controller.confirm({
+      title: t("syncPacks.selection.removeTitle"),
+      message: t("syncPacks.selection.removeConfirm", { count: refs.length }),
+      confirmText: t("syncPacks.targets.remove"),
+      cancelText: t("common.cancel"),
+      type: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      await SyncPackService.removeSyncPackEntries(refs);
+    } catch (err) {
+      toast.error(parseErrorMessage(err));
+      await controller.refresh();
+      return;
+    }
+    setSelection(new Set());
+    await controller.refresh();
+  }, [selectedRefs, controller, t]);
+
+  const setSelectedModsEnabled = useCallback(
+    async (enabled: boolean) => {
+      const refs = selectedRefs().filter((ref) => ref.kind === "mod");
+      if (refs.length === 0) return;
+      try {
+        await SyncPackService.setSyncPackModsEnabled(refs, enabled);
+      } catch (err) {
+        toast.error(parseErrorMessage(err));
+        await controller.refresh();
+        return;
+      }
+      setSelection(new Set());
+      await controller.refresh();
+    },
+    [selectedRefs, controller],
+  );
+
+  const modsSelected = selectedRefs().some((ref) => ref.kind === "mod");
+
+  const fabActions: FABActionConfig[] = [
+    {
+      icon: "solar:check-circle-bold",
+      label: t("syncPacks.selection.enable"),
+      onClick: () => void setSelectedModsEnabled(true),
+      disabled: !modsSelected,
+    },
+    {
+      icon: "solar:close-circle-bold",
+      label: t("syncPacks.selection.disable"),
+      onClick: () => void setSelectedModsEnabled(false),
+      disabled: !modsSelected,
+    },
+    {
+      icon: "solar:trash-bin-trash-bold",
+      label: t("syncPacks.targets.remove"),
+      onClick: () => void removeSelected(),
+      tone: "danger",
+    },
+  ];
+
   return (
     <div className="h-full flex flex-col overflow-hidden relative select-none">
       <div className="flex items-center justify-between px-5 h-11 border-b border-white/5 flex-shrink-0">
@@ -143,6 +260,8 @@ export function SyncPacksPage() {
             <SyncPackCard
               key={pack.id}
               pack={pack}
+              selection={selection}
+              onToggleSelect={toggleSelect}
               controller={controller}
               iconFor={iconFor}
             />
@@ -252,6 +371,17 @@ export function SyncPacksPage() {
       )}
 
       {confirmDialog}
+      <FloatingActionBar
+        visible={selection.size > 0}
+        count={selection.size}
+        totalCount={selectableKeys.length}
+        accent={accentColor.value}
+        allSelected={selection.size > 0 && selection.size === selectableKeys.length}
+        onSelectAll={() => setSelection(new Set(selectableKeys))}
+        onClear={() => setSelection(new Set())}
+        actions={fabActions}
+      />
+
     </div>
   );
 }

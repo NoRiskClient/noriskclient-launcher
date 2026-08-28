@@ -9,6 +9,7 @@ import { ModPlatform } from "../../types/unified";
 import type { UnifiedVersion } from "../../types/unified";
 import { loaderIconSrc, loaderLabel } from "../../lib/loader-icons";
 import { Tooltip } from "../ui/Tooltip";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { VersionSelectDropdown } from "../profiles/v3/shared/VersionSelectDropdown";
 import type { SyncPackModMatrixRow, VersionOverride } from "../../types/syncPacks";
 
@@ -60,7 +61,7 @@ export function SyncPackVersionRow({
 
   const marker: Record<Mode, { icon: string; color: string; tip: string }> = {
     latest: {
-      icon: "solar:refresh-circle-linear",
+      icon: "solar:double-alt-arrow-up-bold",
       color: "rgba(255,255,255,0.4)",
       tip: t("syncPacks.entries.modeLatestTip"),
     },
@@ -86,7 +87,7 @@ export function SyncPackVersionRow({
 
   return (
     <div className="group/version flex items-center gap-3 rounded border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-      <span className="w-[92px] flex-shrink-0 truncate font-mono text-[11px] text-white/70">
+      <span className="w-[92px] flex-shrink-0 truncate font-minecraft text-xs text-white/70">
         {row.mc_version}
       </span>
       <Tooltip content={loaderLabel(row.loader)} position="top">
@@ -122,7 +123,7 @@ export function SyncPackVersionRow({
             if (canSwitch) onOpenDropdown();
           }}
           disabled={!canSwitch}
-          className={`inline-flex h-5 max-w-full items-center gap-1 truncate rounded px-1.5 font-mono text-[11px] transition-colors ${
+          className={`inline-flex h-5 max-w-full items-center gap-1 truncate rounded px-1.5 font-minecraft text-xs transition-colors ${
             canSwitch ? "cursor-pointer hover:bg-white/5" : "cursor-default"
           }`}
           style={{
@@ -176,18 +177,13 @@ export function SyncPackVersionRow({
         position="top"
         wrapperClassName="flex-shrink-0"
       >
-        <button
-          onClick={() => (mode === "off" ? onEnable() : onDisable())}
-          className={`px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider transition-colors ${
-            mode === "off"
-              ? "text-white/45 hover:text-white"
-              : "text-white/0 group-hover/version:text-white/35 hover:!text-red-400"
-          }`}
-        >
-          {mode === "off"
-            ? t("syncPacks.entries.enable")
-            : t("syncPacks.entries.disable")}
-        </button>
+        <div className="flex-shrink-0">
+          <ToggleSwitch
+            checked={mode !== "off"}
+            onChange={(next) => (next ? onEnable() : onDisable())}
+            size="sm"
+          />
+        </div>
       </Tooltip>
     </div>
   );

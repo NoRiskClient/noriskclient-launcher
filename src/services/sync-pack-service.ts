@@ -220,3 +220,29 @@ export async function addDroppedSyncTarget(
     sourcePath,
   });
 }
+
+export type SyncPackEntryKind = "target" | "mod" | "jar";
+
+export interface SyncPackEntryRef {
+  packId: string;
+  kind: SyncPackEntryKind;
+  id: string;
+}
+
+export interface SyncPackBatchResult {
+  removed: number;
+  failed: number;
+}
+
+export async function removeSyncPackEntries(
+  entries: SyncPackEntryRef[],
+): Promise<SyncPackBatchResult> {
+  return invoke<SyncPackBatchResult>("remove_sync_pack_entries", { entries });
+}
+
+export async function setSyncPackModsEnabled(
+  entries: SyncPackEntryRef[],
+  enabled: boolean,
+): Promise<number> {
+  return invoke<number>("set_sync_pack_mods_enabled", { entries, enabled });
+}

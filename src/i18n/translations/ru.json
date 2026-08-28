@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} выключено",
   "content_manager.errors.batch_partial": "{{count}} не удалось изменить",
   "webgl.unavailable": "3D-предпросмотр недоступен на этом устройстве.",
-  "webgl.unavailable.description": "Ваше устройство не поддерживает 3D, поэтому скины и плащи показываются плоскими изображениями."
+  "webgl.unavailable.description": "Ваше устройство не поддерживает 3D, поэтому скины и плащи показываются плоскими изображениями.",
+  "syncPacks.selection.enable": "Включить",
+  "syncPacks.selection.disable": "Выключить",
+  "syncPacks.selection.removeTitle": "Удалить выбранное",
+  "syncPacks.selection.removeConfirm": "Удалить {{count}} записей из этого sync pack? Ваши файлы останутся на диске."
 }

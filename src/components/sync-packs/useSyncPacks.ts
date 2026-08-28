@@ -429,32 +429,63 @@ export function useSyncPacks() {
   );
 
   const removeTarget = useCallback(
-    (packId: string, target: SyncTarget) =>
-      run(async () => {
+    async (packId: string, target: SyncTarget) => {
+      const confirmed = await confirm({
+        title: t("syncPacks.targets.removeTitle"),
+        message: t("syncPacks.targets.removeConfirm", { path: target.path }),
+        confirmText: t("syncPacks.targets.remove"),
+        cancelText: t("common.cancel"),
+        type: "danger",
+      });
+      if (!confirmed) return;
+
+      await run(async () => {
         await SyncPackService.removeSyncPackTarget(packId, target.id);
         toast.success(
           t("syncPacks.targets.removeSuccess", { path: target.path }),
         );
-      }, "syncPacks.targets.removeError"),
-    [run, t],
+      }, "syncPacks.targets.removeError");
+    },
+    [confirm, run, t],
   );
 
   const removeMod = useCallback(
-    (packId: string, entry: SyncPackModEntry) =>
-      run(
-        () => SyncPackService.removeModFromSyncPack(packId, entry.id),
-        "syncPacks.targets.removeError",
-      ),
-    [run],
+    async (packId: string, entry: SyncPackModEntry) => {
+      const name = entry.display_name;
+      const confirmed = await confirm({
+        title: t("syncPacks.mods.removeTitle"),
+        message: t("syncPacks.mods.removeConfirm", { name }),
+        confirmText: t("syncPacks.mods.remove"),
+        cancelText: t("common.cancel"),
+        type: "danger",
+      });
+      if (!confirmed) return;
+
+      await run(async () => {
+        await SyncPackService.removeModFromSyncPack(packId, entry.id);
+        toast.success(t("syncPacks.mods.removeSuccess", { name }));
+      }, "syncPacks.mods.removeError");
+    },
+    [confirm, run, t],
   );
 
   const removeJar = useCallback(
-    (packId: string, fileName: string) =>
-      run(
-        () => SyncPackService.removeSyncPackLocalJar(packId, fileName),
-        "syncPacks.targets.removeError",
-      ),
-    [run],
+    async (packId: string, fileName: string) => {
+      const confirmed = await confirm({
+        title: t("syncPacks.mods.removeJarTitle"),
+        message: t("syncPacks.mods.removeJarConfirm", { name: fileName }),
+        confirmText: t("syncPacks.mods.removeJar"),
+        cancelText: t("common.cancel"),
+        type: "danger",
+      });
+      if (!confirmed) return;
+
+      await run(async () => {
+        await SyncPackService.removeSyncPackLocalJar(packId, fileName);
+        toast.success(t("syncPacks.mods.removeJarSuccess", { name: fileName }));
+      }, "syncPacks.mods.removeJarError");
+    },
+    [confirm, run, t],
   );
 
   const setModEnabled = useCallback(
@@ -545,6 +576,7 @@ export function useSyncPacks() {
     setAdoptPrompt,
     detachPrompt,
     setDetachPrompt,
+    confirm,
     confirmDialog,
     refresh,
     pickPaths,

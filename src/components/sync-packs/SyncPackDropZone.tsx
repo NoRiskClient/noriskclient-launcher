@@ -68,7 +68,7 @@ export function SyncPackDropZone({
               <button
                 onClick={() => onPickPreset(preset)}
                 disabled={isBusy}
-                className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[11px] text-white/50 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white/90 disabled:opacity-30"
+                className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-minecraft text-xs text-white/50 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white/90 disabled:opacity-30"
               >
                 + {preset.path}
               </button>

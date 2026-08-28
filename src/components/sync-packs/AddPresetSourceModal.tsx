@@ -174,7 +174,7 @@ export function AddPresetSourceModal({
                     <div className="w-1/3 truncate rounded bg-white/[0.07] font-minecraft text-base text-transparent">
                       &nbsp;
                     </div>
-                    <div className="mt-0.5 w-2/3 truncate rounded bg-white/[0.04] font-mono text-[11px] text-transparent">
+                    <div className="mt-0.5 w-2/3 truncate rounded bg-white/[0.04] font-minecraft text-xs text-transparent">
                       &nbsp;
                     </div>
                   </div>
@@ -234,7 +234,7 @@ export function AddPresetSourceModal({
                         position="top"
                         wrapperClassName="mt-0.5 min-w-0 max-w-full"
                       >
-                        <div className="w-full truncate font-mono text-[11px] text-white/25">
+                        <div className="w-full truncate font-minecraft text-xs text-white/25">
                           {shortPath(candidate.path)}
                         </div>
                       </Tooltip>

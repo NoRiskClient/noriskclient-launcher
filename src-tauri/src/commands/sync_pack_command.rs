@@ -1,3 +1,5 @@
+use serde::Serialize;
+use std::collections::HashMap;
 use crate::commands::content_command::InstallContentPayload;
 use crate::error::{AppError, CommandError};
 use crate::state::profile_state::{find_mod_by_project_id, ModLoader};
@@ -135,6 +137,132 @@ pub async fn add_sync_pack_target(params: SyncTargetParams) -> Result<SyncTarget
         },
     )
     .await?)
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SyncPackEntryKind {
+    Target,
+    Mod,
+    Jar,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncPackEntryRef {
+    pub pack_id: Uuid,
+    pub kind: SyncPackEntryKind,
+    pub id: String,
+}
+
+#[derive(Serialize, Debug, Default)]
+pub struct SyncPackBatchResult {
+    pub removed: usize,
+    pub failed: usize,
+}
+
+#[tauri::command]
+pub async fn remove_sync_pack_entries(
+    entries: Vec<SyncPackEntryRef>,
+) -> Result<SyncPackBatchResult, CommandError> {
+    let mut result = SyncPackBatchResult::default();
+    if entries.is_empty() {
+        return Ok(result);
+    }
+
+    let state = State::get().await?;
+    let mut mods_by_pack: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+
+    for entry in entries {
+        match entry.kind {
+            SyncPackEntryKind::Mod => match Uuid::parse_str(&entry.id) {
+                Ok(mod_id) => mods_by_pack.entry(entry.pack_id).or_default().push(mod_id),
+                Err(_) => result.failed += 1,
+            },
+            SyncPackEntryKind::Target => {
+                let Ok(target_id) = Uuid::parse_str(&entry.id) else {
+                    result.failed += 1;
+                    continue;
+                };
+                match state
+                    .sync_pack_manager
+                    .remove_target(entry.pack_id, target_id)
+                    .await
+                {
+                    Ok(Some(removed)) => {
+                        shortcuts::remove(entry.pack_id, &removed).await;
+                        result.removed += 1;
+                    }
+                    Ok(None) => result.failed += 1,
+                    Err(e) => {
+                        warn!("Batch remove could not drop a target: {}", e);
+                        result.failed += 1;
+                    }
+                }
+            }
+            SyncPackEntryKind::Jar => {
+                match remove_sync_pack_local_jar(entry.pack_id, entry.id.clone()).await {
+                    Ok(()) => result.removed += 1,
+                    Err(e) => {
+                        warn!("Batch remove could not drop a jar: {}", e.message);
+                        result.failed += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    for (pack_id, mod_ids) in mods_by_pack {
+        match state.sync_pack_manager.remove_mods(pack_id, &mod_ids).await {
+            Ok(removed) => result.removed += removed,
+            Err(e) => {
+                warn!("Batch remove failed for pack {}: {}", pack_id, e);
+                result.failed += mod_ids.len();
+            }
+        }
+    }
+
+    info!(
+        "Batch sync pack remove: {} removed, {} failed",
+        result.removed, result.failed
+    );
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn set_sync_pack_mods_enabled(
+    entries: Vec<SyncPackEntryRef>,
+    enabled: bool,
+) -> Result<usize, CommandError> {
+    if entries.is_empty() {
+        return Ok(0);
+    }
+
+    let state = State::get().await?;
+    let mut by_pack: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    for entry in entries {
+        if entry.kind != SyncPackEntryKind::Mod {
+            continue;
+        }
+        if let Ok(mod_id) = Uuid::parse_str(&entry.id) {
+            by_pack.entry(entry.pack_id).or_default().push(mod_id);
+        }
+    }
+
+    let mut changed = 0;
+    for (pack_id, mod_ids) in by_pack {
+        match state
+            .sync_pack_manager
+            .set_mods_enabled(pack_id, &mod_ids, enabled)
+            .await
+        {
+            Ok(n) => changed += n,
+            Err(e) => warn!("Batch toggle failed for pack {}: {}", pack_id, e),
+        }
+    }
+
+    info!("Batch sync pack toggle: {} mod(s) set to {}", changed, enabled);
+    Ok(changed)
 }
 
 #[tauri::command]
@@ -351,11 +479,9 @@ pub async fn set_profile_sync_packs(
         return Ok(report);
     }
 
-    let mut updated = profile;
-    updated.sync_pack_ids = next;
     state
         .profile_manager
-        .update_profile(params.profile_id, updated)
+        .set_profile_sync_packs(params.profile_id, next)
         .await?;
 
     Ok(report)

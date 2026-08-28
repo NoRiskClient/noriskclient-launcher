@@ -2347,5 +2347,9 @@
   "profiles.v3.batch.disabled": "{{count}} बंद किए",
   "content_manager.errors.batch_partial": "{{count}} बदले नहीं जा सके",
   "webgl.unavailable": "इस डिवाइस पर 3D प्रीव्यू उपलब्ध नहीं है।",
-  "webgl.unavailable.description": "आपका डिवाइस 3D सपोर्ट नहीं करता, इसलिए स्किन और केप सपाट इमेज के रूप में दिखाए जाते हैं।"
+  "webgl.unavailable.description": "आपका डिवाइस 3D सपोर्ट नहीं करता, इसलिए स्किन और केप सपाट इमेज के रूप में दिखाए जाते हैं।",
+  "syncPacks.selection.enable": "सक्षम करें",
+  "syncPacks.selection.disable": "अक्षम करें",
+  "syncPacks.selection.removeTitle": "चयन हटाएं",
+  "syncPacks.selection.removeConfirm": "इस सिंक पैक से {{count}} प्रविष्टियां हटाएं? आपकी फ़ाइलें डिस्क पर बनी रहेंगी।"
 }

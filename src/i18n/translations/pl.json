@@ -2330,5 +2330,9 @@
   "profiles.v3.batch.disabled": "{{count}} wylaczonych",
   "content_manager.errors.batch_partial": "{{count}} nie udalo sie zmienic",
   "webgl.unavailable": "Podgląd 3D nie jest dostępny na tym urządzeniu.",
-  "webgl.unavailable.description": "Twoje urządzenie nie obsługuje 3D, więc skiny i peleryny są pokazywane jako płaskie obrazy."
+  "webgl.unavailable.description": "Twoje urządzenie nie obsługuje 3D, więc skiny i peleryny są pokazywane jako płaskie obrazy.",
+  "syncPacks.selection.enable": "Włącz",
+  "syncPacks.selection.disable": "Wyłącz",
+  "syncPacks.selection.removeTitle": "Usuń zaznaczenie",
+  "syncPacks.selection.removeConfirm": "Usunąć {{count}} wpisów z tego sync packa? Twoje pliki pozostaną na dysku."
 }

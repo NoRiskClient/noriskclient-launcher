@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} kapatildi",
   "content_manager.errors.batch_partial": "{{count}} degistirilemedi",
   "webgl.unavailable": "Bu cihazda 3B önizleme kullanılamıyor.",
-  "webgl.unavailable.description": "Cihazın 3B desteklemiyor, bu yüzden skinler ve pelerinler düz görsel olarak gösteriliyor."
+  "webgl.unavailable.description": "Cihazın 3B desteklemiyor, bu yüzden skinler ve pelerinler düz görsel olarak gösteriliyor.",
+  "syncPacks.selection.enable": "Etkinleştir",
+  "syncPacks.selection.disable": "Devre dışı bırak",
+  "syncPacks.selection.removeTitle": "Seçimi kaldır",
+  "syncPacks.selection.removeConfirm": "Bu sync pack'ten {{count}} öğe kaldırılsın mı? Dosyalarınız diskte kalır."
 }

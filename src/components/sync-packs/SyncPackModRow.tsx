@@ -18,6 +18,9 @@ import { RowAction, SyncPackRow } from "./SyncPackRow";
 import { SyncPackVersionRow } from "./SyncPackVersionRow";
 
 export interface SyncPackModRowProps {
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   entry: SyncPackModEntry;
   matrix?: SyncPackModMatrix;
   iconUrl: string | null;
@@ -32,10 +35,10 @@ export interface SyncPackModRowProps {
   ) => void;
 }
 
-const SUBTLE_BUTTON =
-  "px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider text-white/40 transition-colors disabled:opacity-30";
-
 export function SyncPackModRow({
+  selectable,
+  selected,
+  onToggleSelect,
   entry,
   matrix,
   iconUrl,
@@ -73,6 +76,9 @@ export function SyncPackModRow({
   return (
     <div>
       <SyncPackRow
+        selectable={selectable}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
         iconUrl={iconUrl}
         fallbackLetter={(entry.display_name ?? "?").trim().charAt(0)}
         title={entry.display_name ?? entry.id}
@@ -107,6 +113,7 @@ export function SyncPackModRow({
             </Tooltip>
             <RowAction
               label={t("syncPacks.targets.remove")}
+                        icon="solar:trash-bin-trash-bold"
               onClick={onRemove}
               danger
             />
@@ -122,22 +129,32 @@ export function SyncPackModRow({
       />
 
       {isExpanded && (
-        <div className="border-t border-white/[0.06] bg-black/20 px-3 py-2.5">
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/35">
               {t("syncPacks.entries.overridesTitle")}
             </span>
-            <button
-              onClick={() => onResolve()}
-              disabled={resolving}
-              className={`${SUBTLE_BUTTON} px-2 text-white/45 hover:text-white`}
+            <Tooltip
+              content={t("syncPacks.entries.resolveAll")}
+              position="top"
+              wrapperClassName="flex-shrink-0"
             >
-              {t("syncPacks.entries.resolveAll")}
-            </button>
+              <button
+                onClick={() => onResolve()}
+                disabled={resolving}
+                aria-label={t("syncPacks.entries.resolveAll")}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 transition-colors hover:border-white/20 hover:bg-black/60 hover:!text-white disabled:opacity-30"
+              >
+                <Icon
+                  icon="solar:refresh-bold"
+                  className={`h-3.5 w-3.5 ${resolving ? "animate-spin" : ""}`}
+                />
+              </button>
+            </Tooltip>
           </div>
 
           {!matrix || matrix.rows.length === 0 ? (
-            <div className="py-2 font-minecraft text-[11px] text-white/25">
+            <div className="py-2 font-minecraft text-xs text-white/40">
               {t("syncPacks.entries.noVersions")}
             </div>
           ) : (

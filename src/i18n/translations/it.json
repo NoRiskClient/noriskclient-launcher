@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} disattivati",
   "content_manager.errors.batch_partial": "{{count}} non hanno potuto essere modificati",
   "webgl.unavailable": "L'anteprima 3D non è disponibile su questo dispositivo.",
-  "webgl.unavailable.description": "Il tuo dispositivo non supporta il 3D, quindi skin e mantelli vengono mostrati come immagini piatte."
+  "webgl.unavailable.description": "Il tuo dispositivo non supporta il 3D, quindi skin e mantelli vengono mostrati come immagini piatte.",
+  "syncPacks.selection.enable": "Attiva",
+  "syncPacks.selection.disable": "Disattiva",
+  "syncPacks.selection.removeTitle": "Rimuovi selezione",
+  "syncPacks.selection.removeConfirm": "Rimuovere {{count}} voci da questo sync pack? I tuoi file restano sul disco."
 }

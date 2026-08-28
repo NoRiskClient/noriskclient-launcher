@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} desactivados",
   "content_manager.errors.batch_partial": "{{count}} no se pudieron cambiar",
   "webgl.unavailable": "La vista previa en 3D no está disponible en este dispositivo.",
-  "webgl.unavailable.description": "Tu dispositivo no admite 3D, así que las skins y capas se muestran como imágenes planas."
+  "webgl.unavailable.description": "Tu dispositivo no admite 3D, así que las skins y capas se muestran como imágenes planas.",
+  "syncPacks.selection.enable": "Activar",
+  "syncPacks.selection.disable": "Desactivar",
+  "syncPacks.selection.removeTitle": "Quitar selección",
+  "syncPacks.selection.removeConfirm": "¿Quitar {{count}} entradas de este sync pack? Tus archivos permanecen en el disco."
 }

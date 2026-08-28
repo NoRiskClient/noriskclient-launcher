@@ -2352,5 +2352,9 @@
   "profiles.v3.batch.disabled": "{{count}} ausgeschaltet",
   "content_manager.errors.batch_partial": "{{count}} konnten nicht geaendert werden",
   "webgl.unavailable": "3D-Vorschau ist auf diesem Gerät nicht verfügbar.",
-  "webgl.unavailable.description": "Dein Gerät unterstützt kein 3D, deshalb werden Skins und Capes als flache Bilder angezeigt."
+  "webgl.unavailable.description": "Dein Gerät unterstützt kein 3D, deshalb werden Skins und Capes als flache Bilder angezeigt.",
+  "syncPacks.selection.enable": "Aktivieren",
+  "syncPacks.selection.disable": "Deaktivieren",
+  "syncPacks.selection.removeTitle": "Auswahl entfernen",
+  "syncPacks.selection.removeConfirm": "{{count}} Einträge aus diesem Sync Pack entfernen? Deine Dateien bleiben auf der Festplatte."
 }

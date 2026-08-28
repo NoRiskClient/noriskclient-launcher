@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} desactives",
   "content_manager.errors.batch_partial": "{{count}} n'ont pas pu etre modifies",
   "webgl.unavailable": "L'aperçu 3D n'est pas disponible sur cet appareil.",
-  "webgl.unavailable.description": "Ton appareil ne prend pas en charge la 3D, les skins et capes s'affichent donc en images plates."
+  "webgl.unavailable.description": "Ton appareil ne prend pas en charge la 3D, les skins et capes s'affichent donc en images plates.",
+  "syncPacks.selection.enable": "Activer",
+  "syncPacks.selection.disable": "Désactiver",
+  "syncPacks.selection.removeTitle": "Retirer la sélection",
+  "syncPacks.selection.removeConfirm": "Retirer {{count}} entrées de ce sync pack ? Vos fichiers restent sur le disque."
 }

@@ -525,31 +525,81 @@ impl SyncPackManager {
     }
 
     pub async fn remove_mod(&self, pack_id: Uuid, mod_id: Uuid) -> Result<()> {
-        let pool = self.pool().await?;
-        let existing = Self::require_mod(&pool, pack_id, mod_id)
-            .await
-            .ok()
-            .and_then(|m| crate::sync::resolution::project_key_of(&m.source));
-
-        sqlx::query("DELETE FROM sync_pack_mods WHERE pack_id = ?1 AND mod_id = ?2")
-            .bind(pack_id.to_string())
-            .bind(mod_id.to_string())
-            .execute(&pool)
-            .await?;
-
-        if let Some(key) = existing {
-            self.clear_mod_resolutions(pack_id, &key).await.ok();
-        }
-
-        self.touch(&pool, pack_id).await;
+        self.remove_mods(pack_id, &[mod_id]).await?;
         Ok(())
     }
 
     pub async fn set_mod_enabled(&self, pack_id: Uuid, mod_id: Uuid, enabled: bool) -> Result<()> {
+        self.set_mods_enabled(pack_id, &[mod_id], enabled).await?;
+        Ok(())
+    }
+
+    pub async fn set_mods_enabled(
+        &self,
+        pack_id: Uuid,
+        mod_ids: &[Uuid],
+        enabled: bool,
+    ) -> Result<usize> {
+        if mod_ids.is_empty() {
+            return Ok(0);
+        }
         let pool = self.pool().await?;
-        let mut entry = Self::require_mod(&pool, pack_id, mod_id).await?;
-        entry.enabled = enabled;
-        self.add_mods(pack_id, std::slice::from_ref(&entry)).await
+
+        let mut changed = Vec::new();
+        for mod_id in mod_ids {
+            match Self::require_mod(&pool, pack_id, *mod_id).await {
+                Ok(mut entry) => {
+                    if entry.enabled != enabled {
+                        entry.enabled = enabled;
+                        changed.push(entry);
+                    }
+                }
+                Err(e) => warn!("Skipping mod {} of pack {}: {}", mod_id, pack_id, e),
+            }
+        }
+
+        self.add_mods(pack_id, &changed).await?;
+        Ok(changed.len())
+    }
+
+    pub async fn remove_mods(&self, pack_id: Uuid, mod_ids: &[Uuid]) -> Result<usize> {
+        if mod_ids.is_empty() {
+            return Ok(0);
+        }
+        let pool = self.pool().await?;
+
+        let mut keys = Vec::new();
+        for mod_id in mod_ids {
+            if let Ok(entry) = Self::require_mod(&pool, pack_id, *mod_id).await {
+                if let Some(key) = crate::sync::resolution::project_key_of(&entry.source) {
+                    keys.push(key);
+                }
+            }
+        }
+
+        let mut removed = 0;
+        for chunk in mod_ids.chunks(900) {
+            let placeholders = (0..chunk.len())
+                .map(|i| format!("?{}", i + 2))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "DELETE FROM sync_pack_mods WHERE pack_id = ?1 AND mod_id IN ({})",
+                placeholders
+            );
+            let mut query = sqlx::query(&sql).bind(pack_id.to_string());
+            for mod_id in chunk {
+                query = query.bind(mod_id.to_string());
+            }
+            removed += query.execute(&pool).await?.rows_affected() as usize;
+        }
+
+        for key in keys {
+            self.clear_mod_resolutions(pack_id, &key).await.ok();
+        }
+
+        self.touch(&pool, pack_id).await;
+        Ok(removed)
     }
 
     pub async fn set_mod_version_override(

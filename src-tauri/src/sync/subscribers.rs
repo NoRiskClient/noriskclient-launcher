@@ -1,3 +1,4 @@
+use crate::minecraft::launch::version::compare_versions;
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
 use std::collections::HashSet;
@@ -68,6 +69,16 @@ pub fn contexts(subscribers: &[Subscriber]) -> Vec<(String, ModLoader)> {
             out.push(entry);
         }
     }
-    out.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.as_str().cmp(b.1.as_str())));
+    sort_contexts(&mut out);
     out
 }
+
+pub fn sort_contexts(contexts: &mut [(String, ModLoader)]) {
+    contexts.sort_by(|a, b| {
+        compare_versions(&b.0, &a.0).then_with(|| a.1.as_str().cmp(b.1.as_str()))
+    });
+}
+
+#[cfg(test)]
+#[path = "subscribers_test.rs"]
+mod tests;

@@ -2332,5 +2332,9 @@
   "profiles.v3.batch.disabled": "{{count}} desativados",
   "content_manager.errors.batch_partial": "{{count}} nao puderam ser alterados",
   "webgl.unavailable": "A pré-visualização 3D não está disponível neste dispositivo.",
-  "webgl.unavailable.description": "O teu dispositivo não suporta 3D, por isso as skins e capas são mostradas como imagens planas."
+  "webgl.unavailable.description": "O teu dispositivo não suporta 3D, por isso as skins e capas são mostradas como imagens planas.",
+  "syncPacks.selection.enable": "Ativar",
+  "syncPacks.selection.disable": "Desativar",
+  "syncPacks.selection.removeTitle": "Remover seleção",
+  "syncPacks.selection.removeConfirm": "Remover {{count}} entradas deste sync pack? Os seus ficheiros permanecem no disco."
 }
