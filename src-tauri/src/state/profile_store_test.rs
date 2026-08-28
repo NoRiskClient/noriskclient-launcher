@@ -683,6 +683,75 @@ async fn deleting_a_profile_drops_its_subscriptions() {
     assert_eq!(left, 0, "the cascade must take the links with it");
 }
 
+#[tokio::test]
+async fn upserting_one_mod_leaves_its_neighbours_alone() {
+    let store = store().await;
+    let profile = corpus()
+        .into_iter()
+        .find(|p| p.mods.len() >= 3)
+        .expect("a profile with three mods");
+    store.upsert_many(&[profile.clone()]).await.unwrap();
+
+    let mut changed = profile.mods[1].clone();
+    changed.display_name = Some("renamed by a targeted write".to_string());
+    changed.enabled = !changed.enabled;
+    store.upsert_mods(profile.id, &[(1, changed.clone())]).await.unwrap();
+
+    let loaded = &store.load_all().await.unwrap()[&profile.id];
+    assert_eq!(
+        loaded.mods.iter().map(|m| m.id).collect::<Vec<_>>(),
+        profile.mods.iter().map(|m| m.id).collect::<Vec<_>>(),
+        "order must survive a targeted write"
+    );
+    assert_eq!(loaded.mods[1].display_name, changed.display_name);
+    assert_eq!(loaded.mods[1].enabled, changed.enabled);
+    assert_eq!(loaded.mods[0].display_name, profile.mods[0].display_name);
+    assert_eq!(loaded.mods[2].display_name, profile.mods[2].display_name);
+}
+
+#[tokio::test]
+async fn upserting_an_unknown_mod_appends_it_without_touching_the_rest() {
+    let store = store().await;
+    let profile = corpus()
+        .into_iter()
+        .find(|p| !p.mods.is_empty())
+        .expect("a profile with mods");
+    store.upsert_many(&[profile.clone()]).await.unwrap();
+
+    let mut fresh = profile.mods[0].clone();
+    fresh.id = Uuid::new_v4();
+    let at = profile.mods.len();
+    store.upsert_mods(profile.id, &[(at, fresh.clone())]).await.unwrap();
+
+    let loaded = &store.load_all().await.unwrap()[&profile.id];
+    assert_eq!(loaded.mods.len(), profile.mods.len() + 1);
+    assert_eq!(loaded.mods.last().unwrap().id, fresh.id, "a new mod lands at its ordinal");
+}
+
+#[tokio::test]
+async fn a_targeted_mod_write_never_reaches_another_profile() {
+    let store = store().await;
+    let mut corpus = corpus();
+    let first = corpus.remove(0);
+    let mut second = corpus
+        .into_iter()
+        .find(|p| !p.mods.is_empty())
+        .expect("a second profile with mods");
+    second.mods = first.mods.clone();
+    store.upsert_many(&[first.clone(), second.clone()]).await.unwrap();
+
+    let mut changed = first.mods[0].clone();
+    changed.display_name = Some("only here".to_string());
+    store.upsert_mods(first.id, &[(0, changed)]).await.unwrap();
+
+    let loaded = store.load_all().await.unwrap();
+    assert_eq!(
+        loaded[&second.id].mods[0].display_name,
+        second.mods[0].display_name,
+        "the same mod id in another profile must be untouched"
+    );
+}
+
 const FIXTURE_ENV: &str = "NRC_PROFILES_FIXTURE";
 
 fn is_profiles_json(name: &str) -> bool {

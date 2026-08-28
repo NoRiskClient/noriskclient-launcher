@@ -1130,7 +1130,7 @@ impl ProfileManager {
                 file_hash_sha1: file_hash_sha1.clone(),
             };
 
-            let mut needs_save = false;
+            let mut touched: Option<Uuid> = None;
             {
                 let mut profiles = self.profiles.write().await;
                 if let Some(profile) = profiles.get_mut(&profile_id) {
@@ -1163,8 +1163,8 @@ impl ProfileManager {
                             force_include_versions,
                             extra: Default::default(),
                         };
+                        touched = Some(new_mod.id);
                         profile.mods.push(new_mod);
-                        needs_save = true;
                     } else {
                         info!(
                             "Mod {} ({}) already exists in profile {}. Skipping addition.",
@@ -1176,8 +1176,8 @@ impl ProfileManager {
                 }
             }
 
-            if needs_save {
-                self.save_profile(profile_id).await?;
+            if let Some(touched) = touched {
+                self.save_mods(profile_id, &[touched]).await?;
                 info!(
                     "Profile saved after adding mod {} ({})",
                     display_name_log, version_log
@@ -1390,7 +1390,7 @@ impl ProfileManager {
             platform_name, display_name_log, payload.profile_id, add_dependencies
         );
 
-        let mut needs_save = false;
+        let mut touched: Option<Uuid> = None;
         {
             let mut profiles = self.profiles.write().await;
             if let Some(profile) = profiles.get_mut(&payload.profile_id) {
@@ -1413,18 +1413,18 @@ impl ProfileManager {
                             "{} mod {} already present in profile {} in a different version. Replacing it instead of adding a duplicate.",
                             platform_name, display_name_log, payload.profile_id
                         );
+                        touched = Some(entry.id);
                         if let Some(index) = profile.mods.iter().position(|m| m.id == entry.id) {
                             profile.mods[index] = entry;
                         }
-                        needs_save = true;
                     }
                     ModUpsert::Added(entry) => {
                         info!(
                             "Adding mod {} to profile {}",
                             display_name_log, payload.profile_id
                         );
+                        touched = Some(entry.id);
                         profile.mods.push(entry);
-                        needs_save = true;
                     }
                 }
             } else {
@@ -1432,8 +1432,8 @@ impl ProfileManager {
             }
         }
 
-        if needs_save {
-            self.save_profile(payload.profile_id).await?;
+        if let Some(touched) = touched {
+            self.save_mods(payload.profile_id, &[touched]).await?;
             info!(
                 "Successfully added {} mod {} to profile {}",
                 platform_name, display_name_log, payload.profile_id
@@ -1632,6 +1632,60 @@ impl ProfileManager {
 
     async fn forget_persisted(&self, profile_id: Uuid) {
         self.persisted.lock().await.remove(&profile_id);
+    }
+
+    async fn save_mods(&self, profile_id: Uuid, mod_ids: &[Uuid]) -> Result<()> {
+        if mod_ids.is_empty() {
+            return Ok(());
+        }
+
+        let transient = self.transient.read().await.clone();
+        let entries: Vec<(usize, Mod)> = {
+            let profiles = self.profiles.read().await;
+            let Some(profile) = profiles.get(&profile_id) else {
+                return Err(AppError::ProfileNotFound(profile_id));
+            };
+            if !should_persist(profile, &transient) {
+                return Ok(());
+            }
+            profile
+                .mods
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| mod_ids.contains(&entry.id))
+                .map(|(ordinal, entry)| (ordinal, entry.clone()))
+                .collect()
+        };
+
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        self.store.upsert_mods(profile_id, &entries).await?;
+        self.forget_persisted(profile_id).await;
+        Ok(())
+    }
+
+    pub async fn set_profile_sync_packs(
+        &self,
+        profile_id: Uuid,
+        pack_ids: Vec<Uuid>,
+    ) -> Result<()> {
+        let (changed, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                if profile.sync_pack_ids == pack_ids {
+                    return false;
+                }
+                profile.sync_pack_ids = pack_ids.clone();
+                true
+            })
+            .await?;
+
+        if changed && persistable {
+            self.store.set_sync_pack_ids(profile_id, &pack_ids).await?;
+            self.forget_persisted(profile_id).await;
+        }
+        Ok(())
     }
 
     pub async fn set_mods_enabled(
@@ -1921,7 +1975,7 @@ impl ProfileManager {
         apply_unified_version_to_mod(&mut profile.mods[index], new_version, &profile_mc_version)?;
 
         drop(profiles);
-        self.save_profile(profile_id).await?;
+        self.save_mods(profile_id, &[mod_id]).await?;
         info!(
             "Switched mod {} to unified version {} ({:?}) in profile {}",
             mod_id, new_version.version_number, new_version.source, profile_id
@@ -2083,7 +2137,7 @@ impl ProfileManager {
 
         // Save changes to the profile first
         drop(profiles);
-        self.save_profile(profile_id).await?;
+        self.save_mods(profile_id, &[mod_id]).await?;
         info!(
             "Profile {} saved after updating mod {}.",
             profile_id, mod_id
@@ -3250,6 +3304,7 @@ impl ProfileManager {
         }
 
         let mut applied = Vec::new();
+        let mut touched: Vec<Uuid> = Vec::new();
         {
             let mut profiles = self.profiles.write().await;
             let profile = profiles
@@ -3274,7 +3329,10 @@ impl ProfileManager {
                     &payload.new_version_details,
                     &profile_mc_version,
                 ) {
-                    Ok(()) => applied.push(slot),
+                    Ok(()) => {
+                        touched.push(profile.mods[index].id);
+                        applied.push(slot);
+                    }
                     Err(e) => error!(
                         "Bulk update failed for '{}': {}",
                         current_item.filename, e
@@ -3287,7 +3345,7 @@ impl ProfileManager {
             return Ok(applied);
         }
 
-        self.save_profile(profile_id).await?;
+        self.save_mods(profile_id, &touched).await?;
         info!(
             "Bulk update applied {} of {} version switches in profile {}",
             applied.len(),
@@ -3295,17 +3353,19 @@ impl ProfileManager {
             profile_id
         );
 
+        let mut seen = std::collections::HashSet::new();
         for slot in &applied {
             let payload = payloads[*slot];
             if payload.new_version_details.dependencies.is_empty() {
                 continue;
             }
             if let Err(e) = self
-                .install_missing_dependencies(
+                .install_missing_dependencies_seen(
                     profile_id,
                     &payload.new_version_details.dependencies,
                     &payload.new_version_details.source,
                     &payload.new_version_details.date_published,
+                    &mut seen,
                 )
                 .await
             {
@@ -3344,13 +3404,15 @@ impl ProfileManager {
 
         let mod_to_update_index = find_mod_for_version_switch(&profile.mods, current_item);
 
+        let touched;
         if let Some(index) = mod_to_update_index {
             apply_unified_version_to_mod(
                 &mut profile.mods[index],
                 &payload.new_version_details,
                 &profile_mc_version,
             )?;
-            info!("Successfully updated mod {} in profile {}", profile.mods[index].id, profile_id);
+            touched = profile.mods[index].id;
+            info!("Successfully updated mod {} in profile {}", touched, profile_id);
         } else {
             error!(
                 "Mod not found in profile {} for update with unified version",
@@ -3365,7 +3427,7 @@ impl ProfileManager {
         }
 
         drop(profiles);
-        self.save_profile(profile_id).await?;
+        self.save_mods(profile_id, &[touched]).await?;
 
         info!(
             "Profile {} saved after updating mod with unified version.",
@@ -3407,8 +3469,27 @@ impl ProfileManager {
         platform: &crate::integrations::unified_mod::ModPlatform,
         parent_date: &str,
     ) -> Result<()> {
+        let mut seen = std::collections::HashSet::new();
+        self.install_missing_dependencies_seen(
+            profile_id,
+            dependencies,
+            platform,
+            parent_date,
+            &mut seen,
+        )
+        .await
+    }
+
+    async fn install_missing_dependencies_seen(
+        &self,
+        profile_id: Uuid,
+        dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
+        platform: &crate::integrations::unified_mod::ModPlatform,
+        parent_date: &str,
+        seen: &mut std::collections::HashSet<String>,
+    ) -> Result<()> {
         use crate::integrations::mod_dependencies::{
-            resolve_required_dependencies, DependencyTarget,
+            resolve_required_dependencies_seen, DependencyTarget,
         };
 
         let profile = self.get_profile(profile_id).await?;
@@ -3417,12 +3498,13 @@ impl ProfileManager {
             game_version: profile.game_version.clone(),
         };
 
-        let resolved = resolve_required_dependencies(
+        let resolved = resolve_required_dependencies_seen(
             platform,
             dependencies,
             parent_date,
             &target,
             crate::integrations::mod_dependencies::DEPENDENCY_DEPTH,
+            seen,
         )
         .await;
 
