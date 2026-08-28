@@ -54,8 +54,27 @@ pub async fn resolve_required_dependencies(
     target: &DependencyTarget,
     max_depth: u8,
 ) -> Vec<ResolvedDependency> {
+    let mut seen = HashSet::new();
+    resolve_required_dependencies_seen(
+        platform,
+        dependencies,
+        parent_date,
+        target,
+        max_depth,
+        &mut seen,
+    )
+    .await
+}
+
+pub async fn resolve_required_dependencies_seen(
+    platform: &ModPlatform,
+    dependencies: &[UnifiedDependency],
+    parent_date: &str,
+    target: &DependencyTarget,
+    max_depth: u8,
+    seen: &mut HashSet<String>,
+) -> Vec<ResolvedDependency> {
     let mut resolved = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
     let mut queue: VecDeque<(Vec<UnifiedDependency>, String, u8)> = VecDeque::new();
     queue.push_back((dependencies.to_vec(), parent_date.to_string(), max_depth));
 
@@ -154,3 +173,7 @@ pub async fn version_details(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mod_dependencies_test.rs"]
+mod tests;
