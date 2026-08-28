@@ -1178,6 +1178,7 @@
   "content_manager.success.batch_toggled": "Alternados exitosamente {{count}} elemento(s).",
   "content_manager.success.updated": "¡{{name}} actualizado exitosamente a {{version}}!",
   "content_manager.success.updated_all": "Actualizados exitosamente todos los {{count}} {{type}}(s).",
+  "content_manager.errors.update_all_failed": "Error al actualizar: {{error}}",
   "content_manager.success.switched": "{{name}} cambiado a {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Verificaciones de actualización habilitadas para {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Verificaciones de actualización deshabilitadas para {{name}}.",
@@ -1185,6 +1186,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Verificaciones de actualización deshabilitadas para {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Actualizando {{name}} a {{version}}...",
   "content_manager.loading.updating_progress": "Actualizando {{current}}/{{total}} {{type}}s...",
+  "content_manager.loading.updating_bulk": "Actualizando {{total}} {{type}}s...",
   "content_manager.loading.switching": "Cambiando a {{version}}...",
   "content_manager.loading.enabling_update_checks": "Habilitando verificaciones de actualización para {{name}}...",
   "content_manager.loading.disabling_update_checks": "Deshabilitando verificaciones de actualización para {{name}}...",
@@ -2325,5 +2327,10 @@
   "syncPacks.entries.modeOffTip": "Este mod se omite para esta version de Minecraft",
   "syncPacks.entries.modOff": "desactivado para todos los perfiles",
   "syncPacks.entries.disableEverywhere": "Desactivar este mod para todos los perfiles",
-  "syncPacks.entries.enableEverywhere": "Volver a activar este mod para todos los perfiles"
+  "syncPacks.entries.enableEverywhere": "Volver a activar este mod para todos los perfiles",
+  "profiles.v3.batch.enabled": "{{count}} activados",
+  "profiles.v3.batch.disabled": "{{count}} desactivados",
+  "content_manager.errors.batch_partial": "{{count}} no se pudieron cambiar",
+  "webgl.unavailable": "La vista previa en 3D no está disponible en este dispositivo.",
+  "webgl.unavailable.description": "Tu dispositivo no admite 3D, así que las skins y capas se muestran como imágenes planas."
 }

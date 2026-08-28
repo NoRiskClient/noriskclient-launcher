@@ -57,11 +57,6 @@ impl SyncPackManager {
     }
 
     async fn pool(&self) -> Result<SqlitePool> {
-        if crate::state::db::is_ephemeral(&self.inner.db).await {
-            return Err(AppError::Other(
-                "The launcher database could not be opened, so sync packs are read only this session. Check the log for a failed migration.".to_string(),
-            ));
-        }
         crate::state::db::pool_of(&self.inner.db).await.ok_or_else(no_db)
     }
 

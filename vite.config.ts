@@ -20,6 +20,7 @@ export default defineConfig(async () => ({
   },
 
   resolve: {
+    dedupe: ["three", "react", "react-dom", "@react-three/fiber", "@react-three/drei"],
     alias: [
       {
         find: /^@iconify\/react$/,

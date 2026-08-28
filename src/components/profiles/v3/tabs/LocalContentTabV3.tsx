@@ -212,52 +212,35 @@ export function LocalContentTabV3<T extends LocalContentItem>({
 
   // Batch Enable/Disable — iteriert Selection und toggelt nur die Mods,
   // deren aktueller State vom Ziel abweicht.
-  const handleBatchEnable = useCallback(async () => {
-    const targets: T[] = [];
-    for (const id of manager.selectedItemIds) {
-      const item = manager.items.find(i => i.filename === id);
-      if (item && item.is_disabled) targets.push(item);
-    }
+  const runBatch = useCallback(async (enabled: boolean) => {
+    const targets = manager.items.filter(
+      (item) => manager.selectedItemIds.has(item.filename) && item.is_disabled === enabled,
+    );
     if (targets.length === 0) {
       manager.handleSelectAllToggle(false);
       return;
     }
+
     setBatchProgress({ current: 0, total: targets.length });
     try {
-      for (let i = 0; i < targets.length; i++) {
-        await manager.handleToggleItemEnabled(targets[i]);
-        setBatchProgress({ current: i + 1, total: targets.length });
+      const changed = await manager.handleBatchSetEnabled(enabled);
+      setBatchProgress({ current: targets.length, total: targets.length });
+      if (changed > 0) {
+        toast.success(
+          t(enabled ? "profiles.v3.batch.enabled" : "profiles.v3.batch.disabled", {
+            count: changed,
+          }),
+        );
       }
     } finally {
       setBatchProgress(null);
       manager.handleSelectAllToggle(false);
     }
-  }, [manager]);
+  }, [manager, t]);
 
-  const handleBatchDisable = useCallback(async () => {
-    const targets: T[] = [];
-    for (const id of manager.selectedItemIds) {
-      const item = manager.items.find(i => i.filename === id);
-      if (item && !item.is_disabled) targets.push(item);
-    }
-    if (targets.length === 0) {
-      manager.handleSelectAllToggle(false);
-      return;
-    }
-    setBatchProgress({ current: 0, total: targets.length });
-    try {
-      for (let i = 0; i < targets.length; i++) {
-        await manager.handleToggleItemEnabled(targets[i]);
-        setBatchProgress({ current: i + 1, total: targets.length });
-      }
-    } finally {
-      setBatchProgress(null);
-      manager.handleSelectAllToggle(false);
-    }
-  }, [manager]);
+  const handleBatchEnable = useCallback(() => runBatch(true), [runBatch]);
+  const handleBatchDisable = useCallback(() => runBatch(false), [runBatch]);
 
-  // Batch Pause/Resume Update-Checks — zielt auf Mehrheits-Zustand:
-  // Wenn >= die Haelfte aktiv, wird pausiert. Sonst wieder aktiviert.
   const batchUpdateChecksConfig = useMemo(() => {
     const selectedItems = Array.from(manager.selectedItemIds)
       .map(id => manager.items.find(i => i.filename === id))

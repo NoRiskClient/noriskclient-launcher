@@ -25,6 +25,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { Modal } from "../ui/Modal";
 import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
+import { WebGLBoundary } from "../WebGLBoundary";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import gsap from "gsap";
 import { IconButton } from "../ui/buttons/IconButton";
@@ -831,16 +832,21 @@ function Cape3DPreviewWithToggle({
           title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
           aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
         />
-        <SkinRenderer
-          textureUrl={skinUrl ?? null}
-          variant={skinVariant ?? "auto"}
-          cape={{ texture: finalCapeUrl, elytra: showElytra }}
-          rotation={Math.PI}
-          draggable
-          zoom={1.6}
-          fps={30}
-          style={{ width: 300, height: 380 }}
-        />
+        <WebGLBoundary
+          label="cape preview"
+          fallback={<CapeImage imageUrl={finalCapeUrl} part="back" width={200} />}
+        >
+          <SkinRenderer
+            textureUrl={skinUrl ?? null}
+            variant={skinVariant ?? "auto"}
+            cape={{ texture: finalCapeUrl, elytra: showElytra }}
+            rotation={Math.PI}
+            draggable
+            zoom={1.6}
+            fps={30}
+            style={{ width: 300, height: 380 }}
+          />
+        </WebGLBoundary>
       </div>
 
       <div className="flex justify-center mt-4">

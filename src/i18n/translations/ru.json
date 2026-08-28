@@ -1312,6 +1312,7 @@
   "content_manager.success.batch_toggled": "Успешно переключено {{count}} элемент(ов).",
   "content_manager.success.updated": "{{name}} успешно обновлён до {{version}}!",
   "content_manager.success.updated_all": "Успешно обновлены все {{count}} {{type}}(ов).",
+  "content_manager.errors.update_all_failed": "Не удалось обновить: {{error}}",
   "content_manager.success.switched": "{{name}} переключён на {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Проверка обновлений включена для {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Проверка обновлений отключена для {{name}}.",
@@ -1319,6 +1320,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Проверка обновлений отключена для {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Обновление {{name}} до {{version}}...",
   "content_manager.loading.updating_progress": "Обновление {{current}}/{{total}} {{type}}ов...",
+  "content_manager.loading.updating_bulk": "Обновление {{total}} {{type}}ов...",
   "content_manager.loading.switching": "Переключение на {{version}}...",
   "content_manager.loading.enabling_update_checks": "Включение проверки обновлений для {{name}}...",
   "content_manager.loading.disabling_update_checks": "Отключение проверки обновлений для {{name}}...",
@@ -2325,5 +2327,10 @@
   "syncPacks.entries.modeOffTip": "Этот мод пропускается для этой версии Minecraft",
   "syncPacks.entries.modOff": "выключен для всех профилей",
   "syncPacks.entries.disableEverywhere": "Выключить этот мод для всех профилей",
-  "syncPacks.entries.enableEverywhere": "Снова включить этот мод для всех профилей"
+  "syncPacks.entries.enableEverywhere": "Снова включить этот мод для всех профилей",
+  "profiles.v3.batch.enabled": "{{count}} включено",
+  "profiles.v3.batch.disabled": "{{count}} выключено",
+  "content_manager.errors.batch_partial": "{{count}} не удалось изменить",
+  "webgl.unavailable": "3D-предпросмотр недоступен на этом устройстве.",
+  "webgl.unavailable.description": "Ваше устройство не поддерживает 3D, поэтому скины и плащи показываются плоскими изображениями."
 }

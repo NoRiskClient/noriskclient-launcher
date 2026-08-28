@@ -26,7 +26,6 @@ CREATE TABLE sync_pack_mods (
     pack_id           TEXT NOT NULL,
     mod_id            TEXT NOT NULL,
     data              TEXT NOT NULL,
-    resolve_mode      TEXT NOT NULL DEFAULT 'auto',
     version_overrides TEXT NOT NULL DEFAULT '{}',
     icon_url          TEXT NULL,
 
@@ -68,3 +67,14 @@ CREATE TABLE sync_pack_adoptions (
 
     PRIMARY KEY (pack_id, target_path, profile_id)
 );
+
+CREATE TABLE profile_sync_packs (
+    profile_id TEXT    NOT NULL,
+    pack_id    TEXT    NOT NULL,
+    ordinal    INTEGER NOT NULL,
+
+    PRIMARY KEY (profile_id, pack_id),
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+);
+
+CREATE INDEX profile_sync_packs_pack_idx ON profile_sync_packs (pack_id);

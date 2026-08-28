@@ -1147,6 +1147,7 @@
   "content_manager.success.batch_toggled": "{{count}} Element(e) erfolgreich umgeschaltet.",
   "content_manager.success.updated": "{{name}} erfolgreich auf {{version}} aktualisiert!",
   "content_manager.success.updated_all": "Alle {{count}} {{type}}(s) erfolgreich aktualisiert.",
+  "content_manager.errors.update_all_failed": "Aktualisieren fehlgeschlagen: {{error}}",
   "content_manager.success.switched": "{{name}} auf {{version}} gewechselt.",
   "content_manager.success.toggle_updates_enabled": "Update-Prüfung für {{name}} aktiviert.",
   "content_manager.success.toggle_updates_disabled": "Update-Prüfung für {{name}} deaktiviert.",
@@ -1154,6 +1155,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Update-Prüfung für {{count}} {{itemLabel}} deaktiviert.",
   "content_manager.loading.updating": "Aktualisiere {{name}} auf {{version}}...",
   "content_manager.loading.updating_progress": "Aktualisiere {{current}}/{{total}} {{type}}s...",
+  "content_manager.loading.updating_bulk": "Aktualisiere {{total}} {{type}}s...",
   "content_manager.loading.switching": "Wechsle zu {{version}}...",
   "content_manager.loading.enabling_updates": "Aktiviere Update-Prüfung für {{name}}...",
   "content_manager.loading.disabling_updates": "Deaktiviere Update-Prüfung für {{name}}...",
@@ -2345,5 +2347,10 @@
   "syncPacks.entries.modeOffTip": "Diese Mod wird fuer diese Minecraft Version uebersprungen",
   "syncPacks.entries.modOff": "aus fuer alle Profile",
   "syncPacks.entries.disableEverywhere": "Diese Mod fuer alle Profile ausschalten",
-  "syncPacks.entries.enableEverywhere": "Diese Mod fuer alle Profile wieder einschalten"
+  "syncPacks.entries.enableEverywhere": "Diese Mod fuer alle Profile wieder einschalten",
+  "profiles.v3.batch.enabled": "{{count}} eingeschaltet",
+  "profiles.v3.batch.disabled": "{{count}} ausgeschaltet",
+  "content_manager.errors.batch_partial": "{{count}} konnten nicht geaendert werden",
+  "webgl.unavailable": "3D-Vorschau ist auf diesem Gerät nicht verfügbar.",
+  "webgl.unavailable.description": "Dein Gerät unterstützt kein 3D, deshalb werden Skins und Capes als flache Bilder angezeigt."
 }

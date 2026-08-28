@@ -1178,6 +1178,7 @@
   "content_manager.success.batch_toggled": "{{count}} élément(s) basculé(s) avec succès.",
   "content_manager.success.updated": "{{name}} mis à jour vers {{version}} avec succès !",
   "content_manager.success.updated_all": "Tous les {{count}} {{type}}(s) mis à jour avec succès.",
+  "content_manager.errors.update_all_failed": "Échec de la mise à jour : {{error}}",
   "content_manager.success.switched": "{{name}} basculé vers {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Vérifications de mise à jour activées pour {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Vérifications de mise à jour désactivées pour {{name}}.",
@@ -1185,6 +1186,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Vérifications de mise à jour désactivées pour {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Mise à jour de {{name}} vers {{version}}...",
   "content_manager.loading.updating_progress": "Mise à jour de {{current}}/{{total}} {{type}}s...",
+  "content_manager.loading.updating_bulk": "Mise à jour de {{total}} {{type}}s...",
   "content_manager.loading.switching": "Basculement vers {{version}}...",
   "content_manager.loading.enabling_update_checks": "Activation des vérifications de mise à jour pour {{name}}...",
   "content_manager.loading.disabling_update_checks": "Désactivation des vérifications de mise à jour pour {{name}}...",
@@ -2325,5 +2327,10 @@
   "syncPacks.entries.modeOffTip": "Ce mod est ignore pour cette version de Minecraft",
   "syncPacks.entries.modOff": "desactive pour tous les profils",
   "syncPacks.entries.disableEverywhere": "Desactiver ce mod pour tous les profils",
-  "syncPacks.entries.enableEverywhere": "Reactiver ce mod pour tous les profils"
+  "syncPacks.entries.enableEverywhere": "Reactiver ce mod pour tous les profils",
+  "profiles.v3.batch.enabled": "{{count}} actives",
+  "profiles.v3.batch.disabled": "{{count}} desactives",
+  "content_manager.errors.batch_partial": "{{count}} n'ont pas pu etre modifies",
+  "webgl.unavailable": "L'aperçu 3D n'est pas disponible sur cet appareil.",
+  "webgl.unavailable.description": "Ton appareil ne prend pas en charge la 3D, les skins et capes s'affichent donc en images plates."
 }

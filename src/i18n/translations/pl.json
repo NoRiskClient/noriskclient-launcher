@@ -1178,6 +1178,7 @@
   "content_manager.success.batch_toggled": "Pomyślnie przełączono {{count}} element(ów).",
   "content_manager.success.updated": "Pomyślnie zaktualizowano {{name}} do {{version}}!",
   "content_manager.success.updated_all": "Pomyślnie zaktualizowano wszystkie {{count}} {{type}}(ów).",
+  "content_manager.errors.update_all_failed": "Aktualizacja nie powiodła się: {{error}}",
   "content_manager.success.switched": "Przełączono {{name}} na {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Sprawdzanie aktualizacji włączone dla {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Sprawdzanie aktualizacji wyłączone dla {{name}}.",
@@ -1185,6 +1186,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Sprawdzanie aktualizacji wyłączone dla {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Aktualizowanie {{name}} do {{version}}...",
   "content_manager.loading.updating_progress": "Aktualizowanie {{current}}/{{total}} {{type}}ów...",
+  "content_manager.loading.updating_bulk": "Aktualizowanie {{total}} {{type}}ów...",
   "content_manager.loading.switching": "Przełączanie na {{version}}...",
   "content_manager.loading.enabling_update_checks": "Włączanie sprawdzania aktualizacji dla {{name}}...",
   "content_manager.loading.disabling_update_checks": "Wyłączanie sprawdzania aktualizacji dla {{name}}...",
@@ -2323,5 +2325,10 @@
   "syncPacks.entries.modeOffTip": "Ten mod jest pomijany dla tej wersji Minecrafta",
   "syncPacks.entries.modOff": "wylaczony dla wszystkich profili",
   "syncPacks.entries.disableEverywhere": "Wylacz tego moda dla wszystkich profili",
-  "syncPacks.entries.enableEverywhere": "Wlacz tego moda ponownie dla wszystkich profili"
+  "syncPacks.entries.enableEverywhere": "Wlacz tego moda ponownie dla wszystkich profili",
+  "profiles.v3.batch.enabled": "{{count}} wlaczonych",
+  "profiles.v3.batch.disabled": "{{count}} wylaczonych",
+  "content_manager.errors.batch_partial": "{{count}} nie udalo sie zmienic",
+  "webgl.unavailable": "Podgląd 3D nie jest dostępny na tym urządzeniu.",
+  "webgl.unavailable.description": "Twoje urządzenie nie obsługuje 3D, więc skiny i peleryny są pokazywane jako płaskie obrazy."
 }

@@ -1150,6 +1150,7 @@
   "content_manager.success.batch_toggled": "Successfully toggled {{count}} item(s).",
   "content_manager.success.updated": "Successfully updated {{name}} to {{version}}!",
   "content_manager.success.updated_all": "Successfully updated all {{count}} {{type}}(s).",
+  "content_manager.errors.update_all_failed": "Update failed: {{error}}",
   "content_manager.success.switched": "Switched {{name}} to {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Update checks enabled for {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Update checks disabled for {{name}}.",
@@ -1157,6 +1158,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Update checks disabled for {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Updating {{name}} to {{version}}...",
   "content_manager.loading.updating_progress": "Updating {{current}}/{{total}} {{type}}s...",
+  "content_manager.loading.updating_bulk": "Updating {{total}} {{type}}s...",
   "content_manager.loading.switching": "Switching to {{version}}...",
   "content_manager.loading.enabling_update_checks": "Enabling update checks for {{name}}...",
   "content_manager.loading.disabling_update_checks": "Disabling update checks for {{name}}...",
@@ -2365,5 +2367,10 @@
   "syncPacks.entries.modeOffTip": "This mod is skipped for this Minecraft version",
   "syncPacks.entries.modOff": "off for every profile",
   "syncPacks.entries.disableEverywhere": "Turn this mod off for every profile",
-  "syncPacks.entries.enableEverywhere": "Turn this mod back on for every profile"
+  "syncPacks.entries.enableEverywhere": "Turn this mod back on for every profile",
+  "profiles.v3.batch.enabled": "{{count}} turned on",
+  "profiles.v3.batch.disabled": "{{count}} turned off",
+  "content_manager.errors.batch_partial": "{{count}} could not be changed",
+  "webgl.unavailable": "3D preview is not available on this device.",
+  "webgl.unavailable.description": "Your device has no working 3D support, so skins and capes are shown as flat images."
 }

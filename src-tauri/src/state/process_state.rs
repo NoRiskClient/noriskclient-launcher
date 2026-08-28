@@ -1004,36 +1004,22 @@ impl ProcessManager {
                 let secs = elapsed.num_seconds().max(0) as u64;
                 if secs > 0 {
                     if let Ok(state) = &state_for_monitor_res {
-                        match state.profile_manager.get_profile(metadata.profile_id).await {
-                            Ok(mut profile) => {
-                                profile.playtime_seconds =
-                                    profile.playtime_seconds.saturating_add(secs);
-                                if let Err(e) = state
-                                    .profile_manager
-                                    .update_profile(metadata.profile_id, profile)
-                                    .await
-                                {
-                                    log::warn!(
-                                        "Failed to persist playtime (+{}s) for profile {}: {}",
-                                        secs,
-                                        metadata.profile_id,
-                                        e
-                                    );
-                                } else {
-                                    log::info!(
-                                        "Added {}s of playtime to profile {}",
-                                        secs,
-                                        metadata.profile_id
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                log::warn!(
-                                    "Could not load profile {} to update playtime: {}",
-                                    metadata.profile_id,
-                                    e
-                                );
-                            }
+                        match state
+                            .profile_manager
+                            .add_playtime(metadata.profile_id, secs)
+                            .await
+                        {
+                            Ok(()) => log::info!(
+                                "Added {}s of playtime to profile {}",
+                                secs,
+                                metadata.profile_id
+                            ),
+                            Err(e) => log::warn!(
+                                "Failed to persist playtime (+{}s) for profile {}: {}",
+                                secs,
+                                metadata.profile_id,
+                                e
+                            ),
                         }
                     }
                 }

@@ -1187,6 +1187,7 @@
   "content_manager.success.batch_toggled": "{{count}} आइटम सफलतापूर्वक टॉगल किए गए।",
   "content_manager.success.updated": "{{name}} को {{version}} पर सफलतापूर्वक अपडेट किया गया!",
   "content_manager.success.updated_all": "सभी {{count}} {{type}} सफलतापूर्वक अपडेट किए गए।",
+  "content_manager.errors.update_all_failed": "अपडेट विफल: {{error}}",
   "content_manager.success.switched": "{{name}} को {{version}} पर स्विच किया गया।",
   "content_manager.success.toggle_updates_enabled": "{{name}} के लिए अपडेट चेक सक्षम।",
   "content_manager.success.toggle_updates_disabled": "{{name}} के लिए अपडेट चेक अक्षम।",
@@ -1194,6 +1195,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "{{count}} {{itemLabel}} के लिए अपडेट चेक अक्षम।",
   "content_manager.loading.updating": "{{name}} को {{version}} पर अपडेट हो रहा है...",
   "content_manager.loading.updating_progress": "{{current}}/{{total}} {{type}} अपडेट हो रहे हैं...",
+  "content_manager.loading.updating_bulk": "{{total}} {{type}} अपडेट हो रहे हैं...",
   "content_manager.loading.switching": "{{version}} पर स्विच हो रहा है...",
   "content_manager.loading.enabling_update_checks": "{{name}} के लिए अपडेट चेक सक्षम हो रहा है...",
   "content_manager.loading.disabling_update_checks": "{{name}} के लिए अपडेट चेक अक्षम हो रहा है...",
@@ -2340,5 +2342,10 @@
   "syncPacks.entries.modeOffTip": "इस Minecraft संस्करण के लिए यह मॉड छोड़ा जाता है",
   "syncPacks.entries.modOff": "सभी प्रोफ़ाइल के लिए बंद",
   "syncPacks.entries.disableEverywhere": "यह मॉड सभी प्रोफ़ाइल के लिए बंद करें",
-  "syncPacks.entries.enableEverywhere": "यह मॉड सभी प्रोफ़ाइल के लिए फिर चालू करें"
+  "syncPacks.entries.enableEverywhere": "यह मॉड सभी प्रोफ़ाइल के लिए फिर चालू करें",
+  "profiles.v3.batch.enabled": "{{count}} चालू किए",
+  "profiles.v3.batch.disabled": "{{count}} बंद किए",
+  "content_manager.errors.batch_partial": "{{count}} बदले नहीं जा सके",
+  "webgl.unavailable": "इस डिवाइस पर 3D प्रीव्यू उपलब्ध नहीं है।",
+  "webgl.unavailable.description": "आपका डिवाइस 3D सपोर्ट नहीं करता, इसलिए स्किन और केप सपाट इमेज के रूप में दिखाए जाते हैं।"
 }

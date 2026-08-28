@@ -1,6 +1,6 @@
 use crate::commands::content_command::InstallContentPayload;
 use crate::error::{AppError, CommandError};
-use crate::state::profile_state::{find_mod_by_project_id, Mod, ModLoader};
+use crate::state::profile_state::{find_mod_by_project_id, ModLoader};
 use crate::state::state_manager::State;
 use crate::sync::engine::SyncEngine;
 use crate::sync::ingest::{self, DroppedSyncResult};

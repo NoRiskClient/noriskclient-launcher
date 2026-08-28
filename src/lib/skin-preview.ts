@@ -4,6 +4,8 @@ import {
   type SkinSnapshotRequest,
 } from "@noriskclient/nrc-skin-renderer/snapshot";
 
+import { isWebGLAvailable, renderFlatSkin } from "@noriskclient/nrc-skin-renderer";
+
 const RENDERER_VERSION =
   typeof __SKIN_RENDERER_VERSION__ === "string"
     ? __SKIN_RENDERER_VERSION__
@@ -182,6 +184,10 @@ export async function getSkinPreview(
     emoteTime: POSE_EMOTE_TIME,
     ...given,
   };
+  if (!isWebGLAvailable()) {
+    return renderFlatSkin(framed.textureUrl, { variant: framed.variant as any });
+  }
+
   const key = await skinPreviewKey(framed, options);
 
   const known = resolved.get(key);

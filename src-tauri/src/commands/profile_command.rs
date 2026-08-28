@@ -191,6 +191,7 @@ pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, Command
         preferred_account_id: None,
         playtime_seconds: 0,
         sync_pack_ids: Vec::new(),
+        extra: Default::default(),
     };
 
     let id = state.profile_manager.create_profile(profile.clone()).await?;
@@ -898,6 +899,19 @@ pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandEr
         .restore_profile_backup(backup_path.into())
         .await?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_profile_store_status(
+) -> Result<crate::state::profile_state::ProfileStoreStatus, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.store_status().await?)
+}
+
+#[tauri::command]
+pub async fn reimport_profiles_from_legacy_json() -> Result<usize, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.reimport_from_legacy_json().await?)
 }
 
 /// Loads and returns the list of standard profiles from the local configuration file.
@@ -1636,6 +1650,7 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         preferred_account_id: source_profile.preferred_account_id,
         playtime_seconds: 0,
         sync_pack_ids: source_profile.sync_pack_ids.clone(),
+        extra: Default::default(),
     };
 
     // 6. Erstelle das neue Profilverzeichnis
@@ -2285,10 +2300,8 @@ pub struct ProfileListEntry {
     mod_count: usize,
 }
 
-impl From<Profile> for ProfileListEntry {
-    fn from(mut profile: Profile) -> Self {
-        let mod_count = profile.mods.len();
-        profile.mods = Vec::new();
+impl From<(Profile, usize)> for ProfileListEntry {
+    fn from((profile, mod_count): (Profile, usize)) -> Self {
         Self { profile, mod_count }
     }
 }
@@ -2305,7 +2318,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
     let state = State::get().await?;
 
     // Fetch User Profiles (includes editable copies of standard profiles)
-    let user_profiles = state.profile_manager.list_profiles().await?;
+    let user_profiles = state.profile_manager.list_profiles_without_mods().await?;
 
     // Handle `last_played_profile_id`
     let mut launcher_config = state.config_manager.get_config().await;
@@ -2314,7 +2327,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
 
     // Validate existing last_played_profile_id
     if let Some(id_to_check) = effective_last_played_id {
-        let exists = user_profiles.iter().any(|p| p.id == id_to_check);
+        let exists = user_profiles.iter().any(|(p, _)| p.id == id_to_check);
         if !exists {
             info!(
                 "Last played profile ID {} no longer exists. Marking for reset.",
@@ -2348,7 +2361,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
         } else {
             // No standard profiles available, use first user profile
             info!("No standard profiles available. Using first user profile as default.");
-            user_profiles.first().map(|p| p.id)
+            user_profiles.first().map(|(p, _)| p.id)
         };
 
         // Check if the determined new_default_id is different from what's in the original config.
@@ -3027,6 +3040,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         preferred_account_id: None,
         playtime_seconds: 0,
         sync_pack_ids: Vec::new(),
+        extra: Default::default(),
     };
 
     let game_dir = state

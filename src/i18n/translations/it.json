@@ -1178,6 +1178,7 @@
   "content_manager.success.batch_toggled": "{{count}} elemento/i attivato/i/disattivato/i con successo.",
   "content_manager.success.updated": "{{name}} aggiornato a {{version}} con successo!",
   "content_manager.success.updated_all": "{{count}} {{type}} aggiornato/i con successo.",
+  "content_manager.errors.update_all_failed": "Aggiornamento non riuscito: {{error}}",
   "content_manager.success.switched": "{{name}} cambiato a {{version}}.",
   "content_manager.success.toggle_updates_enabled": "Controllo aggiornamenti abilitato per {{name}}.",
   "content_manager.success.toggle_updates_disabled": "Controllo aggiornamenti disabilitato per {{name}}.",
@@ -1185,6 +1186,7 @@
   "content_manager.success.batch_toggle_updates_disabled": "Controllo aggiornamenti disabilitato per {{count}} {{itemLabel}}.",
   "content_manager.loading.updating": "Aggiornamento {{name}} a {{version}}...",
   "content_manager.loading.updating_progress": "Aggiornamento {{current}}/{{total}} {{type}}...",
+  "content_manager.loading.updating_bulk": "Aggiornamento di {{total}} {{type}}...",
   "content_manager.loading.switching": "Cambio a {{version}}...",
   "content_manager.loading.enabling_update_checks": "Abilitazione controllo aggiornamenti per {{name}}...",
   "content_manager.loading.disabling_update_checks": "Disabilitazione controllo aggiornamenti per {{name}}...",
@@ -2325,5 +2327,10 @@
   "syncPacks.entries.modeOffTip": "Questa mod viene saltata per questa versione di Minecraft",
   "syncPacks.entries.modOff": "disattivata per tutti i profili",
   "syncPacks.entries.disableEverywhere": "Disattiva questa mod per tutti i profili",
-  "syncPacks.entries.enableEverywhere": "Riattiva questa mod per tutti i profili"
+  "syncPacks.entries.enableEverywhere": "Riattiva questa mod per tutti i profili",
+  "profiles.v3.batch.enabled": "{{count}} attivati",
+  "profiles.v3.batch.disabled": "{{count}} disattivati",
+  "content_manager.errors.batch_partial": "{{count}} non hanno potuto essere modificati",
+  "webgl.unavailable": "L'anteprima 3D non è disponibile su questo dispositivo.",
+  "webgl.unavailable.description": "Il tuo dispositivo non supporta il 3D, quindi skin e mantelli vengono mostrati come immagini piatte."
 }

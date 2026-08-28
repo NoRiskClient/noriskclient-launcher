@@ -11,6 +11,7 @@ import EffectPreviewCard from "../../EffectPreviewCard";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { BACKGROUND_EFFECTS, useBackgroundEffectStore } from "../../../store/background-effect-store";
 import { useQualitySettingsStore } from "../../../store/quality-settings-store";
+import { isWebGLAvailable } from "@noriskclient/nrc-skin-renderer";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../../ui/buttons/Button";
@@ -27,6 +28,7 @@ export function AppearanceTab() {
     customMediaUrl, customMediaOpacity, customMediaBlur, customMediaQuality, customMediaOnlyOnPlay, customMediaHideEffects,
     setCustomMedia, setCustomMediaOpacity, setCustomMediaBlur, setCustomMediaQuality, setCustomMediaOnlyOnPlay, setCustomMediaHideEffects
   } = useBackgroundEffectStore();
+  const webglOk = isWebGLAvailable();
   const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } =
     useQualitySettingsStore();
 
@@ -87,11 +89,11 @@ export function AppearanceTab() {
             size="md"
           />
         </SettingRow>
-        <SettingRow label={t("settings.background.skin_animation")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving}>
+        <SettingRow label={t("settings.background.skin_animation")} description={webglOk ? undefined : t("webgl.unavailable")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving}>
           <ToggleSwitch
-            checked={cosmeticRenderer3d}
+            checked={cosmeticRenderer3d && webglOk}
             onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-            disabled={saving}
+            disabled={saving || !webglOk}
             size="md"
           />
         </SettingRow>

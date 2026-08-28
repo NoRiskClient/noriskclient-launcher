@@ -35,6 +35,7 @@ pub fn mod_from_modrinth_version(
             .find_map(|loader| ModLoader::from_str(loader).ok()),
         modpack_origin: None,
         updates_enabled: true,
+        extra: Default::default(),
         force_include_versions: Vec::new(),
     })
 }
@@ -64,6 +65,7 @@ pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
             .find_map(|loader| ModLoader::from_str(loader).ok()),
         modpack_origin: None,
         updates_enabled: true,
+        extra: Default::default(),
         force_include_versions: Vec::new(),
     }
 }
@@ -162,6 +164,7 @@ pub fn mod_from_unified_version(version: &unified_mod::UnifiedVersion) -> Option
             .find_map(|loader| ModLoader::from_str(loader).ok()),
         modpack_origin: None,
         updates_enabled: true,
+        extra: Default::default(),
         force_include_versions: Vec::new(),
     })
 }
