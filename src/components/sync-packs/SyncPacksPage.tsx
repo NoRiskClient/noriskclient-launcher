@@ -142,13 +142,14 @@ export function SyncPacksPage() {
     const refs = selectedRefs();
     if (refs.length === 0) return;
 
-    const confirmed = await controller.confirm({
-      title: t("syncPacks.selection.removeTitle"),
-      message: t("syncPacks.selection.removeConfirm", { count: refs.length }),
-      confirmText: t("syncPacks.targets.remove"),
-      cancelText: t("common.cancel"),
-      type: "danger",
-    });
+    const confirmed = await controller.confirmDanger(
+      {
+        title: "syncPacks.selection.removeTitle",
+        message: "syncPacks.selection.removeConfirm",
+        confirm: "syncPacks.targets.remove",
+      },
+      { count: refs.length },
+    );
     if (!confirmed) return;
 
     try {

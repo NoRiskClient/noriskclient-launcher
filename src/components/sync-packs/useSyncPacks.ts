@@ -390,15 +390,31 @@ export function useSyncPacks() {
     [applyToggle, isBusy, profile, t],
   );
 
-  const deletePack = useCallback(
-    async (pack: SyncPack) => {
-      const confirmed = await confirm({
-        title: t("syncPacks.deleteTitle"),
-        message: t("syncPacks.deleteConfirm", { name: pack.name }),
-        confirmText: t("syncPacks.delete"),
+  const confirmDanger = useCallback(
+    (
+      keys: { title: string; message: string; confirm: string },
+      vars?: Record<string, unknown>,
+    ) =>
+      confirm({
+        title: t(keys.title),
+        message: t(keys.message, vars),
+        confirmText: t(keys.confirm),
         cancelText: t("common.cancel"),
         type: "danger",
-      });
+      }),
+    [confirm, t],
+  );
+
+  const deletePack = useCallback(
+    async (pack: SyncPack) => {
+      const confirmed = await confirmDanger(
+        {
+          title: "syncPacks.deleteTitle",
+          message: "syncPacks.deleteConfirm",
+          confirm: "syncPacks.delete",
+        },
+        { name: pack.name },
+      );
       if (!confirmed) return;
 
       try {
@@ -416,49 +432,37 @@ export function useSyncPacks() {
   );
 
   const renamePack = useCallback(
-    async (packId: string, name: string) => {
+    (packId: string, name: string) => {
       const trimmed = name.trim();
       if (!trimmed) {
         toast.error(t("syncPacks.nameRequired"));
-        return false;
+        return Promise.resolve();
       }
-      try {
-        await SyncPackService.updateSyncPack({ pack_id: packId, name: trimmed });
-        await refresh();
-        return true;
-      } catch (err) {
-        toast.error(
-          t("syncPacks.renameError", { error: parseErrorMessage(err) }),
-        );
-        return false;
-      }
+      return run(
+        () => SyncPackService.updateSyncPack({ pack_id: packId, name: trimmed }),
+        "syncPacks.renameError",
+      );
     },
-    [refresh, t],
+    [run, t],
   );
 
   const setPackIcon = useCallback(
-    async (packId: string, chosen: { url: string } | { path: string } | null) => {
-      try {
+    (packId: string, chosen: { url: string } | { path: string } | null) =>
+      run(async () => {
         if (chosen === null) {
           await SyncPackService.updateSyncPack({
             pack_id: packId,
             clear_icon: true,
           });
-        } else {
-          const icon =
-            "url" in chosen
-              ? chosen.url
-              : await SyncPackService.importSyncPackIcon(packId, chosen.path);
-          await SyncPackService.updateSyncPack({ pack_id: packId, icon });
+          return;
         }
-        await refresh();
-      } catch (err) {
-        toast.error(
-          t("syncPacks.iconError", { error: parseErrorMessage(err) }),
-        );
-      }
-    },
-    [refresh, t],
+        const icon =
+          "url" in chosen
+            ? chosen.url
+            : await SyncPackService.importSyncPackIcon(packId, chosen.path);
+        await SyncPackService.updateSyncPack({ pack_id: packId, icon });
+      }, "syncPacks.iconError"),
+    [run],
   );
 
   const openFolder = useCallback(
@@ -476,13 +480,14 @@ export function useSyncPacks() {
 
   const removeTarget = useCallback(
     async (packId: string, target: SyncTarget) => {
-      const confirmed = await confirm({
-        title: t("syncPacks.targets.removeTitle"),
-        message: t("syncPacks.targets.removeConfirm", { path: target.path }),
-        confirmText: t("syncPacks.targets.remove"),
-        cancelText: t("common.cancel"),
-        type: "danger",
-      });
+      const confirmed = await confirmDanger(
+        {
+          title: "syncPacks.targets.removeTitle",
+          message: "syncPacks.targets.removeConfirm",
+          confirm: "syncPacks.targets.remove",
+        },
+        { path: target.path },
+      );
       if (!confirmed) return;
 
       await run(async () => {
@@ -492,19 +497,20 @@ export function useSyncPacks() {
         );
       }, "syncPacks.targets.removeError");
     },
-    [confirm, run, t],
+    [confirmDanger, run, t],
   );
 
   const removeMod = useCallback(
     async (packId: string, entry: SyncPackModEntry) => {
       const name = entry.display_name;
-      const confirmed = await confirm({
-        title: t("syncPacks.mods.removeTitle"),
-        message: t("syncPacks.mods.removeConfirm", { name }),
-        confirmText: t("syncPacks.mods.remove"),
-        cancelText: t("common.cancel"),
-        type: "danger",
-      });
+      const confirmed = await confirmDanger(
+        {
+          title: "syncPacks.mods.removeTitle",
+          message: "syncPacks.mods.removeConfirm",
+          confirm: "syncPacks.mods.remove",
+        },
+        { name },
+      );
       if (!confirmed) return;
 
       await run(async () => {
@@ -512,18 +518,19 @@ export function useSyncPacks() {
         toast.success(t("syncPacks.mods.removeSuccess", { name }));
       }, "syncPacks.mods.removeError");
     },
-    [confirm, run, t],
+    [confirmDanger, run, t],
   );
 
   const removeJar = useCallback(
     async (packId: string, fileName: string) => {
-      const confirmed = await confirm({
-        title: t("syncPacks.mods.removeJarTitle"),
-        message: t("syncPacks.mods.removeJarConfirm", { name: fileName }),
-        confirmText: t("syncPacks.mods.removeJar"),
-        cancelText: t("common.cancel"),
-        type: "danger",
-      });
+      const confirmed = await confirmDanger(
+        {
+          title: "syncPacks.mods.removeJarTitle",
+          message: "syncPacks.mods.removeJarConfirm",
+          confirm: "syncPacks.mods.removeJar",
+        },
+        { name: fileName },
+      );
       if (!confirmed) return;
 
       await run(async () => {
@@ -531,7 +538,7 @@ export function useSyncPacks() {
         toast.success(t("syncPacks.mods.removeJarSuccess", { name: fileName }));
       }, "syncPacks.mods.removeJarError");
     },
-    [confirm, run, t],
+    [confirmDanger, run, t],
   );
 
   const setModEnabled = useCallback(
@@ -622,7 +629,7 @@ export function useSyncPacks() {
     setAdoptPrompt,
     detachPrompt,
     setDetachPrompt,
-    confirm,
+    confirmDanger,
     confirmDialog,
     refresh,
     pickPaths,
