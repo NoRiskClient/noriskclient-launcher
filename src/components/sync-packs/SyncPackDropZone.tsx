@@ -10,7 +10,7 @@ import { Tooltip } from "../ui/Tooltip";
 export interface SyncPackDropZoneProps {
   pack: SyncPack;
   isDragOver: boolean;
-  isBusy: boolean;
+  showBusy: boolean;
   canBrowse: boolean;
   onPickPaths: (directory: boolean) => void;
   onPickPreset: (preset: SyncTargetPreset) => void;
@@ -31,7 +31,7 @@ function missingPresets(pack: SyncPack): SyncTargetPreset[] {
 export function SyncPackDropZone({
   pack,
   isDragOver,
-  isBusy,
+  showBusy,
   canBrowse,
   onPickPaths,
   onPickPreset,
@@ -65,7 +65,7 @@ export function SyncPackDropZone({
             >
               <button
                 onClick={() => onPickPreset(preset)}
-                disabled={isBusy}
+                disabled={showBusy}
                 className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-minecraft text-xs text-white/50 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white/90 disabled:opacity-30"
               >
                 + {preset.path}
@@ -79,7 +79,7 @@ export function SyncPackDropZone({
         <div className="flex items-center gap-1">
           <button
             onClick={() => onPickPaths(true)}
-            disabled={isBusy}
+            disabled={showBusy}
             className={`${ADD_BUTTON} text-white/45 hover:text-white`}
           >
             + {t("syncPacks.add.folder")}
@@ -87,7 +87,7 @@ export function SyncPackDropZone({
           <span className="text-white/15">|</span>
           <button
             onClick={() => onPickPaths(false)}
-            disabled={isBusy}
+            disabled={showBusy}
             className={`${ADD_BUTTON} text-white/45 hover:text-white`}
           >
             + {t("syncPacks.add.file")}
@@ -101,7 +101,7 @@ export function SyncPackDropZone({
           >
             <button
               onClick={onBrowseMods}
-              disabled={isBusy || !canBrowse}
+              disabled={showBusy || !canBrowse}
               className={ADD_BUTTON}
               style={{ color: accentColor.value }}
             >

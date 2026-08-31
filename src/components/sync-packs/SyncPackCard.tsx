@@ -47,7 +47,7 @@ export function SyncPackCard({
     setExpandedPack,
     localJars,
     matrix,
-    isBusy,
+    showBusy,
     isDragOver,
     resolvingMod,
     setBrowsePack,
@@ -182,7 +182,7 @@ export function SyncPackCard({
               <ToggleSwitch
                 checked={inUse}
                 onChange={(next) => togglePack(pack, next)}
-                disabled={isBusy}
+                disabled={showBusy}
                 size="sm"
               />
             </div>
@@ -341,7 +341,7 @@ export function SyncPackCard({
           <SyncPackDropZone
             pack={pack}
             isDragOver={isDragOver}
-            isBusy={isBusy}
+            showBusy={showBusy}
             canBrowse={!!browseProfile}
             onPickPaths={(directory) => pickPaths(pack.id, directory)}
             onPickPreset={(preset) => setPresetPrompt({ packId: pack.id, preset })}

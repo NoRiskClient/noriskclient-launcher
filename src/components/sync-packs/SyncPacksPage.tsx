@@ -43,7 +43,7 @@ export function SyncPacksPage() {
     conflicts,
     profile,
     browseProfile,
-    isBusy,
+    showBusy,
     browsePack,
     setBrowsePack,
     presetPrompt,
@@ -222,7 +222,7 @@ export function SyncPacksPage() {
 
         <button
           onClick={() => setIsCreating(true)}
-          disabled={isBusy || isCreating}
+          disabled={showBusy || isCreating}
           className="px-2 py-1 text-[11px] font-minecraft uppercase tracking-wider text-white/45 transition-colors hover:text-white disabled:opacity-25"
         >
           + {t("syncPacks.create")}
@@ -286,7 +286,7 @@ export function SyncPacksPage() {
               />
               <button
                 onClick={submitDraft}
-                disabled={!draftName.trim() || isBusy}
+                disabled={!draftName.trim() || showBusy}
                 className="px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider transition-opacity disabled:opacity-30"
                 style={{ color: accentColor.value }}
               >
@@ -308,7 +308,7 @@ export function SyncPacksPage() {
           profileName={profile.name}
           packName={adoptPrompt.pack.name}
           entries={adoptPrompt.entries}
-          busy={isBusy}
+          busy={showBusy}
           onCancel={() => setAdoptPrompt(null)}
           onConfirm={() => {
             const pending = adoptPrompt;
@@ -322,7 +322,7 @@ export function SyncPacksPage() {
         <DetachModeModal
           profileName={profile.name}
           packName={detachPrompt.pack.name}
-          busy={isBusy}
+          busy={showBusy}
           onCancel={() => setDetachPrompt(null)}
           onConfirm={(mode) => {
             const pending = detachPrompt;

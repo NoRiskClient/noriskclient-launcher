@@ -11,6 +11,7 @@ import { toast } from "react-hot-toast";
 import { useAppDragDropStore } from "../../store/appStore";
 import { useProfileStore } from "../../store/profile-store";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useDelayedTrue } from "../../hooks/useDelayedTrue";
 import { parseErrorMessage } from "../../utils/error-utils";
 import * as SyncPackService from "../../services/sync-pack-service";
 import type {
@@ -73,6 +74,7 @@ export function useSyncPacks() {
   const [matrix, setMatrix] = useState<Record<string, SyncPackModMatrix[]>>({});
   const [expandedPack, setExpandedPack] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const showBusy = useDelayedTrue(isBusy, 200, 400);
   const [isDragOver, setIsDragOver] = useState(false);
   const [resolvingMod, setResolvingMod] = useState<string | null>(null);
   const [browsePack, setBrowsePack] = useState<SyncPack | null>(null);
@@ -84,6 +86,7 @@ export function useSyncPacks() {
   );
 
   const expandedRef = useRef<string | null>(null);
+  const profilesRequested = useRef(false);
   const busyRef = useRef(false);
   expandedRef.current = expandedPack;
   busyRef.current = isBusy;
@@ -143,6 +146,12 @@ export function useSyncPacks() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (profilesRequested.current || profiles.length > 0) return;
+    profilesRequested.current = true;
+    void fetchProfiles();
+  }, [fetchProfiles, profiles.length]);
 
   useEffect(() => {
     if (expandedPack) loadPackDetails(expandedPack);
@@ -618,7 +627,7 @@ export function useSyncPacks() {
     subscribedIds,
     expandedPack,
     setExpandedPack,
-    isBusy,
+    showBusy,
     isDragOver,
     resolvingMod,
     browsePack,
