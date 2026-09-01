@@ -17,6 +17,8 @@ import { MigrationInfo } from "../types/profile";
 import * as SyncPackService from "../services/sync-pack-service";
 import { needsAdoptConfirm } from "../types/syncPacks";
 import { AdoptPreviewModal } from "../components/sync-packs/AdoptPreviewModal";
+import { requireMinecraftAccount } from "../lib/require-account";
+import { useProfileStore } from "../store/profile-store";
 
 interface UseProfileLaunchOptions {
   profileId: string;
@@ -195,6 +197,15 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     }
   };
 
+  // Sign-in gate. Without an account the backend aborts the launch with a bare
+  // NoCredentialsError, so catch it here and offer the sign-in instead; the
+  // prompt calls `retry` once an account is active so the click still lands.
+  const hasAccountOrPrompt = (retry: () => void): boolean =>
+    requireMinecraftAccount({
+      profileName: useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name,
+      onAuthenticated: retry,
+    });
+
   // Actual launch function
   const performLaunch = async (migrationInfo?: MigrationInfo) => {
     initiateButtonLaunch(profileId);
@@ -246,6 +257,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
       return;
     }
 
+    if (!hasAccountOrPrompt(() => handleLaunch())) return;
     if (!(await ensureSyncConfirmed())) return;
 
     // Check if migration is needed
@@ -279,12 +291,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     }
   };
 
-  return {
-    isLaunching: isButtonLaunching,
-    statusMessage: buttonStatusMessage,
-    launchState,
-    handleLaunch,
-    handleQuickPlayLaunch: async (
+  const handleQuickPlayLaunch = async (
       singleplayer?: string,
       multiplayer?: string,
       overrides?: LaunchOverrides,
@@ -311,6 +318,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         return;
       }
 
+      if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer, overrides))) return;
       if (!(await ensureSyncConfirmed())) return;
 
       if (overrides) {
@@ -415,6 +423,13 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           onLaunchError?.(launchErrorMsg);
         }
       }
-    },
+    };
+
+  return {
+    isLaunching: isButtonLaunching,
+    statusMessage: buttonStatusMessage,
+    launchState,
+    handleLaunch,
+    handleQuickPlayLaunch,
   };
 }

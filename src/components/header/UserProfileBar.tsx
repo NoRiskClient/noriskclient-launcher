@@ -25,6 +25,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const { initializeAccounts } = useMinecraftAuthStore();
+  const accountCount = useMinecraftAuthStore((s) => s.accounts.length);
   const [_, setMounted] = useState(false);
   const { openModal: openSocialsModal } = useSocialsModalStore();
   const { toggleSidebar: toggleFriendsSidebar } = useFriendsStore();
@@ -47,6 +48,15 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
 
     return () => ctx.revert();
   }, []);
+
+  // Removing the last account hands the screen over to the welcome gate. That
+  // gate has to render below this dropdown (it opens the browser-login modal
+  // itself, so it sits under the modal layer, while the dropdown portals above
+  // it), so an open dropdown would be left floating over the sign-in screen —
+  // an account manager for zero accounts. Close it instead.
+  useEffect(() => {
+    if (accountCount === 0) setIsAccountDropdownOpen(false);
+  }, [accountCount]);
 
   const toggleAccountDropdown = () => {
     setIsAccountDropdownOpen(!isAccountDropdownOpen);
