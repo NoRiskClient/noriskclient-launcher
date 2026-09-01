@@ -9,7 +9,7 @@ use std::path::{Component, Path, PathBuf};
 
 const ALLOWED_CONTENT_EXTENSIONS: &[&str] = &["jar", "zip"];
 
-const MODRINTH_HOSTS: &[&str] = &["cdn.modrinth.com"];
+pub const MODRINTH_HOSTS: &[&str] = &["cdn.modrinth.com"];
 const CURSEFORGE_HOSTS: &[&str] = &[
     "edge.forgecdn.net",
     "mediafilez.forgecdn.net",
@@ -339,7 +339,7 @@ fn inspect_mod(mod_info: &Mod, report: &mut ImportSecurityReport) -> std::result
     Ok(())
 }
 
-fn check_content_file_name(name: &str) -> std::result::Result<(), String> {
+pub fn check_content_file_name(name: &str) -> std::result::Result<(), String> {
     let cleaned = safe_file_component(name).map_err(|e| e.to_string())?;
     let extension = std::path::Path::new(&cleaned)
         .extension()
@@ -367,7 +367,7 @@ fn require_https(url: &str) -> std::result::Result<String, String> {
         .ok_or_else(|| format!("'{}' has no host", url))
 }
 
-fn require_host(
+pub fn require_host(
     url: &str,
     allowed: &[&str],
     platform: &str,
@@ -387,14 +387,10 @@ fn is_coordinate_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+')
 }
 
-fn is_version_like(value: &str) -> bool {
+pub fn is_version_like(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
 }
-
-#[cfg(test)]
-#[path = "import_safety_test.rs"]
-mod tests;

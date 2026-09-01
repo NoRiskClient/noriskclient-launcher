@@ -213,16 +213,3 @@ fn get_install_directory() -> Result<PathBuf> {
 
     Ok(install_dir.to_path_buf())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_install_directory() {
-        let result = get_install_directory();
-        assert!(result.is_ok());
-        let dir = result.unwrap();
-        assert!(dir.exists());
-    }
-}

@@ -89,7 +89,3 @@ pub fn map_from_str<T: DeserializeOwned>(text: &str) -> serde_json::Result<HashM
     }
     Ok(parsed)
 }
-
-#[cfg(test)]
-#[path = "lenient_test.rs"]
-mod tests;

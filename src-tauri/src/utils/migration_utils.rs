@@ -37,7 +37,7 @@ pub fn migrate_profiles(profiles: &mut HashMap<Uuid, Profile>) -> Vec<Uuid> {
     migrate_profiles_with_ledger(profiles, &ledger_path())
 }
 
-fn migrate_profiles_with_ledger(
+pub fn migrate_profiles_with_ledger(
     profiles: &mut HashMap<Uuid, Profile>,
     path: &Path,
 ) -> Vec<Uuid> {
@@ -163,7 +163,3 @@ fn write_ledger(path: &Path, ledger: &Ledger) {
         warn!("Could not record migrations in {:?}: {}", path, e);
     }
 }
-
-#[cfg(test)]
-#[path = "migration_utils_test.rs"]
-mod tests;

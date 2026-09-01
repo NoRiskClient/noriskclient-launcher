@@ -589,12 +589,12 @@ async fn hash_bundled_mod_jars(zip: &mut PackZip) -> Result<BundledJars> {
     Ok(BundledJars { hashes, truncated })
 }
 
-enum HashOutcome {
+pub enum HashOutcome {
     Complete(String),
     BudgetExceeded,
 }
 
-async fn stream_sha1<R>(reader: R, byte_budget: u64) -> Result<(HashOutcome, u64)>
+pub async fn stream_sha1<R>(reader: R, byte_budget: u64) -> Result<(HashOutcome, u64)>
 where
     R: futures_lite::io::AsyncRead + Unpin,
 {
@@ -693,8 +693,3 @@ fn base_name(path: &str) -> String {
         .unwrap_or(path)
         .to_string()
 }
-
-
-#[cfg(test)]
-#[path = "pack_preview_test.rs"]
-mod tests;

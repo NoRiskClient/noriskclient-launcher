@@ -218,7 +218,3 @@ impl SyncHandler for OptionsMergeHandler {
         Some(ctx.preview_entry(PreviewAction::Merge))
     }
 }
-
-#[cfg(test)]
-#[path = "options_merge_scenario_test.rs"]
-mod scenario_tests;

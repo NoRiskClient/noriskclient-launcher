@@ -330,11 +330,3 @@ impl SyncHandler for DirLinkHandler {
         Some(entry)
     }
 }
-
-#[cfg(test)]
-#[path = "dir_link_test.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "dir_link_scenario_test.rs"]
-mod scenario_tests;

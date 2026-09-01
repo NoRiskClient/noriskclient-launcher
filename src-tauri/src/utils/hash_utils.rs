@@ -5,10 +5,6 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt; // Import the trait for read()
 
-#[cfg(test)]
-#[path = "hash_utils_test.rs"]
-mod tests;
-
 const MURMUR2_M: u32 = 0x5bd1e995;
 const MURMUR2_R: u32 = 24;
 const CURSEFORGE_FINGERPRINT_SEED: u32 = 1;

@@ -2110,7 +2110,7 @@ async fn minecraft_entitlements(
     Ok(entitlements)
 }
 
-fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
+pub fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
     match err {
         AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
             source,
@@ -2139,7 +2139,7 @@ fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
     }
 }
 
-fn is_offline_error(err: &AppError) -> bool {
+pub fn is_offline_error(err: &AppError) -> bool {
     matches!(
         err,
         AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
@@ -2460,7 +2460,3 @@ pub async fn start_oauth_callback_server(
 
     Ok((handle, rx))
 }
-
-#[cfg(test)]
-#[path = "minecraft_auth_test.rs"]
-mod tests;

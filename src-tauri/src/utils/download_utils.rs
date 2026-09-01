@@ -690,7 +690,3 @@ impl DownloadUtils {
         false
     }
 }
-
-#[cfg(test)]
-#[path = "download_utils_test.rs"]
-mod tests;

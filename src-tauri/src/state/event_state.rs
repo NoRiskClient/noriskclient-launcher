@@ -210,7 +210,3 @@ fn now_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-
-#[cfg(test)]
-#[path = "event_state_test.rs"]
-mod tests;

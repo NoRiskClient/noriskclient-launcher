@@ -26,10 +26,6 @@ use crate::utils::download_utils::DownloadUtils;
 
 use crate::utils::string_utils::safe_truncate;
 
-#[cfg(test)]
-#[path = "curseforge_test.rs"]
-mod tests;
-
 // Base URL for CurseForge API
 const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
 
@@ -1151,7 +1147,7 @@ fn default_required() -> bool {
 }
 
 /// Determines the ModLoader from CurseForge mod loader string
-pub(crate) fn determine_loader_from_curseforge_string(loader_string: &str) -> ModLoader {
+pub fn determine_loader_from_curseforge_string(loader_string: &str) -> ModLoader {
     let lower = loader_string.to_lowercase();
 
     // Check for specific loaders first (neoforge before forge)
@@ -1169,7 +1165,7 @@ pub(crate) fn determine_loader_from_curseforge_string(loader_string: &str) -> Mo
 }
 
 /// Extracts loader version from CurseForge loader string
-pub(crate) fn extract_loader_version(
+pub fn extract_loader_version(
     loader_string: &str,
     mc_version: Option<&str>,
 ) -> Option<String> {
@@ -1197,7 +1193,7 @@ pub(crate) fn extract_loader_version(
 }
 
 /// Determines the ModLoader and version from CurseForge mod loaders
-fn determine_loader_from_curseforge_loaders(
+pub fn determine_loader_from_curseforge_loaders(
     loaders: &[CurseForgeModLoader],
     mc_version: Option<&str>,
 ) -> (ModLoader, Option<String>) {
@@ -2161,7 +2157,6 @@ pub async fn import_curseforge_pack_as_profile(
     Ok(profile_id) // Return the ID of the created profile
 }
 
-
 /// Downloads a CurseForge modpack file and installs it as a new profile
 /// If event_id is provided, progress events will be emitted.
 pub async fn download_and_install_curseforge_modpack(
@@ -2917,4 +2912,3 @@ pub async fn check_mod_updates_bulk(
     info!("Found {} CurseForge mod updates after filtering", updates.len());
     Ok(updates)
 }
-

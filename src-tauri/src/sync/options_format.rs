@@ -76,7 +76,6 @@ impl OptionsDocument {
         out
     }
 
-    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
@@ -145,7 +144,3 @@ fn split_pair(line: &str, separator: char) -> Option<(&str, &str)> {
     }
     Some((key, &line[index + separator.len_utf8()..]))
 }
-
-#[cfg(test)]
-#[path = "options_format_test.rs"]
-mod tests;

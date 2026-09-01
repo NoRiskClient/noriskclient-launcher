@@ -363,10 +363,6 @@ pub struct ProfileBackupInfo {
     pub profile_count: usize,
 }
 
-#[cfg(test)]
-#[path = "profile_state_test.rs"]
-mod tests;
-
 pub(crate) fn mod_project_key(source: &ModSource) -> Option<(&'static str, &str)> {
     match source {
         ModSource::Modrinth { project_id, .. } => Some(("modrinth", project_id.as_str())),
@@ -398,13 +394,13 @@ pub(crate) fn mod_platform_ids(
     }
 }
 
-pub(crate) fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
+pub fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
     let key = mod_project_key(source)?;
     mods.iter()
         .position(|m| mod_project_key(&m.source) == Some(key))
 }
 
-pub(crate) fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
+pub fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
     mods.iter()
         .position(|m| mod_project_key(&m.source).map(|(_, id)| id) == Some(project_id))
 }
@@ -457,7 +453,7 @@ pub(crate) fn mod_from_payload(
     }
 }
 
-pub(crate) fn replace_mod_with_payload(
+pub fn replace_mod_with_payload(
     existing: &mut Mod,
     payload: &crate::commands::content_command::InstallContentPayload,
     source: ModSource,
@@ -498,7 +494,7 @@ pub(crate) fn upsert_mod_from_payload(
     }
 }
 
-pub(crate) fn find_mod_for_version_switch(
+pub fn find_mod_for_version_switch(
     mods: &[Mod],
     current_item: &crate::utils::profile_utils::LocalContentItem,
 ) -> Option<usize> {
@@ -540,7 +536,6 @@ pub struct ProfileStoreStatus {
     pub mod_count: usize,
     pub legacy_json_available: bool,
 }
-
 
 /// Rewrite an installed mod in-place to a [`UnifiedVersion`] (Modrinth or CurseForge): source,
 /// version, game versions, loader, and force-include the profile MC if the version omits it.
@@ -3008,9 +3003,6 @@ impl ProfileManager {
         Ok(outcome.imported)
     }
 
-
-
-
     async fn save_profile(&self, id: Uuid) -> Result<()> {
         let _guard = self.save_lock.lock().await;
 
@@ -3461,7 +3453,6 @@ impl ProfileManager {
             .map(|idx| (profile.mods[idx].id, profile.mods[idx].enabled))
     }
 
-
     async fn install_missing_dependencies(
         &self,
         profile_id: Uuid,
@@ -3703,7 +3694,7 @@ impl PostInitializationHandler for ProfileManager {
 
 const PRE_MIGRATION_SNAPSHOT: &str = "pre-profiles";
 
-fn should_persist(profile: &Profile, transient: &HashSet<Uuid>) -> bool {
+pub fn should_persist(profile: &Profile, transient: &HashSet<Uuid>) -> bool {
     if transient.contains(&profile.id) || profile.path.starts_with("noriskclient/temp/") {
         return false;
     }

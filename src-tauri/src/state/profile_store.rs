@@ -12,7 +12,7 @@ use sqlx::{Row, SqlitePool};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-const SQL_VARIABLE_CHUNK: usize = 900;
+pub const SQL_VARIABLE_CHUNK: usize = 900;
 
 pub struct ProfileStore {
     db: DbHandle,
@@ -63,7 +63,7 @@ fn nanos_into(raw: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_nanos(raw)
 }
 
-pub(crate) fn canonical_value(profile: &Profile) -> Result<serde_json::Value> {
+pub fn canonical_value(profile: &Profile) -> Result<serde_json::Value> {
     let mut value = serde_json::to_value(profile)?;
     if let Some(set) = value
         .get_mut("disabled_norisk_mods_detailed")
@@ -123,7 +123,7 @@ impl From<SettingsData> for ProfileSettings {
     }
 }
 
-fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
+pub fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
     let raw_id: String = row.get("id");
     let id = Uuid::parse_str(&raw_id)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_id, e)))?;
@@ -180,7 +180,7 @@ fn parse_optional_uuid(raw: Option<String>) -> Option<Uuid> {
     }
 }
 
-fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
+pub fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
     let raw_profile: String = row.get("profile_id");
     let profile_id = Uuid::parse_str(&raw_profile)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_profile, e)))?;
@@ -214,7 +214,7 @@ fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
     ))
 }
 
-fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIdentifier)> {
+pub fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIdentifier)> {
     let raw_profile: String = row.get("profile_id");
     let profile_id = Uuid::parse_str(&raw_profile)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_profile, e)))?;
@@ -238,7 +238,9 @@ fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIden
     ))
 }
 
-fn source_lookup(source: &crate::state::profile_state::ModSource) -> (String, Option<String>, Option<String>, Option<String>) {
+pub fn source_lookup(
+    source: &crate::state::profile_state::ModSource,
+) -> (String, Option<String>, Option<String>, Option<String>) {
     use crate::state::profile_state::ModSource;
     match source {
         ModSource::Local { file_name } => {
@@ -279,7 +281,7 @@ impl ProfileStore {
         Self { db }
     }
 
-    async fn pool(&self) -> Result<SqlitePool> {
+    pub async fn pool(&self) -> Result<SqlitePool> {
         match db::pool_of(&self.db).await {
             Some(pool) => Ok(pool),
             None => Err(AppError::Other(
@@ -927,7 +929,3 @@ async fn verify_import(
 
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "profile_store_test.rs"]
-mod tests;

@@ -70,7 +70,7 @@ async fn adopt_database_from_custom_dir(target: &Path) {
     info!("Adopted the database from {:?} into {:?}", legacy, target);
 }
 
-async fn open_or_reopen_at(handle: &DbHandle, path: PathBuf) -> Result<()> {
+pub async fn open_or_reopen_at(handle: &DbHandle, path: PathBuf) -> Result<()> {
     {
         let db = handle.read().await;
         if db.pool.is_some() && db.path.as_deref() == Some(path.as_path()) {
@@ -182,7 +182,7 @@ fn connect_options(path: &Path, wal: bool) -> Result<SqliteConnectOptions> {
         .optimize_on_close(true, None))
 }
 
-async fn open(path: &Path, wal: bool) -> std::result::Result<SqlitePool, String> {
+pub async fn open(path: &Path, wal: bool) -> std::result::Result<SqlitePool, String> {
     let options = connect_options(path, wal).map_err(|e| e.to_string())?;
     let pool = SqlitePoolOptions::new()
         .max_connections(8)
@@ -195,7 +195,7 @@ async fn open(path: &Path, wal: bool) -> std::result::Result<SqlitePool, String>
     Ok(pool)
 }
 
-async fn migrate(pool: &SqlitePool) -> Result<()> {
+pub async fn migrate(pool: &SqlitePool) -> Result<()> {
     let mut migrator = sqlx::migrate!("./migrations");
     migrator.set_ignore_missing(true);
     migrator
@@ -204,8 +204,7 @@ async fn migrate(pool: &SqlitePool) -> Result<()> {
         .map_err(|e| AppError::Other(format!("SQLite migration failed: {}", e)))
 }
 
-#[cfg(test)]
-async fn open_in_memory() -> Result<SqlitePool> {
+pub async fn open_in_memory() -> Result<SqlitePool> {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .idle_timeout(None)
@@ -271,29 +270,3 @@ async fn init_at(path: &Path) -> Result<SqlitePool> {
         }
     }
 }
-
-#[cfg(test)]
-pub(crate) async fn test_pool() -> SqlitePool {
-    open_in_memory()
-        .await
-        .expect("in-memory test database must open")
-}
-
-#[cfg(test)]
-pub(crate) async fn set_pool_for_test(handle: &DbHandle, pool: SqlitePool) {
-    let mut db = handle.write().await;
-    db.pool = Some(pool);
-    db.path = None;
-}
-
-#[cfg(test)]
-pub(crate) async fn open_at_for_test(handle: &DbHandle, path: &Path) {
-    open_or_reopen_at(handle, path.to_path_buf())
-        .await
-        .expect("the test database must open")
-}
-
-#[cfg(test)]
-#[path = "db_test.rs"]
-mod tests;
-

@@ -173,7 +173,3 @@ pub async fn version_details(
         }
     }
 }
-
-#[cfg(test)]
-#[path = "mod_dependencies_test.rs"]
-mod tests;

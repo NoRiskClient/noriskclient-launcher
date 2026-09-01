@@ -7,10 +7,6 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-#[cfg(test)]
-#[path = "cosmetic_pack_api_test.rs"]
-mod tests;
-
 fn cdn_base(pack: &str) -> String {
     format!("https://cdn.norisk.gg/assets/{}/assets/", pack)
 }
@@ -163,7 +159,7 @@ pub struct EmoteAssetUrlsDto {
     pub mcmeta: Option<String>,
 }
 
-fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> Value {
+pub fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> Value {
     let Some(settings) = settings else {
         return meta;
     };

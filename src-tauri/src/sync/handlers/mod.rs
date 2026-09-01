@@ -66,7 +66,3 @@ pub async fn file_sha1(path: &Path) -> Option<String> {
 pub fn profile_state_key(target_path: &str, profile_id: Uuid) -> String {
     format!("{}@{}", target_path, profile_id)
 }
-
-#[cfg(test)]
-#[path = "scenario_support.rs"]
-pub(crate) mod scenario_support;

@@ -78,7 +78,3 @@ pub fn sort_contexts(contexts: &mut [(String, ModLoader)]) {
         compare_versions(&b.0, &a.0).then_with(|| a.1.as_str().cmp(b.1.as_str()))
     });
 }
-
-#[cfg(test)]
-#[path = "subscribers_test.rs"]
-mod tests;
