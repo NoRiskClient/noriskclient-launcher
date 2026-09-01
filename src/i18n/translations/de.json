@@ -41,7 +41,7 @@
   "settings.open_logs.tooltip": "Automatisch das Spiellog-Fenster beim Starten von Minecraft öffnen. Nützlich zur Fehlersuche.",
   "settings.hide_window": "Fenster beim Start ausblenden",
   "settings.hide_window.tooltip": "Automatisch das Launcher-Fenster ausblenden, wenn Minecraft startet. Reduziert Unordnung auf dem Desktop.",
-  "settings.concurrent_downloads": "Aktuelle Downloads",
+  "settings.concurrent_downloads": "Gleichzeitige Downloads",
   "settings.concurrent_downloads.tooltip": "Maximale Anzahl gleichzeitig heruntergeladener Dateien. Niedrigere Werte reduzieren die Bandbreitennutzung.",
   "settings.concurrent_io": "Gleichzeitige I/O-Operationen",
   "settings.concurrent_io.tooltip": "Maximale Anzahl gleichzeitig auf die Festplatte geschriebener Dateien. Niedrigere Werte reduzieren die Festplattenbelastung.",
@@ -94,7 +94,7 @@
 
   "settings.game_data_dir.title": "Spieldaten-Verzeichnis",
   "settings.game_data_dir.description": "Wähle einen benutzerdefinierten Speicherort für Spieldaten (Welten, Mods, Bibliotheken, etc.)",
-  "settings.game_data_dir.tooltip": "Diese Einstellung erlaubt es, Spieldaten auf einem anderen Laufwerk zu speichern. Nützlich, wenn das Hauptlaufwerk wenig Platz hat. Der Launcher übernimmt automatisch die Änderung des Speicherorts für neue Downloads und Installationen.",
+  "settings.game_data_dir.tooltip": "Diese Einstellung erlaubt es, Spieldaten auf einem anderen Laufwerk zu speichern. Nützlich, wenn das Hauptlaufwerk wenig Platz hat.",
   "settings.game_data_dir.placeholder": "Standardverzeichnis wird verwendet",
   "settings.game_data_dir.reset_tooltip": "Auf Standardverzeichnis zurücksetzen",
   "settings.game_data_dir.select_tooltip": "Verzeichnis auswählen",
