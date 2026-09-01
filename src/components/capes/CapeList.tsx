@@ -14,6 +14,7 @@ import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import type { SkinVariant } from "../../types/localSkin";
 import { EmptyState } from "../ui/EmptyState";
+import { SignedOutState } from "../account/SignedOutState";
 import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage";
 import { VanillaCapeImage } from "./VanillaCapeImage";
@@ -612,6 +613,21 @@ export function CapeList({
 
   // For favorites, don't show loading state since favorites are filtered from available capes
   // Just show the filtered results immediately
+
+  // Signed out, the cape list can only ever be empty, and "no capes available"
+  // reads as a fault rather than as a precondition. Say what is actually
+  // missing instead.
+  if (!isLoading && noActualCapesToDisplay && !activeAccount) {
+    return (
+      <div className="flex-1 h-full flex items-center justify-center p-5">
+        <SignedOutState
+          icon="solar:hanger-2-line-duotone"
+          title={t('capes.signedOut.title')}
+          description={t('capes.signedOut.description')}
+        />
+      </div>
+    );
+  }
 
   if (!isLoading && noActualCapesToDisplay && hasInitiallyLoaded) {
     return (
