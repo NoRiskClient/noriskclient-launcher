@@ -80,41 +80,6 @@ impl QuiltLibrariesDownloadService {
         }
     }
 
-    async fn download_maven_artifact(&self, maven: &str) -> Result<()> {
-        let parts: Vec<&str> = maven.split(':').collect();
-        if parts.len() != 3 {
-            return Err(crate::error::AppError::QuiltError(
-                "Invalid Maven coordinates".to_string(),
-            ));
-        }
-
-        let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-        let group_path = group.replace('.', "/");
-        let target_path = self
-            .libraries_path
-            .join(&group_path)
-            .join(artifact)
-            .join(version)
-            .join(format!("{}-{}.jar", artifact, version));
-
-        if fs::try_exists(&target_path).await? {
-            trace!("📦 Maven artifact already exists: {}", maven);
-            return Ok(());
-        }
-
-        let url = format!(
-            "https://maven.quiltmc.org/repository/release/{}/{}/{}/{}-{}.jar",
-            group_path, artifact, version, artifact, version
-        );
-
-        trace!("⬇️ Downloading Maven artifact: {}", maven);
-        DownloadUtils::download_file(&url, &target_path, DownloadConfig::default()).await
-            .map_err(|e| crate::error::AppError::QuiltError(format!("Failed to download Maven artifact: {}", e)))?;
-
-        trace!("💾 Saved Maven artifact: {}", maven);
-        Ok(())
-    }
-
     fn create_library_from_maven(&self, maven: &str) -> QuiltLibrary {
         QuiltLibrary {
             name: maven.to_string(),

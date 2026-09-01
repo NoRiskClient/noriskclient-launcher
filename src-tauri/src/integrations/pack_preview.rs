@@ -573,8 +573,7 @@ async fn hash_bundled_mod_jars(zip: &mut PackZip) -> Result<BundledJars> {
                 total_bytes = total_bytes.saturating_add(read_bytes);
                 hashes.push((name, hash));
             }
-            Ok((HashOutcome::BudgetExceeded, read_bytes)) => {
-                total_bytes = total_bytes.saturating_add(read_bytes);
+            Ok((HashOutcome::BudgetExceeded, _)) => {
                 warn!("Bundled jar '{}' exceeds the decompression budget", name);
                 truncated = true;
                 break;

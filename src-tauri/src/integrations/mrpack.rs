@@ -593,7 +593,7 @@ pub async fn extract_mrpack_overrides(
         AppError::Io(e)
     })?;
     let mut initial_buf_reader = BufReader::new(initial_file_for_listing);
-    let mut zip_lister = ZipFileReader::with_tokio(&mut initial_buf_reader)
+    let zip_lister = ZipFileReader::with_tokio(&mut initial_buf_reader)
         .await
         .map_err(|e| {
             error!("Failed to read mrpack as ZIP for listing: {}", e);

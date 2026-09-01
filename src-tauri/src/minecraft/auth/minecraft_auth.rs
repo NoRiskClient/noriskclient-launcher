@@ -1726,7 +1726,7 @@ async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
     })?;
 
     let status = res.status();
-    let current_date = get_date_header(res.headers());
+    let _current_date = get_date_header(res.headers());
     let text = res
         .text()
         .await
@@ -2422,7 +2422,7 @@ pub async fn start_oauth_callback_server(
                         }
                         // Inject error into HTML template via URL parameters
                         // The JavaScript in the template will handle displaying the error
-                        let error_url = format!("?error={}&error_description={}", 
+                        let _error_url = format!("?error={}&error_description={}", 
                             urlencoding::encode(error),
                             urlencoding::encode(error_description));
                         Html(error_html_shared.as_str().to_string())

@@ -8,13 +8,9 @@ use crate::minecraft::GameArguments;
 use crate::minecraft::JvmArguments;
 use crate::state::profile_state::{ImageSource, Profile, ProfileBanner, WindowSize};
 use crate::state::state_manager::State;
-use log::{debug, error, info, warn};
-use serde_json::Value;
-use std::collections::HashMap;
+use log::{info, warn};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Instant;
-use tauri::Manager;
+use std::process::Command;
 use uuid::Uuid;
 
 pub struct MinecraftLaunchParameters {
@@ -117,7 +113,7 @@ impl MinecraftLaunchParameters {
 /// Returns None if the banner is None or cannot be resolved.
 fn resolve_profile_banner_path(
     banner: &Option<ProfileBanner>,
-    profile_id: Uuid,
+    _profile_id: Uuid,
     profile_path: &Path,
 ) -> Option<String> {
     let banner = banner.as_ref()?;
@@ -228,7 +224,7 @@ impl MinecraftLauncher {
         // Arguments
         let mut args_iter = command.get_args().peekable();
         while let Some(arg_os_str) = args_iter.next() {
-            let mut arg_str = arg_os_str.to_string_lossy().into_owned();
+            let arg_str = arg_os_str.to_string_lossy().into_owned();
 
             if arg_str.starts_with("-Dnorisk.token=") {
                 parts.push("-Dnorisk.token=*****".to_string());

@@ -94,64 +94,67 @@ pub struct CurseForgeSearchResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgePagination {
     pub index: u32,
-    pub pageSize: u32,
-    pub resultCount: u32,
-    pub totalCount: u32,
+    pub page_size: u32,
+    pub result_count: u32,
+    pub total_count: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeMod {
     pub id: u32,
-    pub gameId: u32,
+    pub game_id: u32,
     pub name: String,
     pub slug: String,
     pub links: CurseForgeLinks,
     pub summary: String,
     pub status: u32,
-    pub downloadCount: u64,
-    pub isFeatured: bool,
-    pub primaryCategoryId: u32,
+    pub download_count: u64,
+    pub is_featured: bool,
+    pub primary_category_id: u32,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub categories: Vec<CurseForgeCategory>,
-    pub classId: Option<u32>,
+    pub class_id: Option<u32>,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub authors: Vec<CurseForgeAuthor>,
     #[serde(default, deserialize_with = "lenient::opt")]
     pub logo: Option<CurseForgeAttachment>,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub screenshots: Vec<CurseForgeAttachment>,
-    pub mainFileId: u32,
+    pub main_file_id: u32,
     #[serde(default, deserialize_with = "lenient::vec")]
-    pub latestFiles: Vec<CurseForgeFile>,
+    pub latest_files: Vec<CurseForgeFile>,
     #[serde(default, deserialize_with = "lenient::vec")]
-    pub latestFilesIndexes: Vec<CurseForgeFileIndex>,
+    pub latest_files_indexes: Vec<CurseForgeFileIndex>,
     #[serde(default, deserialize_with = "lenient::vec")]
-    pub latestEarlyAccessFilesIndexes: Vec<CurseForgeFileIndex>,
-    pub dateCreated: String,
-    pub dateModified: String,
-    pub dateReleased: String,
-    pub allowModDistribution: Option<bool>,
-    pub gamePopularityRank: u32,
-    pub isAvailable: bool,
-    pub thumbsUpCount: u32,
+    pub latest_early_access_files_indexes: Vec<CurseForgeFileIndex>,
+    pub date_created: String,
+    pub date_modified: String,
+    pub date_released: String,
+    pub allow_mod_distribution: Option<bool>,
+    pub game_popularity_rank: u32,
+    pub is_available: bool,
+    pub thumbs_up_count: u32,
     pub rating: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeCategory {
     pub id: u32,
-    pub gameId: u32,
+    pub game_id: u32,
     pub name: String,
     pub slug: String,
     pub url: String,
-    pub iconUrl: String,
-    pub dateModified: String,
-    pub isClass: Option<bool>,
-    pub classId: Option<u32>,
-    pub parentCategoryId: Option<u32>,
-    pub displayIndex: Option<u32>,
+    pub icon_url: String,
+    pub date_modified: String,
+    pub is_class: Option<bool>,
+    pub class_id: Option<u32>,
+    pub parent_category_id: Option<u32>,
+    pub display_index: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -162,55 +165,58 @@ pub struct CurseForgeAuthor {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeAttachment {
     pub id: u32,
-    pub modId: u32,
+    pub mod_id: u32,
     pub title: String,
     pub description: String,
-    pub thumbnailUrl: String,
+    pub thumbnail_url: String,
     pub url: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeLinks {
-    pub websiteUrl: String,
-    pub wikiUrl: Option<String>,
-    pub issuesUrl: Option<String>,
-    pub sourceUrl: Option<String>,
+    pub website_url: String,
+    pub wiki_url: Option<String>,
+    pub issues_url: Option<String>,
+    pub source_url: Option<String>,
 }
 
 // Additional structures for files
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeFile {
     pub id: u32,
-    pub gameId: u32,
-    pub modId: u32,
-    pub isAvailable: bool,
-    pub displayName: String,
-    pub fileName: String,
-    pub releaseType: u32,
-    pub fileStatus: u32,
+    pub game_id: u32,
+    pub mod_id: u32,
+    pub is_available: bool,
+    pub display_name: String,
+    pub file_name: String,
+    pub release_type: u32,
+    pub file_status: u32,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub hashes: Vec<CurseForgeFileHash>,
-    pub fileDate: String,
-    pub fileLength: u64,
-    pub downloadCount: u64,
-    pub fileSizeOnDisk: Option<u64>, // Made optional as per API docs
-    pub downloadUrl: String, // Not optional per API docs
+    pub file_date: String,
+    pub file_length: u64,
+    pub download_count: u64,
+    pub file_size_on_disk: Option<u64>, // Made optional as per API docs
+    pub download_url: String, // Not optional per API docs
     #[serde(default)]
-    pub gameVersions: Vec<String>,
+    pub game_versions: Vec<String>,
     #[serde(default, deserialize_with = "lenient::vec")]
-    pub sortableGameVersions: Vec<CurseForgeSortableGameVersion>,
+    pub sortable_game_versions: Vec<CurseForgeSortableGameVersion>,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub dependencies: Vec<CurseForgeDependency>,
-    pub exposeAsAlternative: Option<bool>,
-    pub parentProjectFileId: Option<u32>,
-    pub alternateFileId: Option<u32>,
-    pub isServerPack: Option<bool>,
-    pub serverPackFileId: Option<u32>,
-    pub isEarlyAccessContent: Option<bool>,
-    pub earlyAccessEndDate: Option<String>,
-    pub fileFingerprint: u64,
+    pub expose_as_alternative: Option<bool>,
+    pub parent_project_file_id: Option<u32>,
+    pub alternate_file_id: Option<u32>,
+    pub is_server_pack: Option<bool>,
+    pub server_pack_file_id: Option<u32>,
+    pub is_early_access_content: Option<bool>,
+    pub early_access_end_date: Option<String>,
+    pub file_fingerprint: u64,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub modules: Vec<CurseForgeModule>,
 }
@@ -222,18 +228,20 @@ pub struct CurseForgeFileHash {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeSortableGameVersion {
-    pub gameVersionName: String,
-    pub gameVersionPadded: String,
-    pub gameVersion: String,
-    pub gameVersionReleaseDate: String,
-    pub gameVersionTypeId: Option<u32>,
+    pub game_version_name: String,
+    pub game_version_padded: String,
+    pub game_version: String,
+    pub game_version_release_date: String,
+    pub game_version_type_id: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeDependency {
-    pub modId: u32,
-    pub relationType: u32,
+    pub mod_id: u32,
+    pub relation_type: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -243,13 +251,14 @@ pub struct CurseForgeModule {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CurseForgeFileIndex {
-    pub gameVersion: String,
-    pub fileId: u32,
+    pub game_version: String,
+    pub file_id: u32,
     pub filename: String,
-    pub releaseType: u32,
-    pub gameVersionTypeId: Option<u32>,
-    pub modLoader: Option<u32>,
+    pub release_type: u32,
+    pub game_version_type_id: Option<u32>,
+    pub mod_loader: Option<u32>,
 }
 
 pub async fn find_project_by_slug(slug: &str, class_id: u32) -> Result<Option<u32>> {
@@ -439,7 +448,7 @@ pub async fn search_mods(
     log::info!(
         "Found {} mods out of {} total",
         search_response.data.len(),
-        search_response.pagination.totalCount
+        search_response.pagination.total_count
     );
 
     Ok(search_response)
@@ -586,15 +595,17 @@ pub struct CurseForgeModResponse {
 
 // Structure for Get Mods by IDs request body
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GetModsByIdsRequestBody {
-    pub modIds: Vec<u32>,
-    pub filterPcOnly: Option<bool>,
+    pub mod_ids: Vec<u32>,
+    pub filter_pc_only: Option<bool>,
 }
 
 // Structure for Get Files by IDs request body
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GetModFilesRequestBody {
-    pub fileIds: Vec<u32>,
+    pub file_ids: Vec<u32>,
 }
 
 // Structure for Get Files by IDs response
@@ -732,7 +743,7 @@ pub async fn get_mod_files(
     log::info!(
         "Found {} files out of {} total for mod {}",
         files_response.data.len(),
-        files_response.pagination.totalCount,
+        files_response.pagination.total_count,
         mod_id
     );
 
@@ -921,8 +932,8 @@ pub async fn get_mods_by_ids(
     let url = format!("{}/mods", CURSEFORGE_API_BASE_URL);
 
     let request_body = GetModsByIdsRequestBody {
-        modIds: mod_ids.clone(),
-        filterPcOnly: filter_pc_only,
+        mod_ids: mod_ids.clone(),
+        filter_pc_only: filter_pc_only,
     };
 
     log::info!("Getting CurseForge mods by IDs: {:?}", mod_ids);
@@ -1011,7 +1022,7 @@ pub async fn get_files_by_ids(file_ids: Vec<u32>) -> Result<Vec<CurseForgeFile>>
     let url = format!("{}/mods/files", CURSEFORGE_API_BASE_URL);
 
     let request_body = GetModFilesRequestBody {
-        fileIds: file_ids.clone(),
+        file_ids: file_ids.clone(),
     };
 
     log::info!("Getting CurseForge files by IDs: {} files", file_ids.len());
@@ -1263,6 +1274,7 @@ pub trait ModpackManifest {
     fn get_loader_version(&self) -> Option<String>;
 
     /// Returns a list of mods as Mod structs (requires API calls)
+    #[allow(async_fn_in_trait)]
     async fn get_mods_structs(&self) -> Result<Vec<Mod>>;
 }
 
@@ -1456,7 +1468,7 @@ pub async fn download_curseforge_content_files(
     let content_mods: Vec<_> = mods_response
         .data
         .into_iter()
-        .filter_map(|m| curseforge_content_subfolder(m.classId).map(|folder| (m, folder)))
+        .filter_map(|m| curseforge_content_subfolder(m.class_id).map(|folder| (m, folder)))
         .collect();
     if content_mods.is_empty() {
         return Ok(());
@@ -1488,7 +1500,7 @@ pub async fn download_curseforge_content_files(
             continue;
         };
 
-        if file_details.downloadUrl.trim().is_empty() {
+        if file_details.download_url.trim().is_empty() {
             warn!(
                 "CurseForge content '{}' has no download URL (distribution disabled?). Skipping.",
                 content_mod.name
@@ -1496,7 +1508,7 @@ pub async fn download_curseforge_content_files(
             continue;
         }
 
-        let sanitized_name = sanitize_filename::sanitize(&file_details.fileName);
+        let sanitized_name = sanitize_filename::sanitize(&file_details.file_name);
         if sanitized_name.is_empty() {
             warn!("Skipping CurseForge content with empty file name: {}", content_mod.name);
             continue;
@@ -1513,10 +1525,10 @@ pub async fn download_curseforge_content_files(
         );
         match file_details.hashes.iter().find(|h| h.algo == 1) {
             Some(sha1) => {
-                DownloadUtils::download_with_sha1(&file_details.downloadUrl, &dest_path, &sha1.value).await?;
+                DownloadUtils::download_with_sha1(&file_details.download_url, &dest_path, &sha1.value).await?;
             }
             None => {
-                DownloadUtils::download_simple(&file_details.downloadUrl, &dest_path).await?;
+                DownloadUtils::download_simple(&file_details.download_url, &dest_path).await?;
             }
         }
     }
@@ -1591,10 +1603,10 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     for curseforge_mod in mods_response.data {
         let project_id = curseforge_mod.id;
 
-        if curseforge_content_subfolder(curseforge_mod.classId).is_some() {
+        if curseforge_content_subfolder(curseforge_mod.class_id).is_some() {
             debug!(
                 "Skipping non-mod CurseForge project '{}' (classId {:?}) in mod resolution",
-                curseforge_mod.name, curseforge_mod.classId
+                curseforge_mod.name, curseforge_mod.class_id
             );
             continue;
         }
@@ -1615,12 +1627,12 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
             let mod_source = ModSource::CurseForge {
                 project_id: project_id.to_string(),
                 file_id: file_id.to_string(),
-                file_name: file_details.fileName.clone(),
-                download_url: file_details.downloadUrl.clone(),
+                file_name: file_details.file_name.clone(),
+                download_url: file_details.download_url.clone(),
                 file_hash_sha1: file_details.hashes.iter()
                     .find(|h| h.algo == 1) // SHA1 = 1
                     .map(|h| h.value.clone()),
-                file_fingerprint: Some(file_details.fileFingerprint),
+                file_fingerprint: Some(file_details.file_fingerprint),
             };
 
             let new_mod = Mod {
@@ -1628,7 +1640,7 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 source: mod_source,
                 enabled: true,
                 display_name: Some(curseforge_mod.name.clone()),
-                version: Some(file_details.displayName.clone()),
+                version: Some(file_details.display_name.clone()),
                 game_versions: Some(vec![game_version.clone()]),
                 file_name_override: None,
                 associated_loader: Some(
@@ -2370,7 +2382,7 @@ pub async fn fingerprints_known(
 
     let mut known: HashSet<u64> = data.exact_fingerprints.into_iter().collect();
     for m in data.exact_matches {
-        known.insert(m.file.fileFingerprint);
+        known.insert(m.file.file_fingerprint);
     }
     Ok(known)
 }
@@ -2386,7 +2398,7 @@ pub async fn fingerprint_matches(
     for chunk in fingerprints.chunks(CURSEFORGE_FINGERPRINT_BATCH) {
         let data = post_fingerprints(chunk.to_vec()).await?;
         for m in data.exact_matches {
-            matches.insert(m.file.fileFingerprint, (m.file.modId, m.file.id));
+            matches.insert(m.file.file_fingerprint, (m.file.mod_id, m.file.id));
         }
     }
 
@@ -2464,32 +2476,6 @@ pub fn curseforge_loader_id_to_string(loader_id: u32) -> &'static str {
     }
 }
 
-/// Find the best matching file from a list of files based on game versions and loaders
-/// Only returns files that match both the exact game version AND loader combination
-pub(crate) fn find_best_matching_file<'a>(
-    files: &'a [CurseForgeFile],
-    game_versions: &[String],
-    loaders: &[String],
-) -> Option<&'a CurseForgeFile> {
-    if files.is_empty() {
-        return None;
-    }
-
-    // Only accept files that match both game version and loader
-    for file in files {
-        let file_loaders = crate::integrations::unified_mod::extract_loaders_from_game_versions(&file.gameVersions);
-        let has_matching_game_version = game_versions.iter().any(|gv| file.gameVersions.contains(gv));
-        let has_matching_loader = loaders.iter().any(|loader| file_loaders.contains(loader));
-
-        if has_matching_game_version && has_matching_loader {
-            return Some(file);
-        }
-    }
-
-    // No compatible file found - don't suggest updates for incompatible versions
-    None
-}
-
 /// Find the index of the currently installed file in the mod's latestFilesIndexes
 /// and check if there are newer compatible versions available
 /// Returns only data from latestFilesIndexes without accessing latestFiles
@@ -2502,15 +2488,15 @@ pub fn check_mod_update_by_file_index(
     log::trace!("###Checking mod update by file index for mod {}", mod_data.name);
 
     // Debug: Show all latestFilesIndexes entries first
-    log::trace!("Mod {}: Available latestFilesIndexes entries ({} total):", mod_data.name, mod_data.latestFilesIndexes.len());
-    for (i, index_entry) in mod_data.latestFilesIndexes.iter().enumerate() {
+    log::trace!("Mod {}: Available latestFilesIndexes entries ({} total):", mod_data.name, mod_data.latest_files_indexes.len());
+    for (i, index_entry) in mod_data.latest_files_indexes.iter().enumerate() {
         log::trace!("  [{}] FileId: {}, GameVersion: {}, ModLoader: {:?}, Filename: '{}', ReleaseType: {}",
                    i,
-                   index_entry.fileId,
-                   index_entry.gameVersion,
-                   index_entry.modLoader,
+                   index_entry.file_id,
+                   index_entry.game_version,
+                   index_entry.mod_loader,
                    index_entry.filename,
-                   index_entry.releaseType);
+                   index_entry.release_type);
     }
 
     // Find the index of the installed file in the mod's latestFilesIndexes
@@ -2518,11 +2504,11 @@ pub fn check_mod_update_by_file_index(
     log::trace!("Mod {}: Looking for installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
 
     // Find the file index entry for our installed file
-    let installed_file_index = mod_data.latestFilesIndexes
+    let installed_file_index = mod_data.latest_files_indexes
         .iter()
-        .find(|idx| idx.fileId == installed_file_id);
+        .find(|idx| idx.file_id == installed_file_id);
 
-    if let Some(index) = installed_file_index {
+    if let Some(_index) = installed_file_index {
         log::trace!("Mod {}: Found installed file ID {} in latestFilesIndexes", mod_data.name, installed_file_id);
     } else {
         log::trace!("Mod {}: Installed file ID {} NOT found in latestFilesIndexes - will return first compatible file from latestFilesIndexes", mod_data.name, installed_file_id);
@@ -2534,9 +2520,9 @@ pub fn check_mod_update_by_file_index(
             "Mod {}: Installed file ID {} found in latestFilesIndexes - GameVersion: {}, FileId: {}, ModLoader: {:?}",
             mod_data.name,
             installed_file_id,
-            installed_index.gameVersion,
-            installed_index.fileId,
-            installed_index.modLoader
+            installed_index.game_version,
+            installed_index.file_id,
+            installed_index.mod_loader
         );
     }
 
@@ -2545,18 +2531,18 @@ pub fn check_mod_update_by_file_index(
 
     let mut compatible_updates = Vec::new();
 
-    for (current_pos, index_entry) in mod_data.latestFilesIndexes.iter().enumerate() {
+    for (current_pos, index_entry) in mod_data.latest_files_indexes.iter().enumerate() {
         // Skip our installed file if we found it
-        if index_entry.fileId == installed_file_id {
+        if index_entry.file_id == installed_file_id {
             continue;
         }
 
         // If we found the installed file, skip older files (higher indices)
         // Note: In CurseForge latestFilesIndexes, newer versions appear at LOWER indices!
-        if let Some(installed_index) = installed_file_index {
-            let installed_index_pos = mod_data.latestFilesIndexes
+        if let Some(_installed_index) = installed_file_index {
+            let installed_index_pos = mod_data.latest_files_indexes
                 .iter()
-                .position(|idx| idx.fileId == installed_file_id)
+                .position(|idx| idx.file_id == installed_file_id)
                 .unwrap_or(usize::MAX);
 
             if current_pos >= installed_index_pos {
@@ -2566,11 +2552,11 @@ pub fn check_mod_update_by_file_index(
 
         // Check game version compatibility
         let has_matching_game_version = game_versions.iter().any(|gv| {
-            gv == &index_entry.gameVersion
+            gv == &index_entry.game_version
         });
 
         // Check loader compatibility
-        let has_matching_loader = if let Some(mod_loader_id) = index_entry.modLoader {
+        let has_matching_loader = if let Some(mod_loader_id) = index_entry.mod_loader {
             // Convert loader ID to string and check against our loaders
             let loader_name = curseforge_loader_id_to_string(mod_loader_id);
             loaders.iter().any(|l| l == loader_name)
@@ -2584,9 +2570,9 @@ pub fn check_mod_update_by_file_index(
                 "Mod {}: Found compatible update via latestFilesIndexes - Index: {}, FileId: {}, GameVersion: {}, ModLoader: {:?}, Filename: '{}'",
                 mod_data.name,
                 current_pos,
-                index_entry.fileId,
-                index_entry.gameVersion,
-                index_entry.modLoader,
+                index_entry.file_id,
+                index_entry.game_version,
+                index_entry.mod_loader,
                 index_entry.filename
             );
 
@@ -2605,14 +2591,14 @@ pub fn check_mod_update_by_file_index(
                 "Mod {}: Returning latest compatible update via latestFilesIndexes - Index: {}, FileId: {}",
                 mod_data.name,
                 latest_pos,
-                latest_update.fileId
+                latest_update.file_id
             );
         } else {
             log::trace!(
                 "Mod {}: Returning first compatible file from latestFilesIndexes (installed file not found) - Index: {}, FileId: {}",
                 mod_data.name,
                 latest_pos,
-                latest_update.fileId
+                latest_update.file_id
             );
         }
         Some(latest_update)
@@ -2794,9 +2780,9 @@ pub async fn check_mod_updates_bulk(
             info!(
                 "Mod {}: Found update candidate via latestFilesIndexes - FileId: {}, GameVersion: {}, ModLoader: {:?} (exact match)",
                 mod_data.name,
-                update_index.fileId,
-                update_index.gameVersion,
-                update_index.modLoader
+                update_index.file_id,
+                update_index.game_version,
+                update_index.mod_loader
             );
 
             update_candidates.push(UpdateCandidate {
@@ -2826,9 +2812,9 @@ pub async fn check_mod_updates_bulk(
             info!(
                 "Mod {}: Found update candidate via latestFilesIndexes - FileId: {}, GameVersion: {}, ModLoader: {:?} (partial match)",
                 mod_data.name,
-                update_index.fileId,
-                update_index.gameVersion,
-                update_index.modLoader
+                update_index.file_id,
+                update_index.game_version,
+                update_index.mod_loader
             );
 
             let project_id_key = fingerprint_match.id.to_string();
@@ -2852,7 +2838,7 @@ pub async fn check_mod_updates_bulk(
     // Second pass: Batch fetch detailed file information using POST /v1/mods/files
     if !update_candidates.is_empty() {
         let file_ids: Vec<u32> = update_candidates.iter()
-            .map(|candidate| candidate.update_index.fileId)
+            .map(|candidate| candidate.update_index.file_id)
             .collect();
 
         info!("Batch fetching {} file details for update candidates", file_ids.len());
@@ -2866,13 +2852,13 @@ pub async fn check_mod_updates_bulk(
 
                 // Process each update candidate
                 for candidate in update_candidates {
-                    if let Some(update_file) = file_data_map.get(&candidate.update_index.fileId) {
+                    if let Some(update_file) = file_data_map.get(&candidate.update_index.file_id) {
                         info!(
                             "Mod {}: Retrieved detailed file info for FileId {} - Name: '{}', Size: {} bytes ({})",
                             candidate.mod_data.name,
                             update_file.id,
-                            update_file.displayName,
-                            update_file.fileLength,
+                            update_file.display_name,
+                            update_file.file_length,
                             if candidate.is_exact_match { "exact" } else { "partial" }
                         );
 
@@ -2881,16 +2867,16 @@ pub async fn check_mod_updates_bulk(
                             fingerprint: candidate.fingerprint_match.id,
                             project_id: candidate.mod_data.id,
                             file_id: update_file.id,
-                            file_name: update_file.fileName.clone(),
-                            download_url: update_file.downloadUrl.clone(),
-                            release_type: update_file.releaseType,
-                            game_versions: update_file.gameVersions.clone(),
+                            file_name: update_file.file_name.clone(),
+                            download_url: update_file.download_url.clone(),
+                            release_type: update_file.release_type,
+                            game_versions: update_file.game_versions.clone(),
                             dependencies: update_file.dependencies.clone(),
                             hash_sha1: update_file.hashes.iter()
                                 .find(|h| h.algo == 1) // SHA1 = 1
                                 .map(|h| h.value.clone()),
-                            file_size: update_file.fileLength,
-                            file_date: update_file.fileDate.clone(),
+                            file_size: update_file.file_length,
+                            file_date: update_file.file_date.clone(),
                         };
 
                         updates.push(update_info);
@@ -2898,7 +2884,7 @@ pub async fn check_mod_updates_bulk(
                         error!(
                             "Mod {}: File data not found in batch response for FileId {}",
                             candidate.mod_data.name,
-                            candidate.update_index.fileId
+                            candidate.update_index.file_id
                         );
                     }
                 }

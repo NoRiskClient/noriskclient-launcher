@@ -16,5 +16,3 @@ pub mod wordpress_api;
 
 pub use neo_forge_api::NeoForgeApi;
 pub use norisk_api::NoRiskApi;
-pub use vanilla_cape_api::VanillaCapeApi;
-pub use wordpress_api::WordPressApi;

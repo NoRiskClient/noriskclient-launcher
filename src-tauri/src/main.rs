@@ -4,28 +4,14 @@
     windows_subsystem = "windows"
 )]
 
-#[macro_use]
-mod utils;
-mod cli;
-mod commands;
-mod config;
-mod error;
-mod friends;
-pub mod integrations;
-mod logging;
-mod minecraft;
-mod state;
-mod sync;
+use noriskclient_launcher_v3_lib::*;
+use noriskclient_launcher_v3_lib::{cli, commands, logging, state, utils};
 
-use crate::integrations::norisk_packs;
-use crate::integrations::norisk_versions;
-use log::{debug, error, info, trace};
-use std::path::PathBuf;
+use log::{error, info, trace};
 use std::sync::Arc;
 use tauri::Listener;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
-use utils::debug_utils;
 use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
@@ -40,7 +26,6 @@ use commands::minecraft_auth_command::{
 };
 use commands::minecraft_command::{
     add_skin,
-    add_skin_locally,
     apply_skin_from_base64,
     get_active_skin,
     // Local skin database commands
@@ -134,7 +119,7 @@ use commands::vanilla_cape_command::{
 use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command, get_advent_calendar_command, claim_advent_calendar_day_command, get_unique_players_24h_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command};
 
 // Import Content commands
 use commands::content_command::{
@@ -558,7 +543,7 @@ async fn main() {
             if let Some(main_window) = app.get_webview_window("main") {
                 let focus_app_handle = app_handle.clone();
                 main_window.listen("tauri://focus", move |_event| {
-                    let listener_app_handle = focus_app_handle.clone();
+                    let _listener_app_handle = focus_app_handle.clone();
                     tokio::spawn(async move {
                         trace!("Main window focus event received. Triggering DiscordManager handler.");
                         match state::state_manager::State::get().await {

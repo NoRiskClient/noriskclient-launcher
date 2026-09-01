@@ -1,4 +1,4 @@
-use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::{JavaDistribution, ZuluApiResponse};
 use crate::state::State;
@@ -8,25 +8,20 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use flate2::read::GzDecoder;
 use futures::future::try_join_all;
 use log::{debug, error, info};
-use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
 use tar::Archive;
 use tokio::fs;
 use tokio::io::BufReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 const JAVA_DIR: &str = "java";
-const DEFAULT_CONCURRENT_EXTRACTIONS: usize = 4;
 
 // Legacy Java component that requires x86_64 Java on ARM64 Macs
 const LEGACY_JAVA_COMPONENT: &str = "jre-legacy";
 
 pub struct JavaDownloadService {
     base_path: PathBuf,
-    concurrent_extractions: usize,
 }
 
 impl JavaDownloadService {
@@ -34,7 +29,6 @@ impl JavaDownloadService {
         let base_path = crate::config::standard_meta_dir().join(JAVA_DIR);
         Self {
             base_path,
-            concurrent_extractions: DEFAULT_CONCURRENT_EXTRACTIONS,
         }
     }
 
@@ -188,7 +182,7 @@ impl JavaDownloadService {
                     AppError::JavaDownload(format!("ZIP Open error for listing: {}", e))
                 })?;
                 let mut buf_reader_listing = BufReader::new(file_for_listing);
-                let mut zip_lister = ZipFileReader::with_tokio(&mut buf_reader_listing)
+                let zip_lister = ZipFileReader::with_tokio(&mut buf_reader_listing)
                     .await
                     .map_err(|e| {
                         error!("Failed to read Java ZIP for listing: {}", e);

@@ -1,4 +1,4 @@
-use log::{debug, error, trace};
+use log::{error, trace};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 

@@ -114,34 +114,34 @@ async fn install_from_curseforge(args: &ModpackArgs) -> Result<Uuid, String> {
         Some(wanted) => files
             .data
             .into_iter()
-            .find(|f| f.id.to_string() == *wanted || f.displayName == *wanted)
+            .find(|f| f.id.to_string() == *wanted || f.display_name == *wanted)
             .ok_or_else(|| format!("version '{}' not found for '{}'", wanted, args.id))?,
         None => files
             .data
             .into_iter()
-            .max_by(|a, b| a.fileDate.cmp(&b.fileDate))
+            .max_by(|a, b| a.file_date.cmp(&b.file_date))
             .ok_or_else(|| format!("no files for '{}'", args.id))?,
     };
 
-    if file.downloadUrl.trim().is_empty() {
+    if file.download_url.trim().is_empty() {
         return Err(format!(
             "'{}' does not allow third-party downloads",
-            file.fileName
+            file.file_name
         ));
     }
 
     println!(
         "[modpack] installing {} ({}) for MC {}",
-        file.fileName,
+        file.file_name,
         file.id,
-        file.gameVersions.join("/")
+        file.game_versions.join("/")
     );
 
     curseforge::download_and_install_curseforge_modpack(
         project_id,
         file.id,
-        file.fileName.clone(),
-        file.downloadUrl.clone(),
+        file.file_name.clone(),
+        file.download_url.clone(),
         None,
         None,
     )

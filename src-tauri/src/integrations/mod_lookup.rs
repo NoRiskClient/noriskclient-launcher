@@ -44,23 +44,23 @@ pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
     Mod {
         id: Uuid::new_v4(),
         source: ModSource::CurseForge {
-            project_id: file.modId.to_string(),
+            project_id: file.mod_id.to_string(),
             file_id: file.id.to_string(),
-            file_name: file.fileName.clone(),
-            download_url: file.downloadUrl.clone(),
+            file_name: file.file_name.clone(),
+            download_url: file.download_url.clone(),
             file_hash_sha1: file
                 .hashes
                 .iter()
                 .find(|hash| hash.algo == 1)
                 .map(|hash| hash.value.clone()),
-            file_fingerprint: Some(file.fileFingerprint),
+            file_fingerprint: Some(file.file_fingerprint),
         },
         enabled: true,
-        display_name: Some(file.displayName.clone()),
+        display_name: Some(file.display_name.clone()),
         version: None,
-        game_versions: Some(file.gameVersions.clone()),
+        game_versions: Some(file.game_versions.clone()),
         file_name_override: None,
-        associated_loader: unified_mod::extract_loaders_from_game_versions(&file.gameVersions)
+        associated_loader: unified_mod::extract_loaders_from_game_versions(&file.game_versions)
             .iter()
             .find_map(|loader| ModLoader::from_str(loader).ok()),
         modpack_origin: None,

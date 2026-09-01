@@ -161,13 +161,6 @@ impl ModDownloadService {
                         debug!("Skipping embedded mod (cache check): {}", name);
                         Ok(())
                     }
-                    _ => {
-                        debug!(
-                            "Skipping non-downloadable mod source type after filename check: {}",
-                            display_name
-                        );
-                        Ok(())
-                    }
                 }
             });
         }

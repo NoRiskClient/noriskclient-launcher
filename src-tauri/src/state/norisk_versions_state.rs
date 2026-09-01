@@ -173,7 +173,7 @@ impl NoriskVersionManager {
     /// Prints the current configuration to the console for debugging.
     #[allow(dead_code)]
     pub async fn print_current_config(&self) {
-        let config_guard = self.config.read().await;
+        let _config_guard = self.config.read().await;
         //println!("--- Current Norisk Versions Config ---");
         //println!("{:#?}", *config_guard);
         //println!("--- End Norisk Versions Config ---");

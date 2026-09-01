@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use tokio::fs;
 
 pub struct FabricLibrariesDownloadService {
-    base_path: PathBuf,
     libraries_path: PathBuf,
     concurrent_downloads: usize,
 }
@@ -16,7 +15,6 @@ pub struct FabricLibrariesDownloadService {
 impl FabricLibrariesDownloadService {
     pub fn new() -> Self {
         Self {
-            base_path: LAUNCHER_DIRECTORY.meta_dir().join("fabric"),
             libraries_path: LAUNCHER_DIRECTORY.meta_dir().join("libraries"),
             concurrent_downloads: 10, // Default value
         }
@@ -80,50 +78,10 @@ impl FabricLibrariesDownloadService {
         }
     }
 
-    async fn download_maven_artifact(&self, maven: &str) -> Result<()> {
-        // Parse Maven coordinates (format: group:artifact:version)
-        let parts: Vec<&str> = maven.split(':').collect();
-        if parts.len() != 3 {
-            return Err(crate::error::AppError::FabricError(
-                "Invalid Maven coordinates".to_string(),
-            ));
-        }
-
-        let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-        let group_path = group.replace('.', "/");
-
-        // Construct target path
-        let target_path = self
-            .libraries_path
-            .join(&group_path)
-            .join(artifact)
-            .join(version)
-            .join(format!("{}-{}.jar", artifact, version));
-
-        // Construct Maven URL
-        let url = format!(
-            "https://maven.fabricmc.net/{}/{}/{}/{}-{}.jar",
-            group_path, artifact, version, artifact, version
-        );
-
-        // Use the centralized download utility
-        trace!("⬇️ Downloading Maven artifact: {}", maven);
-        let config = DownloadConfig::new()
-            .with_streaming(false) // Maven artifacts are usually small
-            .with_retries(3);
-
-        DownloadUtils::download_file(&url, &target_path, config).await.map_err(|e| {
-            crate::error::AppError::FabricError(format!("Failed to download Maven artifact: {}", e))
-        })?;
-
-        trace!("💾 Saved Maven artifact: {}", maven);
-        Ok(())
-    }
-
     fn create_library_from_maven(&self, maven: &str) -> FabricLibrary {
         let parts: Vec<&str> = maven.split(':').collect();
-        let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-        let group_path = group.replace('.', "/");
+        let (group, _artifact, _version) = (parts[0], parts[1], parts[2]);
+        let _group_path = group.replace('.', "/");
 
         // Only set the base URL, the rest will be built in download_library
         let url = "https://maven.fabricmc.net/".to_string();

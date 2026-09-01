@@ -1,23 +1,18 @@
 use crate::commands::file_command; // Added import for file_command
 use crate::error::{AppError, CommandError};
-use crate::integrations::modrinth::ModrinthVersion; // Added for new payload
-use crate::integrations::curseforge::CurseForgeFile; // Added for CurseForge support
 use crate::integrations::unified_mod::UnifiedVersion; // Added for unified version support
 use crate::state::profile_state::ModSource;
 use crate::integrations::unified_mod::ModPlatform; // Import unified ModPlatform
 use crate::state::state_manager::State as AppStateManager;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::hash_utils; // For calculate_sha1
-use crate::utils::profile_utils::GenericModrinthInfo; // Already there or similar
 use crate::utils::resourcepack_utils::ResourcePackInfo;
 use crate::utils::shaderpack_utils::ShaderPackInfo;
 use crate::utils::{datapack_utils, profile_utils, resourcepack_utils, shaderpack_utils};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri_plugin_fs::FilePath;
 use tokio::fs;
-use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 // Updated InstallContentPayload struct
@@ -1382,18 +1377,6 @@ pub async fn install_local_content_to_profile(
             return Err(CommandError::from(AppError::Other(
                 "Local installation of NoRiskMod content type is not supported.".to_string(),
             )));
-        }
-        // Handle any other ContentType variants not explicitly covered, if any exist or are added later.
-        _ => {
-            log::warn!(
-                "Local installation for content type {:?} is not yet implemented for profile {}.",
-                payload.content_type,
-                payload.profile_id
-            );
-            return Err(CommandError::from(AppError::Other(format!(
-                "Local installation for content type {:?} is not yet implemented.",
-                payload.content_type
-            ))));
         }
     }
 

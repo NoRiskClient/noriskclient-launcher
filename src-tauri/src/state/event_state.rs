@@ -93,10 +93,10 @@ pub struct ProcessMetricsPayload {
 }
 
 #[derive(Clone)]
-struct EventInfo {
-    event_type: EventType,
-    target_id: Option<Uuid>,
-    start_time: std::time::SystemTime,
+pub struct EventInfo {
+    pub event_type: EventType,
+    pub target_id: Option<Uuid>,
+    pub start_time: std::time::SystemTime,
 }
 
 #[derive(Clone)]

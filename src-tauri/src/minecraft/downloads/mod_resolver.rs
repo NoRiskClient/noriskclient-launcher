@@ -6,7 +6,6 @@ use crate::state::profile_state::{
 use log::{debug, info, trace, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::command;
 use uuid::Uuid;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use tokio::fs;

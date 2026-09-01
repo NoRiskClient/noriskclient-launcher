@@ -2,7 +2,6 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::downloads::{NeoForgeInstallerDownloadService, NeoForgeLibrariesDownload};
 use crate::minecraft::launch::neo_forge_arguments::NeoForgeArguments;
-use crate::minecraft::launch::version::compare_versions;
 use crate::minecraft::{NeoForgeApi, NeoForgePatcher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::Profile;
@@ -174,7 +173,7 @@ impl NeoForgeInstaller {
         let neo_forge_game_arguments = NeoForgeArguments::get_game_arguments(&neoforge_version);
 
         // Use determined target_neoforge_version for client path and installer path
-        let custom_client_path =
+        let _custom_client_path =
             neoforge_installer_download.get_client_path(&target_neoforge_version);
         let installer_path =
             neoforge_installer_download.get_installer_path(&target_neoforge_version);

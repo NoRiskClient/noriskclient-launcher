@@ -7,7 +7,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 /// Generational (Grandfather-Father-Son) retention. Independent day/week/month

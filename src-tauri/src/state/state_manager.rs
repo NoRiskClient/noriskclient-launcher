@@ -16,7 +16,6 @@ use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
 use crate::state::sync_pack_state::SyncPackManager;
 use crate::utils::referral_utils;
-use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, Mutex, Semaphore};
 use tokio::task::JoinHandle;

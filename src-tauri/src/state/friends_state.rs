@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::friends::models::{
-    Chat, ChatMessage, ComputedChat, FriendRequestWithUsers, FriendsFriendUser, FriendsUser,
+    ChatMessage, ComputedChat, FriendRequestWithUsers, FriendsFriendUser, FriendsUser,
     OnlineState,
 };
 use crate::friends::websocket::FriendsWebSocket;

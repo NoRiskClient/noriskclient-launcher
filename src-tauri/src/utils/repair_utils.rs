@@ -4,9 +4,8 @@ use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadServ
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
 use crate::state::state_manager::State;
-use crate::state::profile_state::{ModSource, get_profile_mod_filename};
+use crate::state::profile_state::get_profile_mod_filename;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
-use crate::integrations::norisk_packs;
 use crate::utils::path_utils;
 use log::{debug, info, warn};
 use uuid::Uuid;

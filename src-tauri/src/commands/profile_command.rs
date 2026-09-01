@@ -13,15 +13,13 @@ use crate::state::profile_state::{
     default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
     ProfileState,
 };
-use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
 use crate::commands::analytics_command::track_event as track_analytics;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
 use crate::utils::path_utils::{find_unique_profile_segment, copy_dir_recursively, count_files_recursively};
 use crate::utils::profile_utils::{
-    check_for_group_migration, CheckContentParams, ContentInstallStatus, ContentType as ProfileUtilContentType,
-    GenericModrinthInfo, LoadItemsParams as ProfileUtilLoadItemsParams, LocalContentItem,
+    CheckContentParams, ContentInstallStatus, LoadItemsParams as ProfileUtilLoadItemsParams, LocalContentItem,
     LocalContentLoader as ProfileUtilLocalContentLoader, MigrationInfo, ScreenshotInfo,
 };
 use crate::utils::resourcepack_utils::ResourcePackInfo;
@@ -32,7 +30,7 @@ use crate::utils::{
     shaderpack_utils,
 };
 use chrono::Utc;
-use log::{error, info, trace, warn};
+use log::{error, info, warn};
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -105,7 +103,6 @@ impl ExportFormat {
 #[derive(Deserialize)]
 pub struct ExportProfileParams {
     profile_id: Uuid,
-    output_path: Option<String>, // This will be ignored but kept for backward compatibility
     file_name: String,           // Base name without extension
     include_files: Option<Vec<PathBuf>>,
     open_folder: bool, // Whether to open the exports folder after export

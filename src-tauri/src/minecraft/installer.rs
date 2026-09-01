@@ -227,7 +227,7 @@ pub async fn install_minecraft_version(
     info!("Checking Java {} for Minecraft...", java_version);
 
     // Emit Java installation event
-    let event_id = emit_progress_event(
+    let _event_id = emit_progress_event(
         &state,
         EventType::InstallingJava,
         profile.id,
@@ -665,7 +665,7 @@ pub async fn install_minecraft_version(
     if let Some(selected_pack_id) = profile.effective_norisk_pack_id().await {
         // Use the already loaded config
         if let Some(config) = loaded_norisk_config.as_ref() {
-            let norisk_mods_event_id = emit_progress_event(
+            let _norisk_mods_event_id = emit_progress_event(
                 &state,
                 EventType::DownloadingMods,
                 profile.id,
@@ -748,7 +748,7 @@ pub async fn install_minecraft_version(
     }
 
     // --- Step: Resolve final mod list for syncing ---
-    let resolve_event_id = emit_progress_event(
+    let _resolve_event_id = emit_progress_event(
         &state,
         EventType::SyncingMods,
         profile.id,
@@ -949,7 +949,7 @@ pub async fn install_minecraft_version(
     let launcher_config = state.config_manager.get_config().await;
     if let Some(hook) = &launcher_config.hooks.pre_launch {
         info!("Executing pre-launch hook: {}", hook);
-        let hook_event_id = emit_progress_event(
+        let _hook_event_id = emit_progress_event(
             &state,
             EventType::LaunchingMinecraft,
             profile.id,
