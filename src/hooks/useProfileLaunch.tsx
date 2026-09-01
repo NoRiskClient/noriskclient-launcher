@@ -14,6 +14,8 @@ import { useGlobalModal } from "./useGlobalModal";
 import { GroupMigrationModal } from "../components/modals/GroupMigrationModal";
 import { checkForGroupMigration } from "../services/profile-service";
 import { MigrationInfo } from "../types/profile";
+import { requireMinecraftAccount } from "../lib/require-account";
+import { useProfileStore } from "../store/profile-store";
 
 interface UseProfileLaunchOptions {
   profileId: string;
@@ -153,6 +155,15 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     return clearPolling;
   }, [profileId, isButtonLaunching, finalizeButtonLaunch, getProfileState, quickPlaySingleplayer, quickPlayMultiplayer]);
 
+  // Sign-in gate. Without an account the backend aborts the launch with a bare
+  // NoCredentialsError, so catch it here and offer the sign-in instead; the
+  // prompt calls `retry` once an account is active so the click still lands.
+  const hasAccountOrPrompt = (retry: () => void): boolean =>
+    requireMinecraftAccount({
+      profileName: useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name,
+      onAuthenticated: retry,
+    });
+
   // Actual launch function
   const performLaunch = async (migrationInfo?: MigrationInfo) => {
     initiateButtonLaunch(profileId);
@@ -204,6 +215,8 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
       return;
     }
 
+    if (!hasAccountOrPrompt(() => handleLaunch())) return;
+
     // Check if migration is needed
     try {
       const migrationInfo: MigrationInfo = await checkForGroupMigration(profileId);
@@ -235,12 +248,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     }
   };
 
-  return {
-    isLaunching: isButtonLaunching,
-    statusMessage: buttonStatusMessage,
-    launchState,
-    handleLaunch,
-    handleQuickPlayLaunch: async (
+  const handleQuickPlayLaunch = async (
       singleplayer?: string,
       multiplayer?: string,
       overrides?: LaunchOverrides,
@@ -266,6 +274,8 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         }
         return;
       }
+
+      if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer, overrides))) return;
 
       if (overrides) {
         initiateButtonLaunch(profileId);
@@ -369,6 +379,13 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           onLaunchError?.(launchErrorMsg);
         }
       }
-    },
+    };
+
+  return {
+    isLaunching: isButtonLaunching,
+    statusMessage: buttonStatusMessage,
+    launchState,
+    handleLaunch,
+    handleQuickPlayLaunch,
   };
 }
