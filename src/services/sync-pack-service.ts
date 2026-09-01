@@ -80,11 +80,23 @@ export async function listSyncSeedCandidates(
   return invoke<SeedCandidate[]>("list_sync_seed_candidates", { relativePath });
 }
 
+export async function countSyncPackTargetUsers(
+  packId: string,
+  targetPath: string,
+): Promise<number> {
+  return invoke<number>("count_sync_pack_target_users", { packId, targetPath });
+}
+
 export async function removeSyncPackTarget(
   packId: string,
   targetId: string,
-): Promise<void> {
-  return invoke<void>("remove_sync_pack_target", { packId, targetId });
+  detachMode?: DetachMode,
+): Promise<number> {
+  return invoke<number>("remove_sync_pack_target", {
+    packId,
+    targetId,
+    detachMode,
+  });
 }
 
 export async function addContentToSyncPack(

@@ -47,6 +47,9 @@ export function SyncPacksPage() {
     browsePack,
     setBrowsePack,
     presetPrompt,
+    targetRemovePrompt,
+    setTargetRemovePrompt,
+    applyTargetRemoval,
     setPresetPrompt,
     adoptPrompt,
     setAdoptPrompt,
@@ -320,14 +323,47 @@ export function SyncPacksPage() {
 
       {detachPrompt && profile && (
         <DetachModeModal
-          profileName={profile.name}
-          packName={detachPrompt.pack.name}
+          title={t("syncPacks.detachDialog.title", {
+            pack: detachPrompt.pack.name,
+          })}
+          subtitle={t("syncPacks.detachDialog.subtitle", {
+            profile: profile.name,
+          })}
+          confirmLabel={t("syncPacks.detachDialog.confirm")}
+          confirmLabels={{
+            keep_copy: t("syncPacks.detachDialog.keep_copy.action"),
+            drop: t("syncPacks.detachDialog.drop.action"),
+          }}
           busy={showBusy}
           onCancel={() => setDetachPrompt(null)}
           onConfirm={(mode) => {
             const pending = detachPrompt;
             setDetachPrompt(null);
             applyToggle(pending.pack, pending.packIds, false, mode);
+          }}
+        />
+      )}
+
+      {targetRemovePrompt && (
+        <DetachModeModal
+          title={t("syncPacks.targetDetachDialog.title", {
+            path: targetRemovePrompt.target.path,
+          })}
+          subtitle={t("syncPacks.targetDetachDialog.subtitle", {
+            count: targetRemovePrompt.count,
+          })}
+          confirmLabel={t("syncPacks.targetDetachDialog.confirm")}
+          confirmLabels={{
+            keep_copy: t("syncPacks.targetDetachDialog.keep_copy.action"),
+            drop: t("syncPacks.targetDetachDialog.drop.action"),
+          }}
+          choicePrefix="syncPacks.targetDetachDialog"
+          busy={showBusy}
+          onCancel={() => setTargetRemovePrompt(null)}
+          onConfirm={(mode) => {
+            const pending = targetRemovePrompt;
+            setTargetRemovePrompt(null);
+            applyTargetRemoval(pending.packId, pending.target, mode);
           }}
         />
       )}

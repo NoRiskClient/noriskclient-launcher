@@ -817,6 +817,7 @@ async fn main() {
             commands::sync_pack_command::update_sync_pack,
             commands::sync_pack_command::import_sync_pack_icon,
             commands::sync_pack_command::add_sync_pack_target,
+            commands::sync_pack_command::count_sync_pack_target_users,
             commands::sync_pack_command::remove_sync_pack_target,
             commands::sync_pack_command::add_content_to_sync_pack,
             commands::sync_pack_command::remove_content_from_sync_pack,

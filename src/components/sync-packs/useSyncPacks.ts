@@ -47,6 +47,12 @@ interface DetachPrompt {
   packIds: string[];
 }
 
+interface TargetRemovePrompt {
+  packId: string;
+  target: SyncTarget;
+  count: number;
+}
+
 interface PresetPrompt {
   packId: string;
   preset: SyncTargetPreset;
@@ -81,6 +87,8 @@ export function useSyncPacks() {
   const [presetPrompt, setPresetPrompt] = useState<PresetPrompt | null>(null);
   const [adoptPrompt, setAdoptPrompt] = useState<AdoptPrompt | null>(null);
   const [detachPrompt, setDetachPrompt] = useState<DetachPrompt | null>(null);
+  const [targetRemovePrompt, setTargetRemovePrompt] =
+    useState<TargetRemovePrompt | null>(null);
   const [pendingToggle, setPendingToggle] = useState<Record<string, boolean>>(
     {},
   );
@@ -487,8 +495,46 @@ export function useSyncPacks() {
     [t],
   );
 
+  const applyTargetRemoval = useCallback(
+    async (packId: string, target: SyncTarget, detachMode?: DetachMode) => {
+      await run(async () => {
+        const detached = await SyncPackService.removeSyncPackTarget(
+          packId,
+          target.id,
+          detachMode,
+        );
+        toast.success(
+          detached === 0
+            ? t("syncPacks.targets.removeSuccess", { path: target.path })
+            : t(
+                detachMode === "drop"
+                  ? "syncPacks.targets.removeSuccessDropped"
+                  : "syncPacks.targets.removeSuccessDetached",
+                { path: target.path, count: detached },
+              ),
+        );
+      }, "syncPacks.targets.removeError");
+    },
+    [run, t],
+  );
+
   const removeTarget = useCallback(
     async (packId: string, target: SyncTarget) => {
+      let affected = 0;
+      try {
+        affected = await SyncPackService.countSyncPackTargetUsers(
+          packId,
+          target.path,
+        );
+      } catch {
+        affected = 0;
+      }
+
+      if (affected > 0) {
+        setTargetRemovePrompt({ packId, target, count: affected });
+        return;
+      }
+
       const confirmed = await confirmDanger(
         {
           title: "syncPacks.targets.removeTitle",
@@ -499,14 +545,9 @@ export function useSyncPacks() {
       );
       if (!confirmed) return;
 
-      await run(async () => {
-        await SyncPackService.removeSyncPackTarget(packId, target.id);
-        toast.success(
-          t("syncPacks.targets.removeSuccess", { path: target.path }),
-        );
-      }, "syncPacks.targets.removeError");
+      await applyTargetRemoval(packId, target);
     },
-    [confirmDanger, run, t],
+    [applyTargetRemoval, confirmDanger],
   );
 
   const removeMod = useCallback(
@@ -633,6 +674,9 @@ export function useSyncPacks() {
     browsePack,
     setBrowsePack,
     presetPrompt,
+    targetRemovePrompt,
+    setTargetRemovePrompt,
+    applyTargetRemoval,
     setPresetPrompt,
     adoptPrompt,
     setAdoptPrompt,

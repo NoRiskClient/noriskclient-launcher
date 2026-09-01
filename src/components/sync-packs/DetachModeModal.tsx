@@ -10,8 +10,11 @@ import { useThemeStore } from "../../store/useThemeStore";
 import type { DetachMode } from "../../types/syncPacks";
 
 export interface DetachModeModalProps {
-  profileName: string;
-  packName: string;
+  title: string;
+  subtitle: string;
+  confirmLabel: string;
+  confirmLabels?: Partial<Record<DetachMode, string>>;
+  choicePrefix?: string;
   busy?: boolean;
   onCancel: () => void;
   onConfirm: (mode: DetachMode) => void;
@@ -23,8 +26,11 @@ const CHOICES: { mode: DetachMode; icon: string }[] = [
 ];
 
 export function DetachModeModal({
-  profileName,
-  packName,
+  title,
+  subtitle,
+  confirmLabel,
+  confirmLabels,
+  choicePrefix = "syncPacks.detachDialog",
   busy,
   onCancel,
   onConfirm,
@@ -35,10 +41,10 @@ export function DetachModeModal({
 
   return (
     <Modal
-      title={t("syncPacks.detachDialog.title", { pack: packName })}
+      title={title}
       titleSubtitle={
         <span className="font-minecraft text-xs normal-case text-white/45">
-          {t("syncPacks.detachDialog.subtitle", { profile: profileName })}
+          {subtitle}
         </span>
       }
       onClose={onCancel}
@@ -54,7 +60,7 @@ export function DetachModeModal({
             onClick={() => onConfirm(mode)}
             disabled={busy}
           >
-            {t("syncPacks.detachDialog.confirm")}
+            {confirmLabels?.[mode] ?? confirmLabel}
           </Button>
         </div>
       }
@@ -85,10 +91,10 @@ export function DetachModeModal({
               />
               <div className="min-w-0 flex-1">
                 <div className="font-minecraft text-base text-white/90">
-                  {t(`syncPacks.detachDialog.${choice.mode}.title`)}
+                  {t(`${choicePrefix}.${choice.mode}.title`)}
                 </div>
                 <div className="mt-1 font-minecraft text-sm leading-relaxed text-white/45">
-                  {t(`syncPacks.detachDialog.${choice.mode}.hint`)}
+                  {t(`${choicePrefix}.${choice.mode}.hint`)}
                 </div>
               </div>
             </button>

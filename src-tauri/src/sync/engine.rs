@@ -205,6 +205,15 @@ impl SyncEngine {
         pack_ids: &[Uuid],
         phase: Phase,
     ) -> Result<LaunchSyncResult> {
+        Self::run_scoped(profile, pack_ids, phase, None).await
+    }
+
+    async fn run_scoped(
+        profile: &Profile,
+        pack_ids: &[Uuid],
+        phase: Phase,
+        only_target: Option<Uuid>,
+    ) -> Result<LaunchSyncResult> {
         let mut result = LaunchSyncResult::default();
         result.report.profile_id = Some(profile.id);
 
@@ -288,6 +297,9 @@ impl SyncEngine {
 
             for planned_target in &planned.targets {
                 let target = &planned_target.target;
+                if only_target.is_some_and(|wanted| target.id != wanted) {
+                    continue;
+                }
                 let ctx = SyncContext::new(
                     pack,
                     target,
@@ -381,6 +393,36 @@ impl SyncEngine {
         mode: DetachMode,
     ) -> Result<SyncReport> {
         Self::run_for_profile(profile_id, Some(pack_ids), Phase::Detach(mode)).await
+    }
+
+    pub async fn detach_target_from_subscribers(
+        pack_id: Uuid,
+        target_id: Uuid,
+        mode: DetachMode,
+    ) -> Result<usize> {
+        let state = State::get().await?;
+        let mut detached = 0usize;
+
+        for subscriber in subscribers::of_pack(&state, pack_id).await {
+            let name = subscriber.profile.name.clone();
+            match Self::run_scoped(
+                &subscriber.profile,
+                &[pack_id],
+                Phase::Detach(mode),
+                Some(target_id),
+            )
+            .await
+            {
+                Ok(result) if result.report.changed_targets() > 0 => detached += 1,
+                Ok(_) => {}
+                Err(e) => warn!(
+                    "Could not release the shared folder from profile '{}': {}",
+                    name, e
+                ),
+            }
+        }
+
+        Ok(detached)
     }
 
     pub async fn detach_all(profile_id: Uuid, mode: DetachMode) -> Result<SyncReport> {

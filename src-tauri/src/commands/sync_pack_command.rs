@@ -241,6 +241,16 @@ pub async fn remove_sync_pack_entries(
                     result.failed += 1;
                     continue;
                 };
+                if let Err(e) = SyncEngine::detach_target_from_subscribers(
+                    entry.pack_id,
+                    target_id,
+                    DetachMode::KeepCopy,
+                )
+                .await
+                {
+                    warn!("Batch remove could not release a shared folder: {}", e);
+                }
+
                 match state
                     .sync_pack_manager
                     .remove_target(entry.pack_id, target_id)
@@ -323,7 +333,35 @@ pub async fn set_sync_pack_mods_enabled(
 }
 
 #[tauri::command]
-pub async fn remove_sync_pack_target(pack_id: Uuid, target_id: Uuid) -> Result<(), CommandError> {
+pub async fn count_sync_pack_target_users(
+    pack_id: Uuid,
+    target_path: String,
+) -> Result<usize, CommandError> {
+    let state = State::get().await?;
+    let mut users = 0usize;
+
+    for subscriber in subscribers::of_pack(&state, pack_id).await {
+        let link = subscriber.instance_dir.join(&target_path);
+        if crate::utils::symlink_utils::is_symlink(&link)
+            .await
+            .unwrap_or(false)
+        {
+            users += 1;
+        }
+    }
+
+    Ok(users)
+}
+
+#[tauri::command]
+pub async fn remove_sync_pack_target(
+    pack_id: Uuid,
+    target_id: Uuid,
+    detach_mode: Option<DetachMode>,
+) -> Result<usize, CommandError> {
+    let mode = detach_mode.unwrap_or(DetachMode::KeepCopy);
+    let detached = SyncEngine::detach_target_from_subscribers(pack_id, target_id, mode).await?;
+
     let state = State::get().await?;
     if let Some(removed) = state
         .sync_pack_manager
@@ -332,7 +370,7 @@ pub async fn remove_sync_pack_target(pack_id: Uuid, target_id: Uuid) -> Result<(
     {
         shortcuts::remove(pack_id, &removed).await;
     }
-    Ok(())
+    Ok(detached)
 }
 
 #[derive(Debug, Deserialize)]
