@@ -281,11 +281,9 @@ impl SyncHandler for DirLinkHandler {
             }
         }
 
-        if !matches!(mode, DetachMode::KeepCopy) {
-            ctx.manager
-                .clear_adoption(ctx.pack.id, &ctx.target.path, ctx.profile.id)
-                .await?;
-        }
+        ctx.manager
+            .clear_adoption(ctx.pack.id, &ctx.target.path, ctx.profile.id)
+            .await?;
 
         Ok(outcome)
     }
@@ -332,3 +330,11 @@ impl SyncHandler for DirLinkHandler {
         Some(entry)
     }
 }
+
+#[cfg(test)]
+#[path = "dir_link_test.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "dir_link_scenario_test.rs"]
+mod scenario_tests;

@@ -141,3 +141,7 @@ impl SyncHandler for FileCopyHandler {
         Some(ctx.preview_entry(action))
     }
 }
+
+#[cfg(test)]
+#[path = "file_copy_scenario_test.rs"]
+mod scenario_tests;
