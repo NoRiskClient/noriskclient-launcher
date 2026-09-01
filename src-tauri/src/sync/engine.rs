@@ -22,20 +22,20 @@ enum Phase {
     Detach(DetachMode),
 }
 
-struct PlannedTarget {
-    target: SyncTarget,
-    implicit: bool,
+pub struct PlannedTarget {
+    pub target: SyncTarget,
+    pub implicit: bool,
 }
 
-struct PlannedPack {
-    pack: SyncPack,
-    targets: Vec<PlannedTarget>,
+pub struct PlannedPack {
+    pub pack: SyncPack,
+    pub targets: Vec<PlannedTarget>,
 }
 
-struct Plan {
-    packs: Vec<PlannedPack>,
-    conflicts: Vec<SyncConflict>,
-    linked_dirs: HashSet<String>,
+pub struct Plan {
+    pub packs: Vec<PlannedPack>,
+    pub conflicts: Vec<SyncConflict>,
+    pub linked_dirs: HashSet<String>,
 }
 
 fn conflict_between(
@@ -56,7 +56,7 @@ fn conflict_between(
     }
 }
 
-fn build_plan(packs: Vec<SyncPack>, with_implicit_mods: bool) -> Plan {
+pub fn build_plan(packs: Vec<SyncPack>, with_implicit_mods: bool) -> Plan {
     let enabled: Vec<SyncPack> = packs.into_iter().filter(|p| p.enabled).collect();
 
     let mut entries: Vec<(usize, usize)> = Vec::new();
@@ -77,7 +77,7 @@ fn build_plan(packs: Vec<SyncPack>, with_implicit_mods: bool) -> Plan {
 
     for (pack_index, target_index) in &entries {
         let target = target_at(*pack_index, *target_index);
-        for claim in handler_for(&target.kind).claims(target) {
+        for claim in target.claimed_paths() {
             if let Some((prev_pack, prev_target)) =
                 winner_by_path.insert(claim.clone(), (*pack_index, *target_index))
             {
@@ -133,8 +133,8 @@ fn build_plan(packs: Vec<SyncPack>, with_implicit_mods: bool) -> Plan {
     };
 
     for (pack_index, target_index) in &entries {
-        if handler_for(&enabled[*pack_index].targets[*target_index].kind)
-            .claims(&enabled[*pack_index].targets[*target_index])
+        if enabled[*pack_index].targets[*target_index]
+            .claimed_paths()
             .is_empty()
         {
             keep(*pack_index, *target_index);

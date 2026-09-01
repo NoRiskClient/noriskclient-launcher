@@ -59,6 +59,15 @@ pub enum SyncTargetKind {
     Mods,
 }
 
+impl SyncTarget {
+    pub fn claimed_paths(&self) -> Vec<String> {
+        match self.kind {
+            SyncTargetKind::Mods => Vec::new(),
+            _ => vec![self.path.clone()],
+        }
+    }
+}
+
 impl SyncTargetKind {
     pub fn discriminant(&self) -> &'static str {
         match self {

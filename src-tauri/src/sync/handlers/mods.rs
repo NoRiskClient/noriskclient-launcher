@@ -1,7 +1,6 @@
 use crate::error::Result;
 use crate::sync::context::SyncContext;
 use crate::sync::handlers::SyncHandler;
-use crate::sync::model::SyncTarget;
 use crate::sync::paths;
 use crate::sync::report::HandlerOutcome;
 use crate::sync::resolution;
@@ -12,10 +11,6 @@ pub struct ModsHandler;
 
 #[async_trait]
 impl SyncHandler for ModsHandler {
-    fn claims(&self, _target: &SyncTarget) -> Vec<String> {
-        Vec::new()
-    }
-
     async fn apply_pre_launch(&self, ctx: &SyncContext<'_>) -> Result<HandlerOutcome> {
         let mut outcome = HandlerOutcome::unchanged();
 

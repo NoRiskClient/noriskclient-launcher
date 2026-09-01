@@ -5,7 +5,7 @@ pub mod options_merge;
 
 use crate::error::Result;
 use crate::sync::context::SyncContext;
-use crate::sync::model::{DetachMode, SyncTarget, SyncTargetKind};
+use crate::sync::model::{DetachMode, SyncTargetKind};
 use crate::sync::report::{HandlerOutcome, SyncPreviewEntry};
 use async_trait::async_trait;
 use std::path::Path;
@@ -13,10 +13,6 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait SyncHandler: Send + Sync {
-    fn claims(&self, target: &SyncTarget) -> Vec<String> {
-        vec![target.path.clone()]
-    }
-
     async fn apply_pre_launch(&self, ctx: &SyncContext<'_>) -> Result<HandlerOutcome>;
 
     async fn write_back_post_exit(&self, _ctx: &SyncContext<'_>) -> Result<HandlerOutcome> {
