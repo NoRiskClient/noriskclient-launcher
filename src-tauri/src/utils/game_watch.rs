@@ -42,33 +42,38 @@ async fn tick() -> anyhow::Result<()> {
         }
     }
 
-    let Some(chosen) = clips.other_game.as_ref() else {
+    let attached = supervisor.attached();
+    let front = crate::utils::game_detect::foreground_app();
+
+    if let (Some(chosen), Some(front)) = (clips.other_game.as_ref(), front.as_ref()) {
+        if clips.records(&front.executable) {
+            if attached != Some(front.pid) {
+                point_at(&supervisor, front.pid, &chosen.name);
+            }
+            return Ok(());
+        }
+    }
+
+    let Some(minecraft) = crate::utils::window_finder::find_running_game() else {
         return Ok(());
     };
-
-    let Some(front) = crate::utils::game_detect::foreground_app() else {
-        return Ok(());
-    };
-
-    if !clips.records(&front.executable) {
+    if attached == Some(minecraft) {
         return Ok(());
     }
 
-    if supervisor.attached() == Some(front.pid) {
-        return Ok(());
-    }
-
-    log::info!(
-        "Recording {} ({}, pid {})",
-        chosen.name,
-        front.executable,
-        front.pid
-    );
-    if let Err(e) = supervisor.attach_game(front.pid, chosen.name.clone()) {
-        log::warn!("Could not point the capture engine at {}: {e}", chosen.name);
+    let minecraft_in_front = front.as_ref().is_some_and(|app| app.pid == minecraft);
+    if attached.is_none() || minecraft_in_front {
+        point_at(&supervisor, minecraft, "Minecraft");
     }
 
     Ok(())
+}
+
+fn point_at(supervisor: &crate::state::capture_state::CaptureSupervisor, pid: u32, name: &str) {
+    log::info!("Recording {name} (pid {pid})");
+    if let Err(e) = supervisor.attach_game(pid, name.to_string()) {
+        log::warn!("Could not point the capture engine at {name}: {e}");
+    }
 }
 
 #[cfg(windows)]

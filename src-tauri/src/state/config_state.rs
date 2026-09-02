@@ -147,8 +147,6 @@ pub struct ClipConfig {
     pub hotkey_save: String,
     #[serde(default = "default_clip_hotkey_toggle")]
     pub hotkey_toggle: String,
-    #[serde(default = "default_true_bool")]
-    pub record_minecraft: bool,
     #[serde(default)]
     pub other_game: Option<OtherGame>,
 }
@@ -184,7 +182,6 @@ impl Default for ClipConfig {
             post_roll_seconds: 0,
             hotkey_save: default_clip_hotkey_save(),
             hotkey_toggle: default_clip_hotkey_toggle(),
-            record_minecraft: true,
             other_game: None,
         }
     }
@@ -228,11 +225,6 @@ mod other_game {
         let clips = chosen("RocketLeague.exe");
         assert!(clips.records("rocketleague.exe"));
         assert!(clips.records("ROCKETLEAGUE.EXE"));
-    }
-
-    #[test]
-    fn minecraft_is_recorded_unless_it_is_turned_off() {
-        assert!(ClipConfig::default().record_minecraft);
     }
 }
 

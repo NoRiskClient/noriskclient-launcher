@@ -889,7 +889,7 @@ impl ProcessManager {
 
         if let Ok(state) = State::get().await {
             let clips = state.config_manager.get_config().await.clips;
-            if clips.enabled && clips.record_minecraft {
+            if clips.enabled {
                 log::debug!("Attaching the capture engine to game process {} (pid {})", process_id, pid);
                 if let Err(e) = state
                     .capture_supervisor

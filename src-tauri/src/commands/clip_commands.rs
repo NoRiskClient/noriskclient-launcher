@@ -86,7 +86,7 @@ pub async fn bring_up(
         .capture_supervisor
         .send(LauncherToCapture::Configure(clips.to_capture_config()))?;
 
-    adopt_running_game(&state, clips);
+    adopt_running_game(&state);
 
     #[cfg(windows)]
     let registered = crate::utils::hotkey_manager::apply(app, clips)?;
@@ -98,8 +98,8 @@ pub async fn bring_up(
     Ok(registered)
 }
 
-fn adopt_running_game(state: &crate::state::State, clips: &crate::state::config_state::ClipConfig) {
-    if state.capture_supervisor.attached().is_some() || !clips.record_minecraft {
+fn adopt_running_game(state: &crate::state::State) {
+    if state.capture_supervisor.attached().is_some() {
         return;
     }
 

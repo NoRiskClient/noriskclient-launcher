@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import { open } from "@tauri-apps/plugin-dialog";
 
 import { Select } from "../../ui/Select";
 import { parseErrorMessage } from "../../../utils/error-utils";
@@ -666,19 +667,55 @@ export function ClipsTab() {
       >
         <SettingRow
           label={t("settings.clips.storage.folder")}
-          description={clips.output_dir ?? t("settings.clips.storage.default")}
-          searchKeywords={kw("settings.clips.storage.folder", "ordner", "folder", "oeffnen", "open")}
+          description={
+            clips.output_dir
+              ? `${clips.output_dir} ${t("settings.clips.storage.change_hint")}`
+              : t("settings.clips.storage.default")
+          }
+          searchKeywords={kw("settings.clips.storage.folder", "ordner", "folder", "oeffnen", "open", "speicherort", "pfad", "path", "aendern", "change")}
         >
-          <Button
-            variant="ghost"
-            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-            icon={<Icon icon="solar:folder-with-files-bold" className="w-4 h-4" />}
-            onClick={() =>
-              void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
-            }
-          >
-            {t("settings.clips.storage.open")}
-          </Button>
+          <div className="flex items-center gap-2">
+            {clips.output_dir && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => patch({ output_dir: null })}
+                disabled={saving}
+                icon={<Icon icon="solar:restart-bold" className="w-4 h-4" />}
+              >
+                {t("settings.clips.storage.reset")}
+              </Button>
+            )}
+            <Button
+              variant="flat"
+              size="sm"
+              disabled={saving}
+              icon={<Icon icon="solar:folder-open-bold" className="w-4 h-4" />}
+              onClick={() =>
+                void open({
+                  directory: true,
+                  multiple: false,
+                  defaultPath: clips.output_dir ?? undefined,
+                })
+                  .then((selected) => {
+                    if (typeof selected === "string" && selected) patch({ output_dir: selected });
+                  })
+                  .catch((e) => toast.error(parseErrorMessage(e)))
+              }
+            >
+              {t("settings.clips.storage.change")}
+            </Button>
+            <Button
+              variant="flat"
+              size="sm"
+              icon={<Icon icon="solar:folder-with-files-bold" className="w-4 h-4" />}
+              onClick={() =>
+                void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
+              }
+            >
+              {t("settings.clips.storage.open")}
+            </Button>
+          </div>
         </SettingRow>
 
         <SettingRow
@@ -728,8 +765,8 @@ export function ClipsTab() {
           searchKeywords={kw("settings.clips.library.open", "galerie", "gallery", "clips", "seite", "page")}
         >
           <Button
-            variant="ghost"
-            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+            variant="flat"
+            size="sm"
             icon={<Icon icon="solar:video-library-bold" className="w-4 h-4" />}
             onClick={toLibrary}
             disabled={!clips.enabled}
