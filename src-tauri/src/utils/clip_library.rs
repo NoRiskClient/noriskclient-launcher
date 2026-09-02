@@ -909,6 +909,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn the_same_clip_is_filed_the_same_way_however_its_path_is_written() {
         let dir = temp_dir("meta-key");
         let clip = write_clip(&dir, "same.mp4", 8);
