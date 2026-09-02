@@ -117,9 +117,20 @@ fn virtual_key(code: &str) -> Option<u32> {
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Press {
+    Fired(u8),
+    Ignored {
+        key: u32,
+        ctrl: bool,
+        shift: bool,
+        alt: bool,
+    },
+}
+
 struct Watch {
     bindings: Vec<(Binding, u8)>,
-    events: Sender<u8>,
+    events: Sender<Press>,
 }
 
 static WATCH: Mutex<Option<Watch>> = Mutex::new(None);
@@ -131,7 +142,7 @@ struct HookThread {
     handle: Option<std::thread::JoinHandle<()>>,
 }
 
-pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<u8>) -> crate::error::Result<()> {
+pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::error::Result<()> {
     uninstall();
 
     if bindings.is_empty() {
@@ -164,6 +175,8 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<u8>) -> crate::error
             while unsafe { GetMessageW(&mut message, None, 0, 0) }.as_bool() {
                 unsafe { DispatchMessageW(&message) };
             }
+
+            log::debug!("Hotkey hook thread finished");
 
             let _ = unsafe { UnhookWindowsHookEx(hook) };
         })
@@ -211,16 +224,18 @@ unsafe extern "system" fn callback(code: i32, wparam: WPARAM, lparam: LPARAM) ->
     if code >= 0 && (wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN) {
         let info = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
 
-        const LLKHF_INJECTED: u32 = 0x10;
-        if info.flags.0 & LLKHF_INJECTED == 0 {
-            if let Ok(watch) = WATCH.try_lock() {
-                if let Some(watch) = watch.as_ref() {
-                    for (binding, tag) in &watch.bindings {
-                        if binding.matches(info.vkCode) {
-                            let _ = watch.events.send(*tag);
-                            break;
-                        }
-                    }
+        if let Ok(watch) = WATCH.try_lock() {
+            if let Some(watch) = watch.as_ref() {
+                if let Some((_, tag)) = watch.bindings.iter().find(|(b, _)| b.matches(info.vkCode))
+                {
+                    let _ = watch.events.send(Press::Fired(*tag));
+                } else if watch.bindings.iter().any(|(b, _)| b.key == info.vkCode) {
+                    let _ = watch.events.send(Press::Ignored {
+                        key: info.vkCode,
+                        ctrl: held(VK_CONTROL.0 as i32),
+                        shift: held(VK_SHIFT.0 as i32),
+                        alt: held(VK_MENU.0 as i32),
+                    });
                 }
             }
         }

@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use tauri::AppHandle;
 
 use crate::error::{AppError, Result};
+use crate::utils::hotkey_hook::Press;
 use crate::state::config_state::ClipConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,7 +80,7 @@ pub fn apply(app: &AppHandle, config: &ClipConfig) -> Result<Vec<String>> {
     }
 
     if !hooked.is_empty() {
-        let (events, presses) = std::sync::mpsc::channel::<u8>();
+        let (events, presses) = std::sync::mpsc::channel::<Press>();
 
         if let Err(e) = crate::utils::hotkey_hook::install(hooked, events) {
             problems.push(format!("{e}"));
@@ -88,7 +89,21 @@ pub fn apply(app: &AppHandle, config: &ClipConfig) -> Result<Vec<String>> {
             std::thread::Builder::new()
                 .name("nrc-hotkey-dispatch".into())
                 .spawn(move || {
-                    while let Ok(tag) = presses.recv() {
+                    while let Ok(press) = presses.recv() {
+                        let tag = match press {
+                            Press::Fired(tag) => tag,
+                            Press::Ignored {
+                                key,
+                                ctrl,
+                                shift,
+                                alt,
+                            } => {
+                                log::debug!(
+                                    "Hotkey key {key:#04x} seen but ignored (ctrl: {ctrl}, shift: {shift}, alt: {alt})"
+                                );
+                                continue;
+                            }
+                        };
                         let Some(action) = action_from_tag(tag) else {
                             continue;
                         };
