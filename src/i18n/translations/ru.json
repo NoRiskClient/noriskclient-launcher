@@ -2115,6 +2115,8 @@
   "settings.tabs.clips": "Клипы",
   "settings.clips.title": "Клипы",
   "settings.clips.description": "Хранит последние минуты игры в памяти и позволяет сохранить лучшие моменты одной кнопкой.",
+  "settings.clips.windows_only": "Клипы доступны только в Windows",
+  "settings.clips.windows_only.hint": "Запись подключается к графическому конвейеру игры, пока это поддерживается только в Windows.",
   "settings.clips.enabled": "Записывать клипы",
   "settings.clips.enabled.description": "Запускается вместе с игрой и незаметно пишет в фоне.",
   "settings.clips.games.other": "Записывать ещё",

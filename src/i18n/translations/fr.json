@@ -2115,6 +2115,8 @@
   "settings.tabs.clips": "Clips",
   "settings.clips.title": "Clips",
   "settings.clips.description": "Garde les dernières minutes de jeu en mémoire et enregistre les meilleurs moments en une touche.",
+  "settings.clips.windows_only": "Les clips sont réservés à Windows",
+  "settings.clips.windows_only.hint": "L'enregistrement se branche sur le pipeline graphique du jeu, pris en charge uniquement sous Windows pour l'instant.",
   "settings.clips.enabled": "Enregistrer des clips",
   "settings.clips.enabled.description": "Démarre avec le jeu et continue d'enregistrer discrètement en arrière-plan.",
   "settings.clips.games.other": "Enregistrer aussi",

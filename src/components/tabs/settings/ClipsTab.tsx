@@ -14,7 +14,9 @@ import { RangeSlider } from "../../ui/RangeSlider";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { Button } from "../../ui/buttons/Button";
+import { EmptyState } from "../../ui/EmptyState";
 import { StatusMessage } from "../../ui/StatusMessage";
+import { isWindows } from "../../../utils/platform";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
@@ -92,6 +94,7 @@ export function ClipsTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
+  const supported = isWindows();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -127,6 +130,7 @@ export function ClipsTab() {
   );
 
   useEffect(() => {
+    if (!supported) return;
     let cancelled = false;
     const read = async () => {
       try {
@@ -145,6 +149,7 @@ export function ClipsTab() {
   }, []);
 
   useEffect(() => {
+    if (!supported) return;
     let cancelled = false;
     getEncoderCapabilities()
       .then((next) => {
@@ -157,6 +162,18 @@ export function ClipsTab() {
       cancelled = true;
     };
   }, []);
+
+  if (!supported) {
+    return (
+      <EmptyState
+        icon="solar:videocamera-record-bold"
+        message={t("settings.clips.windows_only")}
+        description={t("settings.clips.windows_only.hint")}
+        smallDescription
+        fullHeight={false}
+      />
+    );
+  }
 
   if (!clips) return null;
 

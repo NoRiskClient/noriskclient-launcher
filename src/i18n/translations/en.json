@@ -2155,6 +2155,8 @@
   "settings.tabs.clips": "Clips",
   "settings.clips.title": "Clips",
   "settings.clips.description": "Keep the last few minutes of play in memory and save the good bits with one key.",
+  "settings.clips.windows_only": "Clips are Windows only",
+  "settings.clips.windows_only.hint": "Recording hooks into the game's graphics pipeline, which we only support on Windows right now.",
   "settings.clips.enabled": "Record clips",
   "settings.clips.enabled.description": "Starts with the game and keeps recording quietly in the background.",
   "settings.clips.games.other": "Also record",

@@ -2135,6 +2135,8 @@
   "settings.tabs.clips": "Clips",
   "settings.clips.title": "Clips",
   "settings.clips.description": "Behält die letzten Minuten deines Spiels im Arbeitsspeicher und speichert die guten Momente per Tastendruck.",
+  "settings.clips.windows_only": "Clips gibt es nur unter Windows",
+  "settings.clips.windows_only.hint": "Die Aufnahme hängt sich in die Grafik-Pipeline des Spiels, das unterstützen wir bisher nur unter Windows.",
   "settings.clips.enabled": "Clips aufnehmen",
   "settings.clips.enabled.description": "Startet mit dem Spiel und nimmt unauffällig im Hintergrund auf.",
   "settings.clips.games.other": "Zusätzlich aufnehmen",

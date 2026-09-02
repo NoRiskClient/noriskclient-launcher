@@ -2130,6 +2130,8 @@
   "settings.tabs.clips": "क्लिप्स",
   "settings.clips.title": "क्लिप्स",
   "settings.clips.description": "गेमप्ले के आख़िरी कुछ मिनट मेमोरी में रखें और एक बटन दबाकर बेहतरीन पल सेव करें।",
+  "settings.clips.windows_only": "क्लिप केवल Windows पर उपलब्ध हैं",
+  "settings.clips.windows_only.hint": "रिकॉर्डिंग गेम की ग्राफ़िक्स पाइपलाइन से जुड़ती है, जिसे हम अभी केवल Windows पर सपोर्ट करते हैं।",
   "settings.clips.enabled": "क्लिप्स रिकॉर्ड करें",
   "settings.clips.enabled.description": "गेम के साथ शुरू होता है और बैकग्राउंड में चुपचाप रिकॉर्ड करता रहता है।",
   "settings.clips.games.other": "साथ में रिकॉर्ड करें",

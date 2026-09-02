@@ -2115,6 +2115,8 @@
   "settings.tabs.clips": "Klipler",
   "settings.clips.title": "Klipler",
   "settings.clips.description": "Oyunun son birkaç dakikasını hafızada tut ve en iyi anları tek tuşla kaydet.",
+  "settings.clips.windows_only": "Klipler yalnızca Windows'ta",
+  "settings.clips.windows_only.hint": "Kayıt, oyunun grafik hattına bağlanır ve bunu şimdilik yalnızca Windows'ta destekliyoruz.",
   "settings.clips.enabled": "Klip kaydet",
   "settings.clips.enabled.description": "Oyunla birlikte başlar ve arka planda sessizce kayıt yapar.",
   "settings.clips.games.other": "Ayrıca kaydet",

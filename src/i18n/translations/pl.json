@@ -2113,6 +2113,8 @@
   "settings.tabs.clips": "Klipy",
   "settings.clips.title": "Klipy",
   "settings.clips.description": "Przechowuj w pamięci ostatnie kilka minut rozgrywki i zapisuj najlepsze momenty jednym klawiszem.",
+  "settings.clips.windows_only": "Klipy są dostępne tylko w Windows",
+  "settings.clips.windows_only.hint": "Nagrywanie podpina się do potoku graficznego gry, co obsługujemy obecnie tylko w Windows.",
   "settings.clips.enabled": "Nagrywaj klipy",
   "settings.clips.enabled.description": "Uruchamia się razem z grą i nagrywa cicho w tle.",
   "settings.clips.games.other": "Nagrywaj też",

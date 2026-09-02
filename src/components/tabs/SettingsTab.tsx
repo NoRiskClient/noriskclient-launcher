@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import type { LauncherConfig } from "../../types/launcherConfig";
@@ -23,8 +23,8 @@ import { SettingsConfigProvider } from "./settings/settings-context";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
-import { isWindows } from "../../utils/platform";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
+import { isWindows } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -76,7 +76,6 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab, sidebarQuery]);
 
-  const clipsAvailable = useMemo(() => isWindows(), []);
 
   const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
     general: [
@@ -91,14 +90,16 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "background", label: t("settings.background.title") },
       { id: "custom-background", label: t("settings.custom_background.title") },
     ],
-    clips: [
-      { id: "clips-general", label: t("settings.clips.title") },
-      { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
-      { id: "clips-buffer", label: t("settings.clips.buffer.title") },
-      { id: "clips-quality", label: t("settings.clips.quality.title") },
-      { id: "clips-audio", label: t("settings.clips.audio.title") },
-      { id: "clips-storage", label: t("settings.clips.storage.title") },
-    ],
+    clips: isWindows()
+      ? [
+          { id: "clips-general", label: t("settings.clips.title") },
+          { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
+          { id: "clips-buffer", label: t("settings.clips.buffer.title") },
+          { id: "clips-quality", label: t("settings.clips.quality.title") },
+          { id: "clips-audio", label: t("settings.clips.audio.title") },
+          { id: "clips-storage", label: t("settings.clips.storage.title") },
+        ]
+      : [],
     advanced: [
       { id: "login_cache", label: t("settings.sections.login_cache") },
       { id: "gamedir", label: t("settings.game_data_dir.title") },
@@ -116,14 +117,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   }[] = [
     { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
-    ...(clipsAvailable
-      ? [{
-          id: "clips" as const,
-          label: t("settings.tabs.clips"),
-          icon: "solar:videocamera-record-bold",
-          children: sectionDefs.clips,
-        }]
-      : []),
+    { id: "clips", label: t("settings.tabs.clips"), icon: "solar:videocamera-record-bold", children: sectionDefs.clips },
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
     { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
   ];
@@ -314,7 +308,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     const bodyOf: Partial<Record<SettingsTabId, ReactNode>> = {
       general: <GeneralTab />,
       appearance: <AppearanceTab />,
-      ...(clipsAvailable ? { clips: <ClipsTab /> } : {}),
+      clips: <ClipsTab />,
       advanced: <AdvancedTab />,
     };
 
