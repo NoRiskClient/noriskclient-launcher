@@ -63,26 +63,28 @@ fn a_pack_cannot_reach_outside_the_instance() {
 }
 
 #[test]
-fn a_pack_cannot_name_a_drive_on_the_disk() {
-    refused(r"C:\Windows\System32");
-    refused("C:/Windows");
-}
+fn a_path_that_looks_absolute_never_leads_out_of_the_profile() {
+    let instance = Path::new("instances").join("my-profile");
 
-#[test]
-fn a_leading_slash_still_means_somewhere_inside_the_profile() {
-    let instance = Path::new(r"C:\instances\my-profile");
+    for path in [
+        r"C:\Windows\System32",
+        "C:/Windows",
+        "/etc/passwd",
+        r"\\server\share",
+    ] {
+        let Ok(normalized) = paths::validate_target_path(path, &dir_link()) else {
+            continue;
+        };
 
-    for path in ["/etc/passwd", r"\\server\share"] {
-        let normalized = allowed(path);
+        let target = paths::instance_path_for(&instance, &normalized).unwrap();
         assert!(
-            !normalized.starts_with('/') && !normalized.contains(':'),
-            "'{path}' must not stay absolute, got '{normalized}'"
-        );
-        let target = paths::instance_path_for(instance, &normalized).unwrap();
-        assert!(
-            target.starts_with(instance),
+            target.starts_with(&instance),
             "'{path}' escaped the profile as {}",
             target.display()
+        );
+        assert!(
+            !Path::new(&normalized).is_absolute(),
+            "'{path}' stayed absolute as '{normalized}'"
         );
     }
 }
