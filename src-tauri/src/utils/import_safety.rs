@@ -225,6 +225,11 @@ fn strip_profile_flags(profile: &mut Profile, report: &mut ImportSecurityReport)
             .stripped_profile_flags
             .push("preferred_account_id".to_string());
     }
+    if !std::mem::take(&mut profile.sync_pack_ids).is_empty() {
+        report
+            .stripped_profile_flags
+            .push("sync_pack_ids".to_string());
+    }
     profile.playtime_seconds = 0;
 
     if strip_unsafe_banner(&mut profile.banner) {

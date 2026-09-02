@@ -203,6 +203,7 @@ fn strips_profile_flags_a_pack_has_no_business_setting() {
         "use_shared_minecraft_folder": true,
         "preferred_account_id": "11111111-2222-3333-4444-555555555555",
         "playtime_seconds": 999999,
+        "sync_pack_ids": ["66666666-7777-8888-9999-aaaaaaaaaaaa"],
         "banner": { "source": { "type": "absolutePath", "path": "C:/Users/x/.ssh/id_rsa" } },
         "background": { "source": { "type": "relativePath", "path": "../../../../etc/passwd" } },
         "settings": {
@@ -219,9 +220,13 @@ fn strips_profile_flags_a_pack_has_no_business_setting() {
     assert!(!profile.use_shared_minecraft_folder);
     assert_eq!(profile.preferred_account_id, None);
     assert_eq!(profile.playtime_seconds, 0);
+    assert!(
+        profile.sync_pack_ids.is_empty(),
+        "an imported pack must not decide which sync packs a profile uses"
+    );
     assert!(profile.banner.is_none());
     assert!(profile.background.is_none());
-    assert_eq!(report.stripped_profile_flags.len(), 5);
+    assert_eq!(report.stripped_profile_flags.len(), 6);
 }
 
 #[test]
