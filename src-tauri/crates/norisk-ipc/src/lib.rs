@@ -533,6 +533,7 @@ mod tests {
             encode_fps: 0.0,
             dropped_frames: 0,
             encode_latency_ms_p99: 0.0,
+            capture_method: Some("graphics hook".to_string()),
             active_codec: Some(ClipCodec::Av1),
             active_encoder: Some(EncoderPreference::Nvenc),
         });
