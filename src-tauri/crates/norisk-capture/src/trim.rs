@@ -386,7 +386,7 @@ pub(crate) fn read(path: &Path) -> Result<SourceClip> {
                 std::slice::from_raw_parts((*packet).data, (*packet).size.max(0) as usize).to_vec();
 
             target.push(Packet {
-                data,
+                data: data.into(),
                 pts,
                 dts,
                 keyframe: (*packet).flags & ff::AV_PKT_FLAG_KEY != 0,
@@ -513,7 +513,7 @@ mod tests {
 
     fn frame(pts: i64, keyframe: bool) -> Packet {
         Packet {
-            data: vec![0; 10],
+            data: vec![0; 10].into(),
             pts,
             dts: pts,
             keyframe,

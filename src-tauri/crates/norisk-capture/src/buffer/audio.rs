@@ -97,7 +97,7 @@ mod tests {
     fn fill(ring: &mut AudioRing, frames: i64, bytes_each: usize) {
         for i in 0..frames {
             ring.push(Packet {
-                data: vec![0u8; bytes_each],
+                data: vec![0u8; bytes_each].into(),
                 pts: i * AAC_TICKS,
                 dts: i * AAC_TICKS,
                 keyframe: true,

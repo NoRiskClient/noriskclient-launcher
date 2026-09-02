@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
@@ -34,6 +35,7 @@ pub struct Engine {
     retired: Option<Retired>,
     buffering_enabled: bool,
     last_status: Instant,
+    rate_sample: std::cell::Cell<(u64, u64, Instant)>,
 }
 
 enum FrameSource {
@@ -108,10 +110,30 @@ struct Pipeline {
     ring: Arc<Mutex<RingBuffer>>,
     extradata: Vec<u8>,
     dropped: Arc<AtomicU64>,
+    encode_latency: LatencyWindow,
     settings: EncoderSettings,
     encoder: norisk_ipc::EncoderPreference,
     audio: Option<AudioPipeline>,
     target: window::GameWindow,
+}
+
+type LatencyWindow = Arc<Mutex<VecDeque<u32>>>;
+
+const LATENCY_SAMPLES: usize = 240;
+
+fn latency_p99_ms(window: &LatencyWindow) -> f32 {
+    let mut samples: Vec<u32> = window
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .copied()
+        .collect();
+    if samples.is_empty() {
+        return 0.0;
+    }
+    samples.sort_unstable();
+    let index = ((samples.len() - 1) as f32 * 0.99).round() as usize;
+    samples[index] as f32 / 1000.0
 }
 
 struct AudioPlan {
@@ -214,6 +236,7 @@ impl Engine {
             retired: None,
             buffering_enabled: true,
             last_status: Instant::now(),
+            rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
         }
     }
 
@@ -564,12 +587,16 @@ impl Engine {
         let fps = self.config.fps.max(1);
         let (frames_tx, frames_rx) = std::sync::mpsc::sync_channel::<PoolFrame>(ENCODE_QUEUE_DEPTH);
 
+        let encode_latency: LatencyWindow = Arc::new(Mutex::new(
+            VecDeque::with_capacity(LATENCY_SAMPLES),
+        ));
         let encode_thread = {
             let ring = Arc::clone(&ring);
             let events = self.events.clone();
+            let latency = Arc::clone(&encode_latency);
             std::thread::Builder::new()
                 .name("nrc-encode".into())
-                .spawn(move || encode_loop(encoder, frames_rx, ring, events, fps))
+                .spawn(move || encode_loop(encoder, frames_rx, ring, events, fps, latency))
                 .context("could not start the encode thread")?
         };
 
@@ -672,6 +699,7 @@ impl Engine {
             ring,
             extradata,
             dropped,
+            encode_latency,
             settings,
             encoder: chosen,
         });
@@ -801,41 +829,50 @@ impl Engine {
             None => (Vec::new(), Vec::new()),
         };
 
-        let written = write_mp4(
-            &clip,
-            &path,
-            &TrackInfo {
-                width: settings.width,
-                height: settings.height,
-                fps: settings.fps,
-                time_base_den: TIME_BASE_DEN as i64,
-                codec: settings.codec,
-                extradata,
-            },
-            audio_track.as_slice(),
-        )?;
+        let track = TrackInfo {
+            width: settings.width,
+            height: settings.height,
+            fps: settings.fps,
+            time_base_den: TIME_BASE_DEN as i64,
+            codec: settings.codec,
+            extradata,
+        };
+        let events = self.events.clone();
+        let reason = request.reason;
 
-        log::info!(
-            "Saved {:.1}s clip to {}",
-            written.duration_seconds,
-            path.display()
-        );
-
-        let _ = self
-            .events
-            .send(CaptureToLauncher::ClipSaved(ClipManifest {
-                path: written.path,
-                thumbnail: None,
-                duration_seconds: written.duration_seconds as f32,
-                width: written.width,
-                height: written.height,
-                fps: pipeline.settings.fps,
-                bitrate_kbps: pipeline.settings.bitrate_kbps,
-                size_bytes: written.size_bytes,
-                reason: request.reason,
-                created_at: created,
-                audio_tracks,
-            }));
+        std::thread::Builder::new()
+            .name("nrc-save".into())
+            .spawn(move || match write_mp4(&clip, &path, &track, audio_track.as_slice()) {
+                Ok(written) => {
+                    log::info!(
+                        "Saved {:.1}s clip to {}",
+                        written.duration_seconds,
+                        path.display()
+                    );
+                    let _ = events.send(CaptureToLauncher::ClipSaved(ClipManifest {
+                        path: written.path,
+                        thumbnail: None,
+                        duration_seconds: written.duration_seconds as f32,
+                        width: written.width,
+                        height: written.height,
+                        fps: settings.fps,
+                        bitrate_kbps: settings.bitrate_kbps,
+                        size_bytes: written.size_bytes,
+                        reason,
+                        created_at: created,
+                        audio_tracks,
+                    }));
+                }
+                Err(e) => {
+                    log::error!("Could not write the clip: {e:#}");
+                    let _ = events.send(CaptureToLauncher::Error(CaptureError {
+                        code: ErrorCode::ClipWrite,
+                        message: format!("{e:#}"),
+                        recoverable: true,
+                    }));
+                }
+            })
+            .context("could not start the clip writer thread")?;
 
         Ok(())
     }
@@ -861,7 +898,19 @@ impl Engine {
         };
 
         let stats = pipeline.source.stats();
-        let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
+        let (buffer_fill_seconds, buffer_bytes) = {
+            let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
+            (ring.duration_seconds() as f32, ring.bytes())
+        };
+
+        let now = Instant::now();
+        let (received_before, delivered_before, sampled_at) = self.rate_sample.replace((
+            stats.received,
+            stats.delivered,
+            now,
+        ));
+        let elapsed = now.duration_since(sampled_at).as_secs_f32().max(1e-3);
+        let rate = |after: u64, before: u64| after.saturating_sub(before) as f32 / elapsed;
 
         let state = if !self.buffering_enabled {
             CaptureState::Paused
@@ -871,12 +920,12 @@ impl Engine {
 
         let _ = self.events.send(CaptureToLauncher::Status(StatusReport {
             state,
-            buffer_fill_seconds: ring.duration_seconds() as f32,
-            buffer_bytes: ring.bytes(),
-            capture_fps: stats.received as f32,
-            encode_fps: stats.delivered as f32,
+            buffer_fill_seconds,
+            buffer_bytes,
+            capture_fps: rate(stats.received, received_before),
+            encode_fps: rate(stats.delivered, delivered_before),
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
-            encode_latency_ms_p99: 0.0,
+            encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
             active_codec: Some(pipeline.settings.codec),
             active_encoder: Some(pipeline.encoder),
         }));
@@ -1395,6 +1444,7 @@ fn encode_loop(
     ring: Arc<Mutex<RingBuffer>>,
     events: UnboundedSender<CaptureToLauncher>,
     fps: u32,
+    latency: LatencyWindow,
 ) {
     use std::sync::mpsc::RecvTimeoutError;
 
@@ -1408,8 +1458,17 @@ fn encode_loop(
     let mut repeats: u64 = 0;
 
     let emit = |encoder: &mut VideoEncoder, frame: &PoolFrame| -> bool {
+        let started = Instant::now();
         match encoder.encode(frame) {
             Ok(packets) => {
+                let micros = started.elapsed().as_micros().min(u32::MAX as u128) as u32;
+                {
+                    let mut window = latency.lock().unwrap_or_else(|e| e.into_inner());
+                    if window.len() == LATENCY_SAMPLES {
+                        window.pop_front();
+                    }
+                    window.push_back(micros);
+                }
                 let mut guard = ring.lock().unwrap_or_else(|e| e.into_inner());
                 for packet in packets {
                     guard.push(packet);

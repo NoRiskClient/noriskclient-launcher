@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use anyhow::{anyhow, Context, Result};
@@ -37,7 +38,11 @@ struct Processor {
     processor: ID3D11VideoProcessor,
     input: (u32, u32),
     crop: Option<(i32, i32, u32, u32)>,
+    input_views: HashMap<usize, ID3D11VideoProcessorInputView>,
+    output_views: HashMap<(usize, u32), ID3D11VideoProcessorOutputView>,
 }
+
+const MAX_CACHED_VIEWS: usize = 64;
 
 unsafe impl Send for Converter {}
 unsafe impl Sync for Converter {}
@@ -204,6 +209,8 @@ impl Converter {
             processor,
             input,
             crop,
+            input_views: HashMap::new(),
+            output_views: HashMap::new(),
         })
     }
 
@@ -267,11 +274,26 @@ impl Converter {
         }
 
         let processor = inner
-            .as_ref()
+            .as_mut()
             .ok_or_else(|| anyhow!("the video processor was not built"))?;
 
-        let input_view = self.input_view(processor, source)?;
-        let output_view = self.output_view(processor, dst, dst_slice)?;
+        if processor.input_views.len() + processor.output_views.len() > MAX_CACHED_VIEWS {
+            processor.input_views.clear();
+            processor.output_views.clear();
+        }
+
+        let input_key = source.as_raw() as usize;
+        if !processor.input_views.contains_key(&input_key) {
+            let view = self.input_view(processor, source)?;
+            processor.input_views.insert(input_key, view);
+        }
+        let output_key = (dst.as_raw() as usize, dst_slice);
+        if !processor.output_views.contains_key(&output_key) {
+            let view = self.output_view(processor, dst, dst_slice)?;
+            processor.output_views.insert(output_key, view);
+        }
+        let input_view = processor.input_views[&input_key].clone();
+        let output_view = &processor.output_views[&output_key];
 
         let stream = D3D11_VIDEO_PROCESSOR_STREAM {
             Enable: TRUE,
@@ -289,7 +311,7 @@ impl Converter {
 
         let result = unsafe {
             self.video_context
-                .VideoProcessorBlt(&processor.processor, &output_view, 0, &[stream])
+                .VideoProcessorBlt(&processor.processor, output_view, 0, &[stream])
         };
 
         result.context("VideoProcessorBlt failed")

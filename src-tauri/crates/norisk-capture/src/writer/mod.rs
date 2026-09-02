@@ -181,15 +181,10 @@ pub fn write_mp4(
             bail!("could not open {} for writing: {}", path.display(), av_error(rc));
         }
         guard.1 = true;
-        let mut options: *mut ff::AVDictionary = std::ptr::null_mut();
-        let key = CString::new("movflags").unwrap();
-        let value = CString::new("+faststart").unwrap();
-        ff::av_dict_set(&mut options, key.as_ptr(), value.as_ptr(), 0);
 
         (*format_ctx).avoid_negative_ts = ff::AVFMT_AVOID_NEG_TS_DISABLED;
 
-        let rc = ff::avformat_write_header(format_ctx, &mut options);
-        ff::av_dict_free(&mut options);
+        let rc = ff::avformat_write_header(format_ctx, std::ptr::null_mut());
         if rc < 0 {
             bail!("avformat_write_header failed: {}", av_error(rc));
         }

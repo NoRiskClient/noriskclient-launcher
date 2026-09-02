@@ -327,6 +327,10 @@ impl Encoder {
             (*context).gop_size = (fps * 2) as i32;
             (*context).bit_rate = 8_000_000;
             (*context).flags |= ff::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
+            (*context).thread_count = 0;
+            if !(*context).priv_data.is_null() {
+                ff::av_opt_set((*context).priv_data, c"preset".as_ptr(), c"veryfast".as_ptr(), 0);
+            }
 
             let rc = ff::avcodec_open2(context, codec, std::ptr::null_mut());
             if rc < 0 {
@@ -404,7 +408,7 @@ impl Encoder {
                 let packet = &*self.packet;
                 out.push(Packet {
                     data: std::slice::from_raw_parts(packet.data, packet.size.max(0) as usize)
-                        .to_vec(),
+                        .into(),
                     pts: packet.pts,
                     dts: if packet.dts == ff::AV_NOPTS_VALUE {
                         packet.pts

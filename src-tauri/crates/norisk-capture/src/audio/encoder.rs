@@ -258,7 +258,7 @@ impl AudioEncoder {
                 };
 
                 out.push(Packet {
-                    data: bytes,
+                    data: bytes.into(),
                     pts,
                     dts: pts,
                     keyframe: true,

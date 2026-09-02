@@ -164,7 +164,7 @@ impl VideoEncoder {
                     std::slice::from_raw_parts(packet.data, packet.size.max(0) as usize).to_vec();
 
                 out.push(EncodedPacket {
-                    data: bytes,
+                    data: bytes.into(),
                     pts: packet.pts,
                     dts: packet.dts,
                     keyframe: packet.flags & ff::AV_PKT_FLAG_KEY != 0,
@@ -196,6 +196,7 @@ unsafe fn configure_common(
     codec_name: &str,
     settings: EncoderSettings,
     cap_rate: bool,
+    tuned: bool,
 ) {
     (*context).width = settings.width as i32;
     (*context).height = settings.height as i32;
@@ -217,12 +218,47 @@ unsafe fn configure_common(
 
     (*context).flags |= ff::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
 
-    if !(*context).priv_data.is_null() {
-        let option = std::ffi::CString::new("forced-idr").unwrap();
-        let rc = ff::av_opt_set_int((*context).priv_data, option.as_ptr(), 1, 0);
-        if rc < 0 {
-            log::debug!("'{codec_name}' has no forced-idr option; assuming it honours pict_type");
+    if (*context).priv_data.is_null() {
+        return;
+    }
+
+    set_option(context, codec_name, "forced-idr", "1");
+    if tuned {
+        for (key, value) in tuning_for(codec_name) {
+            set_option(context, codec_name, key, value);
         }
+    }
+}
+
+fn tuning_for(codec_name: &str) -> &'static [(&'static str, &'static str)] {
+    match codec_name {
+        name if name.ends_with("_nvenc") => &[
+            ("preset", "p5"),
+            ("tune", "hq"),
+            ("rc", "vbr"),
+            ("multipass", "qres"),
+            ("spatial-aq", "1"),
+            ("temporal-aq", "1"),
+        ],
+        name if name.ends_with("_amf") => &[
+            ("quality", "quality"),
+            ("rc", "vbr_peak"),
+            ("preanalysis", "1"),
+        ],
+        name if name.ends_with("_qsv") => &[("preset", "slow")],
+        "libx264" => &[("preset", "veryfast"), ("tune", "zerolatency")],
+        "libx265" => &[("preset", "ultrafast"), ("tune", "zerolatency")],
+        "libsvtav1" => &[("preset", "10")],
+        _ => &[],
+    }
+}
+
+unsafe fn set_option(context: *mut ff::AVCodecContext, codec_name: &str, key: &str, value: &str) {
+    let key_c = std::ffi::CString::new(key).unwrap();
+    let value_c = std::ffi::CString::new(value).unwrap();
+    let rc = ff::av_opt_set((*context).priv_data, key_c.as_ptr(), value_c.as_ptr(), 0);
+    if rc < 0 {
+        log::debug!("'{codec_name}' ignored {key}={value}: {}", av_error(rc));
     }
 }
 
@@ -233,25 +269,33 @@ fn open_hardware(
     settings: EncoderSettings,
 ) -> Result<*mut ff::AVCodecContext> {
     unsafe {
-        let context = ff::avcodec_alloc_context3(codec);
-        if context.is_null() {
-            bail!("avcodec_alloc_context3 failed");
+        let mut last = String::new();
+
+        for tuned in [true, false] {
+            let context = ff::avcodec_alloc_context3(codec);
+            if context.is_null() {
+                bail!("avcodec_alloc_context3 failed");
+            }
+            let mut guard = ContextGuard(context);
+
+            configure_common(context, codec_name, settings, true, tuned);
+            (*context).pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_D3D11;
+            (*context).sw_pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_NV12;
+            (*context).hw_frames_ctx = pool
+                .frames_ref()
+                .context("could not reference the frame pool")?;
+
+            let rc = ff::avcodec_open2(context, codec, std::ptr::null_mut());
+            if rc >= 0 {
+                if !tuned {
+                    log::warn!("'{codec_name}' only opens with vendor defaults: {last}");
+                }
+                return Ok(guard.release());
+            }
+            last = av_error(rc);
         }
-        let mut guard = ContextGuard(context);
 
-        configure_common(context, codec_name, settings, true);
-        (*context).pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_D3D11;
-        (*context).sw_pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_NV12;
-        (*context).hw_frames_ctx = pool
-            .frames_ref()
-            .context("could not reference the frame pool")?;
-
-        let rc = ff::avcodec_open2(context, codec, std::ptr::null_mut());
-        if rc < 0 {
-            bail!("opening '{codec_name}' failed: {}", av_error(rc));
-        }
-
-        Ok(guard.release())
+        bail!("opening '{codec_name}' failed: {last}")
     }
 }
 
@@ -271,7 +315,7 @@ fn open_software(
                 }
                 let mut guard = ContextGuard(context);
 
-                configure_common(context, codec_name, settings, cap_rate);
+                configure_common(context, codec_name, settings, cap_rate, true);
                 (*context).pix_fmt = format;
                 (*context).thread_count = 0;
 

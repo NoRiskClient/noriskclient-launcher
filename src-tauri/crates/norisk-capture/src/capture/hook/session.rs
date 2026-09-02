@@ -437,7 +437,7 @@ unsafe impl Send for HookSession {}
 fn cooperative_interval(published: u64, fps: u32) -> u64 {
     let wanted = 10_000_000 / fps.max(1) as u64;
     match published {
-        0 => wanted,
+        0 => 0,
         already => already.min(wanted),
     }
 }
@@ -462,9 +462,9 @@ mod tests {
     }
 
     #[test]
-    fn the_frame_interval_is_in_hundred_nanosecond_units() {
-        assert_eq!(cooperative_interval(0, 60), HZ_60);
-        assert_eq!(cooperative_interval(0, 30), HZ_30);
+    fn an_unthrottled_hook_stays_unthrottled_so_every_present_is_published() {
+        assert_eq!(cooperative_interval(0, 60), 0);
+        assert_eq!(cooperative_interval(0, 30), 0);
     }
 
     #[test]
@@ -479,6 +479,7 @@ mod tests {
 
     #[test]
     fn a_nonsensical_rate_does_not_divide_by_zero() {
-        assert_eq!(cooperative_interval(0, 0), 10_000_000);
+        assert_eq!(cooperative_interval(0, 0), 0);
+        assert_eq!(cooperative_interval(HZ_60, 0), HZ_60);
     }
 }

@@ -5,10 +5,11 @@ pub use audio::AudioRing;
 pub use peaks::{Peak, PeakRing};
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Packet {
-    pub data: Vec<u8>,
+    pub data: Arc<[u8]>,
     pub pts: i64,
     pub dts: i64,
     pub keyframe: bool,
@@ -285,7 +286,7 @@ mod tests {
         for i in 0..frames {
             let pts = i * TICKS_PER_FRAME;
             buffer.push(Packet {
-                data: vec![0u8; bytes_per_frame],
+                data: vec![0u8; bytes_per_frame].into(),
                 pts,
                 dts: pts,
                 keyframe: i % gop == 0,
@@ -298,7 +299,7 @@ mod tests {
         let mut buffer = RingBuffer::new(30.0, TB);
         for i in 0..5 {
             buffer.push(Packet {
-                data: vec![0; 10],
+                data: vec![0; 10].into(),
                 pts: i,
                 dts: i,
                 keyframe: false,
@@ -408,7 +409,7 @@ mod tests {
         for i in 0..600 {
             let pts = i * TICKS_PER_FRAME;
             buffer.push(Packet {
-                data: vec![(i % 251) as u8; 32],
+                data: vec![(i % 251) as u8; 32].into(),
                 pts,
                 dts: pts,
                 keyframe: i % 120 == 0,
