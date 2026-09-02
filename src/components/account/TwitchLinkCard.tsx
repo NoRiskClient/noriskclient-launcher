@@ -144,12 +144,12 @@ export function TwitchLinkCard() {
   );
 }
 
-interface TwitchDeviceLoginModalProps {
+export interface TwitchDeviceLoginModalProps {
   onClose: () => Promise<void>;
   onCompleted: () => Promise<void>;
 }
 
-function TwitchDeviceLoginModal({
+export function TwitchDeviceLoginModal({
   onClose,
   onCompleted,
 }: TwitchDeviceLoginModalProps) {

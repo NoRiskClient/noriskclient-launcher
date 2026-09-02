@@ -73,6 +73,10 @@ async fn active_account_id() -> Result<Uuid, AppError> {
 /// reports its outcome through the `twitch:device_login` window event.
 #[tauri::command]
 pub async fn twitch_begin_device_login(app: AppHandle) -> Result<(), CommandError> {
+    begin_device_login(app).await
+}
+
+async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
     info!("[Twitch] Starting device code login");
 
     // Abort a previous attempt so its polling can't race the new one.

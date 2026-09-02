@@ -38,7 +38,8 @@ use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
 };
 use commands::twitch_command::{
-    twitch_begin_device_login, twitch_cancel_login, twitch_get_status, twitch_unlink,
+    twitch_begin_device_login, twitch_cancel_login, twitch_get_status,
+    twitch_unlink,
 };
 use commands::minecraft_command::{
     add_skin,
