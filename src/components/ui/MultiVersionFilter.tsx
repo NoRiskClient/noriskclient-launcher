@@ -49,7 +49,7 @@ export function MultiVersionFilter({
       {/* Trigger button (icon-only, accent-tinted while a filter is active) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 rounded-md px-2 py-1 text-white font-minecraft-ten transition-all duration-200 focus:outline-none ${
+        className={`flex items-center gap-2 rounded-md px-2 py-1 text-white font-minecraft transition-all duration-200 focus:outline-none ${
           isSm ? "text-sm" : "text-xl"
         }`}
         style={{
@@ -69,12 +69,17 @@ export function MultiVersionFilter({
         <Icon
           icon="solar:gamepad-bold"
           className="w-4 h-4"
-          style={{ color: isActive ? accentColor.value : "rgba(255, 255, 255, 0.7)" }}
+          style={{
+            color: isActive ? accentColor.value : "rgba(255, 255, 255, 0.7)",
+          }}
         />
         {isActive && (
           <span
-            className="min-w-[1rem] text-center text-xs font-minecraft-ten rounded-full px-1"
-            style={{ backgroundColor: `${accentColor.value}30`, color: accentColor.value }}
+            className="min-w-[1rem] text-center text-xs font-minecraft rounded-full px-1"
+            style={{
+              backgroundColor: `${accentColor.value}30`,
+              color: accentColor.value,
+            }}
           >
             {selected.length}
           </span>
@@ -85,11 +90,13 @@ export function MultiVersionFilter({
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 w-56 bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <span className="text-white/60 font-minecraft-ten text-xs lowercase">{t("profiles.filter.versions")}</span>
+            <span className="text-white/60 font-minecraft text-xs lowercase">
+              {t("profiles.filter.versions")}
+            </span>
             {isActive && (
               <button
                 onClick={onClear}
-                className="text-white/60 hover:text-white font-minecraft-ten text-xs lowercase transition-colors"
+                className="text-white/60 hover:text-white font-minecraft text-xs lowercase transition-colors"
               >
                 {t("profiles.filter.clear")}
               </button>
@@ -97,7 +104,9 @@ export function MultiVersionFilter({
           </div>
           <div className="py-1 max-h-72 overflow-y-auto no-scrollbar">
             {options.length === 0 && (
-              <div className="px-3 py-2 text-white/40 font-minecraft-ten text-xs">{t("profiles.filter.noVersions")}</div>
+              <div className="px-3 py-2 text-white/40 font-minecraft text-xs">
+                {t("profiles.filter.noVersions")}
+              </div>
             )}
             {options.map((option) => {
               const checked = selected.includes(option.value);
@@ -105,20 +114,33 @@ export function MultiVersionFilter({
                 <button
                   key={option.value}
                   onClick={() => onToggle(option.value)}
-                  className={`w-full flex items-center gap-2.5 text-left font-minecraft-ten transition-colors duration-150 ${
+                  className={`w-full flex items-center gap-2.5 text-left font-minecraft transition-colors duration-150 ${
                     isSm ? "px-3 py-1.5 text-xs" : "px-3 py-2 text-sm"
                   } ${checked ? "text-white" : "text-white/80 hover:bg-white/5 hover:text-white"}`}
-                  style={{ backgroundColor: checked ? `${accentColor.value}20` : undefined }}
+                  style={{
+                    backgroundColor: checked
+                      ? `${accentColor.value}20`
+                      : undefined,
+                  }}
                 >
                   {/* checkbox */}
                   <span
                     className="w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0"
                     style={{
-                      borderColor: checked ? accentColor.value : "rgba(255,255,255,0.3)",
-                      backgroundColor: checked ? accentColor.value : "transparent",
+                      borderColor: checked
+                        ? accentColor.value
+                        : "rgba(255,255,255,0.3)",
+                      backgroundColor: checked
+                        ? accentColor.value
+                        : "transparent",
                     }}
                   >
-                    {checked && <Icon icon="solar:check-bold" className="w-3 h-3 text-black" />}
+                    {checked && (
+                      <Icon
+                        icon="solar:check-circle-bold"
+                        className="w-3 h-3 text-black"
+                      />
+                    )}
                   </span>
                   <span className="flex-1">{option.value}</span>
                   <span className="text-white/40 text-xs">{option.count}</span>

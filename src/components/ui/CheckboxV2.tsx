@@ -73,16 +73,16 @@ export function CheckboxV2({
   const getLabelSize = () => {
     switch (size) {
       case "sm":
-        return "text-sm";
+        return "text-xs";
       case "lg":
-        return "text-lg";
-      default: // md
         return "text-base";
+      default: // md
+        return "text-sm";
     }
   };
 
   const getCheckboxStyles = () => {
-    const baseClasses = `transition-all duration-200 border font-minecraft rounded flex items-center justify-center cursor-pointer ${getSizeClasses()}`;
+    const baseClasses = `transition-all duration-200 border font-smallcaps rounded flex items-center justify-center cursor-pointer ${getSizeClasses()}`;
     
     if (checked || indeterminate) {
       return {
@@ -138,7 +138,7 @@ export function CheckboxV2({
       >
         {(checked || indeterminate) && (
           <Icon
-            icon={indeterminate ? "mingcute:minus-line" : "mingcute:check-line"}
+            icon={indeterminate ? "mdi:minus" : "mingcute:check-line"}
             className={`${getIconSize()} transition-all duration-200`}
           />
         )}
@@ -147,7 +147,7 @@ export function CheckboxV2({
       {label && (
         <label
           onClick={!disabled ? handleClick : undefined}
-          className={`font-minecraft lowercase text-white cursor-pointer select-none ${getLabelSize()} ${
+          className={`font-smallcaps text-white cursor-pointer select-none ${getLabelSize()} ${
             disabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-white/80'
           }`}
         >

@@ -17,7 +17,7 @@ const SLIDE_INTERVAL_MS = 8000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const TEXT_CLASSES =
-  "text-white/70 font-minecraft-ten text-[8px] font-normal leading-none";
+  "text-white/70 font-minecraft text-[8px] font-normal leading-none";
 
 export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
   const { t, i18n } = useTranslation();
@@ -89,20 +89,24 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
 
   const content = playerSlideActive ? (
     <Tooltip content={t("header.stats.players_24h_tooltip")}>
-      <span className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}>
+      <span
+        className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}
+      >
         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
         {formattedCount}
       </span>
     </Tooltip>
   ) : (
-    <span className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}>
+    <span
+      className={`${TEXT_CLASSES} inline-flex items-center whitespace-nowrap`}
+    >
       {versionText}
     </span>
   );
 
   return (
     <div
-      className="inline-flex -mt-2.5 h-3 min-w-[3.5rem] items-center overflow-hidden"
+      className="relative inline-flex items-center h-3 min-w-[3.5rem]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

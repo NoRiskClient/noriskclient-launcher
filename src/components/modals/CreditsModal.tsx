@@ -50,10 +50,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               </div>
               <div className="min-h-[3rem] flex flex-col justify-center">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-minecraft text-white lowercase tracking-wider">
+                  <span className="text-base font-smallcaps text-white tracking-wider">
                     Deadmake
                   </span>
-                  <span className="text-white/50 font-minecraft text-lg lowercase">
+                  <span className="text-white/50 font-smallcaps text-xs">
                     aka Maggus
                   </span>
                 </div>
@@ -61,7 +61,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-right mr-3">
-                <p className="text-white/80 font-minecraft text-lg lowercase tracking-wide">
+                <p className="text-white/80 font-smallcaps text-xs tracking-wide">
                   {t("credits_modal.ui_frontend")}
                 </p>
               </div>
@@ -102,14 +102,14 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               </div>
               <div className="min-h-[3rem] flex flex-col justify-center">
                 <div className="flex items-baseline gap-2">
-                  <h4 className="text-2xl font-minecraft text-white lowercase tracking-wider">
+                  <h4 className="text-base font-smallcaps text-white tracking-wider">
                     NoRisk
                   </h4>
                 </div>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-white/80 font-minecraft text-lg lowercase tracking-wide">
+              <p className="text-white/80 font-smallcaps text-xs tracking-wide">
                 {t("credits_modal.backend_core")}
               </p>
             </div>
@@ -122,8 +122,8 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
               onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
             >
-              <Icon icon="solar:external-link-bold" className="w-5 h-5" />
-              <span className="font-minecraft text-lg lowercase">
+              <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
+              <span className="font-smallcaps text-xs">
                 {t("credits_modal.view_licenses")}
               </span>
             </Button>

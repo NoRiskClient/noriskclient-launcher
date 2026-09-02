@@ -6,16 +6,17 @@ import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { ThemedSurface } from "../ThemedSurface";
-import { 
+import {
   getVariantColors,
   getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
   type ComponentSize,
-  type ComponentVariant 
+  type ComponentVariant,
 } from "../design-system";
 
-interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface IconButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ComponentVariant;
   displayVariant?: "button" | "ghost" | "themed-surface";
   size?: ComponentSize;
@@ -132,20 +133,28 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         variant === "3d" &&
         shadowDepth !== "none"
       );
-    };    const colors = getVariantColors(variant, accentColor);
+    };
+    const colors = getVariantColors(variant, accentColor);
     const radiusClass = getBorderRadiusClass();
     const accessibilityProps = getAccessibilityProps({
       label,
       description,
-      disabled
-    });    const getIconButtonSizeClasses = () => {
+      disabled,
+    });
+    const getIconButtonSizeClasses = () => {
       switch (size) {
-        case "xs": return "h-[36px] w-[36px] p-2 text-base";
-        case "sm": return "h-[42px] w-[42px] p-2.5 text-lg";
-        case "md": return "h-[50px] w-[50px] p-3 text-xl";
-        case "lg": return "h-[58px] w-[58px] p-3.5 text-2xl";
-        case "xl": return "h-[66px] w-[66px] p-4 text-2xl";
-        default: return "h-[50px] w-[50px] p-3 text-xl";
+        case "xs":
+          return "h-[36px] w-[36px] p-2 text-xs";
+        case "sm":
+          return "h-[42px] w-[42px] p-2.5 text-xs";
+        case "md":
+          return "h-[50px] w-[50px] p-3 text-sm";
+        case "lg":
+          return "h-[58px] w-[58px] p-3.5 text-base";
+        case "xl":
+          return "h-[66px] w-[66px] p-4 text-base";
+        default:
+          return "h-[50px] w-[50px] p-3 text-sm";
       }
     };
 
@@ -153,12 +162,18 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
     const getIconSize = () => {
       switch (size) {
-        case "xs": return "w-4 h-4";
-        case "sm": return "w-5 h-5";
-        case "md": return "w-6 h-6";
-        case "lg": return "w-7 h-7";
-        case "xl": return "w-8 h-8";
-        default: return "w-6 h-6";
+        case "xs":
+          return "w-4 h-4";
+        case "sm":
+          return "w-5 h-5";
+        case "md":
+          return "w-6 h-6";
+        case "lg":
+          return "w-7 h-7";
+        case "xl":
+          return "w-8 h-8";
+        default:
+          return "w-6 h-6";
       }
     };
 
@@ -243,12 +258,16 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
       if (variant === "3d") {
         if (isFullRiskStyle) {
-          return shadowDepth === "none" ? "border-[3px]" : "border-[3px] border-b-[7px]";
+          return shadowDepth === "none"
+            ? "border-[3px]"
+            : "border-[3px] border-b-[7px]";
         }
         return shadowDepth === "none" ? "border-2" : "border-2 border-b-4";
       }
 
-      return isFullRiskStyle ? "border-[2px] border-b-[4px]" : "border border-b-2";
+      return isFullRiskStyle
+        ? "border-[2px] border-b-[4px]"
+        : "border border-b-2";
     };
 
     const getShadowClasses = () => {
@@ -276,8 +295,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-          isFullRiskStyle ? "font-minecraft relative overflow-hidden" : "font-minecraft relative overflow-hidden backdrop-blur-md",
-          isFullRiskStyle ? "text-white tracking-wider" : "rounded-md text-white tracking-wider",
+          isFullRiskStyle
+            ? "font-smallcaps relative overflow-hidden"
+            : "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          isFullRiskStyle
+            ? "text-white tracking-wider"
+            : "rounded-md text-white tracking-wider",
           "flex items-center justify-center",
           "text-shadow-sm",
           getBorderClasses(),
@@ -288,9 +311,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           className,
         )}
         style={{
-          ...(isFullRiskStyle ? { background: getBackgroundColor() } : { backgroundColor: getBackgroundColor() }),
+          ...(isFullRiskStyle
+            ? { background: getBackgroundColor() }
+            : { backgroundColor: getBackgroundColor() }),
           borderColor: getBorderColor(),
-          borderBottomColor: variant === "3d" && isFullRiskStyle ? "#094f86" : getBorderBottomColor(),
+          borderBottomColor:
+            variant === "3d" && isFullRiskStyle
+              ? "#094f86"
+              : getBorderBottomColor(),
           boxShadow: getBoxShadow(),
           color: colors.text,
           filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
@@ -310,7 +338,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                 opacity: isHovered ? 1 : 0.8,
               }}
             />
-          )}        <span
+          )}{" "}
+        <span
           className={cn(
             "relative z-10 flex items-center justify-center transition-transform duration-200",
             getIconSize(),
@@ -327,7 +356,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
     if (displayVariant === "themed-surface") {
       const surfaceBaseColorHex =
-        variant === "default" || variant === "ghost" ? undefined : colors.main;      return (
+        variant === "default" || variant === "ghost" ? undefined : colors.main;
+      return (
         <ThemedSurface
           baseColorHex={surfaceBaseColorHex}
           className={cn(sizeClasses, "!p-0", className)}

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
+import { useEffect, useMemo, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
@@ -10,6 +12,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { ProfileCardV2 } from "../profiles/ProfileCardV2";
 import { toast } from "react-hot-toast";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
+import { MultiVersionFilter } from "../ui/MultiVersionFilter";
 import { MultiVersionFilter } from "../ui/MultiVersionFilter";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { ActionButtons, type ActionButton } from "../ui/ActionButtons";
@@ -40,6 +43,7 @@ export function ProfilesTabV2() {
   const { confirm, confirmDialog } = useConfirmDialog();
   const { openModal: openWizard } = useProfileWizardStore();
   const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
+  const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
   const { showModal, hideModal } = useGlobalModal();
   const uiStylePreset = useThemeStore((state) => state.uiStylePreset);
   const isFullRiskStyle = uiStylePreset === "fullrisk";
@@ -49,9 +53,12 @@ export function ProfilesTabV2() {
     profilesTabActiveGroup,
     profilesTabSortBy,
     profilesTabVersionFilters,
+    profilesTabVersionFilters,
     profilesTabLayoutMode,
     setProfilesTabActiveGroup,
     setProfilesTabSortBy,
+    setProfilesTabVersionFilters,
+    toggleProfilesTabVersionFilter,
     setProfilesTabVersionFilters,
     toggleProfilesTabVersionFilter,
     setProfilesTabLayoutMode,
@@ -67,6 +74,7 @@ export function ProfilesTabV2() {
   // Use persistent values instead of local state
   const activeGroup = profilesTabActiveGroup;
   const sortBy = profilesTabSortBy;
+  const selectedVersions = profilesTabVersionFilters;
   const selectedVersions = profilesTabVersionFilters;
   const layoutMode = profilesTabLayoutMode;
 
@@ -272,6 +280,7 @@ export function ProfilesTabV2() {
       loading: t("profiles.openingFolder", { name: profile.name }),
       success: t("profiles.openFolderSuccess", { name: profile.name }),
       error: (err) => {
+        const message = parseErrorMessage(err);
         const message = parseErrorMessage(err);
         console.error(`Failed to open folder for ${profile.name}:`, err);
         return t("profiles.openFolderError", { error: message });

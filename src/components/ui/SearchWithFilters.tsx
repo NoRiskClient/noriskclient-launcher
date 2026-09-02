@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
+import { useRef } from "react";
 import { StableIcon } from "./IconWrapper";
 import { CustomDropdown } from "./CustomDropdown";
 import type { DropdownOption } from "./CustomDropdown";
@@ -36,7 +37,8 @@ export interface SearchWithFiltersProps {
   showFilter?: boolean;
   /** Custom filter control rendered in the filter slot (inside the search bar), replacing the default dropdown. */
   filterSlot?: React.ReactNode;
-  dropdownSize?: 'sm' | 'md';
+  dropdownSize?: "sm" | "md";
+  compact?: boolean;
 }
 
 export function SearchWithFilters({
@@ -55,38 +57,72 @@ export function SearchWithFilters({
   showSort = true,
   showFilter = true,
   filterSlot,
-  dropdownSize = 'md',
+  dropdownSize = "md",
+  compact = false,
 }: SearchWithFiltersProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onSearchChange?.(e.target.value);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && onSearchEnter) {
+    if (e.key === "Enter" && onSearchEnter) {
       onSearchEnter(searchValue);
     }
   };
 
+  const handleClearSearch = () => {
+    onSearchChange?.("");
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const showSortSection = showSort && sortOptions.length > 0;
+  const showFilterSection = showFilter && filterOptions.length > 0;
+  const hasSearchValue = Boolean(searchValue);
+
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       {/* Search with integrated filters */}
-      <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors flex-1 max-w-md">
-        <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50" />
-        <input
-          type="text"
-          placeholder={placeholder}
-          value={searchValue}
-          onChange={handleSearchChange}
-          onKeyDown={handleSearchKeyDown}
-          className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-sm flex-1 outline-none"
-        />
-        
+      <div
+        className={`flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 hover:border-white/20 transition-colors ${
+          compact ? "px-3 py-2 w-full" : "px-4 py-3 flex-1 max-w-md"
+        }`}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <StableIcon
+            icon={searchIcon}
+            className="w-4 h-4 text-white/50 shrink-0"
+          />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={placeholder}
+            value={searchValue}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+            className="bg-transparent text-white placeholder-white/50 font-minecraft text-sm flex-1 min-w-0 outline-none"
+          />
+          {hasSearchValue && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              aria-label="Clear search"
+              className="text-white/60 hover:text-white transition-colors duration-200 shrink-0"
+            >
+              <Icon icon="lucide:x" className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
         {/* Sort Filter */}
-        {showSort && sortOptions.length > 0 && (
+        {showSortSection && (
           <>
             {/* Separator */}
             <div className="h-4 w-px bg-white/20 mx-2"></div>
-            
+
             {/* Sort Filter Button */}
             <div className="relative">
               <CustomDropdown
@@ -100,7 +136,7 @@ export function SearchWithFilters({
             </div>
           </>
         )}
-        
+
         {/* Version/Filter */}
         {filterSlot ? (
           <>
@@ -109,7 +145,7 @@ export function SearchWithFilters({
             <div className="relative">{filterSlot}</div>
           </>
         ) : (
-          showFilter && filterOptions.length > 0 && (
+          showFilterSection && (
             <>
               {/* Separator */}
               <div className="h-4 w-px bg-white/20 mx-2"></div>

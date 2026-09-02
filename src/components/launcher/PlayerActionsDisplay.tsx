@@ -1,42 +1,24 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "../../lib/utils";
-import { SkinViewer } from "./SkinViewer";
 import { MainLaunchButton } from "./MainLaunchButton";
+import { PlayerRig } from "./PlayerRig";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useSkinStore } from "../../store/useSkinStore";
-import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import type { GetStarlightSkinRenderPayload } from "../../types/localSkin";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { Icon } from "@iconify/react";
 import { ServerLaunchCard } from "./ServerLaunchCard";
+import { useProfileStore } from "../../store/profile-store";
+import type { PromoOutlineConfig } from "@noriskclient/nrc-skin-renderer/postfx";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { StaticTooltip } from "../ui/Tooltip";
 import { toast } from "sonner";
 import { isWorldCupEventActive } from "../../data/worldcup-event";
 import type { LaunchOverrides } from "../../services/process-service";
-import { Dropdown } from "../ui/dropdown/Dropdown";
 
-const DEFAULT_FALLBACK_SKIN_URL = "/skins/default_steve_full.png"; // Defined constant for fallback URL
-const STARLIGHT_RENDER_TYPES = [
-  "default",
-  "crouching",
-  "criss_cross",
-  "ultimate",
-  "relaxing",
-  "pointing",
-  "sleeping",
-  "mojavatar",
-  "reading",
-] as const;
-
-function getRandomRenderType() {
-  const randomIndex = Math.floor(Math.random() * STARLIGHT_RENDER_TYPES.length);
-  return STARLIGHT_RENDER_TYPES[randomIndex];
-}
-
+// Featured server configuration
+// Option A: profileId = null → uses currently selected profile from MainLaunchButton
+// Option B: profileId = "uuid" → uses dedicated profile for this server
 const FEATURED_SERVER = {
   address: "hugosmp.net",
   name: "HugoSMP.net",
@@ -64,6 +46,7 @@ interface PlayerActionsDisplayProps {
   }>;
   className?: string;
   displayMode?: "playerName" | "logo";
+  outline?: Partial<PromoOutlineConfig>;
 }
 
 function FeaturedPromoIcon({
@@ -103,19 +86,13 @@ export function PlayerActionsDisplay({
   launchButtonVersions,
   className,
   displayMode = "playerName",
+  outline,
 }: PlayerActionsDisplayProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const uiStylePreset = useThemeStore((state) => state.uiStylePreset);
   const featureMode = useThemeStore((state) => state.featureMode);
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
-  const isFullRiskStyle = uiStylePreset === "fullrisk";
-  const [resolvedSkinUrl, setResolvedSkinUrl] = useState<string>(
-    DEFAULT_FALLBACK_SKIN_URL,
-  );
-  const [currentRenderType, setCurrentRenderType] = useState<string>("default");
-  const [isPoseDropdownOpen, setIsPoseDropdownOpen] = useState(false);
-  const skinRevision = useSkinStore((state) => state.skinRevision);
   const navigate = useNavigate();
   const [poseTriggerRef, setPoseTriggerRef] =
     useState<HTMLButtonElement | null>(null);
@@ -127,7 +104,6 @@ export function PlayerActionsDisplay({
       return FEATURED_SERVER.profileId;
     }
 
-    // Option A: Use currently selected profile from MainLaunchButton
     const selectedVersion = launchButtonVersions.find(
       (v) => v.id === launchButtonDefaultVersion,
     );
@@ -149,92 +125,14 @@ export function PlayerActionsDisplay({
     setFeatureMode(!featureMode);
   };
 
-  const fetchAndSetSkin = useCallback(
-    async (requestedRenderType?: string) => {
-      if (!playerName) {
-        console.log(
-          "[PlayerActionsDisplay] No player name, using default fallback skin.",
-        );
-        setCurrentRenderType("default");
-        setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-        return;
-      }
-
-      const renderType = requestedRenderType || "default";
-
-      try {
-        const payload: GetStarlightSkinRenderPayload = {
-          player_name: playerName,
-          render_type: renderType,
-          render_view: "full",
-        };
-        setCurrentRenderType(renderType);
-        const localPath =
-          await MinecraftSkinService.getStarlightSkinRender(payload);
-        if (localPath) {
-          setResolvedSkinUrl(convertFileSrc(localPath));
-        } else {
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-        }
-      } catch (error) {
-        console.error(
-          "[PlayerActionsDisplay] Failed to fetch starlight skin render:",
-          error,
-        );
-        try {
-          const activeSkin = await MinecraftSkinService.getActiveSkin().catch(
-            () => null,
-          );
-          const payload: GetStarlightSkinRenderPayload = {
-            player_name: playerName,
-            render_type: "default",
-            render_view: "full",
-            base64_skin_data: activeSkin?.base64_data ?? null,
-          };
-          const localPath =
-            await MinecraftSkinService.getStarlightSkinRender(payload);
-          if (localPath) {
-            setResolvedSkinUrl(convertFileSrc(localPath));
-          } else {
-            setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-          }
-        } catch (error) {
-          console.error(
-            "[PlayerActionsDisplay] Failed to fetch starlight skin render:",
-            error,
-          );
-          setResolvedSkinUrl(DEFAULT_FALLBACK_SKIN_URL);
-        }
-      }
-    },
-    [playerName, skinRevision],
-  );
-
-  useEffect(() => {
-    fetchAndSetSkin(getRandomRenderType());
-  }, [fetchAndSetSkin]);
-
   const dropShadowX = "2px";
   const dropShadowY = "4px";
   const dropShadowBlur = "6px";
   const commonDropShadowStyle = `drop-shadow(${dropShadowX} ${dropShadowY} ${dropShadowBlur} ${accentColor.value})`;
 
-  const skinViewerDisplayHeight = isFullRiskStyle ? 470 : 450;
-  const skinViewerMaxDisplayWidth = isFullRiskStyle ? 238 : 225;
-
-  const skinViewerStyles: React.CSSProperties = {
-    filter: "drop-shadow(5px 10px 5px rgba(0,0,0,0.75))",
-    WebkitBoxReflect:
-      "below 0px linear-gradient(to bottom, transparent, rgba(0,0,0,0.05))",
-    height: `${skinViewerDisplayHeight}px`,
-    width: "auto",
-    maxWidth: `${skinViewerMaxDisplayWidth}px`,
-  };
-
   const selectedVersionLabel = launchButtonVersions.find(
     (v) => v.id === launchButtonDefaultVersion,
   )?.label;
-  const activeProfileName = selectedVersionLabel || playerName || "default";
 
   const worldCupActive = isWorldCupEventActive();
   const featuredLaunchOverrides: LaunchOverrides | undefined = worldCupActive
@@ -268,99 +166,21 @@ export function PlayerActionsDisplay({
             filter: commonDropShadowStyle,
           }}
         />
-      ) : isFullRiskStyle ? (
-        <div className="absolute top-10 left-12 right-12 z-20">
-          <div className="max-w-[560px]">
-            <h2 className="fullrisk-title font-minecraft text-[96px] leading-[0.9] font-normal break-words">
-              {activeProfileName.toLowerCase()}
-            </h2>
-            <button
-              type="button"
-              ref={setPoseTriggerRef}
-              onClick={() => setIsPoseDropdownOpen((value) => !value)}
-              className="font-minecraft-ten text-[10px] uppercase tracking-[0.24em] text-white/55 mt-3 cursor-pointer hover:text-white/80 transition-colors"
-            >
-              pose: {currentRenderType}
-            </button>
-            {poseTriggerRef && (
-              <Dropdown
-                isOpen={isPoseDropdownOpen}
-                onClose={() => setIsPoseDropdownOpen(false)}
-                triggerRef={{ current: poseTriggerRef }}
-                width={220}
-                className="max-h-[320px] overflow-y-auto custom-scrollbar"
-              >
-                <div className="py-2">
-                  {STARLIGHT_RENDER_TYPES.map((renderType) => (
-                    <button
-                      key={renderType}
-                      type="button"
-                      onClick={() => {
-                        setIsPoseDropdownOpen(false);
-                        fetchAndSetSkin(renderType);
-                      }}
-                      className={cn(
-                        "w-full px-4 py-2 text-left font-minecraft-ten text-[10px] uppercase tracking-[0.2em] transition-colors",
-                        currentRenderType === renderType
-                          ? "text-white bg-white/12"
-                          : "text-white/70 hover:text-white hover:bg-white/8",
-                      )}
-                    >
-                      {renderType.replace(/_/g, " ")}
-                    </button>
-                  ))}
-                </div>
-              </Dropdown>
-            )}
-          </div>
-        </div>
-      ) : (
-        <h2 className="font-minecraft text-6xl text-center text-white mb-2 lowercase font-normal">
-          {playerName || "no account"}
-        </h2>
-      )}
+      ) : null}
 
       <div
         className={cn(
-          isFullRiskStyle
-            ? "relative w-full h-full flex flex-col items-center justify-end"
-            : "relative w-full max-w-[500px] flex flex-col items-center",
+          "relative w-full max-w-[500px] flex flex-col items-center",
           displayMode === "logo" && "z-10",
         )}
       >
-        {isFullRiskStyle && (
-          <div className="absolute bottom-[27rem] left-1/2 z-20 -translate-x-1/2 text-center pointer-events-none">
-            <p className="font-minecraft text-[38px] text-white/90 lowercase text-shadow-sm">
-              {playerName ? playerName.toLowerCase() : "no account"}
-            </p>
-          </div>
-        )}
-        <SkinViewer
-          skinUrl={resolvedSkinUrl}
-          playerName={playerName?.toString()}
-          width={skinViewerMaxDisplayWidth}
-          height={skinViewerDisplayHeight}
-          className="bg-transparent flex-shrink-0"
-          style={{
-            ...skinViewerStyles,
-            ...(isFullRiskStyle ? { transform: "translateY(12px)" } : {}),
-          }}
-        />
+        <PlayerRig playerName={playerName} outline={outline} />
 
         {!isLoadingProfiles && (
           <>
             {/* Featured Server Toggle - above the launch button */}
             <div
-              className={cn(
-                "absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300",
-                isFullRiskStyle
-                  ? featureMode
-                    ? "bottom-44"
-                    : "bottom-36"
-                  : featureMode
-                    ? "bottom-40"
-                    : "bottom-32",
-              )}
+              className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? "bottom-32" : "bottom-24"}`}
             >
               {!featureMode && worldCupActive ? (
                 <StaticTooltip
@@ -372,7 +192,7 @@ export function PlayerActionsDisplay({
                 >
                   <button
                     onClick={handleTopToggle}
-                    className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                    className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   >
                     <span className="flex items-center gap-2">
                       <FeaturedPromoIcon
@@ -380,32 +200,26 @@ export function PlayerActionsDisplay({
                         alt=""
                         size="md"
                       />
-                      {t("wm.public_viewing").toLowerCase()}
+                      {t("wm.public_viewing")}
                     </span>
                   </button>
                 </StaticTooltip>
               ) : (
                 <button
                   onClick={handleTopToggle}
-                  className="font-minecraft text-2xl lowercase text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                  className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
                   title={
                     featureMode
                       ? t("wm.switch_to_main")
                       : t("wm.switch_to_hugo", { server: FEATURED_SERVER.name })
                   }
                 >
-                  {featureMode
-                    ? t("wm.switch_to_main")
-                    : FEATURED_SERVER.name.toLowerCase()}
+                  {featureMode ? t("wm.switch_to_main") : FEATURED_SERVER.name}
                 </button>
               )}
             </div>
             <div
-              className={
-                isFullRiskStyle
-                  ? "absolute bottom-5 left-0 right-0 flex justify-center px-4"
-                  : "absolute bottom-8 left-0 right-0 flex justify-center px-4"
-              }
+              className={`absolute left-0 right-0 flex justify-center px-4 bottom-2`}
             >
               {featureMode ? (
                 <ServerLaunchCard

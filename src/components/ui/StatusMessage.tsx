@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
-import { gsap } from "gsap";
 import { getBorderRadiusClass } from "./design-system";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface StatusMessageProps {
   type: "success" | "error" | "warning" | "info";
@@ -20,20 +20,11 @@ export function StatusMessage({
   const messageRef = useRef<HTMLDivElement>(null);
   const radiusClass = getBorderRadiusClass();
 
-  useEffect(() => {
-    if (messageRef.current) {
-      gsap.fromTo(
-        messageRef.current,
-        { opacity: 0, y: -10 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.4,
-          ease: "back.out(1.7)",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    messageRef,
+    { opacity: 0, y: -10 },
+    { opacity: 1, y: 0, duration: 0.4, ease: "back.out(1.7)" },
+  );
 
   const getTypeStyles = () => {
     switch (type) {
@@ -83,8 +74,12 @@ export function StatusMessage({
       role="alert"
       aria-live="polite"
     >
-      <Icon icon={styles.icon} className="w-6 h-6 mr-3 flex-shrink-0 mt-1" aria-hidden="true" />
-      <div className="whitespace-pre-line text-base font-minecraft-ten">{message}</div>
+      <Icon
+        icon={styles.icon}
+        className="w-6 h-6 mr-3 flex-shrink-0 mt-1"
+        aria-hidden="true"
+      />
+      <div className="text-base font-minecraft">{message}</div>
     </div>
   );
 }

@@ -9,11 +9,12 @@ interface NavButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ReactNode;
   isActive?: boolean;
   variant?: "default" | "secondary" | "ghost";
+  label?: React.ReactNode;
 }
 
 export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
   (
-    { className, icon, isActive = false, variant = "default", ...props },
+    { className, icon, isActive = false, variant = "default", label, ...props },
     ref,
   ) => {
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -50,8 +51,12 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
     const colors = getVariantColors();
 
     const baseClasses = cn(
-      "font-minecraft relative overflow-hidden transition-all duration-300",
-      isFullRiskStyle ? "w-[68px] h-[68px] text-white flex items-center justify-center" : "w-16 h-16 rounded-md text-white flex items-center justify-center",
+      "font-smallcaps relative overflow-hidden transition-all duration-300",
+      isFullRiskStyle
+        ? "w-[68px] h-[68px] text-white flex items-center justify-center"
+        : "w-16 rounded-md text-white flex items-center justify-center",
+      label ? "py-2" : "h-16",
+      variant !== "ghost" && "border-2 border-b-4 border-transparent",
       "text-shadow-sm",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/20",
     );
@@ -71,17 +76,20 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
       ],
       "hover:brightness-110 active:brightness-90",
     );
-    
-    const activeStateStyles: React.CSSProperties = variant === "ghost" ? {} : {
-      backgroundColor: `${colors.main}40`,
-      borderColor: `${colors.main}90`,
-      borderTopColor: isFullRiskStyle ? `${colors.light}` : colors.light,
-      borderBottomColor: isFullRiskStyle ? "#094f86" : colors.dark,
-      boxShadow: isFullRiskStyle
-        ? `0 6px 0 rgba(0,0,0,0.25), 0 10px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 0 0 1px ${colors.main}20`
-        : `0 6px 0 rgba(0,0,0,0.25), 0 8px 15px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
-      color: colors.text,
-    };
+
+    const activeStateStyles: React.CSSProperties =
+      variant === "ghost"
+        ? {}
+        : {
+            backgroundColor: `${colors.main}40`,
+            borderColor: `${colors.main}90`,
+            borderTopColor: isFullRiskStyle ? `${colors.light}` : colors.light,
+            borderBottomColor: isFullRiskStyle ? "#094f86" : colors.dark,
+            boxShadow: isFullRiskStyle
+              ? `0 6px 0 rgba(0,0,0,0.25), 0 10px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 0 0 1px ${colors.main}20`
+              : `0 6px 0 rgba(0,0,0,0.25), 0 8px 15px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
+            color: colors.text,
+          };
 
     const nonActiveStateClasses = cn(
       variant !== "ghost" && [
@@ -106,7 +114,17 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
           isActive ? activeStateClasses : nonActiveStateClasses,
           className,
         )}
-        style={isActive ? activeStateStyles : isFullRiskStyle ? { ...nonActiveStateStyles, backgroundColor: "rgba(255,255,255,0.03)", border: "3px solid transparent" } : { ...nonActiveStateStyles, borderColor: "transparent" }}
+        style={
+          isActive
+            ? activeStateStyles
+            : isFullRiskStyle
+              ? {
+                  ...nonActiveStateStyles,
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  border: "3px solid transparent",
+                }
+              : { ...nonActiveStateStyles, borderColor: "transparent" }
+        }
         {...props}
       >
         <span
@@ -117,8 +135,15 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
               : "opacity-0 transition-opacity duration-300",
           )}
         />
-        <span className="relative z-10 flex items-center justify-center w-8 h-8">
-          {icon}
+        <span className="relative z-10 flex flex-col items-center justify-center gap-1">
+          <span className="flex items-center justify-center w-8 h-8">
+            {icon}
+          </span>
+          {label && (
+            <span className="font-smallcaps text-xs leading-tight text-center whitespace-nowrap [text-shadow:none]">
+              {label}
+            </span>
+          )}
         </span>
       </button>
     );

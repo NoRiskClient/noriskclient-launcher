@@ -40,7 +40,8 @@ export function handleIconImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
   // Assigned definitively (with defaults) so a reused <img> element resets
   // correctly when its src changes from e.g. a block texture to a photo.
   img.style.imageRendering = img.naturalWidth <= 64 ? "pixelated" : "auto";
-  img.style.objectPosition = img.naturalHeight > img.naturalWidth ? "top" : "center";
+  img.style.objectPosition =
+    img.naturalHeight > img.naturalWidth ? "top" : "center";
 }
 
 export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
@@ -59,7 +60,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
   const isSelected = (icon: ChosenIcon): boolean => {
     if (!selected) return false;
     if ("url" in icon && "url" in selected) return icon.url === selected.url;
-    if ("path" in icon && "path" in selected) return icon.path === selected.path;
+    if ("path" in icon && "path" in selected)
+      return icon.path === selected.path;
     return false;
   };
 
@@ -77,7 +79,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
         addCustomFile(selectedPath);
       }
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Dialog cancelled")) return;
+      if (err instanceof Error && err.message.includes("Dialog cancelled"))
+        return;
       console.error("Failed to select custom icon file:", err);
       toast.error(t("profiles.errors.image_dialog_failed"));
     }
@@ -107,7 +110,10 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
 
   const activeStyle = (active: boolean): React.CSSProperties =>
     active
-      ? { borderColor: accentColor.value, boxShadow: `0 0 0 2px ${accentColor.value}55` }
+      ? {
+          borderColor: accentColor.value,
+          boxShadow: `0 0 0 2px ${accentColor.value}55`,
+        }
       : {};
 
   return (
@@ -120,7 +126,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
       <div className="p-6 space-y-6">
         {/* Blocks */}
         <section className="space-y-3">
-          <h3 className="font-minecraft text-2xl text-white lowercase">
+          <h3 className="font-smallcaps text-base text-white">
             {t("profiles.iconPicker.blocks")}
           </h3>
           <div style={GRID_STYLE}>
@@ -131,7 +137,10 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
                   key={block.id}
                   type="button"
                   title={block.name}
-                  className={cn(tileClass(active), "bg-black/30 hover:scale-105")}
+                  className={cn(
+                    tileClass(active),
+                    "bg-black/30 hover:scale-105",
+                  )}
                   style={activeStyle(active)}
                   onClick={() => pick({ url: block.url })}
                 >
@@ -150,7 +159,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
 
         {/* Custom */}
         <section className="space-y-3">
-          <h3 className="font-minecraft text-2xl text-white lowercase">
+          <h3 className="font-smallcaps text-base text-white">
             {t("profiles.iconPicker.custom")}
           </h3>
 
@@ -166,7 +175,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
                   if (e.key === "Escape") setShowUrlInput(false);
                 }}
                 placeholder={t("profiles.iconPicker.addUrlPlaceholder")}
-                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/40 font-minecraft-ten text-sm outline-none focus:border-white/25"
+                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/40 font-minecraft text-sm outline-none focus:border-white/25"
               />
               <Button size="sm" variant="flat" onClick={handleAddUrl}>
                 {t("profiles.iconPicker.add")}
@@ -182,8 +191,11 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               onClick={handleUpload}
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
-              <Icon icon="solar:upload-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft-ten text-[10px] text-white/50 lowercase">
+              <Icon
+                icon="solar:upload-bold"
+                className="w-6 h-6 text-white/60"
+              />
+              <span className="font-minecraft text-[10px] text-white/50 lowercase">
                 {t("profiles.iconPicker.uploadFile")}
               </span>
             </button>
@@ -196,7 +208,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
               <Icon icon="solar:link-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft-ten text-[10px] text-white/50 lowercase">
+              <span className="font-minecraft text-[10px] text-white/50 lowercase">
                 {t("profiles.iconPicker.addUrl")}
               </span>
             </button>
@@ -205,7 +217,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
             {customIcons.map((ci) => {
               const chosen: ChosenIcon =
                 ci.kind === "file" ? { path: ci.value } : { url: ci.value };
-              const src = ci.kind === "file" ? convertFileSrc(ci.value) : ci.value;
+              const src =
+                ci.kind === "file" ? convertFileSrc(ci.value) : ci.value;
               const active = isSelected(chosen);
               return (
                 <div
@@ -232,7 +245,10 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
                     onClick={() => removeCustomIcon(ci.id)}
                     className="absolute top-0.5 right-0.5 w-5 h-5 flex items-center justify-center rounded bg-black/70 text-white/80 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+                    <Icon
+                      icon="solar:trash-bin-trash-bold"
+                      className="w-3.5 h-3.5"
+                    />
                   </button>
                 </div>
               );

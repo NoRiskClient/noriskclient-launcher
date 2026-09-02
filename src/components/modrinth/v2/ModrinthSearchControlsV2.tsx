@@ -143,7 +143,7 @@ export const ModrinthSearchControlsV2: React.FC<
 
             <button
               onClick={onToggleSidebar}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
+              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
               title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
             >
               <div className="w-4 h-8 flex items-center justify-center">
@@ -159,7 +159,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={() => onModSourceChange(ModPlatform.Modrinth)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]",
+                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.Modrinth
                   ? "bg-green-400/40 text-white border border-green-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
@@ -177,7 +177,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={() => onModSourceChange(ModPlatform.CurseForge)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]",
+                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.CurseForge
                   ? "bg-orange-400/40 text-white border border-orange-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"

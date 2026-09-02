@@ -309,7 +309,6 @@ impl ModloaderInstaller for FabricInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -342,7 +341,6 @@ impl ModloaderInstaller for QuiltInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -359,7 +357,6 @@ impl ModloaderInstaller for ForgeInstaller {
             game_args: Some(result.game_args),
             minecraft_arguments: result.minecraft_arguments,
             custom_client_path: result.custom_client_path,
-            force_include_minecraft_jar: result.force_include_minecraft_jar,
         })
     }
 }
@@ -369,50 +366,13 @@ impl ModloaderInstaller for NeoForgeInstaller {
     async fn install(&self, version_id: &str, profile: &Profile) -> Result<ModloaderInstallResult> {
         let result = self.install(version_id, profile).await?;
 
-        let mut alt_jvm_args = None;
-        if result.uses_neoforgeclient {
-            // For NeoForge with the special launcher case
-            let neoforge_api = crate::minecraft::api::neo_forge_api::NeoForgeApi::new();
-            let versions = neoforge_api.get_all_versions().await?;
-            let compatible_versions = versions.get_versions_for_minecraft(version_id);
-
-            let target_version_str = match &profile.loader_version {
-                Some(v) if !v.is_empty() && compatible_versions.contains(v) => v.clone(),
-                _ => compatible_versions
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| version_id.to_string()),
-            };
-
-            // Special case for neoforgeclient flag - additional JVM args needed
-            use crate::minecraft::downloads::neo_forge_installer_download::NeoForgeInstallerDownloadService;
-            use crate::minecraft::launch::neo_forge_arguments::NeoForgeArguments;
-
-            // Download the NeoForge version JSON to get the proper version object
-            let downloader = NeoForgeInstallerDownloadService::new();
-            let neoforge_version = downloader.extract_version_json(&target_version_str).await?;
-
-            alt_jvm_args = Some(NeoForgeArguments::get_jvm_arguments(
-                &neoforge_version,
-                &crate::config::LAUNCHER_DIRECTORY
-                    .meta_dir()
-                    .join("libraries"),
-                version_id, // MCVERSION not NEOFORGEVERSION
-            ));
-        }
-
         Ok(ModloaderInstallResult {
             libraries: result.libraries,
             main_class: Some(result.main_class),
-            jvm_args: alt_jvm_args.or(Some(result.jvm_args)),
+            jvm_args: Some(result.jvm_args),
             game_args: Some(result.game_args),
             minecraft_arguments: result.minecraft_arguments,
-            custom_client_path: if result.uses_neoforgeclient {
-                None
-            } else {
-                result.custom_client_path
-            },
-            force_include_minecraft_jar: false,
+            custom_client_path: result.custom_client_path,
         })
     }
 }
@@ -434,7 +394,6 @@ impl ModloaderInstaller for VanillaInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -446,5 +405,4 @@ pub struct ModloaderInstallResult {
     pub game_args: Option<Vec<String>>,
     pub minecraft_arguments: Option<String>,
     pub custom_client_path: Option<PathBuf>,
-    pub force_include_minecraft_jar: bool,
 }

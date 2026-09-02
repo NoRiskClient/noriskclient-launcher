@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useFontStore } from "../../store/font-store";
 import { useProcessStore } from "../../store/useProcessStore";
 import { LogViewerCore } from "./LogViewerCore";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
@@ -61,6 +62,7 @@ export function SingleLogViewer({
     const themeStore = useThemeStore.getState();
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
+    useFontStore.getState().applyFontToDOM();
   }, []);
 
   const handleClear = () => {

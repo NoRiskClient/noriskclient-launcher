@@ -4,7 +4,7 @@ use crate::minecraft::api::NoRiskApi;
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
 use crate::minecraft::dto::piston_meta::AssetObject;
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
 use crate::state::State;
 use futures::stream::{iter, StreamExt};
@@ -25,7 +25,13 @@ const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
 /// launcher skips its own download/copy/cleanup of non-override entries and
 /// passes `-Dnrc.assets.{dir,bucket}` so the client takes over. Every other
 /// pack runs the legacy launcher-side asset pipeline.
-const CLIENT_MANAGED_PACKS: &[&str] = &["nrc-nightly", "nrc-standalone", "nrc-mini"];
+const CLIENT_MANAGED_PACKS: &[&str] = &[
+    "nrc-nightly",
+    "nrc-standalone",
+    "nrc-mini",
+    "verity-nexus",
+    "verity-emote",
+];
 
 /// `true` when the given (effective) pack id is client-managed — see
 /// `CLIENT_MANAGED_PACKS`. `overrides/` entries are always kept regardless,
@@ -696,6 +702,7 @@ impl NoriskClientAssetsDownloadService {
 
         let completed_ref = Arc::clone(&completed_counter);
         let asset_id_clone = asset_id.to_string();
+        let progress_throttle = Arc::new(ProgressThrottle::new(100));
 
         let results: Vec<Result<()>> = iter(downloads)
             .buffer_unordered(self.concurrent_downloads)
@@ -706,7 +713,7 @@ impl NoriskClientAssetsDownloadService {
                     if let (Some(state_ref), Some(profile_id_val)) = (&state_clone_for_inspect, profile_id) {
                         let completed = completed_ref.load(Ordering::SeqCst);
                         let total = total_to_download.load(Ordering::SeqCst);
-                        if total > 0 {
+                        if total > 0 && progress_throttle.should_emit() {
                             let progress_within_download = 0.1 + (completed as f64 / total as f64) * 0.7;
                             let asset_id_for_task = asset_id_inspect.clone();
                             tokio::spawn({
@@ -914,6 +921,7 @@ impl NoriskClientAssetsDownloadService {
         let batch_size = 50;
         let mut batch_count = 0;
         let total_batches = (total_assets + batch_size - 1) / batch_size;
+        let progress_throttle = ProgressThrottle::new(100);
 
         for chunk in assets_list.chunks(batch_size) {
             batch_count += 1;
@@ -983,18 +991,20 @@ impl NoriskClientAssetsDownloadService {
             }
 
             if let (Some(state_ref), Some(profile_id_val)) = (&state, profile_id) {
-                let progress_within_copy = (batch_count as f64 / total_batches as f64) * 0.9 + 0.1;
-                self.emit_copy_event(
-                    state_ref,
-                    profile_id_val,
-                    &format!(
-                        "Copying '{}' assets: Batch {}/{} (Copied: {}, Skipped: {})",
-                        asset_id, batch_count, total_batches, copied_count, skipped_count
-                    ),
-                    progress_within_copy,
-                    None,
-                )
-                .await?;
+                if progress_throttle.should_emit() {
+                    let progress_within_copy = (batch_count as f64 / total_batches as f64) * 0.9 + 0.1;
+                    self.emit_copy_event(
+                        state_ref,
+                        profile_id_val,
+                        &format!(
+                            "Copying '{}' assets: Batch {}/{} (Copied: {}, Skipped: {})",
+                            asset_id, batch_count, total_batches, copied_count, skipped_count
+                        ),
+                        progress_within_copy,
+                        None,
+                    )
+                    .await?;
+                }
             }
         }
 

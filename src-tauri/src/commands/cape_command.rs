@@ -3,7 +3,7 @@ use crate::minecraft::api::cape_api::{CapeApi, CapeUploadResponse, CapesBrowseRe
 use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::state::state_manager::State;
 use log::{debug, error};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri_plugin_opener::OpenerExt;

@@ -56,7 +56,7 @@ export function LoaderPickerV3({ currentLoader, onSelect }: LoaderPickerV3Props)
               className="w-4 h-4 flex-shrink-0"
               style={{ imageRendering: l.key === "vanilla" ? "pixelated" : undefined }}
             />
-            <span className={`flex-1 text-xs font-minecraft-ten ${isCurrent ? "text-white" : "text-white/85"}`}>
+            <span className={`flex-1 text-xs font-minecraft ${isCurrent ? "text-white" : "text-white/85"}`}>
               {l.name}
             </span>
             {isCurrent && (

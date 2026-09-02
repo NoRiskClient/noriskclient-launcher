@@ -63,22 +63,25 @@ export function LauncherNoticeBanner() {
 
               <div className="flex-1 min-w-0">
                 {notice.title && (
-                  <h3 className="text-2xl font-minecraft text-white mb-2 lowercase">
+                  <h3 className="text-base font-smallcaps text-white mb-2">
                     {notice.title}
                   </h3>
                 )}
 
-                <p className="text-sm text-gray-300 font-minecraft-ten leading-relaxed">
+                <p className="text-sm text-gray-300 font-minecraft leading-relaxed">
                   {notice.message}
                 </p>
 
                 {notice.link_url && (
                   <button
                     onClick={() => openExternalUrl(notice.link_url!)}
-                    className="mt-3 inline-flex items-center gap-1.5 font-minecraft text-lg lowercase transition-colors hover:underline underline-offset-2"
+                    className="mt-3 inline-flex items-center gap-1.5 font-smallcaps text-xs transition-colors hover:underline underline-offset-2"
                     style={{ color }}
                   >
-                    <Icon icon="solar:arrow-right-up-linear" className="w-4 h-4" />
+                    <Icon
+                      icon="solar:arrow-right-up-linear"
+                      className="w-4 h-4"
+                    />
                     {notice.link_label || notice.link_url}
                   </button>
                 )}

@@ -497,9 +497,6 @@ pub async fn install_minecraft_version(
             launch_params = launch_params.with_custom_client_jar(custom_client_path);
         }
 
-        if modloader_result.force_include_minecraft_jar {
-            launch_params = launch_params.with_force_include_minecraft_jar(true);
-        }
     } else {
         // Vanilla main class
         launch_params = launch_params.with_main_class(&piston_meta.main_class);
@@ -692,6 +689,7 @@ pub async fn install_minecraft_version(
 
     // ---> NEW: Get custom mods for this profile <---
     info!("Listing custom mods for profile '{}'...", profile.name);
+    #[allow(deprecated)]
     let mut custom_mod_infos = state.profile_manager.list_custom_mods(&profile).await?;
     info!(
         "Found {} custom mods for profile '{}'",
@@ -747,10 +745,28 @@ pub async fn install_minecraft_version(
 
     // --- Provide managed mods via meta file (Fabric: addMods, Forge: NrcCoreMod) ---
     if modloader_enum == ModLoader::Fabric {
+        // Loose jars in <instance>/mods are invisible to Fabric, because fabric.modsFolder
+        // replaces that directory rather than adding to it. Pass them through addMods so
+        // dropping a jar into mods/ behaves the same as it does on Forge.
+        let instance_path = state
+            .profile_manager
+            .calculate_instance_path_for_profile(profile)?;
+        let root_mods =
+            crate::minecraft::downloads::mod_resolver::collect_instance_root_mods(&instance_path)
+                .await;
+        if !root_mods.is_empty() {
+            info!(
+                "Including {} loose jar(s) from {}/mods for profile '{}'",
+                root_mods.len(),
+                instance_path.display(),
+                profile.name
+            );
+        }
         let add_mods_arg = crate::minecraft::downloads::mod_resolver::build_fabric_add_mods_arg(
             profile.id,
             version_id,
             &target_mods,
+            &root_mods,
         )
         .await?;
         let mut current_jvm_args = launch_params.additional_jvm_args.clone();
@@ -762,16 +778,14 @@ pub async fn install_minecraft_version(
         let is_legacy_forge = modloader_enum == ModLoader::Forge
             && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
 
-        let (early_service_mods, meta_mods) = if modloader_enum == ModLoader::NeoForge {
-            crate::minecraft::downloads::mod_resolver::split_neoforge_early_service_mods(&target_mods).await
-        } else {
-            (Vec::new(), target_mods.clone())
-        };
-
+        // Early services go through the meta file like everything else: the loader registers an
+        // ITransformerDiscoveryService, and ModLauncher puts what it reports into Layer.SERVICE.
+        // Handing those jars to the class path instead made BootstrapLauncher own them from
+        // MC-BOOTSTRAP, which a class-transforming mod rejects.
         let meta_path = crate::minecraft::downloads::mod_resolver::build_forge_add_mods_meta(
             profile.id,
             version_id,
-            &meta_mods,
+            &target_mods,
         )
         .await?;
 
@@ -789,14 +803,11 @@ pub async fn install_minecraft_version(
 
         let mut libs = launch_params.additional_libraries.clone();
         libs.push(loader_path);
-        for tm in &early_service_mods {
-            libs.push(tm.cache_path.clone());
-        }
         launch_params = launch_params.with_additional_libraries(libs);
 
         info!(
-            "Configured {} ForgeModLoader for profile '{}' ({} meta mods, {} early-service mods on cp)",
-            loader_str, profile.name, meta_mods.len(), early_service_mods.len()
+            "Configured {} ForgeModLoader for profile '{}' ({} mods)",
+            loader_str, profile.name, target_mods.len()
         );
     }
 

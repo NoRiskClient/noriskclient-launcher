@@ -30,20 +30,20 @@ export const router = createHashRouter([
         element: <PlayTab />,
       },
       {
-        path: "profiles/:profileId",
-        element: <ProfileDetailViewV2Wrapper />,
+        path: "profiles",
+        element: <ProfilesTabV2 />,
       },
       {
         path: "profilesv2/:profileId",
         element: <ProfileDetailViewV2Wrapper />,
       },
       {
-        path: "profilesv2/:profileId/browse/:contentType",
-        element: <BrowseTabWrapper />,
+        path: "profiles/:profileId",
+        element: <ProfileDetailViewV2Wrapper />,
       },
       {
-        path: "profiles",
-        element: <ProfilesTabV2 />,
+        path: "profilesv2/:profileId/browse/:contentType",
+        element: <BrowseTabWrapper />,
       },
       {
         path: "profiles/:profileId/browse/:contentType",

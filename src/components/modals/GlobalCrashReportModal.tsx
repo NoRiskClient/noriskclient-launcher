@@ -383,7 +383,7 @@ export function GlobalCrashReportModal() {
         {/* BETA badge — corner overlay like the rollout blitz in MainLaunchButton; tooltip on hover */}
         <div className="absolute -top-2 -left-2 z-10 pointer-events-auto">
           <StaticTooltip content={t("crash_modal.tooltip.beta")} delay={0}>
-            <span className="rounded border border-amber-400/50 bg-amber-400/30 px-1.5 py-0.5 text-[10px] font-minecraft-ten uppercase leading-none text-amber-200 cursor-help shadow-md">
+            <span className="rounded border border-amber-400/50 bg-amber-400/30 px-1.5 py-0.5 text-[10px] font-minecraft uppercase leading-none text-amber-200 cursor-help shadow-md">
               beta
             </span>
           </StaticTooltip>
@@ -402,7 +402,7 @@ export function GlobalCrashReportModal() {
   );
 
   const titleSubtitleNode = (
-    <p className="text-xs font-minecraft-ten text-gray-400">
+    <p className="text-xs font-minecraft text-gray-400">
       {t("crash_modal.profile_label")}:{" "}
       {crashData.process_metadata?.profile_name ||
         profileName ||
@@ -428,17 +428,17 @@ export function GlobalCrashReportModal() {
               icon="solar:shield-check-bold"
               className="w-12 h-12 text-amber-300 animate-pulse"
             />
-            <p className="text-lg font-minecraft-ten text-gray-200">
+            <p className="text-lg font-minecraft text-gray-200">
               {statusText ?? t("common.loading")}
             </p>
           </div>
         ) : (
           <>
-            <p className="pt-3 text-gray-300 text-lg font-minecraft-ten">
+            <p className="pt-3 text-gray-300 text-lg font-minecraft">
               {t("crash_modal.description")}
             </p>
 
-            <p className="pt-4 text-2xl font-minecraft text-red-400">
+            <p className="pt-4 text-base font-smallcaps text-red-400">
               {t("crash_modal.exit_code")}: {crashData.exit_code ?? "N/A"}
             </p>
           </>

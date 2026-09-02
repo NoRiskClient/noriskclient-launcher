@@ -185,12 +185,15 @@ export function MainLaunchButton({
   };
 
   const renderLaunchButtonContent = () => {
-    const actionText = isButtonLaunching ? "STOP" : "LAUNCH";
+    const actionText = isButtonLaunching ? "Stop" : "Launch";
 
     let statusSubText: string | null | undefined = null;
     let statusColorClass = "opacity-85";
 
-    if (transientSuccessActive && buttonStatusMessage === "STARTING!") {
+    if (
+      transientSuccessActive &&
+      buttonStatusMessage === t("launch.starting")
+    ) {
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {

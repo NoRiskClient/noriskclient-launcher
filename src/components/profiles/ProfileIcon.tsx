@@ -15,14 +15,19 @@ import { IconPicker, handleIconImgLoad, type ChosenIcon } from "./IconPicker";
 // Global cache for resolved image URLs to prevent flickering on tab switches
 const imageUrlCache = new Map<string, { url: string; timestamp: number }>();
 
-function getCacheKey(profileId: string, banner: ProfileBanner | null | undefined): string {
+function getCacheKey(
+  profileId: string,
+  banner: ProfileBanner | null | undefined,
+): string {
   if (!banner?.source) return `${profileId}:null`;
   const source = banner.source;
   if (source.type === "absolutePath") return `${profileId}:abs:${source.path}`;
   if (source.type === "relativePath") return `${profileId}:rel:${source.path}`;
-  if (source.type === "relativeProfile") return `${profileId}:prof:${source.path}`;
+  if (source.type === "relativeProfile")
+    return `${profileId}:prof:${source.path}`;
   if (source.type === "url") return `${profileId}:url:${source.url}`;
-  if (source.type === "base64") return `${profileId}:b64:${source.data.substring(0, 50)}`;
+  if (source.type === "base64")
+    return `${profileId}:b64:${source.data.substring(0, 50)}`;
   return `${profileId}:unknown`;
 }
 
@@ -61,12 +66,16 @@ export function ProfileIcon({
 }: ProfileIconProps) {
   const { t } = useTranslation();
   const { showModal, hideModal } = useGlobalModal();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const cachedUrl = banner?.source
+    ? (imageUrlCache.get(getCacheKey(profileId, banner))?.url ?? null)
+    : null;
+
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
-  const [hasLoadedImage, setHasLoadedImage] = useState(false);
-  const [imageOpacity, setImageOpacity] = useState(0);
+  const [hasLoadedImage, setHasLoadedImage] = useState(!!cachedUrl);
+  const [imageOpacity, setImageOpacity] = useState(cachedUrl ? 1 : 0);
   const cacheVersion = useRef(0);
 
   useEffect(() => {
@@ -106,17 +115,20 @@ export function ProfileIcon({
             if (resolvedPathOrUrl) {
               const assetUrl = await convertFileSrc(resolvedPathOrUrl);
               // Use cache version for cache busting only when image actually changes
-              const finalUrl = assetUrl + '?v=' + cacheVersion.current;
+              const finalUrl = assetUrl + "?v=" + cacheVersion.current;
               setImageUrl(finalUrl);
               setHasLoadedImage(true);
               // Cache the resolved URL
-              imageUrlCache.set(cacheKey, { url: finalUrl, timestamp: Date.now() });
+              imageUrlCache.set(cacheKey, {
+                url: finalUrl,
+                timestamp: Date.now(),
+              });
               // Fade-in mit kleiner Verzögerung für smooth transition
               setTimeout(() => setImageOpacity(1), 50);
             } else {
-                setImageUrl(null);
-                setHasLoadedImage(false);
-                setImageOpacity(0);
+              setImageUrl(null);
+              setHasLoadedImage(false);
+              setImageOpacity(0);
             }
           } else {
             // For URL or Base64, the resolvedPathOrUrl is already the final URL
@@ -124,7 +136,10 @@ export function ProfileIcon({
             setHasLoadedImage(!!resolvedPathOrUrl);
             if (resolvedPathOrUrl) {
               // Cache the resolved URL
-              imageUrlCache.set(cacheKey, { url: resolvedPathOrUrl, timestamp: Date.now() });
+              imageUrlCache.set(cacheKey, {
+                url: resolvedPathOrUrl,
+                timestamp: Date.now(),
+              });
               setTimeout(() => setImageOpacity(1), 50);
             } else {
               setImageOpacity(0);
@@ -166,17 +181,19 @@ export function ProfileIcon({
         await ProfileService.uploadProfileImages({
           profileId: profileId,
           imageType: "icon",
-          ...("url" in chosen ? { iconUrl: chosen.url } : { path: chosen.path }),
+          ...("url" in chosen
+            ? { iconUrl: chosen.url }
+            : { path: chosen.path }),
         });
         // Invalidate cache for this profile so the new image gets loaded
         const cacheKey = getCacheKey(profileId, banner);
         imageUrlCache.delete(cacheKey);
         cacheVersion.current++;
-        toast.success(t('profiles.icon_updated'));
+        toast.success(t("profiles.icon_updated"));
         onSuccessfulUpdate();
       } catch (error) {
         console.error("Failed to upload profile icon:", error);
-        toast.error(t('profiles.errors.icon_update_failed'));
+        toast.error(t("profiles.errors.icon_update_failed"));
       } finally {
         setIsUpdating(false);
         setShowLoading(false);
@@ -198,26 +215,48 @@ export function ProfileIcon({
       />,
       1100,
     );
-  }, [isEditable, isLoading, isUpdating, profileId, showModal, hideModal, applyIcon]);
+  }, [
+    isEditable,
+    isLoading,
+    isUpdating,
+    profileId,
+    showModal,
+    hideModal,
+    applyIcon,
+  ]);
 
   const canBeClicked = isEditable && !isLoading && !isUpdating;
   const displaySpinner = showLoading || isUpdating;
 
-  const effectiveIconClassName = cn(iconClassName, displaySpinner && "opacity-50");
-  const displayPlaceholderIcon = displaySpinner ? "eos-icons:loading" : placeholderIcon;
+  const effectiveIconClassName = cn(
+    iconClassName,
+    displaySpinner && "opacity-50",
+  );
+  const displayPlaceholderIcon = displaySpinner
+    ? "eos-icons:loading"
+    : placeholderIcon;
   const hasImage = imageUrl && hasLoadedImage && !isLoading;
   const shouldShowPlaceholder = !banner?.source && !isLoading;
-  
-  const baseContainerClasses = "flex items-center justify-center flex-shrink-0 transition-all duration-200 ease-in-out relative group overflow-hidden";
 
-  const variantClasses = variant === "default" ? cn(borderWidthClassName, roundedClassName) : "";
-  const variantStyles = variant === "default" ? {
-    backgroundColor: `${accentColor}${bgColorOpacity}`,
-    borderColor: `${accentColor}${borderColorOpacity}`,
-  } : {};
+  const baseContainerClasses =
+    "flex items-center justify-center flex-shrink-0 transition-all duration-200 ease-in-out relative group overflow-hidden";
 
-  const placeholderIconStyle = variant === "bare" && !hasImage ? { color: accentColor } : {};
-  const placeholderFinalIconClassName = variant === "bare" && !hasImage ? cn(iconClassName, "text-transparent") : iconClassName;
+  const variantClasses =
+    variant === "default" ? cn(borderWidthClassName, roundedClassName) : "";
+  const variantStyles =
+    variant === "default"
+      ? {
+          backgroundColor: `${accentColor}${bgColorOpacity}`,
+          borderColor: `${accentColor}${borderColorOpacity}`,
+        }
+      : {};
+
+  const placeholderIconStyle =
+    variant === "bare" && !hasImage ? { color: accentColor } : {};
+  const placeholderFinalIconClassName =
+    variant === "bare" && !hasImage
+      ? cn(iconClassName, "text-transparent")
+      : iconClassName;
 
   return (
     <div
@@ -233,19 +272,22 @@ export function ProfileIcon({
         displaySpinner
           ? "Processing..."
           : hasImage
-            ? (isEditable ? "Change Profile Icon" : (profileName || "Profile Icon"))
-            : (isEditable ? "Select Profile Icon" : (profileName || "Profile Icon"))
+            ? isEditable
+              ? "Change Profile Icon"
+              : profileName || "Profile Icon"
+            : isEditable
+              ? "Select Profile Icon"
+              : profileName || "Profile Icon"
       }
       role={canBeClicked ? "button" : undefined}
       tabIndex={canBeClicked ? 0 : undefined}
-      onKeyDown={ (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            if (canBeClicked) {
-                handleIconClick();
-            }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          if (canBeClicked) {
+            handleIconClick();
           }
         }
-      }
+      }}
     >
       {hasImage ? (
         <>
@@ -253,34 +295,39 @@ export function ProfileIcon({
             src={imageUrl!}
             alt={profileName ? `${profileName} icon` : "Profile Icon"}
             className={cn(
-                "w-full h-full object-cover transition-opacity duration-300",
-                canBeClicked && "group-hover:opacity-60"
+              "w-full h-full object-cover transition-opacity duration-300",
+              canBeClicked && "group-hover:opacity-60",
             )}
             style={{ opacity: imageOpacity }}
             onLoad={handleIconImgLoad}
           />
           {canBeClicked && (
-             <div className={cn(
+            <div
+              className={cn(
                 "absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-                variant === "default" ? roundedClassName : ""
-              )}>
-                <Icon icon="solar:gallery-edit-bold" className="w-5 h-5 text-white" />
+                variant === "default" ? roundedClassName : "",
+              )}
+            >
+              <Icon
+                icon="solar:gallery-edit-bold"
+                className="w-5 h-5 text-white"
+              />
             </div>
           )}
         </>
       ) : displaySpinner ? (
-        <Icon 
-            icon="eos-icons:loading" 
-            className={cn(effectiveIconClassName, placeholderFinalIconClassName)} 
-            style={placeholderIconStyle}
+        <Icon
+          icon="eos-icons:loading"
+          className={cn(effectiveIconClassName, placeholderFinalIconClassName)}
+          style={placeholderIconStyle}
         />
       ) : shouldShowPlaceholder ? (
-        <Icon 
-            icon={placeholderIcon} 
-            className={cn(effectiveIconClassName, placeholderFinalIconClassName)} 
-            style={placeholderIconStyle}
+        <Icon
+          icon={placeholderIcon}
+          className={cn(effectiveIconClassName, placeholderFinalIconClassName)}
+          style={placeholderIconStyle}
         />
       ) : null}
     </div>
   );
-} 
+}

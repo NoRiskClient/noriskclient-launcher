@@ -78,11 +78,11 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-base font-medium text-white truncate font-minecraft-ten">
+          <span className="text-base font-medium text-white truncate font-minecraft">
             {otherUser.username}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-base text-white/50 font-minecraft">
+        <div className="flex items-center gap-1.5 text-xs text-white/50 font-smallcaps">
           <Icon
             icon={type === "incoming" ? "solar:inbox-in-bold" : "solar:inbox-out-bold"}
             className="w-4 h-4"

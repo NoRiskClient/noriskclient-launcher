@@ -5,11 +5,11 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../../lib/utils";
 import { useThemeStore } from "../../../store/useThemeStore";
-import { 
+import {
   getVariantColors,
   getBorderRadiusClass,
   createRadiusStyle,
-  getAccessibilityProps
+  getAccessibilityProps,
 } from "../design-system";
 
 interface DropdownProps {
@@ -55,7 +55,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
     const colors = getVariantColors("default", accentColor);
     const radiusClass = getBorderRadiusClass(borderRadius);
     const accessibilityProps = getAccessibilityProps({
-      label: ariaLabel
+      label: ariaLabel,
     });
 
     useEffect(() => {
@@ -97,7 +97,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }
 
         previousIsOpen.current = isOpen;
-      }    }, [isOpen, animationState, isMounted]);
+      }
+    }, [isOpen, animationState, isMounted]);
 
     useEffect(() => {
       if (isOpen && dropdownRef.current && animationState === "entered") {
@@ -116,7 +117,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         let left = 0;
 
         const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;        const scrollY = window.scrollY || window.pageYOffset;
+        const viewportWidth = window.innerWidth;
+        const scrollY = window.scrollY || window.pageYOffset;
         const scrollX = window.scrollX || window.pageXOffset;
 
         const estimatedHeight = actualHeight || Math.min(400, dropdownHeight);
@@ -156,7 +158,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           case "right":
             top = rect.top + scrollY + rect.height / 2 - estimatedHeight / 2;
             left = rect.right + scrollX + offset;
-            break;        }
+            break;
+        }
 
         const padding = 16;
         left = Math.max(padding + scrollX, left);
@@ -248,7 +251,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       }
     };
 
-    const animationClasses = getAnimationClasses();    return createPortal(
+    const animationClasses = getAnimationClasses();
+    return createPortal(
       <div
         ref={(node) => {
           if (ref) {
@@ -262,7 +266,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }}
         role={role}
         className={cn(
-          "fixed font-minecraft backdrop-blur-xl z-[1001] overflow-hidden",
+          "fixed font-smallcaps backdrop-blur-md z-[1001] overflow-hidden",
           radiusClass,
           "text-white transition-all duration-200",
           "border shadow-[0_20px_45px_rgba(0,0,0,0.42)]",

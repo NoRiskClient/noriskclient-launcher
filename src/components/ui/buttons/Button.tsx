@@ -5,14 +5,14 @@ import { forwardRef, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
-import { 
+import {
   getVariantColors,
   getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
   createRadiusStyle,
   type ComponentSize,
-  type ComponentVariant
+  type ComponentVariant,
 } from "../design-system";
 
 const darkenHex = (hex: string, amount: number) => {
@@ -148,25 +148,32 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const shouldShowShadow = () => {
       return variant === "3d" && shadowDepth !== "none";
-    };    const colors = getVariantColors(variant, accentColor);
-    
+    };
+    const colors = getVariantColors(variant, accentColor);
+
     const getButtonSizeClasses = () => {
       switch (size) {
-        case "xs": return "h-[36px] px-5 py-2 text-xl";
-        case "sm": return "h-[42px] px-6 py-2 text-2xl"; 
-        case "md": return "h-[50px] px-8 py-2.5 text-2xl";
-        case "lg": return "h-[58px] px-10 py-3 text-3xl";
-        case "xl": return "h-[66px] px-12 py-4 text-3xl";
-        default: return "h-[50px] px-8 py-2.5 text-2xl";
+        case "xs":
+          return "h-[36px] px-5 py-2 text-xs";
+        case "sm":
+          return "h-[42px] px-6 py-2 text-sm";
+        case "md":
+          return "h-[50px] px-8 py-2.5 text-sm";
+        case "lg":
+          return "h-[58px] px-10 py-3 text-base";
+        case "xl":
+          return "h-[66px] px-12 py-4 text-lg";
+        default:
+          return "h-[50px] px-8 py-2.5 text-sm";
       }
     };
-    
+
     const sizeClasses = getButtonSizeClasses();
     const radiusClass = getBorderRadiusClass(borderRadius);
     const accessibilityProps = getAccessibilityProps({
       label,
       description,
-      disabled
+      disabled,
     });
 
     const getBackgroundColor = () => {
@@ -240,12 +247,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
       if (variant === "3d") {
         if (isFullRiskStyle) {
-          return shadowDepth === "none" ? "border-[3px]" : "border-[3px] border-b-[7px]";
+          return shadowDepth === "none"
+            ? "border-[3px]"
+            : "border-[3px] border-b-[7px]";
         }
         return shadowDepth === "none" ? "border-2" : "border-2 border-b-4";
       }
 
-      return isFullRiskStyle ? "border-[2px] border-b-[4px]" : "border border-b-2";
+      return isFullRiskStyle
+        ? "border-[2px] border-b-[4px]"
+        : "border border-b-2";
     };
 
     const getTextColor = () => {
@@ -262,8 +273,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type="button"
         disabled={disabled}
         className={cn(
-          "relative overflow-hidden lowercase font-minecraft transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
-          isFullRiskStyle ? "flex items-center justify-center gap-2 whitespace-nowrap" : "flex items-center justify-center gap-2 backdrop-blur-md whitespace-nowrap",
+          "relative overflow-hidden lowercase font-smallcaps transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
+          isFullRiskStyle
+            ? "flex items-center justify-center gap-2 whitespace-nowrap"
+            : "flex items-center justify-center gap-2 backdrop-blur-md whitespace-nowrap",
           radiusClass,
           sizeClasses,
           getBorderClasses(),
@@ -273,7 +286,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           className,
         )}
         style={{
-          ...(isFullRiskStyle ? { background: getBackgroundColor() } : { backgroundColor: getBackgroundColor() }),
+          ...(isFullRiskStyle
+            ? { background: getBackgroundColor() }
+            : { backgroundColor: getBackgroundColor() }),
           borderColor: getBorderColor(),
           borderBottomColor: getBorderBottomColor(),
           boxShadow: getBoxShadow(),
@@ -288,20 +303,36 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         {...accessibilityProps}
-        {...props}      >        {icon && iconPosition === "left" && (
-          <span className="flex items-center transition-transform duration-200" style={{
-            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
-          }}>{icon}</span>
+        {...props}
+      >
+        {" "}
+        {icon && iconPosition === "left" && (
+          <span
+            className="flex items-center transition-transform duration-200"
+            style={{
+              transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+            }}
+          >
+            {icon}
+          </span>
         )}
-        <span className="transition-transform duration-200" style={{
-          transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
-        }}>
+        <span
+          className="transition-transform duration-200"
+          style={{
+            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+          }}
+        >
           {children}
         </span>
         {icon && iconPosition === "right" && (
-          <span className="flex items-center transition-transform duration-200" style={{
-            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
-          }}>{icon}</span>
+          <span
+            className="flex items-center transition-transform duration-200"
+            style={{
+              transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+            }}
+          >
+            {icon}
+          </span>
         )}
       </button>
     );

@@ -97,22 +97,22 @@ export function WindowSettingsTab({
   return (
     <div ref={tabRef} className="space-y-6 select-none">
       <div>
-        <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">
+        <h3 className="text-lg font-smallcaps text-white mb-2">
           {t('profiles.settings.windowSettings')}
         </h3>
-        <p className="text-xs text-white/70 mb-4 font-minecraft-ten tracking-wide select-none">
+        <p className="text-xs text-white/70 mb-4 font-minecraft tracking-wide select-none">
           {t('profiles.settings.windowDescription')}
         </p>
       </div>
 
       <div ref={resolutionRef} className="space-y-4">
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+          <h3 className="text-lg font-smallcaps text-white mb-3">
             {t('profiles.settings.resolution')}
           </h3>
           <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xl text-white/70 font-minecraft mb-2 lowercase tracking-wide select-none">
+                <label className="block text-sm text-white/70 font-smallcaps mb-2 tracking-wide select-none">
                   {t('profiles.settings.width')}
                 </label>
                 <SearchStyleInput
@@ -127,11 +127,11 @@ export function WindowSettingsTab({
                       editedProfile.settings?.resolution?.height || 480,
                     );
                   }}
-                  className="text-xl"
+                  className="text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xl text-white/70 font-minecraft mb-2 lowercase tracking-wide select-none">
+                <label className="block text-sm text-white/70 font-smallcaps mb-2 tracking-wide select-none">
                   {t('profiles.settings.height')}
                 </label>
                 <SearchStyleInput
@@ -146,7 +146,7 @@ export function WindowSettingsTab({
                       height,
                     );
                   }}
-                  className="text-xl"
+                  className="text-sm"
                 />
               </div>
             </div>
@@ -164,7 +164,7 @@ export function WindowSettingsTab({
                   }
                   size="md"
                   className={cn(
-                    "cursor-pointer text-xl preset-${preset.width}x${preset.height}",
+                    "cursor-pointer text-sm preset-${preset.width}x${preset.height}",
                     editedProfile.settings?.resolution?.width ===
                       preset.width &&
                       editedProfile.settings?.resolution?.height ===
@@ -183,7 +183,7 @@ export function WindowSettingsTab({
             checked={editedProfile.settings?.fullscreen || false}
             onChange={(e) => handleFullscreenChange(e.target.checked)}
             label={t('profiles.settings.fullscreen')}
-            className="text-2xl"
+            className="text-base"
             variant="flat"
           />
         </div>

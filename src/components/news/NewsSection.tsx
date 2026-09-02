@@ -216,10 +216,10 @@ export function NewsSection({ className }: NewsSectionProps) {
           return (
             <div key={post.id} className="news-item w-full flex flex-col">
               <p
-                className="font-minecraft text-2xl text-white/70 truncate"
+                className="font-smallcaps text-base text-white/70 truncate"
                 title={displayTitle}
               >
-                {displayTitle.toLowerCase()}
+                {displayTitle}
               </p>
               <div className="relative w-full pt-[56.25%]">
                 <NewsCard
@@ -360,7 +360,7 @@ export function NewsSection({ className }: NewsSectionProps) {
                 icon="pixel:newspaper-solid"
                 className="w-7 h-7 text-white"
               />
-              <h2 className="text-2xl font-minecraft lowercase text-white">
+              <h2 className="text-base font-smallcaps text-white">
                 {t("news.title")}
               </h2>
             </div>

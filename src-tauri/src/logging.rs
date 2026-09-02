@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use chrono::Utc;
-use log::LevelFilter;
+use crate::utils::security_utils::mask_sensitive_data;
+use log::{LevelFilter, Record};
 use log4rs::append::console::{ConsoleAppender, Target};
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
@@ -9,7 +10,7 @@ use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::encode::writer::simple::SimpleWriter;
-use log4rs::encode::Encode;
+use log4rs::encode::{Encode, Write};
 use log4rs::filter::threshold::ThresholdFilter;
 use once_cell::sync::Lazy;
 use std::collections::VecDeque;
@@ -25,6 +26,29 @@ const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {m}{n}";
 const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} | {h({l}):5.5} | {m}{n}"; // Slightly simpler pattern for console
 const LOG_FILE_SIZE_LIMIT_BYTES: u64 = 4_800_000; // ~4.8MB to fit Discord's 8MB upload limit
 const LOG_FILE_BACKUP_COUNT: u32 = 10;
+
+#[derive(Debug)]
+struct RedactingEncoder {
+    inner: PatternEncoder,
+}
+
+impl RedactingEncoder {
+    fn new(pattern: &str) -> Self {
+        Self {
+            inner: PatternEncoder::new(pattern),
+        }
+    }
+}
+
+impl Encode for RedactingEncoder {
+    fn encode(&self, w: &mut dyn Write, record: &Record) -> anyhow::Result<()> {
+        let mut rendered = Vec::new();
+        self.inner.encode(&mut SimpleWriter(&mut rendered), record)?;
+        let line = String::from_utf8_lossy(&rendered);
+        w.write_all(mask_sensitive_data(&line).as_bytes())?;
+        Ok(())
+    }
+}
 const DEBUG_RING_BUFFER_MAX_BYTES: usize = LOG_FILE_SIZE_LIMIT_BYTES as usize;
 const DEBUG_DUMP_FILE_MAX_COUNT: usize = 3;
 
@@ -202,12 +226,12 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- Configure File Appender ---
     let file_appender = RollingFileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(LOG_PATTERN)))
+        .encoder(Box::new(RedactingEncoder::new(LOG_PATTERN)))
         .build(log_file_path, Box::new(compound_policy))?;
 
     // --- Configure Console Appender ---
     let console_appender = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(CONSOLE_LOG_PATTERN)))
+        .encoder(Box::new(RedactingEncoder::new(CONSOLE_LOG_PATTERN)))
         .target(Target::Stdout)
         .build();
 
@@ -227,8 +251,10 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
                 .build("debug_ring_buffer", Box::new(debug_ring_buffer_appender)),
         )
         // Suppress noisy event-loop warnings from window focus/tab-in transitions.
-        .logger(Logger::builder().build("winit", LevelFilter::Error)) // prevent winit from logging at all levels (WARN on window focus)
-        .logger(Logger::builder().build("tao", LevelFilter::Error)) // prevent tao from logging at all levels (WARN on window focus)
+        .logger(Logger::builder().build("sqlx::query", LevelFilter::Warn))
+        .logger(Logger::builder().build("hyper", LevelFilter::Info))
+        .logger(Logger::builder().build("hyper_util", LevelFilter::Info))
+        .logger(Logger::builder().build("reqwest", LevelFilter::Info))
         .build(
             Root::builder()
                 .appender("file") // Log to file
@@ -245,3 +271,7 @@ pub async fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "logging_test.rs"]
+mod tests;

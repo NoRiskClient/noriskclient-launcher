@@ -80,7 +80,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        info!(
+                        debug!(
                             "Preparing Modrinth mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -100,7 +100,7 @@ impl ModDownloadService {
                         file_hash_sha1,
                         ..
                     } => {
-                        info!(
+                        debug!(
                             "Preparing CurseForge mod for cache: {} ({})",
                             display_name, filename
                         );
@@ -115,14 +115,14 @@ impl ModDownloadService {
                             e
                         })
                     }
-                    ModSource::Url { url, file_name, .. } => {
-                        let fname = file_name.as_deref().unwrap_or("unknown");
-                        debug!(
-                            "Skipping URL mod source (cache): {} from {}",
-                            display_name_opt.as_deref().unwrap_or(fname),
-                            url
-                        );
-                        Ok(())
+                    ModSource::Url { url, .. } => {
+                        debug!("Preparing URL mod for cache: {} ({})", display_name, filename);
+                        Self::download_and_verify_file(&url, &target_path, None)
+                            .await
+                            .map_err(|e| {
+                                error!("Failed cache mod {}: {}", display_name, e);
+                                e
+                            })
                     }
                     ModSource::Local { file_name } => {
                         debug!("Skipping local mod (cache check): {}", file_name);
@@ -150,7 +150,8 @@ impl ModDownloadService {
             });
         }
 
-        info!("Executing {} mod cache tasks...", download_futures.len());
+        let task_count = download_futures.len();
+        debug!("Executing {} mod cache tasks...", task_count);
         let results: Vec<Result<()>> = iter(download_futures)
             .buffer_unordered(self.concurrent_downloads)
             .collect()
@@ -165,8 +166,8 @@ impl ModDownloadService {
 
         if errors.is_empty() {
             info!(
-                "Mod cache check/download process completed successfully for profile: '{}'",
-                profile.name
+                "Mod cache ready for profile '{}': {} mods",
+                profile.name, task_count
             );
             Ok(())
         } else {

@@ -5,7 +5,6 @@ use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::api::mclogs_api::upload_log_to_mclogs;
 use crate::minecraft::api::neo_forge_api::NeoForgeApi;
 use crate::minecraft::api::quilt_api::QuiltApi;
-use crate::minecraft::api::starlight_api::{GetSkinRenderPayload, StarlightApiService};
 use crate::minecraft::dto::fabric_meta::FabricVersionInfo;
 use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
 use crate::minecraft::dto::quilt_meta::QuiltVersionInfo;
@@ -816,49 +815,6 @@ pub async fn get_base64_from_skin_source_command(
     );
 
     Ok(base64_data)
-}
-
-#[tauri::command]
-pub async fn get_starlight_skin_render(
-    payload: GetSkinRenderPayload,
-) -> Result<PathBuf, CommandError> {
-    debug!(
-        "Command called: get_starlight_skin_render with payload: {:?}",
-        payload
-    );
-
-    let starlight_service = match StarlightApiService::new() {
-        Ok(service) => service,
-        Err(e) => {
-            error!(
-                "[CMD] get_starlight_skin_render: Failed to create StarlightApiService: {:?}",
-                e
-            );
-            return Err(CommandError::from(e));
-        }
-    };
-
-    match starlight_service
-        .get_skin_render(
-            &payload.player_name,
-            &payload.render_type,
-            &payload.render_view,
-            payload.base64_skin_data,
-        )
-        .await
-    {
-        Ok(path_buf) => {
-            debug!(
-                "Command completed: get_starlight_skin_render, path: {:?}",
-                path_buf
-            );
-            Ok(path_buf)
-        }
-        Err(e) => {
-            error!("Command failed: get_starlight_skin_render: {:?}", e);
-            Err(CommandError::from(e))
-        }
-    }
 }
 
 const FACE_REFRESH_TTL_SECS: u64 = 24 * 60 * 60;

@@ -34,11 +34,11 @@ export function AnalyticsConsentBanner({
           />
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-2xl font-minecraft text-white mb-2">
+            <h3 className="text-base font-smallcaps text-white mb-2">
               {t("analytics.banner.title")}
             </h3>
 
-            <p className="text-sm text-gray-300 font-minecraft-ten leading-relaxed mb-4">
+            <p className="text-sm text-gray-300 font-minecraft leading-relaxed mb-4">
               {t("analytics.banner.description")}{" "}
               <button
                 onClick={() =>
@@ -55,7 +55,7 @@ export function AnalyticsConsentBanner({
                 onClick={onDecline}
                 variant="ghost"
                 size="sm"
-                className="px-3 py-1.5 text-gray-300 hover:text-white hover:bg-white/10 font-minecraft text-lg lowercase"
+                className="px-3 py-1.5 text-gray-300 hover:text-white hover:bg-white/10 font-smallcaps text-xs"
               >
                 {t("analytics.banner.decline")}
               </Button>
@@ -63,7 +63,7 @@ export function AnalyticsConsentBanner({
                 onClick={onAccept}
                 variant="default"
                 size="sm"
-                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-black font-minecraft text-lg lowercase"
+                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-black font-smallcaps text-xs"
               >
                 {t("analytics.banner.accept")}
               </Button>
@@ -137,17 +137,17 @@ export function TermsOfServiceModal({ isOpen }: TermsOfServiceModalProps) {
     >
       <div className="p-6 space-y-6 text-white" style={{ paddingBottom: 0 }}>
         <div className="text-center space-y-4">
-          <h3 className="text-3xl font-minecraft text-blue-400 lowercase">
+          <h3 className="text-lg font-smallcaps text-blue-400">
             {t("tos.welcome")}
           </h3>
-          <p className="text-lg font-minecraft-ten text-gray-300">
+          <p className="text-lg font-minecraft text-gray-300">
             {t("tos.read_accept")}
           </p>
         </div>
 
-        <div className="space-y-4 text-base font-minecraft-ten text-gray-200 max-h-60 overflow-y-auto custom-scrollbar p-4 bg-black/30 rounded border border-gray-600">
+        <div className="space-y-4 text-base font-minecraft text-gray-200 max-h-60 overflow-y-auto custom-scrollbar p-4 bg-black/30 rounded border border-gray-600">
           <div className="space-y-3">
-            <h4 className="text-lg font-minecraft text-white">
+            <h4 className="text-xs font-smallcaps text-white">
               {t("tos.key_points.title")}
             </h4>
             <ul className="space-y-2 list-disc list-inside text-sm">
@@ -190,7 +190,7 @@ export function TermsOfServiceModal({ isOpen }: TermsOfServiceModalProps) {
           </Button>
         </div>
 
-        <div className="text-center text-2xl text-gray-400 flex justify-center">
+        <div className="text-center text-base text-gray-400 flex justify-center">
           <p style={{ lineHeight: 0.8, maxWidth: 600 }}>
             {t("tos.withdraw_notice")}
           </p>

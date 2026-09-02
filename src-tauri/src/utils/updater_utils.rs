@@ -1,9 +1,12 @@
+use crate::config::HTTP_CONNECT_TIMEOUT;
 use crate::error::{AppError, Result as AppResult};
 use log::{error, info, warn};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::time::{sleep, Duration};
+
+const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(20);
 
 const DEFAULT_STABLE_UPDATE_ENDPOINT: &str = "https://fullrisk.net/api/v1/launcher/releases-v2";
 const DEFAULT_BETA_UPDATE_ENDPOINT: &str = "https://fullrisk.net/api/v1/launcher/releases-v2-beta";
@@ -94,8 +97,8 @@ pub async fn check_update_available_detailed(
         ))
     })?;
 
-    let updater_builder = app_handle
-        .updater_builder()
+    let updater_builder = app_handle.updater_builder()
+        .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
         .endpoints(vec![update_url])
         .map_err(|e| AppError::Other(format!("Failed to set updater endpoints: {}", e)))?;
 
@@ -105,7 +108,16 @@ pub async fn check_update_available_detailed(
 
     info!("Updater built successfully. Checking for updates...");
 
-    match updater.check().await {
+    let check_result = tokio::time::timeout(UPDATE_CHECK_TIMEOUT, updater.check())
+        .await
+        .map_err(|_| {
+            AppError::Other(format!(
+                "Update check timed out after {:?}",
+                UPDATE_CHECK_TIMEOUT
+            ))
+        })?;
+
+    match check_result {
         Ok(Some(update)) => {
             let update_info = UpdateInfo {
                 version: update.version.clone(),
@@ -431,7 +443,10 @@ pub async fn check_for_updates(
         }
     };
 
-    let updater_result = app_handle.updater_builder().endpoints(vec![update_url]);
+    let updater_result = app_handle
+        .updater_builder()
+        .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
+        .endpoints(vec![update_url]);
 
     let updater = match updater_result {
         Ok(builder) => match builder.build() {
@@ -457,7 +472,24 @@ pub async fn check_for_updates(
 
     info!("Updater built successfully. Checking for updates...");
 
-    match updater.check().await {
+    let check_result = match tokio::time::timeout(UPDATE_CHECK_TIMEOUT, updater.check()).await {
+        Ok(result) => result,
+        Err(_) => {
+            warn!(
+                "Update check for {} channel timed out after {:?}. Continuing without updating.",
+                channel, UPDATE_CHECK_TIMEOUT
+            );
+            emit_status(
+                &app_handle,
+                "close",
+                "Update check timed out. Starting without update.".to_string(),
+                None,
+            );
+            return;
+        }
+    };
+
+    match check_result {
         Ok(Some(update)) => {
             let update_version = update.version.clone();
             info!(

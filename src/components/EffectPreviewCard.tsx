@@ -146,7 +146,7 @@ export default function EffectPreviewCard({
         </div>
 
         <div className="mt-auto text-center">
-          <h5 className="font-minecraft text-xl lowercase text-white">
+          <h5 className="font-smallcaps text-sm text-white">
             {name}
           </h5>
         </div>

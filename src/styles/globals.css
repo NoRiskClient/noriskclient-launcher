@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 @font-face {
-  font-family: "Minecraft";
-  src: url("/fonts/minecraft.ttf") format("truetype");
+  font-family: "SmallCaps";
+  src: url("/fonts/smallcaps.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -38,28 +38,20 @@
   --border: 217 19% 27%;
   --input: 217 19% 27%;
   --ring: 210 78% 35%;
-  --panel-background: rgba(18, 18, 22, 0.88);
-  --panel-background-strong: rgba(10, 10, 14, 0.94);
-  --panel-border: rgba(79, 142, 255, 0.38);
-  --panel-border-strong: #4f8eff;
-  --panel-border-shadow: rgba(0, 0, 0, 0.7);
-  --panel-highlight: #ffffff;
-  --panel-highlight-shadow: rgba(0, 0, 0, 0.6);
-  --text-shadow-color: rgba(0, 0, 0, 0.9);
   --text-primary: #ffffff;
   --text-secondary: #ababab;
   --text-muted: #808080;
   --animation-short: 0.2s;
   --animation-medium: 0.5s;
   --animation-long: 1s;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
   --border-radius: 0px;
-  --font-minecraft: "Minecraft", monospace;
-  --font-minecraft-ten: "MinecraftTen", sans-serif;
+  --font-smallcaps: "SmallCaps", monospace;
+  --font-minecraft: "MinecraftTen", sans-serif;
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -280,13 +272,11 @@
 
   body {
     @apply bg-dark text-white;
-    background: transparent;
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-    font-family: var(--font-minecraft), monospace;
+    font-family: var(--font-smallcaps), monospace;
     letter-spacing: 0.03em;
-    color: var(--text-primary);
   }
 
   h1,
@@ -295,7 +285,7 @@
   h4,
   h5,
   h6 {
-    @apply font-minecraft tracking-wider lowercase;
+    @apply font-smallcaps tracking-wider;
     font-weight: normal;
     user-select: none;
   }
@@ -316,13 +306,13 @@
   }
 }
 
-.font-minecraft {
-  font-family: var(--font-minecraft), monospace;
+.font-smallcaps {
+  font-family: var(--font-smallcaps), monospace;
   letter-spacing: 0.05em;
 }
 
-.font-minecraft-ten {
-  font-family: var(--font-minecraft-ten), sans-serif;
+.font-minecraft {
+  font-family: var(--font-minecraft), sans-serif;
   letter-spacing: 0.03em;
 }
 
@@ -435,6 +425,33 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
   background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.8);
+}
+
+/* Scrollbar hidden by default, revealed (accent-tinted) only while hovering the area */
+.scrollbar-hover {
+  scrollbar-width: none;
+}
+.scrollbar-hover::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.scrollbar-hover:hover {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4) transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4);
+  border-radius: 3px;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.6);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -710,9 +727,11 @@
   border-radius: 0px !important;
 }
 
+/* Themed radius is opt-in for inputs/textareas: a bare <input>/<textarea> is
+   usually transparent chrome inside an already-rounded wrapper, so rounding the
+   element itself only clips its text. Inputs that ARE the visible box opt in via
+   a rounded-* utility (mapped to var(--border-radius) above) or an inline style. */
 button:not(.no-radius),
-input:not(.no-radius),
-textarea:not(.no-radius),
 select:not(.no-radius),
 .btn:not(.no-radius) {
   border-radius: var(--border-radius) !important;
@@ -734,9 +753,7 @@ nav button:not(.no-radius),
 }
 
 .search-input:not(.no-radius),
-.filter-input:not(.no-radius),
-input[type="search"]:not(.no-radius),
-input[type="text"]:not(.no-radius) {
+.filter-input:not(.no-radius) {
   border-radius: var(--border-radius) !important;
 }
 
@@ -747,12 +764,31 @@ input[type="text"]:not(.no-radius) {
 
 .dark [class*="rounded"],
 .dark button:not(.no-radius),
-.dark input:not(.no-radius),
 .dark .card:not(.no-radius) {
   border-radius: var(--border-radius) !important;
+}
+
+.no-radius {
+  border-radius: 0px !important;
 }
 
 /* Backdrop blur which also works on Linux */
 .backdrop-blur-md-anyos {
   backdrop-filter: blur(12px);
+}
+
+@keyframes nrc-claim-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 79, 142, 255), 0.55);
+    border-color: rgba(var(--accent-rgb, 79, 142, 255), 0.9);
+  }
+  50% {
+    box-shadow: 0 0 14px 3px rgba(var(--accent-rgb, 79, 142, 255), 0.45);
+    border-color: rgba(var(--accent-rgb, 79, 142, 255), 0.45);
+  }
+}
+
+.animate-claim-glow {
+  animation: nrc-claim-glow 1.6s ease-in-out infinite;
 }

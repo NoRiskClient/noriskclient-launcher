@@ -1,7 +1,7 @@
-import flagsmith from 'flagsmith';
-import { invoke } from '@tauri-apps/api/core';
-import { log } from '../utils/logging-utils';
-import { getOrCreateInstallId } from './install-id-service';
+import flagsmith from "flagsmith";
+import { invoke } from "@tauri-apps/api/core";
+import { log } from "../utils/logging-utils";
+import { getOrCreateInstallId } from "./install-id-service";
 
 /**
  * Configuration for blocked mods that cause crashes or compatibility issues.
@@ -25,16 +25,19 @@ let configFetchPromise: Promise<BlockedModsConfig> | null = null;
 const initializeFlagsmith = async () => {
   try {
     const installId = getOrCreateInstallId();
-    log('info', `Initializing Flagsmith service with install id ${installId}...`);
+    log(
+      "info",
+      `Initializing Flagsmith service with install id ${installId}...`,
+    );
     await flagsmith.init({
       environmentID: FLAGSMITH_ENVIRONMENT_ID,
-      api: 'https://flagsmith-staging.norisk.gg/api/v1/',
+      api: "https://flagsmith-staging.norisk.gg/api/v1/",
       identity: installId,
     });
     flagsmithInitialized = true;
-    log('info', 'Flagsmith service initialized successfully');
+    log("info", "Flagsmith service initialized successfully");
   } catch (error) {
-    log('error', `Failed to initialize Flagsmith service: ${error}`);
+    log("error", `Failed to initialize Flagsmith service: ${error}`);
     throw error;
   }
 };
@@ -58,36 +61,44 @@ export const getPackRolloutConfig = async (): Promise<PackRolloutConfig> => {
     try {
       if (!flagsmithInitialized) await initPromise;
 
-      const flagValue = flagsmith.getValue('pack_rollout_aliases');
+      const flagValue = flagsmith.getValue("pack_rollout_aliases");
       let config: PackRolloutConfig = { aliases: {} };
 
       if (flagValue) {
         try {
           const parsed = JSON.parse(flagValue as string);
-          if (parsed && typeof parsed === 'object') {
+          if (parsed && typeof parsed === "object") {
             config = {
               aliases: parsed.aliases ?? parsed,
-              rollout_pct: typeof parsed.rollout_pct === 'number' ? parsed.rollout_pct : undefined,
+              rollout_pct:
+                typeof parsed.rollout_pct === "number"
+                  ? parsed.rollout_pct
+                  : undefined,
             };
           }
         } catch (e) {
-          log('warn', `Failed to parse pack_rollout_aliases flag: ${e}`);
+          log("warn", `Failed to parse pack_rollout_aliases flag: ${e}`);
         }
       }
 
-      log('info', `Pack rollout config: ${JSON.stringify(config)}`);
+      log("info", `Pack rollout config: ${JSON.stringify(config)}`);
       cachedPackRollout = config;
 
       try {
         // Backend only cares about aliases; rollout_pct is UI-only metadata.
-        await invoke('set_pack_rollout_config', { config: { aliases: config.aliases } });
+        await invoke("set_pack_rollout_config", {
+          config: { aliases: config.aliases },
+        });
       } catch (error) {
-        log('error', `Failed to push pack rollout config to backend: ${error}`);
+        log("error", `Failed to push pack rollout config to backend: ${error}`);
       }
 
       return config;
     } catch (error) {
-      log('error', `Failed to fetch pack rollout config from Flagsmith: ${error}`);
+      log(
+        "error",
+        `Failed to fetch pack rollout config from Flagsmith: ${error}`,
+      );
       packRolloutFetchPromise = null;
       throw error;
     }
@@ -103,43 +114,52 @@ export interface PackFallbackConfig {
 let cachedPackFallback: PackFallbackConfig | null = null;
 let packFallbackFetchPromise: Promise<PackFallbackConfig | null> | null = null;
 
-export const getPackFallbackConfig = async (): Promise<PackFallbackConfig | null> => {
-  if (cachedPackFallback) return cachedPackFallback;
-  if (packFallbackFetchPromise) return packFallbackFetchPromise;
+export const getPackFallbackConfig =
+  async (): Promise<PackFallbackConfig | null> => {
+    if (cachedPackFallback) return cachedPackFallback;
+    if (packFallbackFetchPromise) return packFallbackFetchPromise;
 
-  packFallbackFetchPromise = (async () => {
-    try {
-      if (!flagsmithInitialized) await initPromise;
-
-      const flagValue = flagsmith.getValue('pack_fallback_id');
-      // Flag unset → leave the backend default ("norisk-stable") untouched.
-      if (!flagValue || typeof flagValue !== 'string' || !flagValue.trim()) {
-        log('info', 'No pack_fallback_id flag set; keeping backend default');
-        return null;
-      }
-
-      const config: PackFallbackConfig = { fallback_pack_id: flagValue.trim() };
-      log('info', `Pack fallback config: ${JSON.stringify(config)}`);
-      cachedPackFallback = config;
-
+    packFallbackFetchPromise = (async () => {
       try {
-        await invoke('set_pack_fallback_config', { config });
+        if (!flagsmithInitialized) await initPromise;
+
+        const flagValue = flagsmith.getValue("pack_fallback_id");
+        // Flag unset → leave the backend default ("norisk-stable") untouched.
+        if (!flagValue || typeof flagValue !== "string" || !flagValue.trim()) {
+          log("info", "No pack_fallback_id flag set; keeping backend default");
+          return null;
+        }
+
+        const config: PackFallbackConfig = {
+          fallback_pack_id: flagValue.trim(),
+        };
+        log("info", `Pack fallback config: ${JSON.stringify(config)}`);
+        cachedPackFallback = config;
+
+        try {
+          await invoke("set_pack_fallback_config", { config });
+        } catch (error) {
+          log(
+            "error",
+            `Failed to push pack fallback config to backend: ${error}`,
+          );
+        }
+
+        return config;
       } catch (error) {
-        log('error', `Failed to push pack fallback config to backend: ${error}`);
+        log(
+          "error",
+          `Failed to fetch pack fallback config from Flagsmith: ${error}`,
+        );
+        packFallbackFetchPromise = null;
+        throw error;
       }
+    })();
 
-      return config;
-    } catch (error) {
-      log('error', `Failed to fetch pack fallback config from Flagsmith: ${error}`);
-      packFallbackFetchPromise = null;
-      throw error;
-    }
-  })();
+    return packFallbackFetchPromise;
+  };
 
-  return packFallbackFetchPromise;
-};
-
-export type LauncherNoticeSeverity = 'info' | 'warning' | 'error';
+export type LauncherNoticeSeverity = "info" | "warning" | "error";
 
 /**
  * A single remote-controlled notice banner shown in the launcher.
@@ -174,9 +194,9 @@ export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
     try {
       if (!flagsmithInitialized) await initPromise;
 
-      const flagValue = flagsmith.getValue('launcher_notice');
-      if (!flagValue || typeof flagValue !== 'string' || !flagValue.trim()) {
-        log('info', 'No launcher_notice flag set');
+      const flagValue = flagsmith.getValue("launcher_notice");
+      if (!flagValue || typeof flagValue !== "string" || !flagValue.trim()) {
+        log("info", "No launcher_notice flag set");
         cachedLauncherNotices = [];
         return cachedLauncherNotices;
       }
@@ -185,17 +205,20 @@ export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
       const rawList: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
 
       const notices = rawList
-        .filter((n): n is LauncherNotice =>
-          !!n && typeof n === 'object' &&
-          typeof (n as LauncherNotice).id === 'string' &&
-          typeof (n as LauncherNotice).message === 'string')
+        .filter(
+          (n): n is LauncherNotice =>
+            !!n &&
+            typeof n === "object" &&
+            typeof (n as LauncherNotice).id === "string" &&
+            typeof (n as LauncherNotice).message === "string",
+        )
         .filter((n) => n.enabled !== false);
 
-      log('info', `Launcher notices: ${notices.length} active`);
+      log("info", `Launcher notices: ${notices.length} active`);
       cachedLauncherNotices = notices;
       return notices;
     } catch (error) {
-      log('error', `Failed to fetch launcher notices from Flagsmith: ${error}`);
+      log("error", `Failed to fetch launcher notices from Flagsmith: ${error}`);
       launcherNoticesFetchPromise = null;
       cachedLauncherNotices = [];
       return [];
@@ -203,6 +226,21 @@ export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
   })();
 
   return launcherNoticesFetchPromise;
+};
+
+let cachedApplixirEnabled: boolean | null = null;
+
+export const isApplixirEnabled = async (): Promise<boolean> => {
+  if (cachedApplixirEnabled !== null) return cachedApplixirEnabled;
+  try {
+    if (!flagsmithInitialized) await initPromise;
+    cachedApplixirEnabled = flagsmith.hasFeature("applixir_rewarded_video");
+    log("info", `AppLixir rewarded video enabled: ${cachedApplixirEnabled}`);
+  } catch (error) {
+    log("error", `Failed to fetch applixir_rewarded_video flag: ${error}`);
+    cachedApplixirEnabled = false;
+  }
+  return cachedApplixirEnabled;
 };
 
 /**
@@ -224,45 +262,51 @@ export const getBlockedModsConfig = async (): Promise<BlockedModsConfig> => {
     try {
       // Wait for initialization if not done yet
       if (!flagsmithInitialized) {
-        log('info', 'Waiting for Flagsmith initialization...');
+        log("info", "Waiting for Flagsmith initialization...");
         await initPromise;
       }
 
-      log('debug', 'Attempting to get blocked_mods_config flag...');
-      const flagValue = flagsmith.getValue('blocked_mods_config');
-      
-      log('debug', `Raw flag value: ${flagValue}`);
-      
+      log("debug", "Attempting to get blocked_mods_config flag...");
+      const flagValue = flagsmith.getValue("blocked_mods_config");
+
+      log("debug", `Raw flag value: ${flagValue}`);
+
       if (!flagValue) {
         // Log all available flags for debugging
         const allFlags = flagsmith.getAllFlags();
-        log('debug', `Available flags: ${JSON.stringify(allFlags)}`);
-        throw new Error('blocked_mods_config flag not found');
+        log("debug", `Available flags: ${JSON.stringify(allFlags)}`);
+        throw new Error("blocked_mods_config flag not found");
       }
 
       // Parse the JSON value
       const config: BlockedModsConfig = JSON.parse(flagValue as string);
-      log('info', `Parsed blocked mods config: ${JSON.stringify(config)}`);
-      
+      log("info", `Parsed blocked mods config: ${JSON.stringify(config)}`);
+
       cachedBlockedModsConfig = config;
 
       // Send the config to Rust backend for caching
       try {
-        await invoke('set_blocked_mods_config', { config });
-        log('info', 'Successfully sent blocked mods config to Rust backend');
+        await invoke("set_blocked_mods_config", { config });
+        log("info", "Successfully sent blocked mods config to Rust backend");
       } catch (error) {
-        log('error', `Failed to send blocked mods config to Rust backend: ${error}`);
+        log(
+          "error",
+          `Failed to send blocked mods config to Rust backend: ${error}`,
+        );
         // Don't throw here - the config is still valid for frontend use
       }
-      
+
       return config;
     } catch (error) {
-      log('error', `Failed to fetch blocked mods config from Flagsmith: ${error}`);
+      log(
+        "error",
+        `Failed to fetch blocked mods config from Flagsmith: ${error}`,
+      );
       configFetchPromise = null; // Allow retries
       throw error;
     }
   })();
-  
+
   return configFetchPromise;
 };
 
@@ -279,34 +323,46 @@ export const getModNoRiskStatus = (
   filename: string,
   modrinthProjectId?: string | null,
   versionId?: string | null,
-): 'blocked' | 'warning' | null => {
-  console.log('[getModNoRiskStatus] Called with filename:', filename, 'projectId:', modrinthProjectId, 'versionId:', versionId, 'cachedConfig:', cachedBlockedModsConfig);
+): "blocked" | "warning" | null => {
+  console.log(
+    "[getModNoRiskStatus] Called with filename:",
+    filename,
+    "projectId:",
+    modrinthProjectId,
+    "versionId:",
+    versionId,
+    "cachedConfig:",
+    cachedBlockedModsConfig,
+  );
 
   if (!cachedBlockedModsConfig) {
-    console.log('[getModNoRiskStatus] Config not cached, returning null');
+    console.log("[getModNoRiskStatus] Config not cached, returning null");
     // Silently return null if config is not loaded. The UI should trigger the load.
     return null;
   }
 
   const config = cachedBlockedModsConfig;
-  console.log('[getModNoRiskStatus] Checking against config:', config);
+  console.log("[getModNoRiskStatus] Checking against config:", config);
 
   // 1. Check exact filename match (blocked)
   if (config.exact_filenames?.includes(filename)) {
-    console.log('[getModNoRiskStatus] MATCHED exact filename - BLOCKED!');
-    return 'blocked';
+    console.log("[getModNoRiskStatus] MATCHED exact filename - BLOCKED!");
+    return "blocked";
   }
 
   // 2. Check Modrinth project ID for blocking
-  if (modrinthProjectId && config.modrinth_project_ids?.includes(modrinthProjectId)) {
-    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - BLOCKED!');
-    return 'blocked';
+  if (
+    modrinthProjectId &&
+    config.modrinth_project_ids?.includes(modrinthProjectId)
+  ) {
+    console.log("[getModNoRiskStatus] MATCHED Modrinth project ID - BLOCKED!");
+    return "blocked";
   }
 
   // 3. Check version ID (mod_ids) (blocked)
   if (versionId && config.mod_ids?.includes(versionId)) {
-    console.log('[getModNoRiskStatus] MATCHED version ID (mod_id) - BLOCKED!');
-    return 'blocked';
+    console.log("[getModNoRiskStatus] MATCHED version ID (mod_id) - BLOCKED!");
+    return "blocked";
   }
 
   // 4. Check filename patterns (they are full regex) (blocked)
@@ -316,21 +372,30 @@ export const getModNoRiskStatus = (
         // The pattern from Flagsmith is already a complete regex.
         const regex = new RegExp(pattern);
         if (regex.test(filename)) {
-          console.log('[getModNoRiskStatus] MATCHED filename pattern - BLOCKED!', pattern);
-          return 'blocked';
+          console.log(
+            "[getModNoRiskStatus] MATCHED filename pattern - BLOCKED!",
+            pattern,
+          );
+          return "blocked";
         }
       } catch (e) {
-        log('error', `Invalid regex pattern in blocked_mods_config: ${pattern}`);
+        log(
+          "error",
+          `Invalid regex pattern in blocked_mods_config: ${pattern}`,
+        );
       }
     }
   }
 
   // 5. Check Modrinth project ID for warnings (only if not blocked)
-  if (modrinthProjectId && config.warning_project_ids?.includes(modrinthProjectId)) {
-    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - WARNING!');
-    return 'warning';
+  if (
+    modrinthProjectId &&
+    config.warning_project_ids?.includes(modrinthProjectId)
+  ) {
+    console.log("[getModNoRiskStatus] MATCHED Modrinth project ID - WARNING!");
+    return "warning";
   }
 
-  console.log('[getModNoRiskStatus] No match found, returning null');
+  console.log("[getModNoRiskStatus] No match found, returning null");
   return null;
 };

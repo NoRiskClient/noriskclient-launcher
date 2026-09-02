@@ -343,7 +343,7 @@ export function ModrinthQuickInstallProfilesModal({
                   console.log('⬅️ Switching back to profile list view');
                   switchToProfileListView();
                 }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-2xl lowercase font-minecraft"
+                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-base font-smallcaps"
               >
                 <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
                 <span>{t('modrinth.back_to_profiles')}</span>
@@ -368,7 +368,7 @@ export function ModrinthQuickInstallProfilesModal({
           <>
             {/* Version info (placed above search) */}
             {version && (
-              <p className="text-gray-400 text-xs text-center font-minecraft-ten mb-4 -mt-2">
+              <p className="text-gray-400 text-xs text-center font-minecraft mb-4 -mt-2">
                 {t('modrinth.will_install_version', { version: version.version_number, title: project.title })}
               </p>
             )}
@@ -407,7 +407,7 @@ export function ModrinthQuickInstallProfilesModal({
         {processedProfiles.length === 0 ? (
           <div className="text-center py-8 min-h-[400px] flex flex-col justify-center">
             <Icon icon="solar:folder-error-bold" className="mx-auto mb-4 text-4xl text-white/30" />
-            <h3 className="text-xl font-minecraft text-white/50 lowercase mb-2">
+            <h3 className="text-sm font-smallcaps text-white/50 mb-2">
               {profiles.length === 0 ? t('modrinth.no_profiles_available') : t('modrinth.no_profiles_found')}
             </h3>
             <p className="text-white/40 text-sm lowercase">
@@ -437,14 +437,14 @@ export function ModrinthQuickInstallProfilesModal({
 
                 {/* Profile Info */}
                 <div className="flex-grow min-w-0 mr-4 pr-2 max-w-[calc(100%-140px)]">
-                  <h4 className="font-minecraft-ten text-white text-lg whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case group-hover:text-white mb-1 text-left"
+                  <h4 className="font-minecraft text-white text-lg whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case group-hover:text-white mb-1 text-left"
                       title={profile.name}
                   >
                     {profile.name}
                   </h4>
 
                   {/* Profile Details */}
-                  <div className="flex items-center gap-2 text-xs font-minecraft-ten">
+                  <div className="flex items-center gap-2 text-xs font-minecraft">
                     {/* Minecraft Version */}
                     <div className="text-white/70 flex items-center gap-1">
                       <img
@@ -495,9 +495,9 @@ export function ModrinthQuickInstallProfilesModal({
                     return (
                       <button
                         disabled
-                        className="flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
+                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
                       >
-                        <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                         <span>{t('modrinth.uninstalling')}</span>
                       </button>
                     );
@@ -511,7 +511,7 @@ export function ModrinthQuickInstallProfilesModal({
                           handleUninstallClick(profile);
                         }}
                         disabled={isInstalling || isUninstalling}
-                        className="flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
+                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
                       >
                         <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
                         <span>{t('common.uninstall')}</span>
@@ -531,7 +531,7 @@ export function ModrinthQuickInstallProfilesModal({
                           }
                         }}
                         disabled={isInstalling || isInstalled}
-                        className={`flex-shrink-0 px-3 py-1 text-2xl font-minecraft lowercase rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+                        className={`flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 ${
                           isInstalled
                             ? 'cursor-default'
                             : isInstalling
@@ -567,7 +567,7 @@ export function ModrinthQuickInstallProfilesModal({
                           </>
                         ) : isInstalling ? (
                           <>
-                            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+                            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                             <span>{t('modrinth.installing')}</span>
                           </>
                         ) : (
@@ -593,7 +593,7 @@ export function ModrinthQuickInstallProfilesModal({
                   console.log('❌ Closing modal');
                   onClose();
                 }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-sm font-minecraft"
+                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-xs font-smallcaps"
               >
                 <span>{t('common.close')}</span>
               </button>

@@ -57,7 +57,7 @@ export function CustomDropdown({
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Label above (only if provided) */}
       {label && (
-        <label className="block text-white font-minecraft text-3xl lowercase mb-2">
+        <label className="block text-white font-smallcaps text-lg mb-2">
           {label}
         </label>
       )}
@@ -67,10 +67,10 @@ export function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 transition-all duration-200 focus:outline-none focus:ring-0 focus:border-transparent ${
           variant === 'search'
-            ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
+            ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
             : label
-            ? `w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
-            : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
+            ? `w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
+            : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
         }`}
         style={{
           boxShadow: isOpen ? `0 0 0 1px ${accentColor.value}40` : 'none',
@@ -122,7 +122,7 @@ export function CustomDropdown({
                 )}
                 <button
                   onClick={() => handleOptionClick(option.value)}
-                  className={`w-full flex items-center gap-2.5 text-left font-minecraft-ten transition-colors duration-150 ${
+                  className={`w-full flex items-center gap-2.5 text-left font-minecraft transition-colors duration-150 ${
                     isSm ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-3 text-base'
                   } ${
                     option.value === value

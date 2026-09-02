@@ -151,7 +151,7 @@ export function SettingsContextMenu({
                   onClose();
                 }
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left font-minecraft-ten text-sm transition-colors duration-150 ${
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left font-minecraft text-sm transition-colors duration-150 ${
                 item.disabled
                   ? 'text-white/30 cursor-not-allowed opacity-50'
                   : item.destructive

@@ -22,7 +22,6 @@ import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
@@ -815,7 +814,7 @@ export function CapeBrowser(): JSX.Element {
                       });
                     }
                   }}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     !filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -843,7 +842,7 @@ export function CapeBrowser(): JSX.Element {
                     }
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -864,7 +863,7 @@ export function CapeBrowser(): JSX.Element {
                     setSearchQuery("");
                     setCurrentPage(0);
                   }}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -886,7 +885,7 @@ export function CapeBrowser(): JSX.Element {
                     setCurrentPage(0);
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -941,7 +940,7 @@ export function CapeBrowser(): JSX.Element {
                       <div className="relative" ref={templateMenuRef}>
                         <button
                           onClick={() => setShowTemplateMenu(!showTemplateMenu)}
-                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                           title={t('capes.downloadTemplate')}
                         >
                           <div className="w-4 h-4 flex items-center justify-center">
@@ -954,14 +953,14 @@ export function CapeBrowser(): JSX.Element {
                           <div className="absolute top-full left-0 mt-1 z-50 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden min-w-[180px]">
                             <button
                               onClick={() => handleDownloadTemplate(false)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
                               <Icon icon="solar:download-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithoutElytra')}</span>
                             </button>
                             <button
                               onClick={() => handleDownloadTemplate(true)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
                               <Icon icon="solar:download-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithElytra')}</span>
@@ -972,7 +971,7 @@ export function CapeBrowser(): JSX.Element {
 
                       <button
                         onClick={handleUploadClick}
-                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                         title={t('capes.uploadCape')}
                       >
                         <div className="w-4 h-4 flex items-center justify-center">

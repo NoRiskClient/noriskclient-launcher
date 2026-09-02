@@ -4,11 +4,15 @@ import React, { useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 
+const FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
+
 interface SkinViewerProps {
   skinUrl: string; // This will now be the direct URL (file:// or http:// or /path)
   playerName?: string;
   width?: number;
   height?: number;
+  fill?: boolean;
+  fallbackUrl?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -18,6 +22,8 @@ export function SkinViewer({
   playerName,
   width = 300,
   height = 400,
+  fill = false,
+  fallbackUrl = FALLBACK_SKIN_URL,
   className,
   style,
 }: SkinViewerProps) {
@@ -30,23 +36,31 @@ export function SkinViewer({
     setHasError(false);
   }, [skinUrl]);
 
+  const fillStyle: React.CSSProperties = fill
+    ? { height: "100%", width: "auto", maxWidth: "none" }
+    : {};
+
   const handleError = () => {
     console.warn(`[SkinViewer] Error loading image from skinUrl: ${skinUrl}`);
     setHasError(true);
   };
 
   if (hasError || !skinUrl) {
-    // Show fallback if error or no skinUrl provided
     return (
-      <div
-        className={cn(
-          "flex items-center justify-center bg-gray-700/50",
-          className,
-        )}
-        style={{ width, height, ...style }}
-      >
-        <span className="text-gray-500 text-3xl">?</span>
-      </div>
+      <img
+        src={fallbackUrl}
+        alt={playerName ? `${playerName}'s Skin` : "Minecraft Skin"}
+        width={width}
+        height={height}
+        className={cn("object-contain rounded-md select-none", className)}
+        style={{
+          imageRendering: "pixelated",
+          userSelect: "none",
+          ...fillStyle,
+          ...style,
+        }}
+        draggable={false}
+      />
     );
   }
 
@@ -61,6 +75,7 @@ export function SkinViewer({
         imageRendering: "pixelated",
         userSelect: "none",
         transform: isFullRiskStyle ? "translateY(10px)" : undefined,
+        ...fillStyle,
         ...style,
       }}
       draggable={false}

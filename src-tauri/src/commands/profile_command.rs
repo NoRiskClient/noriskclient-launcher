@@ -10,7 +10,8 @@ use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
+    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
+    ProfileState,
 };
 use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
@@ -83,6 +84,25 @@ pub struct CopyProfileParams {
     copy_all_files: Option<bool>,
 }
 
+#[derive(Deserialize, Default, Clone, Copy, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    #[default]
+    Noriskpack,
+    Mrpack,
+    Curseforge,
+}
+
+impl ExportFormat {
+    fn extension(&self) -> &'static str {
+        match self {
+            Self::Noriskpack => "noriskpack",
+            Self::Mrpack => "mrpack",
+            Self::Curseforge => "zip",
+        }
+    }
+}
+
 // Export profile command parameters
 #[derive(Deserialize)]
 pub struct ExportProfileParams {
@@ -91,6 +111,121 @@ pub struct ExportProfileParams {
     file_name: String,           // Base name without extension
     include_files: Option<Vec<PathBuf>>,
     open_folder: bool, // Whether to open the exports folder after export
+    #[serde(default)]
+    format: ExportFormat,
+}
+
+#[tauri::command]
+pub async fn create_profile_desktop_shortcut(profile_id: Uuid) -> Result<String, CommandError> {
+    let state = State::get().await?;
+    let profile = state.profile_manager.get_profile(profile_id).await?;
+    let desktop_dir = dirs::desktop_dir()
+        .ok_or_else(|| AppError::Other("Desktop directory not found".to_string()))?;
+    let exe_path = std::env::current_exe()
+        .map_err(|e| AppError::Other(format!("Failed to resolve launcher executable: {}", e)))?;
+    let shortcut_name = sanitize(format!("{} - FullRiskClient", profile.name));
+
+    #[cfg(target_os = "windows")]
+    {
+        let shortcut_path = desktop_dir.join(format!("{}.lnk", shortcut_name));
+        let escape_ps = |value: &str| value.replace('\'', "''");
+        let working_dir = exe_path
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let script = format!(
+            "$shell = New-Object -ComObject WScript.Shell; \
+             $shortcut = $shell.CreateShortcut('{}'); \
+             $shortcut.TargetPath = '{}'; \
+             $shortcut.Arguments = 'launch --profile {}'; \
+             $shortcut.WorkingDirectory = '{}'; \
+             $shortcut.Save();",
+            escape_ps(&shortcut_path.to_string_lossy()),
+            escape_ps(&exe_path.to_string_lossy()),
+            profile_id,
+            escape_ps(&working_dir),
+        );
+
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| AppError::Other(format!("Failed to create shortcut: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(AppError::Other(format!(
+                "Failed to create shortcut: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
+            .into());
+        }
+
+        return Ok(shortcut_path.to_string_lossy().to_string());
+    }
+
+#[cfg(target_os = "linux")]
+{
+    use tokio::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    let shortcut_path = desktop_dir.join(format!("{}.desktop", shortcut_name));
+
+    let content = format!(
+        "[Desktop Entry]\nType=Application\nName={}\nExec=\"{}\" launch --profile {}\nTerminal=false\n",
+        profile.name.replace('\n', " "),
+        exe_path.to_string_lossy(),
+        profile_id
+    );
+
+    fs::write(&shortcut_path, content)
+        .await
+        .map_err(|e| CommandError::from(AppError::Io(e)))?;
+
+    #[cfg(unix)]
+    {
+        let mut permissions = fs::metadata(&shortcut_path)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?
+            .permissions();
+
+        permissions.set_mode(0o755);
+
+        fs::set_permissions(&shortcut_path, permissions)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?;
+    }
+
+    Ok(shortcut_path.to_string_lossy().to_string())
+}
+
+    #[cfg(target_os = "macos")]
+    {
+        use tokio::fs;
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+
+        let shortcut_path = desktop_dir.join(format!("{}.command", shortcut_name));
+        let content = format!(
+            "#!/bin/sh\n\"{}\" launch --profile {}\n",
+            exe_path.to_string_lossy(),
+            profile_id
+        );
+        fs::write(&shortcut_path, content)
+            .await
+            .map_err(|e| CommandError::from(AppError::Io(e)))?;
+            #[cfg(unix)]
+            {
+                let mut permissions = fs::metadata(&shortcut_path)
+                    .await
+                    .map_err(|e| CommandError::from(AppError::Io(e)))?
+                    .permissions();
+                permissions.set_mode(0o755);
+                fs::set_permissions(&shortcut_path, permissions)
+                    .await
+                    .map_err(|e| CommandError::from(AppError::Io(e)))?;
+            }
+            return Ok(shortcut_path.to_string_lossy().to_string());
+        }
 }
 
 #[tauri::command]
@@ -1037,6 +1172,22 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
     Ok(profiles)
 }
 
+#[tauri::command]
+pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.list_profile_backups().await?)
+}
+
+#[tauri::command]
+pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state
+        .profile_manager
+        .restore_profile_backup(backup_path.into())
+        .await?;
+    Ok(())
+}
+
 /// Loads and returns the list of standard profiles from the local configuration file.
 #[tauri::command]
 pub async fn get_standard_profiles() -> Result<NoriskVersionsConfig, CommandError> {
@@ -1173,6 +1324,7 @@ pub async fn update_modrinth_mod_version(
 // --- Custom Mod Commands ---
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, CommandError> {
     log::info!(
         "Received get_custom_mods command for profile {}",
@@ -1184,6 +1336,7 @@ pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, Com
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn set_custom_mod_enabled(
     profile_id: Uuid,
     filename: String,
@@ -1204,6 +1357,7 @@ pub async fn set_custom_mod_enabled(
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(), CommandError> {
     log::info!(
         "Received delete_custom_mod command for profile {}, file '{}'",
@@ -1235,14 +1389,12 @@ pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(),
 #[tauri::command]
 pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
     log::info!("Received command get_system_ram_mb");
-    // In a real application, you might want to manage the System instance
-    // in the global state to avoid recreating it, but for a one-off command,
-    // this is fine.
-    let mut sys = System::new_all();
-    sys.refresh_memory(); // Refresh memory information
-    let total_memory_bytes = sys.total_memory();
-    let total_memory_mb = total_memory_bytes / (1024 * 1024);
-    Ok(total_memory_mb)
+    Ok(crate::utils::system_info::total_ram_mb())
+}
+
+#[tauri::command]
+pub async fn get_default_memory_max_mb() -> Result<u32, CommandError> {
+    Ok(crate::state::profile_state::default_memory_max_mb())
 }
 
 // --- New Command to open Profile Folder ---
@@ -1365,95 +1517,63 @@ pub async fn import_local_mods(
 }
 
 #[tauri::command]
-pub async fn import_profile_from_file(app_handle: tauri::AppHandle) -> Result<(), CommandError> {
-    log::info!("Executing import_profile_from_file command");
+pub async fn preview_import_pack(
+    file_path_str: String,
+) -> Result<crate::integrations::pack_preview::ImportPackPreview, CommandError> {
+    log::info!("Previewing modpack file: {}", file_path_str);
+    Ok(crate::integrations::pack_preview::preview_pack_at(PathBuf::from(file_path_str)).await?)
+}
 
-    // Spawn the blocking dialog call onto a blocking thread pool
-    let dialog_result = tokio::task::spawn_blocking(move || {
-        app_handle
-            .dialog()
-            .file()
-            .add_filter("Modpack Files", &["mrpack", "noriskpack", "zip"])
-            .set_title("Select Modpack File (.mrpack, .noriskpack, or .zip)")
-            .blocking_pick_file() // Use the blocking version for single file selection
-    })
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Dialog task failed: {}", e))))?;
+async fn apply_import_overrides(
+    state: &std::sync::Arc<State>,
+    profile_id: Uuid,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) {
+    let name = name_override.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    let group = group_override.map(|g| g.trim().to_string());
+    let clear_pack = clear_norisk_pack.unwrap_or(false);
+    if name.is_none() && group.is_none() && norisk_pack_id.is_none() && !clear_pack {
+        return;
+    }
 
-    if let Some(file_path_obj) = dialog_result {
-        // Convert FilePath to PathBuf
-        let file_path_buf = match file_path_obj.into_path() {
-            Ok(path) => path,
-            Err(e) => {
-                log::error!("Failed to convert selected file path: {}", e);
-                return Err(CommandError::from(AppError::Other(
-                    "Failed to convert selected file path".to_string(),
-                )));
-            }
-        };
-
-        log::info!(
-            "User selected modpack file: {:?}. Triggering processing...",
-            file_path_buf
-        );
-
-        // Check the file extension
-        let file_extension = file_path_buf
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| ext.to_lowercase());
-
-        let new_profile_id = match file_extension.as_deref() {
-            Some("mrpack") => {
-                log::info!("File extension is .mrpack, proceeding with mrpack processing.");
-                mrpack::import_mrpack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            Some("noriskpack") => {
-                log::info!("File extension is .noriskpack, proceeding with noriskpack processing.");
-                crate::integrations::norisk_packs::import_noriskpack_as_profile(file_path_buf, None)
-                    .await?
-            }
-            Some("zip") => {
-                log::info!("File extension is .zip, proceeding with CurseForge modpack processing.");
-                curseforge::import_curseforge_pack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            _ => {
-                log::error!(
-                    "Selected file has an invalid extension: {:?}",
-                    file_path_buf
-                );
-                return Err(CommandError::from(AppError::Other(
-                    "Invalid file type selected. Please select a .mrpack, .noriskpack, or .zip file."
-                        .to_string(),
-                )));
-            }
-        };
-
-        // Get state to emit event
-        let state = State::get().await?;
-        // Emit event to trigger UI update for the newly created profile
-        if let Err(e) = state
-            .event_state
-            .trigger_profile_update(new_profile_id)
-            .await
-        {
-            log::error!(
-                "Failed to emit TriggerProfileUpdate event for new profile {}: {}",
-                new_profile_id,
-                e
-            );
+    let mut profile = match state.profile_manager.get_profile(profile_id).await {
+        Ok(profile) => profile,
+        Err(e) => {
+            log::error!("Cannot apply import overrides for {}: {}", profile_id, e);
+            return;
         }
+    };
 
-        Ok(())
-    } else {
-        log::info!("User cancelled the file import dialog.");
-        Ok(())
+    if let Some(name) = name {
+        profile.name = name;
+    }
+    if let Some(group) = group {
+        profile.group = if group.is_empty() { None } else { Some(group) };
+    }
+    if clear_pack {
+        profile.selected_norisk_pack_id = None;
+    } else if let Some(pack_id) = norisk_pack_id {
+        profile.selected_norisk_pack_id = Some(pack_id);
+    }
+
+    if let Err(e) = state.profile_manager.update_profile(profile_id, profile).await {
+        log::error!("Failed to apply import overrides for {}: {}", profile_id, e);
     }
 }
 
 /// Imports a profile from a specified file path.
 #[tauri::command]
-pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> Result<Uuid, CommandError> {
+pub async fn import_profile(
+    file_path_str: String,
+    event_id: Option<String>,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) -> Result<Uuid, CommandError> {
     log::info!(
         "Executing import_profile command with file_path: {}",
         file_path_str
@@ -1526,6 +1646,16 @@ pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> 
             )));
         }
     };
+
+    apply_import_overrides(
+        &state,
+        new_profile_id,
+        name_override,
+        group_override,
+        norisk_pack_id,
+        clear_norisk_pack,
+    )
+    .await;
 
     if let Ok(profile) = state.profile_manager.get_profile(new_profile_id).await {
         let mut props = std::collections::HashMap::new();
@@ -1911,20 +2041,42 @@ pub async fn export_profile(
     }
 
     // Generate complete filename with extension
-    let noriskpack_filename = format!("{}.noriskpack", sanitized_name);
+    let pack_filename = format!("{}.{}", sanitized_name, params.format.extension());
 
     // Create full export path
-    let export_path = exports_dir.join(&noriskpack_filename);
+    let export_path = exports_dir.join(&pack_filename);
 
     info!("Exporting profile to {}", export_path.display());
 
     // Perform the export
-    let result_path = profile_utils::export_profile_to_noriskpack(
-        params.profile_id,
-        Some(export_path.clone()),
-        params.include_files,
-    )
-        .await?;
+    let result_path = match params.format {
+        ExportFormat::Noriskpack => {
+            profile_utils::export_profile_to_noriskpack(
+                params.profile_id,
+                Some(export_path.clone()),
+                params.include_files,
+            )
+            .await?
+        }
+        ExportFormat::Mrpack => {
+            crate::integrations::mrpack_export::export_profile_to_mrpack(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+        ExportFormat::Curseforge => {
+            crate::integrations::curseforge_export::export_profile_to_curseforge(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+    };
 
     // Open the export directory if requested
     if params.open_folder {
@@ -2595,13 +2747,10 @@ pub async fn add_profile_symlink(params: AddSymlinkParams) -> Result<(), Command
     
     // Normalize relative_path by converting to PathBuf (handles forward/backslash normalization)
     // Split by '/' and push segments individually to ensure platform-appropriate separators
-    let mut normalized_relative = PathBuf::new();
-    for segment in params.relative_path.split('/') {
-        if !segment.is_empty() {
-            normalized_relative.push(segment);
-        }
-    }
-    
+    let normalized_relative =
+        crate::utils::import_safety::safe_relative_path(&params.relative_path)
+            .map_err(CommandError::from)?;
+
     let link_path = instance_path.join(&normalized_relative);
     let target_path = PathBuf::from(&params.external_path);
     

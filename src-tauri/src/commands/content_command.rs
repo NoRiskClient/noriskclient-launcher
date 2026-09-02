@@ -129,21 +129,19 @@ async fn uninstall_content_by_sha1_internal(
             .await
         {
             Ok(profile_instance_path) => {
-                // Get profile mods path for local mods scanning
-                let profile_mods_path = state_manager.profile_manager.get_profile_mods_path(&profile)?;
-                
-                let mut dirs_to_scan = vec![
+                let mut dirs_to_scan: Vec<(&str, PathBuf)> = vec![
                     ("shaderpacks", profile_instance_path.join("shaderpacks")),
-                    ("resourcepacks", profile_instance_path.join("resourcepacks")), 
+                    ("resourcepacks", profile_instance_path.join("resourcepacks")),
                     ("datapacks", profile_instance_path.join("datapacks")),
-                    ("mods", profile_mods_path),
-                    ("custom_mods", profile_instance_path.join("custom_mods")),
                 ];
+                for mods_dir in state_manager.profile_manager.mod_scan_dirs(&profile)? {
+                    dirs_to_scan.push(("mods", mods_dir));
+                }
 
                 // Filter directories based on content_type
                 if let Some(ref ct) = content_type {
                     dirs_to_scan = match ct {
-                        profile_utils::ContentType::Mod => dirs_to_scan.into_iter().filter(|(name, _)| name == &"mods" || name == &"custom_mods").collect(),
+                        profile_utils::ContentType::Mod => dirs_to_scan.into_iter().filter(|(name, _)| name == &"mods").collect(),
                         profile_utils::ContentType::ShaderPack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"shaderpacks").collect(),
                         profile_utils::ContentType::ResourcePack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"resourcepacks").collect(),
                         profile_utils::ContentType::DataPack => dirs_to_scan.into_iter().filter(|(name, _)| name == &"datapacks").collect(),
@@ -531,6 +529,7 @@ pub async fn toggle_content_from_profile(
                     content_type: profile_utils::ContentType::Mod,
                     calculate_hashes: true,
                     fetch_modrinth_data: false, // Don't need Modrinth data for toggling
+                    cache_behaviour: Default::default(),
                 }).await {
                     Ok(local_mods) => {
                         for mod_item in local_mods {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -9,8 +9,8 @@ interface TooltipProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
-  // "cursor" (default): follows the mouse. "top": static, centered above the trigger element.
-  position?: "cursor" | "top";
+  // "cursor" (default): follows the mouse. "top"/"bottom": static, centered above/below the trigger.
+  position?: "cursor" | "top" | "bottom";
 }
 
 export function Tooltip({
@@ -20,7 +20,8 @@ export function Tooltip({
   className = "",
   position = "cursor",
 }: TooltipProps) {
-  const isStatic = position === "top";
+  const isStatic = position === "top" || position === "bottom";
+  const isBottom = position === "bottom";
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -52,12 +53,15 @@ export function Tooltip({
     setTooltipPosition({ x, y });
   };
 
-  // Static mode: anchor centered above the trigger. The `translate(-50%, -100%)` on the
-  // tooltip element handles centering + sitting above, so we only need the top-center point.
+  // Static mode: anchor centered above/below the trigger. The transform on the tooltip element
+  // handles centering + vertical placement, so we only need the center-edge point.
   const positionAboveTrigger = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+    setTooltipPosition({
+      x: rect.left + rect.width / 2,
+      y: isBottom ? rect.bottom + 8 : rect.top - 8,
+    });
   };
 
   const showTooltip = (e: React.MouseEvent) => {
@@ -105,9 +109,28 @@ export function Tooltip({
     };
   }, []);
 
+  // Static mode: once the tooltip is measurable, clamp its centered x so it never
+  // overflows the viewport edges (e.g. buttons near the right border).
+  useLayoutEffect(() => {
+    if (!isStatic || !isVisible) return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    const tip = tooltipRef.current;
+    if (!rect || !tip) return;
+    const margin = 8;
+    const half = tip.offsetWidth / 2;
+    let x = rect.left + rect.width / 2;
+    x = Math.min(x, window.innerWidth - margin - half);
+    x = Math.max(x, margin + half);
+    const y = isBottom ? rect.bottom + 8 : rect.top - 8;
+    setTooltipPosition((prev) =>
+      prev.x === x && prev.y === y ? prev : { x, y },
+    );
+  }, [isVisible, isStatic]);
+
   const getTooltipClasses = () => {
     // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
-    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft-ten text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+    const baseClasses =
+      "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
 
     return `${baseClasses} ${className}`;
   };
@@ -129,33 +152,38 @@ export function Tooltip({
         {children}
       </div>
 
-      {isVisible && createPortal(
-        <div
-          ref={tooltipRef}
-          className={getTooltipClasses()}
-          style={{
-            left: tooltipPosition.x,
-            top: tooltipPosition.y,
-            position: 'fixed',
-            // static mode: center horizontally on the anchor point and sit above it
-            transform: isStatic ? 'translate(-50%, -100%)' : undefined,
-            textAlign: isStatic ? 'center' : undefined,
-            backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
-            borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
-            maxWidth: '300px', // Kompakt für kürzere Texte
-            wordWrap: 'break-word', // Automatischer Wortumbruch
-          }}
-        >
-          {content}
-        </div>,
-        document.body
-      )}
+      {isVisible &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            className={getTooltipClasses()}
+            style={{
+              left: tooltipPosition.x,
+              top: tooltipPosition.y,
+              position: "fixed",
+              // static mode: center horizontally on the anchor point and sit above/below it
+              transform: isStatic
+                ? isBottom
+                  ? "translate(-50%, 0)"
+                  : "translate(-50%, -100%)"
+                : undefined,
+              textAlign: isStatic ? "center" : undefined,
+              backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
+              borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
+              maxWidth: "300px", // Kompakt für kürzere Texte
+              wordWrap: "break-word", // Automatischer Wortumbruch
+            }}
+          >
+            {content}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
 
 // Convenience component for simple tooltip usage
-interface SimpleTooltipProps extends Omit<TooltipProps, 'children'> {
+interface SimpleTooltipProps extends Omit<TooltipProps, "children"> {
   children: React.ReactNode;
 }
 
@@ -164,6 +192,6 @@ export function SimpleTooltip(props: SimpleTooltipProps) {
 }
 
 // Static tooltip: shown centered above the trigger element instead of following the cursor.
-export function StaticTooltip(props: Omit<TooltipProps, 'position'>) {
+export function StaticTooltip(props: Omit<TooltipProps, "position">) {
   return <Tooltip {...props} position="top" />;
 }

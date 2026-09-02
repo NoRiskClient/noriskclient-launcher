@@ -13,6 +13,7 @@ import { SymlinkSettingsTab } from "./settings/SymlinkSettingsTab";
 
 import { useProfileStore } from "../../store/profile-store";
 import * as ProfileService from "../../services/profile-service";
+import { logError } from "../../utils/logging-utils";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -72,6 +73,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [systemRam, setSystemRam] = useState<number>(8192);
+  const [recommendedRam, setRecommendedRam] = useState<number>(4096);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -82,14 +84,24 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   const showDesignerTab = usePermission(PERMISSION.DESIGNER_TAB);
   const [tempRamMb, setTempRamMb] = useState(
-    profile.settings?.memory?.max ?? 3072,
+    profile.settings?.memory?.max ?? 0,
   );
 
   useEffect(() => {
     ProfileService.getSystemRamMb()
       .then((ram) => setSystemRam(ram))
       .catch((err) => {
-        console.error("Failed to get system RAM:", err);
+        logError(`Failed to get system RAM: ${err}`);
+      });
+
+    ProfileService.getDefaultMemoryMaxMb()
+      .then((recommended) => {
+        setRecommendedRam(recommended);
+        setTempRamMb((current) => (current === 0 ? recommended : current));
+      })
+      .catch((err) => {
+        logError(`Failed to get the recommended memory default: ${err}`);
+        setTempRamMb((current) => (current === 0 ? 4096 : current));
       });
   }, []);
 
@@ -115,7 +127,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   useEffect(() => {
     let isMounted = true;
-    const initialRamMb = profile.settings?.memory?.max ?? 3072;
+    const initialRamMb = profile.settings?.memory?.max ?? recommendedRam;
     setEditedProfile({ ...profile });
     setCurrentProfile({ ...profile });
     setBaselineProfile({ ...profile });
@@ -365,6 +377,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
             editedProfile={editedProfile}
             updateProfile={updateProfileData}
             systemRam={systemRam}
+            recommendedRam={recommendedRam}
             tempRamMb={tempRamMb}
             setTempRamMb={setTempRamMb}
           />
@@ -416,7 +429,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
           variant="secondary"
           onClick={handleCancel}
           size="md"
-          className="text-2xl"
+          className="text-base"
         >
           {t("profiles.settings.cancel")}
         </Button>
@@ -432,13 +445,13 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         onClick={handleSave}
         disabled={isSaving}
         size="md"
-        className="text-2xl"
+        className="text-base"
       >
         {isSaving ? (
           <div className="flex items-center gap-3">
             <Icon
-              icon="solar:refresh-bold"
-              className="w-6 h-6 animate-spin text-white"
+              icon="svg-spinners:ring-resize"
+              className="w-6 h-6 text-white"
             />
             <span>{t("profiles.settings.saving")}</span>
           </div>
@@ -471,57 +484,44 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
       onClose={handleCancel}
       width="xl"
       footer={renderFooter()}
-      className="h-[650px] min-h-[550px] flex flex-col"
+      className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
     >
-      <div className="flex h-full">
-        <div ref={sidebarRef} className="w-64 flex flex-col">
-          <div className="space-y-0 flex-1">
+      <div className="flex h-full p-4 gap-2">
+        <div ref={sidebarRef} className="w-64 flex flex-col flex-shrink-0">
+          <div className="space-y-0.5 flex-1 overflow-y-auto scrollbar-hover">
             {tabConfig.map((tab) => {
               const isActive = activeTab === tab.id;
 
               return (
-                <div key={tab.id} className="w-full">
-                  <button
+                <button
+                  key={tab.id}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                    isActive
+                      ? "text-white"
+                      : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
+                  )}
+                  style={
+                    isActive
+                      ? { backgroundColor: `${accentColor.value}26` }
+                      : undefined
+                  }
+                  onClick={() => handleTabClick(tab.id)}
+                >
+                  <Icon
+                    icon={tab.icon}
+                    className="w-6 h-6 transition-colors duration-200"
+                    style={{ color: isActive ? accentColor.value : undefined }}
+                  />
+                  <span
                     className={cn(
-                      "w-full text-left p-3 transition-all duration-200 rounded-none relative border-0 outline-none",
-                      isActive
-                        ? "border-l-2 shadow-sm text-white"
-                        : "bg-transparent border-transparent text-white/70 hover:text-white",
+                      "font-smallcaps text-lg transition-colors duration-200",
+                      isActive && "font-medium",
                     )}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: `${accentColor.value}10`, // 60% opacity
-                            borderLeftColor: accentColor.value,
-                            color: "white",
-                          }
-                        : ({
-                            "--hover-bg": `${accentColor.value}33`, // 20% opacity for hover
-                          } as any)
-                    }
-                    onClick={() => handleTabClick(tab.id)}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon
-                        icon={tab.icon}
-                        className={cn(
-                          "w-6 h-6 transition-colors duration-200",
-                          isActive ? "" : "text-white/50",
-                        )}
-                        style={isActive ? { color: accentColor.value } : {}}
-                      />
-                      <span
-                        className={cn(
-                          "font-minecraft text-3xl lowercase transition-colors duration-200",
-                          isActive ? "font-medium" : "",
-                        )}
-                        style={isActive ? { color: accentColor.value } : {}}
-                      >
-                        {tab.label}
-                      </span>
-                    </div>
-                  </button>
-                </div>
+                    {tab.label}
+                  </span>
+                </button>
               );
             })}
           </div>
@@ -534,7 +534,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div
-            className="flex-1 py-2 pl-0 pr-4 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
+            className="flex-1 py-2 px-5 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
             ref={contentRef}
             style={{ maxWidth: "100%", boxSizing: "border-box" }}
           >

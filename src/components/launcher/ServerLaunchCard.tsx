@@ -38,23 +38,23 @@ export function ServerLaunchCard({
   const accentColor = useThemeStore((state) => state.accentColor);
   const getPing = useServerPingStore((state) => state.getPing);
   const subscribe = useServerPingStore((state) => state.subscribe);
-  const triggerBackgroundPing = useServerPingStore((state) => state.triggerBackgroundPing);
+  const triggerBackgroundPing = useServerPingStore(
+    (state) => state.triggerBackgroundPing,
+  );
 
-  const {
-    isLaunching,
-    statusMessage,
-    launchState,
-    handleQuickPlayLaunch
-  } = useProfileLaunch({
-    profileId: profileId || "",
-    quickPlayMultiplayer: serverAddress,
-    onLaunchSuccess: () => {
-      console.log(`[ServerLaunchCard] Launch successful for ${serverAddress}`);
-    },
-    onLaunchError: (error) => {
-      console.error(`[ServerLaunchCard] Launch error:`, error);
-    },
-  });
+  const { isLaunching, statusMessage, launchState, handleQuickPlayLaunch } =
+    useProfileLaunch({
+      profileId: profileId || "",
+      quickPlayMultiplayer: serverAddress,
+      onLaunchSuccess: () => {
+        console.log(
+          `[ServerLaunchCard] Launch successful for ${serverAddress}`,
+        );
+      },
+      onLaunchError: (error) => {
+        console.error(`[ServerLaunchCard] Launch error:`, error);
+      },
+    });
 
   useEffect(() => {
     const cached = getPing(serverAddress);
@@ -85,7 +85,9 @@ export function ServerLaunchCard({
   const get3DStyling = () => {
     const colors = {
       main: isLaunching ? "#ef4444" : accentColor.value,
-      light: isLaunching ? "#f87171" : (accentColor.hoverValue || accentColor.value),
+      light: isLaunching
+        ? "#f87171"
+        : accentColor.hoverValue || accentColor.value,
       dark: isLaunching ? "#dc2626" : accentColor.value,
     };
 
@@ -123,18 +125,18 @@ export function ServerLaunchCard({
     if (isLaunching && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-white font-minecraft-ten text-sm">
+          <span className="text-white font-minecraft text-sm">
             {statusMessage}
           </span>
         </div>
       );
     }
 
-    if (statusMessage === "STARTING!") {
+    if (statusMessage === t("launch.starting")) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-green-400 font-minecraft-ten text-lg">
-            STARTING!
+          <span className="text-green-400 font-minecraft text-lg">
+            {t("launch.starting")}
           </span>
         </div>
       );
@@ -143,7 +145,7 @@ export function ServerLaunchCard({
     if (launchState === LaunchState.ERROR && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
-          <span className="text-red-400 font-minecraft-ten text-sm">
+          <span className="text-red-400 font-minecraft text-sm">
             {statusMessage}
           </span>
         </div>
@@ -153,16 +155,14 @@ export function ServerLaunchCard({
     return (
       <>
         <div
-          className="text-xs leading-tight motd-container font-minecraft-ten w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
-          style={{ textShadow: '2px 2px 0px rgba(0, 0, 0, 0.4)' }}
+          className="text-xs leading-tight motd-container font-minecraft w-full whitespace-pre-wrap break-words overflow-hidden line-clamp-2"
+          style={{ textShadow: "2px 2px 0px rgba(0, 0, 0, 0.4)" }}
           title={serverInfo?.description || serverAddress}
         >
           {isLoading && !serverInfo ? (
-            <span className="italic text-white/50">{t('server.pinging')}</span>
+            <span className="italic text-white/50">{t("server.pinging")}</span>
           ) : motdHtml ? (
-            <span
-              dangerouslySetInnerHTML={{ __html: motdHtml }}
-            />
+            <span dangerouslySetInnerHTML={{ __html: motdHtml }} />
           ) : (
             <span className="italic text-white/50">{serverAddress}</span>
           )}
@@ -170,20 +170,27 @@ export function ServerLaunchCard({
 
         {serverInfo && (
           <div className="flex items-center justify-center gap-3 mt-1">
-            <span className="text-xs text-white/60 font-minecraft-ten">
-              {serverInfo.players_online ?? "?"}/{serverInfo.players_max ?? "?"} {t('server.players')}
+            <span className="text-xs text-white/60 font-minecraft">
+              {serverInfo.players_online ?? "?"}/{serverInfo.players_max ?? "?"}{" "}
+              {t("server.players")}
             </span>
             <img
               src={`/minecraft/ping_${
-                serverInfo.latency_ms === null ? 'unknown' :
-                serverInfo.latency_ms < 80 ? '5' :
-                serverInfo.latency_ms < 100 ? '4' :
-                serverInfo.latency_ms < 150 ? '3' :
-                serverInfo.latency_ms < 300 ? '2' : '1'
+                serverInfo.latency_ms === null
+                  ? "unknown"
+                  : serverInfo.latency_ms < 80
+                    ? "5"
+                    : serverInfo.latency_ms < 100
+                      ? "4"
+                      : serverInfo.latency_ms < 150
+                        ? "3"
+                        : serverInfo.latency_ms < 300
+                          ? "2"
+                          : "1"
               }.png`}
               alt="ping"
               className="h-4"
-              style={{ imageRendering: 'pixelated' }}
+              style={{ imageRendering: "pixelated" }}
             />
           </div>
         )}
@@ -195,7 +202,7 @@ export function ServerLaunchCard({
 
   return (
     <div
-      className={`relative flex items-center gap-4 p-4 rounded-lg backdrop-blur-md transition-all duration-200 cursor-pointer min-w-[550px] ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`relative flex items-center gap-4 p-4 rounded-lg backdrop-blur-md transition-all duration-200 cursor-pointer min-w-[550px] ${isDisabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
       style={get3DStyling()}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -204,13 +211,13 @@ export function ServerLaunchCard({
       <div className="relative w-16 h-16 flex-shrink-0 rounded flex items-center justify-center overflow-hidden">
         {isLaunching ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/70 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/70"
           />
         ) : isLoading ? (
           <Icon
-            icon="solar:refresh-bold"
-            className="w-8 h-8 text-white/50 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8 text-white/50"
           />
         ) : serverInfo?.favicon_base64 ? (
           <img
@@ -241,16 +248,18 @@ export function ServerLaunchCard({
           disabled={isDisabled}
           className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95"
           style={{
-            backgroundColor: isLaunching ? '#ef444460' : `${accentColor.value}35`,
-            border: `2px solid ${isLaunching ? '#ef444490' : `${accentColor.value}60`}`,
+            backgroundColor: isLaunching
+              ? "#ef444460"
+              : `${accentColor.value}35`,
+            border: `2px solid ${isLaunching ? "#ef444490" : `${accentColor.value}60`}`,
           }}
         >
           <Icon
             icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"}
             className="w-4 h-4 text-white"
           />
-          <span className="font-minecraft-ten text-xs text-white uppercase">
-            {isLaunching ? t('server.stop') : t('server.join')}
+          <span className="font-minecraft text-xs text-white uppercase">
+            {isLaunching ? t("server.stop") : t("server.join")}
           </span>
         </button>
 
@@ -267,7 +276,9 @@ export function ServerLaunchCard({
           }}
         >
           <Icon icon="solar:box-bold" className="w-4 h-4 text-white" />
-          <span className="font-minecraft-ten text-xs text-white uppercase">{t('server.mods')}</span>
+          <span className="font-minecraft text-xs text-white uppercase">
+            {t("server.mods")}
+          </span>
         </button>
       </div>
     </div>

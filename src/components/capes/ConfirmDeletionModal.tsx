@@ -41,7 +41,7 @@ export function ConfirmDeletionModal({
       variant="flat"
     >
       <div className="p-4">
-        <p className="text-white/90 mb-4 text-center font-minecraft-ten">
+        <p className="text-white/90 mb-4 text-center font-minecraft">
           {t('capes.confirmDeleteMessagePrefix')}{" "}
           <span style={{ color: "var(--accent)" }}>{capeToDelete._id}</span>
           {t('capes.confirmDeleteMessageSuffix')}
@@ -53,7 +53,7 @@ export function ConfirmDeletionModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t('capes.deleteReasonPlaceholder')}
-              className="w-full px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white font-minecraft-ten text-sm placeholder:text-white/40 focus:outline-none focus:border-white/40"
+              className="w-full px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white font-minecraft text-sm placeholder:text-white/40 focus:outline-none focus:border-white/40"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirmDelete();

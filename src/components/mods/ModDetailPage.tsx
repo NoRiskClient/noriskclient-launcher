@@ -257,34 +257,46 @@ export function ModDetailPage({
           if (projects.length > 0) {
             const modrinthProject = projects[0];
 
-            // Fetch author name from search (this returns org names correctly, e.g., "Cobble Studios")
             let authorName: string | undefined;
             let authorAvatarUrl: string | null = null;
             let teamMembers: UnifiedTeamMember[] = [];
 
-            // First, try to get the author from search results (handles orgs correctly)
-            try {
-              const searchResponse = await ModrinthService.searchProjects(
-                modrinthProject.slug,
-                modrinthProject.project_type,
-                undefined,
-                undefined,
-                1,
-              );
-              if (
-                searchResponse.hits.length > 0 &&
-                searchResponse.hits[0].project_id === modrinthProject.id
-              ) {
-                authorName = searchResponse.hits[0].author || undefined;
+            if (modrinthProject.organization) {
+              try {
+                const searchResponse = await ModrinthService.searchProjects(
+                  modrinthProject.slug,
+                  modrinthProject.project_type,
+                  undefined,
+                  undefined,
+                  1,
+                );
+                if (
+                  searchResponse.hits.length > 0 &&
+                  searchResponse.hits[0].project_id === modrinthProject.id
+                ) {
+                  authorName = searchResponse.hits[0].author || undefined;
+                }
+              } catch (searchErr) {
+                console.warn("Failed to fetch author from search:", searchErr);
               }
-            } catch (searchErr) {
-              console.warn("Failed to fetch author from search:", searchErr);
             }
+
+            const membersPromise = ModrinthService.getProjectMembers(
+              projectId,
+            ).catch((err) => {
+              console.warn("Failed to fetch team members:", err);
+              return [];
+            });
+            const versionsPromise = ModrinthService.getModVersions(
+              projectId,
+            ).catch((err) => {
+              console.warn("Failed to fetch versions:", err);
+              return [];
+            });
 
             // Also fetch team members for the team list in sidebar
             try {
-              const members =
-                await ModrinthService.getProjectMembers(projectId);
+              const members = await membersPromise;
               if (members.length > 0) {
                 // Sort by ordering for display
                 const sortedMembers = [...members].sort(
@@ -325,7 +337,7 @@ export function ModDetailPage({
             // Fetch dependencies from the latest version
             let dependencies: UnifiedProjectDependency[] = [];
             try {
-              const versions = await ModrinthService.getModVersions(projectId);
+              const versions = await versionsPromise;
               if (versions.length > 0) {
                 // Get dependencies from the first (featured/latest) version
                 const latestVersion = versions[0];
@@ -436,7 +448,7 @@ export function ModDetailPage({
         {!hideBackButton && (
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft-ten transition-colors"
+            className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft transition-colors"
           >
             <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
             <span>{t("common.back")}</span>
@@ -445,10 +457,10 @@ export function ModDetailPage({
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Icon
-              icon="solar:refresh-bold"
-              className="w-12 h-12 text-white/50 animate-spin"
+              icon="svg-spinners:ring-resize"
+              className="w-12 h-12 text-white/50"
             />
-            <span className="text-white/50 font-minecraft-ten">
+            <span className="text-white/50 font-minecraft">
               {t("mod_detail.loading_project")}
             </span>
           </div>
@@ -464,7 +476,7 @@ export function ModDetailPage({
         {!hideBackButton && (
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft-ten transition-colors"
+            className="flex items-center gap-2 text-white/70 hover:text-white mb-6 font-minecraft transition-colors"
           >
             <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
             <span>{t("common.back")}</span>
@@ -476,12 +488,12 @@ export function ModDetailPage({
               icon="solar:danger-triangle-bold"
               className="w-12 h-12 text-red-500"
             />
-            <span className="text-red-400 font-minecraft-ten">
+            <span className="text-red-400 font-minecraft">
               {error || t("mod_detail.project_not_found")}
             </span>
             <button
               onClick={handleBack}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft-ten transition-colors"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft transition-colors"
             >
               {t("mod_detail.go_back")}
             </button>
@@ -499,7 +511,7 @@ export function ModDetailPage({
         <div className="px-6 pt-6 pb-4">
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 text-white/70 hover:text-white font-minecraft-ten transition-colors"
+            className="flex items-center gap-2 text-white/70 hover:text-white font-minecraft transition-colors"
           >
             <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
             <span>{t("common.back")}</span>
@@ -525,7 +537,10 @@ export function ModDetailPage({
         {showVersions ? (
           /* Versions View */
           <div className="mt-6">
-            <ModDetailVersions project={project} targetProfile={targetProfile} />
+            <ModDetailVersions
+              project={project}
+              targetProfile={targetProfile}
+            />
           </div>
         ) : (
           /* Default View: Gallery + Description + Sidebar */

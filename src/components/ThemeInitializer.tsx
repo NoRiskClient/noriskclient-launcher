@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useThemeStore } from "../store/useThemeStore";
+import { useFontStore } from "../store/font-store";
 import { useLauncherTheme } from "../hooks/useLauncherTheme";
 
 export function ThemeInitializer() {
@@ -11,6 +12,7 @@ export function ThemeInitializer() {
   const applyBorderRadiusToDOM = useThemeStore(
     (state) => state.applyBorderRadiusToDOM,
   );
+  const applyFontToDOM = useFontStore((state) => state.applyFontToDOM);
   const applyUIStylePresetToDOM = useThemeStore(
     (state) => state.applyUIStylePresetToDOM,
   );
@@ -21,8 +23,14 @@ export function ThemeInitializer() {
   useEffect(() => {
     applyAccentColorToDOM();
     applyBorderRadiusToDOM();
+    applyFontToDOM();
     applyUIStylePresetToDOM();
-  }, [applyAccentColorToDOM, applyBorderRadiusToDOM, applyUIStylePresetToDOM]);
+  }, [
+    applyAccentColorToDOM,
+    applyBorderRadiusToDOM,
+    applyFontToDOM,
+    applyUIStylePresetToDOM,
+  ]);
 
   useEffect(() => {
     if (initialPresetRef.current || uiStylePreset !== "fullrisk") {

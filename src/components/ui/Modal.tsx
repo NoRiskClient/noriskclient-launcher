@@ -153,14 +153,14 @@ export function Modal({
             backgroundColor: `${accentColor.value}30`,
           }}
         >
-          <div className="flex items-start space-x-3">
+          <div className="flex items-center space-x-3">
             {titleIcon && (
-              <span className="text-white flex-shrink-0 pt-1.5">
+              <span className="text-white flex-shrink-0 flex items-center">
                 {titleIcon}
               </span>
             )}
             <div className="flex flex-col">
-              <h2 className="text-3xl font-minecraft text-white lowercase">
+              <h2 className="text-lg font-smallcaps text-white">
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}

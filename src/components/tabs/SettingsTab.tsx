@@ -1,14 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
-import { Card } from ".././ui/Card";
-import { ToggleSwitch } from ".././ui/ToggleSwitch";
-import { Input } from ".././ui/Input";
-import { Select } from ".././ui/Select";
-import { ColorPicker } from ".././ColorPicker";
-import { RadiusPicker } from ".././RadiusPicker";
 import type { LauncherConfig } from "../../types/launcherConfig";
 import * as ConfigService from "../../services/launcher-config-service";
 import { useThemeStore, type UIStylePreset } from "../../store/useThemeStore";
@@ -24,30 +18,27 @@ import {
 import { SnowEffectToggle } from "../ui/SnowEffectToggle";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
-import { GroupTabs, type GroupTab } from ".././ui/GroupTabs";
 import { ActionButton } from ".././ui/ActionButton";
-import { Tooltip } from ".././ui/Tooltip";
-import { SimpleTooltip } from ".././ui/Tooltip";
-import { CompactSettingsGrid } from ".././ui/CompactSettingsGrid";
-import EffectPreviewCard from ".././EffectPreviewCard";
-import { RangeSlider } from ".././ui/RangeSlider";
-import { openExternalUrl } from "../../services/tauri-service";
+import { Modal } from ".././ui/Modal";
+import { SearchWithFilters } from ".././ui/SearchWithFilters";
+import { SettingsSearchContext } from ".././ui/settings/SettingsSearchContext";
 import { openLauncherDirectory } from "../../services/tauri-service";
-import { usePermission } from "../../hooks/usePermission";
-import { PERMISSION } from "../../constants/permissions";
-import { useConfirmDialog } from "../../hooks/useConfirmDialog";
-import { useGlobalModal } from "../../hooks/useGlobalModal";
-import { ColorPickerModal } from "../modals/ColorPickerModal";
-import { ThemeSelector } from "../ThemeSelector";
-import { useLauncherTheme } from "../../hooks/useLauncherTheme";
-import { DebugSection } from "./DebugSection";
+import { DebugSection, getDebugTabs } from "./DebugSection";
+import { GeneralTab } from "./settings/GeneralTab";
+import { AppearanceTab } from "./settings/AppearanceTab";
+import { AdvancedTab } from "./settings/AdvancedTab";
+import { SettingsConfigProvider } from "./settings/settings-context";
 import { useTranslation } from "react-i18next";
-import { LANGUAGE_OPTIONS } from "../../i18n";
-import type { SupportedLanguage } from "../../i18n";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 
-export function SettingsTab() {
+type SettingsTabId = "general" | "appearance" | "advanced" | "debug";
+
+interface SettingsTabProps {
+  onClose: () => void;
+}
+
+export function SettingsTab({ onClose }: SettingsTabProps) {
   const { t } = useTranslation();
   const { language, setLanguage, resetFirstInstallSetupWizard } =
     useThemeStore();
@@ -55,56 +46,116 @@ export function SettingsTab() {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<
-    "general" | "appearance" | "advanced" | "debug"
-  >("general");
+  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<SettingsTabId>(
+    "general",
+  );
+
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(sidebarSearch), 150);
+    return () => clearTimeout(id);
+  }, [sidebarSearch]);
+  const sidebarQuery = debouncedSearch.trim().toLowerCase();
+
+  useEffect(() => { setDiscordState("Configuring Settings"); }, []);
 
   useEffect(() => {
-    setDiscordState("Configuring Settings");
-  }, []);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [activeTab, sidebarQuery]);
 
-  // Create groups array for tabs
-  const createGroups = (): GroupTab[] => {
-    const groups: GroupTab[] = [
-      {
-        id: "general",
-        name: t("settings.tabs.general"),
-        count: undefined,
-      },
-      {
-        id: "appearance",
-        name: t("settings.tabs.appearance"),
-        count: undefined,
-      },
-      {
-        id: "advanced",
-        name: t("settings.tabs.advanced"),
-        count: undefined,
-      },
-      {
-        id: "debug",
-        name: t("settings.tabs.debug"),
-        count: undefined,
-      },
-    ];
-    return groups;
+  const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
+    general: [
+      { id: "language", label: t("settings.language") },
+      { id: "accent", label: t("settings.accent_color.title") },
+      { id: "behaviour", label: t("settings.sections.behaviour") },
+      { id: "interface", label: t("settings.sections.interface") },
+    ],
+    appearance: [
+      { id: "theme", label: t("settings.theme.title") },
+      { id: "font", label: t("settings.font.title") },
+      { id: "background", label: t("settings.background.title") },
+      { id: "custom-background", label: t("settings.custom_background.title") },
+    ],
+    advanced: [
+      { id: "login_cache", label: t("settings.sections.login_cache") },
+      { id: "gamedir", label: t("settings.game_data_dir.title") },
+      { id: "hooks", label: t("settings.hooks.title") },
+      { id: "licenses", label: t("settings.licenses.title") },
+    ],
+    debug: getDebugTabs(t),
   };
 
-  const groups = createGroups();
-  const [customColor, setCustomColor] = useState("#4f8eff");
+  const tabConfig: {
+    id: SettingsTabId;
+    label: string;
+    icon: string;
+    children?: { id: string; label: string }[];
+  }[] = [
+    { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
+    { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
+    { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
+    { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
+  ];
+
+  const selectTab = (id: SettingsTabId) => {
+    setSidebarSearch("");
+    setActiveTab(id);
+  };
   const contentRef = useRef<HTMLDivElement>(null);
-  const tabRef = useRef<HTMLDivElement>(null);
+  const sidebarListRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [isHooksExpanded, setIsHooksExpanded] = useState<boolean>(false);
-  const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] =
-    useState<boolean>(false);
-  const [isWrapperEditEnabled, setIsWrapperEditEnabled] =
-    useState<boolean>(false);
-  const [isPostExitEditEnabled, setIsPostExitEditEnabled] =
-    useState<boolean>(false);
+  useEffect(() => {
+    if (!activeSection) return;
+    const el = sidebarListRef.current?.querySelector(`[data-section-id="${activeSection}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeSection]);
+
+  const spySuppressRef = useRef(false);
+  const spyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(`settings-section-${id}`);
+    if (!el) return;
+    spySuppressRef.current = true;
+    setActiveSection(id);
+    if (spyTimeoutRef.current) clearTimeout(spyTimeoutRef.current);
+    spyTimeoutRef.current = setTimeout(() => {
+      spySuppressRef.current = false;
+    }, 500);
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  useEffect(() => {
+    if (sidebarQuery) return;
+    const root = contentRef.current;
+    const defs = sectionDefs[activeTab];
+    if (!root || !defs) {
+      setActiveSection(null);
+      return;
+    }
+    const onScroll = () => {
+      if (spySuppressRef.current) return;
+      const rootTop = root.getBoundingClientRect().top;
+      const line = 80;
+      let current = defs[0].id;
+      for (const d of defs) {
+        const el = document.getElementById(`settings-section-${d.id}`);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top - rootTop <= line) current = d.id;
+      }
+      setActiveSection(current);
+    };
+    onScroll();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, sidebarQuery, config, tempConfig]);
+
   const isResettingRef = useRef<boolean>(false);
+  const { accentColor } = useThemeStore();
   const {
     uiStylePreset,
     setUIStylePreset,
@@ -259,9 +310,7 @@ export function SettingsTab() {
       } catch (err) {
         console.error("Failed to auto-save configuration:", err);
         const errorMessage = parseErrorMessage(err);
-        toast.error(
-          t("settings.toast.auto_save_failed", { error: errorMessage }),
-        );
+        toast.error(t("settings.toast.auto_save_failed", { error: errorMessage }));
       } finally {
         setSaving(false);
       }
@@ -1300,10 +1349,10 @@ export function SettingsTab() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Icon
-              icon="solar:refresh-bold"
-              className="w-10 h-10 text-white/70 animate-spin mx-auto mb-4"
+              icon="svg-spinners:ring-resize"
+              className="w-10 h-10 text-white/70 mx-auto mb-4"
             />
-            <p className="text-2xl text-white/70 font-minecraft">
+            <p className="text-base text-white/70 font-smallcaps">
               {t("settings.loading")}
             </p>
           </div>
@@ -1320,10 +1369,10 @@ export function SettingsTab() {
               className="w-8 h-8 text-red-400 flex-shrink-0 mt-1"
             />
             <div>
-              <h3 className="text-2xl text-red-300 font-minecraft mb-2">
+              <h3 className="text-base text-red-300 font-smallcaps mb-2">
                 {t("settings.error.title")}
               </h3>
-              <p className="text-xl text-red-200/80 font-minecraft mb-4">
+              <p className="text-sm text-red-200/80 font-smallcaps mb-4">
                 {error}
               </p>
               <Button
@@ -1343,25 +1392,35 @@ export function SettingsTab() {
     if (!config || !tempConfig) {
       return (
         <div className="text-center p-8">
-          <p className="text-2xl text-white/70 font-minecraft">
+          <p className="text-base text-white/70 font-smallcaps">
             {t("settings.error.no_config")}
           </p>
         </div>
       );
     }
 
-    switch (activeTab) {
-      case "general":
-        return renderGeneralTab();
-      case "appearance":
-        return renderAppearanceTab();
-      case "advanced":
-        return renderAdvancedTab();
-      case "debug":
-        return <DebugSection />;
-      default:
-        return null;
+    const bodyOf: Partial<Record<SettingsTabId, ReactNode>> = {
+      general: <GeneralTab />,
+      appearance: <AppearanceTab />,
+      advanced: <AdvancedTab />,
+    };
+
+    if (sidebarQuery) {
+      const order: SettingsTabId[] = ["general", "appearance", "advanced"];
+      const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
+        (id) => bodyOf[id],
+      ) as SettingsTabId[];
+      return (
+        <div className="space-y-6">
+          {ordered.map((id) => (
+            <Fragment key={id}>{bodyOf[id]}</Fragment>
+          ))}
+        </div>
+      );
     }
+
+    if (activeTab === "debug") return <DebugSection />;
+    return bodyOf[activeTab] ?? null;
   };
 
   return (
@@ -1433,19 +1492,24 @@ export function SettingsTab() {
             }}
           />
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Content */}
-        <div
-          ref={contentRef}
-          className={cn(isFullRiskStyle && "fullrisk-panel p-6")}
-        >
-          {renderTabContent()}
+        <div className="flex items-center">
+          <div className="border-l border-white/10 mx-4 my-3 h-[85%]"></div>
+        </div>
+
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div
+            ref={contentRef}
+            className="flex-1 py-2 px-5 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
+          >
+            <SettingsConfigProvider value={{ config, tempConfig, setTempConfig, saving }}>
+              <SettingsSearchContext.Provider value={sidebarQuery}>
+                {renderTabContent()}
+              </SettingsSearchContext.Provider>
+            </SettingsConfigProvider>
+          </div>
         </div>
       </div>
-
-      {confirmDialog}
-    </div>
+    </Modal>
   );
 }

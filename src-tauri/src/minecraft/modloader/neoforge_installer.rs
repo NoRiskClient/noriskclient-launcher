@@ -34,7 +34,6 @@ impl NeoForgeInstaller {
         version_id: &str,
         profile: &Profile,
     ) -> Result<NeoForgeInstallResult> {
-        // Emit NeoForge installation event
         let neoforge_event_id = Uuid::new_v4();
         let state = State::get().await?;
         state
@@ -50,17 +49,13 @@ impl NeoForgeInstaller {
 
         info!("\nInstalling NeoForge...");
 
-        // Initialize services
         let neoforge_api = NeoForgeApi::new();
         let mut neoforge_libraries_download = NeoForgeLibrariesDownload::new();
         let neoforge_installer_download = NeoForgeInstallerDownloadService::new();
 
-        // Setze die Anzahl der konkurrenten Downloads
         neoforge_libraries_download.set_concurrent_downloads(self.concurrent_downloads);
 
-        // Get all NeoForge versions metadata
         let neoforge_metadata = neoforge_api.get_all_versions().await?;
-        // Get versions compatible with the current Minecraft version
         let compatible_versions = neoforge_metadata.get_versions_for_minecraft(version_id);
 
         if compatible_versions.is_empty() {
@@ -70,7 +65,6 @@ impl NeoForgeInstaller {
             )));
         }
 
-        // --- Determine NeoForge Version ---
         let target_neoforge_version = match &profile.loader_version {
             Some(specific_version_str) if !specific_version_str.is_empty() => {
                 info!(
@@ -87,12 +81,10 @@ impl NeoForgeInstaller {
                         "Specified NeoForge version '{}' not found or incompatible with MC {}. Falling back to latest.",
                         specific_version_str, version_id
                     );
-                    // Fallback to the latest compatible version (first in the list from get_versions_for_minecraft)
                     compatible_versions.first().unwrap().clone() // Unsafe unwrap okay due to is_empty check above
                 }
             }
             _ => {
-                // Fallback to latest compatible if no specific version is set
                 info!(
                     "No specific NeoForge version set in profile, using latest for MC {}.",
                     version_id
@@ -100,11 +92,9 @@ impl NeoForgeInstaller {
                 compatible_versions.first().unwrap().clone() // Unsafe unwrap okay due to is_empty check above
             }
         };
-        // --- End Determine NeoForge Version ---
 
         info!("Using NeoForge version: {}", target_neoforge_version);
 
-        // Emit NeoForge version found event (using the determined version)
         state
             .emit_event(EventPayload {
                 event_id: neoforge_event_id,
@@ -119,7 +109,6 @@ impl NeoForgeInstaller {
             })
             .await?;
 
-        // Download and extract NeoForge installer (using the determined version)
         state
             .emit_event(EventPayload {
                 event_id: neoforge_event_id,
@@ -190,7 +179,6 @@ impl NeoForgeInstaller {
         let installer_path =
             neoforge_installer_download.get_installer_path(&target_neoforge_version);
 
-        let mut uses_neoforgeclient = false;
 
         if let Some(neoforge_profile) = profile_json {
             state
@@ -211,7 +199,6 @@ impl NeoForgeInstaller {
             // Prüfen, ob Patching übersprungen werden kann
             let mut should_run_patcher = true;
 
-            // Nur noch PATCHED abrufen
             if let Some(patched) = neoforge_profile.data.get("PATCHED") {
                 let client_path_str = &patched.client;
                 // Maven-Koordinaten extrahieren: [group:artifact:version:classifier]
@@ -257,7 +244,6 @@ impl NeoForgeInstaller {
                 }
             }
 
-            // Patcher nur ausführen, wenn nötig
             if should_run_patcher {
                 state
                     .emit_event(EventPayload {
@@ -291,18 +277,7 @@ impl NeoForgeInstaller {
                     .await?;
             }
 
-            // Check if using neoforgeclient flag
-            if neo_forge_game_arguments.contains(&"neoforgeclient".to_string()) {
-                uses_neoforgeclient = true;
-            }
-
-            // fix https://github.com/NoRiskClient/issues/issues/1616 nobody knows.. 
-            // Check if version is 21.1.170 or greater
-            if compare_versions(&target_neoforge_version, "21.1.170") != std::cmp::Ordering::Less {
-                uses_neoforgeclient = true;
-            }
         } else {
-            // Restore full event payload for legacy library download
             state
                 .emit_event(EventPayload {
                     event_id: neoforge_event_id,
@@ -338,12 +313,18 @@ impl NeoForgeInstaller {
             jvm_args: NeoForgeArguments::get_jvm_arguments(
                 &neoforge_version,
                 &LAUNCHER_DIRECTORY.meta_dir().join("libraries"),
-                &target_neoforge_version,
+                // ${version_name} feeds -DignoreList: the jar BootstrapLauncher must NOT turn
+                // into a module. NeoForge only exists from 1.20.2 on, so this is always the
+                // BootstrapLauncher path and the name has to match the Minecraft jar on the
+                // classpath — not the loader version. See forge_installer for the full story.
+                version_id,
             ),
             game_args: neo_forge_game_arguments,
             minecraft_arguments: neoforge_version.minecraft_arguments.clone(),
-            custom_client_path: Some(custom_client_path),
-            uses_neoforgeclient,
+            // NeoForge is module-layer throughout: it finds its patched classes through
+            // -DlibraryDirectory, and the patched jar carries code only — assets, data and
+            // version.json sit in the client-extra half of the split.
+            custom_client_path: None,
         };
 
         Ok(result)
@@ -357,5 +338,4 @@ pub struct NeoForgeInstallResult {
     pub game_args: Vec<String>,
     pub minecraft_arguments: Option<String>,
     pub custom_client_path: Option<PathBuf>,
-    pub uses_neoforgeclient: bool,
 }

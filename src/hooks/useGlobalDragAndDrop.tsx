@@ -1,25 +1,23 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { listen, type UnlistenFn, type Event as TauriEvent } from '@tauri-apps/api/event';
+import { type UnlistenFn, type Event as TauriEvent } from '@tauri-apps/api/event';
 import type { PhysicalPosition } from '@tauri-apps/api/window'; // For payload.position
 import { toast } from 'react-hot-toast';
 // import { invoke } from '@tauri-apps/api/core'; // No longer directly needed here
 
-import { useAppDragDropStore } from '../store/appStore'; // Use the real store
+import { useAppDragDropStore, type DragHoverKind } from '../store/appStore'; // Use the real store
 import { useProfileStore } from '../store/profile-store'; // Import useProfileStore
+import { useImportConfirmStore } from '../store/import-confirm-store';
 import { parseErrorMessage } from '../utils/error-utils';
+import { logInfo } from '../utils/logging-utils';
 import i18n from '../i18n/i18n';
 import * as ContentService from '../services/content-service';
-import * as ProfileService from '../services/profile-service'; // Import ProfileService
 import * as WorldService from '../services/world-service'; // Import WorldService
 import { ContentType as BackendContentType } from '../types/content';
-import { EventType, type EventPayload } from '../types/events';
-import { ProgressToast } from '../components/ui/ProgressToast';
 
 // Define the expected structure of the drag-drop event payload based on common Tauri patterns
 interface WebviewDragDropPayload {
-  type: 'hover' | 'drop' | 'cancel';
+  type: 'enter' | 'over' | 'drop' | 'leave';
   paths?: string[];
   position?: PhysicalPosition;
 }
@@ -28,10 +26,59 @@ interface WebviewDragDropPayload {
 const recentlyProcessedPaths = new Set<string>();
 const PROCESS_COOLDOWN_MS = 1500; // Cooldown period in milliseconds
 
+const MODPACK_EXTENSIONS = ['.noriskpack', '.mrpack', '.zip'];
+
+const CONTENT_EXTENSIONS: Partial<Record<BackendContentType, string[]>> = {
+  [BackendContentType.Mod]: ['.jar', '.jar.disabled'],
+  [BackendContentType.ResourcePack]: ['.zip', '.zip.disabled'],
+  [BackendContentType.ShaderPack]: ['.zip', '.zip.disabled'],
+  [BackendContentType.DataPack]: ['.zip', '.zip.disabled'],
+};
+
+const CONTENT_TYPE_LABELS: Partial<Record<BackendContentType, string>> = {
+  [BackendContentType.Mod]: 'mods',
+  [BackendContentType.ResourcePack]: 'resource packs',
+  [BackendContentType.ShaderPack]: 'shader packs',
+  [BackendContentType.DataPack]: 'data packs',
+};
+
+function acceptedContentExtensions(
+  contentType: BackendContentType | null,
+): string[] | undefined {
+  return contentType ? CONTENT_EXTENSIONS[contentType] : undefined;
+}
+
+function classifyDrop(paths: string[]): DragHoverKind {
+  if (paths.length === 0) return 'unsupported';
+
+  const lower = paths.map((path) => path.toLowerCase());
+  const { activeDropProfileId, activeDropContentType, activeMainTab } =
+    useAppDragDropStore.getState();
+
+  const accepted = acceptedContentExtensions(activeDropContentType);
+  if (
+    activeDropProfileId &&
+    accepted &&
+    lower.some((path) => accepted.some((ext) => path.endsWith(ext)))
+  ) {
+    return 'content';
+  }
+
+  if (lower.some((path) => MODPACK_EXTENSIONS.some((ext) => path.endsWith(ext)))) {
+    return 'modpack';
+  }
+
+  if (activeMainTab === 'worlds' && activeDropProfileId) {
+    const hasExtension = lower.some((path) => /\.[a-z0-9]{1,8}$/.test(path));
+    if (!hasExtension) return 'world';
+  }
+
+  return 'unsupported';
+}
+
 export function useGlobalDragAndDrop() {
   // Destructure from store for useEffect dependencies, but use getState() inside event handler for freshest values.
   const { activeDropProfileId, activeDropContentType, triggerRefresh } = useAppDragDropStore();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let unlistenDragDrop: UnlistenFn | undefined;
@@ -48,9 +95,16 @@ export function useGlobalDragAndDrop() {
           
           const payload = event.payload as WebviewDragDropPayload;
 
-          if (payload.type === 'hover') {
-            // console.log('User hovering over window at:', payload.position, 'with paths:', payload.paths);
+          if (payload.type === 'enter') {
+            const hoveredPaths = payload.paths ?? [];
+            useAppDragDropStore.getState().setDragHover({
+              kind: classifyDrop(hoveredPaths),
+              fileNames: hoveredPaths.map((path) => path.split(/[/\\]/).pop() ?? path),
+            });
+          } else if (payload.type === 'over') {
+            return;
           } else if (payload.type === 'drop') {
+            useAppDragDropStore.getState().setDragHover(null);
             const droppedPaths = payload.paths;
             console.log(`[DragDrop Hook ${instanceId}] Drop event with paths:`, droppedPaths);
 
@@ -72,90 +126,24 @@ export function useGlobalDragAndDrop() {
               console.log(`[DragDrop Hook ${instanceId}] Cleared pathKey from cache: ${pathKey}`);
             }, PROCESS_COOLDOWN_MS);
 
-            const profilePackPath = droppedPaths.find(path =>
-              path.toLowerCase().endsWith('.noriskpack') || path.toLowerCase().endsWith('.mrpack') || path.toLowerCase().endsWith('.zip')
-            );
+            const dropKind = classifyDrop(droppedPaths);
+            const profilePackPath =
+              dropKind === 'modpack'
+                ? droppedPaths.find((path) =>
+                    MODPACK_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)),
+                  )
+                : undefined;
 
             if (profilePackPath) {
-              const { isPathImporting, addImportingPath, removeImportingPath } = useProfileStore.getState();
-
               // Check if this file is already being imported
-              if (isPathImporting(profilePackPath)) {
+              if (useProfileStore.getState().isPathImporting(profilePackPath)) {
                 toast.error(i18n.t('dragdrop.already_importing'));
                 return;
               }
 
-              const eventId = crypto.randomUUID();
-              const toastId = `import-${eventId}`;
-              let progressUnlisten: UnlistenFn | null = null;
+              logInfo(`[DragDrop Hook ${instanceId}] Requesting import confirmation for: ${profilePackPath} at ${eventTimestamp}`);
 
-              console.log(`[DragDrop Hook ${instanceId}] Initiating profile import (EventID: ${eventId}) for: ${profilePackPath} at ${eventTimestamp}`);
-              const fileName = profilePackPath.substring(profilePackPath.lastIndexOf('/') + 1).substring(profilePackPath.lastIndexOf('\\') + 1); // Get file name for toast
-
-              addImportingPath(profilePackPath);
-
-              try {
-                // Set up event listener for progress updates
-                progressUnlisten = await listen<EventPayload>("state_event", (progressEvent) => {
-                  const progressPayload = progressEvent.payload;
-                  if (progressPayload.event_type !== EventType.TaskProgress) return;
-                  if (progressPayload.event_id !== eventId) return;
-
-                  const progress = (progressPayload.progress ?? 0) * 100; // Convert 0-1 to 0-100
-
-                  // Update toast with progress
-                  toast.custom(
-                    () => <ProgressToast message={i18n.t('dragdrop.importing', { fileName })} progress={progress} />,
-                    { id: toastId, duration: Infinity }
-                  );
-                });
-
-                // Show initial progress toast
-                toast.custom(
-                  () => <ProgressToast message={i18n.t('dragdrop.importing', { fileName })} progress={0} />,
-                  { id: toastId, duration: Infinity }
-                );
-
-                const newProfileId = await ProfileService.importProfileByPath(profilePackPath, eventId);
-                console.log(`[DragDrop Hook ${instanceId}] Profile import SUCCESS (EventID: ${eventId}) for: ${profilePackPath} at ${new Date().toISOString()}`);
-
-                // Clean up listener before showing success
-                if (progressUnlisten) {
-                  progressUnlisten();
-                  progressUnlisten = null;
-                }
-
-                toast.success(
-                  i18n.t('dragdrop.import_success', { fileName }),
-                  { id: toastId, duration: 3000 }
-                );
-                useProfileStore.getState().fetchProfiles(); // Fetch profiles after successful import
-
-                // Navigate to the new profile
-                navigate(`/profilesv2/${newProfileId}`);
-              } catch (err) {
-                console.error(`[DragDrop Hook ${instanceId}] Profile import ERROR (EventID: ${eventId}) for: ${profilePackPath} at ${new Date().toISOString()}:`, err);
-                const errorMessage = parseErrorMessage(err);
-
-                // Check for disk space error and provide helpful hint
-                if (errorMessage.toLowerCase().includes("insufficient disk space")) {
-                  toast.error(
-                    `${errorMessage}\n\n${i18n.t('dragdrop.disk_space_tip')}`,
-                    { id: toastId, duration: 8000 }
-                  );
-                } else {
-                  toast.error(
-                    i18n.t('dragdrop.import_failed', { fileName, error: errorMessage }),
-                    { id: toastId }
-                  );
-                }
-              } finally {
-                // Clean up listener
-                if (progressUnlisten) {
-                  progressUnlisten();
-                }
-                removeImportingPath(profilePackPath);
-              }
+              await useImportConfirmStore.getState().requestImport(profilePackPath);
               return;
             }
 
@@ -235,33 +223,14 @@ export function useGlobalDragAndDrop() {
             }
 
             if (currentProfileId && currentContentType) {
-              let relevantFiles: string[] = [];
-              let expectedExtensions: string[] = [];
-              let itemTypeName = currentContentType.toString();
-
-              switch (currentContentType) {
-                case BackendContentType.Mod:
-                  expectedExtensions = ['.jar', '.jar.disabled'];
-                  itemTypeName = 'mods';
-                  break;
-                case BackendContentType.ResourcePack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'resource packs';
-                  break;
-                case BackendContentType.ShaderPack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'shader packs';
-                  break;
-                case BackendContentType.DataPack:
-                  expectedExtensions = ['.zip', '.zip.disabled'];
-                  itemTypeName = 'data packs';
-                  break;
-                default:
-                  toast.error(i18n.t('dragdrop.not_configured', { type: currentContentType }));
-                  return;
+              const expectedExtensions = acceptedContentExtensions(currentContentType);
+              if (!expectedExtensions) {
+                toast.error(i18n.t('dragdrop.not_configured', { type: currentContentType }));
+                return;
               }
+              const itemTypeName = CONTENT_TYPE_LABELS[currentContentType] ?? currentContentType.toString();
 
-              relevantFiles = droppedPaths.filter(path => 
+              const relevantFiles = droppedPaths.filter(path =>
                 expectedExtensions.some(ext => path.toLowerCase().endsWith(ext))
               );
 
@@ -298,8 +267,9 @@ export function useGlobalDragAndDrop() {
             } else {
               toast(i18n.t('dragdrop.drop_hint'));
             }
-          } else if (payload.type === 'cancel') {
-            console.log(`[DragDrop Hook ${instanceId}] File drop cancelled at ${eventTimestamp}`);
+          } else if (payload.type === 'leave') {
+            useAppDragDropStore.getState().setDragHover(null);
+            logInfo(`[DragDrop Hook ${instanceId}] File drop cancelled at ${eventTimestamp}`);
           }
         });
       } catch (error) {

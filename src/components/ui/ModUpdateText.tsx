@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import type { UnifiedVersion } from "../../types/unified";
 
 interface ModUpdateTextProps {
@@ -25,19 +26,34 @@ export function ModUpdateText({
   modpackOrigin,
   updatesEnabled
 }: ModUpdateTextProps) {
+  const { t } = useTranslation();
+  const isPlatformPack = modpackOrigin?.startsWith('modrinth:') || modpackOrigin?.startsWith('curseforge:');
+
+  const versionTarget = (
+    <>
+      {t('content.update.update_to_version')}{" "}
+      <span className="text-white font-medium">{updateVersion.version_number}</span>
+      {currentVersion && (
+        <span className="text-gray-500">
+          {" "}{t('content.update.from_version', { version: currentVersion })}
+        </span>
+      )}
+    </>
+  );
+
   // Handle different cases based on modpack origin and update settings
   if (isFromModPack && updatesEnabled !== true) {
     return (
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center gap-2">
           <Icon
-            icon="solar:package-bold-duotone"
+            icon="solar:box-bold-duotone"
             className="w-4 h-4 text-purple-400 flex-shrink-0"
           />
           <span className="text-sm font-semibold text-purple-300">
-            {modpackOrigin?.startsWith('modrinth:') || modpackOrigin?.startsWith('curseforge:')
-              ? 'ModPack Mod'
-              : 'Managed Mod'}
+            {isPlatformPack
+              ? t('content.update.modpack_mod')
+              : t('content.update.managed_mod')}
           </span>
         </div>
 
@@ -49,12 +65,12 @@ export function ModUpdateText({
             />
             <div>
               <p className="font-medium text-yellow-300">
-                Automatic Update Checks Disabled
+                {t('content.update.checks_disabled_title')}
               </p>
               <p className="text-gray-400 leading-relaxed">
-                {modpackOrigin?.startsWith('modrinth:') || modpackOrigin?.startsWith('curseforge:')
-                  ? 'This mod is part of a modpack. Individual update checks are disabled to prevent breaking changes and compatibility issues.'
-                  : 'This mod is managed externally. Individual update checks are disabled to prevent conflicts.'}
+                {isPlatformPack
+                  ? t('content.update.disabled_modpack_desc')
+                  : t('content.update.disabled_managed_desc')}
               </p>
             </div>
           </div>
@@ -66,18 +82,11 @@ export function ModUpdateText({
             />
             <div>
               <p className="font-medium text-blue-300">
-                Manual Update Available
+                {t('content.update.manual_available_title')}
               </p>
               <p className="text-gray-400 leading-relaxed">
-                You can still update this mod manually if you know what you're doing.
-                Update to version <span className="text-white font-medium">
-                  {updateVersion.version_number}
-                </span>
-                {currentVersion && (
-                  <span className="text-gray-500">
-                    {" "}from {currentVersion}
-                  </span>
-                )}
+                {t('content.update.manual_available_desc')}{" "}
+                {versionTarget}
               </p>
             </div>
           </div>
@@ -94,7 +103,7 @@ export function ModUpdateText({
             className="w-4 h-4 text-gray-400 flex-shrink-0"
           />
           <span className="text-sm font-semibold text-gray-300">
-            Update Available
+            {t('content.update.available')}
           </span>
         </div>
 
@@ -106,12 +115,10 @@ export function ModUpdateText({
             />
             <div>
               <p className="font-medium text-yellow-300">
-                Update Checks Disabled
+                {t('content.update.checks_disabled_short_title')}
               </p>
               <p className="text-gray-400 leading-relaxed">
-                An update is available for this mod ({updateVersion.version_number})
-                but automatic update checks are disabled.
-                Enable update checks to allow automatic updates.
+                {t('content.update.disabled_regular_desc', { version: updateVersion.version_number })}
               </p>
             </div>
           </div>
@@ -128,7 +135,7 @@ export function ModUpdateText({
           className="w-4 h-4 text-green-400 flex-shrink-0"
         />
         <span className="text-sm font-semibold text-green-300">
-          Update Available
+          {t('content.update.available')}
         </span>
       </div>
 
@@ -140,18 +147,11 @@ export function ModUpdateText({
           />
           <div>
             <p className="font-medium text-green-300">
-              Ready to Update
+              {t('content.update.ready_title')}
             </p>
               <p className="text-gray-400 leading-relaxed">
-                This standalone mod can be automatically updated.
-                Update to version <span className="text-white font-medium">
-                  {updateVersion.version_number}
-                </span>
-                {currentVersion && (
-                  <span className="text-gray-500">
-                    {" "}from {currentVersion}
-                  </span>
-                )}
+                {t('content.update.ready_desc')}{" "}
+                {versionTarget}
               </p>
           </div>
         </div>

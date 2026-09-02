@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useTranslation } from "react-i18next";
@@ -23,8 +24,17 @@ import {
   fetchTesterQueueCount,
   openTesterWindow,
 } from "../../services/tester-service";
+import {
+  listProfileBackups,
+  restoreProfileBackup,
+  type ProfileBackupInfo,
+} from "../../services/profile-service";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useProfileStore } from "../../store/profile-store";
+import { useContentCacheStore } from "../../store/content-cache-store";
+import { SettingsSection } from "../ui/settings/SettingsSection";
 
-type DebugTab =
+export type DebugTab =
   | "launcher"
   | "minecraft"
   | "process"
@@ -32,76 +42,76 @@ type DebugTab =
   | "permissions"
   | "testing";
 
-export function DebugSection() {
+export function getDebugTabs(
+  t: (key: string) => string,
+): { id: DebugTab; label: string }[] {
+  return [
+    { id: "launcher", label: t("debug.tabs.launcher") },
+    { id: "minecraft", label: t("debug.tabs.minecraft") },
+    { id: "process", label: t("debug.tabs.process") },
+    { id: "crashes", label: t("debug.tabs.crashes") },
+    { id: "permissions", label: t("debug.permissions.tab") },
+    { id: "testing", label: t("debug.tabs.testing") },
+  ];
+}
+
+function getErrorMessage(e: unknown): string {
+  if (e && typeof e === "object" && "message" in e) {
+    return (e as { message: string }).message;
+  }
+  return String(e);
+}
+
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return "-";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatDate = (timestamp: number) => {
+  if (timestamp === 0) return "-";
+  return new Date(timestamp * 1000).toLocaleString();
+};
+
+interface LogFileSectionProps {
+  id: DebugTab;
+  title: string;
+  icon: string;
+  crash?: boolean;
+  loader: () => Promise<FileInfo[]>;
+}
+
+function LogFileSection({
+  id,
+  title,
+  icon,
+  crash,
+  loader,
+}: LogFileSectionProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<DebugTab>("launcher");
   const [files, setFiles] = useState<FileInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<PermissionCacheState | null>(
-    null,
-  );
-  const [refreshingPerms, setRefreshingPerms] = useState(false);
 
-  // Load files when tab changes
   useEffect(() => {
-    if (activeTab === "permissions") {
-      getCachedPermissions()
-        .then(setPermissions)
-        .catch(() => setPermissions(null));
-    } else if (activeTab === "testing") {
-      // no auto-load; user triggers actions manually
-    } else {
-      loadFiles();
-    }
-  }, [activeTab]);
-
-  async function loadFiles() {
-    setLoading(true);
-    try {
-      if (activeTab === "launcher") {
-        const logs = await listLauncherLogs();
-        setFiles(logs);
-      } else if (activeTab === "minecraft") {
-        const logs = await listAllMcLogs();
-        setFiles(logs);
-      } else if (activeTab === "process") {
-        const logs = await listProcessLogs();
-        setFiles(logs);
-      } else if (activeTab === "crashes") {
-        const crashes = await listCrashReports();
-        setFiles(crashes);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const f = await loader();
+        if (!cancelled) setFiles(f);
+      } catch (e) {
+        console.error("Failed to load files:", e);
+        if (!cancelled) setFiles([]);
       }
-    } catch (e) {
-      console.error("Failed to load files:", e);
-      setFiles([]);
-    }
-    setLoading(false);
-  }
-
-  async function handleRefreshPermissions() {
-    setRefreshingPerms(true);
-    try {
-      await refreshPermissions();
-      const cached = await getCachedPermissions();
-      setPermissions(cached);
-      toast.success(t("debug.permissions.refreshed"));
-    } catch (e) {
-      console.error("Failed to refresh permissions:", e);
-      toast.error(
-        t("debug.permissions.refresh_failed", { error: getErrorMessage(e) }),
-      );
-    }
-    setRefreshingPerms(false);
-  }
-
-  // Helper to extract error message from Tauri CommandError or any error
-  function getErrorMessage(e: unknown): string {
-    if (e && typeof e === "object" && "message" in e) {
-      return (e as { message: string }).message;
-    }
-    return String(e);
-  }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleUpload(file: FileInfo) {
     setUploadingFile(file.path);
@@ -128,62 +138,21 @@ export function DebugSection() {
     }
   }
 
-  const groups: GroupTab[] = [
-    { id: "launcher", name: "Launcher Logs", count: 0 },
-    { id: "minecraft", name: "MC Logs", count: 0 },
-    { id: "process", name: "Process Logs", count: 0 },
-    { id: "crashes", name: "Crash Reports", count: 0 },
-    {
-      id: "permissions",
-      name: t("debug.permissions.tab"),
-      count: permissions?.nodes.length ?? 0,
-    },
-    { id: "testing", name: "TESTING", count: 0 },
-  ];
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "-";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const formatDate = (timestamp: number) => {
-    if (timestamp === 0) return "-";
-    return new Date(timestamp * 1000).toLocaleString();
-  };
-
   return (
-    <div className="space-y-4">
-      <GroupTabs
-        groups={groups}
-        activeGroup={activeTab}
-        onGroupChange={(id) => setActiveTab(id as DebugTab)}
-        showAddButton={false}
-      />
-
-      {activeTab === "testing" ? (
-        <TestingPanel />
-      ) : activeTab === "permissions" ? (
-        <PermissionsList
-          permissions={permissions}
-          refreshing={refreshingPerms}
-          onRefresh={handleRefreshPermissions}
-        />
-      ) : (
-        /* File List */
+    <SettingsSection id={`settings-section-${id}`} title={title} icon={icon}>
+      <div className="py-2">
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-white/50">
               <Icon
-                icon="solar:refresh-bold"
-                className="w-6 h-6 animate-spin mx-auto mb-2"
+                icon="svg-spinners:ring-resize"
+                className="w-6 h-6 mx-auto mb-2"
               />
-              Loading...
+              {t("common.loading")}
             </div>
           ) : files.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">
-              No files found
+            <div className="p-8 text-center text-white/50 font-minecraft">
+              {t("debug.no_files")}
             </div>
           ) : (
             <div className="divide-y divide-white/10">
@@ -194,14 +163,14 @@ export function DebugSection() {
                 >
                   <Icon
                     icon={
-                      activeTab === "crashes"
+                      crash
                         ? "solar:danger-triangle-bold"
                         : "solar:document-text-bold"
                     }
-                    className={`w-5 h-5 flex-shrink-0 ${activeTab === "crashes" ? "text-red-400" : "text-white/60"}`}
+                    className={`w-5 h-5 flex-shrink-0 ${crash ? "text-red-400" : "text-white/60"}`}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-white font-minecraft-ten truncate">
+                    <div className="text-white font-minecraft truncate">
                       {file.name}
                     </div>
                     <div className="text-xs text-white/40 font-sans truncate">
@@ -214,7 +183,6 @@ export function DebugSection() {
                   <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
                     {formatDate(file.modified)}
                   </div>
-                  {/* Action Buttons */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleCopyContent(file)}
@@ -234,8 +202,8 @@ export function DebugSection() {
                     >
                       {uploadingFile === file.path ? (
                         <Icon
-                          icon="solar:refresh-bold"
-                          className="w-4 h-4 text-white/70 animate-spin"
+                          icon="svg-spinners:ring-resize"
+                          className="w-4 h-4 text-white/70"
                         />
                       ) : (
                         <Icon
@@ -250,7 +218,91 @@ export function DebugSection() {
             </div>
           )}
         </div>
-      )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+export function DebugSection() {
+  const { t } = useTranslation();
+  const [permissions, setPermissions] = useState<PermissionCacheState | null>(
+    null,
+  );
+  const [refreshingPerms, setRefreshingPerms] = useState(false);
+
+  useEffect(() => {
+    getCachedPermissions()
+      .then(setPermissions)
+      .catch(() => setPermissions(null));
+  }, []);
+
+  async function handleRefreshPermissions() {
+    setRefreshingPerms(true);
+    try {
+      await refreshPermissions();
+      const cached = await getCachedPermissions();
+      setPermissions(cached);
+      toast.success(t("debug.permissions.refreshed"));
+    } catch (e) {
+      console.error("Failed to refresh permissions:", e);
+      toast.error(
+        t("debug.permissions.refresh_failed", { error: getErrorMessage(e) }),
+      );
+    }
+    setRefreshingPerms(false);
+  }
+
+  return (
+    <div className="space-y-6">
+      <LogFileSection
+        id="launcher"
+        title={t("debug.tabs.launcher")}
+        icon="solar:document-text-bold"
+        loader={listLauncherLogs}
+      />
+      <LogFileSection
+        id="minecraft"
+        title={t("debug.tabs.minecraft")}
+        icon="solar:document-text-bold"
+        loader={listAllMcLogs}
+      />
+      <LogFileSection
+        id="process"
+        title={t("debug.tabs.process")}
+        icon="solar:document-text-bold"
+        loader={listProcessLogs}
+      />
+      <LogFileSection
+        id="crashes"
+        title={t("debug.tabs.crashes")}
+        icon="solar:danger-triangle-bold"
+        crash
+        loader={listCrashReports}
+      />
+
+      <SettingsSection
+        id="settings-section-permissions"
+        title={t("debug.permissions.tab")}
+        icon="solar:shield-keyhole-bold"
+      >
+        <div className="py-2">
+          <PermissionsList
+            permissions={permissions}
+            refreshing={refreshingPerms}
+            onRefresh={handleRefreshPermissions}
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        id="settings-section-testing"
+        title={t("debug.tabs.testing")}
+        icon="solar:test-tube-bold"
+      >
+        <div className="py-2">
+          <TestingPanel />
+        </div>
+      </SettingsSection>
     </div>
   );
 }
@@ -263,13 +315,67 @@ interface ModCacheCleanupStats {
   skipped_empty_keepset: boolean;
 }
 
+interface CacheClearStats {
+  rows_deleted: number;
+  bytes_before: number;
+  bytes_after: number;
+}
+
 function TestingPanel() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [filenames, setFilenames] = useState<string[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanStats, setCleanStats] = useState<ModCacheCleanupStats | null>(
     null,
   );
+  const [clearingCache, setClearingCache] = useState(false);
+  const [backups, setBackups] = useState<ProfileBackupInfo[] | null>(null);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [restoringPath, setRestoringPath] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const fetchProfiles = useProfileStore((s) => s.fetchProfiles);
+
+  async function loadBackups() {
+    setLoadingBackups(true);
+    try {
+      const result = await listProfileBackups();
+      setBackups(result);
+    } catch (e) {
+      console.error("Failed to list profile backups:", e);
+      toast.error(t("settings.backups.load_failed", { error: String(e) }));
+    }
+    setLoadingBackups(false);
+  }
+
+  async function handleRestore(backup: ProfileBackupInfo) {
+    const date = new Date(backup.backup_time * 1000).toLocaleString();
+    const ok = await confirm({
+      title: t("settings.backups.restore_confirm_title"),
+      message: t("settings.backups.restore_confirm_message", {
+        date,
+        count: backup.profile_count,
+      }),
+      confirmText: t("settings.backups.restore"),
+      cancelText: t("common.cancel"),
+      type: "warning",
+      fullscreen: true,
+    });
+    if (!ok) return;
+    setRestoringPath(backup.path);
+    try {
+      await restoreProfileBackup(backup.path);
+      await fetchProfiles();
+      await loadBackups();
+      toast.success(
+        t("settings.backups.restored", { count: backup.profile_count, date }),
+      );
+    } catch (e) {
+      console.error("Failed to restore profile backup:", e);
+      toast.error(t("settings.backups.restore_failed", { error: String(e) }));
+    }
+    setRestoringPath(null);
+  }
 
   async function runExpectedCacheFilenames() {
     setLoading(true);
@@ -279,11 +385,11 @@ function TestingPanel() {
       );
       setFilenames(result);
       toast.success(
-        `Keep-set: ${result.length} filenames (also dumped to launcher log)`,
+        t("debug.testing.keepset_result", { count: result.length }),
       );
     } catch (e) {
       console.error("Failed to list expected cache filenames:", e);
-      toast.error(`Failed: ${String(e)}`);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setLoading(false);
   }
@@ -296,20 +402,59 @@ function TestingPanel() {
       );
       setCleanStats(stats);
       if (stats.skipped_empty_keepset) {
-        toast.error(
-          "Skipped: keep-set empty (config not loaded) — nothing deleted",
-        );
+        toast.error(t("debug.testing.clean_skipped"));
       } else {
         const mb = (stats.freed_bytes / (1024 * 1024)).toFixed(1);
         toast.success(
-          `Removed ${stats.deleted.length} orphans, freed ${mb} MB`,
+          t("debug.testing.clean_result", { count: stats.deleted.length, mb }),
         );
       }
     } catch (e) {
       console.error("Failed to clean mod_cache:", e);
-      toast.error(`Failed: ${String(e)}`);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setCleaning(false);
+  }
+
+  async function runClearContentCache() {
+    const ok = await confirm({
+      title: t("debug.testing.clear_cache_confirm_title"),
+      message: t("debug.testing.clear_cache_confirm_message"),
+      confirmText: t("debug.testing.clear_cache"),
+      cancelText: t("common.cancel"),
+      type: "warning",
+      fullscreen: true,
+    });
+    if (!ok) return;
+
+    setClearingCache(true);
+    try {
+      const stats = await invoke<CacheClearStats>(
+        "clear_content_cache_command",
+      );
+
+      useContentCacheStore.setState({
+        entries: {},
+        modpackVersions: {},
+        modrinthTags: null,
+        diskSizes: {},
+      });
+
+      const mb = (
+        (stats.bytes_before - stats.bytes_after) /
+        (1024 * 1024)
+      ).toFixed(1);
+      toast.success(
+        t("debug.testing.clear_cache_result", {
+          count: stats.rows_deleted,
+          mb,
+        }),
+      );
+    } catch (e) {
+      console.error("Failed to clear the content cache:", e);
+      toast.error(t("debug.testing.failed", { error: String(e) }));
+    }
+    setClearingCache(false);
   }
 
   return (
@@ -320,37 +465,36 @@ function TestingPanel() {
           className="w-5 h-5 text-amber-300 shrink-0"
         />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">
-            mod_cache keep-set
+          <div className="text-white font-minecraft">
+            {t("debug.testing.keepset_title")}
           </div>
           <div className="text-xs text-white/40 font-sans truncate">
-            Every filename any profile/pack could place in mod_cache (step 1 of
-            cache cleanup)
+            {t("debug.testing.keepset_desc")}
           </div>
         </div>
         <button
           onClick={runExpectedCacheFilenames}
           disabled={loading}
-          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
           title="Run debug_list_expected_cache_filenames"
         >
           {loading ? (
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
           ) : (
             <Icon icon="solar:play-bold" className="w-4 h-4" />
           )}
-          Run
+          {t("debug.testing.run")}
         </button>
       </div>
 
       {filenames !== null && (
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
-            {filenames.length} filenames
+            {t("debug.testing.filenames_count", { count: filenames.length })}
           </div>
           {filenames.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft-ten">
-              Empty
+            <div className="p-8 text-center text-white/50 font-minecraft">
+              {t("debug.testing.empty")}
             </div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
@@ -373,38 +517,71 @@ function TestingPanel() {
           className="w-5 h-5 text-red-300 shrink-0"
         />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">Clean mod_cache</div>
+          <div className="text-white font-minecraft">
+            {t("debug.testing.clean_title")}
+          </div>
           <div className="text-xs text-white/40 font-sans truncate">
-            Delete cached jars not in the keep-set (orphans = stale/unused
-            versions)
+            {t("debug.testing.clean_desc")}
           </div>
         </div>
         <button
           onClick={runCleanModCache}
           disabled={cleaning}
-          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
           title="Run clean_mod_cache_command"
         >
           {cleaning ? (
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
           ) : (
             <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           )}
-          Clean
+          {t("debug.testing.clean")}
+        </button>
+      </div>
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon
+          icon="solar:database-bold"
+          className="w-5 h-5 text-red-300 shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft">
+            {t("debug.testing.clear_cache_title")}
+          </div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            {t("debug.testing.clear_cache_desc")}
+          </div>
+        </div>
+        <button
+          onClick={runClearContentCache}
+          disabled={clearingCache}
+          className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run clear_content_cache_command"
+        >
+          {clearingCache ? (
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+          ) : (
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+          )}
+          {t("debug.testing.clear_cache")}
         </button>
       </div>
 
       {cleanStats !== null && (
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
           <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
-            scanned {cleanStats.scanned} · deleted {cleanStats.deleted.length} ·
-            failed {cleanStats.failed.length} · freed{" "}
-            {(cleanStats.freed_bytes / (1024 * 1024)).toFixed(1)} MB
-            {cleanStats.skipped_empty_keepset && " · SKIPPED (empty keep-set)"}
+            {t("debug.testing.stats", {
+              scanned: cleanStats.scanned,
+              deleted: cleanStats.deleted.length,
+              failed: cleanStats.failed.length,
+              mb: (cleanStats.freed_bytes / (1024 * 1024)).toFixed(1),
+            })}
+            {cleanStats.skipped_empty_keepset &&
+              t("debug.testing.stats_skipped")}
           </div>
           {cleanStats.deleted.length === 0 ? (
-            <div className="p-6 text-center text-white/50 font-minecraft-ten">
-              No orphans
+            <div className="p-6 text-center text-white/50 font-minecraft">
+              {t("debug.testing.no_orphans")}
             </div>
           ) : (
             <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
@@ -420,6 +597,89 @@ function TestingPanel() {
           )}
         </div>
       )}
+
+      <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
+        <Icon
+          icon="solar:history-bold"
+          className="w-5 h-5 text-emerald-300 shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-minecraft">
+            {t("settings.backups.title")}
+          </div>
+          <div className="text-xs text-white/40 font-sans truncate">
+            {t("settings.backups.description")}
+          </div>
+        </div>
+        <button
+          onClick={loadBackups}
+          disabled={loadingBackups}
+          className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          title="Run list_profile_backups"
+        >
+          {loadingBackups ? (
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+          ) : (
+            <Icon icon="solar:list-bold" className="w-4 h-4" />
+          )}
+          {t("settings.backups.load")}
+        </button>
+      </div>
+
+      {backups !== null && (
+        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+          <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+            {t("settings.backups.count", { count: backups.length })}
+          </div>
+          {backups.length === 0 ? (
+            <div className="p-8 text-center text-white/50 font-minecraft">
+              {t("settings.backups.empty")}
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+              {backups.map((b) => (
+                <div
+                  key={b.path}
+                  className="p-3 px-4 hover:bg-white/5 flex items-center gap-4"
+                >
+                  <Icon
+                    icon="solar:archive-bold"
+                    className="w-5 h-5 text-white/50 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-minecraft truncate">
+                      {new Date(b.backup_time * 1000).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-white/40 font-sans truncate">
+                      {t("settings.backups.meta", {
+                        count: b.profile_count,
+                        size: (b.file_size / 1024).toFixed(1),
+                      })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(b)}
+                    disabled={restoringPath !== null}
+                    className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {restoringPath === b.path ? (
+                      <Icon
+                        icon="svg-spinners:ring-resize"
+                        className="w-4 h-4"
+                      />
+                    ) : (
+                      <Icon icon="solar:restart-bold" className="w-4 h-4" />
+                    )}
+                    {t("settings.backups.restore")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmDialog}
     </div>
   );
 }
@@ -461,7 +721,7 @@ function PermissionsList({
       await openTesterWindow();
     } catch (e) {
       console.error("Failed to open tester window:", e);
-      toast.error(`Failed to open tester window: ${String(e)}`);
+      toast.error(t("debug.testing.tester_open_failed", { error: String(e) }));
     } finally {
       setOpening(false);
     }
@@ -475,7 +735,7 @@ function PermissionsList({
           className="w-5 h-5 text-white/60 shrink-0"
         />
         <div className="flex-1 min-w-0">
-          <div className="text-white font-minecraft-ten">
+          <div className="text-white font-minecraft">
             {t("debug.permissions.count", { n: nodes.length })}
           </div>
           {lastFetched && (
@@ -504,37 +764,36 @@ function PermissionsList({
             className="w-5 h-5 text-amber-300 shrink-0"
           />
           <div className="flex-1 min-w-0">
-            <div className="text-white font-minecraft-ten">Tester Queue</div>
+            <div className="text-white font-minecraft">
+              {t("debug.testing.tester_queue")}
+            </div>
             <div className="text-xs text-white/40 font-sans truncate">
               {queueCount === null
-                ? "Click to open the tester window"
+                ? t("debug.testing.tester_open_hint")
                 : queueCount === 0
-                  ? "All caught up — open anyway"
-                  : `${queueCount} issue${queueCount === 1 ? "" : "s"} waiting on you`}
+                  ? t("debug.testing.tester_caught_up")
+                  : t("debug.testing.tester_waiting", { count: queueCount })}
             </div>
           </div>
           <button
             onClick={handleOpenTester}
             disabled={opening}
-            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft-ten text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-            title="Open tester window"
+            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+            title={t("debug.testing.tester_open_title")}
           >
             {opening ? (
-              <Icon
-                icon="solar:refresh-bold"
-                className="w-4 h-4 animate-spin"
-              />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
             ) : (
               <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
             )}
-            Open
+            {t("debug.testing.tester_open")}
           </button>
         </div>
       )}
 
       <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
         {nodes.length === 0 ? (
-          <div className="p-8 text-center text-white/50 font-minecraft-ten">
+          <div className="p-8 text-center text-white/50 font-minecraft">
             {t("debug.permissions.empty")}
           </div>
         ) : (

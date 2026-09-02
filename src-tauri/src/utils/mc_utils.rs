@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::AssetIndex;
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
 use async_compression::tokio::bufread::GzipDecoder;
 // Import the Engine trait for encode/decode methods
@@ -417,8 +417,7 @@ pub async fn try_reuse_minecraft_assets_with_progress(
         let progress_counter = Arc::new(AtomicUsize::new(0));
         let total_count = objects.len();
 
-        // Batch size for progress updates - update every 5% or 100 files, whichever is smaller
-        let update_batch = (total_count / 20).max(1).min(100);
+        let progress_throttle = ProgressThrottle::new(100);
 
         for (asset_name, object) in objects {
             if let (Some(hash), Some(size)) = (
@@ -460,22 +459,23 @@ pub async fn try_reuse_minecraft_assets_with_progress(
                                 // Update progress counter
                                 let progress = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
-                                // Report progress periodically
-                                if let Some(state_ref) = &state {
-                                    let percent_complete = progress as f64 / total_count as f64;
-                                    let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
+                                                if let Some(state_ref) = &state {
+                                    if progress_throttle.should_emit() {
+                                        let percent_complete = progress as f64 / total_count as f64;
+                                        let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
 
-                                    emit_reuse_progress(
-                                        state_ref,
-                                        profile_id,
-                                        &format!(
-                                            "Reusing Minecraft assets: {}/{} files processed",
-                                            progress, total_count
-                                        ),
-                                        scaled_progress,
-                                        None,
-                                    )
-                                    .await?;
+                                        emit_reuse_progress(
+                                            state_ref,
+                                            profile_id,
+                                            &format!(
+                                                "Reusing Minecraft assets: {}/{} files processed",
+                                                progress, total_count
+                                            ),
+                                            scaled_progress,
+                                            None,
+                                        )
+                                        .await?;
+                                    }
                                 }
 
                                 continue;
@@ -513,22 +513,23 @@ pub async fn try_reuse_minecraft_assets_with_progress(
                 // Update progress counter
                 let progress = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
-                // Report progress periodically
                 if let Some(state_ref) = &state {
-                    let percent_complete = progress as f64 / total_count as f64;
-                    let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
+                    if progress_throttle.should_emit() {
+                        let percent_complete = progress as f64 / total_count as f64;
+                        let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
 
-                    emit_reuse_progress(
-                        state_ref,
-                        profile_id,
-                        &format!(
-                            "Reusing Minecraft assets: {}/{} files processed",
-                            progress, total_count
-                        ),
-                        scaled_progress,
-                        None,
-                    )
-                    .await?;
+                        emit_reuse_progress(
+                            state_ref,
+                            profile_id,
+                            &format!(
+                                "Reusing Minecraft assets: {}/{} files processed",
+                                progress, total_count
+                            ),
+                            scaled_progress,
+                            None,
+                        )
+                        .await?;
+                    }
                 }
             }
         }

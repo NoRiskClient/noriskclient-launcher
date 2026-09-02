@@ -64,7 +64,10 @@ async fn handle_auth_bridge(app_handle: &AppHandle, url: &Url) {
         }
     };
 
-    info!("[DeepLink] Auth bridge request with sessionId: {}", session_id);
+    info!(
+        "[DeepLink] Auth bridge request with sessionId: {}",
+        crate::utils::security_utils::mask_identifier(&session_id)
+    );
 
     // Check if user is logged in
     let state = match State::get().await {

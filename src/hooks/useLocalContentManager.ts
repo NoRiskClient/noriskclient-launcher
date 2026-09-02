@@ -1,22 +1,56 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'react-hot-toast';
-import i18n from '../i18n/i18n';
-import type { Profile, LocalContentItem as ProfileLocalContentItem, GenericModrinthInfo as ProfileGenericModrinthInfo, LoadItemsParams } from '../types/profile';
-import type { ModrinthVersion, ModrinthBulkUpdateRequestBody, ModrinthHashAlgorithm, ResourcePackModrinthInfo, ShaderPackModrinthInfo, DataPackModrinthInfo } from '../types/modrinth';
-import type { UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersion } from '../types/unified';
-import { ModPlatform } from '../types/unified';
-import { ContentType as NrContentType } from '../types/content';
-import type { ToggleContentPayload, UninstallContentPayload, SwitchContentVersionPayload } from '../types/content';
-import { ModrinthService } from '../services/modrinth-service';
-import { CurseForgeService } from '../services/curseforge-service';
-import UnifiedService from '../services/unified-service';
-import { getLocalContent } from '../services/profile-service';
-import { toggleContentFromProfile, uninstallContentFromProfile, switchContentVersion, toggleModUpdates, bulkToggleModUpdates } from '../services/content-service';
-import { openPath } from '@tauri-apps/plugin-opener';
-import { revealItemInDir } from '../utils/opener-utils';
-import { getUpdateIdentifier, getContentPlatform } from '../utils/update-identifier-utils';
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "react-hot-toast";
+import i18n from "../i18n/i18n";
+import type {
+  Profile,
+  LocalContentItem as ProfileLocalContentItem,
+  LoadItemsParams,
+  CacheBehaviour,
+} from "../types/profile";
+import type {
+  ModrinthVersion,
+  ModrinthBulkUpdateRequestBody,
+  ModrinthHashAlgorithm,
+  ResourcePackModrinthInfo,
+  ShaderPackModrinthInfo,
+  DataPackModrinthInfo,
+} from "../types/modrinth";
+import type {
+  UnifiedUpdateCheckRequest,
+  UnifiedUpdateCheckResponse,
+  UnifiedVersion,
+} from "../types/unified";
+import { ModPlatform } from "../types/unified";
+import { ContentType as NrContentType } from "../types/content";
+import type {
+  ToggleContentPayload,
+  UninstallContentPayload,
+  SwitchContentVersionPayload,
+} from "../types/content";
+import { ModrinthService } from "../services/modrinth-service";
+import { CurseForgeService } from "../services/curseforge-service";
+import UnifiedService from "../services/unified-service";
+import { getLocalContent } from "../services/profile-service";
+import {
+  toggleContentFromProfile,
+  uninstallContentFromProfile,
+  switchContentVersion,
+  toggleModUpdates,
+  bulkToggleModUpdates,
+} from "../services/content-service";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { revealItemInDir } from "../utils/opener-utils";
+import {
+  getUpdateIdentifier,
+  getContentPlatform,
+} from "../utils/update-identifier-utils";
 import { parseErrorMessage } from "../utils/error-utils";
+import {
+  contentCacheKey,
+  useContentCacheStore,
+} from "../store/content-cache-store";
+import { archiveIconKey, useIconCacheStore } from "../store/icon-cache-store";
 
 // Base type for content items managed by this hook - maps to ProfileLocalContentItem
 // We'll use ProfileLocalContentItem directly or ensure T extends it.
@@ -30,7 +64,12 @@ export interface LocalContentItem extends ProfileLocalContentItem {
 }
 
 // Enum for the types of content this hook can manage (used for UI/logic, maps to NrContentType for backend)
-export type LocalContentType = 'ShaderPack' | 'ResourcePack' | 'DataPack' | 'Mod' | 'NoRiskMod';
+export type LocalContentType =
+  | "ShaderPack"
+  | "ResourcePack"
+  | "DataPack"
+  | "Mod"
+  | "NoRiskMod";
 
 interface UseLocalContentManagerProps<T extends LocalContentItem> {
   profile?: Profile;
@@ -42,8 +81,8 @@ interface UseLocalContentManagerProps<T extends LocalContentItem> {
 interface UseLocalContentManagerReturn<T extends LocalContentItem> {
   items: T[];
   isLoading: boolean;
+  isRevalidating: boolean;
   isFetchingHashes: boolean;
-  isFetchingModrinthDetails: boolean;
   isAnyTaskRunning: boolean;
   error: string | null;
   searchQuery: string;
@@ -69,14 +108,10 @@ interface UseLocalContentManagerReturn<T extends LocalContentItem> {
   handleCloseDeleteDialog: () => void;
   itemToDeleteForDialog: T | null;
 
-  modrinthIcons: Record<string, string | null>;
-  curseforgeIcons: Record<string, string | null>;
-  localArchiveIcons: Record<string, string | null>;
-
   getItemIcon: (item: T) => string | null;
   getItemPlatformDisplayName: (item: T) => string;
 
-  contentUpdates: Record<string, UnifiedVersion | null>;
+  contentUpdates: Record<string, UnifiedVersion>;
   isCheckingUpdates: boolean;
   itemsBeingUpdated: Set<string>;
   contentUpdateError: string | null;
@@ -92,30 +127,50 @@ interface UseLocalContentManagerReturn<T extends LocalContentItem> {
   handleBatchDeleteSelected: () => void;
   handleOpenItemFolder: (item: T) => void;
 
-  checkForContentUpdates: (currentProfile?: Profile, currentItems?: T[]) => Promise<void>;
-  handleUpdateContentItem: (item: T, updateVersion: UnifiedVersion, suppressOwnToast?: boolean) => Promise<void>;
+  checkForContentUpdates: (
+    currentProfile?: Profile,
+    currentItems?: T[],
+  ) => Promise<void>;
+  handleUpdateContentItem: (
+    item: T,
+    updateVersion: UnifiedVersion,
+    suppressOwnToast?: boolean,
+  ) => Promise<void>;
   handleUpdateAllAvailableContent: () => Promise<void>;
-  handleSwitchContentVersion: (item: T, newVersion: UnifiedVersion) => Promise<void>;
+  handleSwitchContentVersion: (
+    item: T,
+    newVersion: UnifiedVersion,
+  ) => Promise<void>;
 
   // Mod update toggle methods
   handleToggleItemUpdatesEnabled: (item: T) => Promise<void>;
-  handleBatchToggleSelectedUpdatesEnabled: (updatesEnabled: boolean) => Promise<void>;
+  handleBatchToggleSelectedUpdatesEnabled: (
+    updatesEnabled: boolean,
+  ) => Promise<void>;
 }
 
 // Helper to map LocalContentType (UI string) to NrContentType (backend enum string)
 function mapUiContentTypeToBackend(uiType: LocalContentType): NrContentType {
   switch (uiType) {
-    case 'ResourcePack': return NrContentType.ResourcePack;
-    case 'ShaderPack': return NrContentType.ShaderPack;
-    case 'DataPack': return NrContentType.DataPack;
-    case 'Mod': return NrContentType.Mod;
-    case 'NoRiskMod': return NrContentType.NoRiskMod;
-    default: throw new Error(`Unsupported UI content type: ${uiType}`);
+    case "ResourcePack":
+      return NrContentType.ResourcePack;
+    case "ShaderPack":
+      return NrContentType.ShaderPack;
+    case "DataPack":
+      return NrContentType.DataPack;
+    case "Mod":
+      return NrContentType.Mod;
+    case "NoRiskMod":
+      return NrContentType.NoRiskMod;
+    default:
+      throw new Error(`Unsupported UI content type: ${uiType}`);
   }
 }
 
 // Helper to map backend ProfileLocalContentItem to frontend T (which extends LocalContentItem)
-function mapBackendItemToFrontendType<T extends LocalContentItem>(rawItem: ProfileLocalContentItem): T {
+function mapBackendItemToFrontendType<T extends LocalContentItem>(
+  rawItem: ProfileLocalContentItem,
+): T {
   // rawItem is typed as ProfileLocalContentItem (from types/profile.ts)
   // It has fields like: filename, path_str, ..., norisk_identifier, fallback_version
   // The actual object from Rust via invoke might have `norisk_info` field instead of `norisk_identifier` being populated.
@@ -134,12 +189,16 @@ function mapBackendItemToFrontendType<T extends LocalContentItem>(rawItem: Profi
 function createUninstallPayload<T extends LocalContentItem>(
   item: T,
   profileId: string,
-  uiContentType: LocalContentType
+  uiContentType: LocalContentType,
 ): UninstallContentPayload | null {
-  if (uiContentType === 'Mod') {
+  if (uiContentType === "Mod") {
     if (item.source_type === "custom") {
       if (!item.path) {
-        toast.error(i18n.t('content_manager.errors.custom_mod_missing_path_uninstall', { filename: item.filename }));
+        toast.error(
+          i18n.t("content_manager.errors.custom_mod_missing_path_uninstall", {
+            filename: item.filename,
+          }),
+        );
         return null;
       }
       return { profile_id: profileId, file_path: item.path };
@@ -147,24 +206,49 @@ function createUninstallPayload<T extends LocalContentItem>(
       // For Modrinth or other non-custom mods, require SHA1 for uninstallation
       // as this is likely used to remove it from the profile's mod list as well.
       if (!item.sha1_hash) {
-        toast.error(i18n.t('content_manager.errors.mod_missing_sha1_uninstall', { filename: item.filename }));
+        toast.error(
+          i18n.t("content_manager.errors.mod_missing_sha1_uninstall", {
+            filename: item.filename,
+          }),
+        );
         return null;
       }
-      return { profile_id: profileId, sha1_hash: item.sha1_hash, content_type: NrContentType.Mod };
+      return {
+        profile_id: profileId,
+        sha1_hash: item.sha1_hash,
+        content_type: NrContentType.Mod,
+      };
     }
-  } else if (uiContentType === 'ResourcePack' || uiContentType === 'ShaderPack' || uiContentType === 'DataPack') {
+  } else if (
+    uiContentType === "ResourcePack" ||
+    uiContentType === "ShaderPack" ||
+    uiContentType === "DataPack"
+  ) {
     if (!item.path) {
-      toast.error(i18n.t('content_manager.errors.content_missing_path_uninstall', { type: uiContentType, filename: item.filename }));
+      toast.error(
+        i18n.t("content_manager.errors.content_missing_path_uninstall", {
+          type: uiContentType,
+          filename: item.filename,
+        }),
+      );
       return null;
     }
     return { profile_id: profileId, file_path: item.path };
-  } else if (uiContentType === 'NoRiskMod') {
-    toast.error(i18n.t('content_manager.errors.norisk_uninstall_not_supported'));
-    console.error("[useLocalContentManager] Attempted to create uninstall payload for NoRiskMod. This is generally not supported here.");
+  } else if (uiContentType === "NoRiskMod") {
+    toast.error(
+      i18n.t("content_manager.errors.norisk_uninstall_not_supported"),
+    );
+    console.error(
+      "[useLocalContentManager] Attempted to create uninstall payload for NoRiskMod. This is generally not supported here.",
+    );
     return null;
   }
 
-  toast.error(i18n.t('content_manager.errors.unsupported_content_type_uninstall', { type: uiContentType }));
+  toast.error(
+    i18n.t("content_manager.errors.unsupported_content_type_uninstall", {
+      type: uiContentType,
+    }),
+  );
   return null;
 }
 
@@ -173,58 +257,88 @@ function createTogglePayload<T extends LocalContentItem>(
   item: T,
   profileId: string,
   uiContentType: LocalContentType,
-  targetEnabledState: boolean // This is the 'enabled' field for the payload
+  targetEnabledState: boolean, // This is the 'enabled' field for the payload
 ): ToggleContentPayload | null {
   const backendContentType = mapUiContentTypeToBackend(uiContentType);
 
-  const payloadBase: Omit<ToggleContentPayload, 'sha1_hash' | 'file_path' | 'norisk_mod_identifier'> = {
+  const payloadBase: Omit<
+    ToggleContentPayload,
+    "sha1_hash" | "file_path" | "norisk_mod_identifier"
+  > = {
     profile_id: profileId,
     enabled: targetEnabledState,
     content_type: backendContentType,
   };
 
-  if (uiContentType === 'NoRiskMod') {
-    const noriskIdentifierFromItem = (item as ProfileLocalContentItem).norisk_info; // Expect norisk_info from the item
+  if (uiContentType === "NoRiskMod") {
+    const noriskIdentifierFromItem = (item as ProfileLocalContentItem)
+      .norisk_info; // Expect norisk_info from the item
     if (noriskIdentifierFromItem) {
-      return { ...payloadBase, norisk_mod_identifier: noriskIdentifierFromItem }; // Map to payload's norisk_mod_identifier
+      return {
+        ...payloadBase,
+        norisk_mod_identifier: noriskIdentifierFromItem,
+      }; // Map to payload's norisk_mod_identifier
     } else {
-      toast.error(i18n.t('content_manager.errors.norisk_missing_info_toggle', { filename: item.filename }));
+      toast.error(
+        i18n.t("content_manager.errors.norisk_missing_info_toggle", {
+          filename: item.filename,
+        }),
+      );
       return null;
     }
-  } else if (uiContentType === 'Mod') {
+  } else if (uiContentType === "Mod") {
     if (item.source_type === "custom") {
-        if (!item.path) {
-            toast.error(i18n.t('content_manager.errors.custom_mod_missing_path_toggle', { filename: item.filename }));
-            return null;
-        }
-        // For custom mods with a path, prioritize using the path.
-        // SHA1 can be included if available.
-        const payload: ToggleContentPayload = { ...payloadBase, file_path: item.path };
-        if (item.sha1_hash) {
-            payload.sha1_hash = item.sha1_hash;
-        }
-        return payload;
+      if (!item.path) {
+        toast.error(
+          i18n.t("content_manager.errors.custom_mod_missing_path_toggle", {
+            filename: item.filename,
+          }),
+        );
+        return null;
+      }
+      // For custom mods with a path, prioritize using the path.
+      // SHA1 can be included if available.
+      const payload: ToggleContentPayload = {
+        ...payloadBase,
+        file_path: item.path,
+      };
+      if (item.sha1_hash) {
+        payload.sha1_hash = item.sha1_hash;
+      }
+      return payload;
     } else {
-        // Original logic for non-custom (e.g., Modrinth) mods
-        if (item.sha1_hash) {
-            const modPayload: ToggleContentPayload = {...payloadBase, sha1_hash: item.sha1_hash};
-            if (item.path) {
-                //modPayload.file_path = item.path;
-            }
-            return modPayload;
-        } else if (item.path) {
-            return { ...payloadBase, /*file_path: item.path*/ };
-        } else {
-            toast.error(i18n.t('content_manager.errors.mod_missing_identifiers_toggle', { filename: item.filename }));
-            return null;
+      // Original logic for non-custom (e.g., Modrinth) mods
+      if (item.sha1_hash) {
+        const modPayload: ToggleContentPayload = {
+          ...payloadBase,
+          sha1_hash: item.sha1_hash,
+        };
+        if (item.path) {
+          //modPayload.file_path = item.path;
         }
+        return modPayload;
+      } else if (item.path) {
+        return { ...payloadBase /*file_path: item.path*/ };
+      } else {
+        toast.error(
+          i18n.t("content_manager.errors.mod_missing_identifiers_toggle", {
+            filename: item.filename,
+          }),
+        );
+        return null;
+      }
     }
   } else {
     // For ResourcePacks, ShaderPacks, DataPacks, use file_path
     if (item.path) {
       return { ...payloadBase, file_path: item.path };
     } else {
-      toast.error(i18n.t('content_manager.errors.path_missing_toggle', { type: uiContentType, filename: item.filename }));
+      toast.error(
+        i18n.t("content_manager.errors.path_missing_toggle", {
+          type: uiContentType,
+          filename: item.filename,
+        }),
+      );
       return null;
     }
   }
@@ -236,13 +350,23 @@ export function useLocalContentManager<T extends LocalContentItem>({
   getDisplayFileName,
   onRefreshRequired,
 }: UseLocalContentManagerProps<T>): UseLocalContentManagerReturn<T> {
-  const [items, setItems] = useState<T[]>([]);
-  const [isInitialLoadingState, setIsInitialLoadingState] = useState(false);
+  const initialEntry = profile?.id
+    ? useContentCacheStore
+        .getState()
+        .getEntry<T>(contentCacheKey(profile.id, contentType))
+    : undefined;
+
+  const [items, setItems] = useState<T[]>(() => initialEntry?.items ?? []);
+  const [isInitialLoadingState, setIsInitialLoadingState] = useState(
+    () => !!profile?.id && !initialEntry,
+  );
+  const [isRevalidating, setIsRevalidating] = useState(() => !!initialEntry);
   const [isFetchingHashesState, setIsFetchingHashesState] = useState(false);
-  const [isFetchingModrinthDetailsState, setIsFetchingModrinthDetailsState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const [itemBeingToggled, setItemBeingToggled] = useState<string | null>(null);
   const [itemBeingDeleted, setItemBeingDeleted] = useState<string | null>(null);
@@ -252,83 +376,120 @@ export function useLocalContentManager<T extends LocalContentItem>({
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
-  const [itemToDeleteForDialog, setItemToDeleteForDialog] = useState<T | null>(null);
-  const [isBatchDeleteConfirmActive, setIsBatchDeleteConfirmActive] = useState(false);
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] =
+    useState(false);
+  const [itemToDeleteForDialog, setItemToDeleteForDialog] = useState<T | null>(
+    null,
+  );
+  const [isBatchDeleteConfirmActive, setIsBatchDeleteConfirmActive] =
+    useState(false);
   const [isDialogActionLoading, setIsDialogActionLoading] = useState(false);
 
-  const [modrinthIcons, setModrinthIcons] = useState<Record<string, string | null>>({});
-  const [curseforgeIcons, setCurseforgeIcons] = useState<Record<string, string | null>>({});
-  const [localArchiveIcons, setLocalArchiveIcons] = useState<Record<string, string | null>>({});
+  const modrinthIcons = useIconCacheStore((state) => state.modrinthIcons);
+  const curseforgeIcons = useIconCacheStore((state) => state.curseforgeIcons);
+  const archiveIcons = useIconCacheStore((state) => state.archiveIcons);
 
   // Helper function to determine which platform to use for an item
-  const getItemPlatform = useCallback((item: T): 'modrinth' | 'curseforge' | 'local' => {
-    // If platform is explicitly set, use that
-    if (item.platform) {
-      return item.platform === 'Modrinth' ? 'modrinth' : 'curseforge';
-    }
+  const getItemPlatform = useCallback(
+    (item: T): "modrinth" | "curseforge" | "local" => {
+      // If platform is explicitly set, use that
+      if (item.platform) {
+        return item.platform === "Modrinth" ? "modrinth" : "curseforge";
+      }
 
-    // Fallback: check if we have info from both platforms
-    if (item.modrinth_info && item.curseforge_info) {
-      // If both are available, prefer the one with more complete info
-      // This is a heuristic - could be improved based on your needs
-      return item.modrinth_info.project_id ? 'modrinth' : 'curseforge';
-    }
+      // Fallback: check if we have info from both platforms
+      if (item.modrinth_info && item.curseforge_info) {
+        // If both are available, prefer the one with more complete info
+        // This is a heuristic - could be improved based on your needs
+        return item.modrinth_info.project_id ? "modrinth" : "curseforge";
+      }
 
-    // Single platform info
-    if (item.modrinth_info) return 'modrinth';
-    if (item.curseforge_info) return 'curseforge';
+      // Single platform info
+      if (item.modrinth_info) return "modrinth";
+      if (item.curseforge_info) return "curseforge";
 
-    // No platform info available
-    return 'local';
-  }, []);
+      // No platform info available
+      return "local";
+    },
+    [],
+  );
 
   // Helper function to get the appropriate icon for an item
-  const getItemIcon = useCallback((item: T): string | null => {
-    const platform = getItemPlatform(item);
+  const getItemIcon = useCallback(
+    (item: T): string | null => {
+      const platform = getItemPlatform(item);
 
-    switch (platform) {
-      case 'modrinth':
-        if (item.modrinth_info?.project_id) {
-          return modrinthIcons[item.modrinth_info.project_id] || null;
-        }
-        break;
-      case 'curseforge':
-        if (item.curseforge_info?.project_id) {
-          return curseforgeIcons[item.curseforge_info.project_id] || null;
-        }
-        break;
-      case 'local':
-        return localArchiveIcons[item.path] || null;
-    }
+      switch (platform) {
+        case "modrinth":
+          if (item.modrinth_info?.project_id) {
+            return (
+              item.modrinth_info.icon_url ||
+              modrinthIcons[item.modrinth_info.project_id] ||
+              null
+            );
+          }
+          break;
+        case "curseforge":
+          if (item.curseforge_info?.project_id) {
+            return (
+              item.curseforge_info.icon_url ||
+              curseforgeIcons[item.curseforge_info.project_id] ||
+              null
+            );
+          }
+          break;
+        case "local":
+          return archiveIcons[archiveIconKey(item)] || null;
+      }
 
-    // Fallback to local archive icon
-    return localArchiveIcons[item.path] || null;
-  }, [getItemPlatform, modrinthIcons, curseforgeIcons, localArchiveIcons]);
+      // Fallback to local archive icon
+      return archiveIcons[archiveIconKey(item)] || null;
+    },
+    [getItemPlatform, modrinthIcons, curseforgeIcons, archiveIcons],
+  );
 
   // Helper function to get platform display name
-  const getItemPlatformDisplayName = useCallback((item: T): string => {
-    const platform = getItemPlatform(item);
+  const getItemPlatformDisplayName = useCallback(
+    (item: T): string => {
+      const platform = getItemPlatform(item);
 
-    switch (platform) {
-      case 'modrinth': return 'Modrinth';
-      case 'curseforge': return 'CurseForge';
-      case 'local': return 'Local';
-      default: return 'Unknown';
-    }
-  }, [getItemPlatform]);
-  const [hashesToFetchModrinthDetailsFor, setHashesToFetchModrinthDetailsFor] = useState<string[] | null>(null);
+      switch (platform) {
+        case "modrinth":
+          return "Modrinth";
+        case "curseforge":
+          return "CurseForge";
+        case "local":
+          return "Local";
+        default:
+          return "Unknown";
+      }
+    },
+    [getItemPlatform],
+  );
 
-  const [contentUpdates, setContentUpdates] = useState<Record<string, UnifiedVersion>>({});
+  const [contentUpdates, setContentUpdates] = useState<
+    Record<string, UnifiedVersion>
+  >(() => initialEntry?.contentUpdates ?? {});
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
-  const [itemsBeingUpdated, setItemsBeingUpdated] = useState<Set<string>>(new Set());
-  const [contentUpdateError, setContentUpdateError] = useState<string | null>(null);
+  const [itemsBeingUpdated, setItemsBeingUpdated] = useState<Set<string>>(
+    new Set(),
+  );
+  const [contentUpdateError, setContentUpdateError] = useState<string | null>(
+    null,
+  );
   const [isUpdatingAll, setIsUpdatingAll] = useState(false);
 
-  const [isInitialLoadProcessComplete, setIsInitialLoadProcessComplete] = useState(false);
+  const [isInitialLoadProcessComplete, setIsInitialLoadProcessComplete] =
+    useState(false);
 
   const onRefreshRequiredRef = useRef(onRefreshRequired);
   const itemsRef = useRef<T[]>([]);
+  const cacheBehaviourRef = useRef<CacheBehaviour>("stale_while_revalidate");
+  const loadIdRef = useRef(0);
+
+  const cacheKey = profile?.id
+    ? contentCacheKey(profile.id, contentType)
+    : null;
 
   useEffect(() => {
     itemsRef.current = items;
@@ -337,242 +498,186 @@ export function useLocalContentManager<T extends LocalContentItem>({
     onRefreshRequiredRef.current = onRefreshRequired;
   }, [onRefreshRequired]);
 
-  // Generic Phase 1: Fetch basic info for all content types
-  const fetchBasicInfo = useCallback(async (): Promise<void> => {
-    if (!profile?.id) {
-      setItems([]);
-      return;
-    }
-    setIsInitialLoadingState(true);
-    setIsFetchingHashesState(false);
-    setIsFetchingModrinthDetailsState(false);
-    setError(null);
-    setModrinthIcons({});
-    setLocalArchiveIcons({});
-    // Note: contentUpdates wird hier NICHT geleert (stale-while-revalidate).
-    // Der Check nach Phase 3 ersetzt sie natuerlich mit frischen Daten. Bei
-    // manuellem Refresh oder Tab-Switch flackert sonst die Update-Info kurz
-    // weg. Hard-Reset passiert weiter via fetchData(initialFetch=true).
-    setContentUpdateError(null);
-    setHashesToFetchModrinthDetailsFor(null); // Reset this here
-
-    const backendContentType = mapUiContentTypeToBackend(contentType);
-    console.log(`[${contentType}] Phase 1: Fetching basic info...`, new Date().toISOString());
-    try {
-      const serviceParams: LoadItemsParams = {
-        profile_id: profile.id,
-        content_type: backendContentType,
-        calculate_hashes: false,
-        fetch_modrinth_data: false,
-      };
-      const fetchedBackendItems = await getLocalContent(serviceParams) as ProfileLocalContentItem[];
-      console.log(`[${contentType}] Phase 1: Raw items from getLocalContent`, new Date().toISOString(), fetchedBackendItems);
-
-      const mappedItemsToFrontend = fetchedBackendItems.map(item => mapBackendItemToFrontendType<T>(item));
-      const processedBasicItems = mappedItemsToFrontend.map(item => {
-        const finalFilename = item.filename || getDisplayFileName(item);
-        console.log(`[${contentType}] fetchBasicInfo: Processing item - Original Filename: ${item.filename}, Path: ${item.path}, getDisplayFileName: ${getDisplayFileName(item)}, Final Filename: ${finalFilename}`);
-        return {
-          ...item,
-          filename: finalFilename,
-          modrinth_info: null, // Ensure modrinth_info is initially null
-          sha1_hash: null, // Ensure sha1_hash is initially null for Phase 1
-        };
-      });
-      setItems(processedBasicItems as T[]);
-      console.log(`[${contentType}] Phase 1: Basic items set (count: ${processedBasicItems.length})`, new Date().toISOString());
-      setSelectedItemIds(new Set());
-      if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
-    } catch (err) {
-      console.error(`[${contentType}] Phase 1: Error fetching basic info:`, err);
-      setError(parseErrorMessage(err));
-    } finally {
-      setIsInitialLoadingState(false);
-    }
-  }, [profile?.id, contentType, getDisplayFileName]);
-
-  // Generic Phase 2: Fetch hashes and update items
-  const fetchHashesAndUpdateItems = useCallback(async (): Promise<void> => {
-    if (!profile?.id || itemsRef.current.length === 0) return;
-
-    const backendContentType = mapUiContentTypeToBackend(contentType);
-    console.log(`[${contentType}] Phase 2: Fetching hashes and full local info...`, new Date().toISOString());
-    setIsFetchingHashesState(true);
-    setError(null); // Clear previous errors before this specific phase
-
-    try {
-      const serviceParams: LoadItemsParams = {
-        profile_id: profile.id,
-        content_type: backendContentType,
-        calculate_hashes: true,
-        fetch_modrinth_data: false, // Modrinth details via JS in Phase 3
-      };
-      const fetchedBackendItemsWithHashes = await getLocalContent(serviceParams) as ProfileLocalContentItem[];
-      console.log(`[${contentType}] Phase 2: Raw items with hashes from getLocalContent`, new Date().toISOString(), fetchedBackendItemsWithHashes);
-      
-      const mappedItemsToFrontend = fetchedBackendItemsWithHashes.map(item => mapBackendItemToFrontendType<T>(item));
-
-      setItems(currentItems =>
-        currentItems.map(currentItem => {
-          const match = mappedItemsToFrontend.find(fi => fi.path === currentItem.path);
-          if (match) { // Merge all details from the hash-calculated fetch
-            return { 
-              ...currentItem, 
-              sha1_hash: match.sha1_hash, 
-              file_size: match.file_size, 
-              is_disabled: match.is_disabled,
-              is_directory: match.is_directory, // Ensure this is also updated
-              // Modrinth info is still deferred to Phase 3
-            } as T;
-          }
-          return currentItem;
-        })
-      );
-
-      const allKnownHashes = mappedItemsToFrontend
-        .map(item => item.sha1_hash)
-        .filter(hash => hash != null) as string[];
-      
-      if (allKnownHashes.length > 0) {
-        console.log(`[${contentType}] Phase 2: Hashes obtained, setting for Modrinth lookup.`, new Date().toISOString(), allKnownHashes);
-        setHashesToFetchModrinthDetailsFor(allKnownHashes);
-      } else {
-        setHashesToFetchModrinthDetailsFor(null);
+  const fetchBasicInfo = useCallback(
+    async (
+      behaviour: CacheBehaviour = "stale_while_revalidate",
+    ): Promise<void> => {
+      if (!profile?.id) {
+        setItems([]);
+        return;
       }
-    } catch (err) {
-      console.error(`[${contentType}] Phase 2: Error fetching hashes:`, err);
-      setError(parseErrorMessage(err));
-    } finally {
-      setIsFetchingHashesState(false);
-    }
-  }, [profile?.id, contentType, getDisplayFileName]);
+      cacheBehaviourRef.current = behaviour;
+      const loadId = ++loadIdRef.current;
 
-  // fetchData now just calls fetchBasicInfo, which is Phase 1
-  const fetchData = useCallback(async (initialFetch = true): Promise<void> => {
-    // The 'initialFetch' parameter for fetchData is now more about resetting UI states like selection
-    // The actual data fetching sequence is managed by fetchBasicInfo and subsequent effects.
-    if (initialFetch) {
-      setSelectedItemIds(new Set());
-      setContentUpdates({}); // Clear previous updates
+      const key = contentCacheKey(profile.id, contentType);
+      const cached =
+        behaviour === "stale_while_revalidate"
+          ? useContentCacheStore.getState().getEntry<T>(key)
+          : undefined;
+
+      if (cached) {
+        setItems(cached.items);
+        setContentUpdates(cached.contentUpdates);
+        setIsInitialLoadingState(false);
+        setIsRevalidating(true);
+      } else {
+        setIsInitialLoadingState(true);
+      }
+      setIsFetchingHashesState(false);
+      setError(null);
+      // Note: contentUpdates wird hier NICHT geleert (stale-while-revalidate).
+      // Bei manuellem Refresh oder Tab-Switch flackert sonst die Update-Info kurz
+      // weg. Hard-Reset passiert weiter via fetchData(initialFetch=true).
       setContentUpdateError(null);
+
+      const backendContentType = mapUiContentTypeToBackend(contentType);
+      console.log(
+        `[${contentType}] Loading local content...`,
+        new Date().toISOString(),
+      );
+      try {
+        const serviceParams: LoadItemsParams = {
+          profile_id: profile.id,
+          content_type: backendContentType,
+          calculate_hashes: true,
+          fetch_modrinth_data: true, // Rust resolves modrinth_info in the same call (cache-backed)
+          cache_behaviour: behaviour,
+        };
+        const fetchedBackendItems = (await getLocalContent(
+          serviceParams,
+        )) as ProfileLocalContentItem[];
+        if (loadIdRef.current !== loadId) return; // superseded by a newer load
+
+        const previousByPath = new Map(
+          itemsRef.current.map((item) => [item.path, item]),
+        );
+        const mappedItemsToFrontend = fetchedBackendItems.map((item) =>
+          mapBackendItemToFrontendType<T>(item),
+        );
+        const processedBasicItems = mappedItemsToFrontend.map((item) => {
+          const previous = previousByPath.get(item.path);
+          return {
+            ...item,
+            filename: item.filename || getDisplayFileName(item),
+            modrinth_info:
+              item.modrinth_info ?? previous?.modrinth_info ?? null,
+            curseforge_info:
+              item.curseforge_info ?? previous?.curseforge_info ?? null,
+          };
+        });
+        setItems(processedBasicItems as T[]);
+        console.log(
+          `[${contentType}] Items set (count: ${processedBasicItems.length})`,
+          new Date().toISOString(),
+        );
+        if (!cached) setSelectedItemIds(new Set());
+
+        setIsInitialLoadProcessComplete(true);
+        setIsRevalidating(false);
+
+        if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
+      } catch (err) {
+        console.error(`[${contentType}] Error loading local content:`, err);
+        setError(parseErrorMessage(err));
+        setIsRevalidating(false);
+      } finally {
+        setIsInitialLoadingState(false);
+      }
+    },
+    [profile?.id, contentType, getDisplayFileName],
+  );
+
+  const fetchData = useCallback(
+    async (initialFetch = true): Promise<void> => {
+      if (profile?.id) {
+        useContentCacheStore
+          .getState()
+          .invalidate(contentCacheKey(profile.id, contentType));
+      }
+      if (initialFetch) {
+        setSelectedItemIds(new Set());
+        setContentUpdates({}); // Clear previous updates
+        setContentUpdateError(null);
+        setSearchQuery(""); // Clear search query on refresh
+      }
       setIsInitialLoadProcessComplete(false); // Reset flag for new load process
-      setSearchQuery(""); // Clear search query on refresh
-    }
-    await fetchBasicInfo();
-  }, [fetchBasicInfo, setSearchQuery]); // Added setSearchQuery to dependencies
+      await fetchBasicInfo("must_revalidate");
+    },
+    [fetchBasicInfo, profile?.id, contentType, setSearchQuery],
+  );
 
   // Initial data fetch (Phase 1)
   useEffect(() => {
     fetchBasicInfo();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchBasicInfo, profile?.selected_norisk_pack_id]); // Added profile.selected_norisk_pack_id to ensure refetch on pack change
-  
-  useEffect(() => {
-    if (!isInitialLoadingState && items.length > 0 && items.some(item => !item.is_directory && item.sha1_hash === null) && !isFetchingHashesState) {
-      fetchHashesAndUpdateItems();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, isInitialLoadingState, isFetchingHashesState, fetchHashesAndUpdateItems]);
-  
-  // Phase 3: Fetch Modrinth project details based on hashes (existing logic, should be fine)
-  useEffect(() => {
-    let isMounted = true; // To prevent state updates on unmounted component
-    if (hashesToFetchModrinthDetailsFor && hashesToFetchModrinthDetailsFor.length > 0 && profile?.id && !isFetchingModrinthDetailsState) {
-      console.log(`[${contentType}] Phase 3: Triggering Modrinth project details fetch for hashes`, new Date().toISOString(), hashesToFetchModrinthDetailsFor);
-      setIsFetchingModrinthDetailsState(true);
-      const fetchModrinthDataByHashes = async () => {
-        try {
-          const modrinthVersionsMap = await ModrinthService.getVersionsByHashes(hashesToFetchModrinthDetailsFor!);
-          if (!isMounted) return;
-          console.log(`[${contentType}] Phase 3: Modrinth data received`, new Date().toISOString(), modrinthVersionsMap);
-          setItems(currentItems =>
-            currentItems.map(item => {
-              if (item.sha1_hash && modrinthVersionsMap[item.sha1_hash]) {
-                const modrinthVersion = modrinthVersionsMap[item.sha1_hash];
-                const primaryFile = modrinthVersion.files.find(f => f.primary) || modrinthVersion.files[0];
-                const newModrinthInfo: ProfileGenericModrinthInfo | null = primaryFile ? {
-                  project_id: modrinthVersion.project_id,
-                  version_id: modrinthVersion.id,
-                  name: modrinthVersion.name, 
-                  version_number: modrinthVersion.version_number,
-                  download_url: primaryFile.url,
-                } : null;
-                return { ...item, modrinth_info: newModrinthInfo } as T;
-              }
-              return item;
-            })
-          );
-          console.log(`[${contentType}] Phase 3: Items updated with Modrinth data`, new Date().toISOString());
-        } catch (modrinthError) {
-          if (!isMounted) return;
-          console.warn(`[${contentType}] Phase 3: Failed to fetch Modrinth details by hashes:`, modrinthError);
-          const errorMsg = parseErrorMessage(modrinthError);
-          setError(prevError => prevError ? `${prevError}; Failed to fetch Modrinth details (${errorMsg})` : `Failed to fetch Modrinth details (${errorMsg})`);
-        } finally {
-          if (isMounted) { // Ensure component is still mounted before setting state
-            setIsFetchingModrinthDetailsState(false);
-            setHashesToFetchModrinthDetailsFor(null); 
-            setIsInitialLoadProcessComplete(true); // Set the flag indicating Phase 3 completion
-          }
-        }
-      };
-      fetchModrinthDataByHashes();
-    }
-    return () => { isMounted = false; }; // Cleanup function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hashesToFetchModrinthDetailsFor, profile?.id, contentType]); // Dependencies should NOT include isInitialLoadProcessComplete
 
   // Click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (activeDropdownId && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        activeDropdownId &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         // Check if the click was on the "More Actions" button or any of its children
         const clickedElement = event.target as HTMLElement;
-        const isMoreActionsButton = clickedElement.closest(`button[title="More Actions"], button[aria-label="More Actions"]`);
+        const isMoreActionsButton = clickedElement.closest(
+          `button[title="More Actions"], button[aria-label="More Actions"]`,
+        );
         if (!isMoreActionsButton) {
           setActiveDropdownId(null);
         }
       }
     };
-    if (activeDropdownId) document.addEventListener("mousedown", handleClickOutside);
+    if (activeDropdownId)
+      document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [activeDropdownId]);
 
   // Fetch Modrinth icons
   useEffect(() => {
     const fetchModrinthIcons = async () => {
-      if (!items || items.length === 0) {
-        setModrinthIcons({});
-        return;
-      }
+      if (!items || items.length === 0) return;
 
+      const { modrinthIcons: cached, mergeModrinthIcons } =
+        useIconCacheStore.getState();
       const projectIdsToFetch = items
-        .filter(item => {
+        .filter((item) => {
           const platform = getItemPlatform(item);
-          return platform === 'modrinth' && item.modrinth_info?.project_id && modrinthIcons[item.modrinth_info.project_id] === undefined;
+          if (platform !== "modrinth" || !item.modrinth_info?.project_id)
+            return false;
+          if (item.modrinth_info.icon_url) return false;
+          return cached[item.modrinth_info.project_id] === undefined;
         })
-        .map(item => item.modrinth_info!.project_id!)
+        .map((item) => item.modrinth_info!.project_id!);
       const uniqueProjectIds = [...new Set(projectIdsToFetch)];
 
       if (uniqueProjectIds.length > 0) {
         try {
-          const projectDetailsList = await ModrinthService.getProjectDetails(uniqueProjectIds);
+          const projectDetailsList = await ModrinthService.getProjectDetails(
+            uniqueProjectIds,
+            cacheBehaviourRef.current,
+          );
           const newIcons: Record<string, string | null> = {};
           if (Array.isArray(projectDetailsList)) {
-            projectDetailsList.forEach(detail => {
-              if (detail && typeof detail === 'object' && detail.id) {
+            projectDetailsList.forEach((detail) => {
+              if (detail && typeof detail === "object" && detail.id) {
                 newIcons[detail.id] = detail.icon_url || null;
               }
             });
           } else {
-             console.warn("[useLocalContentManager] ModrinthService.getProjectDetails did not return an array. Received:", projectDetailsList);
+            console.warn(
+              "[useLocalContentManager] ModrinthService.getProjectDetails did not return an array. Received:",
+              projectDetailsList,
+            );
           }
-          setModrinthIcons(prevIcons => ({ ...prevIcons, ...newIcons }));
+          mergeModrinthIcons(newIcons);
         } catch (err) {
-          console.error("[useLocalContentManager] Failed to fetch Modrinth project details for icons:", err);
-          const errorIcons: Record<string, string | null> = {};
-          uniqueProjectIds.forEach(id => { errorIcons[id] = null; });
-          setModrinthIcons(prevIcons => ({ ...prevIcons, ...errorIcons }));
+          console.error(
+            "[useLocalContentManager] Failed to fetch Modrinth project details for icons:",
+            err,
+          );
         }
       }
     };
@@ -582,29 +687,35 @@ export function useLocalContentManager<T extends LocalContentItem>({
   // Fetch CurseForge icons
   useEffect(() => {
     const fetchCurseForgeIcons = async () => {
-      if (!items || items.length === 0) {
-        setCurseforgeIcons({});
-        return;
-      }
+      if (!items || items.length === 0) return;
 
+      const { curseforgeIcons: cached, mergeCurseforgeIcons } =
+        useIconCacheStore.getState();
       const projectIdsToFetch = items
-        .filter(item => {
+        .filter((item) => {
           const platform = getItemPlatform(item);
-          return platform === 'curseforge' && item.curseforge_info?.project_id && curseforgeIcons[item.curseforge_info.project_id] === undefined;
+          if (platform !== "curseforge" || !item.curseforge_info?.project_id)
+            return false;
+          if (item.curseforge_info.icon_url) return false;
+          return cached[item.curseforge_info.project_id] === undefined;
         })
-        .map(item => item.curseforge_info!.project_id!)
-        .map(id => parseInt(id, 10)) // Convert string to number
-        .filter(id => !isNaN(id)); // Filter out invalid IDs
+        .map((item) => item.curseforge_info!.project_id!)
+        .map((id) => parseInt(id, 10)) // Convert string to number
+        .filter((id) => !isNaN(id)); // Filter out invalid IDs
 
       const uniqueProjectIds = [...new Set(projectIdsToFetch)];
 
       if (uniqueProjectIds.length > 0) {
         try {
-          const modsResponse = await CurseForgeService.getModsByIds(uniqueProjectIds);
+          const modsResponse = await CurseForgeService.getModsByIds(
+            uniqueProjectIds,
+            undefined,
+            cacheBehaviourRef.current,
+          );
           const newIcons: Record<string, string | null> = {};
 
           if (modsResponse && modsResponse.data) {
-            modsResponse.data.forEach(mod => {
+            modsResponse.data.forEach((mod) => {
               if (mod && mod.id && mod.logo) {
                 newIcons[mod.id.toString()] = mod.logo.url || null;
               } else if (mod && mod.id) {
@@ -613,114 +724,107 @@ export function useLocalContentManager<T extends LocalContentItem>({
               }
             });
           } else {
-            console.warn("[useLocalContentManager] CurseForgeService.getModsByIds did not return expected structure. Received:", modsResponse);
+            console.warn(
+              "[useLocalContentManager] CurseForgeService.getModsByIds did not return expected structure. Received:",
+              modsResponse,
+            );
           }
 
-          setCurseforgeIcons(prevIcons => ({ ...prevIcons, ...newIcons }));
+          mergeCurseforgeIcons(newIcons);
         } catch (err) {
-          console.error("[useLocalContentManager] Failed to fetch CurseForge mod details for icons:", err);
-          const errorIcons: Record<string, string | null> = {};
-          uniqueProjectIds.forEach(id => { errorIcons[id.toString()] = null; });
-          setCurseforgeIcons(prevIcons => ({ ...prevIcons, ...errorIcons }));
+          console.error(
+            "[useLocalContentManager] Failed to fetch CurseForge mod details for icons:",
+            err,
+          );
         }
       }
     };
     fetchCurseForgeIcons();
   }, [items, getItemPlatform]);
 
-  // Fetch local archive icons
   useEffect(() => {
-    console.log(`[${contentType}] Running useEffect for fetchLocalArchiveIcons. Items count: ${items.length}, localArchiveIcons keys: ${Object.keys(localArchiveIcons).length}`);
     const fetchLocalArchiveIcons = async () => {
-      if (!items || items.length === 0) {
-        // Only set to empty if it's not already empty, to prevent infinite loop
-        if (Object.keys(localArchiveIcons).length > 0) {
-          setLocalArchiveIcons({});
-          console.log(`[${contentType}] fetchLocalArchiveIcons: No items or items array empty, clearing localArchiveIcons because it wasn't empty.`);
-        } else {
-          // console.log(`[${contentType}] fetchLocalArchiveIcons: No items and localArchiveIcons already empty. Doing nothing to prevent loop.`);
-        }
-        return;
+      if (!items || items.length === 0) return;
+
+      const { archiveIcons: cached, mergeArchiveIcons } =
+        useIconCacheStore.getState();
+      const wanted = new Map<string, string>(); // icon key -> path to read it from
+      for (const item of items) {
+        if (!item.path) continue;
+        const lowerPath = item.path.toLowerCase();
+        const isArchive =
+          contentType === "NoRiskMod"
+            ? lowerPath.endsWith(".jar")
+            : lowerPath.endsWith(".zip");
+        if (!isArchive) continue;
+
+        const key = archiveIconKey(item);
+        if (cached[key] !== undefined || wanted.has(key)) continue;
+        wanted.set(key, item.path);
       }
 
-      // console.log(`[${contentType}] fetchLocalArchiveIcons: Current localArchiveIcons keys:`, Object.keys(localArchiveIcons));
-      items.forEach(item => {
-        // console.log(`[${contentType}] fetchLocalArchiveIcons: Checking item - Path: ${item.path}, Filename: ${item.filename}, Cached: ${localArchiveIcons[item.path!] !== undefined}`);
-      });
+      if (wanted.size === 0) return;
 
-      const pathsToFetchIconsFor = items
-        .filter(item => {
-          if (!item.path || localArchiveIcons[item.path] !== undefined) {
-            return false;
-          }
-          // For NoRiskMod, the item.path points to a .jar file in cache
-          // For other types, item.path usually points to a .zip file
-          const lowerPath = item.path.toLowerCase();
-          if (contentType === 'NoRiskMod') {
-            return lowerPath.endsWith('.jar');
-          } else {
-            return lowerPath.endsWith('.zip');
-          }
-        })
-        .map(item => ({ filename: item.filename, path: item.path! })); 
-      
-      const uniquePathObjects = pathsToFetchIconsFor.filter((obj, index, self) => 
-        index === self.findIndex(t => t.path === obj.path)
-      );
-      console.log(`[${contentType}] fetchLocalArchiveIcons: Unique paths to fetch icons for:`, uniquePathObjects.map(obj => obj.path));
+      const entries = [...wanted.entries()];
+      try {
+        const iconsResult = await invoke<Record<string, string | null>>(
+          "get_icons_for_archives",
+          { archivePaths: entries.map(([, path]) => path) },
+        );
 
-      if (uniquePathObjects.length > 0) {
-        try {
-          const archivePaths = uniquePathObjects.map(obj => obj.path);
-          const iconsResult = await invoke<Record<string, string | null>>(
-            "get_icons_for_archives",
-            { archivePaths }
-          );
-
-          if (iconsResult) {
-            const newLocalIcons: Record<string, string | null> = {};
-            uniquePathObjects.forEach(obj => {
-                const base64Icon = iconsResult[obj.path];
-                if (obj.path) {
-                  newLocalIcons[obj.path] = base64Icon ? 'data:image/png;base64,' + base64Icon : null;
-                }
-            });
-            setLocalArchiveIcons(prevIcons => ({ ...prevIcons, ...newLocalIcons }));
-          } else {
-            console.warn("[useLocalContentManager] get_icons_for_archives returned null or undefined.");
-          }
-        } catch (err) {
-          console.error("[useLocalContentManager] Failed to fetch local archive icons:", err);
-          const errorIcons: Record<string, string | null> = {};
-          uniquePathObjects.forEach(obj => { 
-            if (obj.path) errorIcons[obj.path] = null;
-          });
-          setLocalArchiveIcons(prevIcons => ({ ...prevIcons, ...errorIcons }));
+        const newIcons: Record<string, string | null> = {};
+        for (const [key, path] of entries) {
+          const base64Icon = iconsResult?.[path];
+          newIcons[key] = base64Icon
+            ? "data:image/png;base64," + base64Icon
+            : null;
         }
+        mergeArchiveIcons(newIcons);
+      } catch (err) {
+        console.error(
+          "[useLocalContentManager] Failed to fetch local archive icons:",
+          err,
+        );
       }
     };
     fetchLocalArchiveIcons();
-  }, [items, contentType, localArchiveIcons]); 
+  }, [items, contentType]);
+
+  useEffect(() => {
+    if (!cacheKey || !isInitialLoadProcessComplete) return;
+    useContentCacheStore
+      .getState()
+      .setEntry(cacheKey, { items, contentUpdates });
+  }, [cacheKey, items, contentUpdates, isInitialLoadProcessComplete]);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
-    return items.filter((item) =>
-      getDisplayFileName(item).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.filename.toLowerCase().includes(searchQuery.toLowerCase())
+    return items.filter(
+      (item) =>
+        getDisplayFileName(item)
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        item.filename.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [items, searchQuery, getDisplayFileName]);
 
-  const handleItemSelectionChange = useCallback((itemId: string, isSelected: boolean) => {
-    setSelectedItemIds(prev => {
-      const newSet = new Set(prev);
-      if (isSelected) newSet.add(itemId);
-      else newSet.delete(itemId);
-      return newSet;
-    });
-  }, []);
+  const handleItemSelectionChange = useCallback(
+    (itemId: string, isSelected: boolean) => {
+      setSelectedItemIds((prev) => {
+        const newSet = new Set(prev);
+        if (isSelected) newSet.add(itemId);
+        else newSet.delete(itemId);
+        return newSet;
+      });
+    },
+    [],
+  );
 
   const areAllFilteredSelected = useMemo(() => {
-    return filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.has(item.filename));
+    return (
+      filteredItems.length > 0 &&
+      filteredItems.every((item) => selectedItemIds.has(item.filename))
+    );
   }, [filteredItems, selectedItemIds]);
 
   // Calculate the number of actually updatable content (only mods with updates enabled)
@@ -731,7 +835,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
       if (updateIdentifier && contentUpdates[updateIdentifier]) {
         // Only count mods that have updates enabled (default to true if null/undefined)
         const updatesEnabledDefault = item.updates_enabled ?? true;
-        const hasUpdatesEnabled = contentType === 'Mod' && updatesEnabledDefault !== false;
+        const hasUpdatesEnabled =
+          contentType === "Mod" && updatesEnabledDefault !== false;
 
         if (hasUpdatesEnabled) {
           count++;
@@ -741,63 +846,91 @@ export function useLocalContentManager<T extends LocalContentItem>({
     return count;
   }, [items, contentUpdates, contentType]);
 
-  const handleSelectAllToggle = useCallback((isChecked: boolean) => {
-    setSelectedItemIds(prev => {
-      const newSet = new Set(prev);
-      if (isChecked) filteredItems.forEach(item => newSet.add(item.filename));
-      else filteredItems.forEach(item => newSet.delete(item.filename));
-      return newSet;
-    });
-  }, [filteredItems]);
+  const handleSelectAllToggle = useCallback(
+    (isChecked: boolean) => {
+      setSelectedItemIds((prev) => {
+        const newSet = new Set(prev);
+        if (isChecked)
+          filteredItems.forEach((item) => newSet.add(item.filename));
+        else filteredItems.forEach((item) => newSet.delete(item.filename));
+        return newSet;
+      });
+    },
+    [filteredItems],
+  );
 
-  const handleToggleItemEnabled = useCallback(async (item: T) => {
-    if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_toggle'));
-      return;
-    }
-    console.log(`[${contentType}] handleToggleItemEnabled: Item BEFORE toggle - Path: ${item.path}, Filename: ${item.filename}, Disabled: ${item.is_disabled}`);
-    
-    setItemBeingToggled(item.filename);
-    // If item.is_disabled is true (it's disabled), targetEnabledState becomes true (to enable it).
-    // If item.is_disabled is false (it's enabled), targetEnabledState becomes false (to disable it).
-    const targetEnabledState = item.is_disabled; 
-
-    const payload = createTogglePayload(item, profile.id, contentType, targetEnabledState);
-
-    if (!payload) {
-      setItemBeingToggled(null);
-      // createTogglePayload already shows a toast for some error cases
-      return;
-    }
-
-    try {
-      await toggleContentFromProfile(payload);
-
-      setItems(prevItems =>
-        prevItems.map(i => {
-          if (i.filename === item.filename) {
-            const updatedItem = { ...i, is_disabled: !targetEnabledState };
-            console.log(`[${contentType}] handleToggleItemEnabled: Item AFTER toggle (in setItems) - Path: ${updatedItem.path}, Filename: ${updatedItem.filename}, Disabled: ${updatedItem.is_disabled}`);
-            return updatedItem;
-          }
-          return i;
-        })
-      );
-      if (contentType !== 'NoRiskMod' && onRefreshRequiredRef.current) {
-        onRefreshRequiredRef.current();
+  const handleToggleItemEnabled = useCallback(
+    async (item: T) => {
+      if (!profile) {
+        toast.error(i18n.t("content_manager.errors.profile_missing_toggle"));
+        return;
       }
-    } catch (err) {
-      console.error(`Failed to toggle ${getDisplayFileName(item)}:`, err);
-      const errorMsg = parseErrorMessage(err);
-      toast.error(i18n.t('content_manager.errors.toggle_failed', { name: getDisplayFileName(item), error: errorMsg }));
-    } finally {
-      setItemBeingToggled(null);
-    }
-  }, [profile, contentType, getDisplayFileName]); 
+      console.log(
+        `[${contentType}] handleToggleItemEnabled: Item BEFORE toggle - Path: ${item.path}, Filename: ${item.filename}, Disabled: ${item.is_disabled}`,
+      );
+
+      setItemBeingToggled(item.filename);
+      // If item.is_disabled is true (it's disabled), targetEnabledState becomes true (to enable it).
+      // If item.is_disabled is false (it's enabled), targetEnabledState becomes false (to disable it).
+      const targetEnabledState = item.is_disabled;
+
+      const payload = createTogglePayload(
+        item,
+        profile.id,
+        contentType,
+        targetEnabledState,
+      );
+
+      if (!payload) {
+        setItemBeingToggled(null);
+        // createTogglePayload already shows a toast for some error cases
+        return;
+      }
+
+      try {
+        await toggleContentFromProfile(payload);
+
+        setItems((prevItems) =>
+          prevItems.map((i) => {
+            if (i.filename === item.filename) {
+              const nowDisabled = !targetEnabledState;
+              const enabledPath = i.path.replace(/\.disabled$/, "");
+              const updatedItem = {
+                ...i,
+                is_disabled: nowDisabled,
+                path: nowDisabled ? `${enabledPath}.disabled` : enabledPath,
+              };
+              console.log(
+                `[${contentType}] handleToggleItemEnabled: Item AFTER toggle (in setItems) - Path: ${updatedItem.path}, Filename: ${updatedItem.filename}, Disabled: ${updatedItem.is_disabled}`,
+              );
+              return updatedItem;
+            }
+            return i;
+          }),
+        );
+        if (contentType !== "NoRiskMod" && onRefreshRequiredRef.current) {
+          onRefreshRequiredRef.current();
+        }
+      } catch (err) {
+        console.error(`Failed to toggle ${getDisplayFileName(item)}:`, err);
+        const errorMsg = parseErrorMessage(err);
+        toast.error(
+          i18n.t("content_manager.errors.toggle_failed", {
+            name: getDisplayFileName(item),
+            error: errorMsg,
+          }),
+        );
+      } finally {
+        setItemBeingToggled(null);
+      }
+    },
+    [profile, contentType, getDisplayFileName],
+  );
 
   const handleDeleteItem = useCallback((item: T) => {
-    if (!item.path) { // Use path
-      toast.error(i18n.t('content_manager.errors.item_path_missing_delete'));
+    if (!item.path) {
+      // Use path
+      toast.error(i18n.t("content_manager.errors.item_path_missing_delete"));
       return;
     }
     setItemToDeleteForDialog(item);
@@ -813,7 +946,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
   const handleConfirmDeletion = useCallback(async () => {
     if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_delete'));
+      toast.error(i18n.t("content_manager.errors.profile_missing_delete"));
       handleCloseDeleteDialog();
       return;
     }
@@ -825,7 +958,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     if (isBatchDeleteConfirmActive) {
       setIsBatchDeleting(true);
       for (const itemId of selectedItemIds) {
-        const item = items.find(i => i.filename === itemId);
+        const item = items.find((i) => i.filename === itemId);
         if (item) {
           const payload = createUninstallPayload(item, profile.id, contentType);
           if (payload) {
@@ -834,38 +967,77 @@ export function useLocalContentManager<T extends LocalContentItem>({
               successfulOperations++;
             } catch (err) {
               const errorDetail = parseErrorMessage(err);
-              errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(item), error: errorDetail }));
+              errors.push(
+                i18n.t("content_manager.errors.delete_failed", {
+                  name: getDisplayFileName(item),
+                  error: errorDetail,
+                }),
+              );
             }
           } else {
-             // Error already toasted by createUninstallPayload
-            errors.push(`Could not create uninstall payload for ${getDisplayFileName(item)}.`);
+            // Error already toasted by createUninstallPayload
+            errors.push(
+              `Could not create uninstall payload for ${getDisplayFileName(item)}.`,
+            );
           }
         } else {
           errors.push(`Could not find item ID ${itemId} to delete.`);
         }
       }
-      if (errors.length > 0) toast.error(i18n.t('content_manager.errors.batch_delete_failed', { errors: errors.join("; ") }));
-      if (successfulOperations > 0) toast.success(i18n.t('content_manager.success.batch_deleted', { count: successfulOperations }));
+      if (errors.length > 0)
+        toast.error(
+          i18n.t("content_manager.errors.batch_delete_failed", {
+            errors: errors.join("; "),
+          }),
+        );
+      if (successfulOperations > 0)
+        toast.success(
+          i18n.t("content_manager.success.batch_deleted", {
+            count: successfulOperations,
+          }),
+        );
       setIsBatchDeleting(false);
       setSelectedItemIds(new Set());
     } else if (itemToDeleteForDialog) {
       setItemBeingDeleted(itemToDeleteForDialog.filename);
-      const payload = createUninstallPayload(itemToDeleteForDialog, profile.id, contentType);
+      const payload = createUninstallPayload(
+        itemToDeleteForDialog,
+        profile.id,
+        contentType,
+      );
       if (payload) {
         try {
           await uninstallContentFromProfile(payload);
-          toast.success(i18n.t('content_manager.success.deleted', { name: getDisplayFileName(itemToDeleteForDialog) }));
+          toast.success(
+            i18n.t("content_manager.success.deleted", {
+              name: getDisplayFileName(itemToDeleteForDialog),
+            }),
+          );
           successfulOperations++;
-          setItems(prevItems => prevItems.filter(i => i.filename !== itemToDeleteForDialog.filename));
-          setSelectedItemIds(prevIds => {
+          setItems((prevItems) =>
+            prevItems.filter(
+              (i) => i.filename !== itemToDeleteForDialog.filename,
+            ),
+          );
+          setSelectedItemIds((prevIds) => {
             const newSet = new Set(prevIds);
             newSet.delete(itemToDeleteForDialog.filename);
             return newSet;
           });
         } catch (err) {
           const errorDetail = parseErrorMessage(err);
-          toast.error(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
-          errors.push(i18n.t('content_manager.errors.delete_failed', { name: getDisplayFileName(itemToDeleteForDialog), error: errorDetail }));
+          toast.error(
+            i18n.t("content_manager.errors.delete_failed", {
+              name: getDisplayFileName(itemToDeleteForDialog),
+              error: errorDetail,
+            }),
+          );
+          errors.push(
+            i18n.t("content_manager.errors.delete_failed", {
+              name: getDisplayFileName(itemToDeleteForDialog),
+              error: errorDetail,
+            }),
+          );
         }
       } else {
         // Error already toasted by createUninstallPayload
@@ -876,15 +1048,25 @@ export function useLocalContentManager<T extends LocalContentItem>({
 
     setIsDialogActionLoading(false);
     handleCloseDeleteDialog();
-    if (successfulOperations > 0 || errors.length > 0) { 
-      if (isBatchDeleteConfirmActive || errors.length > 0) { // Refresh if batch or single error
+    if (successfulOperations > 0 || errors.length > 0) {
+      if (isBatchDeleteConfirmActive || errors.length > 0) {
+        // Refresh if batch or single error
         await fetchData(true); // Full refresh
       }
       if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
     }
-    if (errors.length > 0 && !isBatchDeleteConfirmActive) setError(errors.join("; "));
-
-  }, [profile, selectedItemIds, items, itemToDeleteForDialog, isBatchDeleteConfirmActive, fetchData, getDisplayFileName, handleCloseDeleteDialog]);
+    if (errors.length > 0 && !isBatchDeleteConfirmActive)
+      setError(errors.join("; "));
+  }, [
+    profile,
+    selectedItemIds,
+    items,
+    itemToDeleteForDialog,
+    isBatchDeleteConfirmActive,
+    fetchData,
+    getDisplayFileName,
+    handleCloseDeleteDialog,
+  ]);
 
   const handleBatchToggleSelected = useCallback(async () => {
     if (!profile || selectedItemIds.size === 0) return;
@@ -893,410 +1075,609 @@ export function useLocalContentManager<T extends LocalContentItem>({
     let successfulOperations = 0;
 
     for (const itemId of selectedItemIds) {
-      const item = items.find(i => i.filename === itemId);
+      const item = items.find((i) => i.filename === itemId);
       if (item) {
         // Determine the target state for *this specific item*
         const targetEnabledStateForItem = item.is_disabled; // If disabled (true), target is to enable (true). If enabled (false), target is to disable (false).
-        
-        const payload = createTogglePayload(item, profile.id, contentType, targetEnabledStateForItem);
+
+        const payload = createTogglePayload(
+          item,
+          profile.id,
+          contentType,
+          targetEnabledStateForItem,
+        );
 
         if (payload) {
           try {
             await toggleContentFromProfile(payload);
-            setItems(prev => prev.map(i => 
-              i.filename === itemId ? { ...i, is_disabled: !targetEnabledStateForItem } : i
-            ));
+            setItems((prev) =>
+              prev.map((i) =>
+                i.filename === itemId
+                  ? { ...i, is_disabled: !targetEnabledStateForItem }
+                  : i,
+              ),
+            );
             successfulOperations++;
           } catch (err) {
             const errorDetail = parseErrorMessage(err);
-            errors.push(`Failed to toggle ${getDisplayFileName(item)}: ${errorDetail}`);
+            errors.push(
+              `Failed to toggle ${getDisplayFileName(item)}: ${errorDetail}`,
+            );
           }
         } else {
           // Error already toasted by createTogglePayload if it returned null
-          errors.push(`Could not create toggle payload for ${getDisplayFileName(item)}.`);
+          errors.push(
+            `Could not create toggle payload for ${getDisplayFileName(item)}.`,
+          );
         }
       } else {
         errors.push(`Could not find item ID ${itemId} to toggle.`);
       }
     }
     setIsBatchToggling(false);
-    if (errors.length > 0) toast.error(i18n.t('content_manager.errors.batch_toggle_failed', { errors: errors.join("; ") }));
+    if (errors.length > 0)
+      toast.error(
+        i18n.t("content_manager.errors.batch_toggle_failed", {
+          errors: errors.join("; "),
+        }),
+      );
     if (successfulOperations > 0) {
-      toast.success(i18n.t('content_manager.success.batch_toggled', { count: successfulOperations }));
+      toast.success(
+        i18n.t("content_manager.success.batch_toggled", {
+          count: successfulOperations,
+        }),
+      );
       if (onRefreshRequiredRef.current) onRefreshRequiredRef.current();
     }
     setSelectedItemIds(new Set());
-  }, [profile, selectedItemIds, items, contentType, getDisplayFileName]); 
+  }, [profile, selectedItemIds, items, contentType, getDisplayFileName]);
 
   const handleBatchDeleteSelected = useCallback(() => {
     if (!profile || selectedItemIds.size === 0) return;
-    setItemToDeleteForDialog(null); 
+    setItemToDeleteForDialog(null);
     setIsBatchDeleteConfirmActive(true);
     setIsConfirmDeleteDialogOpen(true);
   }, [profile, selectedItemIds]);
 
   const handleOpenItemFolder = useCallback(async (item: T) => {
     if (!item.path) {
-      toast.error(i18n.t('content_manager.errors.path_not_available'));
+      toast.error(i18n.t("content_manager.errors.path_not_available"));
       return;
     }
     try {
       await revealItemInDir(item.path);
     } catch (revealError: any) {
       try {
-        const parentPath = item.path.replace(/[\\/][^\\/]+$/, '');
+        const parentPath = item.path.replace(/[\\/][^\\/]+$/, "");
         await openPath(parentPath || item.path);
       } catch (openError: any) {
-        const errorMsg = openError?.message || revealError?.message || "Failed to open item location.";
-        toast.error(i18n.t('content_manager.errors.failed_open_location', { error: errorMsg }));
+        const errorMsg =
+          openError?.message ||
+          revealError?.message ||
+          "Failed to open item location.";
+        toast.error(
+          i18n.t("content_manager.errors.failed_open_location", {
+            error: errorMsg,
+          }),
+        );
       }
     }
   }, []);
-  
-  const checkForContentUpdates = useCallback(async (currentProfile = profile, currentItems = items) => {
-    if (!currentProfile || !currentItems || currentItems.length === 0) {
-      setContentUpdates({});
-      return;
-    }
 
-    // Sammle alle Items die entweder einen sha1_hash (Modrinth) oder fingerprint (CurseForge) haben
-    const itemsWithIdentifiers = currentItems.filter(item =>
-      item.sha1_hash || (item.curseforge_info?.fingerprint !== undefined)
-    );
-
-    if (itemsWithIdentifiers.length === 0) {
-      setContentUpdates({});
-      return;
-    }
-
-    // Erstelle Identifier-Mapping: für jeden Item einen eindeutigen String-Identifier
-    const itemIdentifiers: Array<{ item: T; identifier: string; platform: ModPlatform }> = [];
-
-    for (const item of itemsWithIdentifiers) {
-      // Use centralized utility function for consistent identifier logic
-      const identifier = getUpdateIdentifier(item);
-      const platform = getContentPlatform(item) === 'CurseForge' ? ModPlatform.CurseForge : ModPlatform.Modrinth;
-
-      if (identifier) {
-        itemIdentifiers.push({ item, identifier, platform });
-      }
-    }
-
-    const hashes = itemIdentifiers.map(({ identifier }) => identifier);
-
-    // Sammle Plattform-Informationen für jeden Identifier
-    const hashPlatforms: Record<string, ModPlatform> = {};
-    const hashFingerprints: Record<string, number> = {};
-
-    for (const { identifier, platform, item } of itemIdentifiers) {
-      hashPlatforms[identifier] = platform;
-
-      // Sammle CurseForge Fingerprints wenn verfügbar
-      if (platform === ModPlatform.CurseForge && item.curseforge_info?.fingerprint) {
-        hashFingerprints[identifier] = item.curseforge_info.fingerprint;
-      }
-    }
-
-    setIsCheckingUpdates(true);
-    setContentUpdateError(null);
-    console.log("Current Items:", currentItems);
-    console.log("Hash platforms:", hashPlatforms);
-
-    try {
-      const request: UnifiedUpdateCheckRequest = {
-        hashes,
-        algorithm: "sha1",
-        loaders: (contentType === 'Mod' || contentType === 'NoRiskMod') && currentProfile.loader ? [currentProfile.loader] : [],
-        game_versions: [currentProfile.game_version],
-        hash_platforms: hashPlatforms, // Neue Plattform-Mapping
-        hash_fingerprints: Object.keys(hashFingerprints).length > 0 ? hashFingerprints : undefined,
-      };
-
-      // Verwende den UnifiedService
-      const updates: UnifiedUpdateCheckResponse = await UnifiedService.checkModUpdates(request);
-
-      // Debug logging
-      console.log('=== UPDATE CHECK DEBUG ===');
-      console.log('Available update keys:', Object.keys(updates.updates));
-      console.log('Sample updates:');
-      Object.entries(updates.updates).slice(0, 3).forEach(([key, update]) => {
-        console.log(`  Key: "${key}" -> ${update.version_number} (${update.source})`);
-      });
-
-      const filteredUpdates: Record<string, UnifiedVersion> = {};
-      const itemsByIdentifier = new Map<string, T>();
-
-      // Erstelle Mapping von Identifier zu Item
-      for (const { item, identifier } of itemIdentifiers) {
-        itemsByIdentifier.set(identifier, item);
+  const checkForContentUpdates = useCallback(
+    async (currentProfile = profile, currentItems = items) => {
+      if (!currentProfile || !currentItems || currentItems.length === 0) {
+        setContentUpdates({});
+        return;
       }
 
-      console.log('=== FILTERING DEBUG ===');
-      console.log('Items by identifier keys:', Array.from(itemsByIdentifier.keys()));
-      console.log('Update keys to process:', Object.keys(updates.updates));
+      // Sammle alle Items die entweder einen sha1_hash (Modrinth) oder fingerprint (CurseForge) haben
+      const itemsWithIdentifiers = currentItems.filter(
+        (item) =>
+          item.sha1_hash || item.curseforge_info?.fingerprint !== undefined,
+      );
 
-      for (const [identifier, unifiedVersion] of Object.entries(updates.updates)) {
-        const item = itemsByIdentifier.get(identifier);
-        console.log(`Processing update key "${identifier}": item found = ${!!item}`);
-        if (item) {
-          console.log(`  Item: ${item.filename}, platform: ${item.platform}, has curseforge_info: ${!!item.curseforge_info}, fingerprint: ${item.curseforge_info?.fingerprint}, sha1_hash: ${item.sha1_hash}`);
-        } else {
-          // Try to find item with different identifier formats
-          console.log(`  Looking for item with fingerprint ${identifier}...`);
-          const foundByFingerprint = items.find(i => i.curseforge_info?.fingerprint?.toString() === identifier);
-          if (foundByFingerprint) {
-            console.log(`  Found by fingerprint: ${foundByFingerprint.filename}`);
-          } else {
-            console.log(`  No item found with fingerprint ${identifier}`);
-          }
-        }
+      if (itemsWithIdentifiers.length === 0) {
+        setContentUpdates({});
+        return;
+      }
 
-        if (item && unifiedVersion && unifiedVersion.id) {
-          // Vergleiche die aktuelle Version mit der verfügbaren Update-Version
-          const currentVersionId = item.modrinth_info?.version_id || item.curseforge_info?.file_id || item.id;
-          console.log(`Comparing versions for ${item.filename}: current=${currentVersionId} (${typeof currentVersionId}), update=${unifiedVersion.id} (${typeof unifiedVersion.id})`);
-          if (currentVersionId !== unifiedVersion.id) {
-            console.log(`Found update for ${item.filename}: ${currentVersionId} -> ${unifiedVersion.id}`);
-            // Verwende UnifiedVersion direkt ohne Konvertierung
-            filteredUpdates[identifier] = unifiedVersion as UnifiedVersion;
-          } else {
-            console.log(`No update needed for ${item.filename}: versions match (${currentVersionId})`);
-          }
-        } else {
-          console.log(`Skipping update for key "${identifier}": item=${!!item}, unifiedVersion=${!!unifiedVersion}, unifiedVersion.id=${unifiedVersion?.id}`);
+      // Erstelle Identifier-Mapping: für jeden Item einen eindeutigen String-Identifier
+      const itemIdentifiers: Array<{
+        item: T;
+        identifier: string;
+        platform: ModPlatform;
+      }> = [];
+
+      for (const item of itemsWithIdentifiers) {
+        // Use centralized utility function for consistent identifier logic
+        const identifier = getUpdateIdentifier(item);
+        const platform =
+          getContentPlatform(item) === "CurseForge"
+            ? ModPlatform.CurseForge
+            : ModPlatform.Modrinth;
+
+        if (identifier) {
+          itemIdentifiers.push({ item, identifier, platform });
         }
       }
 
-      console.log('Filtered updates result:', Object.keys(filteredUpdates));
+      const hashes = itemIdentifiers.map(({ identifier }) => identifier);
 
-      console.log("Filtered updates:", filteredUpdates);
-      setContentUpdates(filteredUpdates);
-    } catch (error) {
-      const errorMsg = parseErrorMessage(error);
-      console.error(`Error checking for ${contentType} updates:`, errorMsg);
-      setContentUpdateError(`Error checking for ${contentType} updates: ${errorMsg}`);
-      setContentUpdates({});
-    } finally {
-      setIsCheckingUpdates(false);
-    }
-  }, [profile, items, contentType]);
+      // Sammle Plattform-Informationen für jeden Identifier
+      const hashPlatforms: Record<string, ModPlatform> = {};
+      const hashFingerprints: Record<string, number> = {};
+
+      for (const { identifier, platform, item } of itemIdentifiers) {
+        hashPlatforms[identifier] = platform;
+
+        // Sammle CurseForge Fingerprints wenn verfügbar
+        if (
+          platform === ModPlatform.CurseForge &&
+          item.curseforge_info?.fingerprint
+        ) {
+          hashFingerprints[identifier] = item.curseforge_info.fingerprint;
+        }
+      }
+
+      setIsCheckingUpdates(true);
+      setContentUpdateError(null);
+      console.log("Current Items:", currentItems);
+      console.log("Hash platforms:", hashPlatforms);
+
+      try {
+        const request: UnifiedUpdateCheckRequest = {
+          hashes,
+          algorithm: "sha1",
+          loaders:
+            (contentType === "Mod" || contentType === "NoRiskMod") &&
+            currentProfile.loader
+              ? [currentProfile.loader]
+              : [],
+          game_versions: [currentProfile.game_version],
+          hash_platforms: hashPlatforms, // Neue Plattform-Mapping
+          hash_fingerprints:
+            Object.keys(hashFingerprints).length > 0
+              ? hashFingerprints
+              : undefined,
+        };
+
+        // Verwende den UnifiedService
+        const updates: UnifiedUpdateCheckResponse =
+          await UnifiedService.checkModUpdates(
+            request,
+            cacheBehaviourRef.current,
+          );
+
+        // Debug logging
+        console.log("=== UPDATE CHECK DEBUG ===");
+        console.log("Available update keys:", Object.keys(updates.updates));
+        console.log("Sample updates:");
+        Object.entries(updates.updates)
+          .slice(0, 3)
+          .forEach(([key, update]) => {
+            console.log(
+              `  Key: "${key}" -> ${update.version_number} (${update.source})`,
+            );
+          });
+
+        const filteredUpdates: Record<string, UnifiedVersion> = {};
+        const itemsByIdentifier = new Map<string, T>();
+
+        // Erstelle Mapping von Identifier zu Item
+        for (const { item, identifier } of itemIdentifiers) {
+          itemsByIdentifier.set(identifier, item);
+        }
+
+        console.log("=== FILTERING DEBUG ===");
+        console.log(
+          "Items by identifier keys:",
+          Array.from(itemsByIdentifier.keys()),
+        );
+        console.log("Update keys to process:", Object.keys(updates.updates));
+
+        for (const [identifier, unifiedVersion] of Object.entries(
+          updates.updates,
+        )) {
+          const item = itemsByIdentifier.get(identifier);
+          console.log(
+            `Processing update key "${identifier}": item found = ${!!item}`,
+          );
+          if (item) {
+            console.log(
+              `  Item: ${item.filename}, platform: ${item.platform}, has curseforge_info: ${!!item.curseforge_info}, fingerprint: ${item.curseforge_info?.fingerprint}, sha1_hash: ${item.sha1_hash}`,
+            );
+          } else {
+            // Try to find item with different identifier formats
+            console.log(`  Looking for item with fingerprint ${identifier}...`);
+            const foundByFingerprint = items.find(
+              (i) => i.curseforge_info?.fingerprint?.toString() === identifier,
+            );
+            if (foundByFingerprint) {
+              console.log(
+                `  Found by fingerprint: ${foundByFingerprint.filename}`,
+              );
+            } else {
+              console.log(`  No item found with fingerprint ${identifier}`);
+            }
+          }
+
+          if (item && unifiedVersion && unifiedVersion.id) {
+            // Vergleiche die aktuelle Version mit der verfügbaren Update-Version
+            const currentVersionId =
+              item.modrinth_info?.version_id ||
+              item.curseforge_info?.file_id ||
+              item.id;
+            console.log(
+              `Comparing versions for ${item.filename}: current=${currentVersionId} (${typeof currentVersionId}), update=${unifiedVersion.id} (${typeof unifiedVersion.id})`,
+            );
+            if (currentVersionId !== unifiedVersion.id) {
+              console.log(
+                `Found update for ${item.filename}: ${currentVersionId} -> ${unifiedVersion.id}`,
+              );
+              // Verwende UnifiedVersion direkt ohne Konvertierung
+              filteredUpdates[identifier] = unifiedVersion as UnifiedVersion;
+            } else {
+              console.log(
+                `No update needed for ${item.filename}: versions match (${currentVersionId})`,
+              );
+            }
+          } else {
+            console.log(
+              `Skipping update for key "${identifier}": item=${!!item}, unifiedVersion=${!!unifiedVersion}, unifiedVersion.id=${unifiedVersion?.id}`,
+            );
+          }
+        }
+
+        console.log("Filtered updates result:", Object.keys(filteredUpdates));
+
+        console.log("Filtered updates:", filteredUpdates);
+        setContentUpdates(filteredUpdates);
+      } catch (error) {
+        const errorMsg = parseErrorMessage(error);
+        console.error(`Error checking for ${contentType} updates:`, errorMsg);
+        setContentUpdateError(
+          `Error checking for ${contentType} updates: ${errorMsg}`,
+        );
+        setContentUpdates({});
+      } finally {
+        setIsCheckingUpdates(false);
+      }
+    },
+    [profile, items, contentType],
+  );
 
   // Common function for switching content versions
-  const performContentVersionSwitch = useCallback(async (
-    item: T,
-    newVersion: UnifiedVersion,
-    options: {
-      removeUpdateNotification?: boolean;
-      isUpdateOperation?: boolean;
-    } = {}
-  ): Promise<T> => {
-    // Use the unified service method - backend handles all platform logic
-    await UnifiedService.switchContentVersion(
-      profile.id,
-      mapUiContentTypeToBackend(contentType),
-      item,
-      newVersion
-    );
+  const performContentVersionSwitch = useCallback(
+    async (
+      item: T,
+      newVersion: UnifiedVersion,
+      options: {
+        removeUpdateNotification?: boolean;
+        isUpdateOperation?: boolean;
+      } = {},
+    ): Promise<T> => {
+      // Use the unified service method - backend handles all platform logic
+      await UnifiedService.switchContentVersion(
+        profile.id,
+        mapUiContentTypeToBackend(contentType),
+        item,
+        newVersion,
+      );
 
-    // After successful invoke, create the updated item for the frontend state.
-    const primaryFile = newVersion.files.find(f => f.primary) || newVersion.files[0];
-    if (!primaryFile) throw new Error(`${options.isUpdateOperation ? 'Updated' : 'Switched'} version details are missing a primary file.`);
+      // After successful invoke, create the updated item for the frontend state.
+      const primaryFile =
+        newVersion.files.find((f) => f.primary) || newVersion.files[0];
+      if (!primaryFile)
+        throw new Error(
+          `${options.isUpdateOperation ? "Updated" : "Switched"} version details are missing a primary file.`,
+        );
 
-    const newSha1 = primaryFile.hashes.sha1 || null;
-    const newFilename = primaryFile.filename;
-    const oldPath = item.path;
-    const pathSeparator = oldPath.includes('/') ? '/' : '\\';
-    const dirPath = oldPath.substring(0, oldPath.lastIndexOf(pathSeparator));
-    const newPath = `${dirPath}${pathSeparator}${newFilename}`;
+      const newSha1 = primaryFile.hashes.sha1 || null;
+      const newFilename = primaryFile.filename;
+      const oldPath = item.path;
+      const pathSeparator = oldPath.includes("/") ? "/" : "\\";
+      const dirPath = oldPath.substring(0, oldPath.lastIndexOf(pathSeparator));
+      const newPath = `${dirPath}${pathSeparator}${newFilename}`;
 
-    // Plattform-spezifische Info-Updates
-    const platform = newVersion.source;
-    let updatedModrinthInfo = item.modrinth_info;
-    let updatedCurseForgeInfo = item.curseforge_info;
+      // Plattform-spezifische Info-Updates
+      const platform = newVersion.source;
+      let updatedModrinthInfo = item.modrinth_info;
+      let updatedCurseForgeInfo = item.curseforge_info;
 
-    if (platform === 'Modrinth') {
-      updatedModrinthInfo = {
-        ...(item.modrinth_info || {}),
-        project_id: newVersion.project_id,
-        version_id: newVersion.id,
-        name: newVersion.name,
-        version_number: newVersion.version_number,
-        download_url: primaryFile.url,
+      if (platform === "Modrinth") {
+        updatedModrinthInfo = {
+          ...(item.modrinth_info || {}),
+          project_id: newVersion.project_id,
+          version_id: newVersion.id,
+          name: newVersion.name,
+          version_number: newVersion.version_number,
+          download_url: primaryFile.url,
+        };
+      } else if (platform === "CurseForge") {
+        updatedCurseForgeInfo = {
+          ...(item.curseforge_info || {}),
+          project_id: newVersion.project_id,
+          file_id: newVersion.id,
+          name: newVersion.name,
+          version_number: newVersion.version_number,
+          download_url: primaryFile.url,
+        };
+      }
+
+      const updatedItem: T = {
+        ...item, // Start with the old item to preserve path etc.
+        filename: newFilename,
+        path: newPath,
+        path_str: newPath,
+        is_disabled: false,
+        sha1_hash: newSha1,
+        fallback_version: newVersion.version_number,
+        modrinth_info: updatedModrinthInfo,
+        curseforge_info: updatedCurseForgeInfo,
       };
-    } else if (platform === 'CurseForge') {
-      updatedCurseForgeInfo = {
-        ...(item.curseforge_info || {}),
-        project_id: newVersion.project_id,
-        file_id: newVersion.id,
-        name: newVersion.name,
-        version_number: newVersion.version_number,
-        download_url: primaryFile.url,
+
+      // Update the main items list with the new item data
+      setItems((prevItems) =>
+        prevItems.map((i) => (i.filename === item.filename ? updatedItem : i)),
+      );
+
+      // Remove update notification if requested
+      if (options.removeUpdateNotification) {
+        const updateIdentifier = getUpdateIdentifier(item);
+        if (updateIdentifier) {
+          setContentUpdates((prev) => {
+            const newUpdates = { ...prev };
+            delete newUpdates[updateIdentifier];
+            return newUpdates;
+          });
+        }
+      }
+
+      return updatedItem;
+    },
+    [profile, contentType, setItems, setContentUpdates],
+  );
+
+  const handleUpdateContentItem = useCallback(
+    async (
+      item: T,
+      updateVersion: UnifiedVersion,
+      suppressOwnToast: boolean = false,
+    ) => {
+      // 1. Initial checks
+      if (!profile) {
+        toast.error(i18n.t("content_manager.errors.profile_missing_update"));
+        return;
+      }
+
+      // 1.5. Check if this is a modpack mod (blocked unless updates are explicitly enabled)
+      if (
+        contentType === "Mod" &&
+        item.modpack_origin !== null &&
+        item.modpack_origin !== undefined &&
+        item.updates_enabled !== true
+      ) {
+        toast.error(
+          i18n.t("content_manager.errors.modpack_mod_update_blocked", {
+            name: getDisplayFileName(item),
+          }),
+        );
+        return;
+      }
+
+      // 2. Validate requirements for all content types
+      const platform = updateVersion.source;
+
+      // Basic validation for all content types
+      if (
+        !item.path &&
+        !(
+          contentType === "Mod" &&
+          item.id &&
+          !item.source_type &&
+          !item.norisk_info
+        )
+      ) {
+        toast.error(
+          i18n.t("content_manager.errors.item_path_missing_update", {
+            name: getDisplayFileName(item),
+          }),
+        );
+        return;
+      }
+
+      // Platform-specific validation
+      if (
+        platform === "Modrinth" &&
+        contentType === "Mod" &&
+        item.id &&
+        !item.source_type &&
+        !item.norisk_info &&
+        !item.modrinth_info
+      ) {
+        toast.error(
+          i18n.t("content_manager.errors.mod_not_modrinth", {
+            name: getDisplayFileName(item),
+          }),
+        );
+        return;
+      }
+
+      if (
+        platform === "CurseForge" &&
+        contentType === "Mod" &&
+        item.id &&
+        !item.source_type &&
+        !item.norisk_info &&
+        !item.curseforge_info
+      ) {
+        toast.error(
+          i18n.t("content_manager.errors.mod_not_curseforge", {
+            name: getDisplayFileName(item),
+          }),
+        );
+        return;
+      }
+
+      console.log(
+        `[${contentType}] Updating ${getDisplayFileName(item)} to version ${updateVersion.version_number} (${platform})`,
+      );
+
+      // 3. Setup for the operation
+      setItemsBeingUpdated((prev) => new Set(prev).add(item.filename));
+      setContentUpdateError(null);
+
+      const promiseAction = async () => {
+        await performContentVersionSwitch(item, updateVersion, {
+          removeUpdateNotification: true,
+          isUpdateOperation: true,
+        });
       };
-    }
 
-    const updatedItem: T = {
-      ...item, // Start with the old item to preserve path etc.
-      filename: newFilename,
-      path: newPath,
-      path_str: newPath,
-      is_disabled: false,
-      sha1_hash: newSha1,
-      fallback_version: newVersion.version_number,
-      modrinth_info: updatedModrinthInfo,
-      curseforge_info: updatedCurseForgeInfo,
-    };
-
-    // Update the main items list with the new item data
-    setItems(prevItems => prevItems.map(i => i.filename === item.filename ? updatedItem : i));
-
-    // Remove update notification if requested
-    if (options.removeUpdateNotification) {
-      const updateIdentifier = getUpdateIdentifier(item);
-      if (updateIdentifier) {
-        setContentUpdates(prev => {
-          const newUpdates = { ...prev };
-          delete newUpdates[updateIdentifier];
-          return newUpdates;
+      // 4. Execute with toast.promise and cleanup
+      try {
+        if (suppressOwnToast) {
+          await promiseAction();
+        } else {
+          await toast.promise(
+            promiseAction(),
+            {
+              loading: i18n.t("content_manager.loading.updating", {
+                name: getDisplayFileName(item),
+                version: updateVersion.version_number,
+              }),
+              success: i18n.t("content_manager.success.updated", {
+                name: getDisplayFileName(item),
+                version: updateVersion.version_number,
+              }),
+              error: (err: any) => {
+                console.error(
+                  `Failed to update ${contentType} for ${getDisplayFileName(item)} (${platform}):`,
+                  err,
+                );
+                const errorMsg =
+                  err?.message ||
+                  (typeof err === "string"
+                    ? err
+                    : "An unknown error occurred during the update.");
+                return i18n.t("content_manager.errors.update_failed", {
+                  name: getDisplayFileName(item),
+                  error: errorMsg,
+                });
+              },
+            },
+            {
+              success: {
+                duration: 700,
+              },
+            },
+          );
+        }
+      } catch (err) {
+        if (suppressOwnToast) {
+          throw err;
+        }
+        // This catch is for issues if toast.promise itself or the promise chain has an unhandled rejection
+        // not already processed by the 'error' callback of toast.promise.
+        console.error(
+          `Outer catch during update process for ${getDisplayFileName(item)}:`,
+          err,
+        );
+        // No additional user-facing toast here, as toast.promise's error handler should cover it.
+      } finally {
+        setItemsBeingUpdated((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(item.filename);
+          return newSet;
         });
       }
-    }
-
-    return updatedItem;
-  }, [profile, contentType, setItems, setContentUpdates]);
-
-  const handleUpdateContentItem = useCallback(async (item: T, updateVersion: UnifiedVersion, suppressOwnToast: boolean = false) => {
-    // 1. Initial checks
-    if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_update'));
-      return;
-    }
-
-    // 1.5. Check if this is a modpack mod (blocked unless updates are explicitly enabled)
-    if (contentType === 'Mod' && item.modpack_origin !== null && item.modpack_origin !== undefined && item.updates_enabled !== true) {
-      toast.error(i18n.t('content_manager.errors.modpack_mod_update_blocked', { name: getDisplayFileName(item) }));
-      return;
-    }
-
-    // 2. Validate requirements for all content types
-    const platform = updateVersion.source;
-
-    // Basic validation for all content types
-    if (!item.path && !(contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info)) {
-      toast.error(i18n.t('content_manager.errors.item_path_missing_update', { name: getDisplayFileName(item) }));
-      return;
-    }
-
-    // Platform-specific validation
-    if (platform === 'Modrinth' && contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info && !item.modrinth_info) {
-      toast.error(i18n.t('content_manager.errors.mod_not_modrinth', { name: getDisplayFileName(item) }));
-      return;
-    }
-
-    if (platform === 'CurseForge' && contentType === 'Mod' && item.id && !item.source_type && !item.norisk_info && !item.curseforge_info) {
-      toast.error(i18n.t('content_manager.errors.mod_not_curseforge', { name: getDisplayFileName(item) }));
-      return;
-    }
-
-    console.log(`[${contentType}] Updating ${getDisplayFileName(item)} to version ${updateVersion.version_number} (${platform})`);
-
-    // 3. Setup for the operation
-    setItemsBeingUpdated(prev => new Set(prev).add(item.filename));
-    setContentUpdateError(null);
-
-    const promiseAction = async () => {
-      await performContentVersionSwitch(item, updateVersion, {
-        removeUpdateNotification: true,
-        isUpdateOperation: true
-      });
-    };
-
-    // 4. Execute with toast.promise and cleanup
-    try {
-      if (suppressOwnToast) {
-        await promiseAction();
-      } else {
-        await toast.promise(
-          promiseAction(),
-          {
-            loading: i18n.t('content_manager.loading.updating', { name: getDisplayFileName(item), version: updateVersion.version_number }),
-            success: i18n.t('content_manager.success.updated', { name: getDisplayFileName(item), version: updateVersion.version_number }),
-            error: (err: any) => {
-              console.error(`Failed to update ${contentType} for ${getDisplayFileName(item)} (${platform}):`, err);
-              const errorMsg = err?.message || (typeof err === 'string' ? err : "An unknown error occurred during the update.");
-              return i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg });
-            }
-          },
-          {
-            success: {
-              duration: 700,
-            },
-          }
-        );
-      }
-    } catch (err) {
-      if (suppressOwnToast) {
-        throw err;
-      }
-      // This catch is for issues if toast.promise itself or the promise chain has an unhandled rejection
-      // not already processed by the 'error' callback of toast.promise.
-      console.error(`Outer catch during update process for ${getDisplayFileName(item)}:`, err);
-      // No additional user-facing toast here, as toast.promise's error handler should cover it.
-    } finally {
-      setItemsBeingUpdated(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(item.filename);
-        return newSet;
-      });
-    }
-  }, [profile, contentType, getDisplayFileName, setItemsBeingUpdated, setContentUpdateError, setContentUpdates, performContentVersionSwitch]);
+    },
+    [
+      profile,
+      contentType,
+      getDisplayFileName,
+      setItemsBeingUpdated,
+      setContentUpdateError,
+      setContentUpdates,
+      performContentVersionSwitch,
+    ],
+  );
 
   const handleUpdateAllAvailableContent = useCallback(async () => {
     if (Object.keys(contentUpdates).length === 0 || !profile) return;
-    
-    const itemsToUpdateWithDetails: {item: T, version: UnifiedVersion}[] = [];
+
+    const itemsToUpdateWithDetails: { item: T; version: UnifiedVersion }[] = [];
     for (const item of items) {
       // Use the same identifier logic as in checkForContentUpdates
       const updateIdentifier = getUpdateIdentifier(item);
       if (updateIdentifier && contentUpdates[updateIdentifier]) {
         // Only include mods that have updates enabled (true or null/undefined)
-        const hasUpdatesEnabled = contentType === 'Mod' && item.updates_enabled !== false;
+        const hasUpdatesEnabled =
+          contentType === "Mod" && item.updates_enabled !== false;
 
         if (hasUpdatesEnabled) {
-          itemsToUpdateWithDetails.push({ item, version: contentUpdates[updateIdentifier] });
+          itemsToUpdateWithDetails.push({
+            item,
+            version: contentUpdates[updateIdentifier],
+          });
         } else {
-          console.log(`Skipping ${getDisplayFileName(item)} from bulk update - UpdatesDisabled: ${!hasUpdatesEnabled}`);
+          console.log(
+            `Skipping ${getDisplayFileName(item)} from bulk update - UpdatesDisabled: ${!hasUpdatesEnabled}`,
+          );
         }
       }
     }
 
     if (itemsToUpdateWithDetails.length === 0) {
-        return;
+      return;
     }
-    
+
     setIsUpdatingAll(true);
     setContentUpdateError(null);
     let succeededCount = 0;
     const totalCount = itemsToUpdateWithDetails.length;
-    
-    const toastId = toast.loading(i18n.t('content_manager.loading.updating_progress', { current: 0, total: totalCount, type: contentType }));
-    
+
+    const toastId = toast.loading(
+      i18n.t("content_manager.loading.updating_progress", {
+        current: 0,
+        total: totalCount,
+        type: contentType,
+      }),
+    );
+
     for (const { item, version } of itemsToUpdateWithDetails) {
       try {
         await handleUpdateContentItem(item, version, true); // suppressOwnToast - version ist jetzt UnifiedVersion
         succeededCount++;
-        toast.loading(i18n.t('content_manager.loading.updating_progress', { current: succeededCount, total: totalCount, type: contentType }), { id: toastId });
-      } catch(err) {
+        toast.loading(
+          i18n.t("content_manager.loading.updating_progress", {
+            current: succeededCount,
+            total: totalCount,
+            type: contentType,
+          }),
+          { id: toastId },
+        );
+      } catch (err) {
         const errorMsg = parseErrorMessage(err);
-        toast.error(i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg }));
+        toast.error(
+          i18n.t("content_manager.errors.update_failed", {
+            name: getDisplayFileName(item),
+            error: errorMsg,
+          }),
+        );
       }
     }
-    
+
     setIsUpdatingAll(false);
-    
+
     const failedCount = totalCount - succeededCount;
     if (failedCount > 0) {
       if (totalCount > 1) {
-        const message = i18n.t('content_manager.update_result.finished_partial', { succeeded: succeededCount, failed: failedCount });
+        const message = i18n.t(
+          "content_manager.update_result.finished_partial",
+          { succeeded: succeededCount, failed: failedCount },
+        );
         if (succeededCount > 0) {
           toast.success(message, { id: toastId, duration: 700 });
         } else {
@@ -1307,189 +1688,278 @@ export function useLocalContentManager<T extends LocalContentItem>({
         toast.dismiss(toastId);
       }
     } else if (succeededCount > 0) {
-      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentType }), { id: toastId, duration: 700 });
+      toast.success(
+        i18n.t("content_manager.success.updated_all", {
+          count: succeededCount,
+          type: contentType,
+        }),
+        { id: toastId, duration: 700 },
+      );
     } else {
       toast.dismiss(toastId);
     }
-    
+
     if (succeededCount > 0) {
-        // The state has been updated in-place for each item.
-        // We don't need to re-check for updates immediately, as this could use stale data
-        // and cause the "Update All" button to reappear incorrectly.
-        // A manual refresh will catch any brand new updates.
+      // The state has been updated in-place for each item.
+      // We don't need to re-check for updates immediately, as this could use stale data
+      // and cause the "Update All" button to reappear incorrectly.
+      // A manual refresh will catch any brand new updates.
     }
-  }, [profile, items, contentUpdates, contentType, getDisplayFileName, handleUpdateContentItem, performContentVersionSwitch]);
+  }, [
+    profile,
+    items,
+    contentUpdates,
+    contentType,
+    getDisplayFileName,
+    handleUpdateContentItem,
+    performContentVersionSwitch,
+  ]);
 
-  const handleSwitchContentVersion = useCallback(async (item: T, newVersion: UnifiedVersion) => {
-    if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_switch'));
-      return;
-    }
+  const handleSwitchContentVersion = useCallback(
+    async (item: T, newVersion: UnifiedVersion) => {
+      if (!profile) {
+        toast.error(i18n.t("content_manager.errors.profile_missing_switch"));
+        return;
+      }
 
-    const promiseAction = async () => {
-      await performContentVersionSwitch(item, newVersion, {
-        isUpdateOperation: false
-      });
-    };
+      const promiseAction = async () => {
+        await performContentVersionSwitch(item, newVersion, {
+          isUpdateOperation: false,
+        });
+      };
 
-    await toast.promise(
-      promiseAction(),
-      {
-        loading: i18n.t('content_manager.loading.switching', { version: newVersion.name }),
-        success: i18n.t('content_manager.success.switched', { name: getDisplayFileName(item), version: newVersion.name }),
-        error: (err) => i18n.t('content_manager.errors.switch_failed', { error: err.message.toString() }),
-      },
-      {
-        success: {
-          duration: 700,
+      await toast.promise(
+        promiseAction(),
+        {
+          loading: i18n.t("content_manager.loading.switching", {
+            version: newVersion.name,
+          }),
+          success: i18n.t("content_manager.success.switched", {
+            name: getDisplayFileName(item),
+            version: newVersion.name,
+          }),
+          error: (err) =>
+            i18n.t("content_manager.errors.switch_failed", {
+              error: err.message.toString(),
+            }),
         },
-      },
-    );
+        {
+          success: {
+            duration: 700,
+          },
+        },
+      );
 
-    // the switch may have installed new dependency mods on the backend — re-fetch so they show up
-    await fetchData(true);
-  }, [profile, contentType, getDisplayFileName, performContentVersionSwitch, fetchData]);
+      // the switch may have installed new dependency mods on the backend — re-fetch so they show up
+      await fetchData(true);
+    },
+    [
+      profile,
+      contentType,
+      getDisplayFileName,
+      performContentVersionSwitch,
+      fetchData,
+    ],
+  );
 
   useEffect(() => {
     // Check for updates only after the initial full loading process for the current profile is complete,
     // and if there are items to check.
     if (profile?.id && items.length > 0 && isInitialLoadProcessComplete) {
-      console.log(`[${contentType}] Initial load process complete. Triggering checkForContentUpdates.`);
+      console.log(
+        `[${contentType}] Initial load process complete. Triggering checkForContentUpdates.`,
+      );
       checkForContentUpdates();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, isInitialLoadProcessComplete, contentType]); // Removed items, relying on checkForContentUpdates internal dep on items. checkForContentUpdates itself is a dependency here to ensure it's the latest version.
   // Note: We are intentionally omitting `items` from this dependency array to prevent re-checking on every toggle.
   // `checkForContentUpdates` is a useCallback that itself depends on `items`, so it will use the latest `items` when called.
   // The `isInitialLoadProcessComplete` flag is the primary gate for this effect.
 
   // Toggle updates enabled for a single item
-  const handleToggleItemUpdatesEnabled = useCallback(async (item: T) => {
-    if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_toggle_updates'));
-      return;
-    }
+  const handleToggleItemUpdatesEnabled = useCallback(
+    async (item: T) => {
+      if (!profile) {
+        toast.error(
+          i18n.t("content_manager.errors.profile_missing_toggle_updates"),
+        );
+        return;
+      }
 
-    if (!item.id) {
-      toast.error(i18n.t('content_manager.errors.no_valid_id_toggle_updates', { name: getDisplayFileName(item) }));
-      return;
-    }
+      if (!item.id) {
+        toast.error(
+          i18n.t("content_manager.errors.no_valid_id_toggle_updates", {
+            name: getDisplayFileName(item),
+          }),
+        );
+        return;
+      }
 
-    const currentUpdatesEnabled = item.updates_enabled ?? true; // Default to true if null
-    const newUpdatesEnabled = !currentUpdatesEnabled;
+      const currentUpdatesEnabled = item.updates_enabled ?? true; // Default to true if null
+      const newUpdatesEnabled = !currentUpdatesEnabled;
 
-    const promiseAction = async () => {
-      await toggleModUpdates({
-        profile_id: profile.id,
-        mod_id: item.id,
-        updates_enabled: newUpdatesEnabled,
-      });
+      const promiseAction = async () => {
+        await toggleModUpdates({
+          profile_id: profile.id,
+          mod_id: item.id,
+          updates_enabled: newUpdatesEnabled,
+        });
 
-      // Update local state immediately for better UX
-      setItems(prevItems =>
-        prevItems.map(prevItem =>
-          prevItem.id === item.id
-            ? { ...prevItem, updates_enabled: newUpdatesEnabled }
-            : prevItem
-        )
-      );
-    };
+        // Update local state immediately for better UX
+        setItems((prevItems) =>
+          prevItems.map((prevItem) =>
+            prevItem.id === item.id
+              ? { ...prevItem, updates_enabled: newUpdatesEnabled }
+              : prevItem,
+          ),
+        );
+      };
 
-    await toast.promise(
-      promiseAction(),
-      {
-        loading: i18n.t(newUpdatesEnabled ? 'content_manager.loading.enabling_update_checks' : 'content_manager.loading.disabling_update_checks', { name: getDisplayFileName(item) }),
-        success: i18n.t(newUpdatesEnabled ? 'content_manager.success.toggle_updates_enabled' : 'content_manager.success.toggle_updates_disabled', { name: getDisplayFileName(item) }),
-        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message?.toString() || 'Unknown error' }),
-      },
-      {
-        success: {
-          duration: 700,
+      await toast.promise(
+        promiseAction(),
+        {
+          loading: i18n.t(
+            newUpdatesEnabled
+              ? "content_manager.loading.enabling_update_checks"
+              : "content_manager.loading.disabling_update_checks",
+            { name: getDisplayFileName(item) },
+          ),
+          success: i18n.t(
+            newUpdatesEnabled
+              ? "content_manager.success.toggle_updates_enabled"
+              : "content_manager.success.toggle_updates_disabled",
+            { name: getDisplayFileName(item) },
+          ),
+          error: (err) =>
+            i18n.t("content_manager.errors.toggle_update_checks_failed", {
+              error: err.message?.toString() || "Unknown error",
+            }),
         },
-      },
-    );
-
-  }, [profile, getDisplayFileName]);
+        {
+          success: {
+            duration: 700,
+          },
+        },
+      );
+    },
+    [profile, getDisplayFileName],
+  );
 
   // Bulk toggle updates enabled for selected items
-  const handleBatchToggleSelectedUpdatesEnabled = useCallback(async (updatesEnabled: boolean) => {
-    if (!profile) {
-      toast.error(i18n.t('content_manager.errors.profile_missing_toggle_updates'));
-      return;
-    }
-
-    if (selectedItemIds.size === 0) {
-      toast.error(i18n.t('content_manager.errors.no_items_selected'));
-      return;
-    }
-
-    // Find the selected items
-    const selectedItems = items.filter(item => selectedItemIds.has(item.filename));
-
-    if (selectedItems.length === 0) {
-      toast.error(i18n.t('content_manager.errors.selected_items_not_found'));
-      return;
-    }
-
-    const itemLabel = i18n.t(selectedItems.length === 1 ? 'content_manager.update_result.item' : 'content_manager.update_result.items');
-
-    const promiseAction = async () => {
-      // Filter out items without valid IDs and prepare bulk update payload
-      const validItems = selectedItems.filter(item => item.id);
-      if (validItems.length === 0) {
-        throw new Error("No valid items found with IDs for update check toggle");
+  const handleBatchToggleSelectedUpdatesEnabled = useCallback(
+    async (updatesEnabled: boolean) => {
+      if (!profile) {
+        toast.error(
+          i18n.t("content_manager.errors.profile_missing_toggle_updates"),
+        );
+        return;
       }
 
-      const modUpdates = validItems.map(item => ({
-        mod_id: item.id,
-        updates_enabled: updatesEnabled,
-      }));
+      if (selectedItemIds.size === 0) {
+        toast.error(i18n.t("content_manager.errors.no_items_selected"));
+        return;
+      }
 
-      await bulkToggleModUpdates({
-        profile_id: profile.id,
-        mod_updates: modUpdates,
-      });
-
-      // Update local state immediately for better UX (only for valid items)
-      setItems(prevItems =>
-        prevItems.map(prevItem =>
-          validItems.some(validItem => validItem.filename === prevItem.filename)
-            ? { ...prevItem, updates_enabled: updatesEnabled }
-            : prevItem
-        )
+      // Find the selected items
+      const selectedItems = items.filter((item) =>
+        selectedItemIds.has(item.filename),
       );
 
-      // Clear selection after successful operation
-      setSelectedItemIds(new Set());
-    };
-
-    await toast.promise(
-      promiseAction(),
-      {
-        loading: i18n.t(updatesEnabled ? 'content_manager.loading.enabling_update_checks_batch' : 'content_manager.loading.disabling_update_checks_batch', { count: selectedItems.length, itemLabel }),
-        success: i18n.t(updatesEnabled ? 'content_manager.success.batch_toggle_updates_enabled' : 'content_manager.success.batch_toggle_updates_disabled', { count: selectedItems.length, itemLabel }),
-        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message || 'Unknown error' }),
-      },
-      {
-        success: {
-          duration: 700,
-        },
-      },
-    ).catch((err) => {
-      // If we get an error about valid items, show a more specific message
-      if (err.message && err.message.includes('No valid items found')) {
-        toast.error(i18n.t('content_manager.errors.no_valid_ids_toggle_updates'));
+      if (selectedItems.length === 0) {
+        toast.error(i18n.t("content_manager.errors.selected_items_not_found"));
+        return;
       }
-    });
 
-  }, [profile, selectedItemIds, items]);
+      const itemLabel = i18n.t(
+        selectedItems.length === 1
+          ? "content_manager.update_result.item"
+          : "content_manager.update_result.items",
+      );
+
+      const promiseAction = async () => {
+        // Filter out items without valid IDs and prepare bulk update payload
+        const validItems = selectedItems.filter((item) => item.id);
+        if (validItems.length === 0) {
+          throw new Error(
+            "No valid items found with IDs for update check toggle",
+          );
+        }
+
+        const modUpdates = validItems.map((item) => ({
+          mod_id: item.id,
+          updates_enabled: updatesEnabled,
+        }));
+
+        await bulkToggleModUpdates({
+          profile_id: profile.id,
+          mod_updates: modUpdates,
+        });
+
+        // Update local state immediately for better UX (only for valid items)
+        setItems((prevItems) =>
+          prevItems.map((prevItem) =>
+            validItems.some(
+              (validItem) => validItem.filename === prevItem.filename,
+            )
+              ? { ...prevItem, updates_enabled: updatesEnabled }
+              : prevItem,
+          ),
+        );
+
+        // Clear selection after successful operation
+        setSelectedItemIds(new Set());
+      };
+
+      await toast
+        .promise(
+          promiseAction(),
+          {
+            loading: i18n.t(
+              updatesEnabled
+                ? "content_manager.loading.enabling_update_checks_batch"
+                : "content_manager.loading.disabling_update_checks_batch",
+              { count: selectedItems.length, itemLabel },
+            ),
+            success: i18n.t(
+              updatesEnabled
+                ? "content_manager.success.batch_toggle_updates_enabled"
+                : "content_manager.success.batch_toggle_updates_disabled",
+              { count: selectedItems.length, itemLabel },
+            ),
+            error: (err) =>
+              i18n.t("content_manager.errors.toggle_update_checks_failed", {
+                error: err.message || "Unknown error",
+              }),
+          },
+          {
+            success: {
+              duration: 700,
+            },
+          },
+        )
+        .catch((err) => {
+          // If we get an error about valid items, show a more specific message
+          if (err.message && err.message.includes("No valid items found")) {
+            toast.error(
+              i18n.t("content_manager.errors.no_valid_ids_toggle_updates"),
+            );
+          }
+        });
+    },
+    [profile, selectedItemIds, items],
+  );
 
   return {
     items,
-    isLoading: isInitialLoadingState, 
+    isLoading: isInitialLoadingState,
+    isRevalidating,
     isFetchingHashes: isFetchingHashesState,
-    isFetchingModrinthDetails: isFetchingModrinthDetailsState,
-    isAnyTaskRunning: isInitialLoadingState || isFetchingHashesState || isFetchingModrinthDetailsState || isCheckingUpdates || isUpdatingAll, 
+    isAnyTaskRunning:
+      isInitialLoadingState ||
+      isFetchingHashesState ||
+      isCheckingUpdates ||
+      isUpdatingAll,
     error,
     searchQuery,
     setSearchQuery,
@@ -1510,9 +1980,6 @@ export function useLocalContentManager<T extends LocalContentItem>({
     handleConfirmDeletion,
     handleCloseDeleteDialog,
     itemToDeleteForDialog,
-    modrinthIcons,
-    curseforgeIcons,
-    localArchiveIcons,
     getItemIcon,
     getItemPlatformDisplayName,
     contentUpdates,
@@ -1536,4 +2003,4 @@ export function useLocalContentManager<T extends LocalContentItem>({
     handleToggleItemUpdatesEnabled,
     handleBatchToggleSelectedUpdatesEnabled,
   };
-} 
+}

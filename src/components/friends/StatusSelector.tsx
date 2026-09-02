@@ -73,7 +73,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
             boxShadow: current.glow,
           }}
         />
-        <span className="text-sm text-white font-minecraft-ten">{t(current.labelKey)}</span>
+        <span className="text-sm text-white font-minecraft">{t(current.labelKey)}</span>
         <Icon
           icon="solar:alt-arrow-down-linear"
           className={cn(

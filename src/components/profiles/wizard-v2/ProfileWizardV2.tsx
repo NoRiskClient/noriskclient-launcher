@@ -30,6 +30,7 @@ import {
 import { useTranslation } from "react-i18next";
 import * as ProfileService from "../../../services/profile-service";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 function NrcCompatibleTooltipContent() {
   const { t } = useTranslation();
@@ -265,72 +266,12 @@ export function ProfileWizardV2({
       return (
         <div className="flex flex-col items-center justify-center h-64">
           <Icon
-            icon="solar:refresh-bold"
-            className="w-12 h-12 text-white animate-spin mb-4"
+            icon="svg-spinners:ring-resize"
+            className="w-12 h-12 text-white mb-4"
           />
-          <p className="text-xl font-minecraft text-white lowercase">
+          <p className="text-sm font-smallcaps text-white">
             {t("profiles.wizard.loadingVersions")}
           </p>
-        </div>
-      );
-    }
-
-    if (selectedVersionType === "default") {
-      return (
-        <div className="space-y-4">
-          <div className="flex justify-end gap-2">
-            {[
-              {
-                key: "release",
-                label: t("profiles.wizard.release"),
-                icon: "solar:star-bold",
-              },
-              {
-                key: "snapshot",
-                label: t("profiles.wizard.snapshot"),
-                icon: "solar:test-tube-bold",
-              },
-              { key: "default", label: "DEFAULT", icon: "solar:restart-bold" },
-            ].map((type) => (
-              <Button
-                key={type.key}
-                variant={selectedVersionType === type.key ? "flat" : "ghost"}
-                size="sm"
-                onClick={() => setSelectedVersionType(type.key as any)}
-                icon={<Icon icon={type.icon} className="w-4 h-4" />}
-              >
-                {type.label}
-              </Button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {defaultProfiles.map((profile) => (
-              <Card
-                key={profile.id}
-                className="p-4 cursor-pointer hover:bg-white/10"
-                onClick={async () => {
-                  await toast.promise(ProfileService.restoreDefaultProfiles(), {
-                    loading: "Restoring default profiles...",
-                    success: "Default profiles restored",
-                    error: (err) =>
-                      err instanceof Error ? err.message : String(err),
-                  });
-                  await useProfileStore.getState().fetchProfiles();
-                  onClose();
-                }}
-              >
-                <div className="font-minecraft text-2xl text-white lowercase">
-                  {profile.name}
-                </div>
-                <div className="font-minecraft-ten text-white/60">
-                  {profile.game_version} · {profile.loader}
-                </div>
-              </Card>
-            ))}
-          </div>
-          {defaultProfiles.length === 0 && (
-            <StatusMessage type="info" message="No default profiles found." />
-          )}
         </div>
       );
     }
@@ -418,10 +359,10 @@ export function ProfileWizardV2({
                   </div>
                 )}
                 <div className="flex flex-col items-center text-center">
-                  <h4 className="font-minecraft text-3xl text-white lowercase">
+                  <h4 className="font-smallcaps text-lg text-white">
                     {version.id}
                   </h4>
-                  <p className="text-xs text-white/60 font-minecraft-ten capitalize mt-1">
+                  <p className="text-xs text-white/60 font-minecraft capitalize mt-1">
                     {version.type}
                   </p>
                 </div>
@@ -436,7 +377,7 @@ export function ProfileWizardV2({
               icon="solar:magnifer-bold"
               className="w-12 h-12 text-white/50 mx-auto mb-2"
             />
-            <p className="text-lg font-minecraft text-white/70 lowercase">
+            <p className="text-xs font-smallcaps text-white/70">
               {t("profiles.wizard.noVersionsFound")}
             </p>
           </div>
@@ -452,7 +393,7 @@ export function ProfileWizardV2({
         onClick={handleStep1Next}
         disabled={loading || !selectedVersion}
         size="md"
-        className="min-w-[120px] text-xl"
+        className="min-w-[120px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
         iconPosition="right"
       >

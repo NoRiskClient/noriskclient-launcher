@@ -5,11 +5,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
-import type {
-  GetStarlightSkinRenderPayload,
-  MinecraftSkin,
-  SkinVariant,
-} from "../../types/localSkin";
+import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { Button } from "../ui/buttons/Button";
@@ -21,12 +17,30 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useSkinStore } from "../../store/useSkinStore";
 import { toast } from "react-hot-toast";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
+import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
+
+function useDelayedFlag(active: boolean, delayMs: number): boolean {
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    const id = setTimeout(() => setShown(true), delayMs);
+    return () => clearTimeout(id);
+  }, [active, delayMs]);
+
+  return shown;
+}
+
+const PREVIEW_WIDTH = 176;
+const PREVIEW_HEIGHT = 280;
 
 const SkinPreview = memo(
   ({
@@ -66,90 +80,15 @@ const SkinPreview = memo(
     const isSelected = selectedLocalSkin?.id === skin.id;
     const isDisabled = loading && isSelected;
 
-    const [starlightRenderUrl, setStarlightRenderUrl] = useState<string | null>(
-      null,
-    );
-    const [isRenderLoading, setIsRenderLoading] = useState<boolean>(true);
-    const [canShowSpinner, setCanShowSpinner] = useState<boolean>(false);
-    const spinnerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
-      let isMounted = true;
-      setIsRenderLoading(true);
-      setStarlightRenderUrl(null);
-      setCanShowSpinner(false);
-
-      if (spinnerTimeoutRef.current) {
-        clearTimeout(spinnerTimeoutRef.current);
-      }
-
-      spinnerTimeoutRef.current = setTimeout(() => {
-        if (isMounted && isRenderLoading) {
-          setCanShowSpinner(true);
-        }
-      }, 500);
-
-      const fetchRender = async () => {
-        if (skin && skin.name) {
-          try {
-            const payload: GetStarlightSkinRenderPayload = {
-              player_name: "skin",
-              render_type: "default",
-              render_view: "full",
-              base64_skin_data: skin.base64_data,
-            };
-            const localPath =
-              await MinecraftSkinService.getStarlightSkinRender(payload);
-            if (isMounted) {
-              if (localPath) {
-                setStarlightRenderUrl(convertFileSrc(localPath));
-              } else {
-                console.warn(
-                  `[SkinPreview] Starlight render returned empty path for ${skin.name}.`,
-                );
-                setStarlightRenderUrl("");
-              }
-              setIsRenderLoading(false);
-              setCanShowSpinner(false);
-              if (spinnerTimeoutRef.current)
-                clearTimeout(spinnerTimeoutRef.current);
-            }
-          } catch (error) {
-            console.error(
-              `[SkinPreview] Failed to fetch Starlight skin render for ${skin.name}:`,
-              error,
-            );
-            if (isMounted) {
-              setStarlightRenderUrl("");
-              setIsRenderLoading(false);
-              setCanShowSpinner(false);
-              if (spinnerTimeoutRef.current)
-                clearTimeout(spinnerTimeoutRef.current);
-            }
-          }
-        } else {
-          if (isMounted) {
-            console.warn(
-              `[SkinPreview] No skin.name provided, cannot fetch Starlight render.`,
-            );
-            setStarlightRenderUrl("");
-            setIsRenderLoading(false);
-            setCanShowSpinner(false);
-            if (spinnerTimeoutRef.current)
-              clearTimeout(spinnerTimeoutRef.current);
-          }
-        }
-      };
-
-      fetchRender();
-
-      return () => {
-        isMounted = false;
-        if (spinnerTimeoutRef.current) {
-          clearTimeout(spinnerTimeoutRef.current);
-        }
-      };
-    }, [skin?.name, skin?.base64_data, skin]);
+    const { url: previewUrl, loading: isRenderLoading } = useSkinPreview(true, {
+      textureUrl: skin.base64_data
+        ? `data:image/png;base64,${skin.base64_data}`
+        : null,
+      variant: skin.variant,
+      width: PREVIEW_WIDTH,
+      height: PREVIEW_HEIGHT,
+    });
+    const canShowSpinner = useDelayedFlag(isRenderLoading, 500);
 
     const animationStyle = isBackgroundAnimationEnabled
       ? { animationDelay: `${index * 0.075}s` }
@@ -171,9 +110,7 @@ const SkinPreview = memo(
           animationClasses,
           isDisabled ? "opacity-60 pointer-events-none" : "",
         )}
-        onClick={() =>
-          !isDisabled && !isApplied && !isSelected && onClick(skin)
-        }
+        onClick={() => !isDisabled && onClick(skin)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -216,22 +153,23 @@ const SkinPreview = memo(
           <div
             className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
             style={{
-              width: "140px",
-              height: "280px",
+              width: `${PREVIEW_WIDTH}px`,
+              height: `${PREVIEW_HEIGHT}px`,
             }}
           >
             {isRenderLoading && canShowSpinner ? (
               <div className="flex flex-col items-center justify-center space-y-2">
                 <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
-                <p className="font-minecraft text-xs text-white/70 lowercase">
+                <p className="font-smallcaps text-xs text-white/70">
                   {t("skins.loading")}
                 </p>
               </div>
             ) : !isRenderLoading ? (
               <SkinViewer
-                skinUrl={starlightRenderUrl || ""}
-                width={140}
-                height={280}
+                skinUrl={previewUrl}
+                width={PREVIEW_WIDTH}
+                height={PREVIEW_HEIGHT}
+                fill
                 className="rounded-sm block"
               />
             ) : null}
@@ -240,11 +178,11 @@ const SkinPreview = memo(
             {isDisabled && (
               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-8 h-8 animate-spin mb-1"
+                  icon="svg-spinners:ring-resize"
+                  className="w-8 h-8 mb-1"
                   style={{ color: accentColor.value }}
                 />
-                <span className="font-minecraft text-xs text-white lowercase">
+                <span className="font-smallcaps text-xs text-white">
                   {t("skins.applying")}
                 </span>
               </div>
@@ -255,14 +193,14 @@ const SkinPreview = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={skin.name}
             >
               {skin.name}
             </h3>
 
             {/* Skin Variant & Applied Status */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:palette-bold"
@@ -326,8 +264,8 @@ const AddSkinCard = memo(
           <div
             className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
             style={{
-              width: "140px",
-              height: "280px",
+              width: `${PREVIEW_WIDTH}px`,
+              height: `${PREVIEW_HEIGHT}px`,
             }}
           >
             <SkinViewer
@@ -351,14 +289,14 @@ const AddSkinCard = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft-ten text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={t("skins.addNewSkin")}
             >
               {t("skins.addNewSkin")}
             </h3>
 
             {/* Description */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft-ten">
+            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
                   icon="solar:upload-bold"
@@ -499,6 +437,7 @@ export function SkinsTab() {
       <AddSkinModal
         skin={skin}
         onSave={saveSkin}
+        onSaveAndApply={saveAndApplySkin}
         onAdd={addSkin}
         isLoading={localSkinsLoading}
       />,
@@ -593,6 +532,16 @@ export function SkinsTab() {
     );
   };
 
+  const saveAndApplySkin = async (skin: MinecraftSkin) => {
+    try {
+      await saveSkin(skin);
+      await applyLocalSkin(skin);
+    } catch (err) {
+      console.error("Save and apply failed:", err);
+      toast.error(parseErrorMessage(err));
+    }
+  };
+
   const applyLocalSkin = async (skin: MinecraftSkin) => {
     if (!activeAccount) {
       toast.error(t("skins.mustBeLoggedIn"));
@@ -638,7 +587,7 @@ export function SkinsTab() {
   const addSkinButton = (
     <button
       onClick={() => startEditSkin(null)}
-      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
       title={t("skins.addSkin")}
       disabled={!activeAccount}
     >
@@ -674,37 +623,37 @@ export function SkinsTab() {
         {/* Content */}
         <div className="space-y-8">
           {accountLoading ? (
-            <p className="text-white/70 font-minecraft text-xl text-center py-4">
+            <p className="text-white/70 font-smallcaps text-sm text-center py-4">
               {t("skins.loadingAccount")}
             </p>
           ) : accountError ? (
             <StatusMessage
               type="error"
-              className="font-minecraft text-lg"
+              className="font-smallcaps text-xs"
               message={t("skins.accountError", { error: accountError })}
             />
           ) : !activeAccount ? (
-            <p className="text-white/70 italic font-minecraft text-xl text-center py-10">
+            <p className="text-white/70 italic font-smallcaps text-sm text-center py-10">
               {t("skins.pleaseLogIn")}
             </p>
           ) : (
             <>
               <div className="space-y-5 text-center">
                 {localSkinsLoading ? (
-                  <p className="text-white/70 font-minecraft text-xl text-center py-4">
+                  <p className="text-white/70 font-smallcaps text-sm text-center py-4">
                     {t("skins.loadingSkins")}
                   </p>
                 ) : localSkinsError ? (
                   <StatusMessage
                     type="error"
-                    className="font-minecraft text-lg"
+                    className="font-smallcaps text-xs"
                     message={localSkinsError}
                   />
                 ) : !localSkinsLoading &&
                   localSkins.length > 0 &&
                   filteredSkins.length === 0 &&
                   !localSkinsError ? (
-                  <p className="text-white/70 italic font-minecraft text-lg">
+                  <p className="text-white/70 italic font-smallcaps text-xs">
                     {t("skins.noSkinsMatchSearch")}
                   </p>
                 ) : (
@@ -722,7 +671,7 @@ export function SkinsTab() {
                         localSkinsLoading={localSkinsLoading}
                         selectedLocalSkin={selectedLocalSkin}
                         isApplied={isSkinApplied(skin)}
-                        onClick={applyLocalSkin}
+                        onClick={(target) => startEditSkin(target)}
                         onEditSkin={startEditSkin}
                         onDeleteSkin={handleDeleteSkin}
                       />

@@ -24,6 +24,7 @@ import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
+import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
@@ -42,12 +43,14 @@ import {
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
+import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
 import { exit, relaunch } from "@tauri-apps/plugin-process";
 import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../utils/error-utils";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { ColorPicker } from "../ColorPicker";
@@ -77,8 +80,35 @@ export function AppLayout({
   const minimizeRef = useRef<HTMLDivElement>(null);
   const maximizeRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLDivElement>(null);
-  const { currentEffect } = useBackgroundEffectStore();
+  const {
+    currentEffect,
+    customMediaUrl,
+    customMediaOnlyOnPlay,
+    customMediaHideEffects,
+  } = useBackgroundEffectStore();
+  const isCustomMediaVisible =
+    Boolean(customMediaUrl) && (!customMediaOnlyOnPlay || activeTab === "play");
+  const shouldShowEffects = !(isCustomMediaVisible && customMediaHideEffects);
 
+  const navItems = [
+    { id: "play", icon: "solar:play-bold", label: t("nav.play") },
+    { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
+    { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
+    {
+      id: "skins",
+      icon: "solar:emoji-funny-circle-bold",
+      label: t("nav.skins"),
+    },
+    { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    // DISABLED: Advent Calendar (seasonal feature)
+    // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
+    {
+      id: "settings",
+      icon: "solar:settings-bold",
+      label: t("nav.settings"),
+      isAction: true,
+    },
+  ];
   const { qualityLevel } = useQualitySettingsStore();
   const {
     isBackgroundAnimationEnabled,
@@ -179,6 +209,11 @@ export function AppLayout({
     const finalB = Math.min(darkB, 30);
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
+  };
+
+  const getComplementaryBackgroundWithAlpha = (alpha: number) => {
+    const rgb = getComplementaryBackground();
+    return rgb.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
   };
 
   const backgroundColor = getComplementaryBackground();
@@ -400,8 +435,8 @@ export function AppLayout({
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundImage: isFullRiskStyle
-          ? `linear-gradient(180deg, rgba(36,34,40,0.98) 0%, ${backgroundColor} 100%)`
+        backgroundImage: isCustomMediaVisible
+          ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
           : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         border: isFullRiskStyle
           ? `0 solid ${themeAccentColor.value}00`
@@ -440,10 +475,10 @@ export function AppLayout({
         )}
 
         <div className="flex-1 relative overflow-hidden">
-          {renderCustomBackground()}
-          {renderBackgroundEffect()}
+          <CustomMediaBackground activeTab={activeTab} />
+          {shouldShowEffects && renderBackgroundEffect()}
           {/* Snow overlay - independent of theme/background */}
-          {isSnowEnabled && qualityLevel !== "potato" && <Snowfall />}
+          {shouldShowEffects && isSnowEnabled && <Snowfall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
             {children}
@@ -454,6 +489,7 @@ export function AppLayout({
       <SocialsModal />
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
+      <SettingsModal />
       <ProfileDuplicateModal />
       <FriendsSidebar />
       {!hasCompletedFirstInstallSetupWizard && <FirstInstallSetupWizard />}
@@ -874,13 +910,13 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       <div className="flex items-center gap-4" data-tauri-drag-region>
         {!isFullRiskStyle && <NavigationHistory />}
 
-        <div className="flex flex-col items-start -mt-2.5">
+        <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
             <h1
               className={
                 isFullRiskStyle
-                  ? "font-minecraft text-[34px] tracking-wider font-bold lowercase text-shadow"
-                  : "font-minecraft text-4xl tracking-wider font-bold lowercase text-shadow"
+                  ? "font-smallcaps text-[34px] tracking-wider font-bold lowercase text-shadow"
+                  : "font-smallcaps text-2xl tracking-wider font-bold lowercase text-shadow"
               }
               data-tauri-drag-region
             >
@@ -897,7 +933,11 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
                 }
               >
                 <div
-                  className={`mt-2.5 ${isUpdating ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                  className={
+                    isUpdating
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer"
+                  }
                   onClick={handleUpdateClick}
                 >
                   <Icon

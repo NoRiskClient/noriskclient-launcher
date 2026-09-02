@@ -25,8 +25,6 @@ interface GeneralSettingsTabProps {
   isDeleting?: boolean;
 }
 
-
-
 export function GeneralSettingsTab({
   profile,
   editedProfile,
@@ -69,8 +67,6 @@ export function GeneralSettingsTab({
           },
         );
       }
-
-
     }
   }, [isBackgroundAnimationEnabled]);
 
@@ -90,9 +86,9 @@ export function GeneralSettingsTab({
         src={avatarUrl}
         alt={account.username}
         className="w-full h-full object-cover pixelated"
-        style={{ imageRendering: 'pixelated' }}
+        style={{ imageRendering: "pixelated" }}
         onError={(e) => {
-          e.currentTarget.style.display = 'none';
+          e.currentTarget.style.display = "none";
         }}
       />
     );
@@ -105,7 +101,7 @@ export function GeneralSettingsTab({
   const handleCopyProfileId = async () => {
     try {
       await writeText(profile.id);
-      toast.success(t('profiles.settings.profileIdCopied'));
+      toast.success(t("profiles.settings.profileIdCopied"));
     } catch (e) {
       console.error("Failed to copy profile ID:", e);
     }
@@ -116,8 +112,8 @@ export function GeneralSettingsTab({
       <div ref={formRef} className="space-y-6">
         <div className="flex gap-6">
           <div className="flex-1 flex flex-col">
-            <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-              {t('profiles.settings.profileName')}
+            <label className="block text-lg font-smallcaps text-white mb-2">
+              {t("profiles.settings.profileName")}
             </label>
             <div className="flex items-center gap-4">
               <ProfileIcon
@@ -131,7 +127,10 @@ export function GeneralSettingsTab({
                       await onRefresh();
                     }
                   } catch (error) {
-                    console.error("Failed to refresh profile after icon update:", error);
+                    console.error(
+                      "Failed to refresh profile after icon update:",
+                      error,
+                    );
                   }
                 }}
                 className="w-12 h-12 flex-shrink-0"
@@ -139,23 +138,25 @@ export function GeneralSettingsTab({
               <SearchStyleInput
                 value={editedProfile.name}
                 onChange={(e) => updateProfile({ name: e.target.value })}
-                placeholder={t('profiles.settings.enterProfileName')}
-                className="text-xl flex-1"
+                placeholder={t("profiles.settings.enterProfileName")}
+                className="text-sm flex-1"
                 disabled={profile.is_standard_version ? true : false}
               />
             </div>
           </div>
 
           <div className="flex-1 flex flex-col">
-            <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-              {t('profiles.settings.group')}
+            <label className="block text-lg font-smallcaps text-white mb-2">
+              {t("profiles.settings.group")}
             </label>
             <div className="flex items-center">
               <SearchStyleInput
                 value={editedProfile.group || ""}
-                onChange={(e) => updateProfile({ group: e.target.value || null })}
-                placeholder={t('placeholders.group_name')}
-                className="text-xl w-full"
+                onChange={(e) =>
+                  updateProfile({ group: e.target.value || null })
+                }
+                placeholder={t("placeholders.group_name")}
+                className="text-sm w-full"
                 disabled={profile.is_standard_version ? true : false}
               />
             </div>
@@ -165,26 +166,26 @@ export function GeneralSettingsTab({
         {/* Shared Minecraft Folder Checkbox */}
         <div className="space-y-1">
           <Checkbox
-            label={t('profiles.settings.useSharedFolder')}
+            label={t("profiles.settings.useSharedFolder")}
             checked={editedProfile.use_shared_minecraft_folder ?? false}
             onChange={(event) => {
               const newValue = event.target.checked;
               updateProfile({
-                use_shared_minecraft_folder: newValue
+                use_shared_minecraft_folder: newValue,
               });
             }}
-            description={t('profiles.settings.sharedFolderDescription')}
-            descriptionClassName="font-minecraft-ten text-sm"
+            description={t("profiles.settings.sharedFolderDescription")}
+            descriptionClassName="font-minecraft text-sm"
             size="lg"
           />
-          <p className="text-xs text-white/50 font-minecraft-ten ml-10 -mt-1">
-            {t('profiles.settings.canChangeAnytime')}
+          <p className="text-xs text-white/50 font-minecraft ml-10 -mt-1">
+            {t("profiles.settings.canChangeAnytime")}
           </p>
         </div>
 
         <div>
-          <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
-            {t('profiles.settings.quickPlayPath')}
+          <label className="block text-lg font-smallcaps text-white mb-2">
+            {t("profiles.settings.quickPlayPath")}
           </label>
           <SearchStyleInput
             value={editedProfile.settings.quick_play_path || ""}
@@ -192,32 +193,35 @@ export function GeneralSettingsTab({
               updateProfile({
                 settings: {
                   ...editedProfile.settings,
-                  quick_play_path: e.target.value || null
-                }
+                  quick_play_path: e.target.value || null,
+                },
               })
             }
-            placeholder={t('profiles.settings.quickPlayPlaceholder')}
-            className="text-xl"
+            placeholder={t("profiles.settings.quickPlayPlaceholder")}
+            className="text-sm"
           />
-          <p className="text-xs text-white/70 mt-2 font-minecraft-ten tracking-wide select-none">
-            {t('profiles.settings.quickPlayDescription')}
+          <p className="text-xs text-white/70 mt-2 font-minecraft tracking-wide select-none">
+            {t("profiles.settings.quickPlayDescription")}
           </p>
         </div>
 
         <div ref={accountRef} className="space-y-3">
-          <h3 className="text-3xl font-minecraft text-white lowercase">
-            {t('profiles.settings.preferredAccount')}
+          <h3 className="text-lg font-smallcaps text-white">
+            {t("profiles.settings.preferredAccount")}
           </h3>
-          
+
           {accounts.length > 0 ? (
             <div className="flex flex-wrap gap-3 p-1">
               {accounts.map((account) => {
-                const isSelected = editedProfile.preferred_account_id === account.id;
-                
+                const isSelected =
+                  editedProfile.preferred_account_id === account.id;
+
                 return (
                   <button
                     key={account.id}
-                    onClick={() => handleAccountSelect(isSelected ? null : account.id)}
+                    onClick={() =>
+                      handleAccountSelect(isSelected ? null : account.id)
+                    }
                     className={cn(
                       "relative group flex flex-col items-center p-3 border-2 transition-all duration-200 rounded-lg hover:scale-105",
                       isSelected
@@ -235,16 +239,18 @@ export function GeneralSettingsTab({
                     title={`${account.username} (${account.id})`}
                   >
                     {/* Player Head */}
-                    <div className={cn(
-                      "relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all duration-200",
-                      isSelected ? "border-accent" : "border-white/20"
-                    )}
-                    style={isSelected ? { borderColor: accentColor.value } : {}}>
+                    <div
+                      className={cn(
+                        "relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all duration-200",
+                        isSelected ? "border-accent" : "border-white/20",
+                      )}
+                      style={
+                        isSelected ? { borderColor: accentColor.value } : {}
+                      }
+                    >
                       <AccountAvatar account={account} />
                       {isSelected && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center bg-black/50"
-                        >
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                           <Icon
                             icon="solar:check-circle-bold"
                             className="w-8 h-8"
@@ -253,12 +259,14 @@ export function GeneralSettingsTab({
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Username */}
-                    <div className={cn(
-                      "mt-2 font-minecraft text-xl lowercase text-center max-w-[100px] truncate",
-                      isSelected ? "text-white" : "text-white/70"
-                    )}>
+                    <div
+                      className={cn(
+                        "mt-2 font-smallcaps text-sm text-center max-w-[100px] truncate",
+                        isSelected ? "text-white" : "text-white/70",
+                      )}
+                    >
                       {account.username}
                     </div>
                   </button>
@@ -266,8 +274,8 @@ export function GeneralSettingsTab({
               })}
             </div>
           ) : (
-            <div className="text-center py-4 text-white/50 font-minecraft text-lg lowercase">
-              {t('profiles.settings.noAccountsFound')}
+            <div className="text-center py-4 text-white/50 font-smallcaps text-xs">
+              {t("profiles.settings.noAccountsFound")}
             </div>
           )}
         </div>
@@ -277,19 +285,16 @@ export function GeneralSettingsTab({
           <button
             type="button"
             onClick={handleCopyProfileId}
-            title={t('profiles.settings.copyProfileId')}
+            title={t("profiles.settings.copyProfileId")}
             className="group flex items-center gap-1.5 text-white/30 hover:text-white/55 transition-colors"
           >
             <Icon icon="solar:copy-linear" className="w-3.5 h-3.5" />
-            <span className="font-minecraft-ten text-xs tracking-wide">
+            <span className="font-minecraft text-xs tracking-wide">
               {profile.id}
             </span>
           </button>
         </div>
-
       </div>
-
-
     </div>
   );
 }
