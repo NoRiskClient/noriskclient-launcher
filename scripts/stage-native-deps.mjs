@@ -86,7 +86,7 @@ const staged = fs
   .reduce((sum, name) => sum + fs.statSync(path.join(staging, name)).size, 0);
 console.log(`\n  Staged ${mb(staged)} MB into src-tauri\\binaries\n`);
 
-function copyIn(dir, name, what) {
+function copyIn(dir, name, what, as_ = name) {
   const from = path.join(dir, name);
   if (!fs.existsSync(from)) {
     throw new Error(
@@ -94,7 +94,7 @@ function copyIn(dir, name, what) {
         `Fetch ${what} first:  node scripts/setup-native-deps.mjs`,
     );
   }
-  fs.copyFileSync(from, path.join(staging, name));
+  fs.copyFileSync(from, path.join(staging, as_));
   return fs.statSync(from).size;
 }
 

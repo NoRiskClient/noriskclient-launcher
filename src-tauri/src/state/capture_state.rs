@@ -1,10 +1,12 @@
+#[cfg(windows)]
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use norisk_ipc::{
-    decode_line, encode_line, CaptureState, CaptureToLauncher, LauncherToCapture, ReadyInfo,
-};
+use norisk_ipc::{CaptureState, CaptureToLauncher, LauncherToCapture, ReadyInfo};
+#[cfg(windows)]
+use norisk_ipc::{decode_line, encode_line};
+#[cfg(windows)]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::ClientOptions;
