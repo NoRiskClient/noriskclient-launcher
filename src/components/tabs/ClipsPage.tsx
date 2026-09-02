@@ -16,6 +16,7 @@ import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
 import { getCaptureStatus, openClipFolder } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureStatus } from "../../types/launcherConfig";
+import { BetaNotice } from "../ui/BetaNotice";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { useClipsStore } from "../../store/clips-store";
 import { setDiscordState } from "../../utils/discordRpc";
@@ -25,6 +26,7 @@ import { cn } from "../../lib/utils";
 
 const STATUS_POLL_MS = 2000;
 const ALL_GAMES = "__all__";
+const FEEDBACK_URL = "https://discord.norisk.gg";
 
 type Tone = "live" | "waiting" | "warn" | "off";
 
@@ -227,6 +229,14 @@ export function ClipsPage() {
           </div>
         </div>
       </div>
+
+      <BetaNotice
+        className="mb-4"
+        tag={t("clips.page.beta_tag")}
+        hint={t("clips.page.beta_hint")}
+        feedbackLabel={t("clips.page.feedback")}
+        feedbackUrl={FEEDBACK_URL}
+      />
 
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <ClipGallery
