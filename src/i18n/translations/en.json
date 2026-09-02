@@ -2153,6 +2153,8 @@
   "modrinth.quick_profile.name_label": "New profile name",
   "syncPacks.title": "Sync Packs",
   "syncPacks.description": "Share folders, settings and mods between your profiles.",
+  "syncPacks.betaTag": "Beta",
+  "syncPacks.betaFeedbackLink": "Feedback",
   "syncPacks.loading": "Loading sync packs...",
   "syncPacks.notFound": "Sync pack not found",
   "syncPacks.create": "Create Sync Pack",

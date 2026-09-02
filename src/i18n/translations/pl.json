@@ -2111,6 +2111,8 @@
   "modrinth.quick_profile.name_label": "Nazwa nowego profilu",
   "syncPacks.title": "Paczki synchronizacji",
   "syncPacks.description": "Współdziel foldery, ustawienia i mody między profilami.",
+  "syncPacks.betaTag": "Beta",
+  "syncPacks.betaFeedbackLink": "Opinia",
   "syncPacks.loading": "Wczytywanie paczek synchronizacji...",
   "syncPacks.notFound": "Nie znaleziono paczki synchronizacji",
   "syncPacks.create": "Utwórz paczkę",

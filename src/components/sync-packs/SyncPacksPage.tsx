@@ -22,6 +22,9 @@ import * as SyncPackService from "../../services/sync-pack-service";
 import type { SyncPackEntryRef } from "../../services/sync-pack-service";
 import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
 import { useSyncPacks } from "./useSyncPacks";
+import { openExternalUrl } from "../../services/tauri-service";
+
+const SYNC_PACKS_DISCORD_URL = "https://discord.norisk.gg";
 
 preloadIcons([
   "solar:arrow-left-linear",
@@ -233,10 +236,31 @@ export function SyncPacksPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4">
-        <div className="mb-4">
-          <span className="font-minecraft text-xs normal-case text-white/40">
+        <div className="mb-4 flex items-center gap-2.5">
+          <span
+            className="rounded px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider"
+            style={{
+              color: accentColor.value,
+              backgroundColor: `${accentColor.value}1f`,
+            }}
+          >
+            {t("syncPacks.betaTag")}
+          </span>
+
+          <span className="truncate font-minecraft text-xs normal-case text-white/40">
             {t("syncPacks.description")}
           </span>
+
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              openExternalUrl(SYNC_PACKS_DISCORD_URL);
+            }}
+            className="ml-auto flex flex-shrink-0 items-center gap-1.5 font-minecraft text-xs normal-case text-white/35 transition-colors hover:text-white/80"
+          >
+            <Icon icon="ic:baseline-discord" className="h-3.5 w-3.5" />
+            {t("syncPacks.betaFeedbackLink")}
+          </button>
         </div>
 
         {conflicts.length > 0 && (
