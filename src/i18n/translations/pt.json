@@ -402,6 +402,8 @@
   "modpack_versions.toast.switch_success": "{{name}} trocado para {{version}} com sucesso!",
   "modpack_versions.toast.switch_failed": "Falha ao trocar versão do modpack: {{error}}",
   "socials.title": "Contas Sociais",
+  "socials.discord_info": "Receba cosméticos por impulsionar o servidor no jogo e o cargo NRC+ no Discord.",
+  "socials.twitch_info": "Use a integração do Twitch no jogo, alertas de follows, chat e muito mais.",
   "socials.referral_text": "Convide amigos, ganhe 3 dias de NRC+ e",
   "socials.referral_more": "mais...",
   "socials.mobile_app": "App Móvel",

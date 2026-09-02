@@ -402,6 +402,8 @@
   "modpack_versions.toast.switch_success": "{{name}} başarıyla {{version}} sürümüne değiştirildi!",
   "modpack_versions.toast.switch_failed": "Modpack sürümü değiştirilemedi: {{error}}",
   "socials.title": "Sosyal Hesaplar",
+  "socials.discord_info": "Oyunda sunucu güçlendirme kozmetiklerini ve Discord'da NRC+ rolünü alın.",
+  "socials.twitch_info": "Oyun içi Twitch entegrasyonunu, takip uyarılarını, sohbeti ve daha fazlasını kullanın.",
   "socials.referral_text": "Arkadaşlarınızı davet edin, 3 gün NRC+ kazanın ve",
   "socials.referral_more": "daha fazlası...",
   "socials.mobile_app": "Mobil Uygulama",

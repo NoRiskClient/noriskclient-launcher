@@ -224,6 +224,8 @@ impl MinecraftLauncher {
 
             if arg_str.starts_with("-Dnorisk.token=") {
                 parts.push("-Dnorisk.token=*****".to_string());
+            } else if arg_str.starts_with("-Dtwitch.token=") {
+                parts.push("-Dtwitch.token=*****".to_string());
             } else if arg_str == "--accessToken" {
                 parts.push(arg_str); // Push "--accessToken"
                 if args_iter.peek().is_some() {
@@ -442,6 +444,22 @@ impl MinecraftLauncher {
             }
         } else {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
+        }
+
+        // Twitch link: refresh right before launch so the game never receives a stale token.
+        if let Some(creds) = &self.credentials {
+            match state
+                .minecraft_account_manager_v2
+                .ensure_fresh_twitch_token(creds.id)
+                .await
+            {
+                Ok(Some(twitch)) => {
+                    info!("[Twitch] Passing Twitch token to the game");
+                    command.arg(format!("-Dtwitch.token={}", twitch.access_token));
+                }
+                Ok(None) => info!("[Twitch] No Twitch account linked, skipping -Dtwitch.token"),
+                Err(e) => warn!("[Twitch] Could not resolve Twitch token: {}", e),
+            }
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the

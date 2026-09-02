@@ -37,6 +37,7 @@ use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
+use crate::minecraft::auth::twitch_auth::{self, TwitchToken};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
 use crate::utils::file_utils::write_atomic;
@@ -76,6 +77,9 @@ pub struct Credentials {
     /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
     #[serde(default)]
     pub mc_access_token_expires: Option<DateTime<Utc>>,
+    /// Twitch credential linked to this account. `None` when the user has not linked / has unlinked.
+    #[serde(default)]
+    pub twitch_token: Option<TwitchToken>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -678,6 +682,7 @@ impl MinecraftAuthStore {
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: existing_account.as_ref().and_then(|a| a.twitch_token.clone()),
         };
 
         self.update_or_insert(credentials.clone()).await?;
@@ -752,6 +757,7 @@ impl MinecraftAuthStore {
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: existing_account.as_ref().and_then(|a| a.twitch_token.clone()),
         };
 
         info!(
@@ -965,6 +971,7 @@ impl MinecraftAuthStore {
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: creds.twitch_token.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -1018,6 +1025,7 @@ impl MinecraftAuthStore {
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: creds.twitch_token.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -1142,6 +1150,51 @@ impl MinecraftAuthStore {
         info!("[Account Manager] Account changes successfully saved");
 
         Ok(())
+    }
+
+    /// Attach (or, with `None`, clear) the Twitch credential of a single account.
+    /// Mutates in place so a concurrent flow holding stale `Credentials` can't clobber it.
+    pub async fn set_twitch_token(&self, id: Uuid, token: Option<TwitchToken>) -> Result<()> {
+        {
+            let mut accounts = self.accounts.write().await;
+            let account = accounts
+                .iter_mut()
+                .find(|acc| acc.id == id)
+                .ok_or_else(|| AppError::AccountError(format!("Account with ID {} not found", id)))?;
+            account.twitch_token = token;
+        }
+        self.save().await
+    }
+
+    /// Return a usable Twitch access token for the account, refreshing it first if it is
+    /// expired or about to expire. `Ok(None)` means the account has no Twitch link.
+    /// A failed refresh clears the stored token so the UI shows the account as unlinked.
+    pub async fn ensure_fresh_twitch_token(&self, id: Uuid) -> Result<Option<TwitchToken>> {
+        let current = match self.get_account_by_id(id).await? {
+            Some(account) => account.twitch_token,
+            None => return Ok(None),
+        };
+
+        let Some(current) = current else {
+            return Ok(None);
+        };
+
+        if !current.is_expired() {
+            return Ok(Some(current));
+        }
+
+        info!("[Twitch] Stored token for account {} is stale, refreshing", id);
+        match twitch_auth::refresh_token(&current.refresh_token).await {
+            Ok(refreshed) => {
+                self.set_twitch_token(id, Some(refreshed.clone())).await?;
+                Ok(Some(refreshed))
+            }
+            Err(e) => {
+                error!("[Twitch] Refresh failed for account {}: {}. Clearing link.", id, e);
+                self.set_twitch_token(id, None).await?;
+                Ok(None)
+            }
+        }
     }
 
     pub async fn update_norisk_and_microsoft_token(

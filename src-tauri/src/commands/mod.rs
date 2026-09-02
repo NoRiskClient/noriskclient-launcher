@@ -28,6 +28,7 @@ pub mod process_command;
 pub mod profile_command;
 pub mod skin_render_command;
 pub mod tester_command;
+pub mod twitch_command;
 pub mod vanilla_cape_command;
 pub mod analytics_command;
 pub mod font_command;

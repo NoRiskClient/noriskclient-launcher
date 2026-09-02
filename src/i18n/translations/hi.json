@@ -404,6 +404,8 @@
   "modpack_versions.toast.switch_success": "{{name}} को सफलतापूर्वक संस्करण {{version}} पर स्विच किया गया!",
   "modpack_versions.toast.switch_failed": "Modpack संस्करण स्विच करने में विफल: {{error}}",
   "socials.title": "सोशल खाते",
+  "socials.discord_info": "गेम में सर्वर बूस्ट कॉस्मेटिक्स और Discord में NRC+ रोल पाएं।",
+  "socials.twitch_info": "गेम में Twitch इंटीग्रेशन, फॉलो अलर्ट, चैट और बहुत कुछ इस्तेमाल करें।",
   "socials.referral_text": "अपने दोस्तों को रेफर करें, NRC+ के 3 दिन पाएं और",
   "socials.referral_more": "अधिक...",
   "socials.mobile_app": "मोबाइल ऐप",

@@ -37,6 +37,9 @@ use crate::commands::process_command::{
 use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
 };
+use commands::twitch_command::{
+    twitch_begin_device_login, twitch_cancel_login, twitch_get_status, twitch_unlink,
+};
 use commands::minecraft_command::{
     add_skin,
     add_skin_locally,
@@ -558,6 +561,10 @@ async fn main() {
             get_active_account,
             set_active_account,
             get_accounts,
+            twitch_begin_device_login,
+            twitch_cancel_login,
+            twitch_unlink,
+            twitch_get_status,
             search_modrinth_mods,
             search_modrinth_projects,
             search_mods_unified_command,

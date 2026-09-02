@@ -23,10 +23,13 @@ import {
 } from "../../services/nrc-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { TwitchLinkCard } from "../account/TwitchLinkCard";
 
 interface AccountLinkRowProps {
   icon: string;
   name: string;
+  info?: string;
+  iconClassName?: string;
   isLoading: boolean;
   isLinked: boolean;
   isProcessing: boolean;
@@ -38,6 +41,8 @@ interface AccountLinkRowProps {
 function AccountLinkRow({
   icon,
   name,
+  info,
+  iconClassName,
   isLoading,
   isLinked,
   isProcessing,
@@ -47,10 +52,13 @@ function AccountLinkRow({
 }: AccountLinkRowProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
-      <div className="flex items-center">
-        <Icon icon={icon} className="w-6 h-6 mr-3 text-white/80" />
-        <span className="text-white/90 font-minecraft text-xs">{name}</span>
+    <div className="flex items-center justify-between gap-3 px-3 py-2 bg-black/20 rounded-md min-h-[58px]">
+      <div className="flex items-center min-w-0">
+        <Icon icon={icon} className={`w-6 h-6 mr-3 ${iconClassName ?? "text-white/80"}`} />
+        <div className="min-w-0">
+          <p className="text-white/90 font-minecraft text-xs">{name}</p>
+          {info && <p className="text-white/55 font-minecraft text-[10px] leading-tight">{info}</p>}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         {isLinked ? (
@@ -410,14 +418,16 @@ export function SocialsModal() {
 
           <AccountLinkRow
             icon="ic:baseline-discord"
-              name="Discord"
-              isLoading={isLoadingDiscord}
-              isLinked={isDiscordLinked}
-              isProcessing={isProcessingDiscord}
-              onLink={handleDiscordLink}
-              onUnlink={handleDiscordUnlink}
-              visitUrl="https://discord.norisk.gg"
-            />
+            name="Discord"
+            info={t('socials.discord_info')}
+            iconClassName={isDiscordLinked ? "text-[#5865F2]" : "text-white/80"}
+            isLoading={isLoadingDiscord}
+            isLinked={isDiscordLinked}
+            isProcessing={isProcessingDiscord}
+            onLink={handleDiscordLink}
+            onUnlink={handleDiscordUnlink}
+            visitUrl="https://discord.norisk.gg"
+          />
 
           <AccountLinkRow
             icon="mdi:github"
@@ -429,6 +439,8 @@ export function SocialsModal() {
             onUnlink={handleGithubUnlink}
             visitUrl="https://github.com/NoRiskClient"
           />
+
+          <TwitchLinkCard />
         </div>
       </div>
     </Modal>

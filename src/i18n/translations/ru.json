@@ -402,6 +402,8 @@
   "modpack_versions.toast.switch_success": "{{name}} успешно переключён на {{version}}!",
   "modpack_versions.toast.switch_failed": "Не удалось переключить версию модпака: {{error}}",
   "socials.title": "Социальные аккаунты",
+  "socials.discord_info": "Получайте косметику за усиление сервера в игре и роль NRC+ в Discord.",
+  "socials.twitch_info": "Используйте интеграцию Twitch в игре, оповещения о подписках, чат и многое другое.",
   "socials.referral_text": "Приглашайте друзей, получите 3 дня NRC+ и",
   "socials.referral_more": "больше...",
   "socials.mobile_app": "Мобильное приложение",

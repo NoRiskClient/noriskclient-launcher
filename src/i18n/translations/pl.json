@@ -402,6 +402,8 @@
   "modpack_versions.toast.switch_success": "Pomyślnie przełączono {{name}} na wersję {{version}}!",
   "modpack_versions.toast.switch_failed": "Nie udało się przełączyć wersji modpacka: {{error}}",
   "socials.title": "Konta społecznościowe",
+  "socials.discord_info": "Otrzymuj kosmetyki za boostowanie serwera w grze oraz rolę NRC+ na Discordzie.",
+  "socials.twitch_info": "Korzystaj z integracji Twitch w grze, alertów obserwowania, czatu i nie tylko.",
   "socials.referral_text": "Zaproś znajomych i otrzymaj 3 dni NRC+ oraz",
   "socials.referral_more": "więcej...",
   "socials.mobile_app": "Aplikacja mobilna",
