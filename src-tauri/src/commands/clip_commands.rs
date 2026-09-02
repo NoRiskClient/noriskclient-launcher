@@ -227,6 +227,7 @@ pub async fn clip_delete(path: std::path::PathBuf) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
     crate::utils::clip_library::delete(&dir, &path)?;
     log::info!("Deleted clip {}", path.display());
+    crate::commands::analytics_command::track("clip_deleted", serde_json::json!({}));
     Ok(())
 }
 
@@ -363,6 +364,10 @@ pub async fn clip_set_favourite(
 ) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
     crate::utils::clip_library::set_favourite(&dir, &path, favourite)?;
+    crate::commands::analytics_command::track(
+        "clip_favourited",
+        serde_json::json!({ "favourite": favourite }),
+    );
     Ok(())
 }
 
@@ -374,6 +379,7 @@ pub async fn clip_rename(
     let dir = clip_dir().await?;
     let renamed = crate::utils::clip_library::rename(&dir, &path, &name)?;
     log::info!("Renamed {} to {}", path.display(), renamed.display());
+    crate::commands::analytics_command::track("clip_renamed", serde_json::json!({}));
     Ok(renamed)
 }
 

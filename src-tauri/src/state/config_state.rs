@@ -770,6 +770,12 @@ impl ConfigManager {
                     props.insert("enabled".to_string(), serde_json::Value::Bool(new_config.check_beta_channel));
                     crate::commands::analytics_command::track_event("beta_update_toggled", props);
                 }
+                if current.clips.enabled != new_config.clips.enabled {
+                    crate::commands::analytics_command::track(
+                        "clips_toggled",
+                        serde_json::json!({ "enabled": new_config.clips.enabled }),
+                    );
+                }
                 if current.profile_grouping_criterion != new_config.profile_grouping_criterion {
                     info!(
                         "Changing profile grouping criterion: {:?} -> {:?}",

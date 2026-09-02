@@ -19,6 +19,7 @@ import type { CaptureStatus } from "../../types/launcherConfig";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { useClipsStore } from "../../store/clips-store";
 import { setDiscordState } from "../../utils/discordRpc";
+import { trackEvent } from "../../services/analytics-service";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
@@ -96,7 +97,8 @@ export function ClipsPage() {
 
   useEffect(() => {
     setDiscordState("Browsing Clips");
-  }, []);
+    void trackEvent("clip_page_opened", { enabled });
+  }, [enabled]);
 
   useEffect(() => {
     void refreshEnabled();

@@ -14,7 +14,9 @@ use tokio::sync::{mpsc, RwLock};
 
 #[cfg(windows)]
 use crate::config::ProjectDirsExt;
+use crate::commands::analytics_command::track;
 use crate::error::{AppError, Result};
+use serde_json::json;
 
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -33,6 +35,62 @@ struct Session {
     attached_pid: Option<u32>,
     attached_game: Option<String>,
     buffering_enabled: Option<bool>,
+    attached_at: Option<std::time::Instant>,
+    buffering_since: Option<std::time::Instant>,
+}
+
+fn gpu_vendor(adapter: &str) -> &'static str {
+    let lower = adapter.to_ascii_lowercase();
+    if lower.contains("nvidia") || lower.contains("geforce") {
+        "nvidia"
+    } else if lower.contains("amd") || lower.contains("radeon") {
+        "amd"
+    } else if lower.contains("intel") {
+        "intel"
+    } else {
+        "other"
+    }
+}
+
+fn game_kind(game: Option<&str>) -> &'static str {
+    match game {
+        Some("Minecraft") => "minecraft",
+        Some(_) => "other",
+        None => "none",
+    }
+}
+
+fn tenths(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
+}
+
+fn megabytes(bytes: u64) -> f64 {
+    tenths(bytes as f64 / 1e6)
+}
+
+fn settings_props(config: Option<&norisk_ipc::CaptureConfig>) -> serde_json::Value {
+    match config {
+        Some(c) => json!({
+            "codec": c.codec,
+            "encoder": c.encoder,
+            "width": c.width,
+            "height": c.height,
+            "fps": c.fps,
+            "bitrate_kbps": c.bitrate_kbps,
+            "buffer_seconds": c.buffer_seconds,
+            "capture_audio": c.capture_audio,
+            "audio_source": c.audio_source,
+            "capture_microphone": c.capture_microphone,
+        }),
+        None => json!({}),
+    }
+}
+
+fn merged(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::Value {
+    if let (Some(target), Some(source)) = (base.as_object_mut(), extra.as_object()) {
+        target.extend(source.clone());
+    }
+    base
 }
 
 pub struct CaptureSupervisor {
@@ -43,6 +101,7 @@ pub struct CaptureSupervisor {
     state: Arc<RwLock<CaptureState>>,
     ready: Arc<RwLock<Option<ReadyInfo>>>,
     active: Arc<RwLock<Option<(norisk_ipc::ClipCodec, norisk_ipc::EncoderPreference)>>>,
+    last_status: Arc<RwLock<Option<norisk_ipc::StatusReport>>>,
     app: Arc<RwLock<Option<tauri::AppHandle>>>,
     running: Arc<RwLock<bool>>,
 }
@@ -58,6 +117,7 @@ impl CaptureSupervisor {
             state: Arc::new(RwLock::new(CaptureState::Idle)),
             ready: Arc::new(RwLock::new(None)),
             active: Arc::new(RwLock::new(None)),
+            last_status: Arc::new(RwLock::new(None)),
             app: Arc::new(RwLock::new(None)),
             running: Arc::new(RwLock::new(false)),
         }
@@ -127,11 +187,61 @@ impl CaptureSupervisor {
 
     pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
         self.send(LauncherToCapture::AttachWindow { pid })?;
-        self.session
+        let mut session = self
+            .session
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner())
-            .attached_game = Some(name);
+            .unwrap_or_else(|poison| poison.into_inner());
+        session.attached_game = Some(name);
+        session.attached_at = Some(std::time::Instant::now());
         Ok(())
+    }
+
+    fn track_state_change(
+        &self,
+        from: CaptureState,
+        to: CaptureState,
+        status: &norisk_ipc::StatusReport,
+    ) {
+        use CaptureState::{Attaching, BlockedFullscreenExclusive, Buffering, Failed, Idle, Paused};
+
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let kind = game_kind(session.attached_game.as_deref());
+        let method = status.capture_method.clone();
+
+        if to == Buffering && session.buffering_since.is_none() {
+            session.buffering_since = Some(std::time::Instant::now());
+            if let Some(started) = session.attached_at.take() {
+                track(
+                    "clip_capture_attached",
+                    json!({
+                        "game": kind,
+                        "capture_method": method,
+                        "attach_ms": started.elapsed().as_millis() as u64,
+                    }),
+                );
+            }
+        }
+
+        let was_live = matches!(from, Buffering | Paused | BlockedFullscreenExclusive);
+        let now_off = matches!(to, Idle | Failed | Attaching);
+        if was_live && now_off {
+            if let Some(since) = session.buffering_since.take() {
+                track(
+                    "clip_capture_session",
+                    json!({
+                        "game": kind,
+                        "capture_method": method,
+                        "minutes": tenths(since.elapsed().as_secs_f64() / 60.0),
+                        "dropped_frames": status.dropped_frames,
+                        "encode_latency_ms_p99": status.encode_latency_ms_p99,
+                        "ended_with": format!("{to:?}"),
+                    }),
+                );
+            }
+        }
     }
 
     pub fn detach(&self) -> Result<()> {
@@ -410,6 +520,26 @@ impl CaptureSupervisor {
                     info.adapter,
                     info.available_encoders
                 );
+
+                let config = self.session_snapshot().config;
+                track(
+                    "clip_engine_ready",
+                    merged(
+                        json!({
+                            "engine_version": info.engine_version,
+                            "gpu_vendor": gpu_vendor(&info.adapter),
+                            "encoders": info.available_encoders,
+                            "hardware_encoders": info
+                                .capabilities
+                                .iter()
+                                .filter(|c| c.available && c.hardware)
+                                .count(),
+                            "game_only_audio": info.supports_game_only_audio,
+                        }),
+                        settings_props(config.as_ref()),
+                    ),
+                );
+
                 *self.ready.write().await = Some(info);
             }
             CaptureToLauncher::Status(status) => {
@@ -417,6 +547,7 @@ impl CaptureSupervisor {
                     let mut current = self.state.write().await;
                     if *current != status.state {
                         log::debug!("Capture state: {:?} -> {:?}", *current, status.state);
+                        self.track_state_change(*current, status.state, &status);
                         *current = status.state;
                     }
                 }
@@ -425,6 +556,7 @@ impl CaptureSupervisor {
                     (Some(codec), Some(encoder)) => Some((codec, encoder)),
                     _ => None,
                 };
+                *self.last_status.write().await = Some(status);
             }
             CaptureToLauncher::ClipSaved(manifest) => {
                 log::info!(
@@ -433,6 +565,33 @@ impl CaptureSupervisor {
                     manifest.duration_seconds,
                     manifest.size_bytes as f64 / 1e6
                 );
+
+                {
+                    let status = self.last_status.read().await.clone();
+                    let active = *self.active.read().await;
+                    track(
+                        "clip_saved",
+                        json!({
+                            "game": game_kind(self.attached_game().as_deref()),
+                            "reason": manifest.reason,
+                            "duration_s": tenths(manifest.duration_seconds as f64),
+                            "size_mb": megabytes(manifest.size_bytes),
+                            "width": manifest.width,
+                            "height": manifest.height,
+                            "fps": manifest.fps,
+                            "bitrate_kbps": manifest.bitrate_kbps,
+                            "audio_tracks": manifest.audio_tracks.len(),
+                            "codec": active.map(|(codec, _)| codec),
+                            "encoder": active.map(|(_, encoder)| encoder),
+                            "capture_method": status.as_ref().and_then(|s| s.capture_method.clone()),
+                            "capture_fps": status.as_ref().map(|s| s.capture_fps.round()),
+                            "encode_fps": status.as_ref().map(|s| s.encode_fps.round()),
+                            "dropped_frames": status.as_ref().map(|s| s.dropped_frames),
+                            "encode_latency_ms_p99": status.as_ref().map(|s| s.encode_latency_ms_p99),
+                            "buffer_fill_s": status.as_ref().map(|s| s.buffer_fill_seconds.round()),
+                        }),
+                    );
+                }
 
                 {
                     let mut details = crate::utils::clip_library::ClipDetails::from(&manifest);
@@ -505,6 +664,15 @@ impl CaptureSupervisor {
                     exported.height,
                     exported.size_bytes as f64 / 1e6
                 );
+                track(
+                    "clip_exported_vertical",
+                    json!({
+                        "duration_s": tenths(exported.duration_seconds),
+                        "size_mb": megabytes(exported.size_bytes),
+                        "width": exported.width,
+                        "height": exported.height,
+                    }),
+                );
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_exported", &exported) {
@@ -518,6 +686,14 @@ impl CaptureSupervisor {
                     trimmed.path.display(),
                     trimmed.duration_seconds,
                     trimmed.size_bytes as f64 / 1e6
+                );
+                track(
+                    "clip_trimmed",
+                    json!({
+                        "duration_s": tenths(trimmed.duration_seconds),
+                        "start_s": tenths(trimmed.start_seconds),
+                        "size_mb": megabytes(trimmed.size_bytes),
+                    }),
                 );
 
                 {
@@ -549,6 +725,15 @@ impl CaptureSupervisor {
                     error.code,
                     error.message,
                     error.recoverable
+                );
+                track(
+                    "clip_engine_error",
+                    json!({
+                        "code": error.code,
+                        "recoverable": error.recoverable,
+                        "game": game_kind(self.attached_game().as_deref()),
+                        "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method.clone()),
+                    }),
                 );
                 if !error.recoverable {
                     *self.state.write().await = CaptureState::Failed;

@@ -32,6 +32,7 @@ import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { trackEvent } from "../../services/analytics-service";
 
 export type ClipSort = "newest" | "oldest" | "largest";
 
@@ -240,7 +241,10 @@ export function ClipGallery({
             clip={clip}
             index={index}
             busy={busy === clip.path}
-            onPlay={() => setSelected(clip)}
+            onPlay={() => {
+              setSelected(clip);
+              void trackEvent("clip_played", { duration_s: clip.durationSeconds });
+            }}
             onReveal={() =>
               void revealClip(clip.path).catch((e) => toast.error(parseErrorMessage(e)))
             }
