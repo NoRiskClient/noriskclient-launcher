@@ -20,11 +20,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::Mutex;
 
-const TTL_METADATA_MS: u64 = 30 * 60 * 1000;
+pub const TTL_METADATA_MS: u64 = 30 * 60 * 1000;
 const TTL_IMMUTABLE_MS: u64 = 30 * 24 * 60 * 60 * 1000;
-const STALE_GRACE_MS: u64 = 30 * 24 * 60 * 60 * 1000;
+pub const STALE_GRACE_MS: u64 = 30 * 24 * 60 * 60 * 1000;
 
 const NEVER_EXPIRES_MS: u64 = i64::MAX as u64;
 
@@ -69,7 +69,7 @@ pub struct CacheEntry<T> {
 }
 
 impl<T> CacheEntry<T> {
-    fn is_fresh(&self) -> bool {
+    pub fn is_fresh(&self) -> bool {
         self.expires_at_ms > now_ms()
     }
 }
@@ -81,11 +81,11 @@ pub struct FileHashEntry {
     pub sha1: String,
 }
 
-struct Row2Write<T> {
-    id: String,
-    alias: Option<String>,
-    data: Option<T>,
-    ttl_ms: u64,
+pub struct Row2Write<T> {
+    pub id: String,
+    pub alias: Option<String>,
+    pub data: Option<T>,
+    pub ttl_ms: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -135,11 +135,11 @@ impl ContentCacheManager {
         })
     }
 
-    async fn pool(&self) -> Option<sqlx::SqlitePool> {
+    pub async fn pool(&self) -> Option<sqlx::SqlitePool> {
         crate::state::db::pool_of(&self.inner.db).await
     }
 
-    async fn get_entries<T: DeserializeOwned + Clone>(
+    pub async fn get_entries<T: DeserializeOwned + Clone>(
         &self,
         kind: &str,
         keys: &[String],
@@ -222,7 +222,7 @@ impl ContentCacheManager {
         out
     }
 
-    async fn get_entry<T: DeserializeOwned + Clone>(
+    pub async fn get_entry<T: DeserializeOwned + Clone>(
         &self,
         kind: &str,
         key: &str,
@@ -271,7 +271,7 @@ impl ContentCacheManager {
         self.delete_ids(kind::PLAYER_ICON, &ids).await;
     }
 
-    async fn put_entries<T: Serialize>(&self, kind: &str, rows: Vec<Row2Write<T>>) {
+    pub async fn put_entries<T: Serialize>(&self, kind: &str, rows: Vec<Row2Write<T>>) {
         if rows.is_empty() {
             return;
         }
@@ -318,7 +318,7 @@ impl ContentCacheManager {
         }
     }
 
-    async fn put_entry<T: Serialize>(
+    pub async fn put_entry<T: Serialize>(
         &self,
         kind: &str,
         id: &str,
@@ -357,7 +357,7 @@ impl ContentCacheManager {
         }
     }
 
-    async fn delete_expired(&self, grace_ms: u64) -> Result<u64> {
+    pub async fn delete_expired(&self, grace_ms: u64) -> Result<u64> {
         let Some(pool) = self.pool().await else { return Ok(0) };
         let cutoff = now_ms().saturating_sub(grace_ms) as i64;
 
@@ -405,7 +405,7 @@ impl ContentCacheManager {
         })
     }
 
-    async fn prune_missing_files(&self) -> Result<u64> {
+    pub async fn prune_missing_files(&self) -> Result<u64> {
         let Some(pool) = self.pool().await else { return Ok(0) };
 
         let rows = sqlx::query("SELECT id FROM cache WHERE data_type = ?1")
@@ -1241,7 +1241,7 @@ impl ContentCacheManager {
     }
 }
 
-fn project_versions_cache_key(
+pub fn project_versions_cache_key(
     project_id_or_slug: &str,
     loaders: &Option<Vec<String>>,
     game_versions: &Option<Vec<String>>,
@@ -1264,7 +1264,7 @@ fn project_versions_cache_key(
     )
 }
 
-fn modpack_cache_key(source: &ModPackSource) -> String {
+pub fn modpack_cache_key(source: &ModPackSource) -> String {
     match source {
         ModPackSource::Modrinth {
             project_id,
@@ -1331,10 +1331,6 @@ fn subset_request(
         hash_installed_info: subset_map(&request.hash_installed_info, &wanted),
     }
 }
-
-#[cfg(test)]
-#[path = "content_cache_state_test.rs"]
-mod tests;
 
 #[async_trait]
 impl PostInitializationHandler for ContentCacheManager {

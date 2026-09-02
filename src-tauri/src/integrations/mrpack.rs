@@ -222,6 +222,7 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        sync_pack_ids: Vec::new(),
         extra: Default::default(),
     };
 
@@ -592,7 +593,7 @@ pub async fn extract_mrpack_overrides(
         AppError::Io(e)
     })?;
     let mut initial_buf_reader = BufReader::new(initial_file_for_listing);
-    let mut zip_lister = ZipFileReader::with_tokio(&mut initial_buf_reader)
+    let zip_lister = ZipFileReader::with_tokio(&mut initial_buf_reader)
         .await
         .map_err(|e| {
             error!("Failed to read mrpack as ZIP for listing: {}", e);

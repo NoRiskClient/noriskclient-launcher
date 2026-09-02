@@ -138,7 +138,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000002-0000-4000-8000-000000000000",
@@ -261,7 +262,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000003-0000-4000-8000-000000000000",
@@ -313,7 +315,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000004-0000-4000-8000-000000000000",
@@ -363,7 +366,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000005-0000-4000-8000-000000000000",
@@ -413,7 +417,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000006-0000-4000-8000-000000000000",
@@ -456,7 +461,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 9223372036854775807
+    "playtime_seconds": 9223372036854775807,
+    "sync_pack_ids": []
   },
   {
     "id": "00000007-0000-4000-8000-000000000000",
@@ -500,7 +506,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "0000000a-0000-4000-8000-000000000000",
@@ -553,7 +560,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "0000000b-0000-4000-8000-000000000000",
@@ -606,7 +614,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "0000000c-0000-4000-8000-000000000000",
@@ -659,7 +668,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "0000000d-0000-4000-8000-000000000000",
@@ -712,7 +722,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000014-0000-4000-8000-000000000000",
@@ -752,7 +763,8 @@
     "norisk_information": null,
     "modpack_info": null,
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   },
   {
     "id": "00000015-0000-4000-8000-000000000000",
@@ -832,7 +844,8 @@
       "file_hash": "abc"
     },
     "preferred_account_id": "00000062-0000-4000-8000-000000000000",
-    "playtime_seconds": 42
+    "playtime_seconds": 42,
+    "sync_pack_ids": []
   },
   {
     "id": "00000016-0000-4000-8000-000000000000",
@@ -879,6 +892,7 @@
       "file_hash": null
     },
     "preferred_account_id": null,
-    "playtime_seconds": 0
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
   }
 ]

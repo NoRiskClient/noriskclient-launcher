@@ -6,7 +6,7 @@ use crate::utils::disk_space_utils::DiskSpaceUtils;
 use futures::stream::StreamExt;
 use log::{debug, error, trace, warn};
 use reqwest::Response;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -690,7 +690,3 @@ impl DownloadUtils {
         false
     }
 }
-
-#[cfg(test)]
-#[path = "download_utils_test.rs"]
-mod tests;

@@ -9,12 +9,10 @@ use std::sync::Arc;
 
 const LIBRARIES_DIR: &str = "libraries";
 const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
-const DEFAULT_CONCURRENT_LIBRARIES: usize = 12;
 
 pub struct MinecraftLibrariesDownloadService {
     base_path: PathBuf,
     concurrent_downloads: usize,
-    concurrent_libraries: usize,
     stats: Option<Arc<DownloadStats>>,
     verify_hashes: bool,
 }
@@ -25,7 +23,6 @@ impl MinecraftLibrariesDownloadService {
         Self {
             base_path,
             concurrent_downloads: DEFAULT_CONCURRENT_DOWNLOADS,
-            concurrent_libraries: DEFAULT_CONCURRENT_LIBRARIES,
             stats: None,
             verify_hashes: false,
         }

@@ -14,18 +14,18 @@ use tokio::fs;
 
 const LOG_DIR_NAME: &str = "logs";
 const LOG_FILE_NAME: &str = "launcher.log";
-const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {m}{n}";
+pub const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S%.3f)} | {({l}):5.5} | {m}{n}";
 const CONSOLE_LOG_PATTERN: &str = "{d(%H:%M:%S)} | {h({l}):5.5} | {m}{n}"; // Slightly simpler pattern for console
 const LOG_FILE_SIZE_LIMIT_BYTES: u64 = 4_800_000; // ~4.8MB to fit Discord's 8MB upload limit
 const LOG_FILE_BACKUP_COUNT: u32 = 10;
 
 #[derive(Debug)]
-struct RedactingEncoder {
+pub struct RedactingEncoder {
     inner: PatternEncoder,
 }
 
 impl RedactingEncoder {
-    fn new(pattern: &str) -> Self {
+    pub fn new(pattern: &str) -> Self {
         Self {
             inner: PatternEncoder::new(pattern),
         }
@@ -144,7 +144,3 @@ pub fn set_log_level(level: LevelFilter) {
         Err(e) => log::error!("Failed to rebuild logging config for level {}: {}", level, e),
     }
 }
-
-#[cfg(test)]
-#[path = "logging_test.rs"]
-mod tests;

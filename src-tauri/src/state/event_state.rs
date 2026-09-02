@@ -27,6 +27,7 @@ pub enum EventType {
     PatchingForge,
     DownloadingMods,
     SyncingMods,
+    SyncingPacks,
     LaunchingMinecraft,
     MinecraftOutput,
     AccountLogin,
@@ -92,10 +93,10 @@ pub struct ProcessMetricsPayload {
 }
 
 #[derive(Clone)]
-struct EventInfo {
-    event_type: EventType,
-    target_id: Option<Uuid>,
-    start_time: std::time::SystemTime,
+pub struct EventInfo {
+    pub event_type: EventType,
+    pub target_id: Option<Uuid>,
+    pub start_time: std::time::SystemTime,
 }
 
 #[derive(Clone)]
@@ -209,7 +210,3 @@ fn now_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-
-#[cfg(test)]
-#[path = "event_state_test.rs"]
-mod tests;

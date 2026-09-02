@@ -166,8 +166,8 @@ pub struct LoaderPolicy {
 #[serde(rename_all = "snake_case")]
 pub enum LoaderStrategy {
     Exact,
-    Latest_compatible,
-    Min_compatible,
+    LatestCompatible,
+    MinCompatible,
 }
 
 /// Definition of a desired/allowed loader version.
@@ -356,6 +356,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     exported_profile.created = Utc::now();
     exported_profile.last_played = None;
     exported_profile.state = ProfileState::NotInstalled;
+    exported_profile.sync_pack_ids = Vec::new();
 
     info!("Prepared new profile with path: {}", exported_profile.path);
 
@@ -389,7 +390,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
         AppError::Io(e)
     })?;
     let mut overrides_buf_reader = BufReader::new(overrides_file_for_listing);
-    let mut zip_lister_for_overrides = ZipFileReader::with_tokio(&mut overrides_buf_reader)
+    let zip_lister_for_overrides = ZipFileReader::with_tokio(&mut overrides_buf_reader)
         .await
         .map_err(|e| {
         error!(
@@ -788,8 +789,8 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
                             e // Use {:?} for CommandError
                         );
                         // Optionally, send an event to the frontend to show an error toast/dialog
-                        if let Some(window) = import_app_handle.get_webview_window("main") {
-                            let error_message = format!(
+                        if let Some(_window) = import_app_handle.get_webview_window("main") {
+                            let _error_message = format!(
                                 "Failed to import noriskpack ({}): {:?}",
                                 file_path_to_import.display(),
                                 e
@@ -859,15 +860,14 @@ impl NoriskModpacksConfig {
 
         // --- 5. Handle Local Mods ---
         // Local mods defined directly in the pack override any inherited mods.
-        if let local_mods = &base_definition.mods {
-            log::trace!(
-                "Pack '{}': Processing {} local mods",
-                pack_id,
-                local_mods.len()
-            );
-            for mod_entry in local_mods {
-                resolved_mods.insert(mod_entry.id.clone(), mod_entry.clone());
-            }
+        let local_mods = &base_definition.mods;
+        log::trace!(
+            "Pack '{}': Processing {} local mods",
+            pack_id,
+            local_mods.len()
+        );
+        for mod_entry in local_mods {
+            resolved_mods.insert(mod_entry.id.clone(), mod_entry.clone());
         }
 
         // --- 6. Handle Exclusions ---

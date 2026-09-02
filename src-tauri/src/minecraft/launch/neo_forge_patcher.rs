@@ -52,28 +52,6 @@ impl NeoForgePatcher {
         self
     }
 
-    fn parse_artifact(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('[') && arg.ends_with(']') {
-            let artifact_str = &arg[1..arg.len() - 1];
-            info!("Parsing artifact: {}", artifact_str);
-            if let Ok(path) = self.get_library_path(artifact_str) {
-                let path_str = path.to_string_lossy().to_string();
-                info!("Resolved artifact path: {}", path_str);
-                return Some(path_str);
-            }
-        }
-        None
-    }
-
-    fn parse_data_value(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('\'') && arg.ends_with('\'') {
-            let value = arg[1..arg.len() - 1].to_string();
-            info!("Parsed data value: {}", value);
-            return Some(value);
-        }
-        None
-    }
-
     fn replace_tokens(
         &self,
         arg: &str,
@@ -402,7 +380,7 @@ impl NeoForgePatcher {
     pub async fn apply_processors(
         &self,
         install_profile: &NeoForgeInstallProfile,
-        minecraft_version: &str,
+        _minecraft_version: &str,
         is_client: bool,
         installer_path: &PathBuf,
     ) -> Result<()> {

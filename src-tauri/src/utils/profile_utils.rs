@@ -1,4 +1,3 @@
-use crate::config::ProjectDirsExt;
 use crate::error::{AppError, Result};
 use crate::integrations::modrinth::{ModrinthProjectType, ModrinthVersion};
 use crate::integrations::norisk_packs;
@@ -19,11 +18,8 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
-use tempfile;
 use tokio::fs;
-use tokio::io::AsyncReadExt;
 use tokio::task::JoinHandle;
 
 use std::collections::HashMap;
@@ -59,13 +55,13 @@ impl From<ModrinthProjectType> for ContentType {
 /// Adds content (resourcepack, shaderpack, datapack) from Modrinth or CurseForge to a profile
 pub async fn add_content_to_profile(
     profile_id: Uuid,
-    project_id: String,
-    version_id: String,
+    _project_id: String,
+    _version_id: String,
     file_name: String,
     download_url: String,
     file_hash_sha1: Option<String>,
     content_name: Option<String>,
-    version_number: Option<String>,
+    _version_number: Option<String>,
     content_type: ContentType,
     source: ModPlatform,
 ) -> Result<()> {
@@ -1158,6 +1154,7 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
     export_profile.settings.quick_play_path = None;
     export_profile.preferred_account_id = None;
     export_profile.playtime_seconds = 0;
+    export_profile.sync_pack_ids = Vec::new();
 
     // Keep other essential data
     export_profile
@@ -1467,7 +1464,7 @@ async fn process_mod_requests(
     // For each request, we need to check both in NoRisk Pack and local installation
     for (request, idx) in requests {
         // Convert to the old params format for reusing norisk pack check logic
-        let old_params = CheckContentParams {
+        let _old_params = CheckContentParams {
             profile_id: profile.id,
             project_id: request.project_id.clone(),
             version_id: request.version_id.clone(),
@@ -1710,7 +1707,7 @@ async fn process_resourcepack_requests(
         let mut status = ContentInstallStatus::default();
 
         // Check NoRisk Pack - reuse old function for now
-        let old_params = CheckContentParams {
+        let _old_params = CheckContentParams {
             profile_id: profile.id,
             project_id: request.project_id.clone(),
             version_id: request.version_id.clone(),
@@ -1727,7 +1724,7 @@ async fn process_resourcepack_requests(
             let state = State::get().await?;
             let config = state.norisk_pack_manager.get_config().await;
 
-            if let Ok(resolved_pack) = config.get_resolved_pack_definition(pack_id) {
+            if let Ok(_resolved_pack) = config.get_resolved_pack_definition(pack_id) {
                 // Check if the pack includes this resource pack
                 // (Note: This would need to be expanded if NoRisk Packs can contain resource packs)
                 // For now, this is a placeholder as the original function doesn't handle this case specifically
@@ -1815,7 +1812,7 @@ async fn process_shaderpack_requests(
         let mut status = ContentInstallStatus::default();
 
         // Check if in NoRisk Pack - placeholder for future NoRisk Pack shader support
-        if let Some(pack_id) = &profile.selected_norisk_pack_id {
+        if let Some(_pack_id) = &profile.selected_norisk_pack_id {
             // Placeholder for future implementation
         }
 
@@ -1897,7 +1894,7 @@ async fn process_datapack_requests(
         let mut status = ContentInstallStatus::default();
 
         // Check if in NoRisk Pack - placeholder for future NoRisk Pack datapack support
-        if let Some(pack_id) = &profile.selected_norisk_pack_id {
+        if let Some(_pack_id) = &profile.selected_norisk_pack_id {
             // Placeholder for future implementation
         }
 
@@ -2094,7 +2091,6 @@ impl LocalContentLoader {
                                 crate::integrations::norisk_packs::NoriskModSourceDefinition::Modrinth { .. } => None,
                                 crate::integrations::norisk_packs::NoriskModSourceDefinition::Maven { .. } => Some("maven"),
                                 crate::integrations::norisk_packs::NoriskModSourceDefinition::Url { .. } => Some("url"),
-                                _ => Some("norisk"),
                             };
 
                             // Extract Modrinth info if available

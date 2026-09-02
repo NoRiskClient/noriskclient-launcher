@@ -8,8 +8,6 @@ import type { UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVers
 import { ModPlatform } from '../types/unified';
 import { ContentType as NrContentType } from '../types/content';
 import type { ToggleContentPayload, UninstallContentPayload, SwitchContentVersionPayload } from '../types/content';
-import { ModrinthService } from '../services/modrinth-service';
-import { CurseForgeService } from '../services/curseforge-service';
 import UnifiedService from '../services/unified-service';
 import { getLocalContent } from '../services/profile-service';
 import { toggleContentFromProfile, toggleContentsFromProfile, uninstallContentFromProfile, uninstallContentsFromProfile, switchContentVersion, toggleModUpdates, bulkToggleModUpdates } from '../services/content-service';
@@ -20,6 +18,8 @@ import { parseErrorMessage } from "../utils/error-utils";
 import { logWarn } from '../utils/logging-utils';
 import { contentCacheKey, useContentCacheStore } from '../store/content-cache-store';
 import { archiveIconKey, useIconCacheStore } from '../store/icon-cache-store';
+import { useProjectIcons } from './useProjectIcons';
+import type { ProjectIconRef } from './useProjectIcons';
 
 // Base type for content items managed by this hook - maps to ProfileLocalContentItem
 // We'll use ProfileLocalContentItem directly or ensure T extends it.
@@ -471,89 +471,18 @@ export function useLocalContentManager<T extends LocalContentItem>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [activeDropdownId]);
 
-  // Fetch Modrinth icons
-  useEffect(() => {
-    const fetchModrinthIcons = async () => {
-      if (!items || items.length === 0) return;
-
-      const { modrinthIcons: cached, mergeModrinthIcons } = useIconCacheStore.getState();
-      const projectIdsToFetch = items
-        .filter(item => {
-          const platform = getItemPlatform(item);
-          if (platform !== 'modrinth' || !item.modrinth_info?.project_id) return false;
-          if (item.modrinth_info.icon_url) return false;
-          return cached[item.modrinth_info.project_id] === undefined;
-        })
-        .map(item => item.modrinth_info!.project_id!)
-      const uniqueProjectIds = [...new Set(projectIdsToFetch)];
-
-      if (uniqueProjectIds.length > 0) {
-        try {
-          const projectDetailsList = await ModrinthService.getProjectDetails(uniqueProjectIds, cacheBehaviourRef.current);
-          const newIcons: Record<string, string | null> = {};
-          if (Array.isArray(projectDetailsList)) {
-            projectDetailsList.forEach(detail => {
-              if (detail && typeof detail === 'object' && detail.id) {
-                newIcons[detail.id] = detail.icon_url || null;
-              }
-            });
-          } else {
-             console.warn("[useLocalContentManager] ModrinthService.getProjectDetails did not return an array. Received:", projectDetailsList);
-          }
-          mergeModrinthIcons(newIcons);
-        } catch (err) {
-          console.error("[useLocalContentManager] Failed to fetch Modrinth project details for icons:", err);
-        }
+  useProjectIcons(
+    (items ?? []).flatMap<ProjectIconRef>((item) => {
+      const platform = getItemPlatform(item);
+      if (platform === 'modrinth' && item.modrinth_info?.project_id && !item.modrinth_info.icon_url) {
+        return [{ platform: 'modrinth', projectId: item.modrinth_info.project_id }];
       }
-    };
-    fetchModrinthIcons();
-  }, [items, getItemPlatform]);
-
-  // Fetch CurseForge icons
-  useEffect(() => {
-    const fetchCurseForgeIcons = async () => {
-      if (!items || items.length === 0) return;
-
-      const { curseforgeIcons: cached, mergeCurseforgeIcons } = useIconCacheStore.getState();
-      const projectIdsToFetch = items
-        .filter(item => {
-          const platform = getItemPlatform(item);
-          if (platform !== 'curseforge' || !item.curseforge_info?.project_id) return false;
-          if (item.curseforge_info.icon_url) return false;
-          return cached[item.curseforge_info.project_id] === undefined;
-        })
-        .map(item => item.curseforge_info!.project_id!)
-        .map(id => parseInt(id, 10)) // Convert string to number
-        .filter(id => !isNaN(id)); // Filter out invalid IDs
-
-      const uniqueProjectIds = [...new Set(projectIdsToFetch)];
-
-      if (uniqueProjectIds.length > 0) {
-        try {
-          const modsResponse = await CurseForgeService.getModsByIds(uniqueProjectIds, undefined, cacheBehaviourRef.current);
-          const newIcons: Record<string, string | null> = {};
-
-          if (modsResponse && modsResponse.data) {
-            modsResponse.data.forEach(mod => {
-              if (mod && mod.id && mod.logo) {
-                newIcons[mod.id.toString()] = mod.logo.url || null;
-              } else if (mod && mod.id) {
-                // Mod exists but has no logo
-                newIcons[mod.id.toString()] = null;
-              }
-            });
-          } else {
-            console.warn("[useLocalContentManager] CurseForgeService.getModsByIds did not return expected structure. Received:", modsResponse);
-          }
-
-          mergeCurseforgeIcons(newIcons);
-        } catch (err) {
-          console.error("[useLocalContentManager] Failed to fetch CurseForge mod details for icons:", err);
-        }
+      if (platform === 'curseforge' && item.curseforge_info?.project_id && !item.curseforge_info.icon_url) {
+        return [{ platform: 'curseforge', projectId: item.curseforge_info.project_id }];
       }
-    };
-    fetchCurseForgeIcons();
-  }, [items, getItemPlatform]);
+      return [];
+    }),
+  );
 
   useEffect(() => {
     const fetchLocalArchiveIcons = async () => {

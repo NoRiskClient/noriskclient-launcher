@@ -6,7 +6,6 @@ use crate::state::profile_state::{
 use log::{debug, info, trace, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::command;
 use uuid::Uuid;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use tokio::fs;
@@ -528,6 +527,7 @@ pub async fn resolve_target_mods(
     profile: &Profile,
     norisk_config: Option<&NoriskModpacksConfig>,
     custom_mod_infos: Option<&[CustomModInfo]>,
+    extra_mods: &[Mod],
     minecraft_version: &str,
     loader_str: &str,
     mod_cache_dir: &PathBuf,
@@ -580,7 +580,7 @@ pub async fn resolve_target_mods(
         "Resolving manually added/overridden mods for profile: '{}'",
         profile.name
     );
-    for mod_info in &profile.mods {
+    for mod_info in extra_mods.iter().chain(profile.mods.iter()) {
         let outcome = resolve_profile_mod(
             mod_info,
             profile,

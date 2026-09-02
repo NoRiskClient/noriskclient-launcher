@@ -4,7 +4,6 @@ use crate::minecraft::dto::forge_install_profile::ForgeInstallProfile;
 use crate::minecraft::dto::forge_meta::ForgeVersion;
 use async_zip::tokio::read::seek::ZipFileReader;
 use log::{info, trace};
-use reqwest;
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

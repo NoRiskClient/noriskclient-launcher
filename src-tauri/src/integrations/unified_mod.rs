@@ -1,12 +1,12 @@
 use crate::integrations::curseforge;
 use crate::integrations::curseforge::ModpackManifest;
 use crate::integrations::modrinth;
-use crate::state::profile_state::{ModPackSource, ProfileManager, Profile};
+use crate::state::profile_state::ModPackSource;
 use crate::state::state_manager::State;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ModPlatform {
@@ -313,7 +313,7 @@ impl From<curseforge::CurseForgeMod> for UnifiedModSearchResult {
             .collect();
 
         // Map CurseForge classId to unified project type
-        let project_type = mod_info.classId
+        let project_type = mod_info.class_id
             .and_then(|class_id| UnifiedProjectType::from_curseforge_class_id(class_id))
             .map(|pt| pt.to_string());
 
@@ -328,10 +328,10 @@ impl From<curseforge::CurseForgeMod> for UnifiedModSearchResult {
             display_categories: categories, // Use same as categories for CurseForge
             client_side: None, // CurseForge doesn't provide this
             server_side: None, // CurseForge doesn't provide this
-            downloads: mod_info.downloadCount,
+            downloads: mod_info.download_count,
             follows: None, // CurseForge doesn't provide this
             icon_url: mod_info.logo.map(|logo| logo.url),
-            project_url: mod_info.links.websiteUrl,
+            project_url: mod_info.links.website_url,
             project_type, // Now properly mapped from classId
             latest_version: None, // CurseForge doesn't provide this
             date_created: None, // CurseForge doesn't provide this
@@ -490,18 +490,18 @@ impl From<curseforge::CurseForgeFile> for UnifiedVersion {
 
         // Create unified file for this CurseForge file
         let unified_file = UnifiedVersionFile {
-            filename: file.fileName.clone(),
-            url: file.downloadUrl.clone(),
-            size: file.fileLength,
+            filename: file.file_name.clone(),
+            url: file.download_url.clone(),
+            size: file.file_length,
             hashes: hashes_map,
             primary: true, // CurseForge doesn't have primary flag, assume single file is primary
-            fingerprint: Some(file.fileFingerprint),
+            fingerprint: Some(file.file_fingerprint),
         };
 
         let unified_files = vec![unified_file];
 
         // Convert release type from CurseForge (1=Release, 2=Beta, 3=Alpha)
-        let release_type = match file.releaseType {
+        let release_type = match file.release_type {
             1 => UnifiedVersionType::Release,
             2 => UnifiedVersionType::Beta,
             3 => UnifiedVersionType::Alpha,
@@ -509,20 +509,20 @@ impl From<curseforge::CurseForgeFile> for UnifiedVersion {
         };
 
         // Extract loaders from gameVersions array (CurseForge puts loaders in gameVersions)
-        let loaders: Vec<String> = extract_loaders_from_game_versions(&file.gameVersions);
+        let loaders: Vec<String> = extract_loaders_from_game_versions(&file.game_versions);
 
-        let display_name_clone = file.displayName.clone();
-        let download_url_clone = file.downloadUrl.clone();
+        let display_name_clone = file.display_name.clone();
+        let download_url_clone = file.download_url.clone();
 
         // Convert CurseForge dependencies to unified dependencies
         // CurseForge relationType: 1=EmbeddedLibrary, 2=OptionalDependency, 3=RequiredDependency, 4=Tool, 5=Incompatible, 6=Include
         let unified_dependencies: Vec<UnifiedDependency> = file.dependencies
             .into_iter()
             .map(|dep| UnifiedDependency {
-                project_id: Some(dep.modId.to_string()),
+                project_id: Some(dep.mod_id.to_string()),
                 version_id: None, // CurseForge doesn't specify version IDs in dependencies
                 file_name: None, // CurseForge doesn't specify file names in dependencies
-                dependency_type: match dep.relationType {
+                dependency_type: match dep.relation_type {
                     1 => UnifiedDependencyType::Embedded, // EmbeddedLibrary
                     2 => UnifiedDependencyType::Optional, // OptionalDependency
                     3 => UnifiedDependencyType::Required, // RequiredDependency
@@ -536,17 +536,17 @@ impl From<curseforge::CurseForgeFile> for UnifiedVersion {
 
         UnifiedVersion {
             id: file.id.to_string(),
-            project_id: file.modId.to_string(),
+            project_id: file.mod_id.to_string(),
             source: ModPlatform::CurseForge,
-            name: file.displayName,
+            name: file.display_name,
             version_number: display_name_clone, // CurseForge uses displayName as version
             changelog: None, // CurseForge doesn't provide changelog
             dependencies: unified_dependencies,
-            game_versions: extract_game_versions_from_mixed(&file.gameVersions),
+            game_versions: extract_game_versions_from_mixed(&file.game_versions),
             loaders, // Extracted from gameVersions array
             files: unified_files,
-            date_published: file.fileDate,
-            downloads: file.downloadCount,
+            date_published: file.file_date,
+            downloads: file.download_count,
             release_type,
             url: download_url_clone,
         }
@@ -601,7 +601,7 @@ pub async fn search_mods_unified(
                         .map(|mod_info| mod_info.into())
                         .collect();
                     all_results.extend(unified_results);
-                    total_count += response.pagination.totalCount as u64;
+                    total_count += response.pagination.total_count as u64;
                 }
                 Err(e) => {
                     log::error!("CurseForge search failed: {}", e);
@@ -746,7 +746,7 @@ pub async fn get_mod_versions_unified(
                         .map(|file| file.into())
                         .collect();
                     all_versions.extend(unified_versions);
-                    total_count += response.pagination.totalCount as u64;
+                    total_count += response.pagination.total_count as u64;
                 }
                 Err(e) => {
                     log::error!("CurseForge files failed: {}", e);
@@ -769,9 +769,9 @@ pub async fn get_modpack_versions_unified(
 ) -> Result<UnifiedModpackVersionsResponse, crate::error::AppError> {
     info!("Getting modpack versions for: {:?}", modpack_source);
 
-    let mut installed_version = None;
-    let mut all_versions = Vec::new();
-    let mut latest_version = None;
+    let installed_version;
+    let all_versions;
+    let latest_version;
 
     match modpack_source {
         ModPackSource::Modrinth { project_id, version_id } => {
@@ -1197,10 +1197,10 @@ async fn check_curseforge_updates_only(
                 fingerprint: Some(update_info.fingerprint as u64), // Include the fingerprint for update tracking
             }],
             dependencies: update_info.dependencies.into_iter().map(|dep| UnifiedDependency {
-                project_id: Some(dep.modId.to_string()),
+                project_id: Some(dep.mod_id.to_string()),
                 version_id: None,
                 file_name: None,
-                dependency_type: convert_curseforge_dependency_type(dep.relationType),
+                dependency_type: convert_curseforge_dependency_type(dep.relation_type),
             }).collect(),
             game_versions: extract_game_versions_from_mixed(&update_info.game_versions),
             loaders: extract_loaders_from_game_versions(&update_info.game_versions),

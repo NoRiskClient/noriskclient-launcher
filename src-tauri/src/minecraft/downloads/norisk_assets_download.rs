@@ -593,7 +593,7 @@ impl NoriskClientAssetsDownloadService {
         &self,
         asset_id: &str,
         assets: &NoriskAssets,
-        is_experimental: bool,
+        _is_experimental: bool,
         norisk_token: &str,
         profile_id: Option<Uuid>,
     ) -> Result<()> {
@@ -644,7 +644,7 @@ impl NoriskClientAssetsDownloadService {
 
         for (name, asset) in assets_list {
             let hash = asset.hash.clone();
-            let size = asset.size;
+            let _size = asset.size;
 
             let hash_prefix = &hash[0..2];
             let target_path = objects_dir.join(hash_prefix).join(&hash);
@@ -1000,8 +1000,6 @@ impl NoriskClientAssetsDownloadService {
 
         for chunk in assets_list.chunks(batch_size) {
             batch_count += 1;
-            let mut batch_copied = 0;
-            let mut batch_skipped = 0;
 
             for (name, asset) in chunk {
                 let hash = &asset.hash;
@@ -1058,10 +1056,8 @@ impl NoriskClientAssetsDownloadService {
                     }
                     fs::copy(&source_path, &target_path).await?;
                     copied_count += 1;
-                    batch_copied += 1;
                 } else {
                     skipped_count += 1;
-                    batch_skipped += 1;
                 }
             }
 
@@ -1142,8 +1138,8 @@ impl NoriskClientAssetsDownloadService {
             return Ok(0);
         }
 
-        let entries_to_check = vec![base_dir.to_path_buf()];
-        let dirs_to_delete_later: Vec<PathBuf> = Vec::new();
+        let _entries_to_check = vec![base_dir.to_path_buf()];
+        let _dirs_to_delete_later: Vec<PathBuf> = Vec::new();
         let mut deleted_count = 0;
 
         // Perform a breadth-first traversal to collect all paths

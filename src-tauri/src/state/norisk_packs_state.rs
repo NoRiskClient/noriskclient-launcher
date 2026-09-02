@@ -167,7 +167,7 @@ impl NoriskPackManager {
     /// Prints the current configuration to the console for debugging.
     #[allow(dead_code)] // Allow unused function for debugging purposes
     pub async fn print_current_config(&self) {
-        let config_guard = self.config.read().await;
+        let _config_guard = self.config.read().await;
         println!("--- Current Norisk Packs Config ---");
        //println!("{:#?}", *config_guard); // Use pretty-print debug format
        //match config_guard.print_resolved_packs() {

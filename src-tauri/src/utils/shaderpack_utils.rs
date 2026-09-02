@@ -1,12 +1,9 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth;
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
-use crate::utils::hash_utils;
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs;
 
 /// Represents a shaderpack found in the profile directory
@@ -120,99 +117,6 @@ pub async fn get_shaderpacks_dir(profile: &Profile) -> Result<PathBuf> {
         shaderpacks_dir.display()
     );
     Ok(shaderpacks_dir)
-}
-
-/// Check if a path is a shaderpack file/directory
-async fn is_shaderpack_file(path: &Path) -> Result<bool> {
-    let metadata = fs::metadata(path)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to get metadata: {}", e)))?;
-
-    // Shader packs can be directories or zip files
-    if metadata.is_dir() {
-        debug!("Checking if directory is a shader pack: {}", path.display());
-        // Check if it contains files that make it a shader pack
-        // (typically shaders/composite.fsh or similar)
-        let result = is_shader_directory(path).await?;
-        if result {
-            debug!("Directory confirmed as shader pack: {}", path.display());
-        } else {
-            debug!("Directory is not a shader pack: {}", path.display());
-        }
-        return Ok(result);
-    }
-
-    if metadata.is_file() {
-        let file_name = match path.file_name().and_then(|s| s.to_str()) {
-            Some(name) => name,
-            None => return Ok(false),
-        };
-
-        // Check for .zip or .zip.disabled extension for shader zip files
-        let is_zip = file_name.ends_with(".zip") || file_name.ends_with(".zip.disabled");
-        if is_zip {
-            debug!("File confirmed as shader pack (zip): {}", path.display());
-        } else {
-            debug!("File is not a shader pack (not a zip): {}", path.display());
-        }
-        return Ok(is_zip);
-    }
-
-    debug!("Path is neither file nor directory: {}", path.display());
-    Ok(false)
-}
-
-/// Check if a directory contains shader files
-async fn is_shader_directory(path: &Path) -> Result<bool> {
-    // Look for common shader files in the right places
-    let shader_dir = path.join("shaders");
-    debug!("Checking for shader directory at: {}", shader_dir.display());
-
-    if !shader_dir.exists() {
-        debug!("No 'shaders' subdirectory found in: {}", path.display());
-        return Ok(false);
-    }
-
-    // Check for common shader files
-    for common_file in &["composite.fsh", "final.fsh", "gbuffers_basic.fsh"] {
-        let common_file_path = shader_dir.join(common_file);
-        if common_file_path.exists() {
-            debug!("Found common shader file: {}", common_file_path.display());
-            return Ok(true);
-        }
-    }
-
-    debug!("No common shader files found, checking for any .fsh or .vsh files...");
-
-    // If we can't find specific files, check if there are any .fsh or .vsh files
-    let mut entries = fs::read_dir(&shader_dir)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read shader directory: {}", e)))?;
-
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read shader entry: {}", e)))?
-    {
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
-                if extension == "fsh" || extension == "vsh" {
-                    debug!(
-                        "Found shader file with .fsh or .vsh extension: {}",
-                        path.display()
-                    );
-                    return Ok(true);
-                }
-            }
-        }
-    }
-
-    debug!(
-        "No shader files found in directory: {}",
-        shader_dir.display()
-    );
-    Ok(false)
 }
 
 /// Update a shader pack from Modrinth to a new version

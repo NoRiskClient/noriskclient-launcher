@@ -4,7 +4,7 @@ use log::{debug, error, info, trace, warn};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::time::{sleep, Duration};
 
@@ -243,7 +243,7 @@ pub fn emit_status(
     let payload = UpdaterStatusPayload {
         message,
         status: status.to_string(),
-        progress: progress_info.map(|(chunk, total)| (chunk * 100 / total.max(1))),
+        progress: progress_info.map(|(chunk, total)| chunk * 100 / total.max(1)),
         total: progress_info.map(|(_, total)| total),
         chunk: progress_info.map(|(chunk, _)| chunk),
     };
@@ -464,8 +464,8 @@ pub async fn check_for_updates(
 ) {
     let current_version = app_handle.package_info().version.to_string();
     let channel = if is_beta_channel { "Beta" } else { "Stable" };
-    let mut final_status: String = "unknown".to_string();
-    let mut final_message: String = "Update process ended.".to_string();
+    let final_status: String;
+    let final_message: String;
 
     info!(
         "Checking for updates (Current: {}). Channel: {}",

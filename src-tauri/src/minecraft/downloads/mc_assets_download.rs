@@ -1,4 +1,4 @@
-use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::{AssetIndex, AssetIndexContent, AssetObject};
 use crate::minecraft::launch::launch_summary::DownloadStats;
@@ -8,7 +8,6 @@ use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use crate::utils::mc_utils;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
-use reqwest;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -128,7 +127,7 @@ impl MinecraftAssetsDownloadService {
         let task_counter = Arc::new(AtomicUsize::new(1)); // Start counter at 1
         let completed_counter = Arc::new(AtomicUsize::new(0));
         let total_to_download = Arc::new(AtomicUsize::new(0));
-        let total_assets = assets.len();
+        let _total_assets = assets.len();
 
         trace!(
             "[Assets Download] Preparing {} potential jobs...",

@@ -1726,7 +1726,7 @@ async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
     })?;
 
     let status = res.status();
-    let current_date = get_date_header(res.headers());
+    let _current_date = get_date_header(res.headers());
     let text = res
         .text()
         .await
@@ -2110,7 +2110,7 @@ async fn minecraft_entitlements(
     Ok(entitlements)
 }
 
-fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
+pub fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
     match err {
         AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
             source,
@@ -2139,7 +2139,7 @@ fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
     }
 }
 
-fn is_offline_error(err: &AppError) -> bool {
+pub fn is_offline_error(err: &AppError) -> bool {
     matches!(
         err,
         AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
@@ -2422,7 +2422,7 @@ pub async fn start_oauth_callback_server(
                         }
                         // Inject error into HTML template via URL parameters
                         // The JavaScript in the template will handle displaying the error
-                        let error_url = format!("?error={}&error_description={}", 
+                        let _error_url = format!("?error={}&error_description={}", 
                             urlencoding::encode(error),
                             urlencoding::encode(error_description));
                         Html(error_html_shared.as_str().to_string())
@@ -2460,7 +2460,3 @@ pub async fn start_oauth_callback_server(
 
     Ok((handle, rx))
 }
-
-#[cfg(test)]
-#[path = "minecraft_auth_test.rs"]
-mod tests;

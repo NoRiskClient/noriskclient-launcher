@@ -95,7 +95,6 @@ impl RuleProcessor {
 
         if let Some(rules) = rules {
             let mut allow_found = false;
-            let mut disallow_found = false; // For clarity in logs
             let mut allow_matches = false;
             let mut disallow_matches = false;
 
@@ -114,7 +113,6 @@ impl RuleProcessor {
                         }
                     }
                     "disallow" => {
-                        disallow_found = true;
                         if conditions_match {
                             disallow_matches = true;
                             trace!("    ✅ Disallow rule's conditions matched");

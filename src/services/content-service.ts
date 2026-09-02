@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
+import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
+import { addContentToSyncPack, removeContentFromSyncPack } from './sync-pack-service';
 
 /**
  * Uninstalls content from a specified profile based on the provided payload.
@@ -106,6 +107,28 @@ export async function installContentToProfile(
     // Consider toast: toast.error(`Failed to install content: ${error}`);
     throw error;
   }
+}
+
+export async function installContentToTarget(
+  payload: InstallContentPayload,
+  target?: ContentInstallTarget,
+  options?: { pinVersion?: boolean },
+): Promise<void> {
+  if (target?.type === 'syncPack') {
+    return addContentToSyncPack(target.packId, payload, options?.pinVersion);
+  }
+  return installContentToProfile(payload);
+}
+
+export async function uninstallContentFromTarget(
+  payload: UninstallContentPayload,
+  projectId: string,
+  target?: ContentInstallTarget,
+): Promise<void> {
+  if (target?.type === 'syncPack') {
+    return removeContentFromSyncPack(target.packId, projectId);
+  }
+  return uninstallContentFromProfile(payload);
 }
 
 /**

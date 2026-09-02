@@ -952,7 +952,7 @@ pub async fn download_and_replace_file(
 /// which `-Dsun.jnu.encoding=UTF-8` does not override. Anything outside it reaches the game as
 /// `?` and the launch dies on an unreadable path. Only the directory is restricted; the display
 /// name keeps its spelling.
-fn to_launchable_ascii(segment: &str) -> String {
+pub fn to_launchable_ascii(segment: &str) -> String {
     let transliterated = deunicode::deunicode(segment);
 
     let mut out = String::with_capacity(transliterated.len());
@@ -985,7 +985,3 @@ fn to_launchable_ascii(segment: &str) -> String {
     }
     format!("profile-{:06x}", hash & 0xffffff)
 }
-
-#[cfg(test)]
-#[path = "path_utils_test.rs"]
-mod tests;

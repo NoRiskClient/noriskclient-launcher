@@ -18,8 +18,8 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickInstallProfilesModal";
 import { ModrinthVersionItemV2 } from "../modrinth/v2/ModrinthVersionItemV2";
 import { ProgressToast } from "../ui/ProgressToast";
-import { installContentToProfile } from "../../services/content-service";
-import { ContentType, type InstallContentPayload } from "../../types/content";
+import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 import { TagBadge } from "../ui/TagBadge";
@@ -28,6 +28,7 @@ import { Select, type SelectOption } from "../ui/Select";
 interface ModDetailVersionsProps {
   project: UnifiedProjectDetails;
   targetProfile?: Profile;
+  installTarget?: ContentInstallTarget;
 }
 
 // Helper to convert UnifiedProjectDetails to ModrinthSearchHit format
@@ -70,7 +71,7 @@ function mapProjectTypeToContentType(projectType: string): ContentType | null {
   }
 }
 
-export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsProps) {
+export function ModDetailVersions({ project, targetProfile, installTarget }: ModDetailVersionsProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { profiles, fetchProfiles } = useProfileStore();
@@ -295,9 +296,9 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
         source: project.source,
       };
 
-      await installContentToProfile(payload);
+      await installContentToTarget(payload, installTarget, { pinVersion: true });
       const versionNumber = version.version_number ?? '';
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: profile.name }));
+      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);

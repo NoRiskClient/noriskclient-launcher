@@ -14,5 +14,6 @@ pub mod profile_state;
 pub mod profile_store;
 pub mod skin_state;
 pub mod state_manager;
+pub mod sync_pack_state;
 
 pub use state_manager::State;

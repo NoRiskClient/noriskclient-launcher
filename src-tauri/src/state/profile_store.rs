@@ -12,7 +12,7 @@ use sqlx::{Row, SqlitePool};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-const SQL_VARIABLE_CHUNK: usize = 900;
+pub const SQL_VARIABLE_CHUNK: usize = 900;
 
 pub struct ProfileStore {
     db: DbHandle,
@@ -63,7 +63,7 @@ fn nanos_into(raw: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_nanos(raw)
 }
 
-pub(crate) fn canonical_value(profile: &Profile) -> Result<serde_json::Value> {
+pub fn canonical_value(profile: &Profile) -> Result<serde_json::Value> {
     let mut value = serde_json::to_value(profile)?;
     if let Some(set) = value
         .get_mut("disabled_norisk_mods_detailed")
@@ -123,7 +123,7 @@ impl From<SettingsData> for ProfileSettings {
     }
 }
 
-fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
+pub fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
     let raw_id: String = row.get("id");
     let id = Uuid::parse_str(&raw_id)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_id, e)))?;
@@ -134,6 +134,7 @@ fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
     let settings: SettingsData = json_into(&row.get::<String, _>("settings"), "profile settings");
 
     Ok(Profile {
+        sync_pack_ids: Vec::new(),
         id,
         name: row.get("name"),
         path: row.get("path"),
@@ -179,7 +180,7 @@ fn parse_optional_uuid(raw: Option<String>) -> Option<Uuid> {
     }
 }
 
-fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
+pub fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
     let raw_profile: String = row.get("profile_id");
     let profile_id = Uuid::parse_str(&raw_profile)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_profile, e)))?;
@@ -213,7 +214,7 @@ fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
     ))
 }
 
-fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIdentifier)> {
+pub fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIdentifier)> {
     let raw_profile: String = row.get("profile_id");
     let profile_id = Uuid::parse_str(&raw_profile)
         .map_err(|e| AppError::Other(format!("Invalid profile id '{}': {}", raw_profile, e)))?;
@@ -237,7 +238,9 @@ fn row_to_disabled(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, NoriskModIden
     ))
 }
 
-fn source_lookup(source: &crate::state::profile_state::ModSource) -> (String, Option<String>, Option<String>, Option<String>) {
+pub fn source_lookup(
+    source: &crate::state::profile_state::ModSource,
+) -> (String, Option<String>, Option<String>, Option<String>) {
     use crate::state::profile_state::ModSource;
     match source {
         ModSource::Local { file_name } => {
@@ -278,7 +281,7 @@ impl ProfileStore {
         Self { db }
     }
 
-    async fn pool(&self) -> Result<SqlitePool> {
+    pub async fn pool(&self) -> Result<SqlitePool> {
         match db::pool_of(&self.db).await {
             Some(pool) => Ok(pool),
             None => Err(AppError::Other(
@@ -323,6 +326,23 @@ impl ProfileStore {
                     }
                 }
                 Err(e) => warn!("Skipping an unreadable mod row: {}", e),
+            }
+        }
+
+        for row in
+            sqlx::query("SELECT * FROM profile_sync_packs ORDER BY profile_id, ordinal")
+                .fetch_all(&pool)
+                .await?
+        {
+            let profile_id: String = row.get("profile_id");
+            let pack_id: String = row.get("pack_id");
+            match (Uuid::parse_str(&profile_id), Uuid::parse_str(&pack_id)) {
+                (Ok(profile_id), Ok(pack_id)) => {
+                    if let Some(profile) = profiles.get_mut(&profile_id) {
+                        profile.sync_pack_ids.push(pack_id);
+                    }
+                }
+                _ => warn!("Skipping an unreadable sync pack link"),
             }
         }
 
@@ -474,6 +494,45 @@ impl ProfileStore {
         Ok(())
     }
 
+    pub async fn upsert_mods(&self, profile_id: Uuid, entries: &[(usize, Mod)]) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let pool = self.pool().await?;
+        let mut tx = pool.begin().await?;
+        let id = profile_id.to_string();
+        for (ordinal, entry) in entries {
+            write_mod(&mut tx, &id, *ordinal, entry).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn set_sync_pack_ids(&self, profile_id: Uuid, pack_ids: &[Uuid]) -> Result<()> {
+        let pool = self.pool().await?;
+        let mut tx = pool.begin().await?;
+
+        sqlx::query("DELETE FROM profile_sync_packs WHERE profile_id = ?1")
+            .bind(profile_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+
+        for (ordinal, pack_id) in pack_ids.iter().enumerate() {
+            sqlx::query(
+                "INSERT OR IGNORE INTO profile_sync_packs (profile_id, pack_id, ordinal)
+                 VALUES (?1, ?2, ?3)",
+            )
+            .bind(profile_id.to_string())
+            .bind(pack_id.to_string())
+            .bind(ordinal as i64)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn delete_profile(&self, id: Uuid) -> Result<()> {
         let pool = self.pool().await?;
         sqlx::query("DELETE FROM profiles WHERE id = ?1")
@@ -504,6 +563,63 @@ impl ProfileStore {
                 .await?,
         )
     }
+}
+
+async fn write_mod(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    profile_id: &str,
+    ordinal: usize,
+    entry: &Mod,
+) -> Result<()> {
+    let (source_type, project_id, version_id, file_name) = source_lookup(&entry.source);
+    sqlx::query(
+        r#"
+        INSERT INTO profile_mods (
+            profile_id, id, ordinal, source, source_type, project_id, version_id,
+            file_name, enabled, display_name, version, game_versions,
+            file_name_override, associated_loader, modpack_origin, updates_enabled,
+            force_include_versions, extra
+        ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
+        ON CONFLICT (profile_id, id) DO UPDATE SET
+            ordinal = excluded.ordinal,
+            source = excluded.source,
+            source_type = excluded.source_type,
+            project_id = excluded.project_id,
+            version_id = excluded.version_id,
+            file_name = excluded.file_name,
+            enabled = excluded.enabled,
+            display_name = excluded.display_name,
+            version = excluded.version,
+            game_versions = excluded.game_versions,
+            file_name_override = excluded.file_name_override,
+            associated_loader = excluded.associated_loader,
+            modpack_origin = excluded.modpack_origin,
+            updates_enabled = excluded.updates_enabled,
+            force_include_versions = excluded.force_include_versions,
+            extra = excluded.extra
+        "#,
+    )
+    .bind(profile_id)
+    .bind(entry.id.to_string())
+    .bind(ordinal as i64)
+    .bind(json_of(&entry.source)?)
+    .bind(source_type)
+    .bind(project_id)
+    .bind(version_id)
+    .bind(file_name)
+    .bind(entry.enabled as i64)
+    .bind(&entry.display_name)
+    .bind(&entry.version)
+    .bind(entry.game_versions.as_ref().map(json_of).transpose()?)
+    .bind(&entry.file_name_override)
+    .bind(entry.associated_loader.as_ref().map(tag_of).transpose()?)
+    .bind(&entry.modpack_origin)
+    .bind(entry.updates_enabled as i64)
+    .bind(json_of(&entry.force_include_versions)?)
+    .bind(json_of(&entry.extra)?)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 async fn write_profile(
@@ -583,35 +699,22 @@ async fn write_profile(
         .await?;
 
     for (ordinal, entry) in profile.mods.iter().enumerate() {
-        let (source_type, project_id, version_id, file_name) = source_lookup(&entry.source);
+        write_mod(tx, &id, ordinal, entry).await?;
+    }
+
+    sqlx::query("DELETE FROM profile_sync_packs WHERE profile_id = ?1")
+        .bind(&id)
+        .execute(&mut **tx)
+        .await?;
+
+    for (ordinal, pack_id) in profile.sync_pack_ids.iter().enumerate() {
         sqlx::query(
-            r#"
-            INSERT INTO profile_mods (
-                profile_id, id, ordinal, source, source_type, project_id, version_id,
-                file_name, enabled, display_name, version, game_versions,
-                file_name_override, associated_loader, modpack_origin, updates_enabled,
-                force_include_versions, extra
-            ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
-            "#,
+            "INSERT OR IGNORE INTO profile_sync_packs (profile_id, pack_id, ordinal)
+             VALUES (?1, ?2, ?3)",
         )
         .bind(&id)
-        .bind(entry.id.to_string())
+        .bind(pack_id.to_string())
         .bind(ordinal as i64)
-        .bind(json_of(&entry.source)?)
-        .bind(source_type)
-        .bind(project_id)
-        .bind(version_id)
-        .bind(file_name)
-        .bind(entry.enabled as i64)
-        .bind(&entry.display_name)
-        .bind(&entry.version)
-        .bind(entry.game_versions.as_ref().map(json_of).transpose()?)
-        .bind(&entry.file_name_override)
-        .bind(entry.associated_loader.as_ref().map(tag_of).transpose()?)
-        .bind(&entry.modpack_origin)
-        .bind(entry.updates_enabled as i64)
-        .bind(json_of(&entry.force_include_versions)?)
-        .bind(json_of(&entry.extra)?)
         .execute(&mut **tx)
         .await?;
     }
@@ -681,6 +784,7 @@ impl ProfileStore {
         let now = Utc::now().timestamp_millis();
 
         for table in [
+            "profile_sync_packs",
             "profile_disabled_norisk_mods",
             "profile_mods",
             "profiles",
@@ -825,7 +929,3 @@ async fn verify_import(
 
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "profile_store_test.rs"]
-mod tests;

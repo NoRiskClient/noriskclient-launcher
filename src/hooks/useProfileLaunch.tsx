@@ -12,8 +12,11 @@ import { toast } from "react-hot-toast";
 import i18n from "../i18n/i18n";
 import { useGlobalModal } from "./useGlobalModal";
 import { GroupMigrationModal } from "../components/modals/GroupMigrationModal";
-import { checkForGroupMigration } from "../services/profile-service";
+import { checkForGroupMigration, getProfile } from "../services/profile-service";
 import { MigrationInfo } from "../types/profile";
+import * as SyncPackService from "../services/sync-pack-service";
+import { needsAdoptConfirm } from "../types/syncPacks";
+import { AdoptPreviewModal } from "../components/sync-packs/AdoptPreviewModal";
 import { requireMinecraftAccount } from "../lib/require-account";
 import { useProfileStore } from "../store/profile-store";
 
@@ -155,6 +158,45 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     return clearPolling;
   }, [profileId, isButtonLaunching, finalizeButtonLaunch, getProfileState, quickPlaySingleplayer, quickPlayMultiplayer]);
 
+  const ensureSyncConfirmed = async (): Promise<boolean> => {
+    try {
+      const profile = await getProfile(profileId);
+      const packIds = profile.sync_pack_ids ?? [];
+      if (packIds.length === 0) return true;
+
+      const preview = await SyncPackService.previewProfileSync(profileId, packIds);
+      const adopting = preview.filter(needsAdoptConfirm);
+      if (adopting.length === 0) return true;
+
+      const packNames = Array.from(
+        new Set(adopting.map((entry) => entry.pack_name)),
+      ).join(", ");
+
+      return await new Promise<boolean>((resolve) => {
+        const modalId = `sync-adopt-${profileId}`;
+        showModal(
+          modalId,
+          <AdoptPreviewModal
+            profileName={profile.name}
+            packName={packNames}
+            entries={adopting}
+            onCancel={() => {
+              hideModal(modalId);
+              resolve(false);
+            }}
+            onConfirm={() => {
+              hideModal(modalId);
+              resolve(true);
+            }}
+          />,
+        );
+      });
+    } catch (err) {
+      console.warn("[useProfileLaunch] Sync pack preflight failed:", err);
+      return true;
+    }
+  };
+
   // Sign-in gate. Without an account the backend aborts the launch with a bare
   // NoCredentialsError, so catch it here and offer the sign-in instead; the
   // prompt calls `retry` once an account is active so the click still lands.
@@ -216,6 +258,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     }
 
     if (!hasAccountOrPrompt(() => handleLaunch())) return;
+    if (!(await ensureSyncConfirmed())) return;
 
     // Check if migration is needed
     try {
@@ -276,6 +319,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
       }
 
       if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer, overrides))) return;
+      if (!(await ensureSyncConfirmed())) return;
 
       if (overrides) {
         initiateButtonLaunch(profileId);

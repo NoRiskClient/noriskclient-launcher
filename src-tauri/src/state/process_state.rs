@@ -13,11 +13,10 @@ use dashmap::DashMap;
 use log;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::Arc;
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::Manager;
 use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
@@ -28,7 +27,7 @@ use uuid::Uuid;
 
 // NEUE Imports für notify
 use notify::{
-    event::CreateKind, Config as NotifyConfig, Event as NotifyEvent, EventKind as NotifyEventKind,
+    Config as NotifyConfig, Event as NotifyEvent, EventKind as NotifyEventKind,
     RecommendedWatcher, RecursiveMode, Watcher,
 };
 use tokio::sync::mpsc; // Für den Channel
@@ -254,6 +253,7 @@ struct Process {
 
 // Kapselt die Nachricht, die vom notify event handler zum ProcessManager geschickt wird
 #[derive(Debug)]
+#[allow(dead_code)]
 struct CrashReportNotification {
     process_id: Uuid,
     file_path: PathBuf,
@@ -292,8 +292,9 @@ impl ProcessManager {
         })
     }
 
+    #[allow(dead_code)]
     async fn process_crash_report_events(
-        app_handle: Arc<tauri::AppHandle>,
+        _app_handle: Arc<tauri::AppHandle>,
         mut receiver: mpsc::Receiver<CrashReportNotification>,
     ) {
         log::info!("Starting crash report event processor task.");
@@ -664,7 +665,7 @@ impl ProcessManager {
     // NEUE Hilfsfunktion zum Stoppen und Entfernen eines Watchers
     async fn stop_crash_report_watcher(&self, process_id: Uuid) {
         let mut watchers_map = self.active_watchers.write().await;
-        if let Some(mut watcher) = watchers_map.remove(&process_id) {
+        if let Some(_watcher) = watchers_map.remove(&process_id) {
             // Explizites unwatch ist bei notify v6 nicht immer nötig, wenn der Watcher gedroppt wird.
             // Aber um sicherzugehen und Pfade zu entfernen, falls der Watcher mehrere Pfade überwacht (hier nicht der Fall).
             // Da wir den Pfad nicht separat speichern, lassen wir unwatch weg und verlassen uns auf drop.
@@ -919,7 +920,7 @@ impl ProcessManager {
 
         let processes_arc_clone = Arc::clone(&self.processes);
         // Klon für active_watchers und den Manager selbst (oder dessen relevante Teile)
-        let active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
+        let _active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
         // Der Monitor-Task benötigt eine Möglichkeit, stop_crash_report_watcher aufzurufen.
         // Da stop_crash_report_watcher &self benötigt und wir nicht den ganzen ProcessManager übergeben wollen,
         // wäre es besser, wenn der Monitor-Task eine Nachricht an den ProcessManager sendet oder
@@ -1022,6 +1023,30 @@ impl ProcessManager {
                             ),
                         }
                     }
+                }
+            }
+
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                match crate::sync::engine::SyncEngine::write_back_after_exit(metadata.profile_id)
+                    .await
+                {
+                    Ok(report) => {
+                        for warning in &report.warnings {
+                            log::warn!("[Sync Packs] {}", warning);
+                        }
+                        if report.changed_targets() > 0 {
+                            log::info!(
+                                "Sync packs wrote back {} target(s) for profile {}",
+                                report.changed_targets(),
+                                metadata.profile_id
+                            );
+                        }
+                    }
+                    Err(e) => log::warn!(
+                        "Sync pack write back failed for profile {}: {}",
+                        metadata.profile_id,
+                        e
+                    ),
                 }
             }
 
@@ -1190,7 +1215,7 @@ impl ProcessManager {
         log::info!("Attempting to stop process {}", process_id);
 
         let mut kill_successful = false;
-        let mut pid_for_error: u32 = 0;
+        let pid_for_error: u32;
 
         let mut processes_map = self.processes.write().await;
 
@@ -1276,10 +1301,10 @@ impl ProcessManager {
     }
 
     async fn periodic_process_check(
-        app_handle: Arc<tauri::AppHandle>,
+        _app_handle: Arc<tauri::AppHandle>,
         processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>,
         active_watchers_arc: Arc<RwLock<HashMap<Uuid, RecommendedWatcher>>>,
-        notify_tx: mpsc::Sender<CrashReportNotification>,
+        _notify_tx: mpsc::Sender<CrashReportNotification>,
     ) {
         let mut interval = interval(Duration::from_secs(10));
         log::trace!("Starting periodic process and watcher checker task.");

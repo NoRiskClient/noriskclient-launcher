@@ -96,15 +96,8 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
   };
 }
 
-// Get loader icon path
-const getLoaderIcon = (loader: string): string => {
-  const loaderLower = loader.toLowerCase();
-  if (loaderLower === "fabric") return "/icons/fabric.png";
-  if (loaderLower === "forge") return "/icons/forge.png";
-  if (loaderLower === "neoforge") return "/icons/neoforge.png";
-  if (loaderLower === "quilt") return "/icons/quilt.png";
-  return "/icons/minecraft.png";
-};
+import { loaderIconSrc } from "../../lib/loader-icons";
+const getLoaderIcon = loaderIconSrc;
 
 // Get status color
 const getStatusColor = (status: InstanceStatus): string => {

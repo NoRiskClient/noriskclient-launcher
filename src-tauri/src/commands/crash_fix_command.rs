@@ -1,7 +1,7 @@
 use crate::error::{AppError, CommandError};
 use crate::integrations::modrinth::{self, ModrinthVersion};
 use crate::integrations::unified_mod::{self, ModPlatform, UnifiedModVersionsParams, UnifiedVersion};
-use crate::state::profile_state::{Mod, ModLoader, ModSource, NoriskModIdentifier, Profile};
+use crate::state::profile_state::{mod_platform_ids, Mod, ModLoader, ModSource, NoriskModIdentifier, Profile};
 use crate::state::state_manager::State;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -139,15 +139,6 @@ fn pick_directional(versions: &[UnifiedVersion], current_id: &str, downgrade: bo
         .cloned()
 }
 
-/// (platform, project_id, current version/file id) for a managed Modrinth/CurseForge mod; None for local/url.
-fn managed_source(m: &Mod) -> Option<(ModPlatform, String, String)> {
-    match &m.source {
-        ModSource::Modrinth { project_id, version_id, .. } => Some((ModPlatform::Modrinth, project_id.clone(), version_id.clone())),
-        ModSource::CurseForge { project_id, file_id, .. } => Some((ModPlatform::CurseForge, project_id.clone(), file_id.clone())),
-        _ => None,
-    }
-}
-
 /// loader-compatible versions for a project on its platform (game-version filtering is done by the caller).
 async fn unified_versions(platform: ModPlatform, project_id: &str, loader: &str) -> Result<Vec<UnifiedVersion>, CommandError> {
     let resp = unified_mod::get_mod_versions_unified(UnifiedModVersionsParams {
@@ -218,7 +209,7 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                 None => return Ok(skip(&action.target)),
             };
             // platform from the installed mod's source (Modrinth or CurseForge); skip local/url mods
-            let (platform, project_id, current_id) = match managed_source(m) {
+            let (platform, project_id, current_id) = match mod_platform_ids(&m.source) {
                 Some(t) => t,
                 None => return Ok(skip(&action.target)),
             };
@@ -290,7 +281,7 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                     None => continue,
                 };
                 // platform from the installed mod's source; only managed Modrinth/CurseForge mods can be re-versioned
-                let (platform, project_id, current_id) = match managed_source(m) {
+                let (platform, project_id, current_id) = match mod_platform_ids(&m.source) {
                     Some(t) => t,
                     None => continue,
                 };
