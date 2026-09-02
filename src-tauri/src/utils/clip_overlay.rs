@@ -1,16 +1,26 @@
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager};
+#[cfg(windows)]
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::Result;
 
 pub const OVERLAY_LABEL: &str = "clip-overlay";
 
+#[cfg(windows)]
 const WIDTH: f64 = 340.0;
+#[cfg(windows)]
 const HEIGHT: f64 = 96.0;
 
 const MARGIN: f64 = 24.0;
 
 const TOP_MARGIN: f64 = 110.0;
 
+#[cfg(not(windows))]
+pub fn create(_app: &AppHandle) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(windows)]
 pub fn create(app: &AppHandle) -> Result<()> {
     if app.get_webview_window(OVERLAY_LABEL).is_some() {
         return Ok(());
