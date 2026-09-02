@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1430",
-    "beforeBuildCommand": "yarn build",
+    "beforeBuildCommand": "yarn build && yarn stage-native",
     "frontendDist": "../dist"
   },
   "plugins": {
@@ -264,6 +264,13 @@
           "https://player.vimeo.com",
           "https://api.norisk.gg",
           "https://api-staging.norisk.gg"
+        ],
+        "media-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "blob:",
+          "data:"
         ]
       },
       "assetProtocol": {

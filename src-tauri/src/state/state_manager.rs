@@ -38,6 +38,7 @@ pub struct State {
     pub cosmetic_pack_manager: CosmeticPackManager,
     pub friends_state: FriendsState,
     pub content_cache: ContentCacheManager,
+    pub capture_supervisor: Arc<crate::state::capture_state::CaptureSupervisor>,
     pub sync_pack_manager: SyncPackManager,
     pub db: crate::state::db::DbHandle,
     pub io_semaphore: Arc<Semaphore>,
@@ -97,6 +98,9 @@ impl State {
                     cosmetic_pack_manager,
                     friends_state,
                     content_cache,
+                    capture_supervisor: Arc::new(
+                        crate::state::capture_state::CaptureSupervisor::new(),
+                    ),
                     sync_pack_manager,
                     db,
                     io_semaphore,

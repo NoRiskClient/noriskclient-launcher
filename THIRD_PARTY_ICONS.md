@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 290 icons from the sets below. The artwork is redistributed
+The launcher bundles 305 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -8,7 +8,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Solar (`solar`)
 
-- 227 icons used of 7401
+- 241 icons used of 7401
 - Author: [480 Design](https://www.figma.com/community/file/1166831539721848736)
 - Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`CC-BY-4.0`)
 
@@ -56,7 +56,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## SVG Spinners (`svg-spinners`)
 
-- 2 icons used of 46
+- 3 icons used of 46
 - Author: [Utkarsh Verma](https://github.com/n3r4zzurr0/svg-spinners)
 - Licence: [MIT](https://github.com/n3r4zzurr0/svg-spinners/blob/main/LICENSE) (`MIT`)
 

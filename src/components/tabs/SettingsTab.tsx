@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import type { LauncherConfig } from "../../types/launcherConfig";
 import * as ConfigService from "../../services/launcher-config-service";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
 import { ActionButton } from ".././ui/ActionButton";
@@ -17,12 +18,22 @@ import { DebugSection, getDebugTabs } from "./DebugSection";
 import { GeneralTab } from "./settings/GeneralTab";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { AdvancedTab } from "./settings/AdvancedTab";
+import { ClipsTab } from "./settings/ClipsTab";
 import { SettingsConfigProvider } from "./settings/settings-context";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { isWindows } from "../../utils/platform";
 
-type SettingsTabId = "general" | "appearance" | "advanced" | "debug";
+type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
+
+const SETTINGS_TAB_IDS: SettingsTabId[] = [
+  "general",
+  "appearance",
+  "clips",
+  "advanced",
+  "debug",
+];
 
 interface SettingsTabProps {
   onClose: () => void;
@@ -34,9 +45,19 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   const [tempConfig, setTempConfig] = useState<LauncherConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<boolean>(false); const [activeTab, setActiveTab] = useState<SettingsTabId>(
-    "general",
+  const [saving, setSaving] = useState<boolean>(false);
+  const requested = useSettingsModalStore.getState().tab;
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() =>
+    SETTINGS_TAB_IDS.includes(requested as SettingsTabId)
+      ? (requested as SettingsTabId)
+      : "general",
   );
+
+  const onlyTab = useSettingsModalStore.getState().only
+    ? (SETTINGS_TAB_IDS.includes(requested as SettingsTabId)
+        ? (requested as SettingsTabId)
+        : null)
+    : null;
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -53,6 +74,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab, sidebarQuery]);
 
+  const clipsAvailable = useMemo(
+    () => isWindows() && onlyTab === "clips",
+    [onlyTab],
+  );
+
   const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
     general: [
       { id: "language", label: t("settings.language") },
@@ -66,6 +92,14 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "background", label: t("settings.background.title") },
       { id: "custom-background", label: t("settings.custom_background.title") },
     ],
+    clips: [
+      { id: "clips-general", label: t("settings.clips.title") },
+      { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
+      { id: "clips-buffer", label: t("settings.clips.buffer.title") },
+      { id: "clips-quality", label: t("settings.clips.quality.title") },
+      { id: "clips-audio", label: t("settings.clips.audio.title") },
+      { id: "clips-storage", label: t("settings.clips.storage.title") },
+    ],
     advanced: [
       { id: "login_cache", label: t("settings.sections.login_cache") },
       { id: "gamedir", label: t("settings.game_data_dir.title") },
@@ -75,7 +109,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     debug: getDebugTabs(t),
   };
 
-  const tabConfig: {
+  const allTabs: {
     id: SettingsTabId;
     label: string;
     icon: string;
@@ -83,9 +117,19 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   }[] = [
     { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
+    ...(clipsAvailable
+      ? [{
+          id: "clips" as const,
+          label: t("settings.tabs.clips"),
+          icon: "solar:videocamera-record-bold",
+          children: sectionDefs.clips,
+        }]
+      : []),
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
     { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
   ];
+
+  const tabConfig = onlyTab ? allTabs.filter((tab) => tab.id === onlyTab) : allTabs;
 
   const selectTab = (id: SettingsTabId) => {
     setSidebarSearch("");
@@ -271,10 +315,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     const bodyOf: Partial<Record<SettingsTabId, ReactNode>> = {
       general: <GeneralTab />,
       appearance: <AppearanceTab />,
+      ...(clipsAvailable ? { clips: <ClipsTab /> } : {}),
       advanced: <AdvancedTab />,
     };
 
-    if (sidebarQuery) {
+    if (sidebarQuery && !onlyTab) {
       const order: SettingsTabId[] = ["general", "appearance", "advanced"];
       const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
         (id) => bodyOf[id],
@@ -292,11 +337,15 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     return bodyOf[activeTab] ?? null;
   };
 
-
   return (
     <Modal
-      title={t("nav.settings")}
-      titleIcon={<Icon icon="solar:settings-bold" className="w-8 h-8" />}
+      title={onlyTab ? tabConfig[0]?.label ?? t("nav.settings") : t("nav.settings")}
+      titleIcon={
+        <Icon
+          icon={onlyTab ? tabConfig[0]?.icon ?? "solar:settings-bold" : "solar:settings-bold"}
+          className="w-8 h-8"
+        />
+      }
       onClose={onClose}
       width="xl"
       className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"

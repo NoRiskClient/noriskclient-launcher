@@ -35,7 +35,7 @@ jobs:
 
       - name: cargo test
         working-directory: ./src-tauri
-        run: cargo test
+        run: cargo test --workspace
 
   # --- JOB 1: Build & Rename ---
   build:
