@@ -33,9 +33,9 @@ export function BannerCard({
     <div
       className={`relative rounded-lg p-4 cursor-default transition-all duration-200 ${className ?? ""}`}
       style={{
-        backgroundColor: "rgba(0,0,0,0.2)",
-        backdropFilter: "blur(12px)",
+        backgroundColor: "rgba(7,15,28,0.94)",
         WebkitBackdropFilter: "blur(12px)",
+        backdropFilter: "blur(12px)",
         border: "1px solid rgba(255,255,255,0.1)",
         borderBottom: `2px solid ${c}80`,
         boxShadow: `0 4px 0 rgba(0,0,0,0.3), 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 ${c}1A`,

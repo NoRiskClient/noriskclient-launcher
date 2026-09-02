@@ -275,7 +275,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           top: `${dropdownTop}px`,
           left: `${dropdownLeft}px`,
           width: `${width}px`,
-          backgroundColor: `${colors.main}15`,
+          backgroundColor: "rgba(7, 15, 28, 0.68)",
           borderColor: `${colors.main}40`,
           borderBottomColor: colors.dark,
           boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}20, inset 0 0 0 1px ${colors.main}10`,

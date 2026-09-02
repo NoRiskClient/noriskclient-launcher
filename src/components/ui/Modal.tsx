@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
@@ -77,6 +78,25 @@ export function Modal({
     };
   }, []);
 
+  useEffect(() => {
+    const root = document.getElementById("root");
+    if (!root) return;
+
+    const modalCount = Number(root.dataset.modalCount ?? "0") + 1;
+    root.dataset.modalCount = String(modalCount);
+    root.classList.add("modal-background-blur");
+
+    return () => {
+      const remaining = Math.max(0, Number(root.dataset.modalCount ?? "1") - 1);
+      if (remaining === 0) {
+        delete root.dataset.modalCount;
+        root.classList.remove("modal-background-blur");
+      } else {
+        root.dataset.modalCount = String(remaining);
+      }
+    };
+  }, []);
+
   const handleClose = () => {
     if (isClosing) return;
     setIsClosing(true);
@@ -116,10 +136,10 @@ export function Modal({
     }
     return "none";
   };
-  return (
+  return createPortal(
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="modal-backdrop fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
       onClick={handleBackdropClick}
     >
       <div
@@ -197,6 +217,7 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

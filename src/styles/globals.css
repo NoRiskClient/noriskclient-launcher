@@ -545,7 +545,16 @@ nav button:not(.no-radius),
 
 /* Backdrop blur which also works on Linux */
 .backdrop-blur-md-anyos {
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
+    isolation: isolate;
+    will-change: backdrop-filter;
+}
+
+/* WebKitGTK may ignore backdrop-filter; blur the launcher layer itself as a fallback. */
+#root.modal-background-blur {
+    filter: blur(10px);
+    transition: filter 120ms ease-out;
 }
 
 @keyframes nrc-claim-glow {

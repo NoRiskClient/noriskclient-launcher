@@ -96,7 +96,9 @@ export function FriendsSidebar() {
             (activeChatFriend || isSettingsOpen) ? "w-[380px] opacity-100" : "w-0 opacity-0"
           )}
           style={{
-            background: `linear-gradient(135deg, ${accentColor.value}40 0%, ${accentColor.value}30 50%, ${accentColor.value}35 100%)`,
+            background: "rgba(7, 15, 28, 0.68)",
+            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(12px)",
             borderLeft: (activeChatFriend || isSettingsOpen) ? `2px solid ${accentColor.value}50` : "none",
             boxShadow: (activeChatFriend || isSettingsOpen) ? `inset 0 0 100px ${accentColor.value}25` : "none",
           }}
@@ -108,7 +110,9 @@ export function FriendsSidebar() {
         <div
           className="w-96 h-full flex flex-col backdrop-blur-md"
           style={{
-            background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
+            background: "rgba(7, 15, 28, 0.68)",
+            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(12px)",
             borderLeft: `2px solid ${accentColor.value}60`,
             boxShadow: `inset 0 0 120px ${accentColor.value}30, -5px 0 20px rgba(0, 0, 0, 0.5)`,
           }}
