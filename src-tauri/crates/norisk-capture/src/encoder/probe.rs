@@ -217,6 +217,11 @@ fn shorten(message: &str) -> String {
 }
 
 pub fn capabilities() -> Vec<EncoderCapability> {
+    static MEASURED: std::sync::OnceLock<Vec<EncoderCapability>> = std::sync::OnceLock::new();
+    MEASURED.get_or_init(measure_capabilities).clone()
+}
+
+fn measure_capabilities() -> Vec<EncoderCapability> {
     probe_all()
         .into_iter()
         .map(|r| EncoderCapability {

@@ -149,8 +149,17 @@ impl CaptureSupervisor {
             return Ok(());
         }
 
-        let receiver = self.take_command_receiver().await?;
+        let mut receiver = self.take_command_receiver().await?;
         let exe = locate_engine()?;
+
+        let mut stale = 0;
+        while receiver.try_recv().is_ok() {
+            stale += 1;
+        }
+        if stale > 0 {
+            log::debug!("Dropped {stale} command(s) left over from the last capture engine");
+        }
+
         *self.running.write().await = true;
 
         let supervisor = Arc::clone(self);
@@ -192,8 +201,11 @@ impl CaptureSupervisor {
     }
 
     pub async fn stop(&self) {
-        let _ = self.commands.send(LauncherToCapture::Shutdown);
-        *self.running.write().await = false;
+        let mut running = self.running.write().await;
+        if *running {
+            let _ = self.commands.send(LauncherToCapture::Shutdown);
+        }
+        *running = false;
     }
 
     #[cfg(windows)]
@@ -255,6 +267,8 @@ impl CaptureSupervisor {
             .arg("--parent-pid")
             .arg(std::process::id().to_string())
             .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
 
         let mut child = match command.spawn() {
@@ -262,6 +276,13 @@ impl CaptureSupervisor {
             Err(e) => return Outcome::Lost(format!("could not start {}: {e}", exe.display())),
         };
         log::info!("Capture engine started (pid {:?})", child.id());
+
+        if let Some(out) = child.stdout.take() {
+            forward_engine_output(out);
+        }
+        if let Some(err) = child.stderr.take() {
+            forward_engine_output(err);
+        }
 
         let client = match connect_with_retry(&pipe_name).await {
             Ok(client) => client,
@@ -577,6 +598,22 @@ fn locate_engine() -> Result<PathBuf> {
          Build it with: cargo build -p norisk-capture",
         dir.display()
     )))
+}
+
+#[cfg(windows)]
+fn forward_engine_output<R>(reader: R)
+where
+    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(reader).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            let line = line.trim_end();
+            if !line.is_empty() {
+                log::debug!("Capture engine: {line}");
+            }
+        }
+    });
 }
 
 #[cfg(windows)]
