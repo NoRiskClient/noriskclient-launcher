@@ -48,6 +48,7 @@ pub struct HookSession {
     info_map: Option<MappedInfo>,
     events: Option<Events>,
     texture_mutexes: Option<(OwnedHandle, OwnedHandle)>,
+    borrowed: bool,
 
     fps: u32,
 }
@@ -61,6 +62,13 @@ enum Stage {
 
 impl HookSession {
     pub fn new(pid: u32, hwnd: HWND, fps: u32) -> Result<Self> {
+        let borrowed = open_mutex(names::WINDOW_HOOK_KEEPALIVE, pid).is_some();
+        if borrowed {
+            log::info!(
+                "Process {pid} is already hooked by another capture program; reading its frames without reconfiguring the hook"
+            );
+        }
+
         let keepalive = unsafe {
             CreateMutexW(
                 None,
@@ -81,6 +89,7 @@ impl HookSession {
             info_map: None,
             events: None,
             texture_mutexes: None,
+            borrowed,
             fps: fps.max(1),
         })
     }
@@ -181,7 +190,7 @@ impl HookSession {
             );
         }
 
-        info.configure(self.fps);
+        info.configure(self.fps, self.borrowed);
         events.signal_init()?;
 
         self.texture_mutexes = Some((mutex1, mutex2));
@@ -218,8 +227,10 @@ impl HookSession {
         }
 
         let Some(handle) = SharedTextureData::open(self.hwnd, info.map_id)? else {
-            if let Some(events) = self.events.as_ref() {
-                events.nudge_restart();
+            if !self.borrowed {
+                if let Some(events) = self.events.as_ref() {
+                    events.nudge_restart();
+                }
             }
             return Ok(None);
         };
@@ -345,15 +356,17 @@ impl MappedInfo {
         unsafe { std::ptr::read_unaligned(self.view.Value as *const HookInfo) }
     }
 
-    fn configure(&mut self, fps: u32) {
+    fn configure(&mut self, fps: u32, borrowed: bool) {
         let mut info = self.read();
 
-        info.frame_interval = 10_000_000 / fps.max(1) as u64;
-        info.force_shmem = false;
-        info.unused_use_scale = false;
-        info.allow_srgb_alias = true;
-        info.capture_overlay = false;
-        info.offsets = Default::default();
+        info.frame_interval = cooperative_interval(info.frame_interval, fps);
+
+        if !borrowed {
+            info.force_shmem = false;
+            info.unused_use_scale = false;
+            info.allow_srgb_alias = true;
+            info.capture_overlay = false;
+        }
 
         unsafe { std::ptr::write_unaligned(self.view.Value as *mut HookInfo, info) };
     }
@@ -421,9 +434,20 @@ impl Drop for OwnedHandle {
 
 unsafe impl Send for HookSession {}
 
+fn cooperative_interval(published: u64, fps: u32) -> u64 {
+    let wanted = 10_000_000 / fps.max(1) as u64;
+    match published {
+        0 => wanted,
+        already => already.min(wanted),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const HZ_30: u64 = 333_333;
+    const HZ_60: u64 = 166_666;
 
     #[test]
     fn object_names_carry_the_pid() {
@@ -439,8 +463,22 @@ mod tests {
 
     #[test]
     fn the_frame_interval_is_in_hundred_nanosecond_units() {
-        let interval = 10_000_000u64 / 60;
-        assert_eq!(interval, 166_666);
-        assert_eq!(10_000_000u64 / 30, 333_333);
+        assert_eq!(cooperative_interval(0, 60), HZ_60);
+        assert_eq!(cooperative_interval(0, 30), HZ_30);
+    }
+
+    #[test]
+    fn a_capturer_already_asking_for_more_frames_is_not_slowed_down() {
+        assert_eq!(cooperative_interval(HZ_60, 30), HZ_60);
+    }
+
+    #[test]
+    fn a_capturer_asking_for_fewer_frames_is_sped_up_to_what_we_need() {
+        assert_eq!(cooperative_interval(HZ_30, 60), HZ_60);
+    }
+
+    #[test]
+    fn a_nonsensical_rate_does_not_divide_by_zero() {
+        assert_eq!(cooperative_interval(0, 0), 10_000_000);
     }
 }
