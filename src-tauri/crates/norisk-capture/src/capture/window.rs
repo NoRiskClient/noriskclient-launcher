@@ -239,6 +239,11 @@ fn utf16_to_string(buffer: &[u16]) -> String {
     String::from_utf16_lossy(&buffer[..end])
 }
 
+pub fn thread_of(hwnd: HWND) -> u32 {
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+    unsafe { GetWindowThreadProcessId(hwnd, None) }
+}
+
 pub fn client_size(hwnd: HWND) -> Option<(u32, u32)> {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::UI::WindowsAndMessaging::GetClientRect;

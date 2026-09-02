@@ -1518,7 +1518,7 @@ fn hook_handshake(
     let mut session = hook::HookSession::new(target.pid, target.hwnd, fps)?;
 
     let started = Instant::now();
-    let injected = hook::inject(target.pid, &dll)
+    let injected = hook::inject(target.pid, window::thread_of(target.hwnd), &dll)
         .with_context(|| format!("could not load the hook into process {}", target.pid))?;
 
     match injected {

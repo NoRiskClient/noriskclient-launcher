@@ -6,6 +6,6 @@ pub mod source;
 
 pub use info::{CaptureType, HookInfo, SharedTextureData};
 pub use log_pipe::HookLog;
-pub use inject::{inject, locate_hook_dll, Injected};
+pub use inject::{inject, injector_request, locate_hook_dll, run_injector, Injected};
 pub use session::{HookSession, HookStep, HookTexture};
 pub use source::HookCapture;

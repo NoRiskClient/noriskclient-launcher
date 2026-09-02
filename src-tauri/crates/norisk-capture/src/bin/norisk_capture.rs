@@ -11,6 +11,13 @@ fn main() -> anyhow::Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
 
+    if let Some((thread_id, dll)) = norisk_capture::capture::hook::injector_request(&args) {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+        return norisk_capture::capture::hook::run_injector(thread_id, &dll);
+    }
+
     let pipe_name = args
         .iter()
         .position(|a| a == "--pipe")
