@@ -2386,5 +2386,7 @@
   "syncPacks.selection.enable": "Włącz",
   "syncPacks.selection.disable": "Wyłącz",
   "syncPacks.selection.removeTitle": "Usuń zaznaczenie",
-  "syncPacks.selection.removeConfirm": "Usunąć {{count}} wpisów z tego sync packa? Twoje pliki pozostaną na dysku."
+  "syncPacks.selection.removeConfirm": "Usunąć {{count}} wpisów z tego sync packa? Twoje pliki pozostaną na dysku.",
+  "clips.gallery.delete_message": "Usunąć „{{name}}”? Plik zostanie usunięty z folderu klipów i nie będzie można go przywrócić.",
+  "clips.gallery.rename_label": "Nowa nazwa"
 }

@@ -2316,6 +2316,8 @@
   "clips.gallery.reveal": "Show in folder",
   "clips.gallery.delete": "Delete",
   "clips.gallery.delete_confirm": "Delete for good",
+  "clips.gallery.delete_message": "Delete “{{name}}”? The file is removed from your clip folder and cannot be restored.",
+  "clips.gallery.rename_label": "New name",
   "clips.gallery.delete_failed": "Could not delete that clip.",
   "clips.gallery.cancel": "Keep it",
   "clips.gallery.close": "Close",

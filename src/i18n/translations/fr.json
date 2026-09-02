@@ -2388,5 +2388,7 @@
   "syncPacks.selection.enable": "Activer",
   "syncPacks.selection.disable": "Désactiver",
   "syncPacks.selection.removeTitle": "Retirer la sélection",
-  "syncPacks.selection.removeConfirm": "Retirer {{count}} entrées de ce sync pack ? Vos fichiers restent sur le disque."
+  "syncPacks.selection.removeConfirm": "Retirer {{count}} entrées de ce sync pack ? Vos fichiers restent sur le disque.",
+  "clips.gallery.delete_message": "Supprimer « {{name}} » ? Le fichier sera retiré de ton dossier de clips et ne pourra pas être restauré.",
+  "clips.gallery.rename_label": "Nouveau nom"
 }

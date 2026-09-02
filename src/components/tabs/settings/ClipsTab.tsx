@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
 import { Select } from "../../ui/Select";
+import { parseErrorMessage } from "../../../utils/error-utils";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
+import { Button } from "../../ui/buttons/Button";
+import { StatusMessage } from "../../ui/StatusMessage";
+import { useThemeStore } from "../../../store/useThemeStore";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 import { HotkeyInput } from "../../ui/HotkeyInput";
@@ -76,10 +80,6 @@ function estimatedBufferMb(clips: ClipConfig): number {
   return Math.round((kbps * seconds) / 8 / 1000);
 }
 
-function hotkeySignature(clips: ClipConfig): string {
-  return `${clips.enabled}|${clips.hotkey_save}|${clips.hotkey_toggle}`;
-}
-
 function resolutionLabel(spec: QualitySpec): string {
   const match = CUSTOM_RESOLUTIONS.find(
     (r) => r.width === spec.width && r.height === spec.height,
@@ -90,25 +90,16 @@ function resolutionLabel(spec: QualitySpec): string {
 export function ClipsTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
-  const { config, tempConfig, setTempConfig, saving } = useSettingsConfig();
+  const { tempConfig, setTempConfig, saving } = useSettingsConfig();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
-  const [applying, setApplying] = useState(false);
-  const appliedRef = useRef<string>("");
-  const hotkeysRef = useRef<string>("");
+  const applying = useClipsStore((state) => state.applying);
 
   const clips = tempConfig?.clips;
-  const savedClips = config?.clips;
 
-  const setClipsEnabled = useClipsStore((state) => state.set);
   const closeSettings = useSettingsModalStore((state) => state.close);
   const navigate = useNavigate();
-  const clipsEnabled = savedClips?.enabled;
-
-  useEffect(() => {
-    if (clipsEnabled !== undefined) setClipsEnabled(clipsEnabled);
-  }, [clipsEnabled, setClipsEnabled]);
 
   const toLibrary = useCallback(() => {
     closeSettings();
@@ -128,7 +119,6 @@ export function ClipsTab() {
       if (recording) {
         releaseHotkeys().catch(() => {});
       } else {
-        appliedRef.current = "";
         applyClipSettings().catch(() => {});
       }
     },
@@ -166,34 +156,6 @@ export function ClipsTab() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!savedClips || saving) return;
-
-    const signature = JSON.stringify(savedClips);
-    if (appliedRef.current === "") {
-      appliedRef.current = signature;
-      hotkeysRef.current = hotkeySignature(savedClips);
-      return;
-    }
-    if (appliedRef.current === signature) return;
-    appliedRef.current = signature;
-    const keysNow = hotkeySignature(savedClips);
-    const keysChanged = hotkeysRef.current !== keysNow;
-    hotkeysRef.current = keysNow;
-
-    setApplying(true);
-    applyClipSettings()
-      .then((keys) => {
-        if (savedClips.enabled && keysChanged && keys.length > 0) {
-          toast.success(t("settings.clips.applied", { keys: keys.join(", ") }));
-        }
-      })
-      .catch((error) => {
-        toast.error(t("settings.clips.apply_failed", { error: String(error) }));
-      })
-      .finally(() => setApplying(false));
-  }, [savedClips, saving, t]);
 
   if (!clips) return null;
 
@@ -269,7 +231,7 @@ export function ClipsTab() {
             "programm",
           )}
         >
-          <span className="text-sm text-white/50">
+          <span className="font-minecraft text-sm text-white/60">
             {clips.other_game?.name ?? t("settings.clips.games.none")}
           </span>
         </SettingRow>
@@ -291,12 +253,11 @@ export function ClipsTab() {
         keywords={kw("settings.clips.hotkeys.title", "hotkey", "tastenkombination", "shortcut", "taste", "key")}
         description={t("settings.clips.hotkeys.description")}
       >
-        <div className="flex gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3">
-          <Icon icon="solar:info-circle-bold" className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
-          <p className="text-sm leading-relaxed text-white/70">
-            {t("settings.clips.hotkeys.warning")}
-          </p>
-        </div>
+        <StatusMessage
+          type="warning"
+          message={t("settings.clips.hotkeys.warning")}
+          className="mb-0 mt-3"
+        />
 
         <SettingRow
           label={t("settings.clips.hotkeys.save")}
@@ -453,17 +414,16 @@ export function ClipsTab() {
           </div>
         )}
 
-        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-          <Icon icon="solar:cpu-bold" className="h-5 w-5 shrink-0 text-white/40" />
-          <p className="text-sm text-white/60">
-            {t("settings.clips.quality.memory", {
-              mb: estimatedMb,
-              seconds: clipSeconds,
-              resolution: resolutionLabel(spec),
-              fps: spec.fps,
-            })}
-          </p>
-        </div>
+        <StatusMessage
+          type="info"
+          message={t("settings.clips.quality.memory", {
+            mb: estimatedMb,
+            seconds: clipSeconds,
+            resolution: resolutionLabel(spec),
+            fps: spec.fps,
+          })}
+          className="mb-0"
+        />
 
         <BitrateNotice spec={spec} t={t} />
 
@@ -719,19 +679,16 @@ export function ClipsTab() {
           description={clips.output_dir ?? t("settings.clips.storage.default")}
           searchKeywords={kw("settings.clips.storage.folder", "ordner", "folder", "oeffnen", "open")}
         >
-          <button
-            type="button"
-            onClick={() => void openClipFolder().catch(() => {})}
-            className={cn(
-              "flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-3 py-1.5",
-              "text-sm text-white/80 transition-colors",
-              "hover:border-white/25 hover:bg-white/[0.08] hover:text-white",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-            )}
+          <Button
+            variant="ghost"
+            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+            icon={<Icon icon="solar:folder-with-files-bold" className="w-4 h-4" />}
+            onClick={() =>
+              void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
+            }
           >
-            <Icon icon="solar:folder-with-files-linear" className="h-4 w-4 shrink-0" />
             {t("settings.clips.storage.open")}
-          </button>
+          </Button>
         </SettingRow>
 
         <SettingRow
@@ -780,21 +737,15 @@ export function ClipsTab() {
           description={t("settings.clips.library.open_description")}
           searchKeywords={kw("settings.clips.library.open", "galerie", "gallery", "clips", "seite", "page")}
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+            icon={<Icon icon="solar:video-library-bold" className="w-4 h-4" />}
             onClick={toLibrary}
             disabled={!clips.enabled}
-            className={cn(
-              "flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-3 py-1.5",
-              "text-sm text-white/80 transition-colors",
-              "hover:border-white/25 hover:bg-white/[0.08] hover:text-white",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-              "disabled:cursor-not-allowed disabled:opacity-40",
-            )}
           >
-            <Icon icon="solar:video-library-bold" className="h-4 w-4 shrink-0" />
             {t("settings.clips.library.open")}
-          </button>
+          </Button>
         </SettingRow>
       </SettingsSection>
     </div>
@@ -814,35 +765,16 @@ function StatusRow({
 }) {
   if (!enabled) return null;
 
-  const { tone, icon, text } = describeStatus(status, applying, t);
+  const { type, text } = describeStatus(status, applying, t);
+  const adapter =
+    status?.adapter && status.adapter !== "<not attached>" ? status.adapter : null;
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 rounded-lg border px-4 py-3",
-        tone === "good" && "border-emerald-400/25 bg-emerald-400/[0.07]",
-        tone === "warn" && "border-amber-400/25 bg-amber-400/[0.07]",
-        tone === "bad" && "border-red-400/25 bg-red-400/[0.07]",
-        tone === "idle" && "border-white/10 bg-white/[0.03]",
-      )}
-    >
-      <Icon
-        icon={icon}
-        className={cn(
-          "mt-0.5 h-5 w-5 shrink-0",
-          tone === "good" && "text-emerald-300",
-          tone === "warn" && "text-amber-300",
-          tone === "bad" && "text-red-300",
-          tone === "idle" && "text-white/40",
-        )}
-      />
-      <div className="min-w-0">
-        <p className="text-sm text-white/80">{text}</p>
-        {status?.adapter && status.adapter !== "<not attached>" && (
-          <p className="mt-0.5 text-xs text-white/40">{status.adapter}</p>
-        )}
-      </div>
-    </div>
+    <StatusMessage
+      type={type}
+      message={adapter ? `${text} · ${adapter}` : text}
+      className="mb-0 mt-3"
+    />
   );
 }
 
@@ -850,28 +782,27 @@ function describeStatus(
   status: CaptureStatus | null,
   applying: boolean,
   t: (key: string, options?: Record<string, unknown>) => string,
-): { tone: "good" | "warn" | "bad" | "idle"; icon: string; text: string } {
+): { type: "success" | "warning" | "error" | "info"; text: string } {
   if (applying) {
-    return { tone: "idle", icon: "svg-spinners:ring-resize", text: t("settings.clips.status.applying") };
+    return { type: "info", text: t("settings.clips.status.applying") };
   }
   if (!status || !status.running) {
-    return { tone: "idle", icon: "solar:moon-sleep-bold", text: t("settings.clips.status.stopped") };
+    return { type: "info", text: t("settings.clips.status.stopped") };
   }
 
   switch (status.state) {
     case "buffering":
-      return { tone: "good", icon: "solar:record-circle-bold", text: t("settings.clips.status.recording") };
+      return { type: "success", text: t("settings.clips.status.recording") };
     case "attaching":
-      return { tone: "idle", icon: "svg-spinners:ring-resize", text: t("settings.clips.status.waiting") };
+      return { type: "info", text: t("settings.clips.status.waiting") };
     case "paused":
-      return { tone: "warn", icon: "solar:pause-circle-bold", text: t("settings.clips.status.paused") };
-    // The one failure users can fix themselves, so it gets its own message.
+      return { type: "warning", text: t("settings.clips.status.paused") };
     case "blocked_fullscreen_exclusive":
-      return { tone: "warn", icon: "solar:danger-triangle-bold", text: t("settings.clips.status.fullscreen") };
+      return { type: "warning", text: t("settings.clips.status.fullscreen") };
     case "failed":
-      return { tone: "bad", icon: "solar:close-circle-bold", text: t("settings.clips.status.failed") };
+      return { type: "error", text: t("settings.clips.status.failed") };
     default:
-      return { tone: "idle", icon: "solar:moon-sleep-bold", text: t("settings.clips.status.idle") };
+      return { type: "info", text: t("settings.clips.status.idle") };
   }
 }
 
@@ -889,19 +820,18 @@ function FallbackNotice({
   if (!codec || codec === clips.codec) return null;
 
   return (
-    <div className="flex gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3">
-      <Icon icon="solar:info-circle-bold" className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
-      <p className="text-sm leading-relaxed text-white/70">
-        {t("settings.clips.quality.codec.fallback", {
-          requested: t(`settings.clips.quality.codec.${clips.codec}`),
-          actual: t(`settings.clips.quality.codec.${codec}`),
-          encoder:
-            encoder === "software"
-              ? t("settings.clips.quality.encoder.cpu")
-              : t("settings.clips.quality.encoder.gpu"),
-        })}
-      </p>
-    </div>
+    <StatusMessage
+      type="warning"
+      className="mb-0"
+      message={t("settings.clips.quality.codec.fallback", {
+        requested: t(`settings.clips.quality.codec.${clips.codec}`),
+        actual: t(`settings.clips.quality.codec.${codec}`),
+        encoder:
+          encoder === "software"
+            ? t("settings.clips.quality.encoder.cpu")
+            : t("settings.clips.quality.encoder.gpu"),
+      })}
+    />
   );
 }
 
@@ -923,30 +853,15 @@ function PresetCard({
   const values = preset === "custom" ? null : QUALITY_PRESETS[preset];
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      disabled={disabled}
-      aria-pressed={selected}
-      className={cn(
-        "flex flex-col gap-1 rounded-lg border px-4 py-3 text-left transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40",
-        selected
-          ? "border-emerald-400/40 bg-emerald-400/[0.08]"
-          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]",
-        disabled && "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-white/[0.03]",
-      )}
-    >
+    <ChoiceCard selected={selected} disabled={disabled} onSelect={onSelect} className="px-4 py-3">
       <span className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-white/90">
+        <span className="font-minecraft text-base text-white">
           {t(`settings.clips.quality.preset.${preset}`)}
         </span>
-        {selected && (
-          <Icon icon="solar:check-circle-bold" className="h-4 w-4 shrink-0 text-emerald-300" />
-        )}
+        {selected && <SelectedMark />}
       </span>
 
-      <span className="text-xs leading-snug text-white/50">
+      <span className="font-minecraft text-xs leading-snug text-white/50">
         {t(`settings.clips.quality.preset.${preset}.description`)}
       </span>
 
@@ -958,7 +873,7 @@ function PresetCard({
             <Chip>{values.bitrateKbps / 1000} Mbps</Chip>
           </span>
 
-          <span className="mt-1 text-[11px] tabular-nums text-white/40">
+          <span className="mt-1 font-minecraft text-xs text-white/40">
             {t("settings.clips.quality.preset.size_estimate", {
               mb: estimatedClipMb(values.bitrateKbps, clipSeconds),
               seconds: clipSeconds,
@@ -966,17 +881,66 @@ function PresetCard({
           </span>
         </>
       ) : (
-        <span className="mt-1.5 text-xs text-white/45">
+        <span className="mt-1.5 font-minecraft text-xs text-white/50">
           {t("settings.clips.quality.preset.custom.hint")}
         </span>
       )}
+    </ChoiceCard>
+  );
+}
+
+function ChoiceCard({
+  selected,
+  disabled,
+  onSelect,
+  className,
+  children,
+}: {
+  selected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const accentColor = useThemeStore((state) => state.accentColor);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cn(
+        "flex flex-col gap-1 rounded-lg border text-left transition-all duration-200",
+        "bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30",
+        disabled && "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-black/20",
+        className,
+      )}
+      style={
+        selected
+          ? { backgroundColor: `${accentColor.value}20`, borderColor: `${accentColor.value}80` }
+          : undefined
+      }
+    >
+      {children}
     </button>
+  );
+}
+
+function SelectedMark() {
+  const accentColor = useThemeStore((state) => state.accentColor);
+  return (
+    <Icon
+      icon="solar:check-circle-bold"
+      className="h-4 w-4 shrink-0"
+      style={{ color: accentColor.value }}
+    />
   );
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[11px] tabular-nums text-white/75">
+    <span className="rounded border border-white/10 bg-black/30 px-1.5 py-0.5 font-minecraft text-xs text-white/70">
       {children}
     </span>
   );
@@ -1007,37 +971,29 @@ function CodecCard({
   const hardware = usable.some((c) => c.hardware);
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <ChoiceCard
+      selected={selected && !unavailable}
       disabled={disabled || unavailable}
-      aria-pressed={selected}
-      className={cn(
-        "flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40",
-        selected && !unavailable
-          ? "border-emerald-400/40 bg-emerald-400/[0.08]"
-          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]",
-        (disabled || unavailable) &&
-          "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-white/[0.03]",
-      )}
+      onSelect={onSelect}
+      className="px-3 py-2.5"
     >
       <span className="flex items-center gap-2">
-        <span className="text-sm font-medium text-white/90">
+        <span className="font-minecraft text-base text-white">
           {t(`settings.clips.quality.codec.${codec}`)}
         </span>
-        {!unavailable && hardware && (
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/50">
-            {t("settings.clips.quality.encoder.gpu")}
+        {!unavailable && hardware && <Chip>{t("settings.clips.quality.encoder.gpu")}</Chip>}
+        {selected && !unavailable && (
+          <span className="ml-auto">
+            <SelectedMark />
           </span>
         )}
       </span>
-      <span className="text-xs leading-snug text-white/50">
+      <span className="font-minecraft text-xs leading-snug text-white/50">
         {unavailable
           ? t("settings.clips.quality.codec.unavailable")
           : t(`settings.clips.quality.codec.${codec}.note`)}
       </span>
-    </button>
+    </ChoiceCard>
   );
 }
 
@@ -1181,14 +1137,14 @@ function StorageLimitInput({
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         className={cn(
-          "w-20 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1.5",
-          "text-right text-sm tabular-nums text-white/90",
-          "focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/20",
+          "h-10 w-24 rounded-lg border border-white/10 bg-black/30 px-3",
+          "text-right font-minecraft text-sm text-white",
+          "transition-colors hover:border-white/20 focus:border-white/30 focus:outline-none",
           "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         )}
         aria-label={t("settings.clips.storage.limit")}
       />
-      <span className="text-sm text-white/45">
+      <span className="font-minecraft text-sm text-white/60">
         {t("settings.clips.storage.limit_unit")}
       </span>
     </div>
@@ -1214,21 +1170,15 @@ function BitrateNotice({
     Math.ceil((spec.width * spec.height * spec.fps * 0.09) / 1000 / 1000) * 1000;
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3">
-      <Icon icon="solar:info-circle-bold" className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
-      <div className="min-w-0">
-        <p className="text-sm text-white/80">
-          {t("settings.clips.quality.thin_bitrate", {
-            fps: spec.fps,
-            mbps: spec.bitrateKbps / 1000,
-          })}
-        </p>
-        <p className="mt-0.5 text-xs text-white/50">
-          {t("settings.clips.quality.thin_bitrate.hint", {
-            suggested: Math.round(suggested / 1000),
-          })}
-        </p>
-      </div>
-    </div>
+    <StatusMessage
+      type="warning"
+      className="mb-0"
+      message={`${t("settings.clips.quality.thin_bitrate", {
+        fps: spec.fps,
+        mbps: spec.bitrateKbps / 1000,
+      })} ${t("settings.clips.quality.thin_bitrate.hint", {
+        suggested: Math.round(suggested / 1000),
+      })}`}
+    />
   );
 }

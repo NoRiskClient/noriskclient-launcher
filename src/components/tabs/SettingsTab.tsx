@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { isWindows } from "../../utils/platform";
+import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -46,6 +47,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  useClipSettingsSync(config, saving);
   const requested = useSettingsModalStore.getState().tab;
   const [activeTab, setActiveTab] = useState<SettingsTabId>(() =>
     SETTINGS_TAB_IDS.includes(requested as SettingsTabId)

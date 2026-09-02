@@ -6,6 +6,8 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 
+import { useThemeStore } from "../../store/useThemeStore";
+
 const HOLD_MS = 2600;
 const FADE_MS = 400;
 
@@ -82,18 +84,18 @@ export function ClipOverlay() {
 
   if (shown.kind === "error") {
     return (
-      <OverlayPanel leaving={leaving}>
+      <OverlayPanel leaving={leaving} tone="warning">
         <Icon
-          icon="solar:info-circle-bold"
-          className="h-6 w-6 shrink-0 text-amber-300"
+          icon="solar:danger-triangle-bold"
+          className="h-6 w-6 shrink-0 text-yellow-400"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">
+          <p className="truncate font-smallcaps text-base tracking-wider text-white text-shadow-sm">
             {t(`overlay.clip.error.${shown.error.code}`, {
               defaultValue: t("overlay.clip.error.generic"),
             })}
           </p>
-          <p className="mt-0.5 truncate text-xs text-white/50">
+          <p className="mt-0.5 truncate font-minecraft text-xs text-white/60">
             {t(`overlay.clip.error.${shown.error.code}.hint`, { defaultValue: "" })}
           </p>
         </div>
@@ -107,17 +109,14 @@ export function ClipOverlay() {
   const megabytes = Math.round(clip.size_bytes / 1_000_000);
 
   return (
-    <OverlayPanel leaving={leaving}>
-      <Icon
-        icon="solar:videocamera-record-bold"
-        className="h-6 w-6 shrink-0 text-emerald-300"
-      />
+    <OverlayPanel leaving={leaving} tone="accent">
+      <AccentIcon icon="solar:videocamera-record-bold" />
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">
+        <p className="truncate font-smallcaps text-base tracking-wider text-white text-shadow-sm">
           {t("overlay.clip.saved")}
         </p>
-        <p className="mt-0.5 truncate font-mono text-xs tabular-nums text-white/50">
+        <p className="mt-0.5 truncate font-minecraft text-xs text-white/60">
           {t("overlay.clip.details", { seconds, megabytes })}
         </p>
       </div>
@@ -125,13 +124,23 @@ export function ClipOverlay() {
   );
 }
 
+function AccentIcon({ icon }: { icon: string }) {
+  const accentColor = useThemeStore((state) => state.accentColor);
+  return <Icon icon={icon} className="h-6 w-6 shrink-0" style={{ color: accentColor.value }} />;
+}
+
 function OverlayPanel({
   leaving,
+  tone,
   children,
 }: {
   leaving: boolean;
+  tone: "accent" | "warning";
   children: React.ReactNode;
 }) {
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const edge = tone === "accent" ? accentColor.value : "#facc15";
+
   return (
     <div
       className="flex h-screen w-screen items-center justify-center"
@@ -141,7 +150,15 @@ function OverlayPanel({
         transition: `opacity ${FADE_MS}ms ease, transform ${FADE_MS}ms ease`,
       }}
     >
-      <div className="flex h-full w-full items-center gap-3 rounded-lg border border-white/10 bg-neutral-800/95 px-4">
+      <div
+        className="flex h-full w-full items-center gap-3 rounded-lg border bg-black/85 px-4 backdrop-blur-md"
+        style={{
+          borderColor: `${edge}80`,
+          borderBottomWidth: 2,
+          borderBottomColor: edge,
+          backgroundImage: `linear-gradient(${edge}20, ${edge}20)`,
+        }}
+      >
         {children}
       </div>
     </div>

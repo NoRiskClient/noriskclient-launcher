@@ -2403,5 +2403,7 @@
   "syncPacks.selection.enable": "सक्षम करें",
   "syncPacks.selection.disable": "अक्षम करें",
   "syncPacks.selection.removeTitle": "चयन हटाएं",
-  "syncPacks.selection.removeConfirm": "इस सिंक पैक से {{count}} प्रविष्टियां हटाएं? आपकी फ़ाइलें डिस्क पर बनी रहेंगी।"
+  "syncPacks.selection.removeConfirm": "इस सिंक पैक से {{count}} प्रविष्टियां हटाएं? आपकी फ़ाइलें डिस्क पर बनी रहेंगी।",
+  "clips.gallery.delete_message": "“{{name}}” हटाएँ? फ़ाइल आपके क्लिप फ़ोल्डर से हट जाएगी और वापस नहीं लाई जा सकेगी।",
+  "clips.gallery.rename_label": "नया नाम"
 }

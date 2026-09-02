@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 
+import { Button } from "../ui/buttons/Button";
+import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, type OpenApp } from "../../services/clip-service";
 import type { OtherGame } from "../../types/launcherConfig";
 import { cn } from "../../lib/utils";
@@ -42,31 +44,28 @@ export function GamePicker({ value, onChange, disabled, t }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-2">
-      <div className="flex items-center justify-between gap-2 px-1.5 pt-0.5">
-        <p className="text-xs text-white/40">{t("settings.clips.games.open")}</p>
-        <button
-          type="button"
+    <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => void refresh()}
           disabled={disabled || loading}
-          className={cn(
-            "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/50 transition-colors",
-            "hover:bg-white/10 hover:text-white",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-            (disabled || loading) && "cursor-not-allowed opacity-40",
-          )}
+          icon={
+            <Icon
+              icon={loading ? "svg-spinners:ring-resize" : "solar:refresh-bold"}
+              className="w-4 h-4"
+            />
+          }
         >
-          <Icon
-            icon={loading ? "svg-spinners:ring-resize" : "solar:refresh-linear"}
-            className="h-3.5 w-3.5"
-          />
           {t("settings.clips.games.refresh")}
-        </button>
+        </Button>
       </div>
 
-      <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+      <div className="flex max-h-64 flex-col gap-1 overflow-y-auto custom-scrollbar pr-1">
         <Row
-          icon="solar:close-circle-linear"
+          icon="solar:close-circle-bold"
           name={t("settings.clips.games.none")}
           detail={t("settings.clips.games.none.description")}
           selected={value === null}
@@ -93,7 +92,7 @@ export function GamePicker({ value, onChange, disabled, t }: Props) {
         ))}
 
         {apps !== null && apps.length === 0 && (
-          <p className="px-2 py-3 text-center text-xs text-white/30">
+          <p className="px-2 py-3 text-center font-minecraft text-xs text-white/40">
             {t("settings.clips.games.empty")}
           </p>
         )}
@@ -117,6 +116,8 @@ function Row({
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const accentColor = useThemeStore((state) => state.accentColor);
+
   return (
     <button
       type="button"
@@ -124,29 +125,36 @@ function Row({
       disabled={disabled}
       aria-pressed={selected}
       className={cn(
-        "flex items-center gap-3 rounded-md px-1.5 py-1.5 text-left transition-colors",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-        selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
-        disabled && "cursor-not-allowed opacity-40",
+        "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all duration-200",
+        selected
+          ? "text-white"
+          : "border-transparent bg-transparent hover:bg-black/30 hover:border-white/10",
+        disabled && "cursor-not-allowed",
       )}
+      style={
+        selected
+          ? { backgroundColor: `${accentColor.value}20`, borderColor: `${accentColor.value}60` }
+          : undefined
+      }
     >
       <span
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
-          selected ? "border-white bg-white" : "border-white/25",
-        )}
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors"
+        style={{
+          borderColor: selected ? accentColor.value : "rgba(255,255,255,0.3)",
+          backgroundColor: selected ? accentColor.value : undefined,
+        }}
       >
-        {selected && <span className="h-1.5 w-1.5 rounded-full bg-black" />}
+        {selected && <span className="h-1.5 w-1.5 rounded-full bg-black/70" />}
       </span>
 
       <Icon
         icon={icon}
-        className={cn("h-4 w-4 shrink-0", selected ? "text-white/70" : "text-white/25")}
+        className={cn("h-4 w-4 shrink-0", selected ? "text-white" : "text-white/40")}
       />
 
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm text-white/80">{name}</span>
-        <span className="truncate text-[11px] text-white/30">{detail}</span>
+        <span className="truncate font-minecraft text-sm text-white/90">{name}</span>
+        <span className="truncate font-minecraft text-xs text-white/40">{detail}</span>
       </span>
     </button>
   );

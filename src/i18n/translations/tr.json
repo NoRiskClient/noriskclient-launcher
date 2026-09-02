@@ -2388,5 +2388,7 @@
   "syncPacks.selection.enable": "Etkinleştir",
   "syncPacks.selection.disable": "Devre dışı bırak",
   "syncPacks.selection.removeTitle": "Seçimi kaldır",
-  "syncPacks.selection.removeConfirm": "Bu sync pack'ten {{count}} öğe kaldırılsın mı? Dosyalarınız diskte kalır."
+  "syncPacks.selection.removeConfirm": "Bu sync pack'ten {{count}} öğe kaldırılsın mı? Dosyalarınız diskte kalır.",
+  "clips.gallery.delete_message": "“{{name}}” silinsin mi? Dosya klip klasöründen kaldırılır ve geri alınamaz.",
+  "clips.gallery.rename_label": "Yeni ad"
 }

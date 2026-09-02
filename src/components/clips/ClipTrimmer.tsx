@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 
+import { Button } from "../ui/buttons/Button";
+import { useThemeStore } from "../../store/useThemeStore";
 import type { ClipDetails, TrackLevel } from "../../services/clip-service";
 import { TrackLevelControl, Waveform, trackName } from "./ClipTimeline";
 import { cn } from "../../lib/utils";
@@ -38,6 +40,7 @@ export function ClipTrimmer({
   onSave,
   t,
 }: Props) {
+  const accentColor = useThemeStore((state) => state.accentColor);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -159,11 +162,11 @@ export function ClipTrimmer({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-lg bg-black border border-white/10">
         <video
           ref={videoRef}
           src={src}
-          className="max-h-[52vh] w-full rounded-xl bg-black"
+          className="max-h-[48vh] w-full"
           onClick={preview}
         />
         {!playing && (
@@ -171,23 +174,26 @@ export function ClipTrimmer({
             type="button"
             onClick={preview}
             aria-label={t("clips.trim.preview")}
-            className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 transition-colors hover:bg-black/30"
+            className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-colors hover:bg-black/40"
           >
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
-              <Icon icon="solar:play-bold" className="ml-0.5 h-6 w-6 text-white" />
+            <span
+              className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20"
+              style={{ backgroundColor: `${accentColor.value}40` }}
+            >
+              <Icon icon="solar:play-bold" className="h-7 w-7 text-white" />
             </span>
           </button>
         )}
       </div>
 
-      <div className="flex items-end justify-center gap-6">
+      <div className="flex items-end justify-center gap-8">
         <Readout label={t("clips.trim.from")} value={formatTime(start)} />
-        <div className="flex flex-col items-center pb-1">
-          <span className="text-2xl font-light tabular-nums text-white">
+        <div className="flex flex-col items-center">
+          <span className="font-minecraft text-3xl text-white">
             {kept.toFixed(1)}
-            <span className="ml-0.5 text-base text-white/50">s</span>
+            <span className="ml-1 text-lg text-white/50">s</span>
           </span>
-          <span className="text-[10px] uppercase tracking-wider text-white/35">
+          <span className="font-smallcaps text-xs uppercase tracking-wider text-white/50">
             {t("clips.trim.kept_label")}
           </span>
         </div>
@@ -197,7 +203,7 @@ export function ClipTrimmer({
       <div className="flex flex-col gap-2">
         <div
           ref={barRef}
-          className="relative select-none overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
+          className="relative select-none overflow-hidden rounded-lg bg-black/40 border border-white/10"
           onPointerDown={(event) => {
             const seconds = secondsAt(event.clientX);
             seek(seconds);
@@ -215,7 +221,7 @@ export function ClipTrimmer({
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Icon icon="solar:refresh-linear" className="h-4 w-4 animate-spin text-white/25" />
+                <Icon icon="svg-spinners:ring-resize" className="h-4 w-4 text-white/40" />
               </div>
             )}
           </div>
@@ -225,10 +231,11 @@ export function ClipTrimmer({
             return (
               <div
                 key={track.stream}
-                className="relative h-12 border-t border-white/[0.07] text-emerald-300"
+                className="relative h-12 border-t border-white/10"
+                style={{ color: accentColor.light }}
               >
                 <Waveform peaks={track.peaks} gain={volume / 100} muted={volume === 0} />
-                <span className="pointer-events-none absolute left-2 top-1.5 text-[10px] uppercase tracking-wider text-white/40">
+                <span className="pointer-events-none absolute left-2 top-1.5 font-smallcaps text-xs uppercase tracking-wider text-white/50">
                   {trackName(track.label, t)}
                 </span>
               </div>
@@ -245,8 +252,12 @@ export function ClipTrimmer({
           />
 
           <div
-            className="pointer-events-none absolute inset-y-0 border-x-2 border-white/80"
-            style={{ left: `${percent(start)}%`, width: `${percent(kept)}%` }}
+            className="pointer-events-none absolute inset-y-0 border-x-2"
+            style={{
+              left: `${percent(start)}%`,
+              width: `${percent(kept)}%`,
+              borderColor: accentColor.value,
+            }}
           />
 
           <div
@@ -259,6 +270,7 @@ export function ClipTrimmer({
             active={dragging === "start"}
             time={formatTime(start)}
             label={t("clips.trim.handle_start")}
+            color={accentColor.value}
             onGrab={() => setDragging("start")}
             onNudge={(by) => moveHandle("start", start + by)}
           />
@@ -267,16 +279,17 @@ export function ClipTrimmer({
             active={dragging === "end"}
             time={formatTime(end)}
             label={t("clips.trim.handle_end")}
+            color={accentColor.value}
             onGrab={() => setDragging("end")}
             onNudge={(by) => moveHandle("end", end + by)}
           />
         </div>
 
-        <p className="min-h-[1.25rem] text-xs text-white/30">{t("clips.trim.hint")}</p>
+        <p className="min-h-[1.25rem] font-minecraft text-xs text-white/50">{t("clips.trim.hint")}</p>
       </div>
 
       {adjustable.length > 0 && (
-        <div className="flex flex-col gap-2.5 rounded-lg bg-white/[0.03] px-3 py-3 ring-1 ring-white/[0.06]">
+        <div className="flex flex-col gap-3 rounded-lg bg-black/20 border border-white/10 px-4 py-3">
           {adjustable.map((track) => (
             <TrackLevelControl
               key={track.stream}
@@ -290,7 +303,7 @@ export function ClipTrimmer({
               t={t}
             />
           ))}
-          <p className="text-[11px] leading-relaxed text-white/30">
+          <p className="font-minecraft text-xs leading-relaxed text-white/50">
             {previewState === "live"
               ? t("clips.trim.levels.live")
               : previewState === "loading"
@@ -302,38 +315,35 @@ export function ClipTrimmer({
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
+      <div className="flex items-center gap-3 border-t border-white/10 pt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Icon icon={playing ? "solar:pause-bold" : "solar:play-bold"} className="w-4 h-4" />}
           onClick={preview}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
         >
-          <Icon icon={playing ? "solar:pause-bold" : "solar:play-bold"} className="h-3.5 w-3.5" />
           {t("clips.trim.preview")}
-        </button>
+        </Button>
 
         <div className="flex-1" />
 
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-lg px-3 py-2 text-xs text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
-        >
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
           {t("clips.trim.cancel")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
           onClick={() => onSave(start, end, levels)}
           disabled={busy || kept < MIN_LENGTH}
-          className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+          icon={
+            <Icon
+              icon={busy ? "svg-spinners:ring-resize" : "solar:scissors-bold"}
+              className="w-4 h-4"
+            />
+          }
         >
-          <Icon
-            icon={busy ? "solar:refresh-linear" : "solar:scissors-bold"}
-            className={cn("h-3.5 w-3.5", busy && "animate-spin")}
-          />
           {t("clips.trim.save")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -342,8 +352,8 @@ export function ClipTrimmer({
 function Readout({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col items-center pb-1">
-      <span className="text-sm tabular-nums text-white/70">{value}</span>
-      <span className="text-[10px] uppercase tracking-wider text-white/35">{label}</span>
+      <span className="font-minecraft text-base text-white/80">{value}</span>
+      <span className="font-smallcaps text-xs uppercase tracking-wider text-white/50">{label}</span>
     </div>
   );
 }
@@ -353,6 +363,7 @@ function Handle({
   active,
   time,
   label,
+  color,
   onGrab,
   onNudge,
 }: {
@@ -360,6 +371,7 @@ function Handle({
   active: boolean;
   time: string;
   label: string;
+  color: string;
   onGrab: () => void;
   onNudge: (by: number) => void;
 }) {
@@ -367,7 +379,6 @@ function Handle({
     <button
       type="button"
       aria-label={label}
-      title={label}
       onPointerDown={(event) => {
         event.stopPropagation();
         onGrab();
@@ -383,15 +394,14 @@ function Handle({
     >
       <span
         className={cn(
-          "absolute inset-y-0 left-1/2 w-1.5 -translate-x-1/2 rounded-full transition-colors",
-          active
-            ? "bg-white"
-            : "bg-white/80 group-hover:bg-white group-focus-visible:bg-white group-focus-visible:ring-2 group-focus-visible:ring-white/40",
+          "absolute inset-y-0 left-1/2 w-1.5 -translate-x-1/2 rounded-full transition-all",
+          active ? "opacity-100" : "opacity-80 group-hover:opacity-100 group-focus-visible:opacity-100",
         )}
+        style={{ backgroundColor: color, boxShadow: active ? `0 0 8px ${color}` : undefined }}
       />
       <span
         className={cn(
-          "pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded bg-black/80 px-1.5 py-0.5 text-[10px] tabular-nums text-white transition-opacity",
+          "pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded bg-black/80 border border-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white transition-opacity",
           active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
         )}
       >

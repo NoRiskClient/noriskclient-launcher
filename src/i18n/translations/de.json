@@ -2296,6 +2296,8 @@
   "clips.gallery.reveal": "Im Ordner zeigen",
   "clips.gallery.delete": "Löschen",
   "clips.gallery.delete_confirm": "Endgültig löschen",
+  "clips.gallery.delete_message": "„{{name}}“ löschen? Die Datei wird aus deinem Clip Ordner entfernt und kann nicht wiederhergestellt werden.",
+  "clips.gallery.rename_label": "Neuer Name",
   "clips.gallery.delete_failed": "Der Clip konnte nicht gelöscht werden.",
   "clips.gallery.cancel": "Behalten",
   "clips.gallery.close": "Schließen",

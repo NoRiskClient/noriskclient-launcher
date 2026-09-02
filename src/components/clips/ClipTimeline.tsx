@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { Icon } from "@iconify/react";
 
+import { RangeSlider } from "../ui/RangeSlider";
+import { ClipIconButton } from "./ClipIconButton";
 import type { ClipAudioTrack } from "../../services/clip-service";
 import { cn } from "../../lib/utils";
 
@@ -68,54 +69,47 @@ interface LevelProps {
 
 export function TrackLevelControl({ track, name, volume, onChange, disabled, t }: LevelProps) {
   const muted = volume === 0;
+  const muteLabel = muted ? t("clips.trim.unmute") : t("clips.trim.mute");
 
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={() => onChange(muted ? 100 : 0)}
-        disabled={disabled}
-        aria-pressed={muted}
-        title={muted ? t("clips.trim.unmute") : t("clips.trim.mute")}
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+    <div className="flex items-center gap-4">
+      <ClipIconButton
+        icon={
           muted
-            ? "bg-white/[0.06] text-white/30 hover:text-white/60"
-            : "text-white/70 hover:bg-white/10 hover:text-white",
-          disabled && "cursor-not-allowed opacity-40",
-        )}
-      >
-        <Icon
-          icon={
-            muted
-              ? "solar:volume-cross-bold"
-              : track.label === "Microphone"
-                ? "solar:microphone-bold"
-                : "solar:volume-loud-bold"
-          }
-          className="h-4 w-4"
-        />
-      </button>
-
-      <span className="w-24 shrink-0 truncate text-xs text-white/60">{name}</span>
-
-      <input
-        type="range"
-        min={0}
-        max={200}
-        step={5}
-        value={volume}
+            ? "solar:volume-cross-bold"
+            : track.label === "Microphone"
+              ? "solar:microphone-bold"
+              : "solar:volume-loud-bold"
+        }
+        label={muteLabel}
+        tooltipPosition="top"
+        aria-pressed={muted}
         disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-        aria-label={t("clips.trim.volume_for", { name })}
-        className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-white disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={() => onChange(muted ? 100 : 0)}
+        className={cn("shrink-0", muted && "text-white/40 hover:text-white/70")}
       />
+
+      <span className="w-28 shrink-0 truncate font-minecraft text-sm text-white/80">{name}</span>
+
+      <div className="flex-1 min-w-0">
+        <RangeSlider
+          value={volume}
+          onChange={onChange}
+          min={0}
+          max={200}
+          step={5}
+          size="sm"
+          showValue={false}
+          recommendedValue={100}
+          disabled={disabled}
+          label={t("clips.trim.volume_for", { name })}
+        />
+      </div>
 
       <span
         className={cn(
-          "w-11 shrink-0 text-right text-xs tabular-nums",
-          volume === 100 ? "text-white/35" : "text-white/70",
+          "w-12 shrink-0 text-right font-minecraft text-sm",
+          volume === 100 ? "text-white/50" : "text-white",
         )}
       >
         {volume}%

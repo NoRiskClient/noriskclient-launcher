@@ -2388,5 +2388,7 @@
   "syncPacks.selection.enable": "Включить",
   "syncPacks.selection.disable": "Выключить",
   "syncPacks.selection.removeTitle": "Удалить выбранное",
-  "syncPacks.selection.removeConfirm": "Удалить {{count}} записей из этого sync pack? Ваши файлы останутся на диске."
+  "syncPacks.selection.removeConfirm": "Удалить {{count}} записей из этого sync pack? Ваши файлы останутся на диске.",
+  "clips.gallery.delete_message": "Удалить «{{name}}»? Файл будет удалён из папки клипов, восстановить его нельзя.",
+  "clips.gallery.rename_label": "Новое имя"
 }

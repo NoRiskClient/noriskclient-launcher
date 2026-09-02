@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { cn } from "../../lib/utils";
+import { Button } from "../ui/buttons/Button";
+import { EmptyState } from "../ui/EmptyState";
+import { Modal } from "../ui/Modal";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useThemeStore } from "../../store/useThemeStore";
 import {
   deleteClip,
   getClipDetails,
-  exportVertical,
   renameClip,
   setClipFavourite,
   getClipStorageUsage,
@@ -23,11 +27,15 @@ import {
   type TrackLevel,
 } from "../../services/clip-service";
 import { ClipTrimmer } from "./ClipTrimmer";
+import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
+import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
 import { parseErrorMessage } from "../../utils/error-utils";
 
 export type ClipSort = "newest" | "oldest" | "largest";
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 interface ClipGalleryProps {
   search?: string;
@@ -45,11 +53,13 @@ export function ClipGallery({
   onGamesChange,
 }: ClipGalleryProps) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [clips, setClips] = useState<ClipEntry[] | null>(null);
   const [usage, setUsage] = useState<ClipStorageUsage | null>(null);
   const [selected, setSelected] = useState<ClipEntry | null>(null);
   const [vertical, setVertical] = useState<ClipEntry | null>(null);
+  const [renaming, setRenaming] = useState<ClipEntry | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -112,11 +122,11 @@ export function ClipGallery({
   );
 
   const rename = useCallback(
-    async (clip: ClipEntry, name: string): Promise<boolean> => {
+    async (clip: ClipEntry, wanted: string): Promise<boolean> => {
       try {
-        const moved = await renameClip(clip.path, name);
+        const moved = await renameClip(clip.path, wanted);
         setSelected((current) =>
-          current?.path === clip.path ? { ...current, path: moved, name } : current,
+          current?.path === clip.path ? { ...current, path: moved, name: wanted } : current,
         );
         await refresh();
         return true;
@@ -131,6 +141,15 @@ export function ClipGallery({
 
   const remove = useCallback(
     async (clip: ClipEntry) => {
+      const sure = await confirm({
+        title: t("clips.gallery.delete"),
+        message: t("clips.gallery.delete_message", { name: clip.name }),
+        confirmText: t("clips.gallery.delete_confirm"),
+        cancelText: t("clips.gallery.cancel"),
+        type: "danger",
+      });
+      if (!sure) return;
+
       setBusy(clip.path);
       try {
         await deleteClip(clip.path);
@@ -143,7 +162,7 @@ export function ClipGallery({
         setBusy(null);
       }
     },
-    [refresh, t],
+    [confirm, refresh, t],
   );
 
   const shown = useMemo(() => {
@@ -170,20 +189,20 @@ export function ClipGallery({
 
   if (clips === null || shown === null) {
     return (
-      <div className="flex items-center gap-2 py-6 text-sm text-white/50">
-        <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" />
+      <p className="text-white/70 font-smallcaps text-sm text-center py-4">
         {t("clips.gallery.loading")}
-      </div>
+      </p>
     );
   }
 
   if (clips.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-6 py-10 text-center">
-        <Icon icon="solar:video-library-bold" className="h-8 w-8 text-white/25" />
-        <p className="text-sm text-white/60">{t("clips.gallery.empty")}</p>
-        <p className="text-xs text-white/35">{t("clips.gallery.empty_hint")}</p>
-      </div>
+      <EmptyState
+        icon="solar:video-library-bold"
+        message={t("clips.gallery.empty")}
+        description={t("clips.gallery.empty_hint")}
+        smallDescription
+      />
     );
   }
 
@@ -200,35 +219,34 @@ export function ClipGallery({
       )}
 
       {shown.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-6 py-10 text-center">
-          <Icon
-            icon={search.trim() ? "solar:magnifer-linear" : "solar:star-linear"}
-            className="h-7 w-7 text-white/20"
-          />
-          <p className="text-sm text-white/55">
-            {search.trim()
+        <EmptyState
+          icon={search.trim() ? "solar:magnifer-bold" : "solar:star-bold"}
+          message={
+            search.trim()
               ? t("clips.gallery.no_match", { search: search.trim() })
-              : t("clips.gallery.no_favourites")}
-          </p>
-          {!search.trim() && (
-            <p className="max-w-sm text-xs text-white/35">
-              {t("clips.gallery.no_favourites_hint")}
-            </p>
-          )}
-        </div>
+              : t("clips.gallery.no_favourites")
+          }
+          description={search.trim() ? undefined : t("clips.gallery.no_favourites_hint")}
+          smallDescription
+          compact
+          fullHeight={false}
+        />
       )}
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] gap-2.5">
-        {shown.map((clip) => (
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+        {shown.map((clip, index) => (
           <ClipCard
             key={clip.path}
             clip={clip}
+            index={index}
             busy={busy === clip.path}
             onPlay={() => setSelected(clip)}
-            onReveal={() => void revealClip(clip.path).catch(() => {})}
+            onReveal={() =>
+              void revealClip(clip.path).catch((e) => toast.error(parseErrorMessage(e)))
+            }
             onDelete={() => void remove(clip)}
             onFavourite={(favourite) => void setFavourite(clip, favourite)}
-            onRename={(name) => rename(clip, name)}
+            onRename={() => setRenaming(clip)}
             onThumbnail={refresh}
             onVertical={() => setVertical(clip)}
             t={t}
@@ -245,6 +263,15 @@ export function ClipGallery({
         />
       )}
 
+      {renaming && (
+        <RenameClipModal
+          key={renaming.path}
+          currentName={renaming.name}
+          onClose={() => setRenaming(null)}
+          onConfirm={(name) => rename(renaming, name)}
+        />
+      )}
+
       {vertical && (
         <VerticalExport
           src={convertFileSrc(vertical.path)}
@@ -257,12 +284,15 @@ export function ClipGallery({
           t={t}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 }
 
 function ClipCard({
   clip,
+  index,
   busy,
   onPlay,
   onReveal,
@@ -274,185 +304,106 @@ function ClipCard({
   t,
 }: {
   clip: ClipEntry;
+  index: number;
   busy: boolean;
   onPlay: () => void;
   onReveal: () => void;
   onDelete: () => void;
   onFavourite: (favourite: boolean) => void;
-  onRename: (name: string) => Promise<boolean>;
+  onRename: () => void;
   onThumbnail: () => void;
   onVertical: () => void;
-  t: (key: string, options?: Record<string, unknown>) => string;
+  t: Translate;
 }) {
-  const [confirming, setConfirming] = useState(false);
-  const [renaming, setRenaming] = useState(false);
-  const [draft, setDraft] = useState(clip.name);
-  const [saving, setSaving] = useState(false);
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const animated = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+  const [hovered, setHovered] = useState(false);
 
-  const startRenaming = useCallback(() => {
-    setDraft(clip.name);
-    setRenaming(true);
-  }, [clip.name]);
-
-  const commit = useCallback(async () => {
-    const wanted = draft.trim();
-    if (!wanted || wanted === clip.name) {
-      setRenaming(false);
-      return;
-    }
-    setSaving(true);
-    const done = await onRename(wanted);
-    setSaving(false);
-    if (done) setRenaming(false);
-  }, [draft, clip.name, onRename]);
+  const favouriteLabel = clip.favourite
+    ? t("clips.gallery.unfavourite")
+    : t("clips.gallery.favourite");
 
   return (
-    <div className="group relative overflow-hidden rounded-md border border-white/10 bg-white/[0.02] transition-colors hover:border-white/25">
+    <div
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
+        animated && "animate-in fade-in duration-500 fill-mode-both",
+        busy && "pointer-events-none",
+      )}
+      style={{
+        animationDelay: animated ? `${Math.min(index, 24) * 0.04}s` : undefined,
+        backgroundColor: hovered ? `${accentColor.value}20` : undefined,
+        borderColor: hovered ? `${accentColor.value}60` : undefined,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <button
         type="button"
         onClick={onPlay}
-        className="relative block w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        className="relative block w-full focus:outline-none"
         aria-label={t("clips.gallery.play")}
       >
         <ClipThumbnail clip={clip} onStored={onThumbnail} />
-        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/35">
-          <Icon
-            icon="solar:play-circle-bold"
-            className="h-11 w-11 text-white/0 transition-all group-hover:text-white/90"
-          />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <Icon icon="solar:play-bold" className="w-12 h-12 text-white" />
         </span>
         {clip.durationSeconds !== null && (
-          <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[11px] tabular-nums text-white/85">
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 border border-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white/80">
             {formatLength(clip.durationSeconds)}
           </span>
         )}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onFavourite(!clip.favourite)}
-        title={clip.favourite ? t("clips.gallery.unfavourite") : t("clips.gallery.favourite")}
-        aria-label={clip.favourite ? t("clips.gallery.unfavourite") : t("clips.gallery.favourite")}
-        aria-pressed={clip.favourite}
-        className={cn(
-          "absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md",
-          "bg-black/50 backdrop-blur-sm transition-all",
-          "hover:bg-black/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
-          clip.favourite
-            ? "text-amber-300 opacity-100"
-            : "text-white/60 opacity-0 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100",
-        )}
-      >
-        <Icon
-          icon={clip.favourite ? "solar:star-bold" : "solar:star-linear"}
-          className="h-4 w-4"
-        />
-      </button>
-
-      <div className="flex flex-col gap-0.5 px-2.5 py-1.5">
-        <div className="flex items-center gap-1">
-          {renaming ? (
-            <input
-              autoFocus
-              value={draft}
-              disabled={saving}
-              onChange={(event) => setDraft(event.target.value)}
-              onBlur={() => void commit()}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void commit();
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setRenaming(false);
-                }
-              }}
-              aria-label={t("clips.gallery.rename")}
-              className={cn(
-                "min-w-0 flex-1 rounded border border-white/25 bg-black/40 px-1.5 py-0.5",
-                "text-xs text-white outline-none focus:border-white/50",
-                saving && "opacity-50",
-              )}
+        {busy && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <Icon
+              icon="svg-spinners:ring-resize"
+              className="w-8 h-8"
+              style={{ color: accentColor.value }}
             />
-          ) : (
-            <button
-              type="button"
-              onClick={startRenaming}
-              title={t("clips.gallery.rename")}
-              className="min-w-0 flex-1 truncate rounded px-0.5 text-left text-xs text-white/80 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-            >
-              {clip.name}
-            </button>
-          )}
+          </span>
+        )}
+      </button>
 
-          {!renaming && (
-            <div
-              className={cn(
-                "flex shrink-0 items-center gap-0.5 transition-opacity",
-                confirming
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-              )}
-            >
-              {confirming ? (
-                <>
-                  <IconButton
-                    icon="solar:trash-bin-trash-bold"
-                    title={t("clips.gallery.delete_confirm")}
-                    tone="danger"
-                    busy={busy}
-                    onClick={onDelete}
-                  />
-                  <IconButton
-                    icon="solar:close-circle-linear"
-                    title={t("clips.gallery.cancel")}
-                    onClick={() => setConfirming(false)}
-                  />
-                </>
-              ) : (
-                <>
-                  <IconButton
-                    icon="solar:pen-linear"
-                    title={t("clips.gallery.rename")}
-                    onClick={startRenaming}
-                  />
-                  <IconButton
-                    icon="solar:smartphone-linear"
-                    title={t("clips.gallery.vertical")}
-                    onClick={onVertical}
-                  />
-                  <IconButton
-                    icon="solar:folder-with-files-linear"
-                    title={t("clips.gallery.reveal")}
-                    onClick={onReveal}
-                  />
-                  <IconButton
-                    icon="solar:trash-bin-trash-linear"
-                    title={t("clips.gallery.delete")}
-                    onClick={() => setConfirming(true)}
-                  />
-                </>
-              )}
-            </div>
-          )}
-        </div>
+      <div className="absolute top-2 left-2 z-20">
+        <ClipIconButton
+          icon={clip.favourite ? "solar:star-bold" : "solar:star-linear"}
+          label={favouriteLabel}
+          aria-pressed={clip.favourite}
+          onClick={() => onFavourite(!clip.favourite)}
+          className={
+            clip.favourite
+              ? "text-yellow-400 hover:text-yellow-300"
+              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+          }
+        />
+      </div>
 
-        <div className="flex items-baseline gap-2">
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+        <ClipIconButton icon="solar:pen-bold" label={t("clips.gallery.rename")} onClick={onRename} />
+        <ClipIconButton icon="solar:smartphone-bold" label={t("clips.gallery.vertical")} onClick={onVertical} />
+        <ClipIconButton icon="solar:folder-with-files-bold" label={t("clips.gallery.reveal")} onClick={onReveal} />
+        <ClipIconButton
+          icon="solar:trash-bin-trash-bold"
+          label={t("clips.gallery.delete")}
+          tone="danger"
+          onClick={onDelete}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1 px-3 py-2.5 min-w-0">
+        <span className="font-minecraft text-base text-white whitespace-nowrap overflow-hidden text-ellipsis normal-case">
+          {clip.name}
+        </span>
+        <div className="flex items-center gap-2 text-xs font-minecraft text-white/60 min-w-0">
           {clip.game && (
             <>
-              <span className="shrink-0 truncate text-[11px] text-white/55" title={clip.game}>
-                {clip.game}
-              </span>
-              <span className="shrink-0 text-[11px] text-white/15">·</span>
+              <span className="truncate">{clip.game}</span>
+              <span className="w-px h-3 bg-white/30 shrink-0" />
             </>
           )}
-          <span className="truncate text-[11px] text-white/40">
-            {formatWhen(clip.createdAt, t)}
-          </span>
-          <span className="shrink-0 text-[11px] tabular-nums text-white/30">
-            {formatBytes(clip.sizeBytes)}
-          </span>
+          <span className="truncate">{formatWhen(clip.createdAt, t)}</span>
+          <span className="w-px h-3 bg-white/30 shrink-0" />
+          <span className="shrink-0 text-white/50">{formatBytes(clip.sizeBytes)}</span>
         </div>
       </div>
     </div>
@@ -465,38 +416,6 @@ function formatLength(seconds: number): string {
   return `${minutes}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function IconButton({
-  icon,
-  title,
-  onClick,
-  tone,
-  busy,
-}: {
-  icon: string;
-  title: string;
-  onClick: () => void;
-  tone?: "danger";
-  busy?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      disabled={busy}
-      onClick={onClick}
-      className={cn(
-        "flex h-7 w-7 items-center justify-center rounded-md text-white/45 transition-colors",
-        "hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
-        tone === "danger" && "text-red-300/80 hover:bg-red-500/15 hover:text-red-300",
-        busy && "cursor-wait opacity-50",
-      )}
-    >
-      <Icon icon={busy ? "svg-spinners:ring-resize" : icon} className="h-4 w-4 shrink-0" />
-    </button>
-  );
-}
-
 function ClipPlayer({
   clip,
   onClose,
@@ -506,13 +425,13 @@ function ClipPlayer({
   clip: ClipEntry;
   onClose: () => void;
   onVertical: () => void;
-  t: (key: string, options?: Record<string, unknown>) => string;
+  t: Translate;
 }) {
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const [trimming, setTrimming] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [ratio, setRatio] = useState(16 / 9);
   const [saving, setSaving] = useState(false);
   const [details, setDetails] = useState<ClipDetails | null>(null);
 
@@ -531,22 +450,6 @@ function ClipPlayer({
     };
   }, [clip.path]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (trimming) setTrimming(false);
-      else onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, trimming]);
-
-  useEffect(() => {
-    if (trimming) return;
-    videoRef.current?.play().catch(() => {
-    });
-  }, [trimming]);
-
   const save = useCallback(
     async (startSeconds: number, endSeconds: number, levels: TrackLevel[]) => {
       setSaving(true);
@@ -564,27 +467,43 @@ function ClipPlayer({
     [clip.path, t],
   );
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="relative flex w-full max-w-5xl flex-col gap-2"
-        onClick={(event) => event.stopPropagation()}
-        role="presentation"
+  const footer = trimming ? undefined : (
+    <div className="flex items-center justify-end gap-3">
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<Icon icon="solar:smartphone-bold" className="w-4 h-4" />}
+        onClick={onVertical}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          title={t("clips.gallery.close")}
-          aria-label={t("clips.gallery.close")}
-          className="absolute -top-1 right-0 -translate-y-full rounded-full p-1.5 text-white/50 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-        >
-          <Icon icon="solar:close-circle-linear" className="h-6 w-6" />
-        </button>
+        {t("clips.vertical.open")}
+      </Button>
+      <Button
+        variant="default"
+        size="sm"
+        icon={<Icon icon="solar:scissors-bold" className="w-4 h-4" />}
+        onClick={() => setTrimming(true)}
+        disabled={duration <= 0}
+      >
+        {t("clips.trim.open")}
+      </Button>
+    </div>
+  );
 
+  return (
+    <Modal
+      title={clip.name}
+      titleIcon={<Icon icon="solar:videocamera-record-bold" className="w-5 h-5" />}
+      titleSubtitle={
+        <span className="font-minecraft text-xs text-white/60">
+          {formatWhen(clip.createdAt, t)} · {formatBytes(clip.sizeBytes)}
+        </span>
+      }
+      onClose={onClose}
+      width="xl"
+      closeOnClickOutside={!trimming}
+      footer={footer}
+    >
+      <div className="p-4">
         {trimming ? (
           <ClipTrimmer
             src={src}
@@ -597,43 +516,31 @@ function ClipPlayer({
             t={t}
           />
         ) : (
-          <video
-            ref={videoRef}
-            src={src}
-            controls
-            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-            className="max-h-[78vh] w-full rounded-lg bg-black"
-          />
+          <div
+            className="mx-auto w-full max-h-[calc(90vh-14rem)] overflow-hidden rounded-lg border border-white/10 bg-black"
+            style={{
+              aspectRatio: `${ratio}`,
+              maxWidth: `calc((90vh - 14rem) * ${ratio})`,
+            }}
+          >
+            <video
+              src={src}
+              controls
+              autoPlay
+              playsInline
+              onLoadedMetadata={(event) => {
+                const video = event.currentTarget;
+                setDuration(video.duration);
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                  setRatio(video.videoWidth / video.videoHeight);
+                }
+              }}
+              className="block h-full w-full object-contain"
+            />
+          </div>
         )}
-
-        <div className="flex items-baseline gap-2 text-xs">
-          <span className="text-white/60">{formatWhen(clip.createdAt, t)}</span>
-          <span className="tabular-nums text-white/35">{formatBytes(clip.sizeBytes)}</span>
-
-          {!trimming && (
-            <>
-              <div className="flex-1" />
-              <button
-                type="button"
-                onClick={onVertical}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <Icon icon="solar:smartphone-bold" className="h-3.5 w-3.5" />
-                {t("clips.vertical.open")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrimming(true)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <Icon icon="solar:scissors-bold" className="h-3.5 w-3.5" />
-                {t("clips.trim.open")}
-              </button>
-            </>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -648,34 +555,42 @@ function StorageBar({
   count: number;
   shown: number;
   filtered: boolean;
-  t: (key: string, options?: Record<string, unknown>) => string;
+  t: Translate;
 }) {
+  const accentColor = useThemeStore((state) => state.accentColor);
   const unlimited = usage.limitBytes === 0;
   const ratio = unlimited ? 0 : Math.min(1, usage.usedBytes / usage.limitBytes);
-  const tone = ratio > 0.9 ? "bg-amber-400" : "bg-white/40";
+  const crowded = ratio > 0.9;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-white/55">
-          {filtered
-            ? t("clips.gallery.count_filtered", { shown, count })
-            : t("clips.gallery.count", { count })}
-        </span>
-        <span className="tabular-nums text-white/40">
-          {unlimited
-            ? formatBytes(usage.usedBytes)
-            : `${formatBytes(usage.usedBytes)} / ${formatBytes(usage.limitBytes)}`}
-        </span>
-      </div>
+    <div className="flex items-center gap-4 px-1">
+      <span className="font-smallcaps text-base text-white/70 whitespace-nowrap">
+        {filtered
+          ? t("clips.gallery.count_filtered", { shown, count })
+          : t("clips.gallery.count", { count })}
+      </span>
       {!unlimited && (
-        <div className="h-1 overflow-hidden rounded-full bg-white/10">
+        <div className="flex-1 h-1.5 rounded-full bg-black/40 border border-white/10 overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all", tone)}
-            style={{ width: `${Math.max(2, ratio * 100)}%` }}
+            className={cn("h-full rounded-full transition-all duration-300", crowded && "bg-yellow-400")}
+            style={{
+              width: `${Math.max(2, ratio * 100)}%`,
+              backgroundColor: crowded ? undefined : accentColor.value,
+            }}
           />
         </div>
       )}
+      <span
+        className={cn(
+          "font-minecraft text-xs whitespace-nowrap",
+          crowded ? "text-yellow-400" : "text-white/60",
+          unlimited && "ml-auto",
+        )}
+      >
+        {unlimited
+          ? formatBytes(usage.usedBytes)
+          : `${formatBytes(usage.usedBytes)} / ${formatBytes(usage.limitBytes)}`}
+      </span>
     </div>
   );
 }
@@ -686,10 +601,7 @@ function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-function formatWhen(
-  unixSeconds: number,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): string {
+function formatWhen(unixSeconds: number, t: Translate): string {
   const seconds = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
 
   if (seconds < 60) return t("clips.gallery.just_now");

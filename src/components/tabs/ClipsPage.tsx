@@ -3,25 +3,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { toast } from "react-hot-toast";
 
 import { Button } from "../ui/buttons/Button";
+import { ActionButton } from "../ui/ActionButton";
+import { EmptyState } from "../ui/EmptyState";
+import { SearchWithFilters } from "../ui/SearchWithFilters";
+import { Tooltip } from "../ui/Tooltip";
+import { formatShortcut } from "../ui/HotkeyInput";
+import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
-import {
-  ClipGameFilter,
-  ClipSearchField,
-  ClipSortSwitch,
-  ClipToolButton,
-} from "../clips/ClipToolbar";
 import { getCaptureStatus, openClipFolder } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureStatus } from "../../types/launcherConfig";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { useClipsStore } from "../../store/clips-store";
-import { useThemeStore } from "../../store/useThemeStore";
 import { setDiscordState } from "../../utils/discordRpc";
+import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
 const STATUS_POLL_MS = 2000;
+const ALL_GAMES = "__all__";
 
 type Tone = "live" | "waiting" | "warn" | "off";
 
@@ -68,17 +70,10 @@ function health(
 }
 
 const TONE_DOT: Record<Tone, string> = {
-  live: "bg-emerald-400",
-  waiting: "bg-sky-400",
-  warn: "bg-amber-400",
+  live: "bg-green-400",
+  waiting: "bg-blue-400",
+  warn: "bg-yellow-400",
   off: "bg-white/30",
-};
-
-const TONE_TEXT: Record<Tone, string> = {
-  live: "text-emerald-300/90",
-  waiting: "text-sky-300/90",
-  warn: "text-amber-300/90",
-  off: "text-white/40",
 };
 
 export function ClipsPage() {
@@ -86,7 +81,6 @@ export function ClipsPage() {
   const enabled = useClipsStore((state) => state.enabled);
   const refreshEnabled = useClipsStore((state) => state.refresh);
   const openSettings = useSettingsModalStore((state) => state.open);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [hotkey, setHotkey] = useState<string | null>(null);
@@ -141,13 +135,23 @@ export function ClipsPage() {
   const state = useMemo(() => health(status, enabled, t), [status, enabled, t]);
 
   const sortOptions = useMemo(
-    () =>
-      [
-        { value: "newest" as const, label: t("clips.page.sort.newest") },
-        { value: "oldest" as const, label: t("clips.page.sort.oldest") },
-        { value: "largest" as const, label: t("clips.page.sort.largest") },
-      ],
+    () => [
+      { value: "newest", label: t("clips.page.sort.newest"), icon: "solar:sort-by-time-bold" },
+      { value: "oldest", label: t("clips.page.sort.oldest"), icon: "solar:history-bold" },
+      { value: "largest", label: t("clips.page.sort.largest"), icon: "solar:database-bold" },
+    ],
     [t],
+  );
+
+  const gameOptions = useMemo(
+    () =>
+      games.length > 1
+        ? [
+            { value: ALL_GAMES, label: t("clips.page.all_games"), icon: "solar:gamepad-bold" },
+            ...games.map((name) => ({ value: name, label: name })),
+          ]
+        : [],
+    [games, t],
   );
 
   const toClipSettings = useCallback(
@@ -157,95 +161,68 @@ export function ClipsPage() {
 
   if (!enabled) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <Icon icon="solar:videocamera-record-bold" className="h-10 w-10 text-white/20" />
-        <div className="space-y-1">
-          <p className="font-smallcaps text-lg text-white/75">{t("clips.page.off.title")}</p>
-          <p className="max-w-sm text-xs leading-relaxed text-white/40">
-            {t("clips.page.off.hint")}
-          </p>
-        </div>
-        <Button size="sm" onClick={toClipSettings}>
-          {t("clips.page.off.action")}
-        </Button>
+      <div className="h-full flex flex-col overflow-hidden p-4 relative">
+        <EmptyState
+          icon="solar:videocamera-record-bold"
+          message={t("clips.page.off.title")}
+          description={t("clips.page.off.hint")}
+          smallDescription
+          action={
+            <Button
+              variant="default"
+              size="sm"
+              icon={<Icon icon="solar:settings-bold" className="w-4 h-4" />}
+              onClick={toClipSettings}
+            >
+              {t("clips.page.off.action")}
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden p-4">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-white/10 pb-4">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="flex items-center gap-2.5">
-            <Icon
-              icon="solar:videocamera-record-bold"
-              className="h-6 w-6 shrink-0"
-              style={{ color: accentColor.value }}
+    <div className="h-full flex flex-col overflow-hidden p-4 relative">
+      <div className="mb-6 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <SearchWithFilters
+              placeholder={t("clips.page.search")}
+              searchValue={search}
+              onSearchChange={setSearch}
+              sortOptions={sortOptions}
+              sortValue={sort}
+              onSortChange={(value) => setSort(value as ClipSort)}
+              filterOptions={gameOptions}
+              filterValue={game ?? ALL_GAMES}
+              onFilterChange={(value) => setGame(value === ALL_GAMES ? null : value)}
+              dropdownSize="sm"
             />
-            <h1 className="font-smallcaps text-2xl leading-none text-white">
-              {t("nav.clips")}
-            </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[2.1rem]">
-            <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
-              {state.tone === "live" && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
-              )}
-              <span className={cn("h-2 w-2 rounded-full", TONE_DOT[state.tone])} />
-            </span>
-            <span className={cn("text-xs", TONE_TEXT[state.tone])}>{state.label}</span>
-            {state.tone === "live" && hotkey && (
-              <span className="flex items-center gap-1.5 text-xs text-white/30">
-                <span className="text-white/15">·</span>
-                {t("clips.page.status.hotkey_hint")}
-                <kbd className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-px font-mono text-[10px] text-white/70">
-                  {hotkey}
-                </kbd>
-              </span>
-            )}
-            {state.detail && (
-              <span className="flex items-center gap-1.5 text-xs text-white/35">
-                <span className="text-white/15">·</span>
-                {state.detail}
-              </span>
-            )}
-          </div>
-        </div>
+          <div className="flex items-center gap-3">
+            <CaptureStatusPill state={state} hotkey={state.tone === "live" ? hotkey : null} t={t} />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {games.length > 1 && (
-            <ClipGameFilter
-              value={game}
-              onChange={setGame}
-              games={games}
-              allLabel={t("clips.page.all_games")}
-              t={t}
-            />
-          )}
-          <ClipSearchField
-            value={search}
-            onChange={setSearch}
-            placeholder={t("clips.page.search")}
-            clearLabel={t("clips.page.search_clear")}
-          />
-          <ClipSortSwitch value={sort} onChange={setSort} options={sortOptions} />
-          <ClipToolButton
-            icon={favouritesOnly ? "solar:star-bold" : "solar:star-linear"}
-            label={t("clips.page.favourites_only")}
-            active={favouritesOnly}
-            onClick={() => setFavouritesOnly((current) => !current)}
-          />
-          <ClipToolButton
-            icon="solar:folder-open-bold"
-            label={t("clips.page.folder")}
-            onClick={() => void openClipFolder().catch(() => {})}
-          />
-          <ClipToolButton
-            icon="solar:settings-bold"
-            label={t("clips.page.settings")}
-            onClick={toClipSettings}
-          />
+            <Tooltip content={t("clips.page.favourites_only")} position="bottom">
+              <ActionButton
+                icon={favouritesOnly ? "solar:star-bold" : "solar:star-linear"}
+                variant={favouritesOnly ? "primary" : "icon-only"}
+                onClick={() => setFavouritesOnly((current) => !current)}
+              />
+            </Tooltip>
+            <Tooltip content={t("clips.page.folder")} position="bottom">
+              <ActionButton
+                icon="solar:folder-open-bold"
+                onClick={() =>
+                  void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
+                }
+              />
+            </Tooltip>
+            <Tooltip content={t("clips.page.settings")} position="bottom">
+              <ActionButton icon="solar:settings-bold" onClick={toClipSettings} />
+            </Tooltip>
+          </div>
         </div>
       </div>
 
@@ -259,5 +236,45 @@ export function ClipsPage() {
         />
       </div>
     </div>
+  );
+}
+
+function CaptureStatusPill({
+  state,
+  hotkey,
+  t,
+}: {
+  state: Health;
+  hotkey: string | null;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const focused = useWindowFocus();
+
+  const pill = (
+    <div className="flex items-center gap-2.5 h-10 px-3 bg-black/30 border border-white/10 rounded-lg">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        {state.tone === "live" && focused && (
+          <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60 animate-ping" />
+        )}
+        <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", TONE_DOT[state.tone])} />
+      </span>
+      <span className="font-smallcaps text-base text-white/70 whitespace-nowrap">{state.label}</span>
+      {hotkey && (
+        <>
+          <span className="w-px h-3 bg-white/30" />
+          <span className="font-minecraft text-xs text-white/60 whitespace-nowrap">
+            {t("clips.page.status.hotkey_hint")} {formatShortcut(hotkey)}
+          </span>
+        </>
+      )}
+    </div>
+  );
+
+  if (!state.detail) return pill;
+
+  return (
+    <Tooltip content={state.detail} position="bottom">
+      {pill}
+    </Tooltip>
   );
 }

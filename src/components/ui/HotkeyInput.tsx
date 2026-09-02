@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { useThemeStore } from "../../store/useThemeStore";
 
 interface HotkeyInputProps {
   value: string;
@@ -34,6 +35,7 @@ export function HotkeyInput({
   className,
 }: HotkeyInputProps) {
   const { t } = useTranslation();
+  const accentColor = useThemeStore((state) => state.accentColor);
   const [recording, setRecording] = useState(false);
   const [preview, setPreview] = useState<string[]>([]);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -113,17 +115,22 @@ export function HotkeyInput({
         onClick={recording ? stop : start}
         disabled={disabled}
         className={cn(
-          "flex h-9 min-w-[11rem] items-center justify-center gap-2 rounded-lg border px-3 font-minecraft text-sm transition-all",
+          "flex h-10 min-w-[11rem] items-center justify-center gap-2 rounded-lg border px-4 font-minecraft text-sm transition-all duration-200",
           recording
-            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-white"
-            : "border-white/15 bg-white/[0.04] text-white/80 hover:border-white/30 hover:bg-white/[0.07]",
-          conflict && !recording && "border-red-400/50 bg-red-400/[0.07]",
-          disabled && "cursor-not-allowed opacity-40 hover:border-white/15 hover:bg-white/[0.04]",
+            ? "text-white"
+            : "border-white/10 bg-black/30 text-white/80 hover:border-white/20 hover:bg-black/40 hover:text-white",
+          conflict && !recording && "border-red-500/40 bg-red-600/20",
+          disabled && "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-black/30",
         )}
+        style={
+          recording
+            ? { borderColor: accentColor.value, backgroundColor: `${accentColor.value}20` }
+            : undefined
+        }
       >
         {recording ? (
           <>
-            <Icon icon="svg-spinners:pulse-rings-3" className="h-4 w-4 text-[var(--accent)]" />
+            <Icon icon="svg-spinners:pulse-rings-3" className="h-4 w-4" style={{ color: accentColor.value }} />
             <span>
               {preview.length > 0
                 ? `${preview.map(labelFor).join(" + ")} + …`
@@ -137,7 +144,7 @@ export function HotkeyInput({
         )}
       </button>
 
-      <p className="text-right text-xs text-white/35">
+      <p className="text-right font-minecraft text-xs text-white/50">
         {recording
           ? t("hotkey.hint_recording")
           : conflict
@@ -157,7 +164,7 @@ function collectModifiers(event: KeyboardEvent): string[] {
   return modifiers;
 }
 
-function formatShortcut(shortcut: string): string {
+export function formatShortcut(shortcut: string): string {
   if (!shortcut) return "";
   return shortcut.split("+").map(labelFor).join(" + ");
 }
