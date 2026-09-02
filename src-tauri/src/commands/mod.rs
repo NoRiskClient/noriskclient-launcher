@@ -4,6 +4,7 @@ pub mod deep_link_handler;
 pub mod cape_command;
 pub mod cosmetic_command;
 pub mod icon_command;
+pub mod launcher_import_command;
 pub mod request_context;
 pub mod clip_commands;
 pub mod config_commands;

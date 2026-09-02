@@ -9,7 +9,6 @@ use crate::utils::import_safety::{mod_label, parse_untrusted_profile, ImportSecu
 use async_zip::tokio::read::seek::ZipFileReader;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::BufReader;
@@ -18,9 +17,6 @@ const MODPACK_GROUP: &str = "MODPACKS";
 
 const MAX_TOTAL_BUNDLED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const HASH_CHUNK_BYTES: usize = 64 * 1024;
-
-const MODRINTH_HASH_BATCH: usize = 200;
-use crate::integrations::curseforge::CURSEFORGE_FINGERPRINT_BATCH;
 
 type PackZip = ZipFileReader<BufReader<File>>;
 
@@ -43,48 +39,9 @@ impl PackFormat {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum UnknownReason {
-    NoHash,
-    NotOnPlatform,
-    BundledFile,
-    LocalSource,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct UnknownContent {
-    pub name: String,
-    pub reason: UnknownReason,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ProvenanceReport {
-    pub verified_count: usize,
-    pub unknown: Vec<UnknownContent>,
-    pub incomplete: bool,
-}
-
-impl ProvenanceReport {
-    fn push_unknown(&mut self, name: impl Into<String>, reason: UnknownReason) {
-        self.unknown.push(UnknownContent {
-            name: name.into(),
-            reason,
-        });
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecutableContentReport {
-    pub scripts: Vec<String>,
-    pub natives: Vec<String>,
-    pub script_count: usize,
-    pub native_count: usize,
-    pub truncated: bool,
-}
+pub use crate::integrations::provenance::{
+    ExecutableContentReport, ProvenanceReport, UnknownContent, UnknownReason,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -279,7 +236,7 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
             _ => provenance.push_unknown(name, UnknownReason::NoHash),
         }
     }
-    classify_by_modrinth_hash(hashed, UnknownReason::NotOnPlatform, &mut provenance).await;
+    crate::integrations::provenance::classify_by_modrinth_hash(hashed, UnknownReason::NotOnPlatform, &mut provenance).await;
     collect_bundled_provenance(zip, &mut provenance).await;
 
     let mut security = ImportSecurityReport::default();
@@ -346,62 +303,14 @@ async fn read_curseforge(zip: &mut PackZip) -> Result<PackDetails> {
 
 const DEFAULT_NORISK_PACK: &str = "norisk-prod";
 
-const MAX_LISTED_EXECUTABLE_FILES: usize = 40;
-
-const SCRIPT_EXTENSIONS: &[&str] = &["js", "zs", "groovy", "lua", "py", "rhai", "kts"];
-
-const NATIVE_EXTENSIONS: &[&str] = &[
-    "exe", "bat", "cmd", "com", "scr", "msi", "ps1", "vbs", "wsf", "sh", "bash", "dll", "so",
-    "dylib", "app", "jar",
-];
-
 fn scan_executable_content(zip: &PackZip, override_prefixes: &[&str]) -> ExecutableContentReport {
-    let mut report = ExecutableContentReport::default();
+    let names = zip
+        .file()
+        .entries()
+        .iter()
+        .filter_map(|entry| entry.filename().as_str().ok().map(|name| name.to_string()));
 
-    for entry in zip.file().entries() {
-        let Ok(name) = entry.filename().as_str() else {
-            continue;
-        };
-        if name.ends_with('/') {
-            continue;
-        }
-        let lower = name.to_ascii_lowercase();
-        let Some(prefix) = override_prefixes
-            .iter()
-            .find(|prefix| lower.starts_with(&prefix.to_ascii_lowercase()))
-        else {
-            continue;
-        };
-
-        let Some(extension) = lower.rsplit_once('.').map(|(_, ext)| ext) else {
-            continue;
-        };
-        let in_mods_dir = lower.starts_with(&format!("{}mods/", prefix.to_ascii_lowercase()));
-
-        if NATIVE_EXTENSIONS.contains(&extension) {
-            if extension == "jar" && in_mods_dir {
-                continue;
-            }
-            report.natives.push(name.to_string());
-        } else if SCRIPT_EXTENSIONS.contains(&extension) {
-            report.scripts.push(name.to_string());
-        }
-    }
-
-    report.scripts.sort();
-    report.natives.sort();
-    report.script_count = report.scripts.len();
-    report.native_count = report.natives.len();
-
-    if report.scripts.len() > MAX_LISTED_EXECUTABLE_FILES {
-        report.scripts.truncate(MAX_LISTED_EXECUTABLE_FILES);
-        report.truncated = true;
-    }
-    if report.natives.len() > MAX_LISTED_EXECUTABLE_FILES {
-        report.natives.truncate(MAX_LISTED_EXECUTABLE_FILES);
-        report.truncated = true;
-    }
-    report
+    crate::integrations::provenance::classify_executable_entries(names, override_prefixes)
 }
 
 fn collect_third_party_hosts(index: &ModrinthIndex) -> Vec<String> {
@@ -446,8 +355,8 @@ async fn collect_profile_provenance(profile: &Profile, report: &mut ProvenanceRe
         }
     }
 
-    classify_by_modrinth_hash(modrinth_hashes, UnknownReason::NotOnPlatform, report).await;
-    classify_by_curseforge_fingerprint(curseforge_prints, report).await;
+    crate::integrations::provenance::classify_by_modrinth_hash(modrinth_hashes, UnknownReason::NotOnPlatform, report).await;
+    crate::integrations::provenance::classify_by_curseforge_fingerprint(curseforge_prints, report).await;
 }
 
 async fn collect_bundled_provenance(zip: &mut PackZip, report: &mut ProvenanceReport) {
@@ -463,65 +372,7 @@ async fn collect_bundled_provenance(zip: &mut PackZip, report: &mut ProvenanceRe
     if bundled.truncated {
         report.incomplete = true;
     }
-    classify_by_modrinth_hash(bundled.hashes, UnknownReason::BundledFile, report).await;
-}
-
-async fn classify_by_modrinth_hash(
-    items: Vec<(String, String)>,
-    unknown_reason: UnknownReason,
-    report: &mut ProvenanceReport,
-) {
-    if items.is_empty() {
-        return;
-    }
-
-    for chunk in items.chunks(MODRINTH_HASH_BATCH) {
-        let hashes: Vec<String> = chunk.iter().map(|(_, hash)| hash.clone()).collect();
-        match crate::integrations::modrinth::get_versions_by_hashes(hashes, "sha1").await {
-            Ok(found) => {
-                let known: HashSet<String> = found.keys().map(|k| k.to_lowercase()).collect();
-                for (name, hash) in chunk {
-                    if known.contains(hash) {
-                        report.verified_count += 1;
-                    } else {
-                        report.push_unknown(name.clone(), unknown_reason);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("Modrinth provenance lookup failed: {}", e);
-                report.incomplete = true;
-            }
-        }
-    }
-}
-
-async fn classify_by_curseforge_fingerprint(
-    items: Vec<(String, u64)>,
-    report: &mut ProvenanceReport,
-) {
-    if items.is_empty() {
-        return;
-    }
-
-    for chunk in items.chunks(CURSEFORGE_FINGERPRINT_BATCH) {
-        let prints: Vec<u64> = chunk.iter().map(|(_, print)| *print).collect();
-        match crate::integrations::curseforge::fingerprints_known(prints).await {
-            Ok(known) => {
-                for (name, print) in chunk {
-                    if known.contains(print) {
-                        report.verified_count += 1;
-                    } else {
-                        report.push_unknown(name.clone(), UnknownReason::NotOnPlatform);
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("CurseForge provenance lookup failed: {}", e);
-                report.incomplete = true;
-            }
-        }
-    }
+    crate::integrations::provenance::classify_by_modrinth_hash(bundled.hashes, UnknownReason::BundledFile, report).await;
 }
 
 struct BundledJars {
