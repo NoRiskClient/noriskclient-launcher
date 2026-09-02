@@ -1378,3 +1378,55 @@ async fn export_profiles_to_json() {
         profiles, mods, out
     );
 }
+
+#[tokio::test]
+async fn a_profiles_file_from_before_sync_packs_upgrades_without_losing_anything() {
+    let store = store().await;
+    let legacy = r#"[
+      {
+        "id": "6f1d5b0a-4f1a-4c9e-9a8e-2f0f6a3b1c22",
+        "name": "Old Prod Profile",
+        "path": "noriskclient/old",
+        "game_version": "1.20.1",
+        "loader": "forge",
+        "loader_version": "47.4.0",
+        "created": "2025-09-01T12:00:00Z",
+        "state": "not_installed",
+        "settings": { "memory": { "min": 1024, "max": 4096 } },
+        "mods": [
+          {
+            "id": "1b8b0c3a-2c7e-4d1f-8a9b-3e5d7c1a4f60",
+            "source": {
+              "type": "modrinth",
+              "project_id": "AANobbMI",
+              "version_id": "abc",
+              "file_name": "sodium.jar",
+              "download_url": "https://example.invalid/sodium.jar"
+            },
+            "enabled": true
+          }
+        ]
+      }
+    ]"#;
+
+    let outcome = store
+        .import_from_json(legacy)
+        .await
+        .expect("a profiles.json from before sync packs must still import");
+
+    assert_eq!(outcome.imported, 1);
+    assert_eq!(outcome.unparsed, 0, "nothing may land in quarantine");
+    assert_eq!(outcome.mods, 1);
+
+    let loaded = store.load_all().await.unwrap();
+    let profile = loaded.values().next().expect("the profile must come back");
+
+    assert_eq!(profile.name, "Old Prod Profile");
+    assert_eq!(profile.mods.len(), 1);
+    assert!(
+        profile.sync_pack_ids.is_empty(),
+        "a profile that never saw sync packs must simply have none"
+    );
+    assert_eq!(profile.playtime_seconds, 0);
+    assert!(profile.preferred_account_id.is_none());
+}
