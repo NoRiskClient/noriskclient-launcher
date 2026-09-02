@@ -4,9 +4,9 @@
   "version": "0.6.26-beta.6",
   "identifier": "gg.norisk.NoRiskClientLauncherV3",
   "build": {
-    "beforeDevCommand": "yarn dev",
+    "beforeDevCommand": "yarn stage-native --debug && yarn dev",
     "devUrl": "http://localhost:1430",
-    "beforeBuildCommand": "yarn build",
+    "beforeBuildCommand": "yarn build && yarn stage-native",
     "frontendDist": "../dist"
   },
   "plugins": {
@@ -264,6 +264,13 @@
           "https://player.vimeo.com",
           "https://api.norisk.gg",
           "https://api-staging.norisk.gg"
+        ],
+        "media-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "blob:",
+          "data:"
         ]
       },
       "assetProtocol": {

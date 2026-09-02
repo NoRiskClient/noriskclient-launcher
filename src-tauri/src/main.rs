@@ -444,6 +444,9 @@ async fn main() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
+                #[cfg(windows)]
+                commands::clip_commands::start_on_launch(state_init_app_handle.clone());
+
                 trace!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
@@ -567,7 +570,6 @@ async fn main() {
             } else {
                 error!("Could not get main window handle to attach focus listener!");
             }
-
 
             Ok(())
         })
@@ -863,6 +865,25 @@ async fn main() {
             add_message_reaction,
             remove_message_reaction,
             commands::deep_link_handler::confirm_auth_bridge,
+            commands::clip_commands::capture_apply_settings,
+            commands::clip_commands::capture_release_hotkeys,
+            commands::clip_commands::capture_status,
+            commands::clip_commands::capture_encoder_capabilities,
+            commands::clip_commands::capture_show_overlay,
+            commands::clip_commands::capture_hide_overlay,
+            commands::clip_commands::clip_list,
+            commands::clip_commands::clip_storage_usage,
+            commands::clip_commands::clip_delete,
+            commands::clip_commands::clip_reveal,
+            commands::clip_commands::clip_trim,
+            commands::clip_commands::clip_details,
+            commands::clip_commands::clip_set_favourite,
+            commands::clip_commands::clip_open_apps,
+            commands::clip_commands::clip_save_thumbnail,
+            commands::clip_commands::clip_export_vertical,
+            commands::clip_commands::clip_prepare_preview,
+            commands::clip_commands::clip_rename,
+            commands::clip_commands::clip_open_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

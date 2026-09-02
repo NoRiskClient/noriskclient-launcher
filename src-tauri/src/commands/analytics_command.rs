@@ -31,6 +31,14 @@ pub struct TrackEventResponse {
 
 const ANALYTICS_URL: &str = "https://analytics-api-staging.norisk.gg/api/track";
 
+pub fn track(event_type: impl Into<String>, properties: Value) {
+    let map = match properties {
+        Value::Object(map) => map.into_iter().collect(),
+        _ => HashMap::new(),
+    };
+    track_event(event_type, map);
+}
+
 /// Fire-and-forget analytics from Rust call sites.
 /// Spawns the HTTP request — returns immediately so callers never block on telemetry.
 pub fn track_event(event_type: impl Into<String>, properties: HashMap<String, Value>) {

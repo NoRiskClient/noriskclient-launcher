@@ -5,6 +5,7 @@ pub mod cape_command;
 pub mod cosmetic_command;
 pub mod icon_command;
 pub mod request_context;
+pub mod clip_commands;
 pub mod config_commands;
 pub mod content_command;
 pub mod crash_fix_command;

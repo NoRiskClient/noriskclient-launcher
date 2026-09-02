@@ -24,6 +24,104 @@ export interface ReferralState {
   redeemed_by_account: string | null;
 }
 
+export type ClipEncoder = "auto" | "nvenc" | "amf" | "quick_sync" | "software";
+
+export type AudioSourceChoice = 'system' | 'game_only' | 'both';
+
+export interface AudioDeviceInfo {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
+
+export type ClipCodec = "h264" | "h265" | "av1";
+
+export type QualityPreset = "low" | "standard" | "high" | "custom";
+
+export interface EncoderCapability {
+  codec: ClipCodec;
+  encoder: ClipEncoder;
+  available: boolean;
+  hardware: boolean;
+  detail: string | null;
+}
+
+export interface QualitySpec {
+  width: number;
+  height: number;
+  fps: number;
+  bitrateKbps: number;
+}
+
+export const QUALITY_PRESETS: Record<Exclude<QualityPreset, "custom">, QualitySpec> = {
+  low: { width: 640, height: 360, fps: 24, bitrateKbps: 2_000 },
+  standard: { width: 1280, height: 720, fps: 60, bitrateKbps: 7_000 },
+  high: { width: 1920, height: 1080, fps: 60, bitrateKbps: 12_000 },
+};
+
+export const CUSTOM_RESOLUTIONS: ReadonlyArray<{ width: number; height: number; label: string }> = [
+  { width: 640, height: 360, label: "360p" },
+  { width: 854, height: 480, label: "480p" },
+  { width: 1280, height: 720, label: "720p" },
+  { width: 1920, height: 1080, label: "1080p" },
+];
+export const CUSTOM_FPS: readonly number[] = [24, 30, 60, 120, 144];
+export const CUSTOM_BITRATES_KBPS: readonly number[] = [
+  3_000, 5_000, 7_000, 10_000, 15_000, 20_000, 25_000, 30_000, 50_000, 70_000, 100_000,
+];
+
+export interface ClipConfig {
+  enabled: boolean;
+  quality: QualityPreset | null;
+  width: number;
+  height: number;
+  fps: number;
+  bitrate_kbps: number;
+  codec: ClipCodec;
+  encoder: ClipEncoder;
+  capture_audio: boolean;
+  audio_source: AudioSourceChoice;
+  audio_device_id: string | null;
+  game_volume: number;
+  other_volume: number;
+  capture_microphone: boolean;
+  microphone_device_id: string | null;
+  microphone_volume: number;
+  output_dir: string | null;
+  max_storage_gb: number;
+  pre_roll_seconds: number;
+  post_roll_seconds: number;
+  hotkey_save: string;
+  hotkey_toggle: string;
+  other_game: OtherGame | null;
+}
+
+export interface OtherGame {
+  executable: string;
+  name: string;
+}
+
+export interface CaptureStatus {
+  running: boolean;
+  state:
+    | "idle"
+    | "attaching"
+    | "buffering"
+    | "paused"
+    | "blocked_fullscreen_exclusive"
+    | "failed";
+  blocked_by_fullscreen: boolean;
+  engine_version: string | null;
+  adapter: string | null;
+  available_encoders: ClipEncoder[];
+  capabilities: EncoderCapability[];
+  active_codec: ClipCodec | null;
+  active_encoder: ClipEncoder | null;
+  audio_devices: AudioDeviceInfo[];
+  microphones: AudioDeviceInfo[];
+  supports_game_only_audio: boolean;
+}
+
 export interface LauncherConfig {
   version: number; // u32
   is_experimental: boolean;
@@ -45,6 +143,7 @@ export interface LauncherConfig {
   referral_state: ReferralState | null; // Referral tracking state
   last_played_profile: string | null; // Option<Uuid>
   pack_rollout_override: "auto" | "off" | "on";
+  clips: ClipConfig;
   log_level: LogLevel;
 }
 
