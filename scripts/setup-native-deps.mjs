@@ -15,11 +15,11 @@ const DEPENDENCIES = [
     label: "FFmpeg n8.1.2",
     dir: path.join(thirdParty, "ffmpeg"),
     stampFile: ".norisk-ffmpeg-version",
-    stamp: "autobuild-2026-08-17-13-05/ffmpeg-n8.1.2-44-g7c533d0f86-win64-gpl-shared-8.1.zip",
+    stamp: "autobuild-2026-09-01-13-13/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-shared-8.1.zip",
     url:
-      "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-17-13-05/" +
-      "ffmpeg-n8.1.2-44-g7c533d0f86-win64-gpl-shared-8.1.zip",
-    sha256: "621d81bc8fb48efaef60ef51e51b365936852c2d34d1fb078b246dcec4bc77e4",
+      "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-01-13-13/" +
+      "ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-shared-8.1.zip",
+    sha256: "799ed38939d6e7513946fb99cc2b8f9c8d7ff99fa3b898bd733801f6b680beba",
     abi: "src-tauri/crates/norisk-capture/src/encoder/d3d11_ffi.rs",
     take: { kind: "inner-directory" },
     expect: ["include/libavcodec/avcodec.h", "lib", "bin"],

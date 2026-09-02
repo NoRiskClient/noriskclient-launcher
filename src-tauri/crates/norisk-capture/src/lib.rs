@@ -16,4 +16,5 @@ pub mod preview;
 #[cfg(windows)]
 pub mod vertical;
 pub mod watchdog;
+#[cfg(windows)]
 pub mod writer;
