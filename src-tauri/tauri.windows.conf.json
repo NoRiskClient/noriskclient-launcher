@@ -10,7 +10,9 @@
       "binaries/swresample-6.dll": "./",
       "binaries/graphics-hook64.dll": "./",
       "binaries/graphics-hook32.dll": "./",
-      "binaries/NOTICE.txt": "./"
+      "binaries/graphics-hook-NOTICE.txt": "./licenses/",
+      "binaries/ffmpeg-NOTICE.txt": "./licenses/",
+      "binaries/ffmpeg-LICENSE.txt": "./licenses/"
     }
   }
 }

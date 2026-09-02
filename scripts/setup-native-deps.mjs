@@ -23,6 +23,27 @@ const DEPENDENCIES = [
     abi: "src-tauri/crates/norisk-capture/src/encoder/d3d11_ffi.rs",
     take: { kind: "inner-directory" },
     expect: ["include/libavcodec/avcodec.h", "lib", "bin"],
+    notice: [
+      "The FFmpeg DLLs in this directory are unmodified binaries from the BtbN",
+      "FFmpeg-Builds project.",
+      "",
+      "  Project:  FFmpeg",
+      "  Version:  n8.1.2 (win64-gpl-shared)",
+      "  Build:    https://github.com/BtbN/FFmpeg-Builds",
+      "  Source:   https://git.ffmpeg.org/ffmpeg.git",
+      "  Licence:  GNU General Public License v3.0 - see LICENSE.txt",
+      "",
+      "They provide the video and audio encoding, decoding and MP4 muxing the clip",
+      "system is built on.",
+      "",
+      "This launcher is licensed under GPL-3.0. Distributing these binaries carries",
+      "the obligation to make the corresponding source available; it is published at",
+      "the URLs above, and the scripts that produced this exact build are in the",
+      "BtbN repository.",
+      "",
+      "Fetched by scripts/setup-native-deps.mjs - do not edit these files by hand.",
+      "",
+    ].join("\n"),
   },
   {
     id: "graphics-hook",
@@ -85,6 +106,7 @@ if (fetched === 0) {
 console.log("");
 async function ensure(dep) {
   if (!force && isCurrent(dep)) {
+    writeNotice(dep);
     ok(`${dep.label} (already there)`);
     return false;
   }
@@ -125,13 +147,19 @@ async function ensure(dep) {
     }
   }
 
-  if (dep.notice) {
-    fs.writeFileSync(path.join(dep.dir, "NOTICE.txt"), dep.notice, "utf8");
-  }
+  writeNotice(dep);
   fs.writeFileSync(path.join(dep.dir, dep.stampFile), dep.stamp, "utf8");
 
   ok(`${dep.label}`);
   return true;
+}
+
+function writeNotice(dep) {
+  if (!dep.notice) return;
+  const at = path.join(dep.dir, "NOTICE.txt");
+  if (!fs.existsSync(at) || fs.readFileSync(at, "utf8") !== dep.notice) {
+    fs.writeFileSync(at, dep.notice, "utf8");
+  }
 }
 
 function isCurrent(dep) {

@@ -15,7 +15,13 @@ const FFMPEG_DLLS = [
   "avutil-60.dll",
   "swresample-6.dll",
 ];
-const HOOK_FILES = ["graphics-hook64.dll", "graphics-hook32.dll", "NOTICE.txt"];
+const HOOK_FILES = ["graphics-hook64.dll", "graphics-hook32.dll"];
+
+const LEGAL_FILES = [
+  { dir: "graphics-hook", name: "NOTICE.txt", as: "graphics-hook-NOTICE.txt" },
+  { dir: "ffmpeg", name: "NOTICE.txt", as: "ffmpeg-NOTICE.txt" },
+  { dir: "ffmpeg", name: "LICENSE.txt", as: "ffmpeg-LICENSE.txt" },
+];
 
 const ok = (msg) => console.log(`  \x1b[32m+\x1b[0m ${msg}`);
 const step = (msg) => console.log(`    ${msg}`);
@@ -67,7 +73,13 @@ ok(`FFmpeg: ${FFMPEG_DLLS.length} DLLs (${mb(ffmpegBytes)} MB)`);
 for (const file of HOOK_FILES) {
   copyIn(hookDir, file, "the graphics hook");
 }
-ok("graphics hook + NOTICE.txt");
+ok("graphics hook");
+
+const thirdParty = path.join(srcTauri, "third-party");
+for (const file of LEGAL_FILES) {
+  copyIn(path.join(thirdParty, file.dir), file.name, file.dir, file.as);
+}
+ok(`licences: ${LEGAL_FILES.length} file(s)`);
 
 const staged = fs
   .readdirSync(staging)
