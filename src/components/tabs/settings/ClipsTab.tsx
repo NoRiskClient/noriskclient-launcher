@@ -207,18 +207,6 @@ export function ClipsTab() {
         </SettingRow>
 
         <SettingRow
-          label={t("settings.clips.games.minecraft")}
-          description={t("settings.clips.games.minecraft.description")}
-          searchKeywords={kw("settings.clips.games.minecraft", "minecraft", "spiel", "game")}
-        >
-          <ToggleSwitch
-            checked={clips.record_minecraft}
-            onChange={(record_minecraft) => patch({ record_minecraft })}
-            disabled={saving || !clips.enabled}
-          />
-        </SettingRow>
-
-        <SettingRow
           label={t("settings.clips.games.other")}
           description={t("settings.clips.games.other.description")}
           searchKeywords={kw(
@@ -335,7 +323,8 @@ export function ClipsTab() {
         keywords={kw("settings.clips.quality.title", "qualitaet", "quality", "aufloesung", "resolution", "bitrate", "fps", "encoder")}
         description={t("settings.clips.quality.description")}
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="flex flex-col gap-4 py-3">
+        <div className="grid grid-cols-2 gap-3">
           {PRESET_ORDER.map((option) => (
             <PresetCard
               key={option}
@@ -428,6 +417,7 @@ export function ClipsTab() {
         <BitrateNotice spec={spec} t={t} />
 
         <FallbackNotice status={status} clips={clips} t={t} />
+        </div>
 
         <SettingRow
           label={t("settings.clips.quality.codec")}
@@ -436,7 +426,7 @@ export function ClipsTab() {
           disabled={!clips.enabled}
           vertical
         >
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-3">
             {CODEC_ORDER.map((option) => (
               <CodecCard
                 key={option}
@@ -853,7 +843,7 @@ function PresetCard({
   const values = preset === "custom" ? null : QUALITY_PRESETS[preset];
 
   return (
-    <ChoiceCard selected={selected} disabled={disabled} onSelect={onSelect} className="px-4 py-3">
+    <ChoiceCard selected={selected} disabled={disabled} onSelect={onSelect} className="p-4">
       <span className="flex items-center justify-between gap-2">
         <span className="font-minecraft text-base text-white">
           {t(`settings.clips.quality.preset.${preset}`)}
@@ -867,7 +857,7 @@ function PresetCard({
 
       {values ? (
         <>
-          <span className="mt-1.5 flex flex-wrap items-center gap-1">
+          <span className="mt-2 flex flex-wrap items-center gap-1.5">
             <Chip>{resolutionLabel({ ...values, bitrateKbps: values.bitrateKbps })}</Chip>
             <Chip>{values.fps} fps</Chip>
             <Chip>{values.bitrateKbps / 1000} Mbps</Chip>
@@ -911,7 +901,7 @@ function ChoiceCard({
       disabled={disabled}
       aria-pressed={selected}
       className={cn(
-        "flex flex-col gap-1 rounded-lg border text-left transition-all duration-200",
+        "flex flex-col gap-1.5 rounded-lg border text-left transition-all duration-200",
         "bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30",
         disabled && "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-black/20",
         className,
@@ -975,7 +965,7 @@ function CodecCard({
       selected={selected && !unavailable}
       disabled={disabled || unavailable}
       onSelect={onSelect}
-      className="px-3 py-2.5"
+      className="p-4"
     >
       <span className="flex items-center gap-2">
         <span className="font-minecraft text-base text-white">
