@@ -45,7 +45,8 @@ pub fn trim(
     let video: Vec<Packet> = clip
         .video
         .iter()
-        .filter(|p| p.pts >= begin && p.pts <= want_end)
+        .skip_while(|p| p.pts < begin)
+        .take_while(|p| p.pts <= want_end)
         .cloned()
         .collect();
 
@@ -399,9 +400,9 @@ pub(crate) fn read(path: &Path) -> Result<SourceClip> {
             bail!("{} holds no video frames", path.display());
         }
 
-        video.sort_by_key(|p: &Packet| p.pts);
+        video.sort_by_key(|p: &Packet| p.dts);
         for source in &mut audio {
-            source.packets.sort_by_key(|p: &Packet| p.pts);
+            source.packets.sort_by_key(|p: &Packet| p.dts);
         }
 
         let start_time = (**(*format_ctx).streams.add(video_index as usize)).start_time;

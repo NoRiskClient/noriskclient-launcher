@@ -263,6 +263,7 @@ impl Engine {
                 log::debug!("Releasing the buffer kept across the last rebuild");
                 self.retired = None;
             }
+            self.step_retired_budget();
 
             if self.last_status.elapsed() >= STATUS_INTERVAL {
                 self.last_status = Instant::now();
@@ -737,6 +738,31 @@ impl Engine {
         }
     }
 
+    fn step_retired_budget(&mut self) {
+        let (Some(retired), Some(active)) = (self.retired.as_ref(), self.active.as_ref()) else {
+            return;
+        };
+
+        let live = active
+            .ring
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .duration_seconds();
+        let spare = self.config.buffer_seconds as f64 - live;
+
+        if spare <= 0.0 {
+            log::debug!("The live buffer is full again; releasing the one kept across the rebuild");
+            self.retired = None;
+            return;
+        }
+
+        retired
+            .ring
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .shrink_window(spare as f32);
+    }
+
     fn detach(&mut self) {
         self.pending_attach = None;
 
@@ -891,6 +917,7 @@ impl Engine {
                 encode_fps: 0.0,
                 dropped_frames: 0,
                 encode_latency_ms_p99: 0.0,
+                capture_method: None,
                 active_codec: None,
                 active_encoder: None,
             }));
@@ -926,6 +953,7 @@ impl Engine {
             encode_fps: rate(stats.delivered, delivered_before),
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
             encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
+            capture_method: Some(pipeline.source.describe().to_string()),
             active_codec: Some(pipeline.settings.codec),
             active_encoder: Some(pipeline.encoder),
         }));

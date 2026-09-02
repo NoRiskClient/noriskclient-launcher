@@ -209,7 +209,7 @@ pub fn write_mp4(
         let mut queue: Vec<(i64, i32, &crate::buffer::Packet, i64)> = clip
             .packets
             .iter()
-            .map(|p| (p.pts, 0i32, p, frame_ticks))
+            .map(|p| (p.dts, 0i32, p, frame_ticks))
             .collect();
 
         for (position, index) in &audio_streams {
@@ -220,10 +220,10 @@ pub fn write_mp4(
                 source
                     .packets
                     .iter()
-                    .map(|p| (p.pts, *index, p, audio_ticks)),
+                    .map(|p| (p.dts, *index, p, audio_ticks)),
             );
         }
-        queue.sort_by_key(|(pts, _, _, _)| *pts);
+        queue.sort_by_key(|(dts, _, _, _)| *dts);
 
         for (_, stream_index, source, duration) in queue {
             let rc = ff::av_new_packet(packet, source.data.len() as i32);
@@ -239,7 +239,7 @@ pub fn write_mp4(
             let pts = source.pts - origin;
             (*packet).stream_index = stream_index;
             (*packet).pts = pts;
-            (*packet).dts = pts;
+            (*packet).dts = (source.dts - origin).min(pts);
             (*packet).duration = duration;
             (*packet).flags = if source.keyframe {
                 ff::AV_PKT_FLAG_KEY
@@ -319,5 +319,146 @@ impl Drop for PacketGuard {
             let mut packet = self.0;
             ff::av_packet_free(&mut packet);
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::buffer::{Packet, RingBuffer};
+
+    const FPS: i64 = 60;
+    const STEP: i64 = 90_000 / FPS;
+    const WIDTH: usize = 320;
+    const HEIGHT: usize = 240;
+
+    fn encode_with_b_frames(frames: usize) -> Option<(Vec<Packet>, Vec<u8>)> {
+        unsafe {
+            let codec = ff::avcodec_find_encoder_by_name(c"libx264".as_ptr());
+            if codec.is_null() {
+                return None;
+            }
+            let context = ff::avcodec_alloc_context3(codec);
+            assert!(!context.is_null());
+            (*context).width = WIDTH as i32;
+            (*context).height = HEIGHT as i32;
+            (*context).pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_YUV420P;
+            (*context).time_base = ff::AVRational { num: 1, den: 90_000 };
+            (*context).framerate = ff::AVRational { num: FPS as i32, den: 1 };
+            (*context).gop_size = 30;
+            (*context).max_b_frames = 2;
+            (*context).flags |= ff::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
+            ff::av_opt_set((*context).priv_data, c"preset".as_ptr(), c"ultrafast".as_ptr(), 0);
+            let rc = ff::avcodec_open2(context, codec, std::ptr::null_mut());
+            assert!(rc >= 0, "libx264 did not open: {}", av_error(rc));
+
+            let frame = ff::av_frame_alloc();
+            (*frame).format = ff::AVPixelFormat::AV_PIX_FMT_YUV420P as i32;
+            (*frame).width = WIDTH as i32;
+            (*frame).height = HEIGHT as i32;
+            assert!(ff::av_frame_get_buffer(frame, 0) >= 0);
+            let packet = ff::av_packet_alloc();
+            let mut out = Vec::new();
+
+            let drain = |out: &mut Vec<Packet>| loop {
+                if ff::avcodec_receive_packet(context, packet) < 0 {
+                    break;
+                }
+                let bytes = std::slice::from_raw_parts((*packet).data, (*packet).size as usize);
+                out.push(Packet {
+                    data: bytes.into(),
+                    pts: (*packet).pts,
+                    dts: (*packet).dts,
+                    keyframe: (*packet).flags & ff::AV_PKT_FLAG_KEY != 0,
+                });
+                ff::av_packet_unref(packet);
+            };
+
+            for index in 0..frames {
+                assert!(ff::av_frame_make_writable(frame) >= 0);
+                let luma = (*frame).data[0];
+                let stride = (*frame).linesize[0] as usize;
+                for row in 0..HEIGHT {
+                    for col in 0..WIDTH {
+                        *luma.add(row * stride + col) = ((row + col + index * 4) & 0xff) as u8;
+                    }
+                }
+                for plane in 1..=2 {
+                    let chroma = (*frame).data[plane];
+                    let stride = (*frame).linesize[plane] as usize;
+                    for row in 0..HEIGHT / 2 {
+                        std::ptr::write_bytes(chroma.add(row * stride), 128, WIDTH / 2);
+                    }
+                }
+                (*frame).pts = index as i64 * STEP;
+                assert!(ff::avcodec_send_frame(context, frame) >= 0);
+                drain(&mut out);
+            }
+            ff::avcodec_send_frame(context, std::ptr::null());
+            drain(&mut out);
+
+            let extradata = std::slice::from_raw_parts(
+                (*context).extradata,
+                (*context).extradata_size as usize,
+            )
+            .to_vec();
+
+            let mut packet = packet;
+            ff::av_packet_free(&mut packet);
+            let mut frame = frame;
+            ff::av_frame_free(&mut frame);
+            let mut context = context;
+            ff::avcodec_free_context(&mut context);
+
+            Some((out, extradata))
+        }
+    }
+
+    #[test]
+    fn b_frame_packets_survive_the_ring_and_the_muxer_in_decode_order() {
+        let Some((packets, extradata)) = encode_with_b_frames(90) else {
+            eprintln!("libx264 is not in this FFmpeg build; skipping");
+            return;
+        };
+        assert!(
+            packets.iter().any(|p| p.pts != p.dts),
+            "the encoder produced no reordering, the test proves nothing"
+        );
+
+        let mut ring = RingBuffer::new(30.0, 90_000);
+        for packet in &packets {
+            ring.push(packet.clone());
+        }
+        let clip = ring
+            .extract_around(ring.newest_pts(), 100.0, 0.0)
+            .expect("the ring holds the whole encode");
+        assert_eq!(clip.packets.len(), packets.len());
+
+        let path = std::env::temp_dir().join(format!("nrc-bframes-{}.mp4", std::process::id()));
+        let track = TrackInfo {
+            width: WIDTH as u32,
+            height: HEIGHT as u32,
+            fps: FPS as u32,
+            time_base_den: 90_000,
+            codec: ClipCodec::H264,
+            extradata,
+        };
+        let written = write_mp4(&clip, &path, &track, &[]).expect("muxing failed");
+        let back = crate::trim::read(&path).expect("demuxing failed");
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(back.video.len(), packets.len());
+        assert!(
+            back.video.windows(2).all(|pair| pair[0].dts < pair[1].dts),
+            "dts must climb in decode order"
+        );
+        let mut shown: Vec<i64> = back.video.iter().map(|p| p.pts - back.first_pts).collect();
+        shown.sort_unstable();
+        let expected: Vec<i64> = (0..90).map(|i| i * STEP).collect();
+        assert_eq!(shown, expected, "every frame must come back at its display time");
+        assert!(
+            (written.duration_seconds - 1.5).abs() < 0.1,
+            "90 frames at 60 fps should be 1.5s, got {:.2}s",
+            written.duration_seconds
+        );
     }
 }

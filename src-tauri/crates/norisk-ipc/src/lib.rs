@@ -264,6 +264,8 @@ pub struct StatusReport {
     pub dropped_frames: u64,
     pub encode_latency_ms_p99: f32,
     #[serde(default)]
+    pub capture_method: Option<String>,
+    #[serde(default)]
     pub active_codec: Option<ClipCodec>,
     #[serde(default)]
     pub active_encoder: Option<EncoderPreference>,

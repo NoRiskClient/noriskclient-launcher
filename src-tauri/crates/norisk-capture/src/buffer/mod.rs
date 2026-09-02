@@ -121,6 +121,12 @@ impl RingBuffer {
         self.trim();
     }
 
+    pub fn shrink_window(&mut self, seconds: f32) {
+        let ticks = (seconds.max(0.0) as f64 * self.time_base_den as f64) as i64;
+        self.window_ticks = ticks.max(1);
+        self.trim();
+    }
+
     fn trim(&mut self) {
         while self.closed.len() > 1 {
             let newest_end = self.newest_pts();
@@ -330,6 +336,19 @@ mod tests {
             held <= 13.0,
             "must not grow far past the window, held {held:.1}s"
         );
+    }
+
+    #[test]
+    fn shrinking_the_window_drops_the_oldest_segments() {
+        let mut buffer = RingBuffer::new(30.0, TB);
+        fill(&mut buffer, 3600, 120, 1000);
+        let before = buffer.duration_seconds();
+
+        buffer.shrink_window(10.0);
+
+        let after = buffer.duration_seconds();
+        assert!(after < before, "shrinking must release footage, {before:.1}s -> {after:.1}s");
+        assert!(after >= 10.0 && after <= 13.0, "held {after:.1}s against a 10s window");
     }
 
     #[test]

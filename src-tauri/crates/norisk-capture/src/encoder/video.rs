@@ -74,13 +74,14 @@ impl VideoEncoder {
         }
 
         log::info!(
-            "Encoder open: {codec_name} ({}) {}x{} @ {} fps, {} kbps, GOP {} frames, no B-frames",
+            "Encoder open: {codec_name} ({}) {}x{} @ {} fps, {} kbps, GOP {} frames, {} B-frames",
             if hardware { "GPU" } else { "CPU" },
             settings.width,
             settings.height,
             settings.fps,
             settings.bitrate_kbps,
-            unsafe { (*context).gop_size }
+            unsafe { (*context).gop_size },
+            unsafe { (*context).max_b_frames }
         );
 
         Ok(Self {
@@ -214,7 +215,7 @@ unsafe fn configure_common(
         (*context).rc_buffer_size = (*context).bit_rate as i32;
     }
     (*context).gop_size = gop_frames(settings);
-    (*context).max_b_frames = 0;
+    (*context).max_b_frames = if tuned { b_frames_for(codec_name) } else { 0 };
 
     (*context).flags |= ff::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
 
@@ -227,6 +228,17 @@ unsafe fn configure_common(
         for (key, value) in tuning_for(codec_name) {
             set_option(context, codec_name, key, value);
         }
+    }
+}
+
+fn b_frames_for(codec_name: &str) -> i32 {
+    let hardware = ["_nvenc", "_amf", "_qsv"]
+        .iter()
+        .any(|suffix| codec_name.ends_with(suffix));
+    if hardware && !codec_name.starts_with("av1") {
+        2
+    } else {
+        0
     }
 }
 
