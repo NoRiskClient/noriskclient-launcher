@@ -9,6 +9,7 @@
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import type { LoaderKey } from "./useHeroChipEditors";
+import { loaderIconSrc, loaderLabel } from "../../../../lib/loader-icons";
 
 interface LoaderOption {
   key: LoaderKey;
@@ -16,13 +17,13 @@ interface LoaderOption {
   name: string;
 }
 
-const LOADERS: LoaderOption[] = [
-  { key: "vanilla",  icon: "/icons/minecraft.png", name: "Vanilla" },
-  { key: "fabric",   icon: "/icons/fabric.png",    name: "Fabric" },
-  { key: "forge",    icon: "/icons/forge.png",     name: "Forge" },
-  { key: "quilt",    icon: "/icons/quilt.png",     name: "Quilt" },
-  { key: "neoforge", icon: "/icons/neoforge.png",  name: "NeoForge" },
-];
+const LOADERS: LoaderOption[] = (
+  ["vanilla", "fabric", "forge", "quilt", "neoforge"] as const
+).map((key) => ({
+  key,
+  icon: loaderIconSrc(key),
+  name: loaderLabel(key),
+}));
 
 interface LoaderPickerV3Props {
   currentLoader: string | null | undefined;

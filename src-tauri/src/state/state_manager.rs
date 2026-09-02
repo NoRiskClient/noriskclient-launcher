@@ -14,8 +14,8 @@ use crate::state::post_init::PostInitializationHandler;
 use crate::state::process_state::{default_processes_path, ProcessManager};
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
+use crate::state::sync_pack_state::SyncPackManager;
 use crate::utils::referral_utils;
-use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, Mutex, Semaphore};
 use tokio::task::JoinHandle;
@@ -39,17 +39,29 @@ pub struct State {
     pub friends_state: FriendsState,
     pub content_cache: ContentCacheManager,
     pub capture_supervisor: Arc<crate::state::capture_state::CaptureSupervisor>,
+    pub sync_pack_manager: SyncPackManager,
     pub db: crate::state::db::DbHandle,
     pub io_semaphore: Arc<Semaphore>,
     pub login_server_handle: Arc<Mutex<Option<JoinHandle<Result<()>>>>>,
 }
 
+async fn ready_step<F>(name: &str, step: F) -> Result<()>
+where
+    F: std::future::Future<Output = Result<()>>,
+{
+    let start = std::time::Instant::now();
+    step.await?;
+    log::info!("{} ready ({}ms)", name, start.elapsed().as_millis());
+    Ok(())
+}
+
 impl State {
     // Initialize the global state
     pub async fn init(app: Arc<tauri::AppHandle>) -> Result<()> {
+        let init_start = std::time::Instant::now();
         let initial_state_arc = LAUNCHER_STATE
             .get_or_try_init(|| async {
-                log::info!("State::init - Starting primary initialization of managers (Phase 1 - Lightweight Instantiation)...");
+                log::trace!("State::init - Starting primary initialization of managers (Phase 1 - Lightweight Instantiation)...");
                 let config_manager = ConfigManager::new()?;
                 let discord_manager = DiscordManager::new(false).await?;
                 let io_semaphore = Arc::new(Semaphore::new(10));
@@ -59,14 +71,18 @@ impl State {
                 let norisk_version_manager = NoriskVersionManager::new(default_norisk_versions_path())?;
                 let skin_manager = SkinManager::new(default_skins_path())?;
                 let active_skin_manager = ActiveSkinManager::new(default_active_skins_path())?;
-                let profile_manager = ProfileManager::new(LAUNCHER_DIRECTORY.root_dir().join("profiles.json"))?;
+                let db = crate::state::db::new_handle();
+                let profile_manager = ProfileManager::new(
+                    LAUNCHER_DIRECTORY.root_dir().join("profiles.json"),
+                    db.clone(),
+                )?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
-                log::info!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
+                log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
                 let cosmetic_pack_manager = CosmeticPackManager::new();
-                let db = crate::state::db::new_handle();
                 let content_cache = ContentCacheManager::new(db.clone())?;
+                let sync_pack_manager = SyncPackManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
                     profile_manager,
@@ -85,6 +101,7 @@ impl State {
                     capture_supervisor: Arc::new(
                         crate::state::capture_state::CaptureSupervisor::new(),
                     ),
+                    sync_pack_manager,
                     db,
                     io_semaphore,
                     login_server_handle: Arc::new(Mutex::new(None)),
@@ -92,23 +109,14 @@ impl State {
             })
             .await?;
 
-        log::info!("State::init - Global state Arc created. Running post-initialization handlers (Phase 2)...");
+        log::trace!("State::init - Global state Arc created. Running post-initialization handlers (Phase 2)...");
 
-        initial_state_arc
-            .config_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - ConfigManager post-initialization complete.");
+        ready_step("ConfigManager", initial_state_arc.config_manager.on_state_ready(app.clone())).await?;
 
         // Must run after ConfigManager: meta_dir() resolves CUSTOM_GAME_DIR_CACHE.
-        crate::state::db::open_or_reopen(&initial_state_arc.db).await;
-        log::info!("State::init - Database pool ready.");
+        crate::state::db::open_or_reopen(&initial_state_arc.db).await?;
 
-        initial_state_arc
-            .content_cache
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - ContentCacheManager post-initialization complete.");
+        ready_step("ContentCacheManager", initial_state_arc.content_cache.on_state_ready(app.clone())).await?;
 
         let loaded_config = initial_state_arc.config_manager.get_config().await;
 
@@ -124,34 +132,16 @@ impl State {
             .discord_manager
             .set_enabled(loaded_config.enable_discord_presence)
             .await?;
-        log::info!(
+        log::trace!(
             "State::init - DiscordManager enabled status set based on loaded config: {}",
             loaded_config.enable_discord_presence
         );
 
-        initial_state_arc
-            .norisk_version_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - NoriskVersionManager post-initialization complete.");
-
-        initial_state_arc
-            .norisk_pack_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - NoriskPackManager post-initialization complete.");
-
-        initial_state_arc
-            .profile_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - ProfileManager post-initialization complete.");
-
-        initial_state_arc
-            .process_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - ProcessManager post-initialization complete.");
+        ready_step("NoriskVersionManager", initial_state_arc.norisk_version_manager.on_state_ready(app.clone())).await?;
+        ready_step("NoriskPackManager", initial_state_arc.norisk_pack_manager.on_state_ready(app.clone())).await?;
+        ready_step("ProfileManager", initial_state_arc.profile_manager.on_state_ready(app.clone())).await?;
+        ready_step("SyncPackManager", initial_state_arc.sync_pack_manager.on_state_ready(app.clone())).await?;
+        ready_step("ProcessManager", initial_state_arc.process_manager.on_state_ready(app.clone())).await?;
 
         // Apply any token handbacks the in-game client dropped while we were closed, then keep
         // watching for new ones (mirrors the Discord client-state poller).
@@ -168,19 +158,10 @@ impl State {
                 }
             });
         }
-        log::info!("State::init - Auth handback watcher started.");
+        log::trace!("State::init - Auth handback watcher started.");
 
-        initial_state_arc
-            .skin_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - SkinManager post-initialization complete.");
-
-        initial_state_arc
-            .active_skin_manager
-            .on_state_ready(app.clone())
-            .await?;
-        log::info!("State::init - ActiveSkinManager post-initialization complete.");
+        ready_step("SkinManager", initial_state_arc.skin_manager.on_state_ready(app.clone())).await?;
+        ready_step("ActiveSkinManager", initial_state_arc.active_skin_manager.on_state_ready(app.clone())).await?;
 
         let reconcile_state = initial_state_arc.clone();
         tokio::spawn(async move {
@@ -212,23 +193,12 @@ impl State {
             }
         });
 
-        initial_state_arc
-            .norisk_pack_manager
-            .print_current_config()
-            .await;
-        initial_state_arc
-            .norisk_version_manager
-            .print_current_config()
-            .await;
-
         let final_config = initial_state_arc.config_manager.get_config().await;
-        tracing::info!(
-            "Launcher Config - Experimental mode: {}",
-            final_config.is_experimental
-        );
-        tracing::info!(
-            "Launcher Config - Discord Rich Presence: {}",
-            final_config.enable_discord_presence
+        log::info!(
+            "Launcher config: experimental={}, discord={}, concurrent_downloads={}",
+            final_config.is_experimental,
+            final_config.enable_discord_presence,
+            final_config.concurrent_downloads
         );
 
         // Check for referral code from installer (affiliate/friend links)
@@ -237,9 +207,7 @@ impl State {
             // Don't fail initialization, just log the error
         }
 
-        log::info!(
-            "State::init - Full initialization, including all post-init handlers, complete."
-        );
+        log::info!("State ready in {}ms", init_start.elapsed().as_millis());
 
         Ok(())
     }
@@ -247,7 +215,7 @@ impl State {
     // Get the current state instance
     pub async fn get() -> Result<Arc<Self>> {
         if !LAUNCHER_STATE.initialized() {
-            log::error!("Attempted to get state before initialization. Waiting...");
+            log::trace!("Attempted to get state before initialization. Waiting...");
             let mut wait_count = 0;
             while !LAUNCHER_STATE.initialized() {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -257,7 +225,7 @@ impl State {
                     log::warn!("Still waiting for state initialization in State::get() after {} attempts...", wait_count);
                 }
             }
-            log::info!(
+            log::trace!(
                 "State has been initialized after {} attempts. Proceeding in State::get().",
                 wait_count
             );

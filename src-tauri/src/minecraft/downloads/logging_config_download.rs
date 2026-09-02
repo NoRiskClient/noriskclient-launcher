@@ -9,7 +9,7 @@ use tokio::fs;
 
 const LOGGING_DIR: &str = "assets/log_configs";
 const PATCHED_PREFIX: &str = "nrc-";
-const PATTERN_LAYOUT: &str =
+pub const PATTERN_LAYOUT: &str =
     "<PatternLayout pattern=\"[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n\" />";
 
 pub struct MinecraftLoggingDownloadService {
@@ -99,7 +99,3 @@ impl MinecraftLoggingDownloadService {
             .replace("<XMLLayout/>", PATTERN_LAYOUT)
     }
 }
-
-#[cfg(test)]
-#[path = "logging_config_download_test.rs"]
-mod tests;

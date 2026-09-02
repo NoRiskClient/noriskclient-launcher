@@ -4,27 +4,14 @@
     windows_subsystem = "windows"
 )]
 
-#[macro_use]
-mod utils;
-mod cli;
-mod commands;
-mod config;
-mod error;
-mod friends;
-pub mod integrations;
-mod logging;
-mod minecraft;
-mod state;
+use noriskclient_launcher_v3_lib::*;
+use noriskclient_launcher_v3_lib::{cli, commands, logging, state, utils};
 
-use crate::integrations::norisk_packs;
-use crate::integrations::norisk_versions;
-use log::{debug, error, info};
-use std::path::PathBuf;
+use log::{debug, error, info, trace};
 use std::sync::Arc;
 use tauri::Listener;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
-use utils::debug_utils;
 use utils::updater_utils;
 
 use crate::commands::analytics_command::track_analytics_event;
@@ -39,7 +26,6 @@ use commands::minecraft_auth_command::{
 };
 use commands::minecraft_command::{
     add_skin,
-    add_skin_locally,
     apply_skin_from_base64,
     get_active_skin,
     // Local skin database commands
@@ -73,6 +59,7 @@ use commands::profile_command::{
     launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
     repair_profile,
+    get_profile_store_status, reimport_profiles_from_legacy_json,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
     update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
@@ -115,8 +102,12 @@ use commands::cape_command::{
     get_capes_by_hashes, get_owned_capes_list,
 };
 
-use commands::cosmetic_command::{get_equipped_cosmetics, get_random_local_emote};
-use commands::icon_command::{get_active_creator_code, get_selected_player_icon};
+use commands::cosmetic_command::{
+    get_equipped_cosmetics, get_equipped_cosmetics_cached, get_random_local_emote,
+};
+use commands::icon_command::{
+    get_active_creator_code, get_selected_player_icon, get_selected_player_icon_cached,
+};
 
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
@@ -128,12 +119,15 @@ use commands::vanilla_cape_command::{
 use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command, get_advent_calendar_command, claim_advent_calendar_day_command, get_unique_players_24h_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command};
 
 // Import Content commands
 use commands::content_command::{
     bulk_toggle_mod_updates, install_content_to_profile, install_local_content_to_profile,
-    switch_content_version, toggle_content_from_profile, toggle_mod_updates,
+    switch_content_version, toggle_content_from_profile, toggle_contents_from_profile,
+    update_contents_from_profile,
+    uninstall_contents_from_profile,
+    toggle_mod_updates,
     uninstall_content_from_profile,
 };
 
@@ -350,7 +344,7 @@ async fn main() {
                 // --- Create Updater Window (but keep hidden initially) ---
                 let updater_window = match updater_utils::create_updater_window(&state_init_app_handle).await {
                     Ok(win) => {
-                        info!("Updater window created successfully (initially hidden).");
+                        trace!("Updater window created successfully (initially hidden).");
                         Some(win)
                     }
                     Err(e) => {
@@ -362,7 +356,7 @@ async fn main() {
                 // --- State Initialization ---
                 info!("Initiating state initialization...");
                 if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
-                    error!("CRITICAL: Failed to initialize state: {}. Update check and main window might not proceed correctly.", e);
+                    error!("CRITICAL: Failed to initialize state: {}", e);
                     if let Some(win) = updater_window {
                         updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state init error.".to_string(), None);
                         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
@@ -370,7 +364,58 @@ async fn main() {
                             error!("Failed to close updater window after state init error: {}", close_err);
                         }
                     }
-                    return;
+                    {
+                        use tauri_plugin_dialog::{
+                            DialogExt, MessageDialogButtons, MessageDialogKind,
+                        };
+
+                        let reset = state_init_app_handle
+                            .dialog()
+                            .message(
+                                [
+                                    "The NoRisk Launcher could not start.".to_string(),
+                                    String::new(),
+                                    e.to_string(),
+                                    String::new(),
+                                    "If that does not help:".to_string(),
+                                    concat!(
+                                        "\"Reset database and restart\" keeps the old ",
+                                        "database as app.db.broken.<time> and restores ",
+                                        "your profiles from profiles.json.migrated."
+                                    )
+                                    .to_string(),
+                                    String::new(),
+                                    "Support: https://discord.norisk.gg".to_string(),
+                                ]
+                                .join("\n"),
+                            )
+                            .kind(MessageDialogKind::Error)
+                            .title("NoRisk Launcher - Startup Failed")
+                            .buttons(MessageDialogButtons::OkCancelCustom(
+                                "Reset database and restart".to_string(),
+                                "Quit".to_string(),
+                            ))
+                            .blocking_show();
+
+                        if reset {
+                            match state::db::quarantine_database().await {
+                                Ok(moved) => {
+                                    info!("Database moved aside to {:?}, restarting", moved);
+                                    state_init_app_handle.restart();
+                                }
+                                Err(err) => {
+                                    error!("Could not move the database aside: {}", err);
+                                    let _ = state_init_app_handle
+                                        .dialog()
+                                        .message(format!("{}", err))
+                                        .kind(MessageDialogKind::Error)
+                                        .title("NoRisk Launcher - Reset Failed")
+                                        .blocking_show();
+                                }
+                            }
+                        }
+                    }
+                    std::process::exit(1);
                 }
                 info!("State initialization finished successfully.");
 
@@ -461,7 +506,7 @@ async fn main() {
                     });
                 }
 
-                info!("Attempting to retrieve launcher configuration for update check...");
+                trace!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {
                     Ok(state_manager_instance) => {
                         let config = state_manager_instance.config_manager.get_config().await;
@@ -475,9 +520,9 @@ async fn main() {
                         }
 
                         if auto_check_updates_enabled {
-                            info!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
+                            trace!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
                             updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
-                            info!("Update check process has finished.");
+                            trace!("Update check process has finished.");
                         } else {
                             info!("Auto-check for updates is disabled in settings. Skipping update check.");
                             // Ensure the updater window (if created) is closed if we skip the check.
@@ -560,9 +605,9 @@ async fn main() {
             if let Some(main_window) = app.get_webview_window("main") {
                 let focus_app_handle = app_handle.clone();
                 main_window.listen("tauri://focus", move |_event| {
-                    let listener_app_handle = focus_app_handle.clone();
+                    let _listener_app_handle = focus_app_handle.clone();
                     tokio::spawn(async move {
-                        debug!("Main window focus event received. Triggering DiscordManager handler.");
+                        trace!("Main window focus event received. Triggering DiscordManager handler.");
                         match state::state_manager::State::get().await {
                             Ok(state_manager_instance) => {
                                 if let Err(e) = state_manager_instance.discord_manager.handle_focus_event().await {
@@ -600,6 +645,8 @@ async fn main() {
             list_profiles,
             list_profile_backups,
             restore_profile_backup,
+            get_profile_store_status,
+            reimport_profiles_from_legacy_json,
             search_profiles,
             get_minecraft_versions,
             launch_profile,
@@ -694,7 +741,9 @@ async fn main() {
             get_player_capes,
             get_active_creator_code,
             get_selected_player_icon,
+            get_selected_player_icon_cached,
             get_equipped_cosmetics,
+            get_equipped_cosmetics_cached,
             get_random_local_emote,
             get_owned_capes_list,
             equip_cape,
@@ -741,6 +790,9 @@ async fn main() {
             switch_modpack_version_command,
             uninstall_content_from_profile,
             toggle_content_from_profile,
+            toggle_contents_from_profile,
+            update_contents_from_profile,
+            uninstall_contents_from_profile,
             toggle_mod_updates,
             bulk_toggle_mod_updates,
             install_content_to_profile,
@@ -816,6 +868,35 @@ async fn main() {
             commands::profile_command::add_profile_symlink,
             commands::profile_command::remove_profile_symlink,
             commands::profile_command::get_profile_symlinks,
+            commands::sync_pack_command::get_or_create_default_sync_pack,
+            commands::sync_pack_command::add_dropped_sync_target,
+            commands::sync_pack_command::list_sync_seed_candidates,
+            commands::sync_pack_command::preview_profile_sync,
+            commands::sync_pack_command::get_sync_packs,
+            commands::sync_pack_command::get_sync_pack,
+            commands::sync_pack_command::create_sync_pack,
+            commands::sync_pack_command::update_sync_pack,
+            commands::sync_pack_command::import_sync_pack_icon,
+            commands::sync_pack_command::add_sync_pack_target,
+            commands::sync_pack_command::count_sync_pack_target_users,
+            commands::sync_pack_command::remove_sync_pack_target,
+            commands::sync_pack_command::add_content_to_sync_pack,
+            commands::sync_pack_command::remove_content_from_sync_pack,
+            commands::sync_pack_command::remove_mod_from_sync_pack,
+            commands::sync_pack_command::get_sync_pack_local_jars,
+            commands::sync_pack_command::remove_sync_pack_local_jar,
+            commands::sync_pack_command::get_sync_pack_subscribers,
+            commands::sync_pack_command::open_sync_pack_folder,
+            commands::sync_pack_command::delete_sync_pack,
+            commands::sync_pack_command::set_profile_sync_packs,
+            commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::sync_profile_now,
+            commands::sync_pack_command::set_sync_pack_mod_enabled,
+            commands::sync_pack_command::remove_sync_pack_entries,
+            commands::sync_pack_command::set_sync_pack_mods_enabled,
+            commands::sync_pack_command::set_sync_pack_mod_version_override,
+            commands::sync_pack_command::get_sync_pack_mod_matrix,
+            commands::sync_pack_command::resolve_sync_pack_mod,
             commands::profile_command::get_profile_instance_path,
             commands::profile_command::get_default_profile_path,
             commands::profile_command::get_profile_disk_size,

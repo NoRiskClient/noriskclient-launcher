@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, TexturesData};
@@ -242,9 +243,9 @@ impl MinecraftApiService {
         }
         let profile = self.get_profile_by_name_or_uuid(name).await.ok()?;
         let textures_prop = profile.properties.iter().find(|p| p.name == "textures")?;
-        let decoded = base64::decode(&textures_prop.value).ok()?;
+        let decoded = BASE64.decode(&textures_prop.value).ok()?;
         let textures: TexturesData = serde_json::from_slice(&decoded).ok()?;
-        let url = textures.textures.SKIN?.url;
+        let url = textures.textures.skin?.url;
         Some(if let Some(stripped) = url.strip_prefix("http:") {
             format!("https:{}", stripped)
         } else {
@@ -477,7 +478,7 @@ impl MinecraftApiService {
 
         // Decode base64 data to bytes
         debug!("Decoding base64 data");
-        let file_content = match base64::decode(base64_data) {
+        let file_content = match BASE64.decode(base64_data) {
             Ok(content) => {
                 debug!("Successfully decoded base64 data ({} bytes)", content.len());
                 content

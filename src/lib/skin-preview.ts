@@ -4,6 +4,8 @@ import {
   type SkinSnapshotRequest,
 } from "@noriskclient/nrc-skin-renderer/snapshot";
 
+import { isWebGLAvailable, renderFlatSkin } from "@noriskclient/nrc-skin-renderer";
+
 const RENDERER_VERSION =
   typeof __SKIN_RENDERER_VERSION__ === "string"
     ? __SKIN_RENDERER_VERSION__
@@ -75,6 +77,15 @@ async function sha1(value: string): Promise<string> {
     .join("");
 }
 
+
+function cosmeticSettingsOf(metadataJson: unknown): unknown {
+  if (!metadataJson || typeof metadataJson !== "object") return null;
+  const defaults = (metadataJson as { defaultSettings?: unknown }).defaultSettings;
+  if (!defaults || typeof defaults !== "object") return null;
+  const { scale, offset, color } = defaults as { scale?: unknown; offset?: unknown; color?: unknown };
+  return { scale: scale ?? null, offset: offset ?? null, color: color ?? null };
+}
+
 export async function skinPreviewKey(
   request: SkinSnapshotRequest,
   options: SkinPreviewOptions = {},
@@ -94,6 +105,7 @@ export async function skinPreviewKey(
         id: c.id,
         geo: c.urls.geo,
         texture: c.urls.texture,
+        settings: cosmeticSettingsOf(c.urls.metadataJson),
       })),
       ...rest,
     }),
@@ -172,6 +184,10 @@ export async function getSkinPreview(
     emoteTime: POSE_EMOTE_TIME,
     ...given,
   };
+  if (!isWebGLAvailable()) {
+    return renderFlatSkin(framed.textureUrl, { variant: framed.variant as any });
+  }
+
   const key = await skinPreviewKey(framed, options);
 
   const known = resolved.get(key);

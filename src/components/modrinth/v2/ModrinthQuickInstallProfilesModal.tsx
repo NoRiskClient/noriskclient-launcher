@@ -14,6 +14,7 @@ import { ModrinthQuickProfile } from './ModrinthQuickProfile';
 import { ActionButton } from '../../ui/ActionButton';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { loaderIconSrc } from "../../../lib/loader-icons";
 
 /**
  * Universal Profiles Modal for Modrinth Installation
@@ -265,21 +266,7 @@ export function ModrinthQuickInstallProfilesModal({
     { value: 'created', label: t('profiles.sort.dateCreated'), icon: 'solar:calendar-bold' },
   ];
 
-  // Get mod loader icon - reused from ProfileCardV2.tsx
-  const getModLoaderIcon = (profile: Profile) => {
-    switch (profile.loader) {
-      case "fabric":
-        return "/icons/fabric.png";
-      case "forge":
-        return "/icons/forge.png";
-      case "quilt":
-        return "/icons/quilt.png";
-      case "neoforge":
-        return "/icons/neoforge.png";
-      default:
-        return "/icons/minecraft.png";
-    }
-  };
+  const getModLoaderIcon = (profile: Profile) => loaderIconSrc(profile.loader);
 
   // Format last played date - simplified version from ProfileCardV2.tsx
   const formatLastPlayed = (lastPlayed: string | null): string => {

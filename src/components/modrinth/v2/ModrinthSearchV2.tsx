@@ -74,11 +74,13 @@ import { ModrinthQuickInstallProfilesModal } from './ModrinthQuickInstallProfile
 // Consolidate imports from content-service and types/content
 import {
   installContentToProfile,
-  uninstallContentFromProfile, // Ensure it's here
+  installContentToTarget,
+  uninstallContentFromTarget,
   toggleContentFromProfile
 } from '../../../services/content-service';
 import {
   ContentType as NrContentType, // Alias for ContentType from content.ts
+  type ContentInstallTarget,
   type InstallContentPayload,
   type UninstallContentPayload,
   type ToggleContentPayload
@@ -123,6 +125,8 @@ export interface ModrinthSearchV2Props {
     project: UnifiedModSearchResult | any,
     source: "modrinth" | "curseforge",
   ) => void;
+  installTarget?: ContentInstallTarget;
+  installedOverride?: { projectIds: string[]; versionIds: string[] } | null;
 }
 
 const ALL_MODRINTH_PROJECT_TYPES: ModrinthProjectType[] = ['modpack', 'mod', 'resourcepack', 'shader', 'datapack'];
@@ -149,6 +153,8 @@ export function ModrinthSearchV2({
   disableVirtualization = false, // Default to false (use Virtuoso by default)
   onProjectClick,
   traceScope,
+  installTarget,
+  installedOverride,
 }: ModrinthSearchV2Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -767,8 +773,9 @@ export function ModrinthSearchV2({
   
   // Create a new function to check installation status for displayed versions only
   const checkDisplayedVersionsStatus = async (projectId: string, versions: UnifiedVersion[], startIndex: number, count: number, forceRefresh: string[] = []) => {
+    if (installedOverride) return;
     if (!selectedProfile || !versions || versions.length === 0) return;
-    
+
     const displayedVersions = versions.slice(startIndex, startIndex + count);
     if (displayedVersions.length === 0) return;
     
@@ -1275,7 +1282,7 @@ export function ModrinthSearchV2({
         source: targetProject.source,
       };
 
-      await installContentToProfile(payload);
+      await installContentToTarget(payload, installTarget, { pinVersion: true });
 
       toast.success(t('content.install.success', { title: targetProject.title, version: targetVersion.version_number, profile: internalProfiles.find(p => p.id === profileId)?.name || 'profile' }));
 
@@ -1385,7 +1392,7 @@ export function ModrinthSearchV2({
       };
 
       await toast.promise(
-        installContentToProfile(payload),
+        installContentToTarget(payload, installTarget, { pinVersion: true }),
         {
           loading: `Installing ${project.title} (${version.version_number}) to ${profileName}...`,
           success: t('content.install.success', { title: project.title, version: version.version_number, profile: profileName }),
@@ -1651,7 +1658,7 @@ export function ModrinthSearchV2({
         };
 
         await toast.promise(
-        installContentToProfile(payload),
+        installContentToTarget(payload, installTarget),
         {
           loading: `Installing ${project.title} (${bestVersion.version_number}) to ${selectedProfile.name}...`,
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: selectedProfile.name }),
@@ -1854,7 +1861,7 @@ export function ModrinthSearchV2({
         };
 
         await toast.promise(
-        installContentToProfile(payload),
+        installContentToTarget(payload, installTarget),
         {
           loading: `Installing ${project.title} (${bestVersion.version_number}) to ${profile.name}...`,
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: profile.name }),
@@ -1975,7 +1982,7 @@ export function ModrinthSearchV2({
         source: quickInstallProject.source,
       };
 
-      await installContentToProfile(payload);
+      await installContentToTarget(payload, installTarget);
 
       toast.success(t('content.install.success', { title: quickInstallProject.title, version: bestVersion.version_number, profile: profile.name }));
 
@@ -2035,6 +2042,7 @@ export function ModrinthSearchV2({
   // Check installation status for all displayed projects when profile changes
   useEffect(() => {
     const checkInstallationStatus = async () => {
+      if (installedOverride) return;
       if (!selectedProfile || !searchResults.length) {
         setInstalledProjects({});
         return;
@@ -2098,6 +2106,7 @@ export function ModrinthSearchV2({
   // Check installation status when loading more results
   useEffect(() => {
     const checkNewResultsInstallation = async () => {
+      if (installedOverride) return;
       if (!selectedProfile || !searchResults.length) return;
 
       if (justInstalledOrToggledRef.current) { // Check flag
@@ -2166,20 +2175,38 @@ export function ModrinthSearchV2({
   // Reset project-level installation status when no profile is selected.
   // Version statuses in `installedVersions` are kept as a cache.
   useEffect(() => {
+    if (installedOverride) return;
     if (!selectedProfile) {
       console.log("No profile selected - resetting project installation status");
       setInstalledProjects({});
       // NOTE: setInstalledVersions({}); is intentionally removed here to persist version status cache.
     }
-  }, [selectedProfile]);
+  }, [selectedProfile, installedOverride]);
 
   // Additional check when project type changes to update project-level installation status
   useEffect(() => {
+    if (installedOverride) return;
     if (selectedProfile) {
       // Reset project-level installation status when project type changes, as it's view-specific
       setInstalledProjects({});
     }
-  }, [projectType, selectedProfile]);
+  }, [projectType, selectedProfile, installedOverride]);
+
+  useEffect(() => {
+    if (!installedOverride) return;
+    const projectState: Record<string, ContentInstallStatus | null> = {};
+    for (const projectId of installedOverride.projectIds) {
+      projectState[projectId] = statusForNewInstall();
+    }
+    setInstalledProjects(projectState);
+
+    if (!selectedProfile) return;
+    const versionState: Record<string, ContentInstallStatus> = {};
+    for (const versionId of installedOverride.versionIds) {
+      versionState[versionId] = statusForNewInstall();
+    }
+    setInstalledVersions({ [selectedProfile.id]: versionState });
+  }, [installedOverride, selectedProfile]);
 
   // Cleanup timeout on component unmount
   useEffect(() => {
@@ -2644,7 +2671,7 @@ export function ModrinthSearchV2({
       sha1_hash: primaryFile.hashes?.sha1 || undefined,
     };
 
-    if (!payload.sha1_hash) {
+    if (!payload.sha1_hash && installTarget?.type !== 'syncPack') {
       toast.error(t('content.install.sha1_missing'));
       console.error("Deletion failed: SHA1 hash missing for", project.title, version.version_number, primaryFile);
       return;
@@ -2656,7 +2683,11 @@ export function ModrinthSearchV2({
     console.log('🗑️ Setting uninstalling state for profile:', profileId);
     setUninstalling(prev => ({ ...prev, [profileId]: true }));
 
-    const removePromise = uninstallContentFromProfile(payload);
+    const removePromise = uninstallContentFromTarget(
+      payload,
+      project.project_id,
+      installTarget,
+    );
 
     await toast.promise(
       removePromise,
@@ -3061,7 +3092,11 @@ export function ModrinthSearchV2({
                       onInstallVersionClick={handleDirectInstall}
                       onHoverVersion={setHoveredVersionId}
                       onDeleteVersionClick={handleDeleteVersionFromProfile}
-                      onToggleEnableClick={handleToggleEnableVersion}
+                      onToggleEnableClick={
+                        installTarget?.type === "syncPack"
+                          ? undefined
+                          : handleToggleEnableVersion
+                      }
                       isBlocked={isProjectBlocked(hit)}
                       projectNoRiskStatus={projectNoRiskStatus}
                       onProjectClick={onProjectClick}
@@ -3154,7 +3189,11 @@ export function ModrinthSearchV2({
                       onInstallVersionClick={handleDirectInstall}
                       onHoverVersion={setHoveredVersionId}
                       onDeleteVersionClick={handleDeleteVersionFromProfile}
-                      onToggleEnableClick={handleToggleEnableVersion}
+                      onToggleEnableClick={
+                        installTarget?.type === "syncPack"
+                          ? undefined
+                          : handleToggleEnableVersion
+                      }
                       isBlocked={isProjectBlocked(hit)}
                       projectNoRiskStatus={projectNoRiskStatus}
                       onProjectClick={onProjectClick}

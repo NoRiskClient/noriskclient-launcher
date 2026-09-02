@@ -17,6 +17,7 @@ export enum EventType {
   PatchingForge = "patching_forge",
   DownloadingMods = "downloading_mods",
   SyncingMods = "syncing_mods",
+  SyncingPacks = "syncing_packs",
   LaunchingMinecraft = "launching_minecraft",
   MinecraftOutput = "minecraft_output",
   AccountLogin = "account_login",

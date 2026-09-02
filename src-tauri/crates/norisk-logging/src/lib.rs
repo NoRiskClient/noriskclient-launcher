@@ -83,9 +83,10 @@ impl LogSetup {
     }
 }
 
-pub fn init(setup: LogSetup) -> anyhow::Result<PathBuf> {
-    std::fs::create_dir_all(&setup.dir)?;
+static HANDLE: std::sync::OnceLock<log4rs::Handle> = std::sync::OnceLock::new();
+static SETUP: std::sync::OnceLock<LogSetup> = std::sync::OnceLock::new();
 
+fn build_config(setup: &LogSetup, level: LevelFilter) -> anyhow::Result<(Config, PathBuf)> {
     let log_path = setup.dir.join(&setup.file_name);
 
     let size_trigger = SizeTrigger::new(setup.max_bytes);
@@ -120,10 +121,41 @@ pub fn init(setup: LogSetup) -> anyhow::Result<PathBuf> {
         builder = builder.logger(Logger::builder().build(target.clone(), *level));
     }
 
-    let config = builder.build(root.build(setup.level))?;
-    log4rs::init_config(config)?;
+    Ok((builder.build(root.build(level))?, log_path))
+}
+
+pub fn init(setup: LogSetup) -> anyhow::Result<PathBuf> {
+    std::fs::create_dir_all(&setup.dir)?;
+
+    let (config, log_path) = build_config(&setup, setup.level)?;
+    let handle = log4rs::init_config(config)?;
+
+    let _ = HANDLE.set(handle);
+    let _ = SETUP.set(setup);
 
     Ok(log_path)
+}
+
+pub fn current_level() -> LevelFilter {
+    log::max_level()
+}
+
+pub fn set_level(level: LevelFilter) -> anyhow::Result<()> {
+    if current_level() == level {
+        return Ok(());
+    }
+
+    let handle = HANDLE
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("the log level changed before logging was set up"))?;
+    let setup = SETUP
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("logging was set up without keeping its configuration"))?;
+
+    let (config, _) = build_config(setup, level)?;
+    handle.set_config(config);
+
+    Ok(())
 }
 
 #[cfg(test)]

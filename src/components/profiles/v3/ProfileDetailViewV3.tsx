@@ -26,7 +26,7 @@ preloadIcons([
   "solar:play-bold", "solar:stop-bold", "solar:settings-bold",
   "solar:refresh-bold",
   "solar:arrow-left-linear", "solar:folder-linear", "solar:copy-linear",
-  "solar:upload-linear", "solar:menu-dots-bold",
+  "solar:upload-linear", "solar:menu-dots-bold", "solar:refresh-circle-bold",
   "solar:clock-circle-bold", "solar:hourglass-bold", "solar:ssd-round-bold",
   "solar:copy-bold", "solar:download-bold", "solar:archive-bold",
   "solar:trash-bin-trash-bold",
@@ -411,6 +411,13 @@ export function ProfileDetailViewV3({
         </button>
 
         <div className="flex items-center gap-1 relative">
+          <button
+            onClick={() => navigate("/sync-packs", { state: { fromProfileId: currentProfile.id } })}
+            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+          >
+            <span className="text-xs font-minecraft uppercase tracking-wider">{t('syncPacks.title')}</span>
+          </button>
+          <div className="w-px h-5 bg-white/10 mx-1" />
           <Tooltip content={t('profiles.openFolder')} position="top" delay={0}>
             <button
               onClick={handleOpenFolder}

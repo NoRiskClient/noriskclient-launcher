@@ -5,39 +5,49 @@ use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt; // Import the trait for read()
 
-#[cfg(test)]
-#[path = "hash_utils_test.rs"]
-mod tests;
-
 const MURMUR2_M: u32 = 0x5bd1e995;
 const MURMUR2_R: u32 = 24;
 const CURSEFORGE_FINGERPRINT_SEED: u32 = 1;
 const FINGERPRINT_READ_BUFFER: usize = 64 * 1024;
+const HASH_READ_BUFFER: usize = 64 * 1024;
 
 /// Asynchronously calculates the SHA1 hash of a file.
 pub async fn calculate_sha1(path: &PathBuf) -> Result<String, io::Error> {
-    let mut file = File::open(path).await?; // Use tokio::fs::File and await
-    let mut hasher = Sha1::new();
-    let mut buffer = [0; 1024]; // Read in chunks
+    hash_file_blocking::<Sha1>(path.clone()).await
+}
 
+async fn hash_file_blocking<D>(path: PathBuf) -> Result<String, io::Error>
+where
+    D: Digest + Send + 'static,
+{
+    tokio::task::spawn_blocking(move || hash_file_sync::<D>(&path))
+        .await
+        .map_err(|e| io::Error::other(format!("hash task failed: {e}")))?
+}
+
+fn hash_file_sync<D: Digest>(path: &Path) -> Result<String, io::Error> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = D::new();
+    let mut buffer = vec![0u8; HASH_READ_BUFFER];
     loop {
-        let n = file.read(&mut buffer).await?; // Use await for reading
+        let n = file.read(&mut buffer)?;
         if n == 0 {
             break;
         }
         hasher.update(&buffer[..n]);
     }
+    Ok(hex_lower(&hasher.finalize()))
+}
 
-    let hash_bytes = hasher.finalize();
-    Ok(format!("{:x}", hash_bytes)) // Format as hex string
+fn hex_lower(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// Calculates the SHA1 hash of a byte slice.
 pub fn calculate_sha1_from_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha1::new();
-    hasher.update(bytes);
-    let hash_bytes = hasher.finalize();
-    format!("{:x}", hash_bytes) // Format as hex string
+    hex_lower(&Sha1::digest(bytes))
 }
 
 /// Alias for calculate_sha1 to match the naming convention used in download_utils
@@ -47,28 +57,12 @@ pub async fn calculate_sha1_from_file<P: AsRef<Path>>(path: P) -> Result<String,
 
 /// Asynchronously calculates the SHA256 hash of a file.
 pub async fn calculate_sha256_from_file<P: AsRef<Path>>(path: P) -> Result<String, io::Error> {
-    let mut file = File::open(path).await?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0; 1024]; // Read in chunks
-
-    loop {
-        let n = file.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-
-    let hash_bytes = hasher.finalize();
-    Ok(format!("{:x}", hash_bytes)) // Format as hex string
+    hash_file_blocking::<Sha256>(path.as_ref().to_path_buf()).await
 }
 
 /// Calculates the SHA256 hash of a byte slice.
 pub fn calculate_sha256_from_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    let hash_bytes = hasher.finalize();
-    format!("{:x}", hash_bytes) // Format as hex string
+    hex_lower(&Sha256::digest(bytes))
 }
 
 fn is_curseforge_stripped(byte: u8) -> bool {

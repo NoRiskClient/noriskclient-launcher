@@ -1,5 +1,5 @@
 use crate::{error::Result, utils::http_client::nrc_get};
-use log::debug;
+use log::trace;
 use uuid::Uuid;
 
 pub struct CosmeticApi;
@@ -24,7 +24,7 @@ impl CosmeticApi {
         is_experimental: bool,
     ) -> Result<serde_json::Value> {
         let url = format!("{}/user/{}/outfit", Self::get_api_base(is_experimental), player_uuid);
-        debug!("[Cosmetic API get_player_outfit] URL: {}", url);
+        trace!("[Cosmetic API get_player_outfit] URL: {}", url);
 
         nrc_get(&url)
             .bearer(norisk_token)

@@ -3686,7 +3686,7 @@ dependencies = [
 
 [[package]]
 name = "noriskclient-launcher-v3"
-version = "0.6.26-beta.1"
+version = "0.6.26-beta.6"
 dependencies = [
  "anyhow",
  "async-compression",

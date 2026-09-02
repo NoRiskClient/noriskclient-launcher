@@ -1,7 +1,7 @@
-use log::error;
+use log::{debug, error};
 use reqwest::{IntoUrl, RequestBuilder};
 use serde::{de::DeserializeOwned, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
@@ -66,10 +66,24 @@ impl NrcRequest {
     /// Send the request, mapping transport failures to `AppError::RequestError`.
     /// The single place that error is built for this lane.
     async fn send_inner(self, ctx: &str) -> Result<reqwest::Response> {
-        self.builder.send().await.map_err(|e| {
+        let target = self
+            .builder
+            .try_clone()
+            .and_then(|b| b.build().ok())
+            .map(|req| format!("{} {}", req.method(), req.url().path()));
+        let started = Instant::now();
+        let response = self.builder.send().await.map_err(|e| {
             error!("[HTTP] {} request failed: {}", ctx, e);
             AppError::RequestError(format!("Failed to send {} request: {}", ctx, e))
-        })
+        })?;
+        debug!(
+            "[HTTP] {} -> {} ({}ms, {})",
+            target.as_deref().unwrap_or("request"),
+            response.status().as_u16(),
+            started.elapsed().as_millis(),
+            ctx
+        );
+        Ok(response)
     }
 
     pub async fn json<T: DeserializeOwned>(self, ctx: &str) -> Result<T> {

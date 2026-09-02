@@ -3,15 +3,14 @@ use crate::error::{AppError, CommandError};
 use crate::state::profile_state::default_profile_path;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use crate::integrations::modrinth::{
-    self, get_mod_versions as get_modrinth_versions_api, search_mods, search_projects,
+    self, search_mods, search_projects,
     ModrinthBulkUpdateRequestBody, ModrinthProjectContext, ModrinthProjectType, ModrinthSearchHit,
     ModrinthSearchResponse, ModrinthSortType, ModrinthVersion,
 };
 use crate::integrations::mrpack;
 use crate::integrations::unified_mod::{
-    get_mod_versions_unified, search_mods_unified, switch_modpack_version, ModPlatform,
-    UnifiedModSearchParams, UnifiedModSearchResponse, UnifiedModVersionsParams, UnifiedModpackVersionsResponse,
-    UnifiedProjectType, UnifiedSortType, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersionResponse,
+    get_mod_versions_unified, search_mods_unified, switch_modpack_version,
+    UnifiedModSearchParams, UnifiedModSearchResponse, UnifiedModVersionsParams, UnifiedModpackVersionsResponse, UnifiedUpdateCheckRequest, UnifiedUpdateCheckResponse, UnifiedVersionResponse,
     ModpackSwitchRequest, ModpackSwitchResponse,
 };
 use crate::state::content_cache_state::CacheBehaviour;

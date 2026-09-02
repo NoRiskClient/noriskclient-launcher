@@ -1,7 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::AppError;
 use crate::integrations::norisk_packs;
-use crate::state::profile_state;
 use crate::state::state_manager::State;
 use crate::utils::trash_utils;
 use serde::Serialize;
@@ -38,15 +37,7 @@ pub async fn expected_cache_filenames(state: &State) -> HashSet<String> {
     }
 
     // 2. All profiles × their own mods
-    if let Ok(profiles) = state.profile_manager.list_profiles().await {
-        for profile in &profiles {
-            for m in &profile.mods {
-                if let Ok(f) = profile_state::get_profile_mod_filename(&m.source) {
-                    set.insert(f);
-                }
-            }
-        }
-    }
+    set.extend(state.profile_manager.expected_mod_filenames().await);
 
     set
 }

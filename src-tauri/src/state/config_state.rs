@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::state::post_init::PostInitializationHandler;
 use crate::state::profile_state::MemorySettings;
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -416,6 +416,31 @@ pub struct LauncherConfig {
     pub pack_rollout_override: String,
     #[serde(default)]
     pub clips: ClipConfig,
+    #[serde(default)]
+    pub log_level: LogLevel,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    #[default]
+    Debug,
+    Trace,
+}
+
+impl From<LogLevel> for log::LevelFilter {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Error => log::LevelFilter::Error,
+            LogLevel::Warn => log::LevelFilter::Warn,
+            LogLevel::Info => log::LevelFilter::Info,
+            LogLevel::Debug => log::LevelFilter::Debug,
+            LogLevel::Trace => log::LevelFilter::Trace,
+        }
+    }
 }
 
 fn default_config_version() -> u32 {
@@ -494,6 +519,7 @@ impl Default for LauncherConfig {
             referral_state: None,
             pack_rollout_override: default_pack_rollout_override(),
             clips: ClipConfig::default(),
+            log_level: LogLevel::default(),
         }
     }
 }
@@ -507,7 +533,7 @@ pub struct ConfigManager {
 impl ConfigManager {
     pub fn new() -> Result<Self> {
         let config_path = LAUNCHER_DIRECTORY.root_dir().join(CONFIG_FILENAME);
-        info!(
+        trace!(
             "ConfigManager: Initializing with path: {:?} (config loading deferred)",
             config_path
         );
@@ -527,7 +553,7 @@ impl ConfigManager {
             return Ok(());
         }
 
-        info!(
+        trace!(
             "Loading launcher configuration from: {:?}",
             self.config_path
         );
@@ -848,6 +874,7 @@ impl ConfigManager {
                         clips.normalize();
                         clips
                     },
+                    log_level: new_config.log_level,
                 };
 
                 true
@@ -857,15 +884,10 @@ impl ConfigManager {
         // Save the updated config if needed
         if should_save {
             self.save_config().await?;
+            apply_log_level(new_config.log_level);
 
             // Update cache
             update_custom_game_dir(new_config.custom_game_directory.clone());
-
-            // meta_dir() just moved, so app.db has to move with it — everything else under
-            // meta_dir resolves its path per access and follows the change immediately.
-            if let Ok(state) = crate::state::State::get().await {
-                crate::state::db::open_or_reopen(&state.db).await;
-            }
 
             // Update Discord status if it changed
             if let Ok(state) = crate::state::State::get().await {
@@ -887,11 +909,25 @@ impl ConfigManager {
 #[async_trait]
 impl PostInitializationHandler for ConfigManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("ConfigManager: on_state_ready called. Loading configuration...");
+        trace!("ConfigManager: on_state_ready called. Loading configuration...");
         self.load_config_internal().await?;
-        info!("ConfigManager: Successfully loaded configuration in on_state_ready.");
+        apply_log_level(self.config.read().await.log_level);
+        trace!("ConfigManager: Successfully loaded configuration in on_state_ready.");
         Ok(())
     }
+}
+
+fn apply_log_level(level: LogLevel) {
+    if let Some(env_level) = crate::logging::env_log_level() {
+        if env_level != log::LevelFilter::from(level) {
+            debug!(
+                "Config log level {:?} ignored, NRC_LOG_LEVEL={} is set",
+                level, env_level
+            );
+        }
+        return;
+    }
+    crate::logging::set_log_level(level.into());
 }
 
 pub fn default_config_path() -> PathBuf {

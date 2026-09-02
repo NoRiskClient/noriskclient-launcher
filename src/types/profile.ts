@@ -215,7 +215,11 @@ export interface Profile {
   last_played: string | null;
   settings: ProfileSettings;
   state: ProfileState;
+  // Entries from get_all_profiles_and_last_played (the profile store list) ship
+  // mods as [] to keep the IPC payload small; use mod_count there.
+  // get_profile returns the full mods list and no mod_count.
   mods: Mod[];
+  mod_count?: number;
   selected_norisk_pack_id: string | null;
   disabled_norisk_mods_detailed: NoriskModIdentifier[];
   source_standard_profile_id: string | null;
@@ -229,6 +233,7 @@ export interface Profile {
   modpack_info?: ModPackInfo | null;
   preferred_account_id: string | null;
   playtime_seconds?: number;
+  sync_pack_ids: string[];
 }
 
 export interface ProfileGroup {

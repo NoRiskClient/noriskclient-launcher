@@ -3,7 +3,6 @@ pub mod forge_installer;
 pub mod neoforge_installer;
 pub mod quilt_installer;
 
-use crate::config::ProjectDirsExt;
 use crate::error::Result;
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;

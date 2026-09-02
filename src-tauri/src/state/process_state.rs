@@ -1,5 +1,8 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::minecraft::downloads::mod_resolver::{
+    ModOutcome, ModResolutionReport, ModResolutionStatus,
+};
 use crate::state::event_state::{
     EventPayload, EventType, MinecraftProcessExitedPayload,
 };
@@ -10,11 +13,10 @@ use dashmap::DashMap;
 use log;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::Arc;
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::Manager;
 use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
@@ -25,7 +27,7 @@ use uuid::Uuid;
 
 // NEUE Imports für notify
 use notify::{
-    event::CreateKind, Config as NotifyConfig, Event as NotifyEvent, EventKind as NotifyEventKind,
+    Config as NotifyConfig, Event as NotifyEvent, EventKind as NotifyEventKind,
     RecommendedWatcher, RecursiveMode, Watcher,
 };
 use tokio::sync::mpsc; // Für den Channel
@@ -66,10 +68,44 @@ pub struct ProcessMetadata {
     pub log_session_id: Option<String>,
     #[serde(default)]
     pub mods: Vec<CrashModInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modpack: Option<CrashModpackInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrashModpackInfo {
+    pub platform: String,
+    pub project_id: String,
+    pub version_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_hash: Option<String>,
+}
+
+pub fn crash_modpack_info(
+    profile: &crate::state::profile_state::Profile,
+) -> Option<CrashModpackInfo> {
+    use crate::state::profile_state::ModPackSource;
+    let info = profile.modpack_info.as_ref()?;
+    let (platform, project_id, version_id) = match &info.source {
+        ModPackSource::Modrinth {
+            project_id,
+            version_id,
+        } => ("modrinth", project_id.clone(), version_id.clone()),
+        ModPackSource::CurseForge {
+            project_id,
+            file_id,
+        } => ("curseforge", project_id.to_string(), file_id.to_string()),
+    };
+    Some(CrashModpackInfo {
+        platform: platform.to_string(),
+        project_id,
+        version_id,
+        file_hash: info.file_hash.clone(),
+    })
 }
 
 /// Mod from the launch manifest (incl. disabled). Mirrors backend `CrashModInfo`. `norisk` = pack module.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CrashModInfo {
     pub id: String,
     pub name: Option<String>,
@@ -77,6 +113,14 @@ pub struct CrashModInfo {
     pub source: Option<String>,
     pub enabled: bool,
     pub norisk: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_launch_set: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overridden_by: Option<String>,
 }
 
 fn mod_source_kind(source: &crate::state::profile_state::ModSource) -> &'static str {
@@ -111,40 +155,75 @@ fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
 pub async fn build_crash_mod_manifest(
     profile: &crate::state::profile_state::Profile,
     state: &State,
+    resolution: Option<&ModResolutionReport>,
 ) -> Vec<CrashModInfo> {
     use crate::state::profile_state::NoriskModIdentifier;
     let mut out: Vec<CrashModInfo> = Vec::new();
 
+    let loader_key = profile.loader.as_str();
+    let report = resolution.filter(|r| r.matches(&profile.game_version, loader_key));
+
+    fn apply(info: &mut CrashModInfo, outcome: Option<&ModOutcome>) {
+        let Some(outcome) = outcome else { return };
+        info.resolution = Some(outcome.status.as_wire().to_string());
+        info.in_launch_set = outcome.status.in_launch_set();
+        info.filename = outcome.filename.clone();
+        info.overridden_by = outcome.overridden_by.clone();
+        if info.version.is_none() {
+            info.version = outcome.version.clone();
+        }
+    }
+
     for m in &profile.mods {
-        out.push(CrashModInfo {
+        let mut info = CrashModInfo {
             id: custom_mod_id(m),
             name: m.display_name.clone(),
             version: m.version.clone(),
             source: Some(mod_source_kind(&m.source).to_string()),
             enabled: m.enabled,
             norisk: false,
-        });
+            ..Default::default()
+        };
+        apply(&mut info, report.and_then(|r| r.profile_mod(&m.id)));
+        out.push(info);
     }
 
     if let Some(pack_id) = profile.effective_norisk_pack_id().await {
         let config = state.norisk_pack_manager.get_config().await;
+        // the resolver saw no pack at all, so nothing from it reached the loader
+        let pack_failed = report
+            .filter(|r| r.pack_resolve_failed())
+            .map(|_| ModOutcome::skipped(ModResolutionStatus::PackResolveFailed));
         match config.get_resolved_pack_definition(&pack_id) {
             Ok(def) => {
                 for entry in &def.mods {
+                    if !entry
+                        .compatibility
+                        .get(&profile.game_version)
+                        .is_some_and(|l| l.contains_key(loader_key))
+                    {
+                        continue;
+                    }
                     let identifier = NoriskModIdentifier {
                         pack_id: pack_id.clone(),
                         mod_id: entry.id.clone(),
                         game_version: profile.game_version.clone(),
                         loader: profile.loader.clone(),
                     };
-                    out.push(CrashModInfo {
+                    let mut info = CrashModInfo {
                         id: entry.id.clone(),
                         name: entry.display_name.clone(),
                         version: None,
                         source: Some("norisk".to_string()),
                         enabled: !profile.disabled_norisk_mods_detailed.contains(&identifier),
                         norisk: true,
-                    });
+                        ..Default::default()
+                    };
+                    let outcome = pack_failed
+                        .as_ref()
+                        .or_else(|| report.and_then(|r| r.pack_mod(&entry.id)));
+                    apply(&mut info, outcome);
+                    out.push(info);
                 }
             }
             Err(e) => log::warn!(
@@ -174,6 +253,7 @@ struct Process {
 
 // Kapselt die Nachricht, die vom notify event handler zum ProcessManager geschickt wird
 #[derive(Debug)]
+#[allow(dead_code)]
 struct CrashReportNotification {
     process_id: Uuid,
     file_path: PathBuf,
@@ -212,8 +292,9 @@ impl ProcessManager {
         })
     }
 
+    #[allow(dead_code)]
     async fn process_crash_report_events(
-        app_handle: Arc<tauri::AppHandle>,
+        _app_handle: Arc<tauri::AppHandle>,
         mut receiver: mpsc::Receiver<CrashReportNotification>,
     ) {
         log::info!("Starting crash report event processor task.");
@@ -321,7 +402,7 @@ impl ProcessManager {
             );
             return Ok(());
         }
-        log::info!("Loading processes metadata from '{:?}'...", file_path);
+        log::trace!("Loading processes metadata from '{:?}'...", file_path);
         let json_content = async_fs::read_to_string(&file_path)
             .await
             .map_err(AppError::Io)?;
@@ -584,7 +665,7 @@ impl ProcessManager {
     // NEUE Hilfsfunktion zum Stoppen und Entfernen eines Watchers
     async fn stop_crash_report_watcher(&self, process_id: Uuid) {
         let mut watchers_map = self.active_watchers.write().await;
-        if let Some(mut watcher) = watchers_map.remove(&process_id) {
+        if let Some(_watcher) = watchers_map.remove(&process_id) {
             // Explizites unwatch ist bei notify v6 nicht immer nötig, wenn der Watcher gedroppt wird.
             // Aber um sicherzugehen und Pfade zu entfernen, falls der Watcher mehrere Pfade überwacht (hier nicht der Fall).
             // Da wir den Pfad nicht separat speichern, lassen wir unwatch weg und verlassen uns auf drop.
@@ -617,6 +698,7 @@ impl ProcessManager {
         post_exit_hook: Option<String>,
         memory_max_mb: u32,
         mods: Vec<CrashModInfo>,
+        modpack: Option<CrashModpackInfo>,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -734,6 +816,7 @@ impl ProcessManager {
             memory_max_mb,
             log_session_id,
             mods,
+            modpack,
         };
 
         log::info!(
@@ -850,7 +933,7 @@ impl ProcessManager {
 
         let processes_arc_clone = Arc::clone(&self.processes);
         // Klon für active_watchers und den Manager selbst (oder dessen relevante Teile)
-        let active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
+        let _active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
         // Der Monitor-Task benötigt eine Möglichkeit, stop_crash_report_watcher aufzurufen.
         // Da stop_crash_report_watcher &self benötigt und wir nicht den ganzen ProcessManager übergeben wollen,
         // wäre es besser, wenn der Monitor-Task eine Nachricht an den ProcessManager sendet oder
@@ -935,38 +1018,48 @@ impl ProcessManager {
                 let secs = elapsed.num_seconds().max(0) as u64;
                 if secs > 0 {
                     if let Ok(state) = &state_for_monitor_res {
-                        match state.profile_manager.get_profile(metadata.profile_id).await {
-                            Ok(mut profile) => {
-                                profile.playtime_seconds =
-                                    profile.playtime_seconds.saturating_add(secs);
-                                if let Err(e) = state
-                                    .profile_manager
-                                    .update_profile(metadata.profile_id, profile)
-                                    .await
-                                {
-                                    log::warn!(
-                                        "Failed to persist playtime (+{}s) for profile {}: {}",
-                                        secs,
-                                        metadata.profile_id,
-                                        e
-                                    );
-                                } else {
-                                    log::info!(
-                                        "Added {}s of playtime to profile {}",
-                                        secs,
-                                        metadata.profile_id
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                log::warn!(
-                                    "Could not load profile {} to update playtime: {}",
-                                    metadata.profile_id,
-                                    e
-                                );
-                            }
+                        match state
+                            .profile_manager
+                            .add_playtime(metadata.profile_id, secs)
+                            .await
+                        {
+                            Ok(()) => log::info!(
+                                "Added {}s of playtime to profile {}",
+                                secs,
+                                metadata.profile_id
+                            ),
+                            Err(e) => log::warn!(
+                                "Failed to persist playtime (+{}s) for profile {}: {}",
+                                secs,
+                                metadata.profile_id,
+                                e
+                            ),
                         }
                     }
+                }
+            }
+
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                match crate::sync::engine::SyncEngine::write_back_after_exit(metadata.profile_id)
+                    .await
+                {
+                    Ok(report) => {
+                        for warning in &report.warnings {
+                            log::warn!("[Sync Packs] {}", warning);
+                        }
+                        if report.changed_targets() > 0 {
+                            log::info!(
+                                "Sync packs wrote back {} target(s) for profile {}",
+                                report.changed_targets(),
+                                metadata.profile_id
+                            );
+                        }
+                    }
+                    Err(e) => log::warn!(
+                        "Sync pack write back failed for profile {}: {}",
+                        metadata.profile_id,
+                        e
+                    ),
                 }
             }
 
@@ -1143,7 +1236,7 @@ impl ProcessManager {
         log::info!("Attempting to stop process {}", process_id);
 
         let mut kill_successful = false;
-        let mut pid_for_error: u32 = 0;
+        let pid_for_error: u32;
 
         let mut processes_map = self.processes.write().await;
 
@@ -1229,13 +1322,13 @@ impl ProcessManager {
     }
 
     async fn periodic_process_check(
-        app_handle: Arc<tauri::AppHandle>,
+        _app_handle: Arc<tauri::AppHandle>,
         processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>,
         active_watchers_arc: Arc<RwLock<HashMap<Uuid, RecommendedWatcher>>>,
-        notify_tx: mpsc::Sender<CrashReportNotification>,
+        _notify_tx: mpsc::Sender<CrashReportNotification>,
     ) {
         let mut interval = interval(Duration::from_secs(10));
-        log::info!("Starting periodic process and watcher checker task.");
+        log::trace!("Starting periodic process and watcher checker task.");
 
         loop {
             interval.tick().await;
@@ -1369,7 +1462,7 @@ impl ProcessManager {
     /// Emits ProcessMetricsUpdate events to the frontend.
     async fn periodic_metrics_collector(processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>) {
         let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
-        log::info!("Starting periodic metrics collector task.");
+        log::trace!("Starting periodic metrics collector task.");
 
         let mut sys = System::new_all();
 
@@ -1787,17 +1880,16 @@ impl ProcessManager {
 #[async_trait]
 impl PostInitializationHandler for ProcessManager {
     async fn on_state_ready(&self, app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        log::info!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
+        log::trace!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
 
         // For process_crash_report_events: The task requires the receive end of an mpsc channel.
         // The most robust way is to initialize tx and rx in `new`, store rx in `self` (e.g., Arc<Mutex<Option<Receiver>>>)
         // and then .take() it here. For now, we will skip spawning this specific task here to simplify the deadlock fix.
         // This can be revisited. The deadlock was caused by `load_processes_and_watchers` calling `State::get()` too early.
-        log::warn!("ProcessManager: Spawning of 'process_crash_report_events' task is TENTATIVELY SKIPPED in on_state_ready to simplify deadlock fix. Review if needed.");
 
         // This was the critical call causing deadlock issues
         self.load_processes_and_watchers().await?;
-        log::info!("ProcessManager: Finished load_processes_and_watchers.");
+        log::trace!("ProcessManager: Finished load_processes_and_watchers.");
 
         let manager_clone_periodic_check_processes = Arc::clone(&self.processes);
         let manager_clone_periodic_check_watchers = Arc::clone(&self.active_watchers);
@@ -1810,13 +1902,13 @@ impl PostInitializationHandler for ProcessManager {
             manager_clone_periodic_check_watchers,
             notify_tx_for_periodic_check,
         ));
-        log::info!("ProcessManager: Spawned periodic_process_check task.");
+        log::trace!("ProcessManager: Spawned periodic_process_check task.");
 
         let metrics_processes_arc = Arc::clone(&self.processes);
         tokio::spawn(Self::periodic_metrics_collector(metrics_processes_arc));
-        log::info!("ProcessManager: Spawned periodic_metrics_collector task.");
+        log::trace!("ProcessManager: Spawned periodic_metrics_collector task.");
 
-        log::info!("ProcessManager: Successfully completed on_state_ready.");
+        log::trace!("ProcessManager: Successfully completed on_state_ready.");
         Ok(())
     }
 }

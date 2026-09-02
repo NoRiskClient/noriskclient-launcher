@@ -10,6 +10,8 @@ import { ProcessMetadata, ProcessState } from "../../types/processState";
 import { EventType } from "../../types/events";
 import * as ProcessService from "../../services/process-service";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
+import { requireMinecraftAccount } from "../../lib/require-account";
+import { useProfileStore } from "../../store/profile-store";
 
 type InstanceStatus = "running" | "idle" | "crashed" | "starting" | "stopping";
 
@@ -94,15 +96,8 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
   };
 }
 
-// Get loader icon path
-const getLoaderIcon = (loader: string): string => {
-  const loaderLower = loader.toLowerCase();
-  if (loaderLower === "fabric") return "/icons/fabric.png";
-  if (loaderLower === "forge") return "/icons/forge.png";
-  if (loaderLower === "neoforge") return "/icons/neoforge.png";
-  if (loaderLower === "quilt") return "/icons/quilt.png";
-  return "/icons/minecraft.png";
-};
+import { loaderIconSrc } from "../../lib/loader-icons";
+const getLoaderIcon = loaderIconSrc;
 
 // Get status color
 const getStatusColor = (status: InstanceStatus): string => {
@@ -402,6 +397,14 @@ export function InstanceSidebar({
     if (profileState.isButtonLaunching) {
       return;
     }
+
+    // No account means the backend would reject this with NoCredentialsError —
+    // prompt for sign-in instead and resume once it is done.
+    const signedIn = requireMinecraftAccount({
+      profileName: useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name,
+      onAuthenticated: () => handleLaunchProfile(profileId),
+    });
+    if (!signedIn) return;
 
     // Note: We allow multiple instances of the same profile to run simultaneously
     // Each will have its own process ID and can be stopped independently

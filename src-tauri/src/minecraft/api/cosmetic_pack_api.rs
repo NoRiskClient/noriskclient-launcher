@@ -1,7 +1,7 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::utils::http_client::nrc_get;
-use crate::minecraft::dto::cosmetic_outfit::CosmeticSettings;
+use crate::minecraft::dto::cosmetic_outfit::{CosmeticFeature, CosmeticSettings, CosmeticTransform};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -159,7 +159,39 @@ pub struct EmoteAssetUrlsDto {
     pub mcmeta: Option<String>,
 }
 
-fn merge_settings(meta: Value, _settings: Option<&CosmeticSettings>) -> Value {
+pub fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> Value {
+    let Some(settings) = settings else {
+        return meta;
+    };
+
+    let defaults: CosmeticTransform = meta
+        .get("defaultSettings")
+        .cloned()
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+    let features: Vec<CosmeticFeature> = meta
+        .get("features")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| serde_json::from_value(item.clone()).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let resolved = settings.resolve_transform(defaults, &features);
+
+    let target = meta
+        .as_object_mut()
+        .map(|obj| obj.entry("defaultSettings").or_insert_with(|| json!({})));
+    if let Some(Value::Object(ds)) = target {
+        ds.insert("scale".into(), json!(resolved.scale));
+        ds.insert("offset".into(), json!(resolved.offset));
+        if let Some(color) = &settings.color {
+            ds.insert("color".into(), color.clone());
+        }
+    }
     meta
 }
 

@@ -145,7 +145,11 @@ export interface LauncherConfig {
   last_played_profile: string | null; // Option<Uuid>
   pack_rollout_override: "auto" | "off" | "on";
   clips: ClipConfig;
+  log_level: LogLevel;
 }
+
+export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
+export const LOG_LEVELS: LogLevel[] = ["error", "warn", "info", "debug", "trace"];
 
 export interface ReferralInfo {
   /** Display name of the referrer (username, creator name, etc.) */

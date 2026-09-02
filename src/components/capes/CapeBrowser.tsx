@@ -797,8 +797,11 @@ export function CapeBrowser(): JSX.Element {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Group Tabs */}
+      <div className={`flex-1 overflow-y-auto no-scrollbar${activeAccount ? "" : " flex flex-col"}`}>
+        {/* Group tabs and search. Hidden while signed out: every filter here
+            needs an account, so the bar would only offer dead controls above an
+            empty list. */}
+        {activeAccount && (<>
         <div className="mb-4">
               <div className="flex items-center gap-2 flex-wrap">
                 <button
@@ -984,6 +987,7 @@ export function CapeBrowser(): JSX.Element {
                 </div>
               </div>
             </div>
+            </>)}
 
             {/* Cape List */}
             <CapeList

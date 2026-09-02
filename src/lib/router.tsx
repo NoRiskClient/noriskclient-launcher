@@ -12,6 +12,7 @@ import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetail
 // DISABLED: Advent Calendar (seasonal feature)
 // import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
 import { ModDetailPage } from "../components/mods/ModDetailPage";
+import { SyncPacksPage } from "../components/sync-packs/SyncPacksPage";
 
 export const router = createHashRouter([
   {
@@ -46,6 +47,10 @@ export const router = createHashRouter([
       {
         path: "profiles/:profileId/browse/:contentType",
         element: <BrowseTabWrapper />,
+      },
+      {
+        path: "sync-packs",
+        element: <SyncPacksPage />,
       },
       {
         path: "mods",

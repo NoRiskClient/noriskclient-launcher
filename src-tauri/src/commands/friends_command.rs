@@ -6,8 +6,6 @@ use crate::friends::models::{
     OnlineState,
 };
 use crate::state::State;
-use std::sync::Arc;
-use tauri::Manager;
 use uuid::Uuid;
 
 async fn get_auth_info() -> Result<(String, Uuid, String, bool), CommandError> {
