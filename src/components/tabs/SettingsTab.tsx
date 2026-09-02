@@ -76,10 +76,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab, sidebarQuery]);
 
-  const clipsAvailable = useMemo(
-    () => isWindows() && onlyTab === "clips",
-    [onlyTab],
-  );
+  const clipsAvailable = useMemo(() => isWindows(), []);
 
   const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
     general: [
