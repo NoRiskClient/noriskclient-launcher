@@ -7,7 +7,7 @@
 use noriskclient_launcher_v3_lib::*;
 use noriskclient_launcher_v3_lib::{cli, commands, logging, state, utils};
 
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use std::sync::Arc;
 use tauri::Listener;
 use tauri::Manager;
@@ -445,66 +445,7 @@ async fn main() {
                 });
 
                 #[cfg(windows)]
-                {
-                    let handle = state_init_app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let Ok(state) = state::state_manager::State::get().await else {
-                            return;
-                        };
-                        let clips = state.config_manager.get_config().await.clips;
-                        if !clips.enabled {
-                            debug!("Clip system disabled; not starting the capture engine");
-                            return;
-                        }
-
-                        let clip_dir = clips.resolved_output_dir();
-                        let _ = tokio::task::spawn_blocking(move || {
-                            utils::clip_library::tidy_clip_folder(&clip_dir)
-                        })
-                        .await;
-
-                        state.capture_supervisor.attach_app(handle.clone()).await;
-
-                        if let Err(e) = utils::clip_overlay::create(&handle) {
-                            error!("Could not create the clip overlay: {e}");
-                        }
-
-                        if let Err(e) = state.capture_supervisor.start().await {
-                            error!("Could not start the capture engine: {e}");
-                            return;
-                        }
-                        if let Err(e) = state
-                            .capture_supervisor
-                            .send(norisk_ipc::LauncherToCapture::Configure(
-                                clips.to_capture_config(),
-                            ))
-                        {
-                            error!("Could not configure the capture engine: {e}");
-                        }
-
-                        match utils::window_finder::find_running_game()
-                            .filter(|_| clips.record_minecraft)
-                        {
-                            Some(pid) => {
-                                info!("Found a game already running (pid {pid}); attaching");
-                                if let Err(e) = state
-                                    .capture_supervisor
-                                    .attach_game(pid, "Minecraft".to_string())
-                                {
-                                    log::warn!("Could not attach to the running game: {e}");
-                                }
-                            }
-                            None => debug!("No game running; the engine will wait for one"),
-                        }
-
-                        match utils::hotkey_manager::apply(&handle, &clips) {
-                            Ok(keys) => info!("Clip system ready, hotkeys: {keys:?}"),
-                            Err(e) => error!("Clip hotkeys could not be registered: {e}"),
-                        }
-
-                        utils::game_watch::spawn();
-                    });
-                }
+                commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
                 trace!("Attempting to retrieve launcher configuration for update check...");
                 match state::state_manager::State::get().await {

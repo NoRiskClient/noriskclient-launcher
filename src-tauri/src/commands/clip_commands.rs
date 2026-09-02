@@ -42,18 +42,79 @@ pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>
         return Ok(Vec::new());
     }
 
+    Ok(bring_up(&app, &clips).await?)
+}
+
+pub fn start_on_launch(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(state) = State::get().await else {
+            return;
+        };
+        let clips = state.config_manager.get_config().await.clips;
+        if !clips.enabled {
+            log::debug!("Clip system disabled; not starting the capture engine");
+            return;
+        }
+
+        let clip_dir = clips.resolved_output_dir();
+        let _ = tokio::task::spawn_blocking(move || {
+            crate::utils::clip_library::tidy_clip_folder(&clip_dir)
+        })
+        .await;
+
+        match bring_up(&app, &clips).await {
+            Ok(keys) => log::info!("Clip system ready, hotkeys: {keys:?}"),
+            Err(e) => log::error!("Clip system could not be started: {e}"),
+        }
+    });
+}
+
+pub async fn bring_up(
+    app: &tauri::AppHandle,
+    clips: &crate::state::config_state::ClipConfig,
+) -> crate::error::Result<Vec<String>> {
+    let state = State::get().await?;
+
     state.capture_supervisor.attach_app(app.clone()).await;
+
+    if let Err(e) = crate::utils::clip_overlay::create(app) {
+        log::error!("Could not create the clip overlay: {e}");
+    }
+
     state.capture_supervisor.start().await?;
     state
         .capture_supervisor
         .send(LauncherToCapture::Configure(clips.to_capture_config()))?;
 
+    adopt_running_game(&state, clips);
+
     #[cfg(windows)]
-    let registered = crate::utils::hotkey_manager::apply(&app, &clips)?;
+    let registered = crate::utils::hotkey_manager::apply(app, clips)?;
     #[cfg(not(windows))]
     let registered = Vec::new();
 
+    crate::utils::game_watch::spawn();
+
     Ok(registered)
+}
+
+fn adopt_running_game(state: &crate::state::State, clips: &crate::state::config_state::ClipConfig) {
+    if state.capture_supervisor.attached().is_some() || !clips.record_minecraft {
+        return;
+    }
+
+    let Some(pid) = crate::utils::window_finder::find_running_game() else {
+        log::debug!("No game running; the engine will wait for one");
+        return;
+    };
+
+    log::info!("Found a game already running (pid {pid}); attaching");
+    if let Err(e) = state
+        .capture_supervisor
+        .attach_game(pid, "Minecraft".to_string())
+    {
+        log::warn!("Could not attach to the running game: {e}");
+    }
 }
 
 #[tauri::command]
@@ -170,7 +231,9 @@ pub async fn clip_delete(path: std::path::PathBuf) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-pub async fn clip_reveal(path: std::path::PathBuf) -> Result<(), CommandError> {
+pub async fn clip_reveal(app: tauri::AppHandle, path: std::path::PathBuf) -> Result<(), CommandError> {
+    use tauri_plugin_opener::OpenerExt;
+
     let dir = clip_dir().await?;
     let canonical = path
         .canonicalize()
@@ -185,16 +248,9 @@ pub async fn clip_reveal(path: std::path::PathBuf) -> Result<(), CommandError> {
         .into());
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std::process::Command::new("explorer.exe")
-            .raw_arg(format!("/select,\"{}\"", canonical.display()))
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| crate::error::AppError::Other(format!("could not open Explorer: {e}")))?;
-    }
+    app.opener()
+        .reveal_item_in_dir(&canonical)
+        .map_err(|e| crate::error::AppError::Other(format!("could not reveal the clip: {e}")))?;
     Ok(())
 }
 
@@ -322,7 +378,9 @@ pub async fn clip_rename(
 }
 
 #[tauri::command]
-pub async fn clip_open_folder() -> Result<(), CommandError> {
+pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError> {
+    use tauri_plugin_opener::OpenerExt;
+
     let dir = clip_dir().await?;
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| {
@@ -333,15 +391,8 @@ pub async fn clip_open_folder() -> Result<(), CommandError> {
         })?;
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std::process::Command::new("explorer.exe")
-            .arg(&dir)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| crate::error::AppError::Other(format!("could not open Explorer: {e}")))?;
-    }
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| crate::error::AppError::Other(format!("could not open the clip folder: {e}")))?;
     Ok(())
 }

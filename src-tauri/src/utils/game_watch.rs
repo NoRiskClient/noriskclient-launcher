@@ -6,7 +6,13 @@ use crate::state::state_manager::State;
 
 const LOOK_EVERY: Duration = Duration::from_secs(2);
 
+static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn spawn() {
+    if RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(LOOK_EVERY).await;
