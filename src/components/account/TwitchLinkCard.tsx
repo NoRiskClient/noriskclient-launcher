@@ -17,6 +17,7 @@ import type { TwitchLoginPayload, TwitchStatus } from "../../types/twitch";
 import { useSocialsModalStore } from "../../store/socials-modal-store";
 
 const MODAL_ID = "twitch-device-login-modal";
+const SCOPE_INFO_MODAL_ID = "twitch-oauth-scope-info-modal";
 
 export function TwitchLinkCard() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ export function TwitchLinkCard() {
     refreshStatus();
   }, [refreshStatus]);
 
-  const handleLink = () => {
+  const startDeviceLogin = () => {
     setIsBusy(true);
     closeSocialsModal();
     showModal(
@@ -65,6 +66,23 @@ export function TwitchLinkCard() {
           openSocialsModal();
           setIsBusy(false);
           toast.error(t("twitch.linkFailed"));
+        }}
+      />,
+    );
+  };
+
+  const handleLink = () => {
+    closeSocialsModal();
+    showModal(
+      SCOPE_INFO_MODAL_ID,
+      <TwitchScopeInfoModal
+        onClose={() => {
+          hideModal(SCOPE_INFO_MODAL_ID);
+          openSocialsModal();
+        }}
+        onContinue={() => {
+          hideModal(SCOPE_INFO_MODAL_ID);
+          startDeviceLogin();
         }}
       />,
     );
@@ -147,6 +165,62 @@ export interface TwitchDeviceLoginModalProps {
   onClose: () => Promise<void>;
   onCompleted: () => Promise<void>;
   onFailedToStart: () => void;
+}
+
+interface TwitchScopeInfoModalProps {
+  onClose: () => void;
+  onContinue: () => void;
+}
+
+function TwitchScopeInfoModal({
+  onClose,
+  onContinue,
+}: TwitchScopeInfoModalProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Modal title={t("twitch.scopeInfoTitle")} onClose={onClose} width="md">
+      <div className="p-6 space-y-5 font-minecraft text-sm text-white/75">
+        <div className="flex items-start gap-3">
+          <Icon
+            icon="solar:danger-triangle-bold"
+            className="w-7 h-7 shrink-0 text-yellow-300"
+          />
+          <div className="space-y-2">
+            <h3 className="text-base font-smallcaps text-white">
+              {t("twitch.scopeInfoHeadline")}
+            </h3>
+            <p>{t("twitch.scopeInfoExplanation")}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2 border-l-2 border-yellow-300/70 pl-4">
+          <p>{t("twitch.scopeInfoUsage")}</p>
+          <p>{t("twitch.scopeInfoNoAutomation")}</p>
+          <p>{t("twitch.scopeInfoFollow")}</p>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button
+            variant="destructive"
+            onClick={onClose}
+            icon={<Icon icon="solar:close-circle-bold" className="w-5 h-5" />}
+            size="md"
+          >
+            {t("twitch.cancel")}
+          </Button>
+          <Button
+            variant="default"
+            onClick={onContinue}
+            icon={<Icon icon="mdi:link-variant" className="w-5 h-5" />}
+            size="md"
+          >
+            {t("twitch.scopeInfoContinue")}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
 }
 
 export function TwitchDeviceLoginModal({
