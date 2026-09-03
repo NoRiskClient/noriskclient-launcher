@@ -1,6 +1,7 @@
 import type {
   ExecutableContentReport,
   ImportSecurityReport,
+  NoriskPackOffer,
   ProvenanceReport,
 } from "./importPreview";
 import type { ImageSource } from "./profile";
@@ -91,6 +92,7 @@ export interface ExternalInstancePreview {
   provenance: ProvenanceReport;
   executableContent: ExecutableContentReport;
   managedPack: string | null;
+  noriskPack: NoriskPackOffer;
   warnings: string[];
   alreadyImportedAt: string | null;
 }

@@ -86,6 +86,7 @@ export function ProfileWizardV2ReviewStep({
         setName(loaded.suggestedName);
         setGroup(loaded.suggestedGroup ?? "");
         setSelection(selectionFromBuckets(loaded.buckets));
+        setUseNoriskPack(loaded.noriskPack.preselected);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -122,6 +123,7 @@ export function ProfileWizardV2ReviewStep({
             name: trimmedName,
             group: group.trim(),
             selection,
+            noriskPackId: useNoriskPack ? preview?.noriskPack.packId : undefined,
             clearNoriskPack: !useNoriskPack,
           })
         }
