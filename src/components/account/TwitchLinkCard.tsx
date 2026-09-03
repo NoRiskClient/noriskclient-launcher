@@ -1,14 +1,16 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { Modal } from "../ui/Modal";
+import { Tooltip } from "../ui/Tooltip";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
+import { useLatest } from "../../hooks/useLatest";
 import { openExternalUrl } from "../../services/tauri-service";
 import { TwitchService } from "../../services/twitch-service";
 import type { TwitchLoginPayload, TwitchStatus } from "../../types/twitch";
@@ -35,7 +37,7 @@ export function TwitchLinkCard() {
     refreshStatus();
   }, [refreshStatus]);
 
-  const handleLink = async () => {
+  const handleLink = () => {
     setIsBusy(true);
     closeSocialsModal();
     showModal(
@@ -58,18 +60,14 @@ export function TwitchLinkCard() {
           openSocialsModal();
           toast.success(t("twitch.linked"));
         }}
+        onFailedToStart={() => {
+          hideModal(MODAL_ID);
+          openSocialsModal();
+          setIsBusy(false);
+          toast.error(t("twitch.linkFailed"));
+        }}
       />,
     );
-
-    try {
-      await TwitchService.beginDeviceLogin();
-    } catch (err) {
-      console.error("Failed to start Twitch login:", err);
-      hideModal(MODAL_ID);
-      openSocialsModal();
-      setIsBusy(false);
-      toast.error(t("twitch.linkFailed"));
-    }
   };
 
   const handleUnlink = async () => {
@@ -132,13 +130,14 @@ export function TwitchLinkCard() {
               {t("socials.button.link")}
             </Button>
           )}
-          <IconButton
-            variant="ghost"
-            size="sm"
-            icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
-            className="invisible"
-            disabled
-          />
+          <div aria-hidden className="invisible">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
+              disabled
+            />
+          </div>
         </div>
     </div>
   );
@@ -147,35 +146,60 @@ export function TwitchLinkCard() {
 export interface TwitchDeviceLoginModalProps {
   onClose: () => Promise<void>;
   onCompleted: () => Promise<void>;
+  onFailedToStart: () => void;
 }
 
 export function TwitchDeviceLoginModal({
   onClose,
   onCompleted,
+  onFailedToStart,
 }: TwitchDeviceLoginModalProps) {
   const { t } = useTranslation();
   const [payload, setPayload] = useState<TwitchLoginPayload | null>(null);
   const [copied, setCopied] = useState(false);
-  // Ref keeps the listener callback stable while still seeing the latest handler.
-  const onCompletedRef = useRef(onCompleted);
-  onCompletedRef.current = onCompleted;
+  const onCompletedRef = useLatest(onCompleted);
+  const onFailedToStartRef = useLatest(onFailedToStart);
 
   useEffect(() => {
     let unlisten: UnlistenFn | undefined;
     let disposed = false;
 
-    TwitchService.onLoginEvent((event) => {
-      setPayload(event);
-      if (event.stage === "completed") {
-        onCompletedRef.current();
-      }
-    }).then((fn) => {
+    const run = async () => {
+      unlisten = await TwitchService.onLoginEvent((event) => {
+        setPayload(event);
+        if (event.stage === "completed") {
+          onCompletedRef.current();
+        }
+      });
+
       if (disposed) {
-        fn();
+        unlisten();
+        unlisten = undefined;
         return;
       }
-      unlisten = fn;
-    });
+
+      try {
+        const device = await TwitchService.beginDeviceLogin();
+        if (disposed) return;
+        setPayload((current) =>
+          current ?? {
+            stage: "awaiting_user",
+            message: "",
+            user_code: device.user_code,
+            verification_uri: device.verification_uri,
+            progress: 0,
+            expires_in: device.expires_in,
+            error: null,
+          },
+        );
+      } catch (err) {
+        if (disposed) return;
+        console.error("Failed to start Twitch login:", err);
+        onFailedToStartRef.current();
+      }
+    };
+
+    run();
 
     return () => {
       disposed = true;
@@ -243,14 +267,15 @@ export function TwitchDeviceLoginModal({
             <p className="text-sm text-white/60 font-minecraft">
               {t("twitch.yourCode")}
             </p>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="text-3xl tracking-[0.4em] text-white font-minecraft hover:text-purple-300 transition-colors"
-              title={t("twitch.copyCode")}
-            >
-              {userCode}
-            </button>
+            <Tooltip content={t("twitch.copyCode")} position="top">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="text-3xl tracking-[0.4em] text-white font-minecraft hover:text-purple-300 transition-colors"
+              >
+                {userCode}
+              </button>
+            </Tooltip>
             <p className="text-sm text-white/50 font-minecraft">
               {copied ? t("twitch.copied") : t("twitch.clickToCopy")}
             </p>
@@ -271,7 +296,7 @@ export function TwitchDeviceLoginModal({
             <span
               className={`font-minecraft ${error ? "text-red-300" : "text-white/80"}`}
             >
-              {payload?.message ?? t("twitch.starting")}
+              {payload?.message || t("twitch.starting")}
             </span>
             {payload?.expires_in != null && !error && (
               <span className="text-white/60 font-minecraft">

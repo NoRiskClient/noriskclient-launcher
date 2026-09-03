@@ -3,6 +3,7 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Z_TOAST } from "../../lib/z-layers";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -137,11 +138,10 @@ export function GlobalToaster() {
   return (
     portalRoot &&
     createPortal(
-      // Portaled outside #root so toasts escape the modal's filter:blur and stack above it.
-      <div ref={toasterRef} style={{ position: "relative", zIndex: 100000 }}>
+      <div ref={toasterRef} style={{ position: "relative", zIndex: Z_TOAST }}>
         <HotToaster
           position="bottom-right"
-          containerStyle={{ zIndex: 100000 }}
+          containerStyle={{ zIndex: Z_TOAST }}
           toastOptions={{
             className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
             style: baseStyles,

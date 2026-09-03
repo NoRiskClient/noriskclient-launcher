@@ -431,13 +431,6 @@
   "auth.browserLoginDescription": "Ein Browserfenster wird geöffnet, damit du dich mit deinem Microsoft-Konto anmelden kannst.",
   "auth.loginError": "Anmeldefehler",
   "auth.cancelLogin": "Anmeldung abbrechen",
-
-  "twitch.title": "Twitch-Verbindung",
-  "twitch.description": "Verknüpfe Twitch, um Twitch-Funktionen im Spiel zu nutzen.",
-  "twitch.statusLinked": "Twitch-Konto verknüpft",
-  "twitch.statusNotLinked": "Kein Twitch-Konto verknüpft",
-  "twitch.link": "Twitch verknüpfen",
-  "twitch.unlink": "Trennen",
   "twitch.linked": "Twitch-Konto verknüpft",
   "twitch.unlinked": "Twitch-Konto getrennt",
   "twitch.linkFailed": "Twitch-Verknüpfung konnte nicht gestartet werden",

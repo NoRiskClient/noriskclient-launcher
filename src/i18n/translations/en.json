@@ -431,13 +431,6 @@
   "auth.browserLoginDescription": "A browser window will open for you to sign in with your Microsoft account.",
   "auth.loginError": "Login Error",
   "auth.cancelLogin": "Cancel Login",
-
-  "twitch.title": "Twitch Connection",
-  "twitch.description": "Link Twitch to use Twitch features in-game.",
-  "twitch.statusLinked": "Twitch account linked",
-  "twitch.statusNotLinked": "No Twitch account linked",
-  "twitch.link": "Link Twitch",
-  "twitch.unlink": "Unlink",
   "twitch.linked": "Twitch account linked",
   "twitch.unlinked": "Twitch account unlinked",
   "twitch.linkFailed": "Failed to start Twitch linking",

@@ -12,7 +12,6 @@ use crate::error::{AppError, CommandError};
 use crate::minecraft::auth::twitch_auth::{self, PollOutcome};
 use crate::state::state_manager::State;
 
-/// Window event carrying the device code and polling progress to the frontend.
 pub const TWITCH_LOGIN_EVENT: &str = "twitch:device_login";
 
 const DEFAULT_POLL_INTERVAL_SECS: i64 = 5;
@@ -31,12 +30,9 @@ pub enum TwitchLoginStage {
 pub struct TwitchLoginPayload {
     pub stage: TwitchLoginStage,
     pub message: String,
-    /// Code the user types on twitch.tv/activate.
     pub user_code: Option<String>,
     pub verification_uri: Option<String>,
-    /// Fraction of the code's lifetime already elapsed, 0..100.
     pub progress: Option<f64>,
-    /// Seconds left before the device code expires.
     pub expires_in: Option<i64>,
     pub error: Option<String>,
 }
@@ -48,7 +44,6 @@ pub struct TwitchStatus {
     pub scopes: Vec<String>,
 }
 
-/// Handle of the running device-code poll loop, so `twitch_cancel_login` can abort it.
 static ACTIVE_LOGIN: Mutex<Option<JoinHandle<()>>> = Mutex::const_new(None);
 
 fn emit(app: &AppHandle, payload: TwitchLoginPayload) {
@@ -67,19 +62,21 @@ async fn active_account_id() -> Result<Uuid, AppError> {
         .ok_or_else(|| AppError::AccountError("No active account to link Twitch to.".to_string()))
 }
 
-/// Start the Twitch device code flow for the currently active account.
-///
-/// Returns as soon as the user code is known; the poll loop keeps running in the background and
-/// reports its outcome through the `twitch:device_login` window event.
+#[derive(Serialize, Clone)]
+pub struct TwitchDeviceLogin {
+    pub user_code: String,
+    pub verification_uri: String,
+    pub expires_in: i64,
+}
+
 #[tauri::command]
-pub async fn twitch_begin_device_login(app: AppHandle) -> Result<(), CommandError> {
+pub async fn twitch_begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, CommandError> {
     begin_device_login(app).await
 }
 
-async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
+async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, CommandError> {
     info!("[Twitch] Starting device code login");
 
-    // Abort a previous attempt so its polling can't race the new one.
     if let Some(handle) = ACTIVE_LOGIN.lock().await.take() {
         handle.abort();
     }
@@ -132,6 +129,8 @@ async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
         },
     );
 
+    let poll_user_code = user_code.clone();
+    let poll_verification_uri = verification_uri.clone();
     let handle = tokio::spawn(async move {
         let deadline = Utc::now() + chrono::Duration::seconds(total_secs);
         let mut poll_interval = interval;
@@ -146,8 +145,8 @@ async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
                     TwitchLoginPayload {
                         stage: TwitchLoginStage::Failed,
                         message: "The Twitch code expired".to_string(),
-                        user_code: Some(user_code.clone()),
-                        verification_uri: Some(verification_uri.clone()),
+                        user_code: Some(poll_user_code.clone()),
+                        verification_uri: Some(poll_verification_uri.clone()),
                         progress: Some(100.0),
                         expires_in: Some(0),
                         error: Some("The Twitch code expired. Please try again.".to_string()),
@@ -213,8 +212,8 @@ async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
                         TwitchLoginPayload {
                             stage: TwitchLoginStage::AwaitingUser,
                             message: "Waiting for confirmation on Twitch".to_string(),
-                            user_code: Some(user_code.clone()),
-                            verification_uri: Some(verification_uri.clone()),
+                            user_code: Some(poll_user_code.clone()),
+                            verification_uri: Some(poll_verification_uri.clone()),
                             progress: Some(progress),
                             expires_in: Some(remaining),
                             error: None,
@@ -242,7 +241,11 @@ async fn begin_device_login(app: AppHandle) -> Result<(), CommandError> {
     });
 
     *ACTIVE_LOGIN.lock().await = Some(handle);
-    Ok(())
+    Ok(TwitchDeviceLogin {
+        user_code,
+        verification_uri,
+        expires_in: total_secs,
+    })
 }
 
 #[tauri::command]
@@ -267,7 +270,6 @@ pub async fn twitch_cancel_login(app: AppHandle) -> Result<(), CommandError> {
     Ok(())
 }
 
-/// Drop the Twitch credential of the active account (sets `twitch_token` to null).
 #[tauri::command]
 pub async fn twitch_unlink() -> Result<(), CommandError> {
     if let Some(handle) = ACTIVE_LOGIN.lock().await.take() {

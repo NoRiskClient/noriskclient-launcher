@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useModalStackEntry } from "../../hooks/useModalStackEntry";
 import { IconButton } from "./buttons/IconButton";
 
 interface ModalProps {
@@ -23,9 +24,6 @@ interface ModalProps {
   className?: string;
   contentClassName?: string;
 }
-
-// Monotonically increasing so the most recently opened modal always stacks on top.
-let modalZIndexCounter = 1000;
 
 export function Modal({
   title,
@@ -52,10 +50,7 @@ export function Modal({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isClosing, setIsClosing] = useState(false);
-  const zIndexRef = useRef<number>();
-  if (zIndexRef.current === undefined) {
-    zIndexRef.current = ++modalZIndexCounter;
-  }
+  const zIndex = useModalStackEntry();
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isClosing) {
@@ -82,25 +77,6 @@ export function Modal({
     return () => {
       document.removeEventListener('mousedown', recordMouseDownTarget, true);
       mouseDownTargetRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const root = document.getElementById("root");
-    if (!root) return;
-
-    const modalCount = Number(root.dataset.modalCount ?? "0") + 1;
-    root.dataset.modalCount = String(modalCount);
-    root.classList.add("modal-background-blur");
-
-    return () => {
-      const remaining = Math.max(0, Number(root.dataset.modalCount ?? "1") - 1);
-      if (remaining === 0) {
-        delete root.dataset.modalCount;
-        root.classList.remove("modal-background-blur");
-      } else {
-        root.dataset.modalCount = String(remaining);
-      }
     };
   }, []);
 
@@ -147,7 +123,7 @@ export function Modal({
     <div
       ref={modalRef}
       className="modal-backdrop fixed inset-0 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
-      style={{ zIndex: zIndexRef.current }}
+      style={{ zIndex }}
       onClick={handleBackdropClick}
     >
       <div

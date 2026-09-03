@@ -23,3 +23,9 @@ export interface TwitchStatus {
   expires: string | null;
   scopes: string[];
 }
+
+export interface TwitchDeviceLogin {
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+}

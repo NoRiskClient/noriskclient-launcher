@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  TwitchDeviceLogin,
   TwitchLoginPayload,
   TwitchStatus,
 } from "../types/twitch";
@@ -9,8 +10,8 @@ import type {
 export const TWITCH_LOGIN_EVENT = "twitch:device_login";
 
 export class TwitchService {
-  static async beginDeviceLogin(): Promise<void> {
-    await invoke("twitch_begin_device_login");
+  static async beginDeviceLogin(): Promise<TwitchDeviceLogin> {
+    return await invoke<TwitchDeviceLogin>("twitch_begin_device_login");
   }
 
   static async cancelLogin(): Promise<void> {

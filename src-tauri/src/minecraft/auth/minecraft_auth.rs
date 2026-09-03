@@ -12,6 +12,7 @@ use log::debug;
 use log::error;
 use log::info;
 use log::trace;
+use log::warn;
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
@@ -38,7 +39,7 @@ use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
-use crate::minecraft::auth::twitch_auth::{self, TwitchToken};
+use crate::minecraft::auth::twitch_auth::{self, RefreshOutcome, TwitchToken};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
 use crate::utils::file_utils::write_atomic;
@@ -1143,8 +1144,6 @@ impl MinecraftAuthStore {
         Ok(())
     }
 
-    /// Attach (or, with `None`, clear) the Twitch credential of a single account.
-    /// Mutates in place so a concurrent flow holding stale `Credentials` can't clobber it.
     pub async fn set_twitch_token(&self, id: Uuid, token: Option<TwitchToken>) -> Result<()> {
         {
             let mut accounts = self.accounts.write().await;
@@ -1157,9 +1156,6 @@ impl MinecraftAuthStore {
         self.save().await
     }
 
-    /// Return a usable Twitch access token for the account, refreshing it first if it is
-    /// expired or about to expire. `Ok(None)` means the account has no Twitch link.
-    /// A failed refresh clears the stored token so the UI shows the account as unlinked.
     pub async fn ensure_fresh_twitch_token(&self, id: Uuid) -> Result<Option<TwitchToken>> {
         let current = match self.get_account_by_id(id).await? {
             Some(account) => account.twitch_token,
@@ -1170,20 +1166,38 @@ impl MinecraftAuthStore {
             return Ok(None);
         };
 
-        if !current.is_expired() {
+        if !current.needs_refresh() {
             return Ok(Some(current));
         }
 
         info!("[Twitch] Stored token for account {} is stale, refreshing", id);
         match twitch_auth::refresh_token(&current.refresh_token).await {
-            Ok(refreshed) => {
+            RefreshOutcome::Refreshed(refreshed) => {
+                let refreshed = *refreshed;
                 self.set_twitch_token(id, Some(refreshed.clone())).await?;
                 Ok(Some(refreshed))
             }
-            Err(e) => {
-                error!("[Twitch] Refresh failed for account {}: {}. Clearing link.", id, e);
+            RefreshOutcome::Rejected(reason) => {
+                error!(
+                    "[Twitch] Refresh token for account {} is no longer valid ({}). Clearing link.",
+                    id, reason
+                );
                 self.set_twitch_token(id, None).await?;
                 Ok(None)
+            }
+            RefreshOutcome::Transient(reason) if current.is_expired() => {
+                warn!(
+                    "[Twitch] Could not refresh account {} ({}) and the token has expired. Keeping the link for the next attempt.",
+                    id, reason
+                );
+                Ok(None)
+            }
+            RefreshOutcome::Transient(reason) => {
+                warn!(
+                    "[Twitch] Could not refresh account {} ({}). Using the still-valid token.",
+                    id, reason
+                );
+                Ok(Some(current))
             }
         }
     }

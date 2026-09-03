@@ -362,21 +362,6 @@ pub async fn github_auth_unlink() -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-pub async fn twitch_auth_link() -> Result<(), CommandError> {
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn twitch_auth_status() -> Result<bool, CommandError> {
-    Ok(true)
-}
-
-#[tauri::command]
-pub async fn twitch_auth_unlink() -> Result<(), CommandError> {
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn check_crash_log_command(
     payload: CrashlogDto,
 ) -> Result<serde_json::Value, CommandError> {

@@ -2,13 +2,13 @@ use chrono::{DateTime, Duration, Utc};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 
+use reqwest::StatusCode;
+
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 
-/// Twitch public client id. Device Code Grant is a public-client flow, so no secret is required.
 pub const TWITCH_CLIENT_ID: &str = "p60nwofs8at0mc615hsbgxu7psdluk";
 
-/// Scopes requested for the in-game Twitch integration (drops/chat identity).
 pub const TWITCH_SCOPES: &'static [&'static str] = &[
     "user:read:chat",
     "user:write:chat",
@@ -22,10 +22,8 @@ pub const TWITCH_SCOPES: &'static [&'static str] = &[
 const DEVICE_CODE_URL: &str = "https://id.twitch.tv/oauth2/device";
 const TOKEN_URL: &str = "https://id.twitch.tv/oauth2/token";
 
-/// Refresh once the token is within this window of expiring.
 const REFRESH_SKEW: Duration = Duration::hours(2);
 
-/// Persisted Twitch credential attached to a launcher account in `accounts.json`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TwitchToken {
     pub access_token: String,
@@ -36,19 +34,21 @@ pub struct TwitchToken {
 }
 
 impl TwitchToken {
-    pub fn is_expired(&self) -> bool {
+    pub fn needs_refresh(&self) -> bool {
         self.expires <= Utc::now() + REFRESH_SKEW
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.expires <= Utc::now()
     }
 }
 
-/// Response of the device authorization request.
 #[derive(Deserialize, Debug, Clone)]
 pub struct DeviceCodeResponse {
     pub device_code: String,
     pub user_code: String,
     pub verification_uri: String,
     pub expires_in: i64,
-    /// Twitch omits this occasionally; callers fall back to 5s.
     #[serde(default)]
     pub interval: Option<i64>,
 }
@@ -69,7 +69,6 @@ struct TwitchErrorResponse {
     message: String,
 }
 
-/// Outcome of a single token poll while the user is still authorizing.
 pub enum PollOutcome {
     Pending,
     SlowDown,
@@ -85,7 +84,6 @@ fn token_from_response(res: TokenResponse) -> TwitchToken {
     }
 }
 
-/// Step 1 of the device code grant: ask Twitch for a user code the player types on twitch.tv.
 pub async fn request_device_code() -> Result<DeviceCodeResponse> {
     let response = HTTP_CLIENT
         .post(DEVICE_CODE_URL)
@@ -112,8 +110,6 @@ pub async fn request_device_code() -> Result<DeviceCodeResponse> {
         .map_err(|e| AppError::Other(format!("Invalid Twitch device code response: {}", e)))
 }
 
-/// Step 2: exchange the device code for a token. Returns `Pending` while the user has not
-/// confirmed yet, so the caller can keep polling on the server-provided interval.
 pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
     let response = HTTP_CLIENT
         .post(TOKEN_URL)
@@ -164,11 +160,16 @@ pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
     )))
 }
 
-/// Exchange a refresh token for a fresh access token.
-pub async fn refresh_token(refresh_token: &str) -> Result<TwitchToken> {
+pub enum RefreshOutcome {
+    Refreshed(Box<TwitchToken>),
+    Rejected(String),
+    Transient(String),
+}
+
+pub async fn refresh_token(refresh_token: &str) -> RefreshOutcome {
     info!("[Twitch] Refreshing access token");
 
-    let response = HTTP_CLIENT
+    let response = match HTTP_CLIENT
         .post(TOKEN_URL)
         .form(&[
             ("client_id", TWITCH_CLIENT_ID),
@@ -177,32 +178,55 @@ pub async fn refresh_token(refresh_token: &str) -> Result<TwitchToken> {
         ])
         .send()
         .await
-        .map_err(|e| AppError::RequestError(format!("Twitch token refresh failed: {}", e)))?;
+    {
+        Ok(response) => response,
+        Err(e) => return RefreshOutcome::Transient(format!("Twitch refresh request failed: {}", e)),
+    };
 
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| AppError::RequestError(format!("Twitch refresh read failed: {}", e)))?;
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(e) => return RefreshOutcome::Transient(format!("Twitch refresh read failed: {}", e)),
+    };
 
     if !status.is_success() {
-        warn!("[Twitch] Refresh rejected with status {}", status);
-        return Err(AppError::Other(format!(
-            "Twitch token refresh rejected ({}): {}",
-            status,
-            error_message(&body)
-        )));
+        let message = error_message(&body);
+        let rejected = is_terminal_refresh_failure(status, &message);
+
+        let detail = format!("Twitch refresh rejected ({}): {}", status, message);
+        return if rejected {
+            warn!("[Twitch] {}", detail);
+            RefreshOutcome::Rejected(detail)
+        } else {
+            warn!("[Twitch] {} (treating as transient)", detail);
+            RefreshOutcome::Transient(detail)
+        };
     }
 
-    let parsed: TokenResponse = serde_json::from_str(&body)
-        .map_err(|e| AppError::Other(format!("Invalid Twitch refresh response: {}", e)))?;
+    let parsed: TokenResponse = match serde_json::from_str(&body) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            return RefreshOutcome::Transient(format!("Invalid Twitch refresh response: {}", e))
+        }
+    };
 
     let mut token = token_from_response(parsed);
-    // Twitch may omit the refresh token on rotation-free responses — keep the existing one.
     if token.refresh_token.is_empty() {
         token.refresh_token = refresh_token.to_string();
     }
-    Ok(token)
+    RefreshOutcome::Refreshed(Box::new(token))
+}
+
+fn is_terminal_refresh_failure(status: StatusCode, message: &str) -> bool {
+    if !status.is_client_error() || status == StatusCode::TOO_MANY_REQUESTS {
+        return false;
+    }
+
+    let lowered = message.to_lowercase();
+    lowered.contains("invalid refresh token")
+        || lowered.contains("invalid_grant")
+        || lowered.contains("invalid client")
+        || lowered.contains("invalid_client")
 }
 
 fn error_message(body: &str) -> String {
@@ -211,4 +235,69 @@ fn error_message(body: &str) -> String {
         .map(|e| e.message)
         .filter(|m| !m.is_empty())
         .unwrap_or_else(|| body.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_refresh_token_is_terminal() {
+        assert!(is_terminal_refresh_failure(
+            StatusCode::BAD_REQUEST,
+            "Invalid refresh token"
+        ));
+    }
+
+    #[test]
+    fn rate_limit_is_not_terminal() {
+        assert!(!is_terminal_refresh_failure(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many requests"
+        ));
+    }
+
+    #[test]
+    fn server_error_is_not_terminal() {
+        assert!(!is_terminal_refresh_failure(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Internal server error"
+        ));
+        assert!(!is_terminal_refresh_failure(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Service unavailable"
+        ));
+    }
+
+    #[test]
+    fn unrecognised_client_error_is_not_terminal() {
+        assert!(!is_terminal_refresh_failure(
+            StatusCode::BAD_REQUEST,
+            "Something we have never seen before"
+        ));
+    }
+
+    #[test]
+    fn needs_refresh_fires_before_actual_expiry() {
+        let token = TwitchToken {
+            access_token: "a".to_string(),
+            refresh_token: "r".to_string(),
+            expires: Utc::now() + Duration::minutes(30),
+            scopes: Vec::new(),
+        };
+        assert!(token.needs_refresh());
+        assert!(!token.is_expired());
+    }
+
+    #[test]
+    fn expired_token_reports_both() {
+        let token = TwitchToken {
+            access_token: "a".to_string(),
+            refresh_token: "r".to_string(),
+            expires: Utc::now() - Duration::minutes(1),
+            scopes: Vec::new(),
+        };
+        assert!(token.needs_refresh());
+        assert!(token.is_expired());
+    }
 }

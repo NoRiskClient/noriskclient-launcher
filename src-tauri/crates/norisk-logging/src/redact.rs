@@ -126,6 +126,17 @@ mod tests {
     }
 
     #[test]
+    fn masks_twitch_launch_args() {
+        let masked = mask_sensitive_data(
+            "-Dtwitch.token=abc123 -Dtwitch.refresh_token=def456 --width 800",
+        );
+        assert_eq!(
+            masked,
+            "-Dtwitch.token=***** -Dtwitch.refresh_token=***** --width 800"
+        );
+    }
+
+    #[test]
     fn masks_microsoft_identifiers() {
         let masked = mask_sensitive_data("--clientId c4502edb-1111 --xuid 2535123 --width 800");
         assert_eq!(masked, "--clientId ***** --xuid ***** --width 800");
