@@ -17,6 +17,8 @@ pub const TWITCH_SCOPES: &'static [&'static str] = &[
     "channel:read:subscriptions",
     "bits:read",
     "channel:read:redemptions",
+    "channel:read:goals",
+    "channel:read:raids"
 ];
 
 const DEVICE_CODE_URL: &str = "https://id.twitch.tv/oauth2/device";
